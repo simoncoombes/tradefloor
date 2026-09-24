@@ -405,6 +405,13 @@ new digest on two architectures before committing it; the baseline note
 records that it was, and at 0.6.0 a Windows build and a Graviton box agreed
 before the five-target gate ever ran.
 
+The new preset also adds its row to `tests/known_answer_presets.json`, from
+`python tests/known_answer_presets.py`, and `test_known_answer.py` fails
+until it does. Add the row and nothing else: every other row belongs to a
+frozen preset, and one that moved is a defect in the change, never a
+baseline to regenerate. The combined `sha256` in that file moves with the
+new row.
+
 **4. Test expectations pinned to the old default.** NEW, and the largest
 unplanned piece of 0.6.0, where six broke in three shapes:
 

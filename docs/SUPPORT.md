@@ -42,7 +42,7 @@ how an agent's trades reach the price.
 
 ### Allowed changes in an LTS patch
 
-- Bug fixes that leave every known-answer digest unchanged: the simulation digest and the combined digest in `tests/known_answer.json`, and the per-preset digests described below.
+- Bug fixes that leave every known-answer digest unchanged: the simulation digest and the combined digest in `tests/known_answer.json`, and the per-preset digests in `tests/known_answer_presets.json`.
 - Security fixes, under the same condition.
 - Wheels for a new CPython version or platform, if they build from the same source and reproduce the same digests.
 - Documentation and error messages.
@@ -68,10 +68,10 @@ better for a published result than a fix that silently changes it.
 
 ## Before the first LTS tag
 
-Two things this policy relies on are not in place yet:
+One of the two things this policy relies on is in place, and one is not:
 
-1. **One known-answer digest per shipped preset.** Today the known-answer test hashes one simulation on the default preset. The claim that every older preset replays exactly rests on the coefficient fingerprints and on the test suite, not on a digest per preset. The LTS release should add one short digest per preset, so the claim is checked on every platform at every release.
-2. **A DOI per release.** `CITATION.cff` and `.zenodo.json` are ready, and the Zenodo integration has to be switched on by the owner, as the "DOI (Zenodo)" section of [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md) describes.
+1. **One known-answer digest per shipped preset.** In place from 0.8.5. `tests/known_answer_presets.py` runs one fixed 60-session market on every shipped preset and hashes each on its own, and `tests/known_answer_presets.json` holds the digests. The determinism workflow checks every one on all five platforms at every release, and a new preset adds its row when it ships. On the day the baseline was recorded, all eighteen presets that 0.8.1 shipped gave the same digest on the published 0.8.1 wheel as on 0.8.5.
+2. **A DOI per release.** Not yet. `CITATION.cff` and `.zenodo.json` are ready, and the Zenodo integration has to be switched on by the owner, as the "DOI (Zenodo)" section of [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md) describes.
 
 ## Freezing and retiring presets
 

@@ -264,6 +264,15 @@ removed. From this line on a new default comes only in a minor release, and
 0.8.5 is the one exception because the policy starts here. `SECURITY.md`
 names the line in its table of supported versions.
 
+The policy's first precondition is in place. `tests/known_answer_presets.py`
+runs one fixed 60-session market on every shipped preset and hashes each on
+its own, `tests/known_answer_presets.json` holds the eighteen digests, and
+`test_known_answer.py` checks them on every wheel target, so the
+determinism workflow now compares five digests per platform. With the two
+treasury yields left out, which 0.8.1 does not report, the harness gives the
+same eighteen digests on the published 0.8.1 wheel as on 0.8.5.
+[PLACEHOLDER pt-v20] pt-v20's row is added when the preset lands.
+
 `.zenodo.json` carries what Zenodo's GitHub integration needs to mint a DOI
 for each published release, once the owner switches it on (`RELEASING.md`,
 "DOI (Zenodo)"). `CITATION.cff` asks for the preset beside the version, and

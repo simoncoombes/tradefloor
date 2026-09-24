@@ -687,3 +687,9 @@ if __name__ == "__main__":
     print(f"  sim      {simulation_digest()}")
     print(f"  meta     {metadata_digest()}")
     print(f"  bonds    {bonds_digest()}")
+    # Every shipped preset's own digest, combined into one line, so the
+    # determinism workflow's cross-target comparison covers them. Which
+    # preset disagrees is what test_known_answer.py reports on each target.
+    import known_answer_presets
+    print(f"  presets  "
+          f"{known_answer_presets.combined_digest(known_answer_presets.preset_digests())}")

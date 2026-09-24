@@ -20,6 +20,8 @@ sys.path.insert(0, str(HERE))
 
 import known_answer  # noqa: E402
 import known_answer_book  # noqa: E402
+import known_answer_presets  # noqa: E402
+import tradefloor  # noqa: E402
 
 
 
@@ -108,6 +110,49 @@ def test_the_book_known_answer_matches_its_baseline():
         "BOOK_KAT_VERSION must bump, or a platform disagrees.")
 
 
+def test_every_shipped_preset_matches_its_own_baseline():
+    """One digest per shipped preset, beside the default's.
+
+    The default's digest moves whenever the default does, so on its own it
+    says nothing about the presets a study pinned. `docs/SUPPORT.md` promises
+    that a preset's market is frozen once it ships, and this is where that
+    promise is checked, on every wheel target the determinism workflow builds.
+
+    A preset the build ships with no row fails here: a new preset gets its
+    digest when it lands, from `python tests/known_answer_presets.py`. A row
+    that moved is never fixed by regenerating it. It means a frozen preset's
+    market changed or a platform disagrees, and each moved preset is named.
+    """
+    baseline = json.loads(
+        (HERE / "known_answer_presets.json").read_text(encoding="utf-8")
+    )
+    assert baseline["presetKatVersion"] == known_answer_presets.PRESET_KAT_VERSION
+    assert (baseline["seed"], baseline["sessions"], baseline["ticks"]) == (
+        known_answer_presets.SEED, known_answer_presets.SESSIONS,
+        known_answer_presets.TICKS)
+    shipped = list(tradefloor.preset_names())
+    recorded = list(baseline["presets"])
+    assert shipped == recorded, (
+        f"the build ships {shipped} and the baseline records {recorded}. A new "
+        "preset adds its row when it lands; a recorded one is never removed.")
+    measured = known_answer_presets.preset_digests()
+    moved = [name for name in shipped if measured[name] != baseline["presets"][name]]
+    assert not moved, (
+        f"the market moved for {moved}. A shipped preset is frozen: either a "
+        "change reached a preset it must not, or a platform disagrees.")
+    assert known_answer_presets.combined_digest(measured) == baseline["sha256"]
+
+
+def test_the_preset_digests_tell_the_presets_apart():
+    """A harness that gave two presets one digest could not see a change that
+    turned one into the other, so every shipped preset's must differ."""
+    baseline = json.loads(
+        (HERE / "known_answer_presets.json").read_text(encoding="utf-8")
+    )
+    digests = list(baseline["presets"].values())
+    assert len(set(digests)) == len(digests)
+
+
 def test_known_answer_is_stable_within_a_process():
     assert known_answer.known_answer_digest() == known_answer.known_answer_digest()
 
@@ -149,12 +194,12 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
-    # FOUR digests, in a fixed order: combined, simulation, metadata, and
-    # the session with the simulated rate indices. The CI gate greps all of
-    # them and compares the SET across platforms, so the count and the order
-    # are both contractual -- .github/workflows/determinism.yml hashes each
-    # target's file and requires one unique hash, which holds for four as it
-    # did for three.
+    # FIVE digests, in a fixed order: combined, simulation, metadata, the
+    # session with the simulated rate indices, and every shipped preset's
+    # digest combined. The CI gate greps all of them and compares the SET
+    # across platforms, so the count and the order are both contractual --
+    # .github/workflows/determinism.yml hashes each target's file and
+    # requires one unique hash, which holds for five as it did for three.
     #
     # It used to be exactly one, and the count was asserted for the same
     # reason it is asserted now: a gate that greps an ambiguous number of
@@ -162,8 +207,11 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # landed, this test and that workflow had to move together -- leaving the
     # workflow alone would have made it count three digests as three
     # disagreements and fail every green run.
-    assert len(digests) == 4, result.stdout
+    assert len(digests) == 5, result.stdout
     assert digests[0] == known_answer.known_answer_digest()
     assert digests[1] == known_answer.simulation_digest()
     assert digests[2] == known_answer.metadata_digest()
     assert digests[3] == known_answer.bonds_digest()
+    # FIVE since 0.8.5: every shipped preset's digest, combined.
+    assert digests[4] == known_answer_presets.combined_digest(
+        known_answer_presets.preset_digests())

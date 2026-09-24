@@ -1,0 +1,29 @@
+{
+ "kind": "pretium.known-answer.presets",
+ "presetKatVersion": 1,
+ "seed": 20260820,
+ "sessions": 60,
+ "ticks": 78,
+ "note": "One digest per shipped preset, fixed when the preset first ships in a tagged release. Recorded 2026-09-24 on release/0.8.5 for pt-v1 to pt-v19. Before committing, the same harness without the two treasury yields (which 0.8.1 does not report) gave the same digest for all eighteen presets on the published 0.8.1 wheel and on this build, so every preset 0.8.1 shipped replays in 0.8.5 bit for bit. A new preset adds its row; an existing row never changes.",
+ "presets": {
+  "pt-v1": "2ea0e1d010e54e6dbd7f1a999ddac5109ce5c5d473d64613fa63abc8a38941b6",
+  "pt-v2": "3eed75860aa8b2714309f238a9e36c1f50f020571dcbafa18b688a49f41b69b5",
+  "pt-v3": "e240e74de09e875c26db0ed37e40fee9af35a0f32723bf66d73a6a1fb8b84f29",
+  "pt-v4": "6706220c043f89ca8c29278f48adac2524f29eb93fa1b7772b3db42964f3dc9d",
+  "pt-v5": "fa3379953c07c365d7a3b7a2761b8192b917607ffaf0eac1680ac57b465c7387",
+  "pt-v6": "755343e5339570980eeda0fdb38c865e85600b98fe5719cbc287a6dbea1a4898",
+  "pt-v7": "b030805e19ae32d270a43873845be0fa77e2411a0a292577cf29535dfbe040d8",
+  "pt-v8": "2281639023acfd359b4adb80c023a7af6056a5c947d9308415bc05584a8d905b",
+  "pt-v9": "6d1450432977dbce4045190232b4debae43c446706deef0d0aa3ca75f9b75306",
+  "pt-v10": "6ff4098bcb4399ce68dfa51a0d5e710bb8bd9ac1f6a7876d2d428bc67c108107",
+  "pt-v11": "a33b6ad9e8d5cccf5e579a22ef6f3cc56614b81ce881e711fc48c53154d96d00",
+  "pt-v12": "86a75d484630aed725eeae76e682abb0463283c35f89eae740a8330ca731d731",
+  "pt-v13": "14e29f947806547764ada7d8d5fabc6089c1c11c66984d58d32a08d26009cfab",
+  "pt-v14": "befa9865d334b3d28bc4d61aea34709e857ab8af0057c5ef47ade35c41937777",
+  "pt-v15": "eb277eb88fdd4bb3b847e175ed3a9cad0e00a6ed897c0599a73f46e02dff020b",
+  "pt-v16": "ca52930a131c51e363302114d4b4c0e2c6430eca9555e1265e49188eaf9d7a68",
+  "pt-v18": "cc03d3a654b47a02b7ff8a1011b435f333a0e9084ecc7e4a6ad76a62a3978d84",
+  "pt-v19": "816eafada02d85bdda5f51bbb4dd575aaad82a4dc5d3454429071d03dc7b4682"
+ },
+ "sha256": "0fea30386372bdaed9422200a593818632b3f76cd238f3b69413ad7b6bfa2aa0"
+}
