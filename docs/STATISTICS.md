@@ -2,8 +2,8 @@
 
 tradefloor checks its market against real markets with several sets of
 statistics. The sets overlap, have different counts, and are measured over
-different horizons, so "19 of 19", "15 of 15" and "14 of 14" can all be true
-of the same preset at once. This page names each set, lists what is in it,
+different horizons, so "19 of 19", "15 of 15", "14 of 14" and "15 of 17" can
+all be true of the same preset at once. This page names each set, lists what is in it,
 and says where it is used. The README and the documentation site use these
 names.
 
@@ -16,7 +16,7 @@ The model itself is specified in
 |---|---|---|---|
 | [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band |
 | [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band |
-| [The long-run criteria](#the-long-run-criteria) | 15 criteria | 21 years | 15 of 15 met |
+| [The long-run criteria](#the-long-run-criteria) | 17 criteria from 0.9.0; 15 before | 21 years | 15 of 17 met; 15 of 15 in 0.8.x |
 | [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria |
 
 Three parts of the one-year table have counts of their own, and appear on
@@ -52,6 +52,12 @@ envelope publishes, over the one-year horizon it certifies. pt-v19 has all
 | `fear_gauge_dn3` | the VIX's rise on a day the index falls 3% or more | index |
 | `index_tail_dn3_pct` | the share of days the index falls 3% or more | index |
 
+`tf.facts.measure()` returns 18 of the 19 on every run. The nineteenth,
+`crisis_sector_dispersion`, comes from `tf.facts.crisis_statistics()`, which
+`measure()` calls, and it appears only when a run holds at least 30 sessions
+with the VIX above the crisis threshold; otherwise `measure()` reports it
+absent and says why.
+
 **How it is measured.** Thirty seeds, 101 to 130, of a 252-session run.
 
 - The shape statistics and crisis dispersion are read on one fixed roster, `Universe.random(40, seed=111)`, and each is the median across seeds. Crisis dispersion needs 30 sessions with the VIX above the crisis threshold, so it is the median over the seeds that have them: 4 of 30 at one year.
@@ -66,7 +72,7 @@ dispersion. A fixed rule sets each band from the spread of one-year windows
 on that record. `tf.envelope.score()` grades a run against the bands, and
 `tf.envelope.certified()` returns pt-v19's table.
 
-**Where it is used.** The README ("19 statistics"), and on the
+**Where it is used.** The README and `rust/README.md` ("19 statistics"), and on the
 documentation site the Realism envelope, The metrics, Principles, The two
 loops, Running a market and Agents pages, and notebook 04.
 
@@ -118,12 +124,19 @@ hosted preset list.
 
 ## The long-run criteria
 
-**15 criteria, over 21 years.** Thirty free-running histories of 21 years
-each, plus replays of 2008 and 2020 with the real VIX imposed, plus a probe
-of how much a late-read headline is worth. Each criterion is something a
-user would notice, with a tolerance that is easy to read. pt-v19 meets all
-15; pt-v18, the previous default, meets 8. The result is in
-`tf.preset_record()["long_run"]`.
+**17 criteria over 21 years, from 0.9.0; 15 before.** Thirty free-running
+histories of 21 years each, plus replays of 2008 and 2020 with the real VIX
+imposed, plus a probe of how much a late-read headline is worth. Each
+criterion is something a user would notice, with a tolerance that is easy to
+read. The result is in `tf.preset_record()["long_run"]`.
+
+pt-v19 was adopted as the default on the first 15, and meets all 15;
+pt-v18, the previous default, meets 8. Two criteria were added on
+2026-09-24 and ship in 0.9.0: C4a and C4b ask whether a rule that reads
+only prices finds an edge real markets do not offer. pt-v19 fails both, so
+its record reads 15 of 17 from 0.9.0. Records in 0.8.x carry the first 15
+rows, and the documentation site, which describes the released 0.8.1
+package, shows those 15 until 0.9.0 is released.
 
 | Id | Criterion | Tolerance |
 |---|---|---|
@@ -141,20 +154,31 @@ user would notice, with a tolerance that is easy to read. pt-v19 meets all
 | C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 times |
 | C2 | histories that touch the VIX ceiling | at most 1 of 30 |
 | C3 | the edge from reading a headline 5 ticks late | under 20 basis points |
+| C4a | lag-1 autocorrelation of 65-minute returns, median name, and the Roll spread against the quoted spread (from 0.9.0) | at or above −0.05, or Roll at most twice quoted |
+| C4b | the best price-only rule on the published suite of 20 markets: median points over buy-and-hold, and markets beaten (from 0.9.0) | every rule at most +5 points and 14 of 20 |
 | D1 | the one-year table, in band on all four cells | every band in |
+
+On pt-v19, C4a reads −0.187 with a Roll spread 5.0 times the quoted one,
+and in C4b a mean-reversion rule that trades every 65 minutes beats
+buy-and-hold in 18 of 20 markets by a median 13.6 points; five-day momentum
+also fails. The next preset is meant to fix both; see
+[Coming in pt-v20](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md#coming-in-pt-v20)
+in the model specification.
 
 D1 contains the one-year table: it requires the fixed-roster panel in band
 at one year, at two years, on held-out seeds and on a held-out roster, and
 the index rows in band at one year.
 
-**Where it is used.** The README, the Realism envelope, Presets,
-Parameters and Release notes pages, and the hosted report.
+**Where it is used.** The README and `rust/README.md`, the Realism
+envelope, Presets, Parameters and Release notes pages, and the hosted
+report.
 
 ## The hosted report
 
 The hosted service's report card shows no realism statistics of its own.
 Its one count is the long-run verdict, "passes all 15 of its long-run
-checks", which is the long-run criteria. The hosted preset list quotes the
+checks", which is the long-run criteria as 0.8.x records them; with a 0.9.0
+record the same line counts 17. The hosted preset list quotes the
 fixed-roster panel and the two-year panel: "all 15 checks over one year and
 all 14 over two". Both use the word "checks" for different sets; the names
 on this page are the ones to use.
