@@ -41,7 +41,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from spec import (Add, Bin, Call, Const, Dial, Draw, Extern, ForCompanies,
-                  If, IfSome, Let, Mechanism, Neg, Set, State, Var, When)
+                  If, IfSome, Let, Mechanism, Neg, Note, Set, State, Taken,
+                  Var, When)
 
 
 class SpecError(Exception):
@@ -180,6 +181,14 @@ def effect_of_statement(stmt: Any, mech: Mechanism) -> Effect:
         return Effect()
     if isinstance(stmt, ForCompanies):
         return effect_of_body(stmt.body, mech).per_company()
+    if isinstance(stmt, Taken):
+        # The gate decides whether the vector moves, not whether the body
+        # runs, so the body's draws are unconditional and its effect
+        # passes through. That is the whole reason the take is a wrapper
+        # rather than a When: a When's body has to be pure.
+        return effect_of(stmt.gate, mech) + effect_of_body(stmt.body, mech)
+    if isinstance(stmt, Note):
+        return Effect()
     raise SpecError(f"not a statement: {stmt!r}")
 
 
@@ -260,6 +269,13 @@ def _hoist_statement(stmt: Any, lets: list, counter: list, inside: bool) -> Any:
     if isinstance(stmt, IfSome):
         return IfSome(stmt.path, stmt.name,
                       tuple(_hoist_statement(s, lets, counter, True) for s in stmt.body))
+    if isinstance(stmt, Note):
+        return stmt
+    if isinstance(stmt, Taken):
+        return Taken(stmt.path, stmt.name,
+                     _hoist_expr(stmt.gate, lets, counter, inside),
+                     tuple(_hoist_statement(s, lets, counter, inside)
+                           for s in stmt.body))
     if isinstance(stmt, ForCompanies):
         inner_lets: list = []
         new_body = []
@@ -448,6 +464,24 @@ def _prove_body(body: tuple, mech: Mechanism, doses: dict, env: dict,
             local = dict(env)
             local[stmt.name] = Sym("company")
             _prove_body(stmt.body, mech, doses, local, counter, proof, reachable)
+        elif isinstance(stmt, Taken):
+            # Putting the vector back is a write of the whole field, and
+            # the prover has no way to see that the loop left every slot
+            # as it found it. So the only taken vector it accepts is one
+            # whose gate the defaults decide false: the move never
+            # happens and the field keeps its bits. A mechanism that
+            # wants the vector live is live, which is the answer.
+            gate = _eval(stmt.gate, mech, doses, env, counter)
+            if reachable and gate is not False:
+                proof.failures.append(
+                    f"{stmt.path} is taken and put back on a path the "
+                    "defaults reach")
+            else:
+                proof.writes.append(f"{stmt.path}: not taken at the defaults")
+            _prove_body(stmt.body, mech, doses, dict(env), counter, proof,
+                        reachable)
+        elif isinstance(stmt, Note):
+            pass
         else:
             raise SpecError(f"not a statement: {stmt!r}")
 
@@ -530,6 +564,14 @@ def _resolve_body(body: tuple, mech: Mechanism, dials: set, states: set,
             _resolve_body(stmt.body, mech, dials, states, bound | {stmt.name})
         elif isinstance(stmt, ForCompanies):
             _resolve_body(stmt.body, mech, dials, states, bound | {stmt.name})
+        elif isinstance(stmt, Taken):
+            if stmt.path not in states:
+                raise SpecError(f"{mech.name} takes state {stmt.path!r}, "
+                                "which it does not declare")
+            _resolve_expr(stmt.gate, mech, dials, states, bound)
+            _resolve_body(stmt.body, mech, dials, states, bound)
+        elif isinstance(stmt, Note):
+            pass
         else:
             raise SpecError(f"not a statement: {stmt!r}")
 

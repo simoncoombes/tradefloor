@@ -106,3 +106,124 @@ def test_long_horizon_tables_count_the_shape_rows_and_print_the_rest_beside():
     # A band midpoint sits in band, so the fabricated shape rows all pass
     # and the count says so without folding the other rows in.
     assert f"{len(SHAPE)}/{len(SHAPE)} shape rows in band" in counts[0]
+
+
+# --------------------------------------------------------------------------
+# A GRADED ROW THAT A RUN CANNOT READ
+#
+# `crisis_sector_dispersion` landed on 2026-09-22 with a ruled band at both
+# horizons and a refusal: a window holding fewer than
+# `facts.CRISIS_DISPERSION_MIN_SESSIONS` sessions above
+# `facts.CRISIS_VIX_THRESHOLD` produces no reading at all, and
+# `facts.crisis_statistics` reports the reason under `<row>_blind` instead
+# of a number. Measured on pt-v19, the certified roster and seeds 101-104:
+# 0, 1, 0 and 10 crisis sessions at 252 days against the thirty the row
+# needs.
+#
+# That is the same shape as the pooled fear row above -- a graded row absent
+# on some seeds and possibly on all of them -- with one difference that
+# matters: this row HAS a band, so it reaches `_count_in_band`, and a row
+# with a band and no reading is neither in band nor a miss. These bind the
+# three seams it travels: the per-seed panel keeps the absence with its
+# reason, the median omits the row, and the count names it and drops it from
+# BOTH sides of the fraction.
+# --------------------------------------------------------------------------
+
+
+def _preset_panel():
+    return pytest.importorskip("preset_panel")
+
+
+def _cell(reads: int, seeds: int = 4) -> list[dict]:
+    """Per-seed panels shaped the way `preset_panel._job` returns them."""
+    from tradefloor.facts import DISPERSION
+
+    row = DISPERSION[0]
+    rows = []
+    for i in range(seeds):
+        panel = {k: (low + high) / 2.0
+                 for k, (low, high) in REAL_MARKETS.items()}
+        if i < reads:
+            panel[row] = 1.10 + 0.01 * i
+            panel[row + "_blind"] = None
+        else:
+            panel[row] = None
+            panel[row + "_blind"] = (
+                f"{row} is ABSENT for this window: it holds {i} sessions "
+                f"with the volatility index above 30.883")
+        panel["days"], panel["burn"] = 252, 0
+        rows.append(panel)
+    return rows
+
+
+def test_an_absent_graded_row_is_out_of_both_sides_of_the_count():
+    import statistics
+
+    from tradefloor.facts import DISPERSION
+
+    preset_panel = _preset_panel()
+    row = DISPERSION[0]
+    assert row in preset_panel.PANEL and row in preset_panel.ABSENT_OK
+
+    bands = {k: (low, high) for k, (low, high) in REAL_MARKETS.items()}
+    bands[row] = (1.0, 2.0)
+
+    # Some seeds read: the row is graded, on the median of those seeds only.
+    rows = _cell(reads=2)
+    panel = preset_panel._median_panel(rows)
+    assert panel[row] == pytest.approx(statistics.median([1.10, 1.11]))
+    n, misses, unreadable, absent = preset_panel._count_in_band(panel, bands)
+    assert absent == [] and misses == [] and unreadable == []
+    assert n == len(preset_panel.PANEL)
+
+    # NO seed reads: the row is absent, named, and in neither the numerator
+    # nor the denominator. Not a miss -- `misses` is what a reader acts on --
+    # and not a silent pass.
+    rows = _cell(reads=0)
+    panel = preset_panel._median_panel(rows)
+    assert row not in panel
+    n, misses, unreadable, absent = preset_panel._count_in_band(panel, bands)
+    assert absent == [row]
+    assert row not in misses and row not in unreadable
+    assert n == len(preset_panel.PANEL) - 1
+    assert n + len(misses) + len(unreadable) + len(absent) == len(
+        preset_panel.PANEL)
+
+
+def test_the_absence_carries_the_readable_seed_count_and_the_reason():
+    """"Absent" with no count cannot be told from a run that stopped
+    measuring the row, which is the `not_shown`-shrinks failure in another
+    spelling. `preset_panel._absence` is what keeps the two apart."""
+    from tradefloor.facts import DISPERSION
+
+    preset_panel = _preset_panel()
+    row = DISPERSION[0]
+
+    block = preset_panel._absence(_cell(reads=2))[row]
+    assert (block["read"], block["seeds"]) == (2, 4)
+    assert block["value"] is not None
+    assert block["estimator"].startswith("median")
+    assert block["reasons"] and all("ABSENT" in r for r in block["reasons"])
+
+    empty = preset_panel._absence(_cell(reads=0))[row]
+    assert (empty["read"], empty["seeds"]) == (0, 4)
+    assert empty["value"] is None
+    # The library's own sentences, deduplicated: four seeds, four distinct
+    # session counts, four reasons. A block with a count and no reason would
+    # say that nothing read and not why.
+    assert len(empty["reasons"]) == 4
+
+
+def test_a_shape_row_is_never_absent_from_the_panel():
+    """The other half of the rule, asserted so the `.get` cannot spread.
+
+    `_job` fetches a shape row with `p[k]` and an `ABSENT_OK` row with
+    `.get`. A shape row is a property of the returns and reads on every run;
+    if one could go missing the same way, the "14 of 14" denominator would
+    shrink without anything failing.
+    """
+    from tradefloor.facts import SHAPE
+
+    preset_panel = _preset_panel()
+    assert not set(SHAPE) & set(preset_panel.ABSENT_OK)
+    assert set(preset_panel.ABSENT_OK) < set(preset_panel.PANEL)

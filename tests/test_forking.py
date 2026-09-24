@@ -983,8 +983,9 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #: So the guard below runs on a model where nothing is off, in a market where
 #: nothing is quiet.
 #:
-#: Three deliberate departures from the shipped preset, each because a dial
-#: that never fires is a dial the guard cannot see:
+#: Five deliberate departures from the shipped preset, each because a dial
+#: that never fires -- or one fired at a value that drowns the rest -- is a
+#: dial the guard cannot see:
 #:
 #: - every parameter shipped at zero, at 0.05. Measured to keep prices finite
 #:   and positive over this horizon.
@@ -994,6 +995,26 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #: - universe stress with weight and decay, under a crisis VIX, because the
 #:   stress term ratchets on the VIX above a threshold and stays at zero in a
 #:   calm market however large its weight.
+#: - the VIX level's loop gain at 1.75, the value the loop's own algebra
+#:   derives at the shipped exponent, rather than 0.05. The gain DIVIDES the
+#:   level's dispersion, so 0.05 multiplies it twentyfold: the VIX then
+#:   swings far enough to exhaust the forced-flow reservoir on both sides of
+#:   every comparison, and `forced_flow_spent` stops being visible to this
+#:   guard. A blanket 0.05 is the wrong shape for a dial whose domain starts
+#:   at one.
+#: - the crisis epicentre's extra at the DERIVED 1.93 rather than 0.05, and
+#:   this one is refused rather than merely weak: the extra is a multiple on
+#:   a name's TOTAL volatility, the market factor carries 0.3916 of that
+#:   variance and is not scaled, so `ModelParams::invariants` refuses
+#:   anything at or below sqrt(0.3916) = 0.626 as asking the non-market parts
+#:   to carry a negative variance. 1.93 is the value the tape derives, and at
+#:   it the `CRISIS` macro below (VIX 45, over the 30.88 threshold) puts every
+#:   engine here inside a crisis episode -- which is what makes the episode's
+#:   four snapshot fields reachable at all.
+#: - the volume scale's jump share at 0.05 rather than the shipped 1.0, which
+#:   is the value that switches the mechanism ON: at 1.0 the day's move is
+#:   measured from the raw open, nothing writes the carried jump, and
+#:   `jump_move` is a snapshot field no market here could reach.
 def _nothing_dormant():
     shipped = tf.ModelParams.from_preset().to_dict()
     dormant = {name: 0.05 for name in tf.ModelParams.settable()
@@ -1001,7 +1022,34 @@ def _nothing_dormant():
     assert dormant, "no dial ships at zero; this model is not testing anything"
     dormant.update(endogenous_news_intensity=0.9,
                    universe_stress_weight=0.5,
-                   universe_stress_decay=0.9)
+                   universe_stress_decay=0.9,
+                   vix_level_loop_gain=1.75,
+                   crisis_epicentre_extra=1.93,
+                   volume_move_jump_share=0.05,
+                   # The anchor weight's cap is a multiple of the centre at or
+                   # above one, so a blanket 0.05 is outside its domain; the
+                   # derived 1.76 (vix-law-levels, design repository).
+                   vix_anchor_weight_level_cap=1.76,
+                   # ... and its below-knee switch is 0.0 or 1.0.
+                   vix_anchor_weight_level_below=1.0,
+                   # The macro-cycle switches are 0.0 or 1.0.
+                   cycle_us_calibration=1.0,
+                   fed_liftoff_rule=1.0,
+                   market_pe_buybacks=1.0,
+                   # ... and so is its knee's fixed-level switch.
+                   vix_anchor_weight_level_knee_fixed=1.0,
+                   # The news re-quote is a switch too (news-speed), and the
+                   # absorption profile carries its derived values: at a
+                   # blanket 0.05 both of its parts have a twentieth-of-a-
+                   # tick half-life, every event is priced whole on its
+                   # first tick, and a snapshot that dropped the day's news
+                   # later in the day would move nothing, so the guard below
+                   # could not see `session_news`. The 42-tick drift keeps
+                   # the news priced all day.
+                   news_quote_revision=1.0,
+                   news_absorption_half_life=0.6,
+                   news_absorption_drift_share=0.12,
+                   news_absorption_drift_half_life=42.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1184,6 +1232,27 @@ UNREACHED_SNAPSHOT_FIELDS = {
     "pending_overnight":
         "the overnight move, waiting for the same row and for the same "
         "reason as pending_jump.",
+    "crisis_in_episode":
+        "the crisis episode, and this scenario cannot reach it because its "
+        "macro is FIXED: `CRISIS` holds VIX at 45, above the 30.88 threshold, "
+        "for every session both engines run. So the episode never ends, the "
+        "sessions-under counter never leaves zero, and an engine restored "
+        "without the flag simply re-enters an episode at its first open and "
+        "redraws from the stream position the snapshot DID carry -- the same "
+        "uniform the parent drew, so the same epicentre. What it takes to see "
+        "these four is a VIX that falls back under the threshold and rises "
+        "again, which is a scenario probe and not a fixed macro. "
+        "tests/test_crisis_epicentre.py::test_a_restored_snapshot_continues_"
+        "like_a_copy_mid_episode is the test that does see them.",
+    "crisis_sessions_under":
+        "the same episode, for the same reason: the counter only moves on a "
+        "session under the threshold and this scenario has none.",
+    "crisis_epicentre":
+        "the same episode, for the same reason.",
+    "crisis_epicentre_pin":
+        "the scenario's pin, and this scenario sets none, so there is nothing "
+        "to drop. tests/test_crisis_epicentre.py pins one and asserts the "
+        "pinned episode takes no draw.",
     "model_fingerprint":
         "not state. It is the guard that refuses a snapshot restored onto an "
         "engine running other coefficients, which has its own test; dropping "
@@ -1207,6 +1276,18 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "the key restores to it. What reaches this field is a snapshot whose "
         "economy carries output away from the restoring engine's own, which "
         "test_earnings_nominal_growth.py restores and then prices against.",
+    "sector_target_day":
+        "the target variance the day's sector draws were SCALED BY, read "
+        "once at the close to standardise the day's sector factor by the "
+        "scale it was drawn at. Its three companions -- sector_variance, "
+        "sector_day_factor and jump_excitation -- are all caught by this "
+        "scenario; this one is not, because the standardised factor only "
+        "reaches a price through the per-sector variance STATE, and the "
+        "state's recursion is what this scenario's preset drives. A market "
+        "that sees it is one where the VIX moves between the ticks and the "
+        "close, so the target after the close differs from the one the "
+        "draws were made at, and the sector state then carries the "
+        "difference into the next day.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "

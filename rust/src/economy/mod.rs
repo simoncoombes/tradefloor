@@ -38,10 +38,13 @@ pub mod daily;
 mod invariants;
 pub mod state;
 
-pub use central_bank::{update_central_bank, Decision, MeetingOutcome};
+pub use central_bank::{update_central_bank, update_central_bank_with, Decision, MeetingOutcome, PolicyOptions};
 pub use cycle::{
-    check_cycle_transition, cycle_hazard_params, get_cycle_transition_probability,
-    mean_sojourn_days, phase_cycle, stationary_opening, stationary_phase_shares, weibull_hazard,
+    check_cycle_transition, check_cycle_transition_for, cycle_hazard_params,
+    cycle_hazard_params_for, get_cycle_transition_probability,
+    get_cycle_transition_probability_for, hazard_cap, mean_sojourn_days, mean_sojourn_days_for,
+    phase_cycle, stationary_opening, stationary_opening_for, stationary_phase_shares,
+    stationary_phase_shares_for, weibull_hazard, CycleSpec,
 };
 pub use daily::{update_economy_daily, DailyInputs};
 pub use state::*;

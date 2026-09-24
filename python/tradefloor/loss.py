@@ -81,7 +81,8 @@ import warnings
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import (AGGREGATE, BAND_WINDOWS, CRISIS, LEVEL, PERSISTENCE,
+from .facts import (AGGREGATE, BAND_WINDOWS, CRISIS, DEFAULT_BAND_BASIS,
+                    LEVEL, PERSISTENCE,
                     REAL_MARKETS,
                     REAL_MARKETS_504, REAL_MARKETS_PROVENANCE,
                     RULERS_BY_HORIZON, SEED_SD, SEED_SD_504,
@@ -564,10 +565,12 @@ def rule_fingerprint(table: Mapping[str, Mapping[str, Any]]) -> str:
 
     A score is only comparable with another taken against the same tape, and
     the tape moves: the 504-bar windows landed after the corpus was measured,
-    `fear_gauge_dn3`'s error is not derived yet, and the level row's centre
-    was re-derived in September. So every result carries the fingerprint of
-    the table it used, and two scores with different fingerprints are two
-    numbers rather than a comparison.
+    the level row's centre was re-derived in September, and
+    `fear_gauge_dn3`'s error landed on 2026-09-09 and moved the fingerprint
+    at both horizons -- every score taken before it is an eighteen-row sum
+    and every score after it a nineteen-row one. So every result carries the
+    fingerprint of the table it used, and two scores with different
+    fingerprints are two numbers rather than a comparison.
     """
     payload = json.dumps(
         [[key, t.get("centre"), t.get("se"), t.get("df"), t.get("estimator")]
@@ -599,7 +602,8 @@ def rule_term(z: float, df: float) -> float:
     return (df + 1.0) * math.log1p(z * z / df)
 
 
-def _band_of(key: str, horizon_days: int) -> tuple[float, float] | None:
+def _band_of(key: str, horizon_days: int,
+             basis: str = DEFAULT_BAND_BASIS) -> tuple[float, float] | None:
     """The row's band at this horizon, for the diagnostic and never for `S`.
 
     `envelope` owns the seventeen-row table at 504 -- the fourteen shape
@@ -608,9 +612,17 @@ def _band_of(key: str, horizon_days: int) -> tuple[float, float] | None:
     scope: `envelope` reads `loss.STRUCTURAL` inside one of its own
     functions, and a module-level import in both directions is a cycle
     waiting for whichever is loaded first.
+
+    THE BASIS IS AN ARGUMENT, since 2026-09-15. This read
+    `envelope.RULERS_BY_HORIZON` with no way to ask for anything else, so
+    `scoring_rule` printed a `band` and an `in_band` off the 2015-2025
+    decade table however the caller was grading. `None` for a row the basis
+    cannot read is the state the callers already handle: they write
+    `in_band: None` and `band: None` and `S` never touches an edge, so a
+    ruled basis loses no term from the sum.
     """
     from . import envelope
-    table = envelope.RULERS_BY_HORIZON.get(int(horizon_days))
+    table = envelope.RULERS_BY_BASIS.get(basis, {}).get(int(horizon_days))
     if table is None:
         return None
     band = table[0].get(key)
@@ -656,6 +668,7 @@ def _blind_reason(key: str, tape: Mapping[str, Any]) -> str:
 def scoring_rule(panels: Sequence[Mapping[str, Any]], *,
                  horizon_days: int,
                  rows: Sequence[str] | None = None,
+                 basis: str = DEFAULT_BAND_BASIS,
                  bootstrap_draws: int = 2000,
                  bootstrap_seed: int = 20260905) -> dict[str, Any]:
     """`S` over the certified rows, from the candidate's own per-seed panels.
@@ -706,7 +719,7 @@ def scoring_rule(panels: Sequence[Mapping[str, Any]], *,
             else:
                 se_m = statistics.stdev(values) / math.sqrt(len(values))
             df_m = len(values) - 1
-        band = _band_of(key, horizon_days)
+        band = _band_of(key, horizon_days, basis)
         measured = graded.get(key)
         row: dict[str, Any] = {
             "row": key,
@@ -778,7 +791,8 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
                               horizon_days: int,
                               se_model: Mapping[str, float],
                               df_model: float,
-                              rows: Sequence[str] | None = None
+                              rows: Sequence[str] | None = None,
+                              basis: str = DEFAULT_BAND_BASIS
                               ) -> dict[str, Any]:
     """`S` from a record that kept only the aggregated panel, not its seeds.
 
@@ -818,7 +832,7 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
     total = gauss = 0.0
     for key, tape in table.items():
         measured = medians.get(key)
-        band = _band_of(key, horizon_days)
+        band = _band_of(key, horizon_days, basis)
         se_m = se_model.get(key)
         row: dict[str, Any] = {
             "row": key,

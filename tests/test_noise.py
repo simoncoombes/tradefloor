@@ -345,7 +345,12 @@ def test_every_stream_and_the_marks_carry_the_day_run_days_was_given():
                     volatility=1.0, record=True, first_day=100)
     for stream in noise.STREAMS:
         log = engine.draw_log(stream, -1000, 1000)
-        if stream == "external":
+        # `external` is the embedder's own stream and nothing here draws on
+        # it. `crisis_epicentre` is silent for a different reason worth
+        # keeping apart: its uniform is taken once per crisis EPISODE, and
+        # `crisis_epicentre_extra` ships 0.0, so no episode is ever entered.
+        # Both are empty and the assertion says which emptiness it expects.
+        if stream in ("external", "crisis_epicentre"):
             assert log == []
             continue
         assert sorted({e[2] for e in log}) == [100, 101, 102], stream
@@ -377,7 +382,9 @@ def test_two_runs_in_a_row_number_four_distinct_days():
     seen = {}
     for stream in noise.STREAMS:
         log = engine.draw_log(stream, -1000, 1000)
-        if stream == "external":
+        # Both silent here; see the test above for the two reasons.
+        if stream in ("external", "crisis_epicentre"):
+            assert log == []
             continue
         seen[stream] = sorted({e[2] for e in log})
     assert set(map(tuple, seen.values())) == {(0, 1, 2, 3)}, seen

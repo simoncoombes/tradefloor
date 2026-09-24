@@ -94,20 +94,29 @@ def same_to_the_bit(a, b):
 SHIPPED_PRESETS = (
     "pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8",
     "pt-v9", "pt-v10", "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-    "pt-v16", "pt-v18",
+    "pt-v16", "pt-v18", "pt-v19",
 )
 
+#: The presets that switch the identity ON, by name and on purpose. pt-v19
+#: is the first (composed 2026-09-10, `params.rs::pt_v19`, provenance in
+#: `provenance.DIAL_PROVENANCE["vix_level_identity"]`). A preset that is
+#: not in this tuple and reads 1.0 turned it on by accident.
+IDENTITY_ON = ("pt-v19",)
 
-def test_every_shipped_preset_leaves_the_identity_off():
+
+def test_every_shipped_preset_leaves_the_identity_off_unless_named_here():
     """A preset that turned it on by accident would move every trajectory
-    it has, and the known-answer digest would be the only thing to say so."""
+    it has, and -- while it is not the default -- nothing but this would
+    say so, because the known-answer digest only watches the default."""
     for name in SHIPPED_PRESETS:
         d = pt.ModelParams.from_preset(name).to_dict()
-        assert d["vix_level_identity"] == 0.0, name
+        expected = 1.0 if name in IDENTITY_ON else 0.0
+        assert d["vix_level_identity"] == expected, name
         # And the premium ships at the value it was MEASURED at, on every
         # one of them, so a preset cannot acquire a different premium
         # without saying so.
         assert d["vix_variance_premium"] == 0.252, name
+    assert set(IDENTITY_ON) <= set(SHIPPED_PRESETS)
 
 
 def test_the_premium_is_not_read_while_the_identity_is_off():

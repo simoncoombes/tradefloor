@@ -37,6 +37,12 @@ Statements:
   being present, binding its value; pure body, same rule
 - ``ForCompanies(name, body)``: the body once per company, with the
   index bound to ``name``; draws inside count once per company
+- ``Taken(path, name, gate, body)``: a per-company vector moved out of
+  the engine for the length of ``body`` and put back after it, so the
+  loop inside can index it while the company list is borrowed
+- ``Note(text)``: a comment in the generated Rust, for prose a reader of
+  the emitted body needs and the specification would otherwise keep to
+  itself
 """
 from __future__ import annotations
 
@@ -146,6 +152,44 @@ class ForCompanies:
     body: tuple
 
 
+@dataclass(frozen=True)
+class Taken:
+    """A per-company vector taken out of the engine, used, and put back.
+
+    ``ForCompanies`` borrows ``self.companies`` mutably, and Rust will
+    not let the body reach through ``self`` for a second field while that
+    borrow is live. The vector is therefore moved into a local before the
+    loop with ``std::mem::take`` and moved back after it, which is the
+    borrow checker's own idiom for exactly this and costs no copy.
+
+    ``gate`` decides whether the move happens at all: while it is false
+    the local is an empty ``Vec`` nothing indexes, the engine's field is
+    not disturbed, and a mechanism whose vector is switched off stays
+    bit-identical. ``path`` names the state entry whose ``rust`` is the
+    local spelling and whose ``take_rust`` is the engine field; ``name``
+    is the local, and the emitter checks the two agree.
+    """
+
+    path: str
+    name: str
+    gate: Any
+    body: tuple
+
+
+@dataclass(frozen=True)
+class Note:
+    """A comment the emitter writes into the generated Rust.
+
+    A ``#`` comment in this file explains the specification to whoever
+    reads the specification. A ``Note`` explains the emitted body to
+    whoever reads engine.rs, where the reasons a branch exists are no
+    less wanted for the code being generated. It is inert, and the digest
+    covers it because it reaches a generated line.
+    """
+
+    text: str
+
+
 # -- the mechanism ----------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -174,10 +218,15 @@ class StateSpec:
     default: float = 0.0
     doc: str = ""
     #: The Rust spelling of the field where the target function reads it.
+    #: ``{index}`` in it is filled with the enclosing loop's index, which
+    #: is how a per-company vector is spelled.
     rust: str = ""
     #: A template for ``Add`` where a plain ``+=`` is not the idiom, with
     #: ``{index}``, ``{value}`` and ``{indent}`` filled by the emitter.
     add_rust: str = ""
+    #: For a field a ``Taken`` moves into a local: the engine's spelling of
+    #: the vector, where ``rust`` is the local spelling the body indexes.
+    take_rust: str = ""
 
 
 @dataclass(frozen=True)

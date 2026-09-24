@@ -992,9 +992,10 @@ def jump_recovery(model: dict) -> str:
         "jump_mean_market + jump_sigma_market * z with a negative mean, "
         f"so this preset's jump is zero at z = {upward_threshold(model):.2f} "
         "and upward above it, where the prior on that normal outweighs "
-        "what the likelihood can repay. Measured on planted jumps, six "
-        "names at 40 ticks: every downward jump from -85 to -208 basis "
-        "points recovered, and no upward jump at any size to +112. So the "
+        "what the likelihood can repay. Measured under pt-v16 rather than "
+        "at this preset's dials: on planted jumps, six names at 40 ticks, "
+        "every downward jump from -85 to -208 basis points recovered, and "
+        "no upward jump at any size to +112. So the "
         "fired counts below are a lower bound, and they carry downward "
         "jumps alone.")
 

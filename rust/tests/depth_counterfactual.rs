@@ -115,10 +115,14 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
         &mut roster,
         &TickInputs {
             prev_day_down: false,
+            // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
             forced_flow_eff: 1.0,
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
+            jump_move: &[],
             economy: &economy,
             market_status: MarketStatus::Open,
             intraday_t: 0.5,
@@ -127,6 +131,7 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &sectors(),
+            sector_sigmas: &[],
             market_sigma_daily: MARKET_FACTOR_SIGMA,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
@@ -136,6 +141,10 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
             // nowhere; this tick's own value is what a single-tick
             // caller opens at.
             nominal_output_base: economy.gdp * economy.cpi,
+            // No crisis episode: the mechanism is off on every preset
+            // these tests pin, and a single-tick caller has no episode
+            // state to carry.
+            crisis_epicentre: None,
             // Trading days closed. The buyback factor is off on
             // every preset these tests pin, so it is read
             // nowhere; 0 is what a single-tick caller opens at.
@@ -330,10 +339,14 @@ fn the_arm_reports_nothing_on_the_replay_path() {
         &mut roster,
         &TickInputs {
             prev_day_down: false,
+            // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
             forced_flow_eff: 1.0,
             universe_stress: 0.0,
             volume_state: 0.0,
             volume_idio: &[],
+            jump_move: &[],
             economy: &economy,
             market_status: MarketStatus::Open,
             intraday_t: 0.5,
@@ -342,6 +355,7 @@ fn the_arm_reports_nothing_on_the_replay_path() {
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &sectors(),
+            sector_sigmas: &[],
             market_sigma_daily: MARKET_FACTOR_SIGMA,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourOrZero,
@@ -351,6 +365,10 @@ fn the_arm_reports_nothing_on_the_replay_path() {
             // nowhere; this tick's own value is what a single-tick
             // caller opens at.
             nominal_output_base: economy.gdp * economy.cpi,
+            // No crisis episode: the mechanism is off on every preset
+            // these tests pin, and a single-tick caller has no episode
+            // state to carry.
+            crisis_epicentre: None,
             // Trading days closed. The buyback factor is off on
             // every preset these tests pin, so it is read
             // nowhere; 0 is what a single-tick caller opens at.

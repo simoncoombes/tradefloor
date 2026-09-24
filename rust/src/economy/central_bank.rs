@@ -94,12 +94,40 @@ pub struct MeetingOutcome {
     pub announcement_variant: Option<usize>,
 }
 
+/// What the engine's dials change about a meeting. [`PolicyOptions::shipped`]
+/// is the reference bank exactly.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PolicyOptions {
+    /// The calendar meeting intervals are counted on; see `MacroCalendar`.
+    pub calendar: MacroCalendar,
+    /// `fed_liftoff_rule`: 0.0 is the shipped ladder. See
+    /// [`crate::params::ModelParams::fed_liftoff_rule`].
+    pub liftoff: f64,
+}
+
+impl PolicyOptions {
+    pub const fn shipped() -> Self {
+        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0 }
+    }
+}
+
 /// Run a scheduled (or emergency) FOMC-style meeting.
 pub fn update_central_bank(
     central_bank: &CentralBankState,
     economy: &EconomyState,
     current_timestamp: i64,
     rng: &mut impl Rng,
+) -> MeetingOutcome {
+    update_central_bank_with(central_bank, economy, current_timestamp, rng, &PolicyOptions::shipped())
+}
+
+/// [`update_central_bank`] under the engine's dials.
+pub fn update_central_bank_with(
+    central_bank: &CentralBankState,
+    economy: &EconomyState,
+    current_timestamp: i64,
+    rng: &mut impl Rng,
+    options: &PolicyOptions,
 ) -> MeetingOutcome {
     // An inflation rate running 4pp above the policy rate forces a meeting
     // regardless of the calendar.
@@ -233,6 +261,27 @@ pub fn update_central_bank(
         rate_change = if rate_deficit > 3.0 { 0.50 } else { 0.25 };
         decision = Decision::StagflationHike;
         new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score + 0.15, -1.0, 1.0);
+    } else if options.liftoff != 0.0
+        && rate_diff > 0.5
+        && economy.unemployment_rate <= central_bank.target_unemployment + 1.0
+        && economy.cycle_phase != CyclePhase::Contraction
+        && economy.cycle_phase != CyclePhase::Trough
+    {
+        // LIFT-OFF (`fed_liftoff_rule`). Every hike branch above needs
+        // inflation at least a point over target, so once a recession has
+        // cut the rate to zero and inflation settles near target, nothing
+        // can raise it again: the Taylor rate sits two or three points
+        // above the policy rate for the rest of the run. This is the cut
+        // branch below mirrored -- that one cuts a quarter point when the
+        // rule is 50bp under the rate and the labour market is slack (more
+        // than a point over target); this one hikes a quarter point when the
+        // rule is 50bp over the rate and it is not slack, whatever inflation
+        // is, outside a recession. Real lift-offs (1994, 2004, 2015) came
+        // with inflation at or under target plus one.
+        // The step and the score move are the mirrored cut's, signs flipped.
+        rate_change = 0.25;
+        decision = Decision::Hike;
+        new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score + 0.2, -1.0, 1.0);
     }
 
     // Urgency amplifies HIKES only. Amplifying cuts by an inflation gap would
@@ -373,12 +422,15 @@ pub fn update_central_bank(
     let inflation_crisis = new_economy.inflation_rate > new_economy.federal_funds_rate + 2.0
         && new_economy.inflation_rate > 4.0;
     // DRAW SITE — always, on both branches.
+    // Intervals are calendar days; on another macro calendar they are scaled
+    // to its steps (`MacroCalendar::scale_days`, the literal as shipped).
+    let cal = options.calendar;
     new_cb.next_meeting_date = if inflation_crisis {
         // Crisis cadence: 21-30 days.
-        current_timestamp + (21 + (rng.next_f64() * 10.0).floor() as i64) * 24 * 60
+        current_timestamp + cal.scale_days(21 + (rng.next_f64() * 10.0).floor() as i64) * 24 * 60
     } else {
         // Normal cadence: 6-8 weeks.
-        current_timestamp + (42 + (rng.next_f64() * 14.0).floor() as i64) * 24 * 60
+        current_timestamp + cal.scale_days(42 + (rng.next_f64() * 14.0).floor() as i64) * 24 * 60
     };
 
     MeetingOutcome {

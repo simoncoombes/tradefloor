@@ -616,9 +616,15 @@ def card(written: Sequence[Written]) -> str:
     out.append("| statistic | measured | band | in band |")
     out.append("|---|---:|---|:---:|")
     for name, row in sorted(panel["statistics"].items()):
-        band = f"{row['band'][0]} to {row['band'][1]}"
-        out.append(f"| {name} | {row['measured']} | {band} | "
-                   f"{'yes' if row['in_band'] else 'no'} |")
+        # A ROW THE BASIS HAS NO BAND FOR IS NOT A ROW THAT FAILED. Printing
+        # "no" for it would report a verdict the envelope did not reach, and
+        # the card is the artefact a reader cites.
+        if row["band"] is None:
+            band, verdict = "unreadable on this basis", "-"
+        else:
+            band = f"{row['band'][0]} to {row['band'][1]}"
+            verdict = "yes" if row["in_band"] else "no"
+        out.append(f"| {name} | {row['measured']} | {band} | {verdict} |")
     out.append("")
     if panel["gaps"]:
         out.append("Gaps in force:")

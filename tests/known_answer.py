@@ -180,7 +180,171 @@ import tradefloor
 # relaxing a supplied opening away over 755 days -- an engine asked for a
 # VIX of 45.0 and a policy rate of 5 per cent opened at 21.55 and 0.00.
 # A supplied opening is now kept, so this section starts where it says.
-KAT_VERSION = 14
+#
+# 2026-09-10: the pt-v18 to pt-v19 era boundary, at 0.8.0. Every seeded run
+# changes, so the digest must. pt-v19 is pt-v18 with four dials moved and
+# nothing else: the VIX level identity on (`vix_level_identity` 1.0), the
+# VIX's fall-rate symmetric (`vix_decay_ratio` 1.0), the sector loading
+# raised (`sector_loading` 0.8) and the per-name volume-variance channel
+# switched on (`volume_idio_variance_gain` 0.20). Both constants moved,
+# `params::DEFAULT_PRESET_NAME` and `Engine::default_model`, and the
+# simulation digest moved from 093f01ac... to 4931c61a... on the same
+# machine that produced the previous one.
+#
+# `metadataSha256` does NOT move here either, for the reason it did not at
+# 0.7.0: none of the four dials is among the mispricing and crowd
+# coefficients `model_preset()` reports, so what the library says about
+# itself is unchanged while what it simulates is not.
+# 2026-09-11: charter bar B4, still inside 0.8.0 and still pt-v19. The
+# index's conditional variance read-back now prices the regime it runs in:
+# `market::index_var` carries the crash amplifier's conditional second
+# moment (`amplifier_moments`, a closed form in `phi` and `Phi` over the
+# standard normal's truncated second, third and fourth moments) and the
+# crisis blend's loading shift, as two new terms inside `total()`'s
+# intraday-curve group. The module had listed both as "conditional on a tail
+# the closed form has no moment for"; the moments exist and are elementary.
+#
+# Two consequences move every seeded pt-v19 trajectory. The derived VIX
+# anchor rises -- 20.1656 to 20.5346 on `Universe.random(40, seed=111)`,
+# which is the 5.4 per cent the amplifier adds to the factor block at the
+# anchor's own regime ratio of exactly 1.0 -- and `vix_target_shock_cap`
+# moves from 45.0 to 255.0, the image of `vix_return_clamp` under the spike,
+# because the cap had been the brake standing in for the missing read-back
+# (`loopgain-report.md` section 8.2) and no longer needs to be.
+#
+# `metadataSha256` does NOT move here, for the third boundary running:
+# neither the cap nor the read-back is among the mispricing and crowd
+# coefficients `model_preset()` reports, so what the library says about
+# itself is unchanged while what it simulates is not.
+#
+# THE PRESET NAME DOES NOT MOVE and neither default constant does. This is
+# not an era boundary in the sense the three above are: pt-v19 has not
+# shipped -- 0.8.0 is unreleased -- so the vector under that name is still
+# in flight, and `params.rs`'s test that the two default constants agree is
+# unchanged because neither moved.
+# 2026-09-11, second re-base of the same day, still inside 0.8.0 and still
+# pt-v19. The read-back now also carries the DOWNSIDE TRANSMISSION TILT and
+# its lagged wire -- `market_beta_down_asym` 0.025 and, since pt-v18,
+# `market_beta_down_asym_lag` 0.375. The tilt is a two-valued loading on the
+# market factor, so it splits the loading and not the amplifier's moment
+# (`index_var::transmission_loadings`); the lag multiplies that loading by
+# 1.375 on the session after a down market factor, which is 1.891 on the
+# market block on about half of all sessions. It was the largest single
+# omission the read-back ever had and it was on the module's residual list
+# rather than in the sum.
+#
+# The derived VIX anchor rises again on `Universe.random(40, seed=111)`,
+# 20.5346 to 23.7212, and `index_unconditional_variance` now averages the
+# identity over the lag bit rather than evaluating it at the unlagged face:
+# the bit is a fair coin on a zero-mean accumulated sum, and an anchor read
+# at one face of a coin is the mean of nothing. Every seeded pt-v19
+# trajectory moves a third time.
+#
+# `metadataSha256` does NOT move, for the fourth boundary running: the tilt
+# dials are not among the mispricing and crowd coefficients `model_preset()`
+# reports.
+#
+# THE CRISIS DIALS ARE NOT TOUCHED, and the reason is the finding recorded
+# in CHANGELOG.md: the stability condition they would be derived from does
+# not bind on them. See there.
+#
+# v18: the stability fix itself, and still inside 0.8.0 and still pt-v19.
+# `crash_amplifier_conditional_sigma` denominates the crash amplifier's
+# shock in the tick's own conditional sigma rather than in the baseline
+# constant, which makes `E[z^2 A^2]` a constant of the dials instead of a
+# function of the regime and takes the superlinearity out of the VIX's map.
+# A new dial, default 0.0, branch-guarded at both its read sites, so
+# pt-v1 through pt-v18 are BIT-IDENTICAL -- measured over seventeen presets
+# and five seeds -- and pt-v19 sets it to 1.0, so every seeded pt-v19
+# trajectory moves a fourth time.
+#
+# TWO THINGS THAT DO NOT MOVE, and both are checks rather than conveniences.
+# `metadataSha256` holds for the fifth boundary running: this dial is not
+# among the mispricing and crowd coefficients `model_preset()` reports. And
+# THE DERIVED ANCHOR HOLDS TOO, at 23.7212 on `Universe.random(40,
+# seed=111)` -- `index_unconditional_variance` evaluates the identity at
+# `v_f = market_factor_sigma^2`, where the regime ratio is exactly 1.0 and
+# the two normalisers agree by construction. So this boundary moves the
+# regime RESPONSE and nothing about the level the VIX rests at.
+# v19: the COMPOSED VECTOR became pt-v19 (`7e7c1a3`), and this baseline was
+# not regenerated for it until 2026-09-13. Eighteen coefficients moved at
+# once -- the blend-off VIX response law and its gain pair, the per-name
+# GARCH memory `garch_beta` 0.7905, the factor's slow pole
+# `market_vol_slow_persistence` 0.9913, the two per-name states
+# (`sector_vol_alpha`, `sector_vol_beta`, `jump_idio_excitation` and its
+# decay and decoupling) and the derived ceiling -- so every seeded pt-v19
+# trajectory moved a fifth time, deliberately, and the fixture went on
+# claiming `c0b3c357`.
+#
+# THE GAP IS THE FINDING and it is recorded as one. `gate-run-2026-09-13.md`
+# in the design repository: every box since `wtcomp1` was launched with
+# `SKIP_GATE_IF_KAT`, which skips the whole suite when the digest matches
+# the value it is handed. The digest matched on every one of them, so the
+# gate reported green by not running, and this test -- which exists to say
+# exactly this -- was one of seventy-eight nobody saw.
+#
+# TWO ARCHITECTURES, per RELEASING.md item 3. `1cc1c4088a05` is the reading
+# on Windows x86_64 and on Amazon Linux x86_64 (the `levelsec1` box,
+# `i-0dc725e36108e6322`, whose own transcript is committed under
+# `programme/results/levelsec1/known-answer.txt`). Character for character.
+#
+# `metadataSha256` does NOT move, for the sixth boundary running: none of
+# the eighteen is among the mispricing and crowd coefficients
+# `model_preset()` reports.
+#
+# THE SLOW VARIANCE LEVEL IS NOT IN THIS. `market_vol_level_sigma` ships at
+# 0.0 and is bit-identical there, and its draw is on a stream of its own, so
+# the digest above is the same one `833fb29` printed before the level
+# existed. When the level is adopted this bumps again.
+# v20: the SLOW VARIANCE LEVEL and the SECTOR LOADING are adopted into
+# pt-v19 (2026-09-14). `market_vol_level_persistence` 0.9977,
+# `market_vol_level_sigma` 0.085 and `sector_loading` 0.8 to 0.60, measured
+# on 22 arms across three boxes and 120 rosters at both horizons
+# (`levelsec1-result.md`, `levsec2-result.md`, `levsec3-result.md`).
+#
+# The level consumes its own normal once a session on the ninth stream, so
+# this boundary moves the trajectory for a reason no previous one has: not a
+# coefficient, a DRAW. Every preset from pt-v1 to pt-v18 still reproduces bit
+# for bit -- the draw is taken on a stream nothing else reads and the
+# multiplier is exactly 1.0 at `market_vol_level_sigma` 0.0 -- so what moves
+# here is pt-v19's trajectory and nothing else's.
+#
+# `metadataSha256` does NOT move, for the seventh boundary running: none of
+# the three is among the mispricing and crowd coefficients `model_preset()`
+# reports.
+#
+# What this boundary buys, and it is the largest of the five:
+# `index_tail_dn3_pct` 0.608 to 1.023 against a tape of 1.213,
+# `excess_kurtosis` 8.56 to 12.21 against 11.06, `sector_excess_corr` 0.179
+# to 0.117 against 0.118, and the objective from 30.56 to 23.08 at 252 and
+# 38.08 to 21.82 at 504 against pt-v18's 31.56 and 41.44 -- 5.3 and 7.8
+# paired error bars with every roster resample ahead.
+#
+# pt-v19 RECOMPOSED (2026-09-20). Nine dials return to pt-v18's values: the
+# GJR triple, the slow pole, the stochastic level and the three
+# idiosyncratic jump dials. The 2^6 factorial over the six families that
+# separate pt-v18 from the 2026-09-14 composition (design repo,
+# programme/results/bestof, 64 cells at 252 and 504 days, registered before
+# it ran) measured the market variance family away from the tape on four
+# rows in 32 of 32 pairs at both horizons and the jump family moving nothing
+# beyond noise. The level's ninth-stream draw is still taken and multiplied
+# by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
+# its third boundary in six days. `metadataSha256` does NOT move, for the
+# eighth boundary running.
+#
+# pt-v19 COMPOSED A FIFTH TIME (2026-09-23). Twenty-three dials: the long-run
+# VIX law (the anchor form with its weight rising above a knee and the slow
+# regime level re-derived on its loop), the macro economy on the session
+# clock with the NBER/BEA cycle table, the Fed's lift-off rule and buybacks
+# in market_pe, news absorbed within minutes with the maker re-quoting, the
+# calm-side variance exponent, and the certification opening drawn from the
+# cycle. Taken on the owner's adopted long-run pass bar (design repo,
+# programme/longrun/CRITERIA.md: the fourth composition fails 8 of 15, this
+# one passes 15 of 15), and bit-identical to the fourth composition with
+# those dials set (programme/results/ptv19-fifth/bitident.py, five seeds x
+# 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
+# it replay exactly. `metadataSha256` does NOT move.
+KAT_VERSION = 27
 
 SEED = 20260820
 DAYS = 250

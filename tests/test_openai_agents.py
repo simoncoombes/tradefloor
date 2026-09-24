@@ -1314,6 +1314,7 @@ needs_fixture = pytest.mark.skipif(
     not FIXTURE.exists(), reason="no recorded run committed")
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_committed_recording_replays_end_to_end():
     """The shipped fixture, replayed through `evaluate` with a model that
@@ -1349,29 +1350,45 @@ def test_the_committed_recording_replays_end_to_end():
     assert len(agent.record) == example.DAYS, (
         f"{example.DAYS - len(agent.record)} recorded decisions did not "
         "replay; a missing key is absorbed by evaluate() rather than raised")
-    # RE-RECORDED at the 0.7.0 boundary that made pt-v18 the default. A
-    # recording is keyed by a digest of the exact observation the model was
-    # sent, and every price in that observation moved, so the committed
-    # transcript could not replay at all and a fresh live run was the only
-    # way back. These are that run: 7 trades against the old 3, and the
-    # values stay PINNED rather than bounded for the reason the docstring
-    # gives -- a corrupted digest drops decisions quietly and only exact
-    # numbers catch it.
-    assert card.trades == 7, card.trades
-    assert card.pnl == pytest.approx(33475.0), card.pnl
-    assert card.turnover == pytest.approx(2657865.0), card.turnover
-
-    # AND THE REFUSAL IS GONE, which is a fact about the new run and not a
-    # bug. The old recording carried one genuine market refusal -- a day-1
-    # leverage overshoot to 2.19x -- and the notebook's mandate table quotes
-    # it as the committed arm's result. gpt-5.2 sized inside the limits on
-    # this market, so the recording has nothing to refuse.
+    # RE-RECORDED at the 0.8.0 boundary that made pt-v19 the default, once
+    # when the preset first moved and again when pt-v19 took its final
+    # dials and the simulation digest moved with them. A recording is keyed
+    # by a digest of the exact observation the model was sent, and every
+    # price in that observation moved, so the committed transcript could
+    # not replay at all and a fresh live run was the only way back. These
+    # are that run. The values stay PINNED rather than bounded for the
+    # reason the docstring gives -- a corrupted digest drops decisions
+    # quietly and only exact numbers catch it.
     #
-    # Pinned at zero deliberately: a replay failure lands in this same list,
-    # so asserting the list is EMPTY still catches one. What is lost is the
-    # notebook's worked example of a refusal, and the honest fix for that is
-    # a re-recorded mandate table rather than fishing for a run that
-    # overshoots.
+    # The eras of this fixture, on the same seed, roster and brief: pt-v16
+    # 3 trades, pt-v18 7, pt-v19 as first composed 7, pt-v19 recomposed a
+    # fourth time 8, and a fifth time 7. The market moved under the model
+    # each time and the model answered it differently; none of them is a
+    # better agent than the others.
+    #
+    # The values replaced by the fifth composition, kept beside the new
+    # ones so a future move can be recognised as the next one and not as
+    # the first: trades 8, pnl 24410.0, turnover 2611910.0. And the ones
+    # the fourth composition replaced before them: trades 7, pnl 14495.0,
+    # turnover 2566815.0.
+    assert card.trades == 7, card.trades
+    assert card.pnl == pytest.approx(22490.0), card.pnl
+    assert card.turnover == pytest.approx(1939890.0), card.turnover
+
+    # AND THE REFUSAL STAYS GONE, which is a fact about this market and
+    # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
+    # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
+    # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
+    # that leg; on the fourth and fifth compositions it stayed inside the
+    # cap every day and there is nothing to refuse. Each of those is the
+    # environment doing its job on a decision the agent made, not a replay
+    # failure.
+    #
+    # Pinned exactly rather than bounded, and the reason both lines exist:
+    # a replay failure lands in this same list, so counting the refusals is
+    # not enough -- the second assertion says the list is EMPTY, which a
+    # missing-digest error would not leave it. Previously: rejected 1, one
+    # leverage refusal.
     assert card.rejected == 0, card.errors
     assert card.errors == [], card.errors
 

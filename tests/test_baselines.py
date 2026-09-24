@@ -129,7 +129,84 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # margin at any swap so far, and the clearest reading yet of why this
     # comment keeps warning about that pair. The bottom pair swapped too.
     # The oracle has still never moved.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
+    #
+    # Re-measured again at the 0.8.0 boundary that made pt-v19 the default:
+    # oracle +7.148%, mean_reversion +2.305%, momentum +2.235%,
+    # buy_and_hold -0.018%, random -1.103%. Momentum and mean-reversion
+    # swapped for the EIGHTH time, 0.070 points apart, which is the second
+    # narrowest margin at any swap and lands the pair back the way pt-v12
+    # had them. The bottom pair held and the oracle has still never moved.
+    #
+    # What moved the whole board is worth naming, because it is the same
+    # mechanism behind three other re-measurements at this boundary: under
+    # `vix_level_identity` the VIX anchor is DERIVED from the roster rather
+    # than read off a dial, and a derived anchor opens above where the VIX
+    # settles. On this roster it opens at 18.66 against pt-v18's flat 15.98
+    # and decays toward it over fifteen to twenty sessions. A five-day run
+    # lives entirely inside that opening window, so every agent here is
+    # graded on a market roughly a fifth more volatile than the one the
+    # preset was certified on at 252 and 504 days.
+    #
+    # Re-measured again when `market::index_var` took the downside
+    # transmission tilt and its lagged wire into the read-back: oracle
+    # +7.527%, momentum +1.954%, mean_reversion +1.920%, buy_and_hold
+    # -0.100%, random -1.146%. Momentum and mean-reversion swapped for the
+    # NINTH time, 0.034 points apart -- narrower than the 0.056 that was
+    # the record two boundaries ago, and about half of it. The bottom pair
+    # held and the oracle has still never moved.
+    #
+    # The same mechanism as the paragraph above, one turn further on: the
+    # derived anchor goes 20.17 to 22.23 on this roster, because the tilt
+    # multiplies the read-back's market block by 1.891 on the session after
+    # a down market factor and the unconditional variance now averages over
+    # that coin. The opening VIX is 20.18 against the anchor's 22.23, so a
+    # five-day run still lives inside the window the previous re-measurement
+    # named, and the volatility it is graded on has risen again.
+    # Re-measured again when pt-v19 took its final three dials -- the
+    # excursion switch, the derived ceiling and the tape's GARCH
+    # coefficients: oracle +7.451%, mean_reversion +2.569%, momentum
+    # +0.677%, buy_and_hold -0.209%, random -1.209%. Momentum and
+    # mean-reversion swapped for the TENTH time, and this one is not the
+    # narrow margin every swap before it was: **1.892 points apart**,
+    # against 0.518 at the widest previous swap. Momentum fell from +1.954%
+    # while mean-reversion rose from +1.920%, so the pair separated rather
+    # than crossing.
+    #
+    # That is the coefficients and not the ceiling. `market_vol_alpha` goes
+    # 0.28035 to 0.1059 and `market_vol_beta` 0.69245 to 0.8787, so the
+    # factor's variance persistence rises (alpha + beta 0.9728 -> 0.9846)
+    # while its per-shock burstiness falls by nearly two thirds. A
+    # five-session window on a smoother, more persistent variance path has
+    # less of the tick-to-tick reversal momentum trades and more of the
+    # drift-to-fair mean-reversion trades, which is the direction this pair
+    # moved. The oracle has still never moved.
+    # Re-measured again when pt-v19 took the tape's GJR triple: oracle
+    # +7.667%, momentum +2.969%, mean_reversion +1.744%, buy_and_hold
+    # -0.203%, random -1.012%. Momentum and mean-reversion swapped for the
+    # ELEVENTH time, 1.225 points apart, and back to the order pt-v18 had.
+    #
+    # It is the same pair moving for the same reason as last time, in
+    # reverse. The symmetric fit's alpha 0.1059 reacted to every shock;
+    # the GJR's loads `alpha + gamma` = 0.1622 on a DOWN day and 0.0066 on
+    # an up one. A five-session window therefore has its variance
+    # concentrated behind the down moves, which is where momentum's
+    # continuation signal lives and where mean-reversion's snap-back does
+    # not. The oracle has still never moved, in eleven swaps.
+    #
+    # Re-measured again at pt-v19's fifth composition (2026-09-23: the
+    # anchor form of the VIX law, the live down-day wire at 0.46, the macro
+    # session clock and US cycle with the drawn opening, news priced within
+    # minutes): oracle +7.664%, mean_reversion +2.663%, momentum +2.156%,
+    # buy_and_hold +0.317%, random -1.124%. Momentum and mean-reversion
+    # swapped for the TWELFTH time, 0.507 points apart; until this
+    # re-measurement the pin read oracle, momentum, mean_reversion,
+    # buy_and_hold, random. No one group of the composition does it alone:
+    # each of the four groups added by itself to the fourth composition
+    # leaves momentum ahead, and taking the lag wire, the macro group or the
+    # news group back out of the fifth puts momentum ahead again. The
+    # bottom pair held, buy_and_hold now just above flat, and the oracle has
+    # still never moved, in twelve swaps.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
                       "buy_and_hold", "random"]
 
 
@@ -138,14 +215,33 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # much over five days, it just pays costs. Any strategy near this number
     # is measuring its own transaction costs.
     #
-    # The bound was 0.5% before the market-factor variance process; it is
-    # 1.0% since, because a random book now carries market beta that no
+    # The bound was 0.5% before the market-factor variance process, and 1.0%
+    # from there to 0.7.0, because a random book carries market beta that no
     # longer diversifies away -- the correlated share of every name is a
-    # third of its variance, so forty coin-flip positions keep a net
-    # exposure the factor's regimes move (measured -0.61% on this seed).
-    # The floor's meaning is relative anyway: an order of magnitude under
-    # the oracle's +8.78% on the same seed and horizon.
-    assert abs(scores["random"].return_pct) < 1.0
+    # third of its variance, so forty coin-flip positions keep a net exposure
+    # the factor's regimes move.
+    #
+    # 1.25% since 0.8.0, and the cause is NOT costs. Measured across twelve
+    # seeds (1, 2, 3, 5, 7, 11, 13, 17, 42, 99, 101, 2026) at this boundary:
+    # trade count is unchanged at about 1194, impact per trade FELL from a
+    # mean 8.89 bps to 7.47, and buy-and-hold is essentially unchanged
+    # seed-for-seed, so the market's direction did not move either. What
+    # moved is the mean: -0.305% to -0.423%, with the spread of |return|
+    # going 0.386% to 0.487% and its worst seed 0.869% to 1.103%. That is
+    # variance drag on an undiversified book in a window roughly a fifth
+    # more volatile -- the same mechanism that raised this bound once
+    # before, arriving by a different route. Under `vix_level_identity` the
+    # VIX anchor is DERIVED from the roster rather than read off a dial, and
+    # a derived anchor opens above where the VIX settles: 18.66 on this
+    # roster against pt-v18's flat 15.98, decaying toward it over fifteen to
+    # twenty sessions. A five-day run sits entirely inside that window.
+    #
+    # 1.25 and not the measured 1.103: a floor asserted at its own worst
+    # observed seed is a floor that fails on the thirteenth seed anybody
+    # tries. The floor's meaning is relative anyway -- an order of magnitude
+    # under the oracle on the same seed and horizon, which the ratio below
+    # measures properly across seeds.
+    assert abs(scores["random"].return_pct) < 1.25
 
     # The RATIO is measured across seeds, not on the fixture's one.
     #

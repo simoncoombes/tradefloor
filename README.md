@@ -140,15 +140,37 @@ lists every target and what it actually reaches.
 ## Realism
 
 `tf.facts.measure()` scores fourteen shape statistics against real-market
-bands, and four more on a protocol that varies the roster with the seed. The
-default preset, `pt-v18`, holds all fourteen at one year and at two years, on
-the certification roster and on a held-out one, at thirty seeds each -- and it
-is the first default to hold the other four as well: the index level returns
-+5.8 per cent a year inside a band of 2.9 to 11.9, where `pt-v16` lost 13.6
-and was reported red for three releases.
+bands, a fifteenth that reads only in a crisis, and four more on a protocol
+that varies the roster with the seed. At the default preset, `pt-v19`,
+every one of them is in its band in all four cells of the record: the
+certification roster and a held-out one, at one year and two, thirty
+seeds each, with no misses. The row it reads furthest from real is
+`sector_excess_corr`, 0.103 against a tape centre of 0.164, in band and
+seven tape errors short; the short-lag clustering rows sit under two tape
+errors from their centres.
 
-One row reads further from real than before: the crisis lever is 6.53x
-against real markets' 6.16x, where `pt-v16` read 6.23x.
+It holds the other four: the index level returns +6.4 per cent a year inside
+a band of 2.9 to 11.9, the -1 per cent fear row reads 1.9 against a tape
+centre of 2.7, the -3 per cent fear row 5.9 against 5.7, where `pt-v18`
+read 3.2, and the index tail 0.78 per cent of sessions against a real 1.21.
+
+Crises have an epicentre. At each crisis one sector is drawn to carry it,
+banks in three of five on the tape, and the crisis dispersion row reads
+1.36 against the tape's 1.34 where it read 1.15 without the draw. A
+scenario can pin the epicentre: `Scenario().hold(epicentre="financial_services")`.
+VIX persistence, the row no earlier preset held, passes the structural
+gate at one year, sits on the tape at two, and rises between them by
++0.007 against the tape's paired +0.012. The crisis lever -- held VIX 65
+over held VIX 5 -- reads 3.11x against real markets' 6.16x, where
+`pt-v18` read 7.06x; the other half of it sits in the names' own
+variance response, a recorded form not yet shipped.
+
+Composed 2026-09-21 and 2026-09-22, four times. The preset carries the
+tape's own GJR variance triple and slow pole, a regime level on the VIX
+law from the tape's yearly medians, the lever's exponent from the tape's
+crisis scaling law, the level's loop gain that undoes the loop's
+amplification of that level, and the crisis epicentre from the tape's
+five episodes. The earlier records and their figures are in the changelog.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market
@@ -179,7 +201,7 @@ Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-`pt-v18` became the default at 0.7.0, taking it from `pt-v16`. Naming your
+`pt-v19` became the default at 0.8.0, taking it from `pt-v18`. Naming your
 preset explicitly makes a run replay exactly, and every preset from `pt-v1` on
 is still selectable.
 

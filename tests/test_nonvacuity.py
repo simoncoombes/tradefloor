@@ -175,17 +175,31 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     """
     pa = pytest.importorskip("pyarrow")
 
-    # The numbers here are the violence needed, not a preference. The ramp
-    # started at 65 with a -0.30 QE step until 0.6.0, when pt-v16's joint
-    # 0.86x noise trim left that scenario short of the band on every seed and
-    # this guard reported "never bound". Measured at the values below the
-    # breaker binds on 33 to 729 rows across seeds 2024, 7, 101 and 555, so
-    # the margin survives the next preset that runs calmer still.
+    # The numbers here are the violence needed, and they have been raised
+    # twice for the same reason. The ramp started at 65 with a -0.30 QE step
+    # until 0.6.0, when pt-v16's joint 0.86x noise trim left that scenario
+    # short of the band on every seed and this guard reported "never bound".
+    # It went to 200 and -0.90, which held until 2026-09-11, when
+    # crash_amplifier_conditional_sigma denominated the amplifier's shock in
+    # the tick's own conditional sigma. That is exactly a change in what a
+    # pinned VIX of 200 does to a tick: at the old normaliser the amplifier's
+    # argument was the shock in BASELINE sigmas, so a regime this deep
+    # multiplied the market component several times over, and at the new one
+    # the argument is the shock in conditional sigmas and the multiplier is
+    # the same few per cent it is in a calm market. Measured at 200 and -0.90
+    # on this build the breaker binds on 0, 75, 16 and 54 rows across seeds
+    # 2024, 7, 101 and 555, so the seed this test runs stopped binding at
+    # all.
+    #
+    # At 400 and -0.95 it binds on 592, 931, 555 and 624 rows across the same
+    # four seeds. Raised to there rather than to the first setting that binds
+    # on seed 2024, so the margin survives the next preset that runs calmer
+    # still, which is the lesson of having done this twice.
     universe = tradefloor.Universe.random(20, seed=5)
     scenario = (tradefloor.Scenario()
                 .hold(vix=15.0, corporate_bond_yield=0.055)
-                .ramp("vix", start=200.0, end=15.0, over=20, begin=5)
-                .step("qe_pe_boost", before=0.0, after=-0.90, at=5))
+                .ramp("vix", start=400.0, end=15.0, over=20, begin=5)
+                .step("qe_pe_boost", before=0.0, after=-0.95, at=5))
     engine = tradefloor.Engine(seed=2024, universe=universe)
     for day in range(25):
         scenario.apply(engine, day)

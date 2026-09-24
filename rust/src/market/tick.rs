@@ -289,6 +289,50 @@ pub fn sector_sigma_at(p: &ModelParams, economy: &EconomyState, vix_anchor: f64)
     }
 }
 
+/// The crisis blend's spike, `0.0` below [`ModelParams::crisis_vix_threshold`]
+/// and rising to [`ModelParams::crisis_blend_cap`] on the ramp above it.
+///
+/// A DETERMINISTIC FUNCTION OF THE STATE the close already holds — today's
+/// VIX and the remembered universe stress — and no draw. That is what lets
+/// [`crate::market::index_var`] price the blend's contribution to the index's
+/// conditional variance rather than leave it as an unmodelled tail: the spike
+/// is not a random variable, so the blend's injection is a known multiple of
+/// the market factor and its second moment is the factor's own.
+///
+/// Lifted out of [`compute_tick`], where it stood inline, for the reason
+/// `sector_sigma_at` was: the read-back and the tick must not be able to
+/// disagree about when a crisis is on. The arithmetic is the arithmetic that
+/// stood there, branch for branch, so every preset is bit-identical.
+///
+/// # Universe memory
+///
+/// Without it this blend is a lookup on today's VIX and nothing else: the
+/// tick VIX drops back under the threshold and the whole cross-section
+/// decouples in the same tick, so a crisis leaves no trace. With it,
+/// remembered stress from earlier days holds the blend up while it decays,
+/// which is what real correlation does after a panic. The branch keeps every
+/// earlier preset bit-identical — at weight zero this is the instant stress
+/// and no arithmetic has touched it.
+pub fn crisis_spike_for(p: &ModelParams, vix: f64, universe_stress: f64) -> f64 {
+    // Today's stress, in VIX points above the crisis threshold.
+    let instant_stress = if vix > p.crisis_vix_threshold {
+        vix - p.crisis_vix_threshold
+    } else {
+        0.0
+    };
+    let effective_stress = if p.universe_stress_weight == 0.0 {
+        instant_stress
+    } else {
+        instant_stress
+            + p.universe_stress_weight * mathx::max(universe_stress - instant_stress, 0.0)
+    };
+    if effective_stress > 0.0 {
+        mathx::min(p.crisis_blend_cap, effective_stress / p.crisis_blend_ramp)
+    } else {
+        0.0
+    }
+}
+
 /// The factor the valuation's fundamentals are restated by, from the
 /// economy's own integrated nominal output.
 ///
@@ -459,11 +503,24 @@ pub struct TickInputs<'a> {
     /// Sector keys in the order `SECTOR_CONFIGS` enumerates them. The ORDER
     /// is contractual: one normal is drawn per key, in this order.
     pub sector_keys: &'a [String],
+    /// One DAILY sigma per sector key from the engine's per-sector variance
+    /// state (`sector_vol_alpha` / `_beta`), or EMPTY, which is the stateless
+    /// draw at `sector_sigma_at` every preset up to pt-v19 runs. See
+    /// `programme/results/vix-dynamics.md` section 19.
+    pub sector_sigmas: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
     /// Read only by the lagged transmission wire
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
     /// including every recorded reference stream.
     pub prev_day_down: bool,
+    /// Yesterday's whole-session accumulated market factor -- the signed
+    /// quantity `prev_day_down` is the sign of. Read ONLY when
+    /// `market_beta_down_asym_lag_live` is nonzero; at 0.0 nothing looks
+    /// at it and every shipped preset is bit-identical whatever it holds.
+    pub prev_day_factor: f64,
+    /// TODAY's running accumulated market factor BEFORE this tick's own
+    /// draw. Read ONLY when `market_beta_down_asym_lag_live` is nonzero.
+    pub day_factor: f64,
     /// Fraction of the forced-flow segment's budget remaining, 1.0 when
     /// the reservoir dial is off. See `ModelParams::forced_flow_reservoir`.
     pub forced_flow_eff: f64,
@@ -497,6 +554,11 @@ pub struct TickInputs<'a> {
     /// Per-NAME volume state, indexed by company (§107). Empty means the
     /// mechanism is off, which every preset before it is.
     pub volume_idio: &'a [f64],
+    /// The log jump each name's `s` took at the LAST close, indexed by
+    /// company. Empty, or all zeros, means the volume scale reads the
+    /// whole of the day's move, which is every preset: see
+    /// [`crate::params::ModelParams::volume_move_jump_share`].
+    pub jump_move: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -526,6 +588,14 @@ pub struct TickInputs<'a> {
     /// `buyback_payout_share` is nonzero, which is pt-v18 and no preset
     /// before it. A single-tick caller passes 0, which makes the factor
     /// 1.0 and the valuation the one every earlier preset computes.
+    /// The sector at the epicentre of the crisis episode this session is
+    /// inside, or `None`.
+    ///
+    /// The engine's episode state, resolved at `open_market` and fixed for
+    /// the whole session. `None` on every shipped preset -- see
+    /// [`crate::params::ModelParams::crisis_epicentre_extra`] and
+    /// `SharedFactors::crisis_epicentre`, which this is copied onto.
+    pub crisis_epicentre: Option<&'a str>,
     pub elapsed_days: i64,
     /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
     /// engine passes its own; a caller building `TickInputs` directly
@@ -558,6 +628,17 @@ pub struct TickOutcome {
     /// `Δs` -- so a consumer can verify the label against the outcome rather
     /// than trusting it.
     pub s_components: Vec<[f64; 8]>,
+    /// The `random_noise` slot of `s_components` split into market, sector
+    /// and idiosyncratic, per active company, at the same scale the slot
+    /// carries. The three sum to that slot up to the order the sum above is
+    /// written in, and the slot is still what moved `s`.
+    pub noise_parts: Vec<[f64; 3]>,
+    /// The square of the scale the idiosyncratic part was drawn at, with
+    /// the name's own daily sigma divided out, at the same tick scale. Summed
+    /// over a day this is `kappa^2`: how far the day's own-noise variance
+    /// sits from the `h` the per-name GJR carries. See
+    /// [`crate::params::ModelParams::garch_innovation_commensurate`].
+    pub noise_own_scale2: Vec<f64>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
     /// The live factor decomposition per active company, in `active_indices`
@@ -693,6 +774,8 @@ pub fn simulate_market_tick(
             fair_values: Vec::new(),
             fundamental_values: Vec::new(),
             s_components: Vec::new(),
+            noise_parts: Vec::new(),
+            noise_own_scale2: Vec::new(),
             volumes: Vec::new(),
             factors: Vec::new(),
             shared_factors: SharedFactors {
@@ -704,6 +787,8 @@ pub fn simulate_market_tick(
                 // the constant: a reader of a closed market's factors
                 // should not find a plausible sigma there.
                 market_sigma_tick: 0.0,
+                // No tick ran, so nothing carried the epicentre either.
+                crisis_epicentre: None,
             },
             shock: Vec::new(),
             absorbed: Vec::new(),
@@ -744,31 +829,7 @@ pub fn simulate_market_tick(
     // makes crossing it MEAN something: the blend saturates at its 0.8
     // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
     // instead of asking for a VIX of 64 that cannot exist.
-    // Today's stress, in VIX points above the crisis threshold.
-    let instant_stress = if economy.vix > p.crisis_vix_threshold {
-        economy.vix - p.crisis_vix_threshold
-    } else {
-        0.0
-    };
-    // UNIVERSE MEMORY. Without it this blend is a lookup on today's VIX and
-    // nothing else: the tick VIX drops back under the threshold and the
-    // whole cross-section decouples in the same tick, so a crisis leaves no
-    // trace. With it, remembered stress from earlier days holds the blend
-    // up while it decays, which is what real correlation does after a
-    // panic. The branch keeps every earlier preset bit-identical -- at
-    // weight zero this is `instant_stress` and no arithmetic has touched it.
-    let effective_stress = if p.universe_stress_weight == 0.0 {
-        instant_stress
-    } else {
-        instant_stress
-            + p.universe_stress_weight
-                * mathx::max(inputs.universe_stress - instant_stress, 0.0)
-    };
-    let vix_correlation_spike = if effective_stress > 0.0 {
-        mathx::min(p.crisis_blend_cap, effective_stress / p.crisis_blend_ramp)
-    } else {
-        0.0
-    };
+    let vix_correlation_spike = crisis_spike_for(p, economy.vix, inputs.universe_stress);
 
     // The sector draw's sigma is `sector_sigma_for`, shared with the
     // overnight move; the arithmetic is the one that stood here.
@@ -776,6 +837,13 @@ pub fn simulate_market_tick(
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for (sector_index, sector) in inputs.sector_keys.iter().enumerate() {
         rng.site(crate::rng::Site::SectorZ, sector_index as u32);
+        // The sector's own variance state when one is running, else the
+        // shared VIX-coupled sigma -- the same multiply in the same order
+        // when `sector_sigmas` is empty.
+        let sector_sigma = match inputs.sector_sigmas.get(sector_index) {
+            Some(s) => *s,
+            None => sector_sigma,
+        };
         let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the
@@ -791,15 +859,48 @@ pub fn simulate_market_tick(
         };
         sector_factors.push((sector.clone(), kept));
     }
+    // THE LAGGED WIRE'S CONDITION, and WHERE it is sampled is the dial.
+    //
+    // At `market_beta_down_asym_lag_live` 0.0 this is exactly the bit the
+    // engine read at the open and nothing below runs -- the same boolean,
+    // by the same comparison, so every preset through pt-v19 is
+    // bit-identical. At 1.0 the SAME condition ("the market has fallen
+    // over the last session") is evaluated against the state as it stands
+    // at this tick: yesterday's total decayed by the fraction of the
+    // session already elapsed, plus today's own running sum. That is
+    // `E[sum of the last 390 tick factors]` given the two numbers the
+    // variance state already holds, and it needs no new state and no draw.
+    //
+    // `inputs.day_factor` is the accumulator BEFORE this tick's factor
+    // lands (the engine accumulates after `simulate_market_tick` returns),
+    // so the multiplier is a function of strictly earlier draws and the
+    // day's delivered factor keeps its zero mean. See
+    // `ModelParams::market_beta_down_asym_lag_live`.
+    let lag_condition = if p.market_beta_down_asym_lag_live == 0.0 {
+        inputs.prev_day_down
+    } else {
+        let c = inputs.prev_day_factor * (1.0 - inputs.intraday_t) + inputs.day_factor;
+        // 2.0 is the registered SIGN CONTROL (F4), not a shipping value.
+        if p.market_beta_down_asym_lag_live >= 2.0 {
+            c > 0.0
+        } else {
+            c < 0.0
+        }
+    };
     let shared = SharedFactors {
         market_factor,
         sector_factors,
         crisis_spike: vix_correlation_spike,
-        prev_day_down: inputs.prev_day_down,
+        prev_day_down: lag_condition,
         // The same expression the draw above multiplied the normal by, so
         // the recentring reads the sigma that was actually used rather
         // than one recomputed from the constant.
         market_sigma_tick: inputs.market_sigma_daily * tick_scale,
+        // Resolved once at `open_market` and carried, not recomputed: the
+        // episode's epicentre is a property of the SESSION, and a tick that
+        // re-read the engine's state mid-day would let an episode start
+        // between two ticks of one day.
+        crisis_epicentre: inputs.crisis_epicentre.map(|s| s.to_string()),
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);
@@ -909,6 +1010,8 @@ pub fn simulate_market_tick(
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
     let mut s_components = vec![[0.0f64; 8]; active_count];
+    let mut noise_parts = vec![[0.0f64; 3]; active_count];
+    let mut noise_own_scale2 = vec![0.0f64; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
     // The fundamentals restated in the economy's current price level and
@@ -1015,6 +1118,22 @@ pub fn simulate_market_tick(
             ]
         };
 
+        // The noise slot's three parts and the scale its own part was drawn
+        // at, both at the scale the slot above carries: `all_noises` already
+        // holds the closed tick's 0.15, and the open tick's
+        // `intraday_vol_mult` multiplies once more. Read off `raw` rather
+        // than recomputed, so these cannot drift from the draw. Nothing here
+        // touches `s_val` below; the close reads them, and only when
+        // `garch_innovation_commensurate` is non-zero.
+        let noise_scale = if open { intraday_vol_mult } else { 0.15 };
+        noise_parts[i] = [
+            raw.noise_market * noise_scale,
+            raw.noise_sector * noise_scale,
+            raw.noise_idio * noise_scale,
+        ];
+        let own_scale = raw.noise_idio_unit * noise_scale;
+        noise_own_scale2[i] = own_scale * own_scale;
+
         if open {
             // The crowd reacts to the mispricing it can SEE — the pre-update
             // state — so there is no same-tick feedback loop.
@@ -1109,7 +1228,30 @@ pub fn simulate_market_tick(
         // Zero-guard: a newly listed company before `resetDailyPrices` seeds
         // `open` would divide by zero and propagate NaN into the batch.
         let daily_change = if stock.open > 0.0 {
-            ((new_prices[i] - stock.open) / stock.open).abs()
+            let move_from_open = (new_prices[i] - stock.open) / stock.open;
+            // The whole move, jumps included -- the shipped spelling, and a
+            // BRANCH rather than a multiply by one, so every preset that
+            // leaves the share alone takes the arithmetic that was here.
+            //
+            // Off 1.0 the day is measured from the open the name would have
+            // had if `(1 - share)` of the last close's jump had gapped
+            // overnight instead of trading in through the book. A jump is
+            // booked into `mispricing_s` at the close and `open` is set from
+            // the price before it, so at share 1.0 a gap counts as a day the
+            // name travelled that far. See
+            // `ModelParams::volume_move_jump_share`.
+            if inputs.params.volume_move_jump_share == 1.0 {
+                move_from_open.abs()
+            } else {
+                match inputs.jump_move.get(idx) {
+                    Some(&j) if j != 0.0 => {
+                        let open_eff = stock.open
+                            * mathx::exp((1.0 - inputs.params.volume_move_jump_share) * j);
+                        ((new_prices[i] - open_eff) / open_eff).abs()
+                    }
+                    _ => move_from_open.abs(),
+                }
+            }
         } else {
             0.0
         };
@@ -1194,7 +1336,23 @@ pub fn simulate_market_tick(
                 ])),
                 SettleDrawPolicy::FourOrZero => None,
             };
-            let micro = companies[idx].micro_view(companies[idx].stock.price);
+            // Quote revision on public news. The maker quotes around the
+            // last print, so a model price that jumps on news reaches the
+            // tape only as fast as the tick's flow can walk the book: an
+            // event priced whole in one tick printed a seventh of it after
+            // that tick and under half after five. Public news moves quotes
+            // without a trade (dealers re-quote on the wire), so with
+            // `news_quote_revision` on, the book is quoted around the last
+            // print moved by this tick's news term, and the flow trades
+            // from there. At 0.0 -- every preset -- or on a tick with no
+            // news term, the branch is not taken and the book is the one
+            // that always stood.
+            let quote_from = if p.news_quote_revision == 0.0 || s_components[i][3] == 0.0 {
+                companies[idx].stock.price
+            } else {
+                companies[idx].stock.price * mathx::exp(s_components[i][3])
+            };
+            let micro = companies[idx].micro_view(quote_from);
             let options = SettleOptions {
                 // From the params, so a preset that smooths the size curve
                 // smooths it in settlement too rather than only in the book.
@@ -1321,6 +1479,8 @@ pub fn simulate_market_tick(
         fair_values: new_prices,
         fundamental_values: fundamentals,
         s_components,
+        noise_parts,
+        noise_own_scale2,
         volumes,
         factors: all_factors,
         shared_factors: shared,

@@ -806,7 +806,21 @@ def test_the_panel_rows_carry_their_band_distances(facts):
     noise units -- without reintroducing the aggregate the function refuses.
     """
     rows = compare_to_real_markets(facts)
+    # A row the basis cannot read has no distance, because there is no edge
+    # to measure to. It is PRESENT and says so, which is the state this loop
+    # has to be able to tell from a row that was never measured, so the
+    # contract is asserted here rather than the row being filtered out
+    # silently. At the default basis, `ruled`, this is the one row
+    # `facts.RULED_UNREADABLE[252]` names, behind a table entry that is owed.
+    unreadable = [k for k, r in rows.items() if r["matches"] is None]
+    for key in unreadable:
+        assert rows[key]["verdict"] == "unreadable", key
+        assert rows[key]["real_range"] is None, key
+        assert rows[key]["band_distance"] is None, key
+        assert rows[key]["unreadable"], key
     for key, row in rows.items():
+        if key in unreadable:
+            continue
         assert row["band_distance"] >= 0.0
         assert (row["band_distance"] == 0.0) == row["matches"], key
         if key not in SEED_SD:

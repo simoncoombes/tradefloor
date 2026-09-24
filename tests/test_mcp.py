@@ -598,19 +598,37 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     """
     d = mcp.describe_simulator()
     from tradefloor import envelope
-    from tradefloor.facts import SHAPE, LEVEL, CRISIS
+    from tradefloor.facts import SHAPE, LEVEL, CRISIS, DISPERSION
     cert = envelope.certified()
     served_out = set(d["certified"]["statistics_out_of_band"])
     served_in = set(d["certified"]["statistics_in_band"])
+    # `is False` / `is True`, NOT truthiness. Since the default basis moved
+    # to `ruled` a row can be UNREADABLE -- `in_band` None, because the
+    # basis adopts no band for it -- and `not None` is True, so the old
+    # truthiness form counted an ungraded row as out of band and asserted
+    # the surface should serve it that way. Three states, tested as three.
+    served_unreadable = set(d["certified"]["statistics_unreadable"])
     assert served_out == {k for k, v in cert["statistics"].items()
-                          if not v["in_band"]}
+                          if v["in_band"] is False}
     assert served_in == {k for k, v in cert["statistics"].items()
-                         if v["in_band"]}
+                         if v["in_band"] is True}
+    assert served_unreadable == {k for k, v in cert["statistics"].items()
+                                 if v["in_band"] is None}
+    # The three sets partition the served statistics; nothing is served
+    # twice and nothing served is unaccounted for.
+    assert not (served_in & served_out) and not (served_in & served_unreadable)
+    assert d["certified"]["band_basis"] == cert["band_basis"]
     # Every shape row is in band, and the shape group is served whole so a
     # reader can tell a crisis row in band from the count a gate reads.
     assert set(SHAPE) <= served_in
     assert d["certified"]["groups"]["shape"] == list(SHAPE)
-    assert all(k in LEVEL + CRISIS for k in served_in - set(SHAPE))
+    # DISPERSION since the fourth composition of 2026-09-22: a graded row
+    # measured on a crisis window and carried in its own group, so it is
+    # served like the others and belongs in this partition. The row named
+    # here rather than the group left open, because a row that reaches the
+    # served set without a group is the wiring fault this line catches.
+    assert all(k in LEVEL + CRISIS + DISPERSION
+               for k in served_in - set(SHAPE))
     # The level and crisis rows are served with their OWN verdicts, which is
     # the property that matters and the one that survives an era boundary.
     # This read `assert "index_drift_pct" in served_out` and pinned the
@@ -618,10 +636,14 @@ def test_describe_simulator_serves_the_envelopes_verdicts_by_group():
     # pt-v16 and is green at pt-v18, and a test that pins today's verdict
     # fails on the release that improves the model. What must hold is that
     # each row is served under the verdict the envelope computes for it.
-    for row in LEVEL + CRISIS:
+    for row in LEVEL + CRISIS + DISPERSION:
         if row not in cert["statistics"]:
             continue                       # unmeasured; asserted just below
-        expected = served_in if cert["statistics"][row]["in_band"] else served_out
+        # Three states again: an UNREADABLE row is served as neither in nor
+        # out, and the truthiness form sent it to `served_out`.
+        _verdict = cert["statistics"][row]["in_band"]
+        expected = (served_unreadable if _verdict is None
+                    else served_in if _verdict else served_out)
         assert row in expected, (
             f"{row} is served under the wrong verdict: the envelope reads "
             f"in_band={cert['statistics'][row]['in_band']}")

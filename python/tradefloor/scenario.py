@@ -170,6 +170,35 @@ does not do is move any single name's IDIOSYNCRATIC variance. It sizes a
 pin to a target per-name volatility goes through the factor's share, not
 one-for-one.
 
+## A forced VIX that sets volatility (``vix_sets_variance``)
+
+By default a forced VIX reaches the market factor's variance the way the
+model's own VIX does: each close moves the variance one step toward the
+level that VIX implies. The factor's fast component closes about 2% of the
+gap a session (a 33-session half-life), so when a scenario drives the VIX
+from 15 to 80 in three weeks, the market's volatility peaks weeks after the
+VIX does. Replaying the real 2020 VIX, the model's volatility and stock
+correlation peaked about 54 sessions after the real ones.
+
+A scenario can ask for the forced VIX to set the variance instead::
+
+    Scenario(vix_sets_variance=True).hold(vix=15.0).ramp(
+        "vix", start=80.0, end=30.0, over=40, begin=60)
+
+or, in YAML, ``vix_sets_variance: true`` in the ``scenario:`` block, or in a
+``to_json`` document, ``"vix_sets_variance": true`` beside ``"path"``. Then
+every session the scenario forces the VIX (a pin, or an intervention on
+``macro.vix``) closes with both variance components SET to the level the
+variance law reverts to at that VIX, clamped as usual, and the next session
+trades at it. It is the level a free run would settle at if that VIX were
+held for ever, so nothing new is introduced, and when the scenario stops
+forcing the VIX the free law carries on from its own fixed point without a
+jump. While forced, the day's own market shock does not feed the factor's
+variance; per-name volatility, sector volatility and jumps still cluster on
+their own shocks. The switch is off by default, a scenario without it runs
+exactly as before, and it changes the scenario's fingerprint when on. A
+scenario that turns it on and never forces the VIX is refused when applied.
+
 ## The macro counterfactual is exact on the market stream, and says so
 
 This is the counterfactual real markets cannot offer: you cannot re-run a
@@ -256,6 +285,7 @@ import warnings
 from typing import Any, Callable, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
+from ._core import sectors as _sectors
 from . import yaml_subset
 from .interventions import (
     SCENARIO_SCHEMA,
@@ -288,6 +318,18 @@ FIELDS = (
     "tariff_rate",
     "oil_price",
     "cycle",
+    # Not a macro level but a pin all the same: which sector carries the
+    # next crisis episode. It sits here because it reaches the engine the
+    # way the eleven above do -- through ``Engine.pin_macro`` -- and because
+    # a scenario that holds VIX at 65 and wants the crisis to be a banking
+    # crisis says so in the same breath:
+    # ``Scenario().hold(vix=65.0, epicentre="financial_services")``.
+    #
+    # A pinned epicentre takes NO draw, so a pinned run and an unpinned one
+    # are not the same random world on the epicentre's stream. See
+    # ``ModelParams.crisis_epicentre_extra``; the pin does nothing at all
+    # while that dial is 0.0, which is every shipped preset.
+    "epicentre",
 )
 
 #: Fields the engine validates as fractions in [-0.05, 0.50]. Listed so a
@@ -305,12 +347,46 @@ RATE_MIN, RATE_MAX = -0.05, 0.50
 #: the run, which is the wrong end for a caller reading a traceback.
 CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
 
+#: What ``epicentre`` may be pinned to: any sector key, or ``"none"`` -- a
+#: crisis with no epicentre, which is two of the tape's five episodes and is
+#: a value in its own right rather than the absence of one. Read off the
+#: engine's own table so the two cannot drift apart, with ``"none"`` in
+#: front because it is not a sector.
+EPICENTRES = ("none",) + tuple(_sectors())
+
+
+def _check_switch(value: Any) -> bool:
+    """``vix_sets_variance`` is a switch: ``True`` or ``False`` and nothing
+    that merely reads as one. A ``"false"`` from a hand-written document is
+    truthy, and taking it as on would run the experiment its author turned
+    off."""
+    if not isinstance(value, bool):
+        raise ScenarioValidationError(
+            f"vix_sets_variance must be true or false, got {value!r}."
+        )
+    return value
+
 
 def _check(field: str, value: Any) -> None:
     if field not in FIELDS:
         raise ValidationError(
             f"unknown macro field {field!r}. Valid: {', '.join(FIELDS)}"
         )
+    if field == "epicentre":
+        if not isinstance(value, str):
+            raise ValidationError(
+                f"epicentre = {value!r} is not a sector. It names which "
+                "sector carries the crisis, as a key, or 'none' for a "
+                "crisis with no epicentre."
+            )
+        if value not in EPICENTRES:
+            raise ValidationError(
+                f"unknown epicentre {value!r}. Valid: "
+                f"{', '.join(EPICENTRES)}. A misspelt sector is the same "
+                "failure a misspelt FIELD would be, so it is refused where "
+                "it is written rather than on the first day of the run."
+            )
+        return
     if field == "cycle":
         if isinstance(value, str) and value not in CYCLES:
             raise ValidationError(
@@ -512,13 +588,14 @@ class Scenario:
 
     __slots__ = ("_drivers", "_label", "_description", "_shocks",
                  "_transmission", "_source", "_log", "_anchors", "_baselines",
-                 "_day")
+                 "_day", "_vix_sets_variance")
 
     def __init__(self, label: str = "", *, name: str | None = None,
                  description: str = "",
                  interventions: Sequence[Intervention] = (),
                  shocks: Sequence[Intervention] = (),
-                 transmission: Sequence[Intervention] = ()) -> None:
+                 transmission: Sequence[Intervention] = (),
+                 vix_sets_variance: bool = False) -> None:
         if name is not None and label and name != label:
             raise ScenarioValidationError(
                 f"a scenario has one identity, and this one was given two: "
@@ -541,6 +618,10 @@ class Scenario:
         # back. See `_release`.
         self._baselines: dict[str, Any] = {}
         self._day = -1
+        # See `vix_sets_variance`. Off unless asked for, so every scenario
+        # written before the switch runs, serialises and fingerprints as it
+        # did.
+        self._vix_sets_variance = _check_switch(vix_sets_variance)
 
         for given, role in ((interventions, None), (shocks, "shock"),
                             (transmission, "transmission")):
@@ -791,6 +872,22 @@ class Scenario:
         return self._description
 
     @property
+    def vix_sets_variance(self) -> bool:
+        """Whether a VIX this scenario forces also SETS the market's volatility.
+
+        Off (the default), a forced VIX reaches volatility the way the
+        model's own VIX does: each close moves the market factor's variance
+        one step toward the level that VIX implies, at the free law's own
+        pace. A fast component's half-life is about 33 sessions, so a VIX
+        that jumps from 15 to 80 in three weeks is felt in the market weeks
+        later. On, every session this scenario forces the VIX -- a pin, or
+        an intervention on ``macro.vix`` -- closes with the factor's variance
+        SET to that level, and the next session trades at it. See "A forced
+        VIX that sets volatility" in this module's docstring.
+        """
+        return self._vix_sets_variance
+
+    @property
     def source(self) -> str | None:
         """Where this scenario was read from, if it was read from a file.
 
@@ -819,7 +916,7 @@ class Scenario:
         constructor that produced it. The realised path and the recipe are
         different statements, and :meth:`to_json` records the first.
         """
-        return {
+        document = {
             "schema": SCENARIO_SCHEMA,
             "name": self._label,
             "description": self._description,
@@ -832,6 +929,12 @@ class Scenario:
             "shocks": [item.as_dict() for item in self._shocks],
             "transmission": [item.as_dict() for item in self._transmission],
         }
+        # Present only when on. It changes the experiment, so it has to move
+        # the fingerprint; absent when off, so no fingerprint written before
+        # the switch existed moves.
+        if self._vix_sets_variance:
+            document["vix_sets_variance"] = True
+        return document
 
     @property
     def fingerprint(self) -> str:
@@ -866,6 +969,13 @@ class Scenario:
             for field in sorted(self._drivers):
                 for pin in self._drivers[field]:
                     out.append(f"  {field:<24} {pin.describe}")
+        if self._vix_sets_variance:
+            out.append("")
+            out.extend(_wrap(
+                "vix_sets_variance: on. Every session this scenario forces "
+                "the VIX closes with the market factor's variance SET to the "
+                "level that VIX implies, rather than moving toward it."
+            ))
 
         for items, heading in (
             (self._shocks, "Exogenous shocks"),
@@ -898,6 +1008,7 @@ class Scenario:
         twin._drivers = {field: list(pins)
                          for field, pins in self._drivers.items()}
         twin._description = self._description
+        twin._vix_sets_variance = self._vix_sets_variance
         return twin
 
     def copy(self) -> "Scenario":
@@ -915,6 +1026,7 @@ class Scenario:
         twin._shocks = list(self._shocks)
         twin._transmission = list(self._transmission)
         twin._source = self._source
+        twin._vix_sets_variance = self._vix_sets_variance
         return twin
 
     # -- the audit trail ---------------------------------------------------
@@ -957,6 +1069,22 @@ class Scenario:
         error.
         """
         return [{"day": day, **self.at(day)} for day in range(days)]
+
+    def _pin_kwargs(self, day: int) -> dict[str, Any]:
+        """What :meth:`apply` hands ``Engine.pin_macro`` for one day's pins.
+
+        :meth:`at` plus the forced-VIX mark, when the scenario asks for it
+        and pins the VIX that day. One place, so the seed sweep, which pins
+        a realised path without calling :meth:`apply`, marks the same days.
+        """
+        pins = self.at(day)
+        if self._vix_sets_variance and "vix" in pins:
+            pins["vix_sets_variance"] = True
+        return pins
+
+    def _forces_vix(self) -> bool:
+        return "vix" in self._drivers or any(
+            item.target == "macro.vix" for item in self.interventions)
 
     def apply(self, engine: Engine, day: int) -> list[Firing]:
         """Drive one day of one run: pins first, then interventions.
@@ -1020,9 +1148,19 @@ class Scenario:
             self._log = []
             self._anchors = {}
             self._baselines = {}
+        # Checked at the start of every run, before anything is written.
+        if (day <= self._day or self._day < 0) and self._vix_sets_variance:
+            if not self._forces_vix():
+                raise ScenarioValidationError(
+                    f"{self._label or 'this scenario'} has vix_sets_variance "
+                    f"on but never forces the VIX: it pins no 'vix' and "
+                    f"carries no intervention on macro.vix. The switch acts "
+                    f"only on a session whose VIX the scenario forces, so "
+                    f"here it would do nothing. Drop it, or force the VIX."
+                )
         self._day = day
 
-        pins = self.at(day)
+        pins = self._pin_kwargs(day)
         if pins:
             engine.pin_macro(**pins)
 
@@ -1037,6 +1175,13 @@ class Scenario:
             if not item.active_on(day):
                 continue
             fired.append(self._fire(index, item, engine, day))
+        # An intervention that wrote the VIX forced it as much as a pin
+        # does. Marked after every write, so the close reads the value the
+        # last of them left.
+        if (self._vix_sets_variance and "vix_sets_variance" not in pins
+                and any(f.target == "macro.vix" and f.operation != "release"
+                        for f in fired)):
+            engine.pin_macro(vix_sets_variance=True)
         self._log.extend(fired)
         return fired
 
@@ -1212,11 +1357,11 @@ class Scenario:
             # for byte. Every published manifest and every fingerprint over
             # one stays valid, which matters more than a uniform schema
             # number: a result cited last month has to replay this month.
-            return json.dumps(
-                {"schema": 1, "label": self._label, "days": days,
-                 "path": self.table(days)},
-                sort_keys=True, separators=(",", ":"),
-            )
+            document = {"schema": 1, "label": self._label, "days": days,
+                        "path": self.table(days)}
+            if self._vix_sets_variance:
+                document["vix_sets_variance"] = True
+            return json.dumps(document, sort_keys=True, separators=(",", ":"))
 
         payload: dict[str, Any] = {
             "schema": SCENARIO_SCHEMA + 1,
@@ -1231,6 +1376,8 @@ class Scenario:
         if self._drivers:
             payload["days"] = days
             payload["path"] = self.table(days)
+        if self._vix_sets_variance:
+            payload["vix_sets_variance"] = True
         return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
     def _source_name(self) -> str | None:
@@ -1326,7 +1473,8 @@ class Scenario:
                 values[field].append(row[field])
 
         scenario = scenario_out if scenario_out is not None else cls(
-            label=payload.get("label", ""))
+            label=payload.get("label", ""),
+            vix_sets_variance=payload.get("vix_sets_variance", False))
         last = len(path) - 1
         for field, series in values.items():
             scenario._pin(field, _Pin(
@@ -1353,6 +1501,7 @@ class Scenario:
         scenario = cls(
             label=payload.get("label", payload.get("name", "")),
             description=payload.get("description", "") or "",
+            vix_sets_variance=payload.get("vix_sets_variance", False),
         )
         source = payload.get("source")
         if source is not None:
@@ -1509,7 +1658,8 @@ class Scenario:
             raise ScenarioValidationError(
                 "the document has no `scenario:` block."
             )
-        allowed = {"name", "description", "shocks", "transmission"}
+        allowed = {"name", "description", "shocks", "transmission",
+                   "vix_sets_variance"}
         extra = sorted(set(body) - allowed)
         if extra:
             raise ScenarioValidationError(
@@ -1533,7 +1683,8 @@ class Scenario:
                 f"description must be text, got {type(description).__name__}."
             )
 
-        scenario = cls(name=name.strip(), description=description.strip())
+        scenario = cls(name=name.strip(), description=description.strip(),
+                       vix_sets_variance=body.get("vix_sets_variance", False))
         scenario._source = source
         total = 0
         for role, key in (("shock", "shocks"),
@@ -1581,6 +1732,8 @@ class Scenario:
             parts.append(f"{len(self._shocks)} shock(s)")
         if self._transmission:
             parts.append(f"{len(self._transmission)} assumption(s)")
+        if self._vix_sets_variance:
+            parts.append("vix sets variance")
         return f"Scenario({label}{'; '.join(parts) or 'driving nothing'})"
 
     def __str__(self) -> str:

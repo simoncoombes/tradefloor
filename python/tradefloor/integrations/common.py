@@ -81,6 +81,15 @@ missing, and the replay RAISES naming the step -- keyed by (arm, step) it
 would answer the new question with a response given to the old one. Replay
 needs no framework, no network and no API key.
 
+A recording also names the MARKET it was made in. ``meta["model_preset"]``
+carries the simulation preset's fingerprint -- a shipped name like
+``"pt-v18"``, or ``custom-XXXXXXXX`` for an overridden vector, the same
+vocabulary :attr:`tradefloor.Scorecard.model_fingerprint` uses -- and
+:func:`replay_response` refuses a replay running under a different one.
+Without it, moving the default preset moved every price in every recorded
+observation, all five committed agent recordings missed at step zero, and
+the artifact had no field that could say why.
+
 This reproduces the AGENT. The market is already reproducible without it:
 :func:`tradefloor.replay.replay` rebuilds an engine from its order log, and
 nothing here duplicates that.
@@ -94,9 +103,10 @@ import importlib
 import json
 import re
 import statistics
+import warnings
 from typing import Any, Literal, Sequence
 
-from .._core import ValidationError
+from .._core import ModelParams, ValidationError
 from ..counterfactual import MACRO_FIELDS
 
 #: The macro fields an adapter may show its framework. Bound to
@@ -1083,6 +1093,20 @@ class Transcript:
     (:meth:`AdapterInfo.as_dict` is the intended shape). Replaying a
     transcript under different instructions produces a different experiment,
     and ``meta`` is how a reader notices.
+
+    It also records ``model_preset``: the fingerprint of the simulation
+    preset the recording was made against, in the vocabulary
+    :attr:`tradefloor.Engine.model_fingerprint` uses -- a shipped preset's
+    name when the market was bit-identical to it, ``custom-XXXXXXXX``
+    otherwise. The instructions and the market are the two halves of the
+    question the model was asked, and until 0.8.0 ``meta`` named only one of
+    them. :class:`~tradefloor.Checkpoint` has carried ``model`` since it
+    existed for the same reason, in its own words: a checkpoint of a
+    custom-model run that resumed under the default would replay a plausible
+    market that is not the one it froze. A transcript replayed under a moved
+    preset does the same thing one step earlier -- every key misses, because
+    every price the digest covers moved -- and the refusal a reader then
+    meets names a step number rather than the cause.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -1139,30 +1163,401 @@ class Transcript:
         Windows and one made on Linux from the same transcript are the
         same file. Recordings get committed, diffed and hashed, and text
         mode would answer all three differently per machine.
+
+        What the file gains on the way -- when it was written and, as a
+        floor, which market -- is :func:`stamp_artefact`'s, shared with
+        ``finrobot.Transcript.save`` so the two cannot say different things
+        about the same kind of file.
         """
-        import datetime
         import pathlib
-        # WHEN, stamped here because here is where a recording becomes an
-        # artefact. Every committed fixture carries `recorded_utc` and
-        # `test_callable.py` asserts it, and nothing set it: the field
-        # reached the first fixtures by hand and every recording made since
-        # has been written without it, so the check passed only for as long
-        # as nobody re-recorded. A recording that cannot say when it was made
-        # is one nobody can place against the model that produced it.
-        #
-        # Set only if absent, so re-saving a loaded transcript keeps the time
-        # it was RECORDED rather than the time it was last written.
-        self.meta.setdefault(
-            "recorded_utc",
-            datetime.datetime.now(datetime.timezone.utc)
-            .replace(microsecond=0).isoformat())
+        stamp_artefact(self.meta)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(self.to_json().encode("utf-8"))
 
 
+def stamp_artefact(meta: dict[str, Any]) -> None:
+    """Stamp on ``meta`` the two facts a recording gains when it becomes a file.
+
+    Called from every ``save`` in this package -- :meth:`Transcript.save`
+    here and ``finrobot.Transcript.save``, which predates this class and
+    keeps its own -- because both fields are properties of the ARTEFACT and
+    not of the framework that produced the responses. A recording is a file
+    of exchanges keyed by digests of observations whichever adapter made
+    it, and two saves with two rules make the same kind of file mean two
+    different things depending on which class wrote it. That is not
+    hypothetical: the FinRobot recording re-made at 0.8.0 shipped without
+    ``recorded_utc`` while the other four carried it, because its ``save``
+    had its own copy of the write and no copy of the stamps.
+
+    WHEN, stamped here because here is where a recording becomes an
+    artefact. Every committed fixture carries ``recorded_utc`` and
+    ``test_callable.py`` asserts it, and for a long time nothing set it:
+    the field reached the first fixtures by hand and every recording made
+    since was written without it, so the check passed only for as long as
+    nobody re-recorded. A recording that cannot say when it was made is
+    one nobody can place against the model that produced it. UTC, whole
+    seconds, ISO 8601: what a reader compares against a provider's model
+    dates, and nothing finer than the file's own timestamp would support.
+
+    Set only if absent, so re-saving a loaded transcript keeps the time it
+    was RECORDED rather than the time it was last written.
+
+    NO VECTOR HERE, although :data:`PRESET_VECTOR_KEY` is what actually
+    separates two models sharing a name. The name written here is a GUESS --
+    the paragraph below says so -- and a guess costs one word. A 178-key
+    vector is not a guess-shaped thing: written here it would say "this
+    recording ran these values" of a transcript that met no engine, and a
+    re-saved pre-0.8.0 fixture would then carry today's vector as if it had
+    run it and PASS :func:`_refuse_a_moved_vector` on the next era boundary.
+    That is worse than the honest gap. The vector is stamped by
+    :func:`stamp_preset`, off the engine the observation carries, which is
+    the only writer in this package that knows.
+
+    WHICH MARKET, for the same reason and with the same rule. A replay key
+    is a digest of the exact observation the model was sent, and every
+    price in that observation comes out of the preset -- so a recording
+    that cannot name its preset cannot explain the one way it is guaranteed
+    to fail. It is not a hypothetical: moving the default from pt-v18 to
+    pt-v19 missed all five committed recordings at step zero, and no field
+    in any of them said so.
+
+    ``setdefault`` again, and the value is only the DEFAULT preset, because
+    a transcript holds no engine and cannot ask one. That guess is right
+    for a transcript that never met a market -- a fresh recorder, a
+    hand-built fixture -- and every adapter overwrites it with the truth
+    long before here: :func:`stamp_preset` writes the running engine's own
+    fingerprint on the first recorded exchange. So this is the floor, not
+    the reading.
+
+    The hazard the two stamps share is stated rather than solved: loading
+    a pre-0.8.0 recording and saving it again stamps today's default onto a
+    market it was not recorded in, exactly as the other line stamps today's
+    date onto a recording made last year. The remedy for both is the same
+    -- do not re-save a recording you did not make -- and adding the field
+    to a legacy fixture is a one-line edit that says what it actually ran
+    under.
+    """
+    import datetime
+    meta.setdefault(
+        "recorded_utc",
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0).isoformat())
+    meta.setdefault("model_preset", ModelParams.from_preset().fingerprint)
+
+
+#: Where a recording keeps the realised parameter vector, beside the name.
+#:
+#: A name is not a model. :meth:`ModelParams.fingerprint` returns a shipped
+#: preset's name whenever the vector is bit-equal to THIS BUILD's preset of
+#: that name, so it is self-referential: the five fixtures recorded at
+#: ``d8e0709`` and a run today both say ``"pt-v19"`` across 131 settable
+#: dials and 148 (MEASURED). The vector is the only field that separates
+#: them.
+#:
+#: The PAIRS and not a digest. ``to_dict()`` as it stands: the 177 pairs
+#: ``digest()`` hashes plus ``name``, 178 keys and 5,656 bytes of JSON
+#: (MEASURED, pt-v19). The name rides along as a label and is never part of
+#: the comparison, exactly as ``digest()`` leaves it out. A digest can only
+#: say "different", and a recording made to exercise a moved dial is MEANT
+#: to differ; only the pairs say WHICH dial moved, which is the whole of
+#: what a reader needs at step 0.
+PRESET_VECTOR_KEY = "model_preset_vector"
+
+#: The frozen preset against which a key nobody set is judged inert.
+#:
+#: ``pt-v1`` is frozen at ``params.rs:5315`` and every era boundary
+#: re-measures pt-v1 through pt-v18 for bit-identity, so its value for a
+#: dial IS what that dial means when a recording never mentioned it. That
+#: makes it the one definition of inert this engine already tests, rather
+#: than a second table somebody would have to keep true.
+INERT_PRESET = "pt-v1"
+
+
+def vector_of(obs: Any) -> dict[str, Any] | None:
+    """The realised parameter vector of ``obs``'s market, or None.
+
+    Off the engine the observation carries, for the reason
+    :func:`preset_of` reads the fingerprint there: an adapter is built
+    before any market exists and is handed one observation at a time, so
+    the observation is the only object in the replay path that knows.
+
+    None where :func:`preset_of` is None, and for the same reason and with
+    the same consequence: "cannot know", never "mismatch".
+    """
+    params = getattr(getattr(obs, "engine", None), "model_params", None)
+    if params is None:
+        return None
+    try:
+        return {str(key): value for key, value in dict(params).items()}
+    except (TypeError, ValueError):
+        return None
+
+
+def moved_dials(recorded: dict[str, Any],
+                running: dict[str, Any],
+                inert: dict[str, Any] | None = None,
+                ) -> tuple[list[str], list[str], list[str]]:
+    """Which dials separate two vectors: the era rule plus the one test.
+
+    ``RunManifest._check_era`` compares the INTERSECTION, so a key only one
+    side carries is bookkeeping. That is right for the case it was written
+    for -- an old manifest holding the legacy nine-coefficient dict -- and
+    wrong for the case that actually happened, where a build GAINS dials and
+    every one of them is waved through. Seventeen settable dials arrived
+    between ``d8e0709`` and ``38f2c43``, 131 to 148 (MEASURED), and under the
+    intersection rule a recording made before them cannot notice any of them.
+
+    So a key the build carries and the record does not is bookkeeping IFF the
+    build's value for it equals ``pt-v1``'s. A dial that was added switched
+    off is genuinely absent from the recorded model; a dial that was added
+    carrying a value is a model the recording never ran. Measured on those
+    seventeen at ``pt-v19``: four are inert and THIRTEEN are live, among them
+    ``market_vol_level_sigma`` 0.085 and ``jump_idio_excitation`` 2.0.
+
+    A key the RECORD carries and the build does not is returned separately
+    and never refused. The build cannot evaluate it -- ``pt-v1`` does not
+    carry it either, so there is no inert value to compare against -- and a
+    refusal on a fact this side cannot test is the guard-on-absence-of-
+    evidence shape :func:`refuse_a_changed_preset` already declines to take.
+    It is named instead, because an undeclared key is exactly what the six
+    joint-t arms carry (``market_vol_shock_dof`` 7.0) and a reader who is
+    told can go and look.
+
+    ``inert`` absent or unreadable means the test cannot run, and then every
+    missing key falls back to bookkeeping -- the behaviour that shipped. A
+    check that cannot run must not refuse. The same holds for a key ``pt-v1``
+    itself does not carry, which cannot arise on the call site here (both
+    sides come off one build and every preset on a build carries one keyset,
+    MEASURED: pt-v1 and pt-v19 carry the same 178 keys) and does arise for a
+    caller comparing two builds.
+
+    :returns: ``(disagreeing, live, undeclared)``, each sorted.
+    """
+    if inert is None:
+        try:
+            inert = ModelParams.from_preset(INERT_PRESET).to_dict()
+        except ValidationError:          # pragma: no cover - frozen preset
+            inert = {}
+    recorded = {k: v for k, v in recorded.items() if k != "name"}
+    running = {k: v for k, v in running.items() if k != "name"}
+    disagreeing = sorted(key for key in set(recorded) & set(running)
+                         if recorded[key] != running[key])
+    live = sorted(key for key in set(running) - set(recorded)
+                  if key in inert and running[key] != inert[key])
+    undeclared = sorted(set(recorded) - set(running))
+    return disagreeing, live, undeclared
+
+
+def preset_of(obs: Any) -> str | None:
+    """The fingerprint of the preset ``obs``'s market is running, or None.
+
+    Read off the engine the observation carries, because that is the only
+    object in the whole replay path that knows: an adapter is constructed
+    before any market exists and is handed one observation at a time. Reading
+    it here rather than in the caller keeps the one spelling -- there is
+    exactly one way to name a preset in this package, and a second would be
+    a fingerprint that disagrees with the manifests, the scorecards and the
+    checkpoints.
+
+    None when there is no engine to ask, which happens in unit tests that
+    drive an adapter with a stand-in observation. None means "cannot know",
+    and every caller here treats it as "do not check" rather than as a
+    mismatch: a guard that fires on absence of evidence refuses the tests
+    that exist to exercise everything else.
+    """
+    fingerprint = getattr(getattr(obs, "engine", None),
+                          "model_fingerprint", None)
+    return str(fingerprint) if fingerprint else None
+
+
+def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
+    """Record which market this recording is being made in, on first write.
+
+    Called from every adapter's recorder branch, beside the provenance
+    stamp and for the identical reason: a guard that arms itself only when
+    somebody remembered to set ``meta`` is off in exactly the runs nobody
+    was careful about. :meth:`Transcript.save` also stamps the field, but
+    only with the DEFAULT preset, and the interesting recordings are the
+    ones made under a pinned non-default -- every shipped integration
+    example pins ``PRESET`` and re-records through it, so a save-time guess
+    would write "pt-v19" into a fixture recorded on pt-v18 and produce a
+    confidently wrong provenance where there had been an honest gap.
+
+    ``setdefault``, so a caller who set the field explicitly keeps it, and
+    so the value is the market of the FIRST recorded exchange. Both arms of
+    a forked experiment share one recorder and one engine, so there is no
+    second market to disagree with.
+    """
+    if recorder is None:
+        return
+    preset = preset_of(obs)
+    if preset:
+        recorder.meta.setdefault("model_preset", preset)
+    # The vector beside the name, under the same `setdefault` and for a
+    # stronger version of the same reason. The name is what the engine
+    # thinks this vector is CALLED on the build that ran it, and that name
+    # is a function of the build; the vector is the model. Both, because a
+    # reader wants to be told "pt-v19" and a check wants the pairs.
+    vector = vector_of(obs)
+    if vector:
+        recorder.meta.setdefault(PRESET_VECTOR_KEY, vector)
+
+
+def refuse_a_changed_preset(transcript: "Transcript | None",
+                            preset: str | None) -> None:
+    """Refuse a replay whose market is not the recorded one.
+
+    The mismatch this catches is the loudest failure a recording has, and
+    until 0.8.0 it was also the least legible. A replay key is a digest of
+    the exact observation the model was sent; every price in that
+    observation descends from the simulation preset; so moving the preset
+    moves every key at once and the run refuses at step zero with a message
+    about a missing digest. Measured at the pt-v19 boundary: seventeen tests
+    across five integrations, all of them one cause, and nothing in any
+    recording that could name it.
+
+    So this is checked BEFORE the lookup, not instead of it. The lookup
+    still refuses -- it is the guard that cannot be forgotten, because it is
+    the lookup -- and this runs first so that a reader meets the cause
+    rather than its first symptom. Same shape as
+    ``finrobot._refuse_a_changed_mandate``, which refuses the other half of
+    the same question.
+
+    Raises :class:`ReplayMiss` rather than a plain
+    :class:`DecisionError`, which the mandate refusal uses. That refusal
+    happens at construction, where nothing can skip it. This one happens
+    inside the run, where :class:`~tradefloor.counterfactual.World` with
+    ``on_refusal="skip"`` would charge a ``DecisionError`` to the agent and
+    carry on -- turning a replay against the wrong market into an agent that
+    refused every decision, completed, and published that. ``ReplayMiss``
+    exists for precisely that distinction and World re-raises it.
+
+    The name is half of "same market" and the weaker half; the other half
+    is :func:`_refuse_a_moved_vector` below, which runs from here once the
+    names agree and compares the recorded parameter vector against the one
+    this build cuts under that name. That is the half that fired.
+
+    A transcript with NO ``model_preset`` is warned about and allowed
+    through. Every recording made before 0.8.0 is in that state, and
+    refusing them would break working replays on upgrade for a fact the
+    library never asked anyone to record -- the same call
+    ``_refuse_a_changed_mandate`` makes for a transcript carrying neither
+    digest nor version. Allowed is not silent, though: an unnamed market is
+    how a day was lost, so it says so once, where the person running the
+    replay can see it.
+    """
+    if transcript is None or not preset:
+        return
+    recorded = (transcript.meta or {}).get("model_preset")
+    if not recorded:
+        warnings.warn(
+            "this transcript does not say which simulation preset it was "
+            f"recorded against; the replay is running {preset}. Recordings "
+            "made before 0.8.0 carry no preset, so this cannot be checked "
+            "and the replay is going ahead -- if it refuses at step 0 with "
+            "a missing digest, a moved preset is the first thing to "
+            "suspect. Add \"model_preset\" to the transcript's meta block "
+            "to make this checkable.", stacklevel=2)
+        return
+    if str(recorded) != preset:
+        raise ReplayMiss(
+            f"this transcript was recorded against a different simulation "
+            f"preset (recorded {recorded}, running {preset}). A replay is "
+            "keyed by a digest of the exact observation the model was sent "
+            "and every price in that observation comes out of the preset, "
+            "so every recorded key would miss and the run would refuse at "
+            "step 0 naming a digest rather than this. Run the replay on "
+            f"{recorded} -- World(..., model={recorded!r}) or "
+            f"evaluate(..., model={recorded!r}) -- or re-record the run "
+            "live against the market you are running now.")
+    _refuse_a_moved_vector(transcript, preset)
+
+
+def _refuse_a_moved_vector(transcript: "Transcript", preset: str) -> None:
+    """Refuse a replay whose preset kept its NAME and moved its values.
+
+    The half of "same market" that the name cannot check, and the half that
+    actually fired. Moving the default from pt-v18 to pt-v19 was caught by
+    the name; re-cutting pt-v19 itself was not, because
+    :meth:`ModelParams.fingerprint` returns a shipped preset's name whenever
+    the vector is bit-equal to THIS BUILD's preset of that name. The five
+    fixtures recorded at ``d8e0709`` and a run at ``38f2c43`` both call
+    themselves ``pt-v19`` over a vector that moved ``vix_ceiling`` 108.63 to
+    181.3295 and gained seventeen settable dials, so the check above compares
+    a string to itself and passes.
+
+    Only ever reached with a RECORDED vector, which is what keeps this at
+    zero refusals of pt-v1 through pt-v18. A shipped preset is not a
+    recording and records nothing by itself; every fixture written before
+    this field existed carries no vector and is not checked here at all --
+    the same call the name check makes for a recording that carries no
+    preset. Nothing in the tree can be refused by adding the field; only a
+    recording made after it can, and only when its own values moved.
+
+    The BUILD side is reconstructed from the name rather than passed in, so
+    no adapter call site changes. That is exactly as strong: the name is
+    checked bit-for-bit above, so by the time this runs the two sides agree
+    on it, and a custom preset -- whose name IS the first eight hex of its
+    own digest -- has already been separated by that check. A name this
+    build does not ship cannot be reconstructed and is not guessed at.
+    """
+    recorded_vector = (transcript.meta or {}).get(PRESET_VECTOR_KEY)
+    if not isinstance(recorded_vector, dict) or not recorded_vector:
+        return
+    try:
+        running_vector = ModelParams.from_preset(preset).to_dict()
+    except ValidationError:
+        # A custom preset, or one this build does not ship. `custom-XXXXXXXX`
+        # is eight hex of the vector's own digest, so a moved vector has
+        # already moved the name and been refused above.
+        return
+    disagreeing, live, undeclared = moved_dials(recorded_vector,
+                                                running_vector)
+    if not disagreeing and not live:
+        if undeclared:
+            warnings.warn(
+                f"this transcript's recorded {preset} carries "
+                f"{len(undeclared)} parameter(s) this build does not: "
+                f"{', '.join(undeclared)}. The build has no value to compare "
+                "them against -- pt-v1 does not carry them either -- so this "
+                "cannot be checked and the replay is going ahead. A retired "
+                "dial that was doing work in the recording would look "
+                "exactly like this.", stacklevel=3)
+        return
+
+    def _detail(keys: Sequence[str]) -> str:
+        return "; ".join(
+            f"{key}: recorded {recorded_vector.get(key)!r}, "
+            f"build {running_vector.get(key)!r}" for key in keys)
+
+    parts = []
+    if disagreeing:
+        parts.append(f"{len(disagreeing)} moved -- {_detail(disagreeing)}")
+    if live:
+        parts.append(
+            f"{len(live)} added carrying a value this recording never ran, "
+            "each of them different from pt-v1's and so not bookkeeping -- "
+            + "; ".join(f"{key}: build {running_vector.get(key)!r}"
+                        for key in live))
+    if undeclared:
+        parts.append(
+            f"{len(undeclared)} recorded but unknown to this build -- "
+            f"{', '.join(undeclared)} (not checkable here, reported)")
+    raise ReplayMiss(
+        f"this transcript was recorded against a different {preset} from the "
+        f"one this build ships: {'; '.join(parts)}. Same name, different "
+        "model -- a preset name identifies a model only within one build, so "
+        "the name check above cannot see this. Every price the model was "
+        "sent descends from these values, so every recorded key would miss "
+        "and the run would refuse at step 0 naming a digest rather than "
+        "these dials. Re-record the run live against the market you are "
+        "running now, or replay on the build that cut this vector."
+    )
+
+
 def replay_response(transcript: Transcript, key: str, *, step: int,
-                    day: int) -> Any:
+                    day: int, preset: str | None = None) -> Any:
     """The recorded response for ``key``, or a refusal naming the step.
 
     The one lookup every replaying adapter performs, centralised so the
@@ -1183,7 +1578,16 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     the failure was written down -- and sending the user off to re-record
     the whole run would spend money to rediscover a file they already
     have.
+
+    ``preset`` is the fingerprint of the market this replay is running,
+    from :func:`preset_of`. Given one, the recorded preset is checked
+    FIRST, so the reader meets the cause -- a moved market -- rather than
+    the missing digest that is only its first symptom. See
+    :func:`refuse_a_changed_preset`. It defaults to None so that an adapter
+    written against the old signature keeps working; that adapter loses the
+    diagnosis, not the refusal.
     """
+    refuse_a_changed_preset(transcript, preset)
     entry = transcript.entry_for(key)
     if entry is None:
         raise ReplayMiss(
@@ -1964,7 +2368,8 @@ class ReplayMixin:
         self.record_exchange(prompt, key=key)
         if self.mode == "replay":
             return replay_response(self.transcript, key,
-                                   step=obs.step, day=obs.day)
+                                   step=obs.step, day=obs.day,
+                                   preset=preset_of(obs))
         # A `prior` recording is consulted first. The market is
         # deterministic, so a resumed run reaches the same prompts and the
         # same digests, and a recorded answer is still an answer to the
@@ -1979,6 +2384,7 @@ class ReplayMixin:
             # replay must return the same shape -- a JSON string
             # json.dumps'd here would replay one parse level short, against
             # a recording that looked fine when it was written.
+            stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,

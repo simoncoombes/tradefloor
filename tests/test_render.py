@@ -564,6 +564,7 @@ def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
+@pytest.mark.needs_live_model
 def test_openai_agents_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_openai_agents_five_days",
                     REPO / "examples" / "integrations" / "openai_agents"
