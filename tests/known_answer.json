@@ -7,7 +7,7 @@
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
   "note": "Re-based 2026-09-23 for the fifth composition of pt-v19: the long-run VIX law (LAWC-D), the macro session clock and US-calibrated cycle, news priced within minutes and the calm-regime variance target, adopted on the owner's long-run pass bar (design repo, programme/longrun/CRITERIA.md; programme/results/ptv19-fifth/RESULT.md). Every seeded pt-v19 trajectory changes; named presets before it replay exactly.",
   "presetDigests": {
-    "pt-v20": "cf5ead40759cc4da3a4fa4d29a9475331efebeb2f5bd9133bbc1da0164957d6c"
+    "pt-v20": "6d66f9ef3f5f473cc492414ca43d62908d9f18ba091281d8447a3ce010c427c1"
   },
   "presetDigestsNote": "Added 2026-09-24 for pt-v20, composed and selectable but not the default: the simulation block of simulationSha256 run under the named preset (tests/known_answer.py, preset_simulation_buffer). Every digest above is unchanged.",
   "seed": 20260820,

@@ -6897,6 +6897,9 @@ impl ModelParams {
     /// `_upside` give aggregate earnings a cycle that falls in a contraction
     /// and recovers in an expansion, and `market_factor_sigma` and
     /// `jump_intensity_market` take the transient part down by as much.
+    /// With less market noise a name's volume tracks its own move more
+    /// tightly, so `volume_move_response` 0.8 keeps that tie inside the
+    /// certified band.
     ///
     /// A LIMIT. The model's inflation almost never leaves the under-3-per-
     /// cent regime, so stocks and Treasuries are always in flight to
@@ -6953,6 +6956,14 @@ impl ModelParams {
         p.earnings_cycle_upside = 0.09;
         p.market_factor_sigma = 0.006454071;
         p.jump_intensity_market = 0.02828766685;
+        // With less transient market noise, the common volume multiplier is
+        // a smaller share of a name's volume, which then tracks its own move
+        // more tightly: the 504-session certification panel's
+        // `volume_abs_return_corr` read 0.639 against the band's 0.63 (box
+        // ptv20g2). The same-day response to a move at 0.8 puts it at 0.618,
+        // and the other three cells stay in (design repository,
+        // programme/results/ptv20/d1screen.py).
+        p.volume_move_response = 0.8;
         p
     }
 
