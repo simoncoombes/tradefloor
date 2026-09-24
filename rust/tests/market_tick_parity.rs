@@ -299,6 +299,8 @@ fn check_scenario(file: &str) {
                 settle_draws: SettleDrawPolicy::FourOrZero,
                 // The depth counterfactual, off. It reaches no company field.
                 settle_depth_counterfactual: false,
+                resting_orders: &[],
+                fill_impact: &[],
                 // The shipped preset: the parity contract is against the
                 // reference model, which is what PT_V1 carries.
                 // The run's opening nominal output. The growth term is

@@ -71,10 +71,16 @@ And b's own reaction to the market a made, which is in the number too.
 Separating that one needs a third arm in which b sees a's prices and
 answers as though it did not, and there is no such arm.
 
-None of the three is the order book. Agents in a cohort take no levels
-from each other, because :meth:`Portfolio.execute` reads the ladder and
-removes nothing, so nothing here is a queue. `counterfactual.py` carries
-that measurement.
+None of the three is the order book. On every shipped preset agents in a
+cohort take no levels from each other, because :meth:`Portfolio.execute`
+reads the ladder and removes nothing. Under a model with ``book_shared`` on
+they do: an agent later in a step's arrival order meets the book an earlier
+one left. That arrives through fills rather than prices, so it is measured
+apart, as :attr:`Externality.levels`: ``levels[a][b]`` is what b's
+execution cost against each step's opening mid changes by when a stops
+trading, positive when a made b's fills dearer. It is zero, to the cent,
+wherever the book is not shared, and it is in ``matrix`` as well, where it
+is one of the things a P&L change holds.
 
 Removal is inaction from the fork day on. The removed agent keeps the
 positions it held at the fork, and a frozen holding sends no flow, so it
@@ -111,7 +117,7 @@ class Externality:
 
     __slots__ = ("labels", "matrix", "diagonal", "diagonal_bps", "cohort_pnl",
                  "trades", "traded", "exposure", "agreement", "days",
-                 "fork_day", "fork_step", "held_at_fork")
+                 "fork_day", "fork_step", "held_at_fork", "levels", "live")
 
     #: The columns :meth:`table` produces, in order. One row per ordered
     #: pair of labels, so an N-agent cohort is N squared rows.
@@ -119,7 +125,7 @@ class Externality:
 
     def __init__(self, *, labels, matrix, diagonal, diagonal_bps, cohort_pnl,
                  trades, traded, exposure, agreement, days, fork_day,
-                 fork_step, held_at_fork) -> None:
+                 fork_step, held_at_fork, levels=None, live=False) -> None:
         self.labels = tuple(labels)
         self.matrix = matrix
         self.diagonal = diagonal
@@ -147,6 +153,16 @@ class Externality:
         #: The agents holding a position when the fork was taken. Their
         #: removal freezes those positions rather than unwinding them.
         self.held_at_fork = tuple(held_at_fork)
+        #: ``levels[a][b]``: b's execution cost against each step's opening
+        #: mid with the whole cohort, minus the same in the arm without a,
+        #: in currency. Positive when a's orders made b's fills dearer by
+        #: taking the levels b then met. The diagonal is a's own cost
+        #: against those mids. Zero off the diagonal wherever agents do not
+        #: share the book.
+        self.levels = levels if levels is not None else {
+            a: {b: 0.0 for b in self.labels} for a in self.labels}
+        #: Whether the cohort's book was shared (``Engine.book_live``).
+        self.live = bool(live)
 
     # -- reading it -------------------------------------------------------
 
@@ -277,6 +293,8 @@ class Externality:
             "exposure": {b: list(names)
                          for b, names in self.exposure.items()},
             "matrix": {a: dict(row) for a, row in self.matrix.items()},
+            "levels": {a: dict(row) for a, row in self.levels.items()},
+            "live": self.live,
             "diagonal": dict(self.diagonal),
             "diagonal_bps": dict(self.diagonal_bps),
             "held_at_fork": list(self.held_at_fork),
@@ -319,6 +337,22 @@ class Externality:
         for a in self.labels:
             out.append(f"    {a:<{width}}{self.diagonal[a]:>+{cell},.0f}"
                        f"   {self.diagonal_bps[a]:+.2f} bps")
+        if self.live:
+            out += [
+                "",
+                "  levels taken: change in the column agent's execution "
+                "cost from the row agent, in dollars",
+                "    " + " " * width + "".join(f"{b:>{cell}}"
+                                               for b in self.labels),
+            ]
+            for a in self.labels:
+                row = "".join(
+                    f"{self.levels[a][b]:>+{cell - 1},.0f}*" if a == b
+                    else f"{self.levels[a][b]:>+{cell - 1},.0f} "
+                    for b in self.labels)
+                out.append(f"    {'remove ' + a:<{width}}{row}")
+            out.append("  * the row agent's own cost against each step's "
+                       "opening mid")
         out += ["", "  arms at the fork"]
         for line in self.agreement.render(width).splitlines():
             out.append("  " + line)
@@ -438,13 +472,41 @@ def externalities(world: World, days: int = 1) -> Externality:
                 else arm.summary(agent=b)["pnl_since"] - cohort_pnl[b])
             for b in labels}
 
+    # Execution against each step's opening mid, per agent and arm. The
+    # full arm's figure for b against the arm without a is what a's orders
+    # did to b's fills.
+    cost_full = {b: _slippage(full, b, fork_step) for b in labels}
+    levels = {a: {b: (cost_full[a] if b == a
+                      else cost_full[b] - _slippage(arms[a], b, fork_step))
+                  for b in labels} for a in labels}
+
     return Externality(labels=labels, matrix=matrix, diagonal=diagonal,
                        diagonal_bps=diagonal_bps, cohort_pnl=cohort_pnl,
                        trades=trades, traded=traded,
                        exposure=exposure,
                        agreement=agreement, days=days,
                        fork_day=fork_day, fork_step=fork_step,
-                       held_at_fork=held)
+                       held_at_fork=held, levels=levels,
+                       live=bool(getattr(world.engine, "book_live", False)))
+
+
+def _slippage(world: World, label: str, fork_step: int) -> float:
+    """One agent's taker fills since the fork, costed against the mid each
+    step opened on, in currency: positive for a cost.
+
+    Read off the trace, whose fills carry that mid (``World._execute``).
+    A resting order's later fills are not in it: they are liquidity the
+    agent provided, and nobody took a level to make them.
+    """
+    total = 0.0
+    for row in world.trace[fork_step:]:
+        fills = (row["agents"][label]["fills"] if "agents" in row
+                 else row["fills"])
+        for f in fills:
+            if f.get("mid") is None or f.get("price") is None:
+                continue
+            total += (f["price"] - f["mid"]) * f["quantity"]
+    return total
 
 
 def _arm_check(arm: Agreement) -> tuple[bool, str]:

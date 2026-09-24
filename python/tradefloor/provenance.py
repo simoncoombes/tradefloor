@@ -360,6 +360,44 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # The agent-facing book (2026-09-24, feature/order-book-depth). Every one
+    # is read only on the path an AGENT's order takes; the market's own
+    # flow settles through the maker's ladder as it always has, so an
+    # untraded run is bit-identical at any setting (rust/src/agent_book.rs).
+    "book_depth_coefficient":
+        "inert at 0.0 as shipped: a branch not taken in agent_book.rs, so "
+        "the book an agent meets is the maker's ten levels and an order past "
+        "them is cut off. Off zero, latent depth follows Y sigma (Q/V)^delta "
+        "behind the ladder (Toth et al. 2011). Starting value from the "
+        "impact-curve comparison is in the hand-off to pt-v20. Not adopted",
+    "book_depth_exponent":
+        "inert at 0.0 as shipped, and refused off zero while "
+        "`book_depth_coefficient` is 0.0: the exponent of the latent "
+        "depth's law. 0.5 is the square root (Toth et al. 2011), 0.6 the "
+        "Almgren et al. (2005) estimate. Not adopted",
+    "book_depth_reach":
+        "inert at 0.0 as shipped, and refused off zero while "
+        "`book_depth_coefficient` is 0.0: how far the latent depth reaches, "
+        "in daily volumes per side. Not adopted",
+    "book_shared":
+        "inert at 0.0 as shipped: a switch, so `Portfolio.execute` prices "
+        "off a snapshot of the book and removes nothing. 1.0 executes agents' "
+        "orders in the engine's book, where what one takes the next meets "
+        "gone until it refills. Not adopted",
+    "book_refill_half_life":
+        "inert at 0.0 as shipped, and refused off zero unless `book_shared` "
+        "is on and `book_depth_coefficient` off zero: the half-life in ticks "
+        "at which consumed latent depth refills. 27 is derived from the "
+        "model's own volume clock (agent_book.rs). Not adopted",
+    "book_resting":
+        "inert at 0.0 as shipped: a switch, so an agent's unfilled limit "
+        "waits outside the book for the traded range. 1.0 rests it in the "
+        "book's queue behind the depth at its price. Not adopted",
+    "fill_impact_coefficient":
+        "inert at 0.0 as shipped: a branch not taken, so agents' fills reach "
+        "`s` through the order-imbalance law. Off zero the law is linear, "
+        "gamma sigma Q/V (Huberman and Stanzl 2004; Almgren et al. 2005 "
+        "measure 0.314). Not adopted",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and

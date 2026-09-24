@@ -3462,6 +3462,108 @@ pub struct ModelParams {
     /// $100B.
     pub spread_size_exponent: f64,
 
+    // ── The agent-facing book (agent_book.rs, engine.rs) ─────────────────
+    //
+    // Seven dials, every one 0.0 on every shipped preset, and every one
+    // read only on the path an AGENT's order takes. The market's own flow
+    // settles through the maker's ladder exactly as it always has, so an
+    // untraded run is bit-identical at any setting of any of them: they
+    // change what an agent pays and what it does to the market, never the
+    // market nobody traded. `agent_book.rs` carries the model and its
+    // sources; the notes here say what each dial moves.
+
+    /// Latent depth behind the maker's ladder: `Y` in the square-root law.
+    ///
+    /// 0.0, every shipped preset, is no depth past the maker's ten levels,
+    /// so an order larger than the ladder fills what the ladder holds and
+    /// drops the rest (whole-book depth is 2.6 to 5% of daily volume per
+    /// side). Off zero, levels are appended behind the ladder out to
+    /// `book_depth_reach` times daily volume, with the cumulative depth to
+    /// a price distance `d` from the touch set so that the MARGINAL price
+    /// of the `Q`-th share is never below `touch * (1 + Y sigma (Q/V)^delta)`:
+    /// `sigma` the name's conditional daily volatility, `V` its average
+    /// daily volume and `delta` [`ModelParams::book_depth_exponent`]. An
+    /// order walks those levels at worse prices instead of being cut off.
+    ///
+    /// That is the latent order book of Toth, Lemperiere, Deremble, de
+    /// Lataillade, Kockelkoren and Bouchaud (Physical Review X 1, 021006,
+    /// 2011): depth that grows linearly with distance from the price gives
+    /// a peak impact `Y sigma sqrt(Q/V)`, with `Y` of order one in their
+    /// data. The average cost of walking such a book is `delta / (1 +
+    /// delta)` of the marginal, two thirds at the square root.
+    pub book_depth_coefficient: f64,
+    /// The exponent `delta` of the latent depth's price-for-size law. Read
+    /// only with [`ModelParams::book_depth_coefficient`] off zero, and
+    /// refused off zero without it. 0.0 reads as 0.5, the square root of
+    /// Toth et al. (2011), so the coefficient alone turns the law on;
+    /// Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62, 2005) measure 0.6
+    /// on the temporary cost of US equity executions.
+    pub book_depth_exponent: f64,
+    /// How far the latent depth reaches, in multiples of the name's average
+    /// daily volume per side. Read only with
+    /// [`ModelParams::book_depth_coefficient`] off zero, and refused off
+    /// zero without it; 0.0 reads as one day's volume. An order past the
+    /// reach is cut off there, as an order past the ladder is without the
+    /// tail.
+    pub book_depth_reach: f64,
+    /// Whether agents consume the book they share. A switch.
+    ///
+    /// 0.0, every shipped preset: an agent's order is priced against the
+    /// book and removes nothing from it (`Portfolio.execute` reads
+    /// `sweep_cost`), so two agents buying the same name in one step fill
+    /// at the same price against the same levels, and the maker's
+    /// inventory never hears about an agent.
+    ///
+    /// 1.0: an agent's order executes in the engine. The levels it takes
+    /// are gone for every agent after it until they refill: the maker's
+    /// ladder at the next tick, when the maker re-quotes, and the latent
+    /// depth at `book_refill_half_life`. Its fills against the maker are
+    /// the maker's trades too, so the maker's inventory moves and it skews
+    /// its quotes until opposing flow unwinds it, exactly as it does for
+    /// the model's own flow.
+    pub book_shared: f64,
+    /// Half-life in ticks at which consumed LATENT depth refills. Read only
+    /// with `book_shared` on and the depth tail on, and refused off zero
+    /// otherwise. 0.0 refills it at the next tick, with the maker's ladder.
+    ///
+    /// Obizhaeva and Wang (Journal of Financial Markets 16(1) 1-32, 2013)
+    /// model a book whose consumed depth recovers exponentially;
+    /// Alfonsi, Fruth and Schied (Quantitative Finance 10(2) 143-157, 2010)
+    /// show that when the recovery acts on the consumed VOLUME, as here,
+    /// a book of any shape admits no profitable round trip. The half-life
+    /// is the one free number; see `agent_book.rs` for the value derived.
+    pub book_refill_half_life: f64,
+    /// Whether an agent's limit order rests IN the book. A switch.
+    ///
+    /// 0.0, every shipped preset: an unfilled limit waits outside the book
+    /// and fills in full at its limit when a later print reaches it, the
+    /// traded-range convention the hosted service has always used. It takes
+    /// no queue, meets no flow, and no other agent can trade against it.
+    ///
+    /// 1.0: the remainder rests at its price with time priority behind the
+    /// depth already there, including the maker's, which re-quotes every
+    /// tick and is therefore always ahead at an equal price. It fills when
+    /// the model's own flow or another agent's order trades through it,
+    /// partially when that flow is smaller than the queue ahead of it plus
+    /// the order, and at its own price. Cancelling removes it.
+    pub book_resting: f64,
+    /// Permanent impact of an agent's fills, linear in size: `gamma` in
+    /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
+    /// mispricing `s` once, on the first tick after the fills.
+    ///
+    /// 0.0, every shipped preset, sends fills through the order-imbalance
+    /// law the model's standing flow uses (`order_flow_impact`), which is
+    /// concave and floored: a one-share order carries the imbalance floor
+    /// of 0.2, worth up to 0.9 bp of `s` in the thinnest names, so a
+    /// trader holding a position can lift its mark with a stream of
+    /// one-share buys at almost no cost. Off zero the law is linear, which
+    /// is the condition Huberman and Stanzl (Econometrica 72(4) 1247-1275,
+    /// 2004) prove necessary for permanent impact to admit no
+    /// price-manipulation round trip, and it is additive across agents, so
+    /// each agent's share of a name's impact is exact. Almgren, Thum,
+    /// Hauptmann and Li (2005) measure `gamma` = 0.314 on the same form.
+    pub fill_impact_coefficient: f64,
+
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
     /// How fast VIX reverts toward its target each day.
     ///
@@ -4697,6 +4799,13 @@ impl ModelParams {
             news_absorption_drift_share: 0.0,
             news_absorption_drift_half_life: 0.0,
             news_quote_revision: 0.0,
+            book_depth_coefficient: 0.0,
+            book_depth_exponent: 0.0,
+            book_depth_reach: 0.0,
+            book_shared: 0.0,
+            book_refill_half_life: 0.0,
+            book_resting: 0.0,
+            fill_impact_coefficient: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -6771,6 +6880,13 @@ impl ModelParams {
             "news_absorption_drift_share" => self.news_absorption_drift_share,
             "news_absorption_drift_half_life" => self.news_absorption_drift_half_life,
             "news_quote_revision" => self.news_quote_revision,
+            "book_depth_coefficient" => self.book_depth_coefficient,
+            "book_depth_exponent" => self.book_depth_exponent,
+            "book_depth_reach" => self.book_depth_reach,
+            "book_shared" => self.book_shared,
+            "book_refill_half_life" => self.book_refill_half_life,
+            "book_resting" => self.book_resting,
+            "fill_impact_coefficient" => self.fill_impact_coefficient,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -6985,6 +7101,13 @@ impl ModelParams {
             "news_absorption_drift_share" => out.news_absorption_drift_share = value,
             "news_absorption_drift_half_life" => out.news_absorption_drift_half_life = value,
             "news_quote_revision" => out.news_quote_revision = value,
+            "book_depth_coefficient" => out.book_depth_coefficient = value,
+            "book_depth_exponent" => out.book_depth_exponent = value,
+            "book_depth_reach" => out.book_depth_reach = value,
+            "book_shared" => out.book_shared = value,
+            "book_refill_half_life" => out.book_refill_half_life = value,
+            "book_resting" => out.book_resting = value,
+            "fill_impact_coefficient" => out.fill_impact_coefficient = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -7126,6 +7249,62 @@ impl ModelParams {
     /// whose denominator is a read-back on another, silently.
     ///
     /// Pure; allocates only on the failure path.
+    /// The agent-facing book's dials: ranges, and the companions each is
+    /// read by nothing without. Part of [`ModelParams::invariants`].
+    fn book_invariants(&self) -> Result<(), String> {
+        let y = self.book_depth_coefficient;
+        if !(y >= 0.0 && y <= 10.0) {
+            return Err(format!(
+                "book_depth_coefficient is {y}. It is the latent depth's Y in \
+                 Y sigma (Q/V)^delta, a non-negative number of order one; 0.0 \
+                 is no depth past the maker's ladder. Set it inside [0, 10]."));
+        }
+        if y == 0.0 {
+            for (name, v) in [("book_depth_exponent", self.book_depth_exponent),
+                              ("book_depth_reach", self.book_depth_reach)] {
+                if v != 0.0 {
+                    return Err(format!(
+                        "{name} is {v} but book_depth_coefficient is 0: it shapes \
+                         the latent depth and is read by nothing without it."));
+                }
+            }
+        }
+        let d = self.book_depth_exponent;
+        if !(d >= 0.0 && d <= 1.0) {
+            return Err(format!(
+                "book_depth_exponent is {d}. It is the exponent of the \
+                 price-for-size law, in [0, 1]: 0.5 is the square root, 1.0 is \
+                 linear, and 0.0 reads as the square root."));
+        }
+        let r = self.book_depth_reach;
+        if !(r >= 0.0 && r <= 10.0) {
+            return Err(format!(
+                "book_depth_reach is {r}. It is how far the latent depth reaches, \
+                 in multiples of daily volume, inside [0, 10]; 0.0 reads as one \
+                 day's volume."));
+        }
+        let h = self.book_refill_half_life;
+        if !(h >= 0.0 && h <= 390.0) {
+            return Err(format!(
+                "book_refill_half_life is {h}. It is a half-life in ticks inside \
+                 the 390-tick session, in [0, 390]; 0.0 refills at the next tick."));
+        }
+        if h != 0.0 && (self.book_shared == 0.0 || y == 0.0) {
+            return Err(format!(
+                "book_refill_half_life is {h} but the consumed latent depth it \
+                 refills needs book_shared on and book_depth_coefficient off zero: \
+                 it is read by nothing without both."));
+        }
+        let g = self.fill_impact_coefficient;
+        if !(g >= 0.0 && g <= 5.0) {
+            return Err(format!(
+                "fill_impact_coefficient is {g}. It is gamma in gamma sigma Q/V, \
+                 non-negative and of order 0.1 to 1 (Almgren et al. 2005 measure \
+                 0.314); 0.0 is the order-imbalance law. Set it inside [0, 5]."));
+        }
+        Ok(())
+    }
+
     pub fn invariants(&self) -> Result<(), String> {
         if self.vix_level_sigma != 0.0 && !(self.vix_level_persistence < 1.0 && self.vix_level_persistence >= 0.0) {
             return Err(format!(
@@ -7251,7 +7430,9 @@ impl ModelParams {
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
                           ("market_pe_buybacks", self.market_pe_buybacks),
-                          ("news_quote_revision", self.news_quote_revision)] {
+                          ("news_quote_revision", self.news_quote_revision),
+                          ("book_shared", self.book_shared),
+                          ("book_resting", self.book_resting)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -7277,6 +7458,7 @@ impl ModelParams {
                  it splits the fast profile and is read by nothing without it.",
                 self.news_absorption_drift_share));
         }
+        self.book_invariants()?;
         if self.news_absorption_drift_half_life != 0.0 && self.news_absorption_drift_share == 0.0 {
             return Err(format!(
                 "news_absorption_drift_half_life is {} but news_absorption_drift_share \
@@ -7652,6 +7834,13 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_absorption_drift_share",
         "news_absorption_drift_half_life",
         "news_quote_revision",
+        "book_depth_coefficient",
+        "book_depth_exponent",
+        "book_depth_reach",
+        "book_shared",
+        "book_refill_half_life",
+        "book_resting",
+        "fill_impact_coefficient",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

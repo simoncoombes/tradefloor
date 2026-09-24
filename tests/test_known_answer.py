@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import known_answer  # noqa: E402
+import known_answer_book  # noqa: E402
 
 
 
@@ -64,6 +65,28 @@ def test_known_answer_digest_matches_the_committed_baseline():
         "and simulationSha256 untouched."
     )
     assert known_answer.known_answer_digest() == baseline["sha256"]
+
+
+def test_the_book_known_answer_matches_its_baseline():
+    """The agent-facing book's gate, beside the market's.
+
+    `known_answer.py`'s digests are set by a market nobody trades, which the
+    book's dials cannot move, so that gate is blind to the book. This one
+    runs a fixed market with every book dial on and several agents in it
+    (`known_answer_book.py` says what it covers) and must agree on every
+    platform, for the same reason the other must. It lives in this file so
+    the determinism workflow, which runs this file on every wheel target,
+    runs it too.
+    """
+    baseline = json.loads(
+        (HERE / "known_answer_book.json").read_text(encoding="utf-8")
+    )
+    assert baseline["bookKatVersion"] == known_answer_book.BOOK_KAT_VERSION, (
+        "BOOK_KAT_VERSION changed without regenerating known_answer_book.json.")
+    assert baseline["dials"] == known_answer_book.DIALS
+    assert known_answer_book.book_digest() == baseline["sha256"], (
+        "the book digest moved. Either the book's behaviour changed and "
+        "BOOK_KAT_VERSION must bump, or a platform disagrees.")
 
 
 def test_known_answer_is_stable_within_a_process():
