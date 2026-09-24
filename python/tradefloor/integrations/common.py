@@ -97,12 +97,15 @@ nothing here duplicates that.
 
 from __future__ import annotations
 
+import atexit
 import copy
 import hashlib
 import importlib
 import json
+import os
 import re
 import statistics
+import threading
 import warnings
 from typing import Any, Literal, Sequence
 
@@ -266,31 +269,97 @@ def require(module: str, *, extra: str | None = None, pip: str | None = None,
         raise MissingDependencyError("\n".join(lines)) from exc
 
 
+#: The bridge's event loop, its thread, the process that started them, and
+#: the lock that starts them once. Module state because the point is ONE loop
+#: per process, shared by every adapter and every call.
+_BRIDGE_LOCK = threading.Lock()
+_BRIDGE: dict[str, Any] = {"loop": None, "thread": None, "pid": None}
+
+
+def _bridge_loop() -> Any:
+    """The process's one long-lived bridge loop, started on first use.
+
+    It runs forever on a daemon thread and is stopped at interpreter exit.
+    A process that inherits it through ``fork`` inherits the loop object but
+    not the thread running it, so a changed pid starts a fresh one rather
+    than submitting to a loop nobody is running.
+    """
+    import asyncio
+
+    with _BRIDGE_LOCK:
+        loop, thread = _BRIDGE["loop"], _BRIDGE["thread"]
+        if (loop is not None and _BRIDGE["pid"] == os.getpid()
+                and thread is not None and thread.is_alive()
+                and not loop.is_closed()):
+            return loop
+        loop = asyncio.new_event_loop()
+        ready = threading.Event()
+
+        def serve() -> None:
+            asyncio.set_event_loop(loop)
+            loop.call_soon(ready.set)
+            loop.run_forever()
+
+        thread = threading.Thread(target=serve, name="tradefloor-run-sync",
+                                  daemon=True)
+        thread.start()
+        ready.wait()
+        _BRIDGE.update(loop=loop, thread=thread, pid=os.getpid())
+        return loop
+
+
+def _stop_bridge() -> None:
+    """At exit: stop the bridge loop and let its thread finish. Pending
+    work is not awaited; a program exiting has stopped waiting for it."""
+    loop, thread = _BRIDGE["loop"], _BRIDGE["thread"]
+    if loop is None or thread is None or _BRIDGE["pid"] != os.getpid():
+        return
+    if not loop.is_closed():
+        loop.call_soon_threadsafe(loop.stop)
+    thread.join(timeout=1.0)
+
+
+atexit.register(_stop_bridge)
+
+
 def run_sync(awaitable: Any) -> Any:
     """Run one coroutine to completion from Tradefloor's synchronous loop.
 
     The ONE supported bridge from ``act()`` to an async framework API, and
-    it is shared because every framework needs it and the failure it guards
-    against only shows up in a notebook. The frameworks' own synchronous
-    entry points raise when called from a thread that already has a running
-    event loop -- the OpenAI Agents SDK's ``Runner.run_sync`` raises a bare
-    RuntimeError, and Jupyter runs everything inside a loop -- so an adapter
-    built on them works in a script and dies in the notebook the same reader
-    tries next. Call the framework's ASYNC entry point and hand the
-    coroutine here instead.
+    it is shared because every framework needs it and the failures it guards
+    against only show up away from the simple case. The frameworks' own
+    synchronous entry points raise when called from a thread that already
+    has a running event loop -- the OpenAI Agents SDK's ``Runner.run_sync``
+    raises a bare RuntimeError, and Jupyter runs everything inside a loop --
+    so an adapter built on them works in a script and dies in the notebook
+    the same reader tries next. Call the framework's ASYNC entry point and
+    hand the coroutine here instead.
 
-    With no loop running in this thread, this is ``asyncio.run``. With one
-    running, the coroutine runs on a separate thread with its own fresh
-    loop, and this call BLOCKS until it finishes; the result comes back, and
-    an exception comes back as the original exception object with its chain
-    intact, so ``FrameworkAdapter.act`` still wraps the real error.
+    Every call runs on ONE long-lived event loop per process, on a dedicated
+    background thread, whether or not the calling thread has a loop of its
+    own running. This call BLOCKS until the coroutine finishes. The result
+    comes back, and an exception comes back as the original exception
+    object with its chain intact, so ``FrameworkAdapter.act`` still wraps
+    the real error. The caller's context variables go with the coroutine,
+    as they would under ``asyncio.run``.
+
+    One loop and not a fresh one per call, since 0.9.0. Until then every
+    call got its own loop, closed when it returned, and this docstring told
+    adapters to create loop-bound resources inside the coroutine. The
+    frameworks do not: the OpenAI Agents SDK caches a default
+    ``AsyncOpenAI`` client whose connection pool is bound to the loop that
+    first used it, so the second decision of a live run raised "Event loop
+    is closed" and every other decision after it failed the same way (3 of
+    5 on the recorded example, found re-recording it on 2026-09-24). A
+    client, a session or a pool created in one call is now usable in the
+    next, because the next runs on the same loop.
 
     What this does not buy, stated plainly: it does not make Tradefloor
     concurrent. One decision runs at a time and the market waits for it, as
-    the run loop requires. And every call gets a FRESH event loop, so an
-    object bound to a loop -- an aiohttp session opened outside, a
-    framework client that caches its loop -- cannot be created once and
-    awaited across calls. Create loop-bound resources inside the coroutine.
+    the run loop requires. A coroutine running on the bridge that calls
+    ``run_sync`` itself cannot be given the bridge loop, which is busy
+    running it, so that nested call gets a fresh loop on its own thread, the
+    old behaviour, rather than deadlocking.
     """
     import asyncio
     import inspect as _inspect
@@ -303,26 +372,31 @@ def run_sync(awaitable: Any) -> Any:
     if _inspect.iscoroutine(awaitable):
         coro = awaitable
     else:
-        # asyncio.run accepts only a coroutine, and futures or task-like
-        # awaitables are bound to the loop that made them anyway.
+        # The loop runs coroutines, and a future or task-like awaitable is
+        # bound to the loop that made it anyway.
         async def _await(a: Any) -> Any:
             return await a
         coro = _await(awaitable)
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
+    if threading.current_thread() is _BRIDGE["thread"]:
+        # Nested: this thread is the bridge, running the coroutine that
+        # called us. Blocking it on its own loop would never return.
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
 
-    # A loop is already running in this thread -- a notebook, or a caller
-    # driving the World from inside async code. Nesting is not an option and
-    # neither is raising, so the coroutine gets its own thread and its own
-    # loop. `Future.result()` re-raises the exception OBJECT raised inside,
-    # `__cause__` and all, which is what keeps the chain honest across the
-    # boundary.
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coro).result()
+    # `run_coroutine_threadsafe` schedules through `call_soon_threadsafe`,
+    # whose handle copies THIS thread's context, so context variables the
+    # caller set reach the coroutine. `Future.result()` re-raises the
+    # exception OBJECT raised inside, `__cause__` and all.
+    future = asyncio.run_coroutine_threadsafe(coro, _bridge_loop())
+    try:
+        return future.result()
+    except BaseException:
+        # An interrupt while waiting must not leave the decision running on
+        # the bridge behind the caller's back. A finished future ignores it.
+        future.cancel()
+        raise
 
 
 # -- the decision model -------------------------------------------------------

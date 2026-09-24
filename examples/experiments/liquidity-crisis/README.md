@@ -1,5 +1,12 @@
 # Will a financial AI agent reduce risk in a market crisis?
 
+> **Measured under the 0.8.x harness.** Every number on this page comes from
+> FinRobot runs recorded before 0.9.0, when Tradefloor counted an agent's own
+> orders on every minute of a step instead of once. From 0.9.0 the prices
+> after the first trade differ, so these recordings no longer replay past the
+> first decision, and the results below have not been re-measured. Re-recording
+> the study is a listed follow-up.
+
 A [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent
 manages twenty-four real companies and fifty million dollars for twenty
 simulated trading days. The run is checkpointed and forked in two. One

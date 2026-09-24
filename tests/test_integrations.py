@@ -1921,3 +1921,104 @@ def test_a_custom_exchange_key_is_honoured():
     assert entry["digest"] == "cafe1234"
     assert entry["prompt"] == "the exact rendered input"
     assert entry["response"]["actions"][0]["symbol"] == "TECH_A"
+
+
+class _LoopBoundClient:
+    """A stand-in for a framework's cached async client.
+
+    The OpenAI Agents SDK keeps a default ``AsyncOpenAI`` client whose pool
+    is bound to the loop that first used it; awaited from another loop, or
+    after that loop closed, it raises "Event loop is closed". This does the
+    same, and nothing else, so the bridge can be tested without the SDK.
+    """
+
+    def __init__(self) -> None:
+        self.loop = None
+        self.calls = 0
+
+    async def complete(self, value: int) -> int:
+        import asyncio
+        here = asyncio.get_running_loop()
+        if self.loop is None:
+            self.loop = here
+        if self.loop.is_closed() or self.loop is not here:
+            raise RuntimeError("Event loop is closed")
+        await asyncio.sleep(0)
+        self.calls += 1
+        return value * 2
+
+
+def test_a_loop_bound_client_fails_across_fresh_loops():
+    """Non-vacuity: the stand-in fails exactly the way the SDK's client did
+    under the old bridge, one ``asyncio.run`` per call."""
+    import asyncio
+
+    client = _LoopBoundClient()
+    assert asyncio.run(client.complete(1)) == 2
+    with pytest.raises(RuntimeError, match="Event loop is closed"):
+        asyncio.run(client.complete(2))
+
+
+def test_run_sync_reuses_one_loop_across_calls_in_a_script():
+    """Five calls in a row, as a five-day live run makes them. Until 0.9.0
+    the second failed, and so did every other one after it."""
+    client = _LoopBoundClient()
+    assert [ci.run_sync(client.complete(k)) for k in range(5)] == [0, 2, 4, 6, 8]
+    assert client.calls == 5
+
+
+def test_run_sync_reuses_one_loop_across_calls_inside_a_running_loop():
+    """The notebook case: the caller's thread has its own loop running, and
+    the client is still reused across calls, on the bridge's loop."""
+    import asyncio
+
+    client = _LoopBoundClient()
+
+    async def outer():
+        return [ci.run_sync(client.complete(k)) for k in range(5)]
+
+    assert asyncio.run(outer()) == [0, 2, 4, 6, 8]
+    # And the same client keeps working from a plain call afterwards: one
+    # bridge loop per process, whichever context the call came from.
+    assert ci.run_sync(client.complete(10)) == 20
+    assert client.calls == 6
+
+
+def test_run_sync_carries_the_callers_context_variables():
+    """``asyncio.run`` ran the coroutine in the caller's context, and a
+    framework's tracing reads context variables, so the bridge must too."""
+    import contextvars
+
+    tag = contextvars.ContextVar("tag", default="unset")
+
+    async def read():
+        return tag.get()
+
+    token = tag.set("set by the caller")
+    try:
+        assert ci.run_sync(read()) == "set by the caller"
+    finally:
+        tag.reset(token)
+
+
+def test_run_sync_nested_inside_a_bridged_coroutine_does_not_deadlock():
+    """A coroutine on the bridge that calls a synchronous helper which calls
+    ``run_sync`` again cannot be given the bridge's own loop, which is busy
+    running it. It gets a fresh loop on its own thread instead."""
+    async def inner():
+        return "inner"
+
+    async def outer():
+        return "outer+" + ci.run_sync(inner())
+
+    assert ci.run_sync(outer()) == "outer+inner"
+
+
+def test_run_sync_keeps_the_chain_across_the_bridge_on_repeated_calls():
+    async def boom(k):
+        raise RuntimeError(f"call {k}") from KeyError(k)
+
+    for k in range(3):
+        with pytest.raises(RuntimeError, match=f"call {k}") as excinfo:
+            ci.run_sync(boom(k))
+        assert isinstance(excinfo.value.__cause__, KeyError)

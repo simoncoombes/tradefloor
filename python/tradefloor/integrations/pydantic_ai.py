@@ -192,15 +192,13 @@ already running` inside a notebook -- measured -- so this adapter calls the
 async `Agent.run` and hands the coroutine to `common.run_sync`, the one
 shared bridge.
 
-The trap: when a loop IS already running, that bridge runs the coroutine on
-a separate thread, and `concurrent.futures` does not propagate context
-variables. `Agent.override(...)` is implemented with context variables, so
-an override set around `World.run` inside a notebook does NOT reach the run.
-This adapter never depends on that -- the model is passed per run through
-`model=`, which is a plain argument -- but a test or notebook that sets a
-model with `override` and then wonders why the real provider was called is
-meeting this and not a bug in the adapter. Pass `model=` to the adapter
-instead.
+`Agent.override(...)` is implemented with context variables, and since
+0.9.0 the bridge carries the caller's context to the coroutine in a script
+and in a notebook alike, so an override set around `World.run` reaches the
+run either way. Until then it reached it in a script and not in a notebook,
+where the bridge crossed a thread without the context. This adapter never
+depends on either: the model is passed per run through `model=`, a plain
+argument, which is still the clearer way to choose one.
 """
 
 from __future__ import annotations
@@ -308,10 +306,8 @@ class PydanticAIAdapter(FrameworkAdapter):
     :meth:`_run` and names the extra if that import fails.
 
     ``model`` overrides the model for every run this adapter makes, as a
-    plain per-run argument rather than through :meth:`Agent.override`. That
-    is what makes an offline test work in a notebook as well as a script:
-    ``override`` is built on context variables, and the shared async bridge
-    crosses a thread boundary where those do not propagate. Pass
+    plain per-run argument rather than through :meth:`Agent.override`, so
+    nothing about it depends on context variables reaching the run. Pass
     ``TestModel()`` or ``FunctionModel(...)`` here for an offline run.
 
     ``deps`` is handed to ``run(deps=...)`` verbatim. The adapter never

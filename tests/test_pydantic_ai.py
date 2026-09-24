@@ -736,27 +736,32 @@ def test_the_frameworks_own_sync_entry_point_would_have_failed_here():
     asyncio.run(notebook_cell())
 
 
-def test_an_override_set_outside_does_not_cross_the_bridge():
-    """A documented trap, pinned so it stays documented rather than becoming
-    a surprise. `Agent.override` is built on context variables, and the
-    shared bridge runs the coroutine on another thread when a loop is
-    already running -- and `concurrent.futures` does not propagate context.
-    The adapter never relies on it: the model is a per-run argument. A user
-    reaching for `override` in a notebook is meeting this, not a bug."""
+def test_an_override_set_outside_crosses_the_bridge_in_both_modes():
+    """`Agent.override` is built on context variables. Until 0.9.0 it
+    reached the run in a script, where the bridge was `asyncio.run` in the
+    caller's thread, and not in a notebook, where it crossed a thread
+    without the context; this test pinned that as a documented trap. The
+    bridge now runs every call on one long-lived loop and carries the
+    caller's context in both cases, so the override wins in both, as
+    PydanticAI documents it winning over a per-run model. The adapter still
+    never relies on it: the model is a per-run argument."""
     agent = Agent("test", output_type=str)
     inside = {}
 
-    async def notebook_cell():
-        with agent.override(model=TestModel(custom_output_text="overridden")):
-            def look(messages, info: AgentInfo) -> ModelResponse:
-                inside["reached"] = True
-                return ModelResponse(parts=[TextPart("not overridden")])
+    def look(messages, info: AgentInfo) -> ModelResponse:
+        inside["reached"] = True
+        return ModelResponse(parts=[TextPart("not overridden")])
 
+    def script():
+        with agent.override(model=TestModel(custom_output_text="overridden")):
             return ci.run_sync(agent.run("x", model=FunctionModel(look)))
 
-    result = asyncio.run(notebook_cell())
-    assert inside.get("reached"), "the per-run model did not take effect"
-    assert result.output == "not overridden"
+    async def notebook_cell():
+        return script()
+
+    assert script().output == "overridden"
+    assert asyncio.run(notebook_cell()).output == "overridden"
+    assert not inside, "the per-run model ran under an override"
 
 
 # -- recording and replay ----------------------------------------------------
