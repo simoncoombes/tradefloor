@@ -7,14 +7,11 @@ Rust and Python suites pass on it, and the four known-answer digests are
 unchanged. `RELEASING.md` is the runbook, and each step below names the
 section of it that applies. The last step is the owner's.
 
-The branch also carries two commits cherry-picked from `dev` (c618089 and
-d1cb9a6), because step 4 cannot read the docs register without them. The
-rest of `dev` is not in this release: `a46575e` (`envelope.check` accepts
-four measured roster mixes), `fbdcac1` (the `forced_flow_threshold`
-summary), `d445d9c` (`decay-curve-504.json` moves into `measurements/`) and
-`1c653e7` (an openai-agents re-record that `fix/agent-flow-once` supersedes).
-An LTS patch takes no new features (`docs/SUPPORT.md`), so if `a46575e` is
-wanted in the 0.8 line it has to be merged before the tag.
+The branch also carries five commits cherry-picked from `dev`: c618089 and
+d1cb9a6 (the docs register, which step 4 reads), a46575e (`envelope.check`
+accepts four measured roster mixes), fbdcac1 and d445d9c. The one `dev`
+commit left out is 1c653e7, an openai-agents re-record that today's
+re-record on `fix/agent-flow-once` supersedes.
 
 ## Digests on the branch today
 
@@ -25,6 +22,13 @@ wanted in the 0.8 line it has to be merged before the tag.
 | `metadataSha256` | `8804ef0e...` | yes |
 | `bondsSha256` | `522aeb76...` | yes, its session runs the default preset |
 | book `sha256` | `b83323a6...` | yes: `preset/pt-v20` re-bases it to `c765d6a6...` with `BOOK_KAT_VERSION` still 1 |
+| presets (18 rows) | combined `0fea3038...` | only by gaining pt-v20's row. The other eighteen rows are frozen |
+
+The per-preset digests (`tests/known_answer_presets.json`) were checked
+against `preset/pt-v20` at 9fce931: a build of it gives the same eighteen
+digests for pt-v1 to pt-v19 as this branch. Each of the eighteen also
+matches the published 0.8.1 wheel, with the two treasury yields that 0.8.1
+does not report left out.
 
 ## 1. Merge the preset
 
@@ -52,16 +56,21 @@ wanted in the 0.8 line it has to be merged before the tag.
       section. Either bring it to pt-v20 or say at the top that it
       describes pt-v19. `library_docs.py` in the docs repository rewrites
       the name of the preset after the default, so check its output.
-- [ ] `docs/SUPPORT.md`, "Before the first LTS tag": it asks for one
-      known-answer digest per shipped preset before the LTS tag. The
-      owner decides whether 0.8.5 waits for that.
+- [ ] Add pt-v20's row to `tests/known_answer_presets.json` with
+      `python tests/known_answer_presets.py`, and change nothing else in
+      that file; `test_known_answer.py` fails until the row is there.
+      Update the combined `sha256` and the note, and the
+      `[PLACEHOLDER pt-v20]` sentence about it in the changelog.
+- [ ] `envelope.check()` accepts the four concentrated roster mixes only
+      on pt-v19 (a46575e). Once pt-v20 is the default, measure the mixes
+      on it or say that `check()` refuses them there.
 - [ ] Optional: the liquidity-crisis FinRobot study is skipped by the slow
       notebook test until `tests/fixtures/finrobot/liquidity-crisis.json`
       (60 calls) and its four replications are re-recorded.
 
 ## 2. Fill the placeholders
 
-- [ ] Engine: `grep -n "PLACEHOLDER pt-v20" CHANGELOG.md` finds five, two of
+- [ ] Engine: `grep -n "PLACEHOLDER pt-v20" CHANGELOG.md` finds seven, two of
       them in the release note. The note is 248 words with the placeholder
       sentences in it and the budget is 250, so pt-v20's numbers have to
       fit in about the 45 words those two sentences hold.
