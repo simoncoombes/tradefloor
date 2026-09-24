@@ -25,11 +25,22 @@ into the gate that guards the numbers.
 
     python tools/remeasure/resync.py --report        # say what it would do
     python tools/remeasure/resync.py --apply         # do it
+    python tools/remeasure/resync.py --lines         # line check only
+
+The line check needs no measurement run. Every row carries an `anchor`, the
+words around the figure as a reader sees them on the built page, and the
+check confirms the row's cited line still shows them. A page edit shifts
+lines without moving a single value, so without this a row that reproduces
+can point at the wrong paragraph for releases and nothing says so, which is
+how the whole register came to cite pages that no longer existed. A row
+whose anchor moved to one other line is re-pointed by --apply; one whose
+anchor appears nowhere, or in several places, is listed for a human.
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import pathlib
@@ -224,6 +235,103 @@ def classify(row: dict, measured, text: str) -> tuple[str, dict]:
     return "repoint", {"line": line_no, "rendering": rendering, "text": line}
 
 
+def visible(line: str) -> str:
+    """A built page's line as a reader sees it: tags dropped, entities read.
+
+    Anchors are written in these terms, so `'wins_a': 12` matches the code
+    block that prints it rather than the `&#39;wins_a&#39;` in the source.
+    """
+    text = html.unescape(re.sub(r"<[^>]+>", " ", line))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+#: The rendered body of a built page. Everything outside it is the head,
+#: whose description repeats the page's prose, or the raw-text copy of the
+#: template the browser mounts, which repeats every typed figure a second
+#: time. Reading either would make each anchor look ambiguous.
+BODY_START = '<div id="pt-root">'
+BODY_END = '<script id="pt-template"'
+
+
+def page_lines(text: str) -> list[str]:
+    """The page's lines as a reader sees them, numbered as in the file.
+
+    Lines outside a built page's rendered body come back empty, so line
+    numbers still match the file. A page without those markers, a README,
+    is read whole.
+    """
+    raw = text.splitlines()
+    if BODY_START not in text:
+        return [visible(l) for l in raw]
+    out, inside = [], False
+    for line in raw:
+        if BODY_START in line:
+            inside = True
+        if BODY_END in line:
+            inside = False
+        out.append(visible(line) if inside else "")
+    return out
+
+
+def locate(anchor: str, lines: list[str], cited: int | None) -> tuple[str, int | None]:
+    """Where an anchor is on a page: ("ok" | "moved" | "lost" | "ambiguous", line)."""
+    if cited and 1 <= cited <= len(lines) and anchor in lines[cited - 1]:
+        return "ok", cited
+    hits = [i for i, text in enumerate(lines, 1) if anchor in text]
+    if len(hits) == 1:
+        return "moved", hits[0]
+    return ("lost" if not hits else "ambiguous"), None
+
+
+def check_lines(rows: list[dict], text_of) -> dict[str, list]:
+    """Check every row's line, and every repeat it lists, against its anchor.
+
+    Returns buckets of (row, place, verdict, line) where `place` is the row
+    itself or one entry of its `also` list.
+    """
+    out: dict[str, list] = {"ok": [], "moved": [], "lost": [], "ambiguous": [],
+                            "unreadable": [], "no anchor": []}
+    for row in rows:
+        places = [row] + list(row.get("also") or [])
+        for place in places:
+            anchor = place.get("anchor")
+            if not anchor:
+                out["no anchor"].append((row, place, None))
+                continue
+            text = text_of(place["file"])
+            if text is None:
+                out["unreadable"].append((row, place, None))
+                continue
+            verdict, line = locate(anchor, page_lines(text), place.get("line"))
+            out[verdict].append((row, place, line))
+    return out
+
+
+def print_lines(buckets: dict[str, list]) -> None:
+    print(f"\n=== LINES  (ok {len(buckets['ok'])}, moved {len(buckets['moved'])}, "
+          f"lost {len(buckets['lost'])}, ambiguous {len(buckets['ambiguous'])}, "
+          f"unreadable {len(buckets['unreadable'])}, "
+          f"no anchor {len(buckets['no anchor'])}) ===")
+    why = {
+        "moved": "anchor now on one other line",
+        "lost": "anchor is nowhere on the page: the sentence changed, read it",
+        "ambiguous": "anchor is on several lines and not the cited one",
+        "unreadable": "no root holds this page",
+        "no anchor": "row carries no anchor, so its line cannot be checked",
+    }
+    for name in ("moved", "lost", "ambiguous", "unreadable", "no anchor"):
+        for row, place, line in buckets[name]:
+            where = f"{place['file']}:{place.get('line')}"
+            to = f" -> {line}" if line else ""
+            tag = "" if place is row else " (repeat)"
+            print(f"  {row['id']:<34} {where}{to}{tag}")
+            print(f"      {why[name]}: {place.get('anchor')!r}"[:140])
+
+
+def needs_a_human(buckets: dict[str, list]) -> bool:
+    return any(buckets[k] for k in ("lost", "ambiguous", "unreadable"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     # The CURRENT run, not a pinned old one. This defaulted to
@@ -239,6 +347,9 @@ def main() -> None:
                     help="the claim register; overrides TRADEFLOOR_DOCS")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--lines", action="store_true",
+                    help="check each row's line against its anchor only; "
+                         "needs no measurement run")
     args = ap.parse_args()
 
     # Named before anything is loaded, so a run that cannot start still says
@@ -246,26 +357,14 @@ def main() -> None:
     inventory_path, how = _register.resolve(args.inventory)
     print(f"register: {inventory_path}  (via {how})")
 
-    figures_path = ROOT / args.figures
-    if not figures_path.is_file():
-        # `out/` is not committed, so this is what a fresh clone hits. A bare
-        # FileNotFoundError names a path and not the thing to do about it.
-        raise SystemExit(
-            f"no measurement run at {figures_path}. Run "
-            "`python tools/remeasure/remeasure.py` first, or pass --figures "
-            "pointing at a stored run such as tools/remeasure/out-0.6.1/"
-            "figures.json."
-        )
-    figures = json.loads(figures_path.read_text(encoding="utf-8"))
-    measured_by_id = {r["id"]: r.get("measured") for r in figures["figures"]}
-    moved = {r["id"] for r in figures["figures"] if r["status"] == "MOVED"}
-
     inv = json.loads(inventory_path.read_text(encoding="utf-8"))
     rows = inv["figures"]
 
     cache: dict[str, str] = {}
-
-    bases = _register.page_roots(args.docs_root)
+    # A register passed with --inventory from inside a documentation
+    # checkout still finds its pages.
+    bases = _register.page_roots(args.docs_root
+                                 or _register.docs_root_of(inventory_path))
 
     def text_of(path: str):
         """The page's text, or None when no root holds it.
@@ -284,6 +383,40 @@ def main() -> None:
                     break
         return cache[path]
 
+    lines = check_lines(rows, text_of)
+
+    def write_lines() -> int:
+        moved = 0
+        for _row, place, line in lines["moved"]:
+            place["line"] = line
+            moved += 1
+        return moved
+
+    if args.lines:
+        print_lines(lines)
+        if args.apply:
+            n = write_lines()
+            inventory_path.write_text(json.dumps(inv, indent=1) + "\n",
+                                      encoding="utf-8")
+            print(f"\nwrote {inventory_path}: {n} lines re-pointed")
+        if needs_a_human(lines):
+            raise SystemExit(1)
+        return
+
+    figures_path = ROOT / args.figures
+    if not figures_path.is_file():
+        # `out/` is not committed, so this is what a fresh clone hits. A bare
+        # FileNotFoundError names a path and not the thing to do about it.
+        raise SystemExit(
+            f"no measurement run at {figures_path}. Run "
+            "`python tools/remeasure/remeasure.py` first, or pass --figures "
+            "pointing at a stored run such as tools/remeasure/out-0.6.1/"
+            "figures.json. `--lines` checks the register without one."
+        )
+    figures = json.loads(figures_path.read_text(encoding="utf-8"))
+    measured_by_id = {r["id"]: r.get("measured") for r in figures["figures"]}
+    moved = {r["id"] for r in figures["figures"] if r["status"] == "MOVED"}
+
     buckets: dict[str, list] = {"repoint": [], "retire": [], "review": [],
                                 "unreadable": []}
     for row in rows:
@@ -294,6 +427,15 @@ def main() -> None:
             buckets["unreadable"].append(
                 (row, {"why": "no root holds this page; pass --docs-root, or "
                               "the inventory still cites a page that moved"}))
+            continue
+        if row.get("bound"):
+            # The page prints what the build wrote from a data file, so no
+            # edit to the row can make it agree. Either the file is stale
+            # against this build (regenerate it) or the recipe here is not
+            # the one that wrote it (fix measures.py).
+            buckets["review"].append(
+                (row, {"why": "bound to " + row["bound"]["file"] + ": "
+                              "regenerate that file, or the recipe differs"}))
             continue
         verdict, info = classify(row, measured_by_id.get(row["id"]), text)
         buckets[verdict].append((row, info))
@@ -320,16 +462,21 @@ def main() -> None:
               "reproduced. Re-point the inventory, or pass --docs-root, "
               "before reading this gate as clean.")
 
+    print_lines(lines)
+
     if not args.apply:
         print("\n(report only; pass --apply to write inventory.json)")
         if considered and blind == considered:
             # Every row blind: the tool saw nothing at all. Returning 0
             # here is exactly how a gate becomes decoration.
             raise SystemExit(2)
+        if needs_a_human(lines):
+            raise SystemExit(1)
         return
 
     keep, retired = [], {r["id"] for r, _ in buckets["retire"]}
     fixes = {r["id"]: i for r, i in buckets["repoint"]}
+    n_lines = write_lines()
     for row in rows:
         if row["id"] in retired:
             continue
@@ -350,7 +497,8 @@ def main() -> None:
     inv["figures"] = keep
     inventory_path.write_text(json.dumps(inv, indent=1) + "\n", encoding="utf-8")
     print(f"\nwrote {inventory_path}: "
-          f"{len(keep)} figures ({len(retired)} retired, {len(fixes)} re-pointed)")
+          f"{len(keep)} figures ({len(retired)} retired, {len(fixes)} re-pointed, "
+          f"{n_lines} lines moved)")
 
 
 if __name__ == "__main__":
