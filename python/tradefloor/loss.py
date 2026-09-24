@@ -1,28 +1,33 @@
-"""The calibration objective: band distance, noise-scaled, diagonally weighted.
+"""The calibration objectives: band distance, and a residual scoring rule.
 
-This module turns the realism panel of `tradefloor.facts` into the number a
-calibration search minimises:
+This module turns the realism panel of `tradefloor.facts` into the numbers a
+calibration search minimises. There are two. `scoring_rule`, added on
+2026-09-07, scores each row's distance from the tape's centre in units of
+the combined tape and model error; the block above `MODEL_SE_ESTIMATOR`
+states it and why it exists. The rest of this docstring describes the first,
+`band_distance_loss`:
 
     d_k    = max(0, lo_k - m_k, m_k - hi_k)      # zero inside the band
     L_real = sum over k of (d_k / s_k)^2
 
 where m_k is the panel median of statistic k, [lo_k, hi_k] is its
-real-market band (`facts.REAL_MARKETS`), and s_k is its across-seed
-standard deviation at the shipped baseline (`facts.SEED_SD`). Each
-statistic's band exit is priced in units of its own sampling noise -- the
-simulated-method-of-moments weighting discipline with a deliberately
-DIAGONAL matrix. Not the full inverse covariance: ten moments estimated
-from thirty seeds make the full inverse ill-conditioned, and using it
-quietly bets the search on noisy off-diagonal estimates. The diagonal is
-honest and revisitable, and every result this module returns says which
-weighting was used so the choice stays visible.
+real-market band (`facts.REAL_MARKETS`, the 2015-2025 decade table, unless
+`bands` names another), and s_k is its across-seed standard deviation on
+pt-v1, the baseline preset (`facts.SEED_SD`, frozen as the denominator, with
+its provenance in `facts.SEED_SD_PROVENANCE`). Each statistic's band exit is
+priced in units of its own sampling noise -- the simulated-method-of-moments
+weighting discipline with a deliberately DIAGONAL matrix. Not the full
+inverse covariance: the nine moments in the loss, estimated from thirty
+seeds, make the full inverse ill-conditioned, and using it quietly bets the
+search on noisy off-diagonal estimates. The diagonal is honest and
+revisitable, and every result this module returns says which weighting was
+used so the choice stays visible.
 
 There is no unweighted form, on purpose. Pooled volatility is numerically
 ~40 on a band of width ~20 while every autocorrelation is measured in
-hundredths, so an unweighted sum is not a neutral default -- it is a
-volatility objective wearing a ten-statistic costume. `band_distance_loss`
-therefore refuses to run without a positive s_k for every statistic in the
-loss, rather than falling back to weights of one.
+hundredths, so an unweighted sum is in effect a volatility objective.
+`band_distance_loss` therefore refuses to run without a positive s_k for
+every statistic in the loss, rather than falling back to weights of one.
 
 ## What is in the loss, and what is reported but excluded
 
@@ -37,14 +42,17 @@ Membership is data, not conditionals:
   or reached lag-5 clustering by destroying the leverage effect -- would
   trade a documented gap for a new one.
 - Structural exclusions -- everything in `facts.REAL_MARKETS` not named
-  above, now only the volume-change autocorrelation: a held volume level
-  plus independent per-tick noise sits near -0.5 at any coefficients,
-  against a real band of -0.32 to -0.20, and no parameter reaches the
-  row. It appears in every result this module returns, with its band
-  distance, as the standing falsification verdict -- but an optimiser
-  pointed at a target no parameter reaches does not fail cleanly: it
-  distorts every other parameter chasing it, then "succeeds" by
-  overfitting. Excluding it is the identifiability gate applied.
+  above: nine rows on this build, from `volume_change_acf1` to the level
+  and crisis rows (`STRUCTURAL`). Each appears in every result this
+  module returns, with its band distance, and none enters the sum. The
+  set is about the objective and not about reachability, as the comment
+  above `STRUCTURAL` says. It was once only the volume-change
+  autocorrelation, which sat near -0.5 against a real band of -0.32 to
+  -0.20 at any coefficients until 0.2.0 reached it; pt-v19 reads -0.2789.
+  An optimiser pointed at a target no parameter reaches does not fail
+  cleanly: it distorts every other parameter chasing it, then "succeeds"
+  by overfitting. Excluding such a row is the identifiability gate
+  applied.
 
 Promoting a structural statistic once a model change makes it reachable
 is one edit: append its key to `LIVE_TARGETS` (or to `CONSTRAINTS`, if
@@ -63,8 +71,8 @@ refusal is a considered position: a model is realistic in some respects
 and not others, and one number hides exactly the structure that matters.
 This loss does not reopen that question. It is an OPTIMISATION DEVICE --
 a search direction for calibration tooling -- not a published metric, and
-the published artifact remains the ten-row panel with per-statistic
-verdicts. That is why `band_distance_loss` returns the full per-statistic
+the published artifact remains the panel `facts.report` prints, one verdict
+per row. That is why `band_distance_loss` returns the full per-statistic
 breakdown with the scalar inside it rather than a bare float, why the
 structural rows ride along in every result, and why nothing here is
 called, or should ever grow into, a `realism_score`.
@@ -131,7 +139,10 @@ LIVE_TARGETS = (
 #: The tail is a GATE property, not a panel property. It is checked by
 #: `decay_curve.py` over thirty seeds, where aggregation kills exactly the
 #: noise that defeats the panel: real markets fit a log-log slope of
-#: -0.436 there and the model -0.956, which is unambiguous.
+#: -0.436 there and pt-v3, the default at 0.1.0, fit -0.956, which was
+#: unambiguous. pt-v19 fits -0.515 +/- 0.109, inside one error of real,
+#: while reading below real at every lag (`envelope.DECAY_252`), so on this
+#: default the slope no longer separates the two and the level does.
 CONSTRAINTS = (
     "excess_kurtosis",
     "volume_abs_return_corr",
@@ -248,15 +259,16 @@ def band_distance_loss(
           "panels":     how many per-seed panels were aggregated,
         }
 
-    All thirteen panel statistics appear in `"statistics"`, in panel order.
+    Every row of the band table appears in `"statistics"`, in table order:
+    the eighteen of `facts.REAL_MARKETS` by default.
     Structural rows carry their measured value and band distance --
     the standing falsification verdict rides along with every loss
     evaluation -- but their `"contribution"` is None and they are absent
     from the sum. `"contribution"` is (d_k/s_k)^2 exactly for the rows in
     the loss, so the sum of non-None contributions IS `"loss"`.
 
-    An optimisation device, not a published metric: report the eight-row
-    panel (`facts.report`), not this number.
+    An optimisation device, not a published metric: report the panel
+    (`facts.report`), not this number.
     """
     if isinstance(panel, Mapping):
         panels: Sequence[Mapping[str, Any]] = (panel,)
