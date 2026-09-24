@@ -33,7 +33,7 @@ authors:
     given-names: Simon
     email: simon@coombes.io
 version: 0.8.0
-date-released: "2026-09-10"
+date-released: "2026-09-24"
 license:
   - MIT
   - Apache-2.0
