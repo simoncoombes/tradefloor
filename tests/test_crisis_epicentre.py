@@ -343,6 +343,20 @@ def test_the_epicentre_moves_up_the_others_move_down_and_the_mean_is_held():
     share stands a little apart from it and the held mean lands off one by
     that difference and by nothing else. The additive form, on the same
     names, would have put the roster's crisis variance up by two fifths.
+
+    "By nothing else" is a claim about a path where nothing but the
+    mechanism moves the variance, and it is asserted on that path: the
+    per-name GJR's shock terms off (`garch_alpha` and `garch_gamma` 0.0, with
+    `garch_beta` at the 0.9416 its identity then gives), where the
+    decomposition holds to the bit. With the GJR on -- the shipped preset --
+    a name that carried a larger shock carries a larger variance into the
+    next session, a second round the identity does not model. It was
+    -0.00007 on pt-v19's fourth composition, inside the 1e-3 this test held
+    the shipped preset to; the fifth composition (2026-09-23) reads 0.9978
+    against a decomposition of 0.9920, a second round of 0.006, and zero
+    with the shock terms off, measured. So on the shipped preset the mean is
+    held to the 2.5 per cent it always was, and the decomposition is read
+    where its "nothing else" is true.
     """
     sectors = _by_sector(engine(live()))
     target = next(s for s, idx in sectors.items() if idx)
@@ -366,17 +380,28 @@ def test_the_epicentre_moves_up_the_others_move_down_and_the_mean_is_held():
         mean = sum(col) / len(col)
         return sum((x - mean) ** 2 for x in col) / len(col)
 
-    v_off = [variance([d[i] for d in off]) for i in range(len(UNIVERSE))]
-    v_on = [variance([d[i] for d in on]) for i in range(len(UNIVERSE))]
-    held = sum(v_on) / sum(v_off)
-    w_roster = sum(v_off[i] for i in epicentre) / sum(v_off)
+    def held_and_share(off, on):
+        v_off = [variance([d[i] for d in off]) for i in range(len(UNIVERSE))]
+        v_on = [variance([d[i] for d in on]) for i in range(len(UNIVERSE))]
+        return (sum(v_on) / sum(v_off),
+                sum(v_off[i] for i in epicentre) / sum(v_off))
 
-    # This roster's own share against the measured one accounts for the whole
-    # of the miss, to four decimals -- so nothing else is moving the roster's
-    # variance over ten sessions: no GARCH feedback, no clamp, no draw.
-    assert held == pytest.approx(
-        w_roster * up * up + (1.0 - w_roster) * down * down, abs=1e-3)
+    # On the shipped preset the mean is held.
+    held, w_roster = held_and_share(off, on)
     assert held == pytest.approx(1.0, abs=0.025)
+
+    # And where nothing else moves the roster's variance -- the per-name
+    # GJR's shock terms off in BOTH arms, so no GARCH feedback, and the same
+    # episode, clamp and draws -- this roster's own share against the
+    # measured one accounts for the whole of the miss, to four decimals.
+    quiet = dict(garch_alpha=0.0, garch_gamma=0.0, garch_beta=0.9416)
+    q_off = _episode_arm(tf.ModelParams.from_preset(
+        "pt-v19", crisis_epicentre_extra=0.0, **quiet), target, days)
+    q_on = _episode_arm(live(**quiet), target, days)
+    q_held, q_w = held_and_share(q_off, q_on)
+    assert q_held == pytest.approx(
+        q_w * up * up + (1.0 - q_w) * down * down, abs=1e-3)
+    assert q_held == pytest.approx(1.0, abs=0.025)
     # And what the additive form would have done to the same names with the
     # same weights: `g^2 = (e^2 - m) / (1 - m)` on the epicentre's names and
     # one everywhere else. It is the `w = 0` edge of the same solve, and this

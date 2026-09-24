@@ -760,9 +760,25 @@ def test_the_matrix_is_the_pnl_the_removal_changed():
 
 def test_removing_an_agent_that_traded_moves_the_other_agents_pnl():
     """The guard on the guard. A matrix of zeros passes every structural
-    test above, so something has to check that a real removal registers."""
+    test above, so something has to check that a real removal registers.
+
+    The two buy the same name AT THE SAME STEP. An entry is the other
+    agent's `pnl_since`, `quantity * (mark - fill)`, so a removal registers
+    only if it moves the fill and the mark by DIFFERENT amounts. Staggered a
+    step apart (alpha at 0, beta at 1, as this test was until 2026-09-23),
+    the first buyer's temporary impact has decayed by the second one's fill
+    and what is left is the permanent part, which moves the fill and the
+    closing mark alike: on pt-v19's fifth composition both moved by exactly
+    one cent on an $83 name, and beta's P&L read -7,140 in both arms, an
+    entry of exactly zero from a removal that did move the market. That is
+    a true reading, not a broken instrument. At the same step each fill
+    carries the other's whole immediate impact while the mark carries only
+    what persists, so the two cannot move together: measured non-zero on
+    both entries at 3,000 and 5,000 shares over one, two and three days, on
+    the fifth composition and on the fourth.
+    """
     world = cohort(agents={"alpha": Buyer(0, at=0, shares=3_000.0),
-                           "beta": Buyer(0, at=1, shares=3_000.0)})
+                           "beta": Buyer(0, at=0, shares=3_000.0)})
     result = externalities(world, days=2)
     assert result.matrix["alpha"]["beta"] != 0.0
     assert result.matrix["beta"]["alpha"] != 0.0
