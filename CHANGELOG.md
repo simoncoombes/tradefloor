@@ -1,13 +1,110 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
 
-**The default preset moves to pt-v19.** Every seeded trajectory changes, so
-a run that did not name a preset will not replay against earlier versions.
-Naming a preset still replays exactly, and every preset from pt-v1 on stays
-selectable.
+**The default preset moves to pt-v19.** A run that did not name a preset
+will not replay against 0.7.x, and `KAT_VERSION` moves to 27. Naming a preset still replays exactly, and pt-v1
+through pt-v18 stay selectable.
 
-**pt-v19's panel, composed on 2026-09-21 and 2026-09-22.** Every row is
+**pt-v19 passes a long-run check that pt-v18 fails.** Thirty 21-year
+histories, plus 2008 and 2020 replayed with the real VIX, are graded on fifteen criteria a user would notice. pt-v19 meets all
+fifteen and pt-v18 meets eight. The verdict ships in the preset record,
+`tf.preset_record()["long_run"]`.
+
+**What a user will notice.** Over 21 years pt-v19 has 1.35 bear markets a
+decade against a real 1.12 (pt-v18: 2.95), index volatility of 16.6% against
+18.1 (22.2), and a return of 6.3% a year (4.0). The VIX sits above 30 on 8.1%
+of sessions against a real 8.2% (2.5%). A headline read five ticks late is
+worth about 11 bp, not 136, because news is now priced within minutes.
+
+**Still off.** Crashes are shallower than pt-v18's. The 2008 replay falls 41%
+against the real 57%, where pt-v18 fell 51% but through a worst month far
+more violent than the real one. The 2020 replay's worst month is about 30%
+milder than real. Over two years the VIX forgets a shock a little too fast,
+and the crisis lever reads 5.2x against a real 6.2x.
+
+**New.** `Engine.session_news()` lists the day's news events, with their
+price impact as the answer key, and `Engine.session_tick` counts ticks since
+the open. `Scenario(vix_sets_variance=True)` lets a forced VIX set the
+market's volatility.
+
+<!-- release-note-ends -->
+
+### The fifth composition of pt-v19 (2026-09-23)
+
+pt-v19 was composed five times before it shipped. The fifth adds 23 dials to
+the fourth, in four groups:
+
+- the VIX law's long-run form. The anchor enters the VIX target rather than
+  its rate (`vix_anchor_weight` 0.375, with slow memory
+  `vix_anchor_memory` 1/18 and a weight that rises above a knee), the slow
+  regime level is re-derived (`vix_level_sigma` 0.0181,
+  `vix_level_loop_gain` 1.79), and the calm side of the variance target
+  gets its own exponent (`market_vol_vix_exponent_below` 2.5);
+- the macro clock and cycle. Rates compound and the calendar runs on 252
+  sessions a year (`macro_compound_days_per_year`,
+  `macro_calendar_days_per_year`), the cycle is calibrated on the US
+  1990-2025 phases (`cycle_us_calibration`), the Fed lifts off by rule
+  (`fed_liftoff_rule`), the market multiple carries buybacks
+  (`market_pe_buybacks`), and certification opens at a random point in the
+  cycle (`cycle_stationary_opening`);
+- news priced within minutes (`news_absorption_half_life` 0.6,
+  `news_absorption_drift_share` 0.12, `news_absorption_drift_half_life` 42,
+  `news_quote_revision` 1), from Christensen, Timmermann and Veliyev's
+  Table 7;
+- the lagged down-beta tilt made live (`market_beta_down_asym_lag_live` 1,
+  `market_beta_down_asym_lag` 0.46).
+
+Three values are fitted (0.46, 1/18 and the VIX exponent 4.0) and three are
+chosen (2.5, the live form of the lag, the 42-tick drift). The rest are
+derived, from the tape or the literature. pt-v1 through pt-v18 do not move.
+
+**Checked as one model.** `from_preset("pt-v19")` is bit-identical to the
+fourth composition with the 23 dials set as an arm: 206 coefficients equal,
+and the prices and the whole state equal after every session over five
+seeds of 300 sessions.
+
+**The record.** Re-measured by name on the certification box: in band on
+every row in all four cells (15 at 252 days, 14 readable at 504, 15 and 15
+held out), no misses. Level rows: `index_drift_pct` 7.65 against a real
+7.37, `fear_gauge_dn1` 1.94 against 2.66, `fear_gauge_dn3` 5.42 against
+5.73, `index_tail_dn3_pct` 1.14 against 1.21. The mechanism certificate
+shows 10 of 10 at 252 days and 9 of 10 held out (`corr_asymmetry_lagged`,
+20 of 30). VIX persistence passes the structural gate at one year (k 18
+of 30) and reads low at two (k 10 of 30, reported, not gated). The crisis
+lever reads 5.22x against 6.16. `sector_excess_corr` reads 0.090 against
+0.164, in band.
+
+**A preset record carries a long-run verdict.** The record's `long_run`
+block holds the grade on fifteen criteria from 21-year runs and two crisis
+replays, each row with the model's value, the real one and the rule.
+`tools/presets/record.py --long-run VERDICT` writes it, refusing a verdict
+not measured on the preset by name, and a `--panel` rebuild carries it
+while the coefficients stand. pt-v19's block reads pass, 15 of 15.
+
+**`Engine.session_news()` and `Engine.session_tick`.** The first lists the
+current news day's events: ticker, sector, day and `price_impact`, which is
+the answer key and must not reach an agent. The second counts ticks since
+the day's open, `None` before a day has opened.
+
+**The five agent fixtures are re-recorded again**, live, on the models
+they used before: openai_agents on gpt-5.2, callable, pydantic_ai and
+langgraph on claude-opus-5, finrobot on claude-sonnet-4-5. Four notebook
+paragraphs described the old recordings and are rewritten from the new
+ones. Two of them say the new and old recordings disagree, which is itself
+a reason to run more seeds before reading a pattern.
+
+`KAT_VERSION` 27: `tests/known_answer.json`'s simulation digest moves from
+`f05e769f` to `1e683b96`.
+
+### The four compositions before it
+
+The entries below were written as pt-v19 was built, over four compositions
+before the one that ships. Their figures describe the composition they
+name. Where one disagrees with the section above, the section above is the
+shipped model.
+
+**The fourth composition's panel (2026-09-22), superseded by the fifth.** Every row is
 in its ruled band in all four cells of the record: fifteen of fifteen at
 252 days, fourteen of fourteen readable at 504, fifteen of fifteen held
 out, no misses. On the level protocol `index_drift_pct` reads 6.36
@@ -22,12 +119,6 @@ now have an epicentre sector, drawn per episode and pinnable from a
 scenario. The crisis lever reads 3.11x against 6.16, up from 2.51x.
 Furthest from real: the lever, and `sector_excess_corr` at 0.103 against
 0.164, in band and seven tape errors short.
-
-The four compositions, the defects they found, the two rulings on the
-ruler, the corrected rise ruler, the `KAT_VERSION` bumps and the records
-they replace are below the marker.
-
-<!-- release-note-ends -->
 
 **A forced VIX can set the market's volatility (2026-09-23).** A scenario
 built with `Scenario(vix_sets_variance=True)`, or with
