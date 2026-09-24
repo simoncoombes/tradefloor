@@ -20,7 +20,7 @@ watch. It is run by the test suite for the reason example 07 is: running the
 library the way a user would has caught defects that every unit test passed
 through.
 
-It takes about two seconds.
+It takes about a second.
 """
 
 import struct

@@ -10,7 +10,7 @@ notebook read correctly, the output looked right, and the code raised
 `TypeError`. It was caught because the notebooks are executed rather than
 written and hoped over.
 
-Opt-in because executing every notebook takes about a minute and needs
+Opt-in because executing every notebook takes several minutes and needs
 `jupyter`, which the library does not depend on. Set `TRADEFLOOR_SLOW_TESTS=1`
 to run it; the release check does.
 

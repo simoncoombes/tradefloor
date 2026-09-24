@@ -39,8 +39,8 @@ question, because history ran once.
 |---|---|
 | [`rate_shock.py`](rate_shock.py) | The experiment. Run it. |
 | [`rate_shock.ipynb`](rate_shock.ipynb) | The same experiment, read rather than run |
-| [`../../python/tradefloor/integrations/finrobot.py`](../../python/tradefloor/integrations/finrobot.py) | The adapter. The source of truth; the notebook imports it |
-| [`../../tests/fixtures/finrobot/`](../../tests/fixtures/finrobot/) | The recorded run both of them replay |
+| [`../../../python/tradefloor/integrations/finrobot.py`](../../../python/tradefloor/integrations/finrobot.py) | The adapter. The source of truth; the notebook imports it |
+| [`../../../tests/fixtures/finrobot/`](../../../tests/fixtures/finrobot/) | The recorded run both of them replay |
 
 ## Running it
 
@@ -50,8 +50,8 @@ python examples/integrations/finrobot/rate_shock.py
 
 That replays a genuine recorded FinRobot run. It needs no API key, no network
 and no FinRobot install. The market is deterministic, so re-executing it
-against the recorded agent responses reproduces the experiment exactly. A
-couple of seconds.
+against the recorded agent responses reproduces the experiment exactly, in
+about a second.
 
 ```bash
 pip install "tradefloor[finrobot]"
@@ -93,7 +93,7 @@ sides, refuses anything it cannot execute, and hands share deltas to the same
 execution path every other agent uses.
 
 **FinRobot is never shown the answer key.** The observation is an allowlist,
-written out field by field. Fair value, the nine-way factor attribution of
+written out field by field. Fair value, the ten-way factor attribution of
 every price move, each company's mispricing and the macro path the run has
 not reached yet all stay on the Tradefloor side of the line.
 `tests/test_finrobot.py` proves it twice: once by running the mapping against

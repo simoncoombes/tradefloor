@@ -17,7 +17,7 @@ experiment you can run and one you can hand to somebody else.
          \\            /
           tf.compare
 
-It should take under five minutes to read and about three seconds to run.
+It should take under five minutes to read and under a second to run.
 
 ## What the scenario says, and what it does not
 
@@ -65,11 +65,20 @@ def prices(engine, universe):
     return struct.unpack("<%dd" % len(universe), engine.prices())
 
 
-def sweep_cost_bps(engine, universe, shares=50_000):
+def sweep_cost_bps(engine, universe, shares=20_000):
     """What it costs to buy `shares` of the median name, right now.
 
     The unambiguous measurement of a liquidity shock. An agent's realised
     impact depends on the agent; the cost of walking a book does not.
+
+    20,000 shares, and 50,000 until 0.8.0. A sweep that runs past the
+    displayed depth fills only what is there and quotes the average of
+    that, so an order bigger than the thinned book prices the whole book
+    and stops rising. At 50,000 the stress branch's median name was past
+    its depth on every preset measured, and on pt-v19 the two branches read
+    14.10bp and 14.30bp, so the check below passed by a fifth of a basis
+    point on a reading that had saturated. At 20,000 pt-v19 reads 8.28bp
+    against 12.62bp inside the window.
     """
     costs = []
     for instrument in universe:
@@ -163,7 +172,7 @@ def main() -> dict:
 
     print("\n  WHAT IT DID")
     print(f"    median name        {median * 100:+.2f}%")
-    print("    cost to buy 50k    control  stress")
+    print("    cost to buy 20k    control  stress")
     print(f"      inside the window  {during[0]:5.2f}bp  {during[1]:5.2f}bp")
     print(f"      three days after   {after[0]:5.2f}bp  {after[1]:5.2f}bp")
     print(f"    fingerprint        {scenario.fingerprint}")
