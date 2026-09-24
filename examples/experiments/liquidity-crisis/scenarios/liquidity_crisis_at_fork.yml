@@ -1,11 +1,17 @@
 # liquidity_crisis, rebased to fire at the fork.
 #
-# This is the scenario that ships with Tradefloor. Every shock, every value
-# and the one assumption are unchanged, and the packaged file is the source
-# of truth for what a funding event does here:
+# This is the scenario that shipped with Tradefloor through 0.8.1. Every
+# shock, every value and the one assumption are that file's, and it was the
+# source of truth for what a funding event did here:
 #
-#     python/tradefloor/scenarios/liquidity_crisis.yml
+#     python/tradefloor/scenarios/liquidity_crisis.yml, 0.8.0 and 0.8.1
 #     sha256:a8eb4bbc679fdfac243930456768fb941da14efd7ab653bac373ffded3531a98
+#
+# 0.8.5 recalibrated the packaged file against March 2020 (VIX x3.5 rather
+# than x2.0, and an earnings fall of 15 per cent over two months), so it is
+# now sha256:7d8c8cc8... and this study no longer rebases the packaged file.
+# The study's recordings were made under 0.8.x on this file, and it stays as
+# it was until the study is re-recorded.
 #
 # ONE FIELD DIFFERS. The packaged file fires `at: 50`, and every packaged
 # scenario does, because they are written for a single market with fifty
