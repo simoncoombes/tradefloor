@@ -84,7 +84,18 @@ BASE_PANEL_PRESET = "pt-v16"
 #: 1.0 the expansion median is 435 days against their 123. The
 #: slower-clock test asks for 1.0 explicitly and compares the two, which is
 #: the check that the clock is load-bearing at all.
-IDENTITY_CLOCK = {"macro_burn_in_days": 0.0, "cycle_hazard_per_month": 0.0}
+#:
+#: TWO MORE since pt-v19's fifth composition (2026-09-23), which switched
+#: them on, for the same reason as the clock: each REPLACES the law the
+#: tables below were derived from. `cycle_us_calibration` 1.0 reads the
+#: NBER/BEA phase table, whose durations are not the shipped table's, and
+#: `macro_calendar_days_per_year` 252.0 makes a month 21 steps where
+#: `opening` below converts the age at 30 days to the month. Held at the
+#: values every preset through pt-v18 ships, so the tables stay the law of
+#: the shipped table on the calendar they were measured in.
+IDENTITY_CLOCK = {"macro_burn_in_days": 0.0, "cycle_hazard_per_month": 0.0,
+                  "cycle_us_calibration": 0.0,
+                  "macro_calendar_days_per_year": 365.0}
 
 
 def panel_digest(model=None, seeds=SEEDS, days=DAYS):
@@ -133,9 +144,13 @@ def undrawn(**overrides):
 
     The baseline every test in this file compares against. It was the bare
     default until 0.7.0, when the default gained a burn-in that runs after
-    the opening is drawn -- so the bare default stopped being the point.
+    the opening is drawn -- so the bare default stopped being the point. And
+    the dial is set OFF by name since pt-v19's fifth composition, which
+    ships it ON (1.0, by the owner's ruling that certification runs open at
+    a random point in the cycle): the default's own opening is now drawn.
     """
     kwargs = dict(IDENTITY_CLOCK)
+    kwargs.update(cycle_stationary_opening=0.0)
     kwargs.update(overrides)
     return tradefloor.ModelParams.from_preset(**kwargs)
 
@@ -280,7 +295,10 @@ def test_the_burn_in_no_longer_restores_the_point_it_started_from():
     than against a recorded state, because what is claimed is that the hold
     is gone -- not any particular place the free run lands.
     """
-    held = tradefloor.ModelParams.from_preset(macro_burn_in_days=755.0)
+    # The held form is the opening dial OFF, set by name: the default draws
+    # its opening since pt-v19's fifth composition.
+    held = tradefloor.ModelParams.from_preset(macro_burn_in_days=755.0,
+                                              cycle_stationary_opening=0.0)
     free = drawn(macro_burn_in_days=755.0)
     for seed in range(1, 11):
         phase, age, _ = opening(held, seed)

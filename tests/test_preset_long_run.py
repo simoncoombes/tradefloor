@@ -92,7 +92,11 @@ def test_a_rebuild_carries_the_block_while_the_values_stand_and_drops_it_when_th
 
     moved = json.loads(path.read_text())
     moved.pop("long_run")
-    moved["coefficients"] = dict(moved["coefficients"], vix_anchor_weight=0.375)
+    # 0.45, LAW's anchor weight and a value no preset ships: pt-v19 ships
+    # 0.375 since its fifth composition, so the 0.375 that stood here had
+    # become the record's own value and moved nothing.
+    assert moved["coefficients"]["vix_anchor_weight"] != 0.45
+    moved["coefficients"] = dict(moved["coefficients"], vix_anchor_weight=0.45)
     assert "DROPPED" in rec_tool.carry_long_run(moved, path)
     assert "long_run" not in moved
 

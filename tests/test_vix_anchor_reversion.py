@@ -19,6 +19,7 @@ Three claims:
 """
 from __future__ import annotations
 
+import math
 import struct
 
 import pytest
@@ -65,6 +66,37 @@ def bits(xs):
     return [struct.pack("<d", x) for x in xs]
 
 
+def pull_target(model, days=DAYS, seed=SEED):
+    """The VIX path and, day by day, the level the reversion pulls it to.
+
+    `L * anchor`, with `L` the slow regime level's multiplier as the engine
+    forms it (`Engine::vix_level_multiplier`, engine.rs): `exp(log_level -
+    var / 2)`, `var` the level's stationary variance at the APPLIED sigma
+    (`vix_level_sigma` over `vix_level_loop_gain` where the gain is set), and
+    exactly 1.0 with the level off or at zero. No accessor exposes it, so it
+    is spelled out here from the snapshot's `vix_log_level` and the dials.
+    """
+    d = model.to_dict()
+    sigma = d["vix_level_sigma"]
+    if d["vix_level_loop_gain"] != 0.0:
+        sigma = sigma / d["vix_level_loop_gain"]
+    phi = d["vix_level_persistence"]
+    var = sigma * sigma / (1.0 - phi * phi) if sigma != 0.0 else 0.0
+    engine = pt.Engine(seed=seed, universe=universe(), model=model)
+    vix, target = [], []
+    for _ in range(days):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.close_market()
+        snap = engine.state_snapshot()
+        vix.append(snap["economy"]["vix"])
+        log_level = snap["vix_log_level"]
+        level = (1.0 if sigma == 0.0 or log_level == 0.0
+                 else math.exp(log_level - 0.5 * var))
+        target.append(level * engine.vix_anchor)
+    return vix, target, engine.vix_anchor
+
+
 # ── 1. Inert at 0.0 ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("name", SHIPPED_PRESETS)
@@ -96,25 +128,33 @@ def test_the_dial_is_not_inert_at_the_derived_value():
 # ── 2. It pulls toward L * anchor ────────────────────────────────────────
 
 def test_the_reversion_pulls_the_vix_toward_the_anchor():
-    """The VIX's mean distance from the anchor, over a run, must shrink.
+    """The VIX's mean distance from `L * anchor`, over a run, must shrink.
 
     Asserted as a DIRECTION over several seeds rather than a value: the
     size is the closed form and the Rust test
     `the_anchor_reversion_moves_the_vix_toward_the_level_times_the_anchor`
     pins it exactly on a day whose variance is pinned. Here the whole loop
     is running, and what is claimed is only that the term does its name.
+
+    The distance is taken to the term's own target, `L * anchor` on each
+    day, and no longer to the bare anchor. The bare anchor stood in for it
+    while the slow level was narrow; pt-v19's fifth composition (2026-09-23)
+    widened the level (sigma 0.0181 on a loop gain of 1.79, against 0.0173
+    on 2.4684) and put the VIX's own target on the anchor form, and against
+    the bare anchor the term then read closer on 4 of 6 seeds while it
+    moved the VIX toward `L * anchor` on all six. The fourth composition
+    reads 6 of 6 either way.
     """
     closer = 0
     for seed in range(1, 7):
-        off = trajectory(pt.ModelParams.from_preset("pt-v19"), days=120, seed=seed)
-        on = trajectory(pt.ModelParams.from_preset("pt-v19", vix_anchor_reversion=KAPPA),
-                        days=120, seed=seed)
+        off = pull_target(pt.ModelParams.from_preset("pt-v19"), days=120, seed=seed)
+        on = pull_target(pt.ModelParams.from_preset("pt-v19", vix_anchor_reversion=KAPPA),
+                         days=120, seed=seed)
         assert off[2] == on[2], "the anchor is derived and the dial must not move it"
-        anchor = off[2]
-        d_off = sum(abs(v - anchor) for v in off[0]) / len(off[0])
-        d_on = sum(abs(v - anchor) for v in on[0]) / len(on[0])
+        d_off = sum(abs(v - t) for v, t in zip(off[0], off[1])) / len(off[0])
+        d_on = sum(abs(v - t) for v, t in zip(on[0], on[1])) / len(on[0])
         closer += d_on < d_off
-    assert closer >= 5, f"the reversion moved the VIX toward the anchor on {closer} of 6"
+    assert closer >= 5, f"the reversion moved the VIX toward L * anchor on {closer} of 6"
 
 
 # ── 3. The invariants ────────────────────────────────────────────────────

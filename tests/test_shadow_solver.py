@@ -362,9 +362,10 @@ def test_a_resumed_run_carries_its_whole_record(short_days):
 JUMP_UNIVERSE = tf.Universe.random(40, seed=3)
 
 
-def _planted_day(seed, z, rng, universe=None):
+def _planted_day(seed, z, rng, universe=None, model=None):
     universe = UNIVERSE if universe is None else universe
-    engine = tf.Engine(seed=seed, universe=universe)
+    kwargs = {} if model is None else {"model": model}
+    engine = tf.Engine(seed=seed, universe=universe, **kwargs)
     engine.open_market()
     engine.run_session(9, 30, 3, shadow.TICKS)
     fwd = shadow.Forward(engine, 1, len(universe))
@@ -1080,19 +1081,42 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # so it is accepted. It recovers a normal of -2.129, clear of the 0.6
     # of zero the 0.8.0 comment rules out.
     #
+    # TENTH SWEEP, 2026-09-23, at the fifth composition of pt-v19. Re-dealt a
+    # tenth time: seed 18 at -3.10 finds the jump on the plain trial alone
+    # (9.16 against a no-jump 38.14), the premise inverted for the eighth
+    # time in ten. The seventy cells re-swept on the same recipe: ONE is
+    # decisive, seed 16 at -1.50, 0.3 nats on its narrower side and a
+    # recovered normal of -0.579, inside the 0.6 of zero the 0.8.0 comment
+    # rules out. Seeds 21 to 40 re-swept on the same recipe give two more
+    # (seed 26 at -4.00 and seed 32 at -4.50).
+    #
+    # AND THE DAY NO LONGER RIDES ON THE DEFAULT. Most of the ten sweeps
+    # were forced by a change to the default preset's vector -- the default
+    # moving to pt-v18 and then to pt-v19, and pt-v19's own compositions --
+    # rather than to the solver or the engine. The mechanism under test is the solver's and not any preset's, so the
+    # day is planted on pt-v18, whose vector is frozen: a recomposition of
+    # the default can no longer re-deal it, and only a change to the engine
+    # itself can. On pt-v18 the seventy cells hold no decisive one; seeds 21
+    # to 40 hold two, and the day chosen is the wider by its narrower side:
+    # seed 22, planted normal -4.00. The reused Jacobian leaves the trial at
+    # 65.03 against a no-jump 40.52 -- 24.5 nats worse, so it is rejected --
+    # and a Jacobian of its own reaches 14.52, 26.0 nats better, so it is
+    # accepted. It recovers a normal of -3.066, clear of the 0.6 of zero.
+    #
     # The fix is unchanged and still guarded, on a day that still needs it.
+    day_preset = tf.ModelParams.from_preset("pt-v18")
     rng = np.random.default_rng(7)
-    fwd, r_obs = _planted_day(18, -3.10, rng)
+    fwd, r_obs = _planted_day(22, -4.00, rng, model=day_preset)
     found = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
     assert found["jump_market"] is not None
     # On the SIZE, for the reason the planted-jump test above gives at
     # length: `jump_market` is the recovered normal and the direction lives
-    # in `jump_mean_market + jump_sigma_market * z`. Measured here the
-    # normal is -2.129 against a sign change at +3.4645, clear of both that
-    # and of zero, so this assertion does not rest on a margin the solver can
-    # cross.
+    # in `jump_mean_market + jump_sigma_market * z`, read on the preset the
+    # day is planted on. Measured here the normal is -3.066, clear of zero
+    # and of that preset's sign change, so this assertion does not rest on
+    # a margin the solver can cross.
     assert found["jump_market"] < shadow.upward_threshold(
-        dict(tf.ModelParams.from_preset().to_dict()))
+        dict(day_preset.to_dict()))
 
     # the same day without the retry: the trial keeps the base Jacobian
     m0 = fwd.layout.size
