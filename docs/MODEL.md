@@ -72,15 +72,15 @@ at session fraction $\tau_t = t/390$.
 | $d$, $t$ | session, and tick within the session | |
 | $V_{i,t}$ | fair value | currency per share |
 | $s_{i,t}$ | mispricing, the log gap between model price and fair value | log |
-| $P^{\ast}_{i,t}$ | model price, $V e^{s}$ | currency |
+| $P_{i,t}^{\ast}$ | model price, $V e^{s}$ | currency |
 | $P_{i,t}$ | printed (traded) price | currency |
-| $P^{o}_{i,d}$ | the session's opening price | currency |
+| $P_{i,d}^{o}$ | the session's opening price | currency |
 | $X_d$ | the VIX, fixed within a session | index points |
 | $A$ | the VIX anchor: the VIX at which every VIX coupling reads one | index points |
 | $\rho_d$ | $X_d / A$ | |
 | $v_d$ | market-factor variance | per day |
 | $h_{i,d}$ | a company's own (GJR-GARCH) variance | per day |
-| $y^{c}_d$ | corporate bond yield | percent a year |
+| $y_d^{c}$ | corporate bond yield | percent a year |
 | $\mathbf{1}[\cdot]$ | 1 if the condition holds, else 0 | |
 | $\mathrm{clip}(x; a, b)$ | $\min(b, \max(a, x))$ | |
 | $Z$, $U$ | a fresh standard normal draw, a fresh uniform draw on $[0, 1)$ | |
@@ -606,7 +606,7 @@ $S_i \mathrm{LogU}(0.004, 0.30)$, and all these ranges are chosen.
 The opening mispricing is not drawn. On the first tick
 $s_{i,0} = \mathrm{clip}(\ln(P_{i,0}/V_{i,0});\ -0.9,\ 0.9)$
 (`market/tick.rs:1050-1055`), which works out to
-$\ln u^{PE}_i - \ln R_{i,0}$ for a profitable company and $-\ln u^{K}_i$ for a
+$\ln u_i^{PE} - \ln R_{i,0}$ for a profitable company and $-\ln u_i^{K}$ for a
 loss-maker. The cross-section of $s_0$ has a standard deviation of about 0.33,
 much wider than the model's own stationary spread of about 0.07. So every run
 opens with a drift back toward fair value that lasts months. pt-v20 changes
@@ -627,7 +627,7 @@ exponential of the mispricing (`market/tick.rs:1155`):
 P^{\ast}_{i,t} = \max\big(0.01,\ V_{i,t}\,e^{s_{i,t+1}}\big)
 ```
 
-If $P^{\ast}$ leaves the session band $[0.75 P^{o}_{i,d},\ 1.25 P^{o}_{i,d}]$
+If $P^{\ast}$ leaves the session band $[0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o}]$
 it is clamped to the band and $s$ is re-derived from the clamped price
 (`market/tick.rs:1161-1170`). The printed price is $P^{\ast}$ traded through
 the book; see [The market maker and the book](#the-market-maker-and-the-book).
@@ -699,7 +699,7 @@ f_t = \sqrt{v_d}\,\frac{z_t}{\sqrt{390}},
 G_{k,t} = \bar\sigma_S\,\rho_d\,\sqrt{h^{S}_{k,d}}\,\frac{\zeta_{k,t}}{\sqrt{390}}
 ```
 
-$v_d$ is the market-factor variance and $h^{S}_{k,d}$ the sector variance
+$v_d$ is the market-factor variance and $h_{k,d}^{S}$ the sector variance
 state, both set at the previous close; see [Volatility](#volatility). The
 sector sigma scales with the VIX ratio $\rho_d$ because
 `sector_vix_coupling` = 1.
@@ -847,9 +847,9 @@ idiosyncratic jumps a year, of standard deviation 7.5%.
 |---|---|---|---|---|
 | $\lambda_M$ | `jump_intensity_market` | 0.05658 a day | fitted | search; for the two-year excess kurtosis |
 | $\mu_M$ | `jump_mean_market` | −0.008522 | fitted | search; negative for skew |
-| $\sigma^{J}_M$ | `jump_sigma_market` | 0.002460 | fitted | search |
+| $\sigma_M^{J}$ | `jump_sigma_market` | 0.002460 | fitted | search |
 | $\lambda_I$ | `jump_intensity_idio` | 0.006890 a day | fitted | search |
-| $\sigma^{J}_I$ | `jump_sigma_idio` | 0.07521 | fitted | search |
+| $\sigma_I^{J}$ | `jump_sigma_idio` | 0.07521 | fitted | search |
 | $c_J$ | `jump_vix_coupling` | 0.2626 | fitted | |
 | | `jump_mean_compensated` | 1.0 | derived | a compensated Poisson process |
 
@@ -975,7 +975,7 @@ not $\omega$, holds the resting level.
 
 ### Sector variance
 
-**Timescale:** daily, at the close. **State:** $h^{S}_{k,d}$, a variance ratio
+**Timescale:** daily, at the close. **State:** $h_{k,d}^{S}$, a variance ratio
 whose fixed point is 1 (`engine.rs:1104-1132`). $D_{k,d} = \sum_t G_{k,t}$ is
 the day's summed sector factor.
 
@@ -1018,7 +1018,7 @@ Here $\bar\beta = \sum_i w_i\beta_i$; $K_u = 1.0844$ is the session mean of
 $u(\tau)^{2}$; $E[z^{2}\Gamma^{2}] = 1.0541$ is the crash amplifier's second
 moment; $\iota_i$ is the company's own-noise scale from the factor
 structure; $\Lambda_d = (1 + a_L)^{2}$ if today's summed market factor
-was negative, else 1; and $J^{V}_d$ is the variance the jumps and news add.
+was negative, else 1; and $J_d^{V}$ is the variance the jumps and news add.
 
 The VIX it implies, and the anchor $A$ (`market/index_var.rs:1189-1191`,
 `engine.rs:1018-1041`):
@@ -1076,8 +1076,8 @@ A fall raises the VIX, by less when the VIX is already high; a rise lowers
 it. $\bar\Phi_d$ is the mean of $\Phi$ under a normal return with the index's
 own variance, subtracted so the fear response adds no drift
 (`economy/daily.rs:559-583`). The weight on the slow memory falls as the VIX
-rises: $a(X) = 1 - (1 - a_0) X^{\ast}_d / \mathrm{clip}(X;\ X^{\ast}_d,\ 2.216 X^{\ast}_d)$ with
-$X^{\ast}_d = A \Xi_d e^{-0.3888}$, so $a$ runs from 0.375 to 0.718
+rises: $a(X) = 1 - (1 - a_0) X_d^{\ast} / \mathrm{clip}(X;\ X_d^{\ast},\ 2.216 X_d^{\ast})$ with
+$X_d^{\ast} = A \Xi_d e^{-0.3888}$, so $a$ runs from 0.375 to 0.718
 (`economy/daily.rs:510-518`).
 
 The step (`economy/daily.rs:1360-1432`):
@@ -1227,7 +1227,7 @@ quote, and with the crowd's lean (`microstructure.rs:597-604`):
 \pi^{\mathrm{buy}}_{i,t} = \mathrm{clip}\Big(0.5 + 40\,\frac{P^{\ast}_{i,t} - \hat P_{i,t}}{\hat P_{i,t}} + 10\,L(s_{i,t}, \mu_{i,d});\ 0.05,\ 0.95\Big)
 ```
 
-Four market orders of $\max(1, \lfloor V^{\mathrm{vol}}_{i,t}/4 \rfloor)$
+Four market orders of $\max(1, \lfloor V_{i,t}^{\mathrm{vol}}/4 \rfloor)$
 shares each, where $V^{\mathrm{vol}}$ is the tick's volume below, walk the
 book: order $j$ buys if $U_j < \pi^{\mathrm{buy}}$ and sells otherwise. The
 print is the price of the last fill; if nothing fills, it is $P^{\ast}$
@@ -1237,7 +1237,7 @@ The maker's inventory takes the other side of every fill and never decays
 (`microstructure.rs:484-501`).
 
 The print is then clamped to the same ±25% session band as the model price:
-$P_{i,t} = \mathrm{clip}(P^{\mathrm{set}}_{i,t};\ 0.75 P^{o}_{i,d},\ 1.25 P^{o}_{i,d})$
+$P_{i,t} = \mathrm{clip}(P_{i,t}^{\mathrm{set}};\ 0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o})$
 (`market/tick.rs:1308-1316`). The overnight gap is not clamped, and on
 pt-v19 there is no overnight move: each session opens at the last print.
 
