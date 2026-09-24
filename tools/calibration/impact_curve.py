@@ -63,9 +63,13 @@ def f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 
+BASE = "pt-v19"
+
+
 def model(coefficient: float, exponent: float, shared: bool = False,
-          half_life: float = 27.0, base: str = "pt-v19",
+          half_life: float = 27.0, base: str | None = None,
           gamma: float = 0.0) -> tf.ModelParams:
+    base = base or BASE
     over: dict[str, float] = {}
     if coefficient:
         over.update(book_depth_coefficient=coefficient,
@@ -205,10 +209,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gamma", type=float, default=0.314,
                     help="fill_impact_coefficient for the refill arm")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--base", default="pt-v19",
+                    help="the preset whose market the book is measured in")
     args = ap.parse_args(argv)
+    global BASE
+    BASE = args.base
 
     result: dict = {"coefficient": args.coefficient, "exponent": args.exponent,
-                    "seeds": args.seeds, "names": args.names, "days": args.days}
+                    "seeds": args.seeds, "names": args.names, "days": args.days,
+                    "base": args.base}
     for label, coef in (("off", 0.0), ("on", args.coefficient)):
         rows = []
         for k in range(args.seeds):

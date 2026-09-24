@@ -6916,6 +6916,18 @@ impl ModelParams {
         p.flight_to_quality_gain = 0.008;
         p.flight_to_quality_day = 1.0;
         p.corporate_yield_daily = 1.0;
+        // The agent-facing book (feature/order-book-depth, E4): size walks a
+        // latent book to the square-root law and pays for it, agents rest
+        // orders and meet each other, and an agent's fill leaves Almgren's
+        // linear permanent impact. Read only on an agent's path, so no
+        // untraded statistic moves with any of them.
+        p.book_depth_coefficient = 0.75;
+        p.book_depth_exponent = 0.5;
+        p.book_depth_reach = 1.0;
+        p.book_shared = 1.0;
+        p.book_refill_half_life = 27.0;
+        p.book_resting = 1.0;
+        p.fill_impact_coefficient = 0.314;
         p
     }
 
