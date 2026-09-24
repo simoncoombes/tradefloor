@@ -94,6 +94,13 @@ wanted in the 0.8 line it has to be merged before the tag.
 
 ## 3. The docs branch against the merged engine
 
+`tradefloor-docs` `release/0.8.5` (d9e47ba) passes all fifteen steps of
+`tools/docs/check.py` against a build of this branch at f19e254. Its CI
+installs `tradefloor==0.8.5` from PyPI, so it stays red until the tag. The
+register's lines are set for the live build, which runs two lines below the
+preview on every page, so `resync.py --lines` reports them as moved on a
+preview build.
+
 In `tradefloor-docs` on `release/0.8.5`, with `TRADEFLOOR_PYTHON` naming an
 interpreter that holds a build of the engine branch:
 
@@ -102,6 +109,14 @@ interpreter that holds a build of the engine branch:
 - [ ] Regenerate `params.py`, `api.py`, `records.py`, `envelope.py` and
       `experiments.py`, then document the API pt-v20 adds (5c), and
       re-read every traded figure on the pages against the new default.
+      With the book dials on in pt-v20, every page that says the seven
+      dials are 0.0 on every shipped preset, or that `book_live` is False,
+      becomes wrong for the default: Core types (`#agent-book`), the
+      Parameters book-dial note and fingerprint example, the Counterfactual
+      API rows and the release notes. The TCA round trip, the untouched
+      names, the grid and the rebalance figures, the rate-index curve
+      readings, the treasury targets and `curve_shock` all move with the
+      preset.
 - [ ] Commit the sources, `python tools/docs/learn/build.py` (preview),
       commit the build, run it once more so the dates settle, and
       `python tools/docs/check.py`.
