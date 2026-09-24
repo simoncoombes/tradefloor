@@ -391,6 +391,16 @@ class StrategySpec:
             "would be a lie. Construct a new one."
         )
 
+    # Immutable, so a copy is the object itself. Without these `copy` rebuilt
+    # a spec through `__setattr__`, which refuses, and every agent carrying
+    # its `.spec` inside a wrapper -- a daily-cadence build, say -- could not
+    # be deep-copied, so `World.fork` raised on it (found 2026-09-24).
+    def __copy__(self) -> "StrategySpec":
+        return self
+
+    def __deepcopy__(self, memo: dict) -> "StrategySpec":
+        return self
+
     # -- named constructors ----------------------------------------------
 
     @classmethod

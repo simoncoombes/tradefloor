@@ -66,6 +66,24 @@ impl PyGameRng {
         self.inner.next_bool(p)
     }
 
+    /// An independent generator at this one's exact position.
+    ///
+    /// Both continue with the same draws, Box-Muller spare included, and
+    /// neither moves the other. This is what `copy.deepcopy` of an agent
+    /// holding a generator needs, and what `World.fork` does to an agent
+    /// with no `fork()` of its own: until 0.9.0 the copy raised, because a
+    /// native object with no `__deepcopy__` cannot be pickled, so a world
+    /// holding the random baseline could not be forked at all.
+    fn __copy__(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
+        self.__copy__()
+    }
+
     fn __repr__(&self) -> String {
         "GameRng(...)".to_string()
     }

@@ -22,45 +22,42 @@ This needs saying first because the name invites the opposite reading, and I
 made that mistake in this file's own documentation for a week.
 
 The Oracle sees the true mispricing. It does not follow that nothing can beat
-it, and measurably something does. Counted on a fully stated grid, meaning the
+it: the same information spent on a different rule beats it, and until 0.9.0
+the reference agents did too. Counted on a fully stated grid, meaning the
 reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
-11, ten days each, and a beat being a capture ratio above 1.0, on this build:
+11, ten days each, and a beat being a capture ratio above 1.0:
 
-    beats the Oracle      largest capture 1.52
+                          0.9.0      0.8.1
+        mean_reversion    0/12       5/12
+        buy_and_hold      0/12       0/12
+        momentum          0/12       0/12
+        random            0/12       0/12
+        largest capture   0.84       1.58
 
-        mean_reversion    5/12
-        buy_and_hold      1/12
-        momentum          0/12
-        random            0/12
+The 0.8.1 column is the harness, not the signal. Every harness held an
+agent's fills on every tick of the step, 65 times at six steps a day, so an
+agent was marked to its own impact, and mean reversion, which buys what it
+just pushed down and sells what it pushed up, collected the most. With the
+fills applied once, no agent that sees only prices beats the Oracle on this
+grid, and the largest capture is buy-and-hold's 0.84. The eras before 0.8.1
+named other winners -- momentum at `pt-v10`, mean reversion at `pt-v12` --
+under the same harness, so read their verdicts the same way.
 
-The breakdown is the whole story, and WHICH agent tells it has now inverted
-TWICE across engine changes. Two eras ago mean-reversion beat the Oracle in
-a third of its pairs; at `pt-v10` momentum did and mean-reversion never did,
-and this docstring drew that moral. On `pt-v12` it has swung back: mean
-reversion beats it in five of twelve markets and momentum in none. Take the
-lesson to be the durable part -- the Oracle knows the *level* of mispricing
-without error and spends that knowledge on a fixed equal-weight rule, so
-whichever signal the current coefficients reward will out-earn it under the
-same constraints -- and not the winner's name, which is a property of the
-preset. Even the old "agents trading no signal never beat it once" no longer
-holds cleanly: buy-and-hold squeaks past at 1.02 on seed 1. Random still
-never does.
-
-So the durable finding is about constraints, not about the winner's name.
+The durable finding is about constraints, not about the winner's name.
 The default Oracle is long the five most underpriced names and short the
 five most overpriced (``top_k=5`` per side) at equal weight, gross 1.0,
 capped at 2% of ADV, the same budget the trend baselines get. Perfect
-information does not make that the best portfolio the same gross can buy,
-and an agent with a better rule under the same constraints out-earns it
-while knowing strictly less.
+information does not make that the best portfolio the same gross can buy:
+spent on three names a side instead of five it earns more on 6 of the 8
+markets below.
 
 Two levers, measured on the same universe (median Oracle P&L across sim
 seeds 0-7, ten days; "beaten" counts the seeds where the best reference
-agent out-earned that configuration):
+agent out-earned that configuration; 0.8.1 in brackets):
 
-    top_k=5,  gross=1.0  (default)   median P&L  59,992   beaten 5/8
-    top_k=15, gross=1.0              median P&L  48,113   beaten 6/8
-    top_k=15, gross=2.0              median P&L 111,424   beaten 1/8
+    top_k=5,  gross=1.0  (default)   median P&L  62,937 ( 68,090)   beaten 0/8 (3/8)
+    top_k=15, gross=1.0              median P&L  44,245 ( 51,318)   beaten 1/8 (8/8)
+    top_k=15, gross=2.0              median P&L  90,789 (123,500)   beaten 0/8 (0/8)
 
 Spreading the same information across more names makes it WORSE, not better.
 What makes it nearly unbeatable is doubling the gross exposure: capital,
@@ -115,6 +112,7 @@ will read: ``tf.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -245,6 +243,28 @@ class RandomTrader:
         self.gross = float(gross)
         self.max_participation = float(max_participation)
 
+    def fork(self) -> "RandomTrader":
+        """An independent copy that will draw what this one would draw next.
+
+        `World.fork` calls it. The generator is copied at its position, so
+        both arms flip the same coins from here and neither moves the
+        other's stream. Until 0.9.0 there was no hook and the world fell
+        back to `copy.deepcopy`, which raised on the generator, so a world
+        holding this baseline could not be forked.
+        """
+        twin = copy.copy(self)
+        twin.rng = copy.copy(self.rng)
+        return twin
+
+    def __deepcopy__(self, memo: dict) -> "RandomTrader":
+        # Wrappers that deep-copy their inner agent (the daily-cadence agent a
+        # spec builds, for one) reach this rather than the generator. The
+        # twin goes in `memo` so a second reference to this agent inside the
+        # same copy, a bound method say, resolves to the same twin.
+        twin = self.fork()
+        memo[id(self)] = twin
+        return twin
+
     def act(self, obs: Observation) -> dict[str, float]:
         raw = [self.rng.next_float() * 2.0 - 1.0 for _ in obs.tickers]
         total = sum(abs(x) for x in raw)
@@ -372,31 +392,35 @@ class Oracle:
     It is a REFERENCE, not a maximum -- see this module's docstring. It gets
     the same gross exposure and participation cap as every other baseline,
     and spends them on a naive rule: equal weight, long the ``top_k`` most
-    underpriced names and short the ``top_k`` most overpriced. Agents do
-    beat it -- mean reversion in 5 of 12 markets on the grid stated in the
-    module docstring -- and that is a result rather than a fault.
+    underpriced names and short the ``top_k`` most overpriced. A different
+    rule on the same information beats it -- ``top_k=3`` on 6 of 8 markets
+    on the module docstring's grid -- and that is a result rather than a
+    fault. Until 0.9.0 mean reversion beat it in 5 of 12 of them too; that
+    was the harness applying its fills on every tick of the step, and none
+    of the price-only agents beats it there now.
 
     Three further caveats, all worth knowing before quoting a capture ratio:
 
     **Its height is a CHOICE, and ``top_k`` is a real lever on it.**
-    Re-measured on pretium 0.3.0 under ``pt-v12`` at sim seed 2026 over thirty
+    Re-measured on 0.9.0 under ``pt-v19`` at sim seed 2026 over thirty
     days, holding gross exposure and the participation cap fixed at the values
     every other baseline gets:
 
         top_k                    1      2      3      5      8     12
-        random(20, seed=11)   196k   213k   180k   181k   164k   150k
-        random(20, seed=7)    209k   176k   193k   269k   204k   170k
+        random(20, seed=11)   214k   211k   181k   150k   135k   130k
+        random(20, seed=7)    235k   198k   179k   178k   158k   127k
 
-    The curve is not monotonic, and its shape is a property of the roster.
-    That is the finding. On the first roster the best configuration measured
-    is ``top_k=2`` at 1.18x the default and the worst is ``top_k=12`` at
-    0.83x; on the second the default ``top_k=5`` is the best measured and
-    every other setting lands between 0.63x and 0.78x of it. Nothing here
-    ranks the same way twice. Do not carry the numbers above to a different
-    universe; re-measure. (An earlier docstring recorded 368k/181k/132k/
-    146k/131k/130k and 375k/220k/150k/73k/129k/127k for these two rows,
-    where ``top_k=1`` was worth multiples of the default. That was measured
-    before the ``pt-v12`` era boundary and does not reproduce on this build.)
+    On this build the curve falls with ``top_k`` on both rosters: the best
+    configuration measured is ``top_k=1``, at 1.43x and 1.32x the default,
+    and ``top_k=12`` is the worst at 0.87x and 0.71x. That shape is new and
+    belongs to this build. Under 0.8.1, which held every agent's fills on
+    all 65 ticks of a step, the same rows read 227k/219k/184k/194k/154k/154k
+    and 249k/225k/210k/252k/197k/152k, where the default was the best on
+    the second roster; under ``pt-v12`` before that, 196k/213k/180k/181k/
+    164k/150k and 209k/176k/193k/269k/204k/170k; and before the ``pt-v12``
+    era boundary ``top_k=1`` was worth multiples of the default. Nothing
+    here has ranked the same way twice. Do not carry the numbers above to a
+    different universe or build; re-measure.
 
     What follows either way is that **a capture ratio is quoted against a
     configuration, not against a universal quantity**. Two ratios computed
@@ -409,13 +433,16 @@ class Oracle:
     more. Quote the horizon with the ratio.
 
     **It is not an upper bound on any strategy.** On the grid stated in the
-    module docstring, mean reversion beats it in 5 of 12 markets and
-    buy-and-hold squeaks past once at 1.02. Which agent wins has inverted
-    twice across engine changes, so treat the name as a property of the
-    preset; that a better rule under the same constraints CAN out-earn
-    revealed information has held in every era measured. A capture ratio
-    above 1.0 is a finding about portfolio construction rather than about
-    information.
+    module docstring the same information on three names a side beats it
+    on 6 of 8 markets, and fifteen names a side at twice the gross earns
+    1.44x its median. No
+    price-only reference agent beats it there since 0.9.0; the ones that
+    did before were marked to their own impact. That a better rule under
+    the same constraints CAN out-earn revealed information has held in
+    every era measured. A capture ratio above 1.0 is a finding about
+    portfolio construction rather than about information, and from a
+    price-only agent it is also a reason to check that its fills reach the
+    market once.
     """
 
     #: Marks an agent that sees past the observation wall. The harness does not
@@ -433,6 +460,28 @@ class Oracle:
         # through the protocol, which would complicate every agent that does
         # not explain itself.
         self._engine: Engine | None = None
+
+    def fork(self) -> "Oracle":
+        """An independent copy for another arm of a forked world.
+
+        The engine the Oracle remembers for `explain` belongs to the world
+        it was reading, and a fork runs a different engine, so the copy
+        forgets it and picks its own up at its first `act`. A fork happens
+        between days, and `explain` is asked only after a day's steps, so
+        nothing reads the gap. Until 0.9.0 there was no hook, and the
+        world's fallback `copy.deepcopy` raised on the engine.
+        """
+        twin = copy.copy(self)
+        twin._engine = None
+        return twin
+
+    def __deepcopy__(self, memo: dict) -> "Oracle":
+        # In `memo` for the reason `RandomTrader.__deepcopy__` gives: the
+        # daily-cadence wrapper holds this agent AND its bound `explain`,
+        # and both must land on one twin.
+        twin = self.fork()
+        memo[id(self)] = twin
+        return twin
 
     def act(self, obs: Observation) -> dict[str, float]:
         self._engine = obs.engine
@@ -495,13 +544,16 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     what a perfectly-informed reference earned in *that* market removes
     exactly that.
 
-    A ratio ABOVE 1.0 is legal and does occur -- on the measured grid in
-    this module's docstring, in 5 of mean-reversion's 12 markets, once for
-    buy-and-hold, and never for random. The Oracle is not an upper bound: it holds the
-    same gross exposure as everyone else and spends it on a naive
-    equal-weight rule, so an agent with a better portfolio under the same
-    constraint out-earns it. Treat that as a finding about portfolio
-    construction, not as a broken denominator.
+    A ratio ABOVE 1.0 is legal. The Oracle is not an upper bound: it holds
+    the same gross exposure as everyone else and spends it on a naive
+    equal-weight rule, so a better portfolio under the same constraint
+    out-earns it, and ``Oracle(top_k=3)`` does on 6 of the 8 markets this
+    module's docstring measures. From a price-only agent it no longer
+    occurs on that grid: 0 of 48 agent-market pairs since 0.9.0, where 0.8.1
+    counted 5 of mean reversion's 12, all of them its own impact counted on
+    every tick of a step. Treat a ratio above 1.0 as a finding about
+    portfolio construction, not as a broken denominator, and from a
+    price-only agent check first that its fills reach the market once.
 
     The ratio is also only comparable across runs that used the SAME Oracle
     configuration; ``top_k`` moves the denominator substantially. See
