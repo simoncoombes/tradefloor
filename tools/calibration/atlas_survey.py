@@ -292,7 +292,6 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "opening_mispricing_sigma": (0.0, 0.3),
     "opening_market_sigma": (0.0, 0.3),
     "fair_value_market_share": (0.0, 1.0),
-    "cascade_gain": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
@@ -643,6 +642,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The stop and squeeze ladders' scale: 1.0 on every preset through
+    # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
+    # The whole unit range, off to full.
+    "cascade_gain": (0.0, 1.0),
     # The macro calendar's year in steps: 365 as shipped, 252 the session
     # calendar (21-step months, 63-step quarters).
     "macro_calendar_days_per_year": (252.0, 365.0),
