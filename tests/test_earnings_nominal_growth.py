@@ -148,6 +148,11 @@ UNDERIVABLE = {
     "opening_mispricing_sigma": "books part of each name's opening premium "
                                 "as its fair-value level, which the "
                                 "truth table does not carry",
+    "fair_value_market_share": "scales the fundamentals by the name's own "
+                               "fair-value level, as the stock-level share "
+                               "does, from the market's shocks",
+    "opening_market_sigma": "books the rest of the index's opening premium "
+                            "as the names' fair-value levels",
 }
 
 
@@ -203,6 +208,8 @@ def _derived(instrument, economy, scale: float, model, *,
     assert p["qe_pe_stock_gain"] == 0.0, UNDERIVABLE["qe_pe_stock_gain"]
     assert p["fair_value_news_share"] == 0.0, UNDERIVABLE["fair_value_news_share"]
     assert p["opening_mispricing_sigma"] == 0.0, UNDERIVABLE["opening_mispricing_sigma"]
+    assert p["fair_value_market_share"] == 0.0, UNDERIVABLE["fair_value_market_share"]
+    assert p["opening_market_sigma"] == 0.0, UNDERIVABLE["opening_market_sigma"]
     if price is None:
         assert p["buyback_payout_share"] == 0.0, (
             "this arm derives the nominal term alone, so the payout share "
