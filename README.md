@@ -98,7 +98,7 @@ claude mcp add tradefloor -- tradefloor-mcp
 
 Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
-[the MCP page](https://simoncoombes.github.io/tradefloor/mcp.html).
+[the MCP page](https://tradefloor.dev/mcp.html).
 
 ## Controlled scenarios
 
@@ -144,33 +144,31 @@ bands, a fifteenth that reads only in a crisis, and four more on a protocol
 that varies the roster with the seed. At the default preset, `pt-v19`,
 every one of them is in its band in all four cells of the record: the
 certification roster and a held-out one, at one year and two, thirty
-seeds each, with no misses. The row it reads furthest from real is
-`sector_excess_corr`, 0.103 against a tape centre of 0.164, in band and
-seven tape errors short; the short-lag clustering rows sit under two tape
-errors from their centres.
+seeds each, with no misses. The row furthest from real is
+`sector_excess_corr`, 0.090 against a tape centre of 0.164, in band.
 
-It holds the other four: the index level returns +6.4 per cent a year inside
-a band of 2.9 to 11.9, the -1 per cent fear row reads 1.9 against a tape
-centre of 2.7, the -3 per cent fear row 5.9 against 5.7, where `pt-v18`
-read 3.2, and the index tail 0.78 per cent of sessions against a real 1.21.
+The four level rows: over one-year windows the index drifts +7.6 per cent
+inside a band of 1.1 to 10.3, the -1 per cent fear row reads 1.9 against a tape centre of
+2.7, the -3 per cent fear row 5.4 against 5.7, and the index falls more
+than 3 per cent on 1.14 per cent of sessions against a real 1.21.
 
-Crises have an epicentre. At each crisis one sector is drawn to carry it,
-banks in three of five on the tape, and the crisis dispersion row reads
-1.36 against the tape's 1.34 where it read 1.15 without the draw. A
-scenario can pin the epicentre: `Scenario().hold(epicentre="financial_services")`.
-VIX persistence, the row no earlier preset held, passes the structural
-gate at one year, sits on the tape at two, and rises between them by
-+0.007 against the tape's paired +0.012. The crisis lever -- held VIX 65
-over held VIX 5 -- reads 3.11x against real markets' 6.16x, where
-`pt-v18` read 7.06x; the other half of it sits in the names' own
-variance response, a recorded form not yet shipped.
+**pt-v19 also passes a long-run check.** Thirty 21-year histories, and the
+2008 and 2020 crises replayed with the real VIX imposed, are graded on
+fifteen criteria a user would notice: how deep the crashes go, how long
+fear lasts, how often the VIX sits above 30 or below 15, bear markets and
+corrections per decade, the long-run return, and whether reading a
+headline late still pays. pt-v19 meets all fifteen. The 2008 replay falls
+41 per cent against the real 57, the VIX spends 8.1 per cent of sessions
+above 30 against a real 8.2, and the index returns 6.3 per cent a year
+over 21 years. The verdict ships in the preset record:
+`tf.preset_record()["long_run"]`.
 
-Composed 2026-09-21 and 2026-09-22, four times. The preset carries the
-tape's own GJR variance triple and slow pole, a regime level on the VIX
-law from the tape's yearly medians, the lever's exponent from the tape's
-crisis scaling law, the level's loop gain that undoes the loop's
-amplification of that level, and the crisis epicentre from the tape's
-five episodes. The earlier records and their figures are in the changelog.
+What is still off: the worst month of the 2020 replay is about 30 per cent
+milder than the real one. Over two years the VIX forgets a shock a little
+too fast. The crisis lever, held VIX 65 over held VIX 5, reads 5.2x against
+real markets' 6.2x. Crises have an epicentre: one sector is drawn to carry
+each one, and a scenario can pin it with
+`Scenario().hold(epicentre="financial_services")`.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market
@@ -180,14 +178,14 @@ Five limits are measured and written down:
 
 | limit | what it means |
 |---|---|
-| horizon | one year is certified. Two and five years are measured, not certified |
+| horizon | one year is certified against the bands. Longer runs are graded by the long-run check, not certified |
 | volatility memory | it decays too fast |
 | scenario size | the response has the right sign, but one run cannot size it |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
 | roster | certification used a sector-balanced roster, which no real index is |
 
 `tf.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://simoncoombes.github.io/tradefloor/realism-envelope.html) says
+[the realism envelope](https://tradefloor.dev/realism-envelope.html) says
 what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
