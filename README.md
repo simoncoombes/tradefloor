@@ -28,17 +28,16 @@ concepts, the realism envelope, presets, the API and the notebooks.
 pip install tradefloor
 ```
 
-> tradefloor was called **pretium** until 0.5.0. Versions through 0.4.3 were
-> published under that name and are still installable, and results recorded
-> against them replay under those versions. The rename changed no behavior,
-> and 0.5.0 reproduces the same known-answer digest on every platform.
+> tradefloor was called **pretium** until 0.5.0. Versions up to 0.4.3 can
+> still be installed under that name, and results recorded with them still
+> replay. The rename changed nothing in the model.
 
 There are wheels for Linux, macOS and Windows on CPython 3.11+, and no
 dependencies. The same engine is a Rust crate (`cargo add tradefloor`).
 
-The API can still change before 1.0, but published results can't. New
-coefficients ship as a new preset, so a run you cited last month replays the
-same way this month.
+The API may change before 1.0. Results will not, because model changes ship
+as a new preset, so a run you cited last month replays the same way this
+month.
 
 ## The demo
 
@@ -70,16 +69,17 @@ scores["mine"].impact_bps            # what its own footprint cost
 scores["mine"].strategy_fingerprint  # sha256, cite this
 ```
 
-That is one market draw. It tells you as much about the seed as about the
-strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
+That result comes from one random market, so it says as much about the seed
+as about the strategy. `tf.rank` runs many seeds and compares strategies with
+a paired sign test.
 
 ## Contents
 
 | | |
 |---|---|
 | `engine.truth()` | why each price moved: ten factors that sum to the move, to 1e-16 |
-| `engine.prints()` | how each print was arrived at: the shock that arrived and the depth that absorbed it |
-| counterfactual TCA | the same seed with your orders and without them |
+| `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
+| counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
@@ -112,10 +112,10 @@ for day in range(80):
     ...                                  # run both branches
 ```
 
-A scenario is a list of market interventions and the assumptions behind
-them, written for controlled experiments. It names targets from a registry of
-fields the engine reads, and it keeps the shocks it says happened apart from
-the transmission it assumes followed:
+A scenario is a file of changes to the market and the assumptions behind
+them, for controlled experiments. Each change targets a field the engine
+reads. The file keeps the shock apart from the knock-on effects you assume
+follow it:
 
 ```
 tradefloor scenario show scenarios/oil_price_spike.yml
@@ -128,54 +128,55 @@ Assumed transmission
   day 55+            macro.corporate_yield    +0.50pp
 ```
 
-tradefloor does not claim what a war, an election, an oil shock or a
-recession will do to markets. It lets you state those assumptions and measure
-how an agent behaves under them.
+tradefloor does not predict what a war, an election, an oil shock or a
+recession will do to markets. You state the assumptions and it measures how an
+agent behaves under them.
 
-Six scenarios ship inside the package, so `Scenario.load` works after a plain
-`pip install`, and each records what it was measured to be worth. Their
+Six scenarios ship with the package, so `Scenario.load` works after a plain
+`pip install`. Each one records how big its effect was measured to be. Their
 [source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
 `tradefloor scenario list` names them, and `tradefloor scenario targets`
 lists every target and what each one reaches.
 
 ## Realism
 
-`tf.facts.measure()` scores fourteen shape statistics against real-market
-bands, a fifteenth that reads only in a crisis, and four more on a protocol
-that varies the roster with the seed. At the default preset, `pt-v19`, all of
-them are in band in all four cells of the record: the certification roster
-and a held-out one, at one year and two, thirty seeds each. The row furthest
-from real is `sector_excess_corr`, 0.090 against a tape center of 0.164,
-which is still in band.
+tradefloor checks its market against real ones. `tf.facts.measure()` measures
+19 statistics of a simulated market, such as volatility, fat tails, how much
+stocks move together and how far the VIX jumps after a fall. It compares each
+one with the range real markets show. On the default preset, `pt-v19`, every
+statistic is inside its real range at one year, and every one that can be read
+at two years is inside too. The check runs 30 random seeds and is repeated on
+a second, held-out set of companies. The statistic furthest from real is how
+much stocks in one sector move together beyond the market, 0.090 against a
+real 0.164, which is still inside the range.
 
-On the four level rows, the index drifts +7.6 percent over one-year windows,
-inside a band of 1.1 to 10.3. The -1 percent fear row reads 1.9 against a
-tape center of 2.7, and the -3 percent row reads 5.4 against 5.7. The index
-falls more than 3 percent on 1.14 percent of sessions, against 1.21 percent
-in real markets.
+Four of the 19 measure levels. An equal-weight portfolio of the stocks gains
+7.6 percent a year, inside a real range of 1.1 to 10.3. On a day the index
+falls 1 percent or more, the VIX rises a median 1.9 points against a real 2.7,
+and on a 3 percent fall it rises 5.4 against 5.7. The index falls 3 percent or
+more on 1.14 percent of days, against 1.21 percent in real markets.
 
-pt-v19 also passes a long-run check. Thirty 21-year histories, plus the 2008
-and 2020 crises replayed with the real VIX imposed, are graded on fifteen
-criteria a user would notice. They cover how deep crashes go, how long fear
-lasts, how often the VIX sits above 30 or below 15, bear markets and
-corrections per decade, the long-run return, and whether a headline read
-late still pays. pt-v19 meets all fifteen, and pt-v18, the previous default,
-meets eight. The 2008 replay falls 41 percent against the real 57, the VIX
-spends 8.1 percent of sessions above 30 against a real 8.2, and the index
-returns 6.3 percent a year over 21 years. The verdict ships in the preset
-record as `tf.preset_record()["long_run"]`.
+pt-v19 also passes a long-run check. It runs the market for 21 years, 30 times
+over, and replays 2008 and 2020 with the real VIX. Fifteen things a user would
+notice are compared with real markets: how deep crashes go, how long fear
+lasts, how often the VIX is above 30 or below 15, how many bear markets and
+corrections a decade brings, the long-run return, and whether a headline read
+late still pays. pt-v19 passes all fifteen. pt-v18, the previous default,
+passes eight. In the 2008 replay the market falls 41 percent against the real
+57, the VIX is above 30 on 8.1 percent of days against a real 8.2, and the
+index returns 6.3 percent a year over 21 years. The result ships with the
+package as `tf.preset_record()["long_run"]`.
 
-Three measurements are still off. The worst month of the 2020 replay is about
-30 percent milder than the real one. Over two years the VIX forgets a shock a
-little too fast. The crisis lever, the ratio of volatility at a held VIX of 65
-to volatility at a held VIX of 5, reads 5.2x against 6.2x in real markets.
+Three things are still off. The worst month of the 2020 replay is about 30
+percent milder than the real one. Over two years the VIX forgets a shock a
+little too fast. With the VIX held at 65 the market is 5.2 times as volatile as
+with it held at 5, against 6.2 times in real markets.
 
-Each crisis is centered on one sector, drawn at random, and a scenario can
-pin it with `Scenario().hold(epicentre="financial_services")`.
+Each crisis starts in one sector, picked at random. A scenario can pick it for
+you with `Scenario().hold(epicentre="financial_services")`.
 
-Five of the fourteen shape statistics were calibration targets, so the same
-bands tuned the model and then graded it, and no market data was held back
-for the test.
+Five of the statistics were also used to tune the model, so they were not held
+out for testing.
 
 Five limits are measured and written down:
 
@@ -192,19 +193,20 @@ Five limits are measured and written down:
 what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
-model, so a strategy that happens to match that model will score well here
-and may fail on real data. The market has one venue, no latency, and no
-counterparty that adapts to you.
+model, so a strategy that happens to match it will score well here and may
+fail on real data. The market has one venue, no latency, and no other trader
+that adapts to you.
 
 ## Seed determinism
 
-Each release builds five targets, runs one fixed simulation in each, and
-compares digests. A disagreement stops the release. The crate ships its own
-`exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
+The same seed gives the same market on every platform. Each release builds
+for five platforms, runs one fixed simulation on each, and stops if any result
+differs. tradefloor ships its own `exp`, `log`, `sin` and `cos`, so the
+system's math library cannot change a result.
 
-`pt-v19` became the default at 0.8.0, taking it from `pt-v18`. Naming your
-preset explicitly makes a run replay exactly, and every preset from `pt-v1` on
-is still selectable.
+`pt-v19` became the default in 0.8.0, replacing `pt-v18`. If you name your
+preset, a run replays exactly, and every preset from `pt-v1` on can still be
+selected.
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -240,9 +242,9 @@ question. They are in no particular order.
 ## Agent frameworks
 
 The framework makes the decisions and tradefloor runs the market. Each
-adapter under `tradefloor.integrations` passes one framework's output through
-the same loop of observation, decision, execution and evaluation, so two
-frameworks can be measured on the same market with the same harness.
+adapter in `tradefloor.integrations` takes one framework through the same
+steps: the agent sees the market, decides, its orders fill, and the result is
+scored. So two frameworks can be compared on the same market.
 
 | Framework | tradefloor support |
 |---|---|
@@ -260,12 +262,11 @@ A plain Python function needs no extra. FinRobot keeps the `finrobot` extra
 it has always had, and its section below covers the rate-shock experiment
 that integration was built for.
 
-Each example runs offline in seconds, with a deterministic function in place
-of the model, so running one needs no API key or provider account. The market
-replays from a seed but a live model call does not, so an adapter records
-each exchange, keyed by a digest of the exact input it sent, and can replay
-the recording later without the framework installed. The four examples are
-in
+Each example runs offline in seconds, with a fixed function in place of the
+model, so it needs no API key. A seed replays the market exactly, but a live
+model gives a different answer each time. So an adapter records each call
+and its answer, and can replay the recording later without the framework or
+a key. The four examples are in
 [`examples/integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations),
 which says what each framework contributes and what tradefloor keeps.
 
