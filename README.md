@@ -132,11 +132,26 @@ tradefloor does not predict what a war, an election, an oil shock or a
 recession will do to markets. You state the assumptions and it measures how an
 agent behaves under them.
 
-Six scenarios ship with the package, so `Scenario.load` works after a plain
+Seven scenarios ship with the package, so `Scenario.load` works after a plain
 `pip install`. Each one records how big its effect was measured to be. Their
 [source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
 `tradefloor scenario list` names them, and `tradefloor scenario targets`
 lists every target and what each one reaches.
+
+### Bonds
+
+`Universe.random(40, seed=1, bonds=True)` adds three simulated rate indices
+after the equities: `UST2Y` and `UST10Y`, constant-maturity 2-year and
+10-year treasury indices, and `IGCORP`, an investment-grade corporate bond
+index. They are not real securities. Each is priced off the engine's own
+curve, returning `yield / 252 - D * dy + 0.5 * C * dy**2` a day, with
+duration and convexity of 1.9 and 4.6, 8.5 and 84, and 7.0 and 100. They
+trade through the same books, fills, portfolio and tape as the equities, and
+they leave every equity price unchanged. `scenarios/curve_shock.yml` moves
+the whole curve 200 basis points in one day, which takes about 15% off
+`UST10Y`; `tradefloor.baselines.Balanced` is a 60/40 portfolio with a drift
+band. `evaluate(..., cash_interest=True)` pays uninvested cash the policy
+rate, and is off by default.
 
 ## Realism
 

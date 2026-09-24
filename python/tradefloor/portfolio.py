@@ -75,11 +75,17 @@ class Portfolio:
     """Cash, positions and P&L for one trader."""
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
-                 "max_leverage", "_stamp")
+                 "max_leverage", "_stamp", "cash_interest", "interest")
 
     def __init__(self, cash: float = 1_000_000.0,
-                 *, max_leverage: float | None = None) -> None:
+                 *, max_leverage: float | None = None,
+                 cash_interest: bool = False) -> None:
         """
+        ``cash_interest`` makes cash earn the policy rate, one day at a time,
+        when :meth:`accrue` is called; the harness calls it once a day, before
+        the close. Off by default, and with it off cash earns nothing, which
+        is how every run before this option behaved. See :meth:`accrue`.
+
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
         defaults to ``None``, meaning unconstrained, because a bare simulator should
         not impose a broker's risk policy on a researcher studying, say, what
@@ -100,6 +106,9 @@ class Portfolio:
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
+        self.cash_interest = bool(cash_interest)
+        # Interest credited so far, net of any charged on a negative balance.
+        self.interest = 0.0
         self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
@@ -282,6 +291,36 @@ class Portfolio:
 
     def realised(self) -> float:
         return sum(p.realised for p in self.positions.values())
+
+    # -- cash -------------------------------------------------------------
+
+    def accrue(self, engine: Engine) -> float:
+        """Credit one trading day's interest on cash, if ``cash_interest``.
+
+        ``cash * policy_rate / 252``, at the policy rate in force now
+        (``engine.macro_fields["federal_funds_rate"]``), added to cash and to
+        :attr:`interest`. Returns the amount, 0.0 with the option off.
+
+        A negative balance, which is borrowing to hold more than the account
+        is worth, is charged at the same rate. That is cheaper than any broker
+        lends, so a levered strategy's financing cost is a floor here, not an
+        estimate.
+
+        Call it once per trading day. The harness calls it just before the
+        close, so the day's interest is at the rate the day traded under and
+        the close's macro step, which may move the rate, applies to the next
+        day. Before this option existed cash earned nothing: a portfolio
+        holding cash through a rate shock gained nothing from the higher
+        rate, and a 60/40 portfolio's bond sleeve was compared against cash
+        that paid zero.
+        """
+        if not self.cash_interest:
+            return 0.0
+        rate = engine.macro_fields["federal_funds_rate"]
+        amount = self.cash * rate / 252.0
+        self.cash += amount
+        self.interest += amount
+        return amount
 
     # -- impact -----------------------------------------------------------
 

@@ -334,13 +334,20 @@ FIELDS = (
     # ships 1.93, so on the default the pin takes effect. This read "every
     # shipped preset" until 2026-09-24.
     "epicentre",
+    # The treasury curve the simulated rate indices read. Equities reach it
+    # only through the corporate yield the central bank sets from the
+    # 10-year, so on a roster without rate indices these move nothing on the
+    # day they are pinned. See ``tradefloor.bonds``.
+    "treasury_yield_2y",
+    "treasury_yield_10y",
 )
 
 #: Fields the engine validates as fractions in [-0.05, 0.50]. Listed so a
 #: scenario can reject 5.0-meaning-5% at construction, where the mistake is
 #: visible, rather than sixty days into a run.
 RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate",
-               "gdp_growth", "unemployment_rate", "tariff_rate")
+               "gdp_growth", "unemployment_rate", "tariff_rate",
+               "treasury_yield_2y", "treasury_yield_10y")
 
 RATE_MIN, RATE_MAX = -0.05, 0.50
 

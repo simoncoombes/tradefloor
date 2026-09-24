@@ -1115,7 +1115,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
 def list_scenarios() -> dict[str, Any]:
     """The catalogue: shipped documents, constructors, and the registry.
 
-    A model authoring a scenario is choosing between twelve targets whose
+    A model authoring a scenario is choosing between fourteen targets whose
     effect sizes differ by three orders of magnitude, and nothing on the wire
     told it which. `macro.qe_pe_boost` moves the median instrument 19.78%;
     `macro.fear_greed` moves it exactly 0.00%, measured, because nothing in

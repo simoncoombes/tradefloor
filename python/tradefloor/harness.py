@@ -349,6 +349,7 @@ def evaluate(
     start: tuple[int, int, int] = (9, 30, 3),
     scenario: Any = None,
     model: str | ModelParams | None = None,
+    cash_interest: bool = False,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -378,6 +379,10 @@ def evaluate(
     to the shipped preset. One model for the whole evaluation, baseline
     included: scoring agents across different models would compare markets,
     not agents. Each scorecard records ``model_fingerprint``.
+
+    ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
+    one day's worth before each close (:meth:`Portfolio.accrue`). Off by
+    default: cash earns nothing, as it always has here.
 
     Returns a scorecard per agent, keyed by name.
     """
@@ -414,6 +419,7 @@ def evaluate(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
+            cash_interest,
         )
     return results
 
@@ -442,10 +448,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
-                  model=None) -> Scorecard:
+                  model=None, cash_interest=False) -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
-    portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
+    portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
+                          cash_interest=cash_interest)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
 
@@ -529,6 +536,9 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             if claimed is not None and actual is not None:
                 explanations.append((claimed, actual))
 
+        # A day's interest on cash at the rate the day traded under, before
+        # the close's macro step can move it. Nothing with the option off.
+        portfolio.accrue(engine)
         engine.close_market()
 
     final = portfolio.net_worth(engine)

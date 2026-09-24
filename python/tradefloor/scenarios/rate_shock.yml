@@ -20,6 +20,15 @@
 # 10-year at the next central-bank meeting and the write is gone. The same
 # shock re-asserted daily moved it -3.50%. A rate shock that is not sustained
 # is not a rate shock.
+#
+# For the simulated rate indices this is NOT a parallel curve shift, because
+# neither treasury yield is written. The corporate index reprices on the day
+# (IGCORP -12.30% on day 50), the 2-year follows the policy rate at that
+# evening's close (UST2Y about -3.2% on day 51), and the 10-year drifts up to
+# the new policy rate over the following weeks (UST10Y -14.77% below the
+# unshocked world by day 120). Measured on `Universe.random(20, seed=101,
+# bonds=True)`, seeds 3/11/29. For the whole curve on one day, which is the
+# usual stress for a bond book, use curve_shock.yml.
 
 version: 1
 

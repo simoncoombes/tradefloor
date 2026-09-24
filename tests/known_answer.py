@@ -545,6 +545,89 @@ def simulation_buffer() -> bytes:
     return bytes(buf)
 
 
+def bonds_buffer() -> bytes:
+    """A session with the simulated rate indices, hashed on its own.
+
+    Kept out of `simulation_buffer` so that adding the indices moved none of
+    the three digests the gate already carries: a roster without them is the
+    market it was, and this buffer is the claim that a roster WITH them is the
+    same market on every platform too.
+
+    The twelve KAT equities plus UST2Y, UST10Y and IGCORP, under the section-5
+    macro, for five sessions. The whole curve moves 100bp on day 2 (the
+    repricing path), an agent's fills reach the UST10Y and IGCORP books on
+    days 1 and 3 (the ladder, the maker's inventory and its decay), and
+    carry accrues at every open after the first. Hashed per day: every
+    column for every instrument, the curve, and the four rate components;
+    then the last session's prices and the draw count, which the rate
+    indices must not have moved.
+    """
+    buf = bytearray()
+    sector_names = tradefloor.sectors()
+    instruments = [
+        tradefloor.Instrument(
+            f"KAT{i}",
+            sector_names[i % 12],
+            initial_price=20.0 + i * 7.5,
+            shares_outstanding=2.5e8 + i * 1e7,
+            eps=(-1.0 if i in (5, 11) else 1.0 + i * 0.6),
+            book_value_per_share=10.0 + i * 2.0,
+            revenue_growth=-0.02 + i * 0.03,
+            avg_volume=250_000 + i * 100_000,
+            beta=0.7 + i * 0.1,
+        )
+        for i in range(12)
+    ] + tradefloor.bonds()
+    engine = tradefloor.Engine(
+        seed=SEED,
+        universe=instruments,
+        macro_state=tradefloor.Macro(
+            vix=19.5, federal_funds_rate=0.0425, corporate_bond_yield=0.0610,
+            inflation_rate=0.031, qe_pe_boost=0.0, fear_greed_index=38.0,
+            cycle="contraction",
+        ),
+    )
+    n = len(instruments)
+    for day in range(5):
+        if day == 2:
+            curve = engine.macro_fields
+            engine.pin_macro(
+                federal_funds_rate=curve["federal_funds_rate"] + 0.01,
+                treasury_yield_2y=curve["treasury_yield_2y"] + 0.01,
+                treasury_yield_10y=curve["treasury_yield_10y"] + 0.01,
+                corporate_bond_yield=curve["corporate_bond_yield"] + 0.01,
+            )
+        engine.open_market()
+        fills = ({"UST10Y": (60_000.0, 0.0), "IGCORP": (0.0, 90_000.0)}
+                 if day in (1, 3) else None)
+        engine.run_session(9, 30, 3, 78, volatility=1.0, fills=fills)
+        engine.close_market()
+        for field in (
+            "price", "previous_close", "open", "high", "low", "volume",
+            "market_cap", "mispricing_s", "maker_inventory", "avg_volume",
+        ):
+            for value in struct.unpack("<%dd" % n, engine.column(field)):
+                _f64(buf, value)
+        for key in sorted(engine.curve):
+            _f64(buf, engine.curve[key])
+        for component in ("carry", "duration", "convexity", "flow"):
+            for value in struct.unpack(
+                "<%dd" % n, engine.rate_attribution(component)
+            ):
+                _f64(buf, value)
+    for value in struct.unpack(
+        "<%dd" % (engine.session_ticks_written * n), engine.session_prices()
+    ):
+        _f64(buf, value)
+    _f64(buf, float(engine.draws_consumed))
+    return bytes(buf)
+
+
+def bonds_digest() -> str:
+    """The rate indices' gate, beside the simulation's rather than in it."""
+    return hashlib.sha256(bonds_buffer()).hexdigest()
+
+
 def metadata_buffer() -> bytes:
     """The REPORTED model preset, hashed separately from the simulation.
 
@@ -603,3 +686,4 @@ if __name__ == "__main__":
     print(f"  sha256   {known_answer_digest()}")
     print(f"  sim      {simulation_digest()}")
     print(f"  meta     {metadata_digest()}")
+    print(f"  bonds    {bonds_digest()}")

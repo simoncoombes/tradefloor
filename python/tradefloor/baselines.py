@@ -122,6 +122,7 @@ if TYPE_CHECKING:
     from ._core import FactorName
 
 from ._core import Engine, GameRng
+from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
 
 # The stream the random baseline draws on. Distinct from the market stream, so
@@ -197,6 +198,10 @@ def _book(tickers, longs, shorts, gross, k):
     for i in shorts:
         weights[tickers[i]] = -per
     return weights
+
+
+#: The simulated rate indices' tickers, for telling them from equities.
+RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 
 
 class BuyAndHold:
@@ -376,6 +381,85 @@ class MeanReversion(_Trend):
     """Long the recent losers, short the recent winners."""
 
     sign = 1.0
+
+
+#: The bond sleeve :class:`Balanced` holds by default, as weights of the
+#: whole portfolio. Its duration is (0.10 * 1.9 + 0.20 * 8.5 + 0.10 * 7.0) /
+#: 0.40 = 6.5 years, about the US aggregate bond index's.
+DEFAULT_BOND_SLEEVE = {"UST2Y": 0.10, "UST10Y": 0.20, "IGCORP": 0.10}
+
+
+class Balanced:
+    """A fixed-weight equity and bond portfolio with a drift band: 60/40.
+
+    Holds ``equity`` of net worth across every equity in the roster, equally
+    weighted, and ``bonds`` (ticker to weight, :data:`DEFAULT_BOND_SLEEVE` by
+    default) in the simulated rate indices. It buys the targets on its first
+    observation and then checks once a day, at the day's first step: if the
+    equity sleeve has drifted more than ``band`` from its target, or any bond
+    weight more than ``band`` from its own, it trades every holding back to
+    target. ``band=None`` never rebalances, which is the buy-and-hold 60/40.
+
+    Needs a roster with the rate indices it names (``Universe.random(...,
+    bonds=True)``). Not in :func:`reference_agents`: it is a portfolio policy
+    to study under a scenario, not a signal to rank.
+
+    ``rebalances`` lists the days it traded back to target, and ``marks``
+    records, at each day's first step, the day and the equity and bond
+    sleeves' values, so a caller can read what each sleeve did.
+    """
+
+    def __init__(self, *, equity: float = 0.6,
+                 bonds: dict[str, float] | None = None,
+                 band: float | None = 0.05,
+                 max_participation: float = 0.05):
+        self.equity = float(equity)
+        self.bonds = dict(DEFAULT_BOND_SLEEVE if bonds is None else bonds)
+        if self.equity < 0 or any(w < 0 for w in self.bonds.values()):
+            raise ValueError("weights must not be negative")
+        if self.equity + sum(self.bonds.values()) > 1.0 + 1e-12:
+            raise ValueError("equity and bond weights sum to more than 1")
+        self.band = None if band is None else float(band)
+        self.max_participation = float(max_participation)
+        self.rebalances: list[int] = []
+        self.marks: list[tuple[int, float, float]] = []
+        self._started = False
+
+    def _targets(self, obs: Observation) -> dict[str, float]:
+        missing = [t for t in self.bonds if t not in obs.tickers]
+        if missing:
+            raise ValueError(
+                f"Balanced holds {', '.join(missing)}, which this roster does "
+                "not list. Build it with Universe.random(..., bonds=True) or "
+                "Universe.with_bonds().")
+        equities = [t for t in obs.tickers if t not in RATE_TICKERS]
+        each = self.equity / len(equities) if equities else 0.0
+        targets = {t: each for t in equities}
+        targets.update(self.bonds)
+        return targets
+
+    def act(self, obs: Observation) -> dict[str, float]:
+        targets = self._targets(obs)
+        if not obs.is_first_step_of_day:
+            return {}
+        worth = obs.portfolio.net_worth(obs.engine)
+        held = {t: obs.position(t) * obs.price(t) for t in obs.tickers}
+        equity_value = sum(v for t, v in held.items() if t not in RATE_TICKERS)
+        bond_value = sum(v for t, v in held.items() if t in RATE_TICKERS)
+        self.marks.append((obs.day, equity_value, bond_value))
+        if not self._started:
+            self._started = True
+            return rebalance(obs, targets,
+                             max_participation=self.max_participation)
+        if self.band is None or worth <= 0:
+            return {}
+        drift = abs(equity_value / worth - self.equity)
+        for ticker, weight in self.bonds.items():
+            drift = max(drift, abs(held[ticker] / worth - weight))
+        if drift <= self.band:
+            return {}
+        self.rebalances.append(obs.day)
+        return rebalance(obs, targets, max_participation=self.max_participation)
 
 
 class Oracle:

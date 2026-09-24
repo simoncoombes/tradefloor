@@ -1,0 +1,62 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market would respond to a real rate rise.
+#
+# A parallel shift: the whole curve 200 basis points higher on day 50. The
+# policy rate, the 2-year and 10-year treasury yields and the corporate yield
+# all move together, which is the standard rate-shock stress for a bond
+# book, and it is what the simulated rate indices (UST2Y, UST10Y, IGCORP)
+# are priced off. rate_shock.yml moves only the policy rate and the corporate
+# yield, so its 10-year arrives over weeks, through the chain; this one lands
+# on the day.
+#
+# The two treasury writes are impulses, not holds. The 10-year closes 5% of
+# its gap to the policy rate plus a term premium every session, and the
+# 2-year is recomputed at every close from the policy rate and the 10-year,
+# so with the policy rate held 200bp higher both stay there on their own and
+# keep their daily noise. A permanent write would freeze them at the day-50
+# level for the rest of the run. The policy rate and the corporate yield are
+# held, as in rate_shock.yml, because a meeting would otherwise re-set them.
+#
+# Measured on `Universe.random(20, seed=101, bonds=True)` over 120 days,
+# seeds 3/11/29, against the same world with no scenario: on day 50 UST2Y
+# returned -3.71%, UST10Y -15.35% and IGCORP -12.30% (the formula alone gives
+# -3.71%, -15.32% and -12.00% for a clean 200bp move; IGCORP's extra is the
+# corporate yield it catches up to on the day). By day 120 they stood -3.17%,
+# -14.54% and -12.92% below the unshocked world, and the median equity -3.88%.
+
+version: 1
+
+scenario:
+  name: curve_shock
+
+  description: >
+    A parallel 200 basis point rise across the whole curve on day 50: the
+    policy rate, the 2-year and 10-year treasury yields and the corporate
+    yield move together and stay up. Example experimental assumptions, not
+    a forecast.
+
+  shocks:
+
+    - target: macro.policy_rate
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent
+
+    - target: macro.treasury_2y
+      operation: add
+      value: 0.02
+      at: 50
+      shape: impulse
+
+    - target: macro.treasury_10y
+      operation: add
+      value: 0.02
+      at: 50
+      shape: impulse
+
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent

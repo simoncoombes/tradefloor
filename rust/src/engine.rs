@@ -529,6 +529,14 @@ pub struct Engine {
     /// Diagnostic only, like `last_index_variance`, and kept OUT of
     /// `state_snapshot` and the state hash for the same reason.
     last_market_targets: Option<(f64, Option<f64>)>,
+    /// The rate instruments, if the embedder listed any
+    /// ([`Engine::set_rate_instruments`]). Empty on every engine built
+    /// without them, and an empty book is never touched: no hook runs, no
+    /// column or buffer grows and nothing extra is hashed, so such an engine
+    /// is the engine it was before rate instruments existed. They take no
+    /// draws and write nothing back to the economy, so adding them leaves
+    /// every equity price bit-identical. See `crate::rates`.
+    rates: crate::rates::RateBook,
 }
 
 impl Engine {
@@ -1000,6 +1008,7 @@ impl Engine {
             // No day has closed, so no VIX update has read a variance.
             last_index_variance: None,
             last_market_targets: None,
+            rates: crate::rates::RateBook::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -1868,6 +1877,13 @@ impl Engine {
         outcome.draws_consumed = consumed;
         if let Some(mark) = self.day_marks.last_mut() {
             mark.ticks += 1;
+        }
+        // The rate indices' minute, after the equities' and reading nothing
+        // they wrote: the economy does not move inside a tick, and the flow
+        // an instrument reads is keyed by its own ticker, which no equity
+        // carries. No draw.
+        if !self.rates.is_empty() {
+            self.rates.tick(request.time, &self.economy, request.order_volumes);
         }
         outcome
     }
@@ -2800,6 +2816,13 @@ impl Engine {
         self.apply_overnight();
 
         reset_daily_prices(&mut self.companies);
+
+        // The rate indices' open: a day's carry if a close came before, then
+        // the curve as it now stands, after the close's macro step and any
+        // pin written since. No draw. Skipped on an engine without them.
+        if !self.rates.is_empty() {
+            self.rates.open(&self.economy);
+        }
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -3243,6 +3266,12 @@ impl Engine {
         self.carry_jump_moves();
         self.update_volume_state();
         self.update_volume_idio();
+        // The rate indices only note that a night has begun, so the next
+        // open accrues its carry. They reprice to the economy's new yields at
+        // that open, not here: the close's macro step runs after this.
+        if !self.rates.is_empty() {
+            self.rates.close();
+        }
     }
 
     /// The stationary opening (`opening_mispricing_sigma`), applied once,
@@ -3846,7 +3875,10 @@ impl Engine {
         request: &SessionRequest,
         buffer: &mut SessionBuffer,
     ) -> SessionOutcome {
-        buffer.resize(request.ticks, self.companies.len());
+        // The row width is every instrument, rate indices after equities, so
+        // the tape carries them in the same rows as the names they trade
+        // beside. Without rate instruments this is `companies.len()`.
+        buffer.resize(request.ticks, self.instrument_count());
         buffer.resize_counterfactual(self.settle_depth_counterfactual);
 
         if request.reopen {
@@ -3906,6 +3938,9 @@ impl Engine {
                     liquidity_share: &self.tick_liquidity_share,
                 },
             );
+            if !self.rates.is_empty() {
+                buffer.write_rates(t, self.companies.len(), &self.rates);
+            }
 
             if let Some(stop) = &request.stop {
                 if stop.triggered(t, &self.companies) {
@@ -4238,6 +4273,76 @@ impl Engine {
         self.companies.is_empty()
     }
 
+    /// Install rate instruments, marked at the curve the economy holds now.
+    ///
+    /// Call once, after construction and before the first open: an engine
+    /// built with a settled opening has already run its burn-in by then, so
+    /// the instruments are marked at the curve the run starts from. They
+    /// never draw and never write the economy, so installing them changes no
+    /// equity price. See `crate::rates`.
+    pub fn set_rate_instruments(&mut self, instruments: Vec<crate::rates::RateInstrument>) {
+        self.rates = crate::rates::RateBook::new(instruments, &self.economy);
+    }
+
+    pub fn rates(&self) -> &crate::rates::RateBook {
+        &self.rates
+    }
+
+    /// A caller has written the corporate yield: re-mark the corporate
+    /// index's spread to it, even if the value did not change. Nothing on an
+    /// engine without rate instruments. See `crate::rates`.
+    pub fn remark_credit_spread(&mut self) {
+        if !self.rates.is_empty() {
+            self.rates.remark_credit_spread(&self.economy);
+        }
+    }
+
+    /// For a restore, which writes the book back whole.
+    pub fn rates_mut(&mut self) -> &mut crate::rates::RateBook {
+        &mut self.rates
+    }
+
+    /// Equities plus rate instruments: the width of every per-instrument
+    /// surface. Equal to [`Engine::len`] on an engine without rate
+    /// instruments.
+    pub fn instrument_count(&self) -> usize {
+        self.companies.len() + self.rates.len()
+    }
+
+    /// One field for the rate instruments, positional against
+    /// `rates().instruments`, in the units [`Engine::column`] uses.
+    ///
+    /// NaN where the field does not exist for an index (`garch_variance`,
+    /// `beta`, `last_daily_return`). The mispricing fields are zero: an
+    /// index level is its own fair value, and the mispricing process never
+    /// runs on it.
+    pub fn rate_column(&self, field: PriceField) -> Vec<f64> {
+        self.rates
+            .instruments
+            .iter()
+            .map(|i| match field {
+                PriceField::Price => i.price,
+                PriceField::PreviousClose => i.previous_close,
+                PriceField::Open => i.open,
+                PriceField::High => i.high,
+                PriceField::Low => i.low,
+                PriceField::Volume => i.volume,
+                PriceField::MarketCap => i.market_cap(),
+                PriceField::MispricingS => 0.0,
+                PriceField::MakerInventory => i.maker_inventory,
+                PriceField::GarchVariance => f64::NAN,
+                PriceField::PreviousTickPrice => f64::NAN,
+                PriceField::MispricingSPrevClose => 0.0,
+                PriceField::MispricingMomentum => 0.0,
+                PriceField::LastDailyReturn => f64::NAN,
+                PriceField::AvgVolume => i.avg_volume,
+                PriceField::Beta => f64::NAN,
+                PriceField::ShortInterest => 0.0,
+                PriceField::FloatShares => i.units_outstanding,
+            })
+            .collect()
+    }
+
     // ── Roster mutation ───────────────────────────────────────────────────
     //
     // A listed universe is not static: companies IPO in, go bankrupt, and are
@@ -4413,6 +4518,12 @@ impl Engine {
     ///
     /// Returns `None` for an out-of-range index.
     pub fn book_for(&self, index: usize) -> Option<crate::order_book::OrderBook> {
+        // Rate instruments sit after the equities, so their index is the
+        // equity count plus their place in the rate book.
+        if index >= self.companies.len() {
+            let inst = self.rates.instruments.get(index - self.companies.len())?;
+            return Some(inst.book(self.economy.vix));
+        }
         let company = self.companies.get(index)?;
         Some(crate::microstructure::build_live_book(
             &company.micro_view(company.stock.price),
@@ -5027,6 +5138,31 @@ impl Engine {
             hash_f64(&mut buf, value);
         }
 
+        // The rate instruments, last, and only when there are any, so every
+        // engine without them hashes exactly as it did before they existed.
+        // In the order the snapshot's `rates` block carries them, which is
+        // the order `manifest.state_hash` reads. The per-tick print
+        // decomposition is output, not state, and is left out as the
+        // equities' is.
+        if !self.rates.is_empty() {
+            hash_str(&mut buf, "rates");
+            hash_u32(&mut buf, self.rates.len() as u32);
+            for inst in &self.rates.instruments {
+                hash_str(&mut buf, inst.spec.ticker);
+                for value in [
+                    inst.level, inst.marked_yield, inst.price, inst.previous_close,
+                    inst.open, inst.high, inst.low, inst.volume, inst.avg_volume,
+                    inst.units_outstanding, inst.maker_inventory, inst.day_carry,
+                    inst.day_duration, inst.day_convexity,
+                ] {
+                    hash_f64(&mut buf, value);
+                }
+            }
+            hash_f64(&mut buf, self.rates.ig_spread);
+            hash_f64(&mut buf, self.rates.last_corporate);
+            hash_bool(&mut buf, self.rates.closed_since_open);
+        }
+
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let out = hasher.finalize();
@@ -5499,6 +5635,35 @@ impl SessionBuffer {
             let row = truth.components.get(i).copied().unwrap_or([0.0; 8]);
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
+            }
+        }
+    }
+
+    /// Write the rate instruments' rows for one tick, after the equities'.
+    ///
+    /// The truth columns carry what exists for an index: the model price is
+    /// the index level (as both `fundamental` and `anchor`), `s` is zero, the
+    /// equity components are zero, and the print decomposition is the book's.
+    /// The depth counterfactual never runs on an index, so its print there is
+    /// the print and its share zero.
+    fn write_rates(&mut self, tick: usize, first: usize, rates: &crate::rates::RateBook) {
+        let base = tick * self.companies + first;
+        for (j, inst) in rates.instruments.iter().enumerate() {
+            let at = base + j;
+            self.prices[at] = inst.price;
+            self.volumes[at] = inst.volume;
+            self.mispricing_s[at] = 0.0;
+            self.fundamental[at] = inst.level;
+            self.anchor[at] = inst.level;
+            self.shock[at] = inst.tick_shock;
+            self.absorbed[at] = inst.tick_absorbed;
+            self.clamp[at] = 0.0;
+            if !self.unbounded_print.is_empty() {
+                self.unbounded_print[at] = inst.price;
+                self.liquidity_share[at] = 0.0;
+            }
+            for column in self.components.iter_mut() {
+                column[at] = 0.0;
             }
         }
     }

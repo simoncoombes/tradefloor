@@ -219,7 +219,7 @@ pub fn compute_spread_bps_with(
     let beta = company.beta.unwrap_or(1.0);
     let vol_multiplier = 0.7 + 0.3 * sector_vol * beta;
 
-    let mut vix_multiplier = 1.0 + mathx::max(0.0, (vix - 15.0) / 30.0);
+    let mut vix_multiplier = vix_spread_multiplier(vix);
     // The reference implementation is `if (difficulty === 'hard' && vix > 25) … else if
     // (difficulty === 'expert' && vix > 25)`. A hard run below VIX 25 falls
     // through BOTH arms, which the guards reproduce.
@@ -256,6 +256,17 @@ pub fn compute_spread_bps_with(
     };
 
     base_bps * vol_multiplier * vix_multiplier * short_spread_mult
+}
+
+/// How much a quoted spread widens with the VIX: `1 + max(0, (vix - 15) / 30)`.
+///
+/// One at VIX 15 and below, two at VIX 45. A function of its own so the
+/// equity spread above and the rate indices' spread (`crate::rates`) widen
+/// by the same rule rather than by two copies of it. The arithmetic is the
+/// expression that stood inline in `compute_spread_bps_with`, so every
+/// equity spread is bit-identical.
+pub fn vix_spread_multiplier(vix: f64) -> f64 {
+    1.0 + mathx::max(0.0, (vix - 15.0) / 30.0)
 }
 
 /// Baseline quote size per level — the legacy display-book size, minus the RNG.

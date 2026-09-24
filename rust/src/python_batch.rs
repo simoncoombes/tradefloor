@@ -97,6 +97,18 @@ impl PyEngineBatch {
         if universe.is_empty() {
             return Err(ValidationError::new_err("universe is empty"));
         }
+        // Rate instruments are a single-engine surface. The batch's columns
+        // are per company and it has no book or flow path for an index, so
+        // accepting one would either drop it silently or price it as an
+        // equity; neither is the instrument.
+        if let Some(rate) = universe.iter().find(|i| i.is_rate()) {
+            return Err(ValidationError::new_err(format!(
+                "{} is a rate index, and EngineBatch runs equities only. Run a \
+                 roster with rate instruments on Engine, or through run_many, \
+                 one seed per engine.",
+                rate.ticker
+            )));
+        }
         let mut sorted = seeds.clone();
         sorted.sort_unstable();
         sorted.dedup();
