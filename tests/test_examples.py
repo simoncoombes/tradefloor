@@ -75,9 +75,27 @@ def test_there_are_notebooks_to_check():
     assert len(NOTEBOOKS) >= 4, f"found {[p.name for p in NOTEBOOKS]}"
 
 
+#: Notebooks whose recorded agent runs were made under a harness this build
+#: no longer runs, and which have not been re-recorded, with the reason. A
+#: replay is keyed to the exact text the agent was sent, so from the first
+#: trade on the prompts differ and the replay misses. Each entry is a
+#: follow-up, not a pass: it names what has to be re-recorded to remove it.
+STALE_RECORDINGS = {
+    EXAMPLES / "experiments" / "liquidity-crisis" / "notebook.ipynb": (
+        "the liquidity-crisis study replays FinRobot runs recorded under the "
+        "0.8.x harness, which counted an agent's fills on every tick of a "
+        "step; since 0.9.0 they reach the market once, every price after the "
+        "first trade moves, and the recorded decisions stop matching. "
+        "Re-record tests/fixtures/finrobot/liquidity-crisis.json (60 calls) "
+        "and the four replications in data/ to remove this skip."),
+}
+
+
 @SLOW
 @pytest.mark.parametrize("path", NOTEBOOKS, ids=lambda p: p.name)
 def test_the_notebook_executes_without_error(path):
+    if path in STALE_RECORDINGS:
+        pytest.skip(STALE_RECORDINGS[path])
     nbformat = pytest.importorskip("nbformat")
     pytest.importorskip("nbclient")
     from nbclient import NotebookClient

@@ -65,6 +65,16 @@ and on any spec-built agent inside a daily-cadence wrapper. `RandomTrader`
 and `Oracle` now have `fork()`, `GameRng` copies at its position, and a
 `StrategySpec`, being immutable, copies to itself.
 
+The five LLM agent recordings behind the integration examples were
+re-recorded live on the fix, on the models they used before, and their
+notebooks' prose re-read against the new runs. The liquidity-crisis study's
+FinRobot recordings were not: its README and notebook say they were measured
+under the 0.8.x harness, and the slow notebook test skips it with that
+reason until it is re-recorded. `run_sync`, the bridge every adapter uses to
+call an async framework, now runs every call on one long-lived event loop,
+so a client a framework caches between calls keeps working; the OpenAI
+Agents SDK's did not, and a live five-day run recorded 3 of 5 decisions.
+
 The README, `rust/README.md` and the `facts` docstrings now name three
 counts consistently: 19 graded rows in the one-year realism table, 18 of them
 read by `facts.measure()`, and 17 long-run criteria.
