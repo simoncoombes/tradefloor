@@ -82,6 +82,11 @@ SEEDS = 30
 #: substitution would change a count, which is itself worth knowing.
 CHEAP = {"bootstrap_draws": 2}
 
+#: The long-run criteria added on 2026-09-24, after the fifteen the shipped
+#: preset was adopted under: no price-only edge, on the tape and through
+#: `tf.evaluate` on the published suite.
+PRICE_ONLY_EDGE = ("C4a", "C4b")
+
 
 def counted_rows(horizon_days: int = 252) -> list[str]:
     """The mechanism rows this horizon GRADES, diagnostics excluded."""
@@ -1127,8 +1132,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     So what is asserted is what the ruling asks of the record: it CARRIES
     both panels' certificates, readable by the bar and rendered in the line
     a reader sees; the reading is pinned so it cannot change in silence; and
-    beside it sit the two things that do gate -- the long-run verdict, which
-    passes, and every ruled band in on all four protocols.
+    beside it sit the two things that do gate -- the fifteen long-run
+    criteria it was adopted under, which pass, and every ruled band in on
+    all four protocols. C4a and C4b sit on the record beside them, graded.
     """
     rec = record(envelope.PRESET)
     for panel in envelope.MECHANISM_BAR_PANELS:
@@ -1154,10 +1160,21 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     assert rec["mechanism_252"]["reversed"] == []
     assert rec["mechanism_heldout_seeds"]["reversed"] == []
 
-    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    # WHAT GATES, beside it: the fifteen long-run criteria the preset was
+    # adopted under on 2026-09-23, all passed ...
     lr = rec["long_run"]
-    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
-    assert all(row["pass"] for row in lr["rows"])
+    adopted = [r for r in lr["rows"] if r["id"] not in PRICE_ONLY_EDGE]
+    assert len(adopted) == 15 and all(r["pass"] for r in adopted)
+    # ... beside C4a and C4b, added 2026-09-24 (design repo
+    # `programme/longrun/CRITERIA.md`, section C4), graded and carried.
+    # pt-v19 fails both: the tape's 65-minute reversal and two price-only
+    # rules on the published suite, both of the market's making once an
+    # agent's fills reach it once. The brief that added them gives them to
+    # pt-v20, so they are pinned as failing here, where a change to either
+    # cannot pass in silence, and they do not gate pt-v19 until the owner
+    # rules that they do.
+    assert lr["of"] == 17 and lr["passed"] == 15 and lr["verdict"] == "fail"
+    assert [r["id"] for r in lr["rows"] if not r["pass"]] == list(PRICE_ONLY_EDGE)
     assert lr["measured"]["fingerprint"] == envelope.PRESET
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
@@ -1187,8 +1204,11 @@ def test_the_fifth_composition_loses_a_held_out_mechanism_and_it_is_reported():
     assert verdict["panels"]["mechanism_252"]["gained"] == ["corr_asymmetry"]
     assert verdict["panels"]["mechanism_heldout_seeds"]["passed"] is False
     assert "mechanism_heldout_seeds" in verdict["reason"]
-    # And the long-run verdict that does gate passes all the same.
-    assert fifth["long_run"]["verdict"] == "pass"
+    # And the long-run criteria that gate pass all the same: the fifteen it
+    # was adopted under. C4a and C4b, added a day later, it fails, and the
+    # ship-bar test above says why they do not stop it.
+    assert all(r["pass"] for r in fifth["long_run"]["rows"]
+               if r["id"] not in PRICE_ONLY_EDGE)
 
 
 def test_a_record_missing_ONE_of_the_two_panels_is_refused_on_that_panel():

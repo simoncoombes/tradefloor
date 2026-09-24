@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.9.0
+
+**An agent's orders now reach the market once.** Every harness passed an
+agent's fills to `run_session` as `order_flow`, which the session held on
+every tick. At six steps a day one order was counted 65 times, after the
+agent had filled at the price before it, so agents were marked to their own
+impact. The spec mean-reversion rule beat buy-and-hold on all 20 markets of
+the published suite by a median 42 points in 60 days. With fills applied
+once it reads +0.5 points, ahead in 10 of 20.
+
+**What breaks.** `run_session(order_flow=...)` now raises. Pass an agent's
+trades as `fills=`, applied once on the session's first tick, or a standing
+rate as `flow_per_tick=`, the old meaning of `order_flow=`;
+`tick(order_flow=)` is unchanged. `evaluate`, the gym environment, `tca.analyse` and `World` use
+`fills`, and logs written by 0.8.x replay as they were recorded.
+
+**What moves.** Untraded runs are identical, and the known-answer digest
+stays at `1e683b96`. Every traded result changes: scorecards, rankings, TCA
+and the recorded agent fixtures. No price-only reference agent now beats the
+Oracle on the reference grids, and a round trip no longer recoups its own
+impact. `World.fork` now copies the random and Oracle baselines.
+
+**Still off.** The long-run check gains C4a and C4b, no price-only edge, and
+pt-v19 fails both. Its 65-minute returns reverse too much (autocorrelation
+-0.187), so a mean-reversion rule that trades every 65 minutes still beats
+buy-and-hold in 18 of 20 suite markets, and five-day momentum in 17. pt-v19
+reads 15 of 17.
+
+<!-- release-note-ends -->
+
+### The fix and its measurement
+
+`Engine.run_session` takes `fills`, carried to the core as
+`SessionRequest.fills` and summed with any standing flow on the session's
+first tick only. A session with fills is the same market, to the bit, as one
+`tick(order_flow=...)` followed by the rest of the session without it. The
+fill is still priced against the book standing at the step boundary, so the
+agent pays the spread and the depth its order walks, and the order's
+permanent impact reaches the market on the next minute. On every shipped
+preset, both sides, at 0.1% to 5% of daily volume, a fill's premium over the
+mid is at least the permanent impact its own flow leaves behind
+(`tests/test_agent_flow.py`). No round trip of one share, 1% or 2% of daily
+volume on 60 names profits from its own impact; with the flow held for the
+step, as before, a quarter of them did.
+
+The run log names a session's flows `fills` and `flow_per_tick`. A log that
+names one `order_flow` is read as `flow_per_tick`, so checkpoints and
+manifests from 0.8.x replay into the market they recorded.
+
+Re-measured on the fix: the reference grids in `baselines`, `ranking` and
+`tca` and their docstrings, the notebooks that trade, and the tests that
+pinned a traded number. Tests that asserted the old behaviour as a finding,
+that a round trip recoups its impact and that price-only agents beat the
+Oracle, now assert its absence. C4 is defined in the design repository's
+`programme/longrun/CRITERIA.md`, measured by `programme/longrun/c4.py`, and
+carried on the pt-v19 record's `long_run` block, 17 rows. The ship-bar tests
+gate on the fifteen criteria pt-v19 was adopted under and pin C4a and C4b as
+failing.
+
+`World.fork` copied an agent with no `fork()` by `copy.deepcopy`, which
+raised on the random baseline's generator, on the engine the Oracle keeps,
+and on any spec-built agent inside a daily-cadence wrapper. `RandomTrader`
+and `Oracle` now have `fork()`, `GameRng` copies at its position, and a
+`StrategySpec`, being immutable, copies to itself.
+
+The README, `rust/README.md` and the `facts` docstrings now name three
+counts consistently: 19 graded rows in the one-year realism table, 18 of them
+read by `facts.measure()`, and 17 long-run criteria.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

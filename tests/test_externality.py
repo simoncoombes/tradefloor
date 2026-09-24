@@ -776,9 +776,15 @@ def test_removing_an_agent_that_traded_moves_the_other_agents_pnl():
     what persists, so the two cannot move together: measured non-zero on
     both entries at 3,000 and 5,000 shares over one, two and three days, on
     the fifth composition and on the fourth.
+
+    5,000 shares since 0.9.0. With each buy's flow reaching the market once
+    instead of on all 65 ticks of the step, 3,000 shares of this $84 name
+    (average volume 976,206) moves `s` by well under a cent and no print
+    differs: both entries read exactly 0.0 over one, two and three days.
+    At 5,000 they read +200, -100 and +300 over one, two and three days.
     """
-    world = cohort(agents={"alpha": Buyer(0, at=0, shares=3_000.0),
-                           "beta": Buyer(0, at=0, shares=3_000.0)})
+    world = cohort(agents={"alpha": Buyer(0, at=0, shares=5_000.0),
+                           "beta": Buyer(0, at=0, shares=5_000.0)})
     result = externalities(world, days=2)
     assert result.matrix["alpha"]["beta"] != 0.0
     assert result.matrix["beta"]["alpha"] != 0.0

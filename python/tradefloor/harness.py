@@ -605,7 +605,7 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
        not subtle. Measured on the reference agents over twelve ten-day
        markets on ``Universe.random(30, seed=11)``, a single seed usually
        NAMES the across-seed leader, nine times in twelve, but what it
-       says that leader is worth ranges from a capture of +0.007 to +2.834
+       says that leader is worth ranges from a capture of -0.776 to +0.836
        depending only on which market it drew.
 
        Use this to read one market. To rank agents, use :func:`tradefloor.rank`,

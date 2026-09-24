@@ -67,6 +67,11 @@ RECORDS = (pathlib.Path(__file__).resolve().parent.parent
 HISTORICAL = (pathlib.Path(__file__).resolve().parent / "fixtures"
               / "records" / "certificates-2026-09-23.json")
 
+#: The long-run criteria added on 2026-09-24, after the fifteen the shipped
+#: preset was adopted under: no price-only edge, on the tape and through
+#: `tf.evaluate` on the published suite.
+PRICE_ONLY_EDGE = ("C4a", "C4b")
+
 
 def record(name: str) -> dict:
     """A COMMITTED record: what ships, and moves with every re-measurement."""
@@ -354,8 +359,9 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     the row on both panels and the rise, readable by the bar and rendered in
     the line a reader sees; the reading is pinned so it cannot change in
     silence; the published table agrees with it; and beside it sit the two
-    things that do gate -- the long-run verdict, which passes, and every
-    ruled band in on all four protocols.
+    things that do gate -- the fifteen long-run criteria it was adopted
+    under, which pass, and every ruled band in on all four protocols. C4a
+    and C4b sit on the record beside them, graded.
     """
     rec = record(envelope.PRESET)
     for field in envelope.STRUCTURE_BAR_PANELS:
@@ -389,10 +395,21 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)
             == envelope.CERTIFIED_STRUCTURE[VIX_AR1_ROW])
 
-    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    # WHAT GATES, beside it: the fifteen long-run criteria the preset was
+    # adopted under on 2026-09-23, all passed ...
     lr = rec["long_run"]
-    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
-    assert all(r["pass"] for r in lr["rows"])
+    adopted = [r for r in lr["rows"] if r["id"] not in PRICE_ONLY_EDGE]
+    assert len(adopted) == 15 and all(r["pass"] for r in adopted)
+    # ... beside C4a and C4b, added 2026-09-24 (design repo
+    # `programme/longrun/CRITERIA.md`, section C4), graded and carried.
+    # pt-v19 fails both: the tape's 65-minute reversal and two price-only
+    # rules on the published suite, both of the market's making once an
+    # agent's fills reach it once. The brief that added them gives them to
+    # pt-v20, so they are pinned as failing here, where a change to either
+    # cannot pass in silence, and they do not gate pt-v19 until the owner
+    # rules that they do.
+    assert lr["of"] == 17 and lr["passed"] == 15 and lr["verdict"] == "fail"
+    assert [r["id"] for r in lr["rows"] if not r["pass"]] == list(PRICE_ONLY_EDGE)
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
     assert set(rec["misses"]) == {"252", "504", "heldout_universe",

@@ -71,12 +71,16 @@ def main() -> dict:
     # what a perfectly-informed reference earned in THAT market removes
     # exactly that.
     #
-    # A ratio above 1.0 is legal and does happen, in roughly 9% of measured
-    # agent-seed pairs. The Oracle is not an upper bound: it gets the same
-    # gross exposure as everyone else and spends it on a naive equal-weight
-    # rule, so an agent with a better portfolio under the same constraint
-    # out-earns it. That is a finding about portfolio construction, not a
-    # broken denominator, so nothing here clamps it.
+    # A ratio above 1.0 is legal. The Oracle is not an upper bound: it gets
+    # the same gross exposure as everyone else and spends it on a naive
+    # equal-weight rule, so a better portfolio under the same constraint
+    # out-earns it -- the same information on three names a side instead of
+    # five does, on 6 of 8 markets in the baselines module's grid. From an
+    # agent that reads only prices it is now rare: 0 of 48 agent-seed pairs
+    # on that grid since 0.9.0, against 5 of 48 before, when every agent was
+    # marked to its own impact counted on each tick of a step. It is a
+    # finding about portfolio construction, not a broken denominator, so
+    # nothing here clamps it.
     ratios = capture_ratio(scores)
     report["capture"] = ratios
     print(f"     capture vs the oracle: "

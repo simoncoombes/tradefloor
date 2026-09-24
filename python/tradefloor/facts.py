@@ -72,12 +72,15 @@ engine is additive in log returns and keeps that convention instead, and
 the two differ by half the cross-sectional variance. See
 `_index_drift_pct`.
 
-A TWENTIETH GRADED ROW landed on 2026-09-22, `crisis_sector_dispersion`:
+A NINETEENTH GRADED ROW landed on 2026-09-22, `crisis_sector_dispersion`:
 in a crisis, how much more the hardest-hit sector moves than the typical
 one. It is in `DISPERSION` and in neither `SHAPE` nor `REAL_MARKETS`,
 because its ruler is the whole tape and the decade panel carries no
 reading for it -- so the fourteen above are untouched and the RULED basis
-now grades twenty rows at two horizons, forty cells. `crisis_dispersion`
+now grades nineteen rows (fourteen `SHAPE`, one `LEVEL`, three `CRISIS`
+and this one) at two horizons, thirty-eight cells. Until 0.9.0 this
+paragraph said twentieth, twenty and forty, which no list here adds up to.
+`crisis_dispersion`
 is the estimator, run by the same code on the tape
 (`REAL_CRISIS_DISPERSION_WINDOWS`) and on the model
 (`crisis_statistics`), and a window holding fewer than thirty crisis
@@ -4024,11 +4027,15 @@ def measure(
 ) -> dict[str, Any]:
     """Run a market and report its statistical properties.
 
-    Ten statistics against `REAL_MARKETS`: two marginal, describing one
-    return series on its own, and eight dependence, describing how things
-    move together -- across time, across stocks, with volume, and
-    asymmetrically with their own sign. The split is the finding, so
-    `report` prints it in two sections.
+    Eighteen statistics against `REAL_MARKETS`: the fourteen of `SHAPE`
+    (two marginal, describing one return series on its own, and twelve
+    dependence, describing how things move together -- across time, across
+    stocks, with volume, and asymmetrically with their own sign), the
+    `LEVEL` row and the three `CRISIS` rows. With `crisis_sector_dispersion`,
+    which `crisis_statistics` reads, they are the nineteen rows the one-year
+    realism table grades. This docstring said ten until 0.9.0, the count
+    before the panel grew; the marginal-dependence split is still the
+    finding, so `report` prints it in two sections.
 
     ``model`` selects the coefficient set the market runs, either a preset
     name or a :class:`tradefloor.ModelParams`, defaulting to the shipped preset. This

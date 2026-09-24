@@ -206,8 +206,22 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # news group back out of the fifth puts momentum ahead again. The
     # bottom pair held, buy_and_hold now just above flat, and the oracle has
     # still never moved, in twelve swaps.
-    assert ranked == ["oracle", "mean_reversion", "momentum",
-                      "buy_and_hold", "random"]
+    #
+    # Re-measured at 0.9.0, when an agent's fills stopped being held on
+    # every tick of the step and reached the market once (`fills=` on
+    # `run_session`): oracle +4.894%, buy_and_hold +0.244%, momentum
+    # -1.970%, random -2.127%, mean_reversion -2.647%. Until this
+    # re-measurement the pin read oracle, mean_reversion, momentum,
+    # buy_and_hold, random, at +7.664, +2.663, +2.156, +0.317 and -1.124.
+    # This is not a thirteenth swap of the same kind. Every agent that
+    # trades lost the tailwind of its own impact, held 65 times on the
+    # prices it was marked at, and the two signal traders lost most because
+    # they trade most: their `impact_bps` goes +19.94 and +25.79 to -0.83
+    # and +2.20, the oracle's +206.34 to +2.97. Over five days neither
+    # signal pays its costs, which is what a price-only rule should do.
+    # The oracle has still never moved.
+    assert ranked == ["oracle", "buy_and_hold", "momentum", "random",
+                      "mean_reversion"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):
@@ -241,7 +255,14 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # tries. The floor's meaning is relative anyway -- an order of magnitude
     # under the oracle on the same seed and horizon, which the ratio below
     # measures properly across seeds.
-    assert abs(scores["random"].return_pct) < 1.25
+    #
+    # 2.5 since 0.9.0, and this time it IS costs. An agent's fills now reach
+    # the market once instead of on every tick of the step, so a random
+    # book no longer marks its own positions up by the impact it made. On
+    # the same twelve seeds the mean goes -0.495% to -1.522% and the worst
+    # seed 1.133% to 2.200% (seed 11), with the trade count unchanged at
+    # 1,195. 2.5 is that worst seed plus the same margin 1.25 gave 1.103.
+    assert abs(scores["random"].return_pct) < 2.5
 
     # The RATIO is measured across seeds, not on the fixture's one.
     #
@@ -255,14 +276,26 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # What the claim actually is: random trading sits well below perfect
     # foresight typically, not on every draw. Five days is short enough that
     # one seed's oracle can have little mispricing to capture.
+    #
+    # Re-measured at 0.9.0, when fills stopped being held on every tick of
+    # the step. Both halves of the ratio moved against it: the oracle no
+    # longer collects its own impact (its five-day return on these six
+    # seeds falls from a median 5.30% to 3.68%) and random no longer
+    # offsets its costs with it. The ratios go 0.147, 0.308, 0.084, 0.112,
+    # 0.126, 0.005 (median 0.119) to 0.435, 1.375, 0.370, 0.481, 0.435,
+    # 0.216 (median 0.435). Over five days a coin flip now costs about
+    # four tenths of what perfect information earns, and on seed 11, where
+    # the oracle makes only 1.6%, more than all of it. So the claim is
+    # restated at what the market does: random sits below the oracle's
+    # gain at the median and on all but one of the six seeds.
     import statistics
     ratios = []
     for seed in (7, 11, 42, 99, 3, 5):
         sc = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
                               universe=UNIVERSE, days=5)
         ratios.append(abs(sc["random"].return_pct) / sc["oracle"].return_pct)
-    assert statistics.median(ratios) < 0.2, f"median ratio {statistics.median(ratios):.3f}"
-    assert sum(1 for r in ratios if r >= 0.2) <= 2, ratios
+    assert statistics.median(ratios) < 0.6, f"median ratio {statistics.median(ratios):.3f}"
+    assert sum(1 for r in ratios if r >= 1.0) <= 1, ratios
 
 
 def test_random_trading_bleeds_over_a_longer_run():
@@ -527,7 +560,12 @@ def test_capture_ratio_is_a_fraction_of_the_ceiling(scores):
     assert "oracle" not in ratios
     assert ratios["momentum"] == pytest.approx(
         scores["momentum"].pnl / scores["oracle"].pnl)
-    assert 0.0 < ratios["momentum"] < 1.0
+    # Every agent below the ceiling on this fixture, and buy-and-hold a
+    # fraction of it. The fraction was momentum's until 0.9.0 (0.281); with
+    # its fills applied once it loses money over these five days (-0.402),
+    # and a negative capture is a loss, not a fraction.
+    assert all(r < 1.0 for r in ratios.values()), ratios
+    assert 0.0 < ratios["buy_and_hold"] < 1.0
 
 
 def test_capture_ratio_declines_to_answer_when_the_oracle_lost_money():
@@ -650,25 +688,27 @@ def test_a_nonsense_lookback_days_is_refused():
 # --------------------------------------------------------------------------
 
 
-def test_the_oracle_is_beaten_only_by_agents_that_trade_a_signal():
-    """The mechanism, not just the phenomenon.
+def test_no_reference_agent_beats_the_oracle_once_it_pays_its_own_impact():
+    """What the reference agents can do against perfect information.
 
-    WHICH signal beats the Oracle is a property of the engine era, and it has
-    inverted once already: an earlier era measured mean-reversion beating it
-    in a third of its pairs and momentum almost never, while on this build
-    momentum is the only agent that ever does (4 of 12 markets on the grid
-    stated in the baselines module docstring). What has held in every era is
-    the boundary this test pins: buy-and-hold and random, which trade no
-    signal at all, never beat it -- out-earning a perfectly-informed
-    reference under equal constraints takes a better portfolio built from
-    SOME signal, and they have none.
+    Until 0.9.0 this test was `the Oracle is beaten only by agents that
+    trade a signal`, and on this grid the signal traders did beat it: 4 of
+    16 agent-market pairs under 0.8.1, and buy-and-hold and random never.
+    The beats were the harness, not the signal. Every harness held an
+    agent's fills on every tick of the step, so the busiest traders
+    collected the most of their own impact, and mean reversion, which buys
+    the names it just pushed down and sells the ones it pushed up, collected
+    it into its own signal. With the fills applied once, nothing beats the
+    Oracle here: 0 of 16 for the signal traders and 0 of 16 for the rest.
 
-    Asserted as the ORDERING rather than as any era's rates, which belong to
-    their rosters. What must hold is that the signal traders beat it strictly
-    more often than the agents trading none.
+    Pinned at zero because zero is the finding. A price-only rule that
+    out-earns a perfectly informed reference under the same constraints
+    should now be a surprise worth reading, and the first thing to check
+    is whether its own flow is reaching the market more than once.
     """
     signal_traders = 0
     non_traders = 0
+    measurable = 0
     for useed in (3, 42):
         universe = tradefloor.Universe.random(20, seed=useed)
         for seed in range(4):
@@ -677,20 +717,18 @@ def test_the_oracle_is_beaten_only_by_agents_that_trade_a_signal():
             ratios = capture_ratio(scores)
             if not ratios:
                 continue
+            measurable += 1
             signal_traders += sum(
                 ratios[n] > 1.0 for n in ("mean_reversion", "momentum")
                 if n in ratios)
             non_traders += sum(
                 ratios[n] > 1.0 for n in ("buy_and_hold", "random")
                 if n in ratios)
-    assert signal_traders > 0, (
-        "no signal trader beat the Oracle at all -- the demonstration is "
-        "vacuous and the rest of this test proves nothing"
-    )
-    assert non_traders < signal_traders, (
-        f"agents with no signal beat the Oracle {non_traders} times against "
-        f"{signal_traders} for those trading one; the documented mechanism "
-        "does not hold"
+    assert measurable == 8, "the oracle lost money somewhere; nothing was measured there"
+    assert non_traders == 0, f"an agent trading no signal beat the Oracle {non_traders} times"
+    assert signal_traders == 0, (
+        f"a price-only signal beat the Oracle {signal_traders} times in 16; "
+        "check that no harness applies an agent's fills more than once"
     )
 
 
@@ -703,19 +741,23 @@ def test_an_agent_can_beat_the_oracle():
     across the top_k most mispriced names -- so an agent whose selection suits
     the constraint better out-earns it.
 
-    Measured across eight seeds: momentum beat it twice and mean-reversion
-    once, three of thirty-two agent-seed pairs. This asserts the phenomenon
-    exists rather than a specific count, because the count is a property of
+    Measured across eight seeds until 0.9.0: momentum beat it twice and
+    mean-reversion once. Those beats were the reference agents collecting
+    their own impact, and with an agent's fills applied once none of them
+    beats it on these eight markets. The point survives with the same
+    information spent differently: three names a side instead of five, at
+    the same gross and participation cap, out-earns the default on 6 of the
+    8 (ratios 1.04, 1.20, 1.16, 1.10, 1.20, 1.00, 1.18, 0.94). Asserted as
+    existing rather than as a count, because the count is a property of
     the seeds.
     """
     universe = tradefloor.Universe.random(30, seed=11)
     beaten = 0
     for seed in range(8):
-        scores = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
-                                  universe=universe, days=10)
-        ceiling = scores["oracle"].pnl
-        if any(card.pnl > ceiling for name, card in scores.items()
-               if name != "oracle"):
+        scores = tradefloor.evaluate({"oracle": Oracle(),
+                                      "narrower": Oracle(top_k=3)},
+                                     seed=seed, universe=universe, days=10)
+        if scores["narrower"].pnl > scores["oracle"].pnl:
             beaten += 1
     assert beaten > 0, (
         "nothing beat the Oracle in eight seeds -- either the baselines got "
