@@ -59,38 +59,29 @@ MARKED = {
          "test_all_fourteen_are_in_band_at_the_certified_horizon"),
         ("test_preset_records.py",
          "test_the_envelope_and_the_record_agree_on_the_band_count"),
-        # THE MECHANISM HALF OF THE SAME BAR, and the first entry here that
-        # is GREEN. That is not an oversight and this file already says so
-        # above: a `ship_bar` test passing is the outcome the project works
-        # toward, and the rule against asserting that a listed entry fails
-        # is stated in WHAT IS DELIBERATELY NOT ASSERTED.
+        # THE MECHANISM AND STRUCTURAL CERTIFICATES, REPORTED BESIDE THE
+        # BAR. Until 2026-09-23 these two were the mechanism half and the
+        # second gate's half of the ship bar: non-regression on the shipped
+        # preset's own certificates. The owner's ruling of that day (design
+        # repo `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-
+        # is-what-a-user-would-notice-programme-longrun-criteria`) makes the
+        # pass bar the fifteen long-run criteria plus every ruled band, and
+        # says the mechanism certificate and the VIX persistence rows "are
+        # reported and investigated but do not gate".
         #
-        # Why it carries the marker at all. It reads the SHIPPED preset's
-        # committed certificate and refuses a release that shows fewer
-        # mechanisms than that record does, on either the 252 panel or the
-        # held-out seeds. A red here is therefore a fact about the preset --
-        # a model that lost a mechanism -- and not about the tree, which is
-        # exactly what the marker means. A box gate must deselect it for the
-        # same reason it deselects the band count: the box is being asked
-        # whether the tree runs, not whether this preset may ship.
+        # Why they still carry the marker. Each reads the SHIPPED preset's
+        # committed record and asserts, beside the certificate it reports,
+        # the two things that DO gate: the long-run verdict passes and every
+        # ruled band is in on all four protocols. A red here is therefore a
+        # fact about the preset and not about the tree, which is what the
+        # marker means, and a box gate must deselect them for the reason it
+        # deselects the band count -- the box is being asked whether the
+        # tree runs, not whether this preset may ship. The bars' own logic
+        # is tested elsewhere in both files, unmarked, on a frozen record.
         ("test_mechanism_gate.py",
-         "test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels"),
-        # THE SECOND GATE'S HALF, and the entry a reader is most likely to
-        # misread, so the reading is written down here. The test is GREEN
-        # and the preset it reads is REFUSED, at the same time and on
-        # purpose: pt-v19 reads REFUSED on `vix_ar1_debiased` on both
-        # panels, and the bar it clears is NON-REGRESSION -- no structural
-        # row a record passes may go refused -- which pt-v19 clears because
-        # it has no earlier structural record to regress from.
-        #
-        # Why it carries the marker. The day a preset lays down a PASS on
-        # the row, a red here is a fact about the preset: a model that lost
-        # a structural reading an earlier one held. That is what the marker
-        # means, and a box gate must deselect it for the reason it
-        # deselects the other two -- the box is being asked whether the
-        # tree runs, not whether this preset may ship.
+         "test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_that_gates"),
         ("test_structure_gate.py",
-         "test_the_shipped_preset_holds_its_structural_certificate_on_both_panels"),
+         "test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_that_gates"),
     },
     "needs_live_model": {
         # Both replay `tests/fixtures/openai_agents/five-days.json` and both

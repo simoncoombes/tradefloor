@@ -525,6 +525,11 @@ FIXTURE_KINDS = {
     #: `tests/test_scoring_conformance.py`. Per-seed scoring rows, not a
     #: transcript.
     "scoring": "scoring-panels",
+    #: The mechanism and structural certificates of pt-v18 and pt-v19's
+    #: fourth composition as their records stood on 2026-09-23, frozen for
+    #: the bar-logic tests in `tests/test_mechanism_gate.py` and
+    #: `tests/test_structure_gate.py`. Record blocks, not a transcript.
+    "records": "frozen-certificates",
 }
 
 _RECORDING_DIRS = {name for name, kind in FIXTURE_KINDS.items()

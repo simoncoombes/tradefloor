@@ -853,14 +853,38 @@ def test_a_panel_without_the_counts_gets_no_tail_block_rather_than_a_guess():
 # record carries -- more mechanisms than the record, never fewer, and never a
 # DIFFERENT one at the same count. Every test below constructs the input that
 # should fail it, which is what `DECISIONS` requires of a gate.
+#
+# WHAT IT GATES SINCE 2026-09-23. The owner's ruling (design repo
+# `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-
+# would-notice-programme-longrun-criteria`) makes the pass bar for a preset
+# the fifteen long-run criteria and every ruled band: "the certification's
+# VIX persistence rows, the mechanism certificate ... are reported and
+# investigated but do not gate". So the bar's LOGIC below is unchanged and
+# still tested to fire, on a FIXED HISTORICAL RECORD rather than on whatever
+# the shipped preset measures today, and the shipped preset's own test reads
+# its certificate as a REPORT beside the verdict that gates.
 # --------------------------------------------------------------------------
 
 RECORDS = (pathlib.Path(__file__).resolve().parent.parent
            / "python" / "tradefloor" / "presets")
 
+#: The certificates of pt-v18 and of pt-v19's FOURTH composition as their
+#: records stood on 2026-09-23, frozen (see the file's own `_about`). The
+#: fourth composition shows nine of ten on both panels with `corr_asymmetry`
+#: not shown, which is the shape every constructed failure below is built
+#: from; pt-v19's fifth composition shows ten and nine and would move them.
+HISTORICAL = (pathlib.Path(__file__).resolve().parent / "fixtures"
+              / "records" / "certificates-2026-09-23.json")
+
 
 def record(name: str) -> dict:
+    """A COMMITTED record: what ships, and moves with every re-measurement."""
     return json.loads((RECORDS / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def historical(name: str) -> dict:
+    """A FROZEN record, for the tests of the bar's own logic."""
+    return json.loads(HISTORICAL.read_text(encoding="utf-8"))["records"][name]
 
 
 def block(shown, not_shown=(), reversed_rows=(), *, horizon_days=252):
@@ -887,11 +911,11 @@ def block(shown, not_shown=(), reversed_rows=(), *, horizon_days=252):
 def test_the_bar_refuses_a_preset_that_loses_a_mechanism():
     """The test that proves the change does anything at all.
 
-    pt-v19's own certificate with `leverage_effect` moved from shown to not
-    shown, which is a model that stopped producing the leverage effect. The
-    bar names the row.
+    pt-v19's fourth-composition certificate (the frozen record) with
+    `leverage_effect` moved from shown to not shown, which is a model that
+    stopped producing the leverage effect. The bar names the row.
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     lost = dict(committed,
                 shown=[r for r in committed["shown"] if r != "leverage_effect"],
                 not_shown=sorted(committed["not_shown"] + ["leverage_effect"]))
@@ -916,9 +940,10 @@ def test_the_bar_refuses_a_swap_the_count_cannot_see():
     and `market_beta_down_asym` are identical on both shipped presets -- so
     a second leverage mechanism can be switched off with the row's verdict
     unmoved, and a count is the wrong instrument for that whole family of
-    change.
+    change. Read on the frozen fourth-composition certificate, which shows
+    nine with `corr_asymmetry` the one not shown.
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     assert committed["counts"]["mechanism_shown"] == 9
     assert committed["not_shown"] == ["corr_asymmetry"]
 
@@ -942,7 +967,7 @@ def test_a_row_that_leaves_the_certificate_is_a_loss_and_not_a_shorter_list():
     so `not_shown <= recorded_not_shown` passes on exactly the change that
     removed the row from the gate. Read on the shown side it is what it is.
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     gone = {"horizon_days": 252,
             "shown": [r for r in committed["shown"] if r != "leverage_effect"],
             "not_shown": [], "reversed": [],
@@ -958,7 +983,7 @@ def test_a_row_that_leaves_the_certificate_is_a_loss_and_not_a_shorter_list():
 
 def test_a_lost_row_that_went_backwards_is_named_as_reversed():
     """REVERSED is the louder failure and the bar does not flatten it."""
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     flipped = block(
         shown=[r for r in committed["shown"] if r != "corr_asymmetry_lagged"],
         not_shown=["corr_asymmetry"], reversed_rows=["corr_asymmetry_lagged"])
@@ -972,11 +997,12 @@ def test_a_lost_row_that_went_backwards_is_named_as_reversed():
 def test_showing_more_than_the_record_passes_and_is_named():
     """The direction that is NOT a regression, asserted rather than assumed.
 
-    pt-v19 does not show `corr_asymmetry`. A build that starts showing it
-    clears the bar, and the row is named in the reason so the gain is
-    visible rather than silent.
+    pt-v19's fourth composition did not show `corr_asymmetry`. A build that
+    starts showing it clears the bar, and the row is named in the reason so
+    the gain is visible rather than silent -- which is what the fifth
+    composition's record did (see the test on the two compositions below).
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     better = block(shown=sorted(committed["shown"] + ["corr_asymmetry"]))
     verdict = envelope.mechanism_bar(better, committed)
     assert verdict["passed"] is True
@@ -991,7 +1017,7 @@ def test_a_preset_with_no_committed_record_is_refused_and_not_passed():
     the tool that WRITES the first record, and it is written at that call
     site rather than here.
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     verdict = envelope.mechanism_bar(committed, None)
     assert verdict["passed"] is False
     assert "no committed certificate" in verdict["reason"]
@@ -1008,7 +1034,7 @@ def test_the_bar_refuses_a_certificate_read_at_another_horizon():
     252 grades ten of the eleven and 504 grades all eleven, so a subset
     taken across the two compares sets with different denominators.
     """
-    committed = record("pt-v19")["mechanism_252"]
+    committed = historical("pt-v19-fourth")["mechanism_252"]
     elsewhere = dict(committed, horizon_days=504)
     verdict = envelope.mechanism_bar(elsewhere, committed, horizon_days=252)
     assert verdict["passed"] is False
@@ -1027,7 +1053,7 @@ def test_the_bar_reads_both_panels_and_either_one_failing_is_a_failure():
     """
     assert envelope.MECHANISM_BAR_PANELS == ("mechanism_252",
                                              "mechanism_heldout_seeds")
-    committed = record("pt-v19")
+    committed = historical("pt-v19-fourth")
     fresh = json.loads(json.dumps(committed))
     ho = fresh["mechanism_heldout_seeds"]
     ho["shown"] = [r for r in ho["shown"] if r != "cross_sectional_corr"]
@@ -1086,33 +1112,82 @@ def test_every_committed_record_clears_the_bar_against_itself(path):
 
 
 @pytest.mark.ship_bar
-def test_the_shipped_preset_clears_the_mechanism_bar_on_both_panels():
-    """THE MECHANISM GATE, IN THE SHIP BAR, BY NAME.
+def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_that_gates():
+    """THE MECHANISM CERTIFICATE, REPORTED BESIDE THE SHIP BAR, BY NAME.
 
-    `test_the_envelope_and_the_record_agree_on_the_band_count` is the bar's
-    fidelity half and has been the whole of it. This is the mechanism half:
-    the shipped preset must still show every mechanism its own committed
-    record shows, on the 252 panel and on the held-out seeds.
+    This test used to be the mechanism half of the ship bar: the shipped
+    preset had to show every mechanism its committed record shows. The
+    owner's ruling of 2026-09-23 (design repo `programme/longrun/
+    CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-would-notice-
+    programme-longrun-criteria`) moved that: the pass bar is the fifteen
+    long-run criteria plus every ruled band, and "the mechanism certificate
+    ... [is] reported and investigated but do[es] not gate".
 
-    It is green today and that is the point of the change rather than a
-    weakness of it -- `test_gate_selection` says in its own words that a
-    `ship_bar` test passing is the outcome the project is working toward.
-    What it refuses is a FUTURE shipped preset that loses a mechanism, which
-    nothing in this repository refused before.
+    So what is asserted is what the ruling asks of the record: it CARRIES
+    both panels' certificates, readable by the bar and rendered in the line
+    a reader sees; the reading is pinned so it cannot change in silence; and
+    beside it sit the two things that do gate -- the long-run verdict, which
+    passes, and every ruled band in on all four protocols.
     """
     rec = record(envelope.PRESET)
+    for panel in envelope.MECHANISM_BAR_PANELS:
+        b = rec[panel]
+        assert b["horizon_days"] == 252 and b["seeds"] == SEEDS, panel
+        assert b["counts"]["mechanism_of"] == 10, panel
+    # A record the bar can read, and the line it renders.
     verdict = envelope.record_bar(rec, rec)
     assert verdict["passed"] is True, verdict["reason"]
-    # 9 and 9 since the 2026-09-21 composition (ptv19gjr): the slow pole
-    # returned `corr_persistence_acf1`'s mechanism to the held-out panel,
-    # which the 2026-09-20 recomposition had given up (9 and 8 then). The
-    # 2026-09-20 record was retired on purpose by the record box, and this
-    # record is the one no future preset may show less than.
-    assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 9
-    assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 9
-    # And the line a reader sees, which is the other half of "by name".
     line = envelope.mechanism_bar_line(verdict)
     assert "mechanism bar" in line and "PASS" in line
+
+    # The reading the release carries, REPORTED: 10 of 10 at 252 and 9 of 10
+    # held out since the fifth composition of 2026-09-23, the held-out miss
+    # being `corr_asymmetry_lagged` at 20 of 30 against a cut of 21. The
+    # fourth composition read 9 and 9 with `corr_asymmetry` the miss on both;
+    # the test below reads the two records against each other.
+    assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 10
+    assert rec["mechanism_252"]["not_shown"] == []
+    assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 9
+    assert rec["mechanism_heldout_seeds"]["not_shown"] == [
+        "corr_asymmetry_lagged"]
+    assert rec["mechanism_252"]["reversed"] == []
+    assert rec["mechanism_heldout_seeds"]["reversed"] == []
+
+    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    lr = rec["long_run"]
+    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
+    assert all(row["pass"] for row in lr["rows"])
+    assert lr["measured"]["fingerprint"] == envelope.PRESET
+    # ... and every ruled band in, on all four protocols.
+    assert rec["misses"] == {p: [] for p in rec["misses"]}
+    assert set(rec["misses"]) == {"252", "504", "heldout_universe",
+                                  "heldout_seeds"}
+
+
+def test_the_fifth_composition_loses_a_held_out_mechanism_and_it_is_reported():
+    """The regression the ruling says to report rather than gate, on record.
+
+    pt-v19's fifth composition against its fourth, each panel against its own
+    counterpart: the 252 panel GAINS `corr_asymmetry` and loses nothing; the
+    held-out panel gains it too and LOSES `corr_asymmetry_lagged` (20 of 30
+    against the cut of 21). Under the subset rule that is a refusal, and it
+    is the one the record box met: the fourth composition's record was
+    retired on purpose to write the fifth's. By the owner's ruling of
+    2026-09-23 (`programme/longrun/CRITERIA.md`, "reported and investigated
+    but do not gate") it stops nothing -- and it is asserted here so the
+    loss stays visible in the suite rather than only in a retired file.
+    """
+    fifth = record("pt-v19")
+    fourth = historical("pt-v19-fourth")
+    verdict = envelope.record_bar(fifth, fourth)
+    assert verdict["passed"] is False
+    assert verdict["lost"] == ["corr_asymmetry_lagged"]
+    assert verdict["panels"]["mechanism_252"]["passed"] is True
+    assert verdict["panels"]["mechanism_252"]["gained"] == ["corr_asymmetry"]
+    assert verdict["panels"]["mechanism_heldout_seeds"]["passed"] is False
+    assert "mechanism_heldout_seeds" in verdict["reason"]
+    # And the long-run verdict that does gate passes all the same.
+    assert fifth["long_run"]["verdict"] == "pass"
 
 
 def test_a_record_missing_ONE_of_the_two_panels_is_refused_on_that_panel():
@@ -1124,7 +1199,7 @@ def test_a_record_missing_ONE_of_the_two_panels_is_refused_on_that_panel():
     of the two is missing rather than failing the preset as a whole with no
     reason a reader can act on.
     """
-    rec = record("pt-v19")
+    rec = historical("pt-v19-fourth")
     half = {k: v for k, v in rec.items() if k != "mechanism_heldout_seeds"}
     verdict = envelope.record_bar(rec, half)
     assert verdict["passed"] is False
@@ -1152,7 +1227,7 @@ def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
     sys.path.insert(0, str(RECORDS.parent.parent.parent / "tools" / "presets"))
     record_tool = pytest.importorskip("record")
 
-    rec = record("pt-v19")
+    rec = historical("pt-v19-fourth")
     first = record_tool.mechanism_bar(rec, None)
     assert first["passed"] is True and first["first"] is True
     assert "LAYS ONE DOWN" in first["reason"]
@@ -1166,3 +1241,64 @@ def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
     assert refused["passed"] is False and refused["first"] is False
     assert refused["lost"] == ["excess_kurtosis"]
     assert "mechanism_252" in refused["reason"]
+
+
+def test_the_record_tool_writes_a_regression_and_carries_it_rather_than_refusing(
+        tmp_path, monkeypatch, capsys):
+    """What the record tool does with a lost mechanism since 2026-09-23.
+
+    Until the owner's ruling of that day (design repo `programme/longrun/
+    CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-would-notice-
+    programme-longrun-criteria`: the mechanism certificate is "reported and
+    investigated but do[es] not gate") the write paths REFUSED a certificate
+    that showed less than the one on disk, and every record box since the
+    third composition retired the committed record on purpose to get past
+    it, which erased the comparison. Now the write goes through, says so on
+    stderr, and the record CARRIES the loss: the row, the bar's reason and
+    the record it was read against. The bar itself is unchanged.
+    """
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent / "tools" / "presets"))
+    record_tool = pytest.importorskip("record")
+    monkeypatch.setattr(record_tool, "OUT", tmp_path)
+    monkeypatch.setattr(record_tool, "ROOT", tmp_path)
+
+    on_disk = record("pt-v18")
+    (tmp_path / "pt-v18.json").write_text(json.dumps(on_disk), encoding="utf-8")
+    assert "leverage_effect" in on_disk["mechanism_252"]["shown"]
+    lost = json.loads(json.dumps(on_disk["mechanism_252"]))
+    lost["shown"] = [r for r in lost["shown"] if r != "leverage_effect"]
+    lost["not_shown"] = sorted(lost["not_shown"] + ["leverage_effect"])
+    panel = {"pretium_version": "test", "method": "test",
+             "presets": {"pt-v18": {
+                 "mechanism_252": lost,
+                 "mechanism_heldout_seeds": on_disk["mechanism_heldout_seeds"]}}}
+    panel_path = tmp_path / "in" / "panel.json"
+    panel_path.parent.mkdir()
+    panel_path.write_text(json.dumps(panel), encoding="utf-8")
+
+    assert record_tool.write_mechanism_gate(str(panel_path)) == 0
+    err = capsys.readouterr().err
+    assert "REGRESSION, REPORTED AND NOT GATED" in err
+    assert record_tool.PASS_BAR_RULING in err and "leverage_effect" in err
+
+    written = json.loads((tmp_path / "pt-v18.json").read_text(encoding="utf-8"))
+    # The new certificate is on the record, loss and all ...
+    assert "leverage_effect" in written["mechanism_252"]["not_shown"]
+    # ... and so is the loss, against the record it replaced.
+    reg = written[record_tool.REGRESSION_FIELD]
+    assert reg["ruling"] == record_tool.PASS_BAR_RULING
+    assert reg["mechanism"]["lost"] == ["leverage_effect"]
+    assert reg["mechanism"]["against"]["coefficient_digest"] == \
+        on_disk["coefficient_digest"]
+    assert "structure" not in reg
+    # The bar still refuses the pair it always refused.
+    assert envelope.record_bar(written, on_disk)["passed"] is False
+
+    # A later write that does NOT regress clears that certificate's entry:
+    # the entry describes a certificate against the one it replaced.
+    again = dict(written)
+    assert record_tool.note_regression(
+        again, written, mechanism=envelope.record_bar(written, written)) == []
+    assert record_tool.REGRESSION_FIELD not in again

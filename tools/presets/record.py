@@ -423,6 +423,68 @@ def structure_bar(fresh: dict, committed: dict | None) -> dict:
     return dict(envelope.structure_record_bar(fresh, committed), first=False)
 
 
+#: WHAT THE TWO BARS ABOVE MAY DO AT A WRITE, since the owner's ruling of
+#: 2026-09-23 (design repo `programme/longrun/CRITERIA.md`, ledger
+#: `ruling-the-pass-bar-is-what-a-user-would-notice-programme-longrun-
+#: criteria`): the pass bar for a preset is the fifteen long-run criteria
+#: and every ruled band, and "the certification's VIX persistence rows, the
+#: mechanism certificate ... are reported and investigated but do not gate
+#: ... These stay on the record and a regression in them is investigated;
+#: they do not by themselves stop a preset."
+#:
+#: Until that ruling the write paths REFUSED a certificate that showed less
+#: than the one on disk, and the way past it was to retire the committed
+#: record on purpose -- which the record boxes of the third, fourth and fifth
+#: compositions all did. That refusal gated a preset on exactly what the
+#: ruling says does not gate, and the retirement it forced erased the
+#: comparison the refusal existed to keep. So a write now GOES THROUGH, says
+#: so loudly on stderr, and carries the regression on the record it writes,
+#: under `REGRESSION_FIELD`: per certificate, the rows lost or gone absent,
+#: the bar's reason, and the record it was read against. The bars themselves
+#: are unchanged, `--check` still lists a loss as a difference, and the
+#: other refusals at a write (moved coefficients, an unnamed band count)
+#: are about the record's integrity rather than the preset's quality and
+#: stand.
+PASS_BAR_RULING = ("ruling-the-pass-bar-is-what-a-user-would-notice-"
+                   "programme-longrun-criteria")
+REGRESSION_FIELD = "reported_regression"
+
+
+def note_regression(record: dict, have: dict | None, **bars: dict) -> list[str]:
+    """Stamp `record` with the certificates that regressed against `have`.
+
+    `bars` maps a certificate name ("mechanism", "structure") to the bar's
+    verdict on this write. A certificate whose bar FAILED gets an entry
+    naming what went and the record it was read against; one whose bar
+    passed has any earlier entry removed, because the entry describes the
+    certificate against the one it replaced and that is no longer the
+    comparison. Returns the stderr lines, empty when nothing regressed.
+    """
+    block = dict(record.get(REGRESSION_FIELD) or {})
+    block.pop("ruling", None)
+    lines: list[str] = []
+    against = {
+        "commit": ((have or {}).get("measured") or {}).get("commit"),
+        "coefficient_digest": (have or {}).get("coefficient_digest"),
+    }
+    for name, bar in bars.items():
+        if bar is None or bar.get("passed", True):
+            block.pop(name, None)
+            continue
+        block[name] = {"lost": list(bar.get("lost") or []),
+                       "absent": list(bar.get("absent") or []),
+                       "reason": bar["reason"], "against": against}
+        lines.append(f"REGRESSION, REPORTED AND NOT GATED ({PASS_BAR_RULING}): "
+                     f"the {name} certificate shows less than the record it "
+                     f"replaces. {bar['reason']}. Written, with the loss "
+                     f"carried under `{REGRESSION_FIELD}`; investigate it")
+    if block:
+        record[REGRESSION_FIELD] = dict(block, ruling=PASS_BAR_RULING)
+    else:
+        record.pop(REGRESSION_FIELD, None)
+    return lines
+
+
 def count_block_gradings(block: dict) -> dict[str, dict]:
     """One count block's published count, recomputed at every basis.
 
@@ -718,7 +780,6 @@ def main() -> int:
         # more, since nothing else about it has been verified.
         note += stamp_band_rulers(record)
         record = place_level_protocol(record)
-        text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
         if args.check:
             if not path.exists():
                 drift.append(f"{path.name} is missing")
@@ -781,39 +842,22 @@ def main() -> int:
                     if have.get(field) != record.get(field):
                         drift.append(f"{path.name}: {field} differs")
         else:
-            # THE SAME BAR ON THE WRITE SIDE, because `--check` is advisory
+            # THE SAME BARS ON THE WRITE SIDE, because `--check` is advisory
             # and this is the path that overwrites a measurement. A record
             # is the only place a preset's mechanism set is written down, so
-            # a run that loses `leverage_effect` and writes anyway destroys
-            # the evidence that it did.
-            bar = mechanism_bar(record, json.loads(path.read_text(
-                encoding="utf-8")) if path.exists() else None)
-            if not bar["passed"]:
-                print(f"REFUSED: {path.name} would overwrite its mechanism "
-                      f"certificate with one that shows less. " + bar["reason"]
-                      + ". A preset may show MORE mechanisms than its record "
-                        "and never fewer; if the loss is intended, the record "
-                        "it is measured against has to be retired on purpose",
-                      file=sys.stderr)
-                drift.append(f"{path.name}: MECHANISM LOST -- " + bar["reason"])
-                continue
-            # THE SAME ON THE SECOND GATE. `--panel` rebuilds both blocks
-            # from the artefact's per-seed rows, so this path is the one
-            # that can overwrite a PASS with a REFUSED and leave no trace
-            # that it did.
-            sbar = structure_bar(record, json.loads(path.read_text(
-                encoding="utf-8")) if path.exists() else None)
-            if not sbar["passed"]:
-                print(f"REFUSED: {path.name} would overwrite its structural "
-                      f"certificate with one that passes less. "
-                      + sbar["reason"]
-                      + ". A preset may pass MORE structural rows than its "
-                        "record and never fewer; if the loss is intended, "
-                        "the record it is measured against has to be "
-                        "retired on purpose", file=sys.stderr)
-                drift.append(f"{path.name}: STRUCTURAL ROW LOST -- "
-                             + sbar["reason"])
-                continue
+            # a run that loses `leverage_effect` and writes it without a
+            # trace destroys the evidence that it did. Since the owner's
+            # ruling of 2026-09-23 the loss is REPORTED rather than refused
+            # (see `PASS_BAR_RULING`): the record is written and carries it.
+            have = (json.loads(path.read_text(encoding="utf-8"))
+                    if path.exists() else None)
+            # THE SECOND GATE beside it. `--panel` rebuilds both blocks from
+            # the artefact's per-seed rows, so this path is the one that can
+            # overwrite a PASS with a REFUSED.
+            for line in note_regression(
+                    record, have, mechanism=mechanism_bar(record, have),
+                    structure=structure_bar(record, have)):
+                print(f"{path.name}: {line}", file=sys.stderr)
             # THE LAST GATE BEFORE TWO COUNTS GO INTO ONE FILE. A record's
             # top-level `in_band` is regraded here at the panel's basis while
             # `level_protocol` is carried forward from a run at whichever
@@ -832,6 +876,7 @@ def main() -> int:
                       file=sys.stderr)
                 drift.append(f"{path.name}: {len(unnamed)} unnamed band count(s)")
                 continue
+            text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
             path.write_text(text, encoding="utf-8", newline="\n")
             print(f"  wrote {path.relative_to(ROOT)}"
                   + (f"  ({note})" if note else ""))
@@ -923,7 +968,7 @@ def write_mechanism_gate(panel_path: str) -> int:
         "method": panel["method"],
     }
     written = 0
-    refused = 0
+    regressed = 0
     for name in sorted(panel["presets"]):
         path = OUT / f"{name}.json"
         if not path.exists():
@@ -934,17 +979,13 @@ def write_mechanism_gate(panel_path: str) -> int:
         # THE BAR, READ BEFORE THE BLOCKS ARE REPLACED. This mode's whole job
         # is to write a fresh certificate over a committed one, so it is the
         # shortest path in the tool from a lost mechanism to a record that
-        # says the mechanism was never there. Refused per preset, never per
-        # run: one preset that regressed is not a reason to leave the other
-        # seventeen carrying a stale certificate.
+        # says the mechanism was never there. Refused per preset until the
+        # owner's ruling of 2026-09-23; REPORTED since (`PASS_BAR_RULING`):
+        # the certificate is written and the record carries the loss.
         bar = mechanism_bar(p, record)
-        if not bar["passed"]:
-            print(f"  REFUSED {name}: " + bar["reason"]
-                  + ". The certificate on disk shows a mechanism this panel "
-                    "does not, and writing would erase the comparison",
-                  file=sys.stderr)
-            refused += 1
-            continue
+        for line in note_regression(record, dict(record), mechanism=bar):
+            print(f"  {name}: {line}", file=sys.stderr)
+            regressed += 1
         for field in ("mechanism_252", "mechanism_heldout_seeds"):
             block = dict(p[field])
             block["measured"] = measured
@@ -973,12 +1014,13 @@ def write_mechanism_gate(panel_path: str) -> int:
         from tradefloor import envelope
         print("  " + envelope.mechanism_bar_line(bar).strip())
         written += 1
-    # A refusal must not exit 0, and it must not be reported as "nothing to
-    # write" either: the two are the same integer and opposite facts.
-    if refused:
-        print(f"  {refused} preset(s) REFUSED: a committed certificate shows "
-              f"a mechanism this panel does not", file=sys.stderr)
-        return 1
+    # Reported, not refused, since the owner's ruling of 2026-09-23: the
+    # count is printed so a run that wrote a regression cannot read as a
+    # clean one, and the exit is the write's.
+    if regressed:
+        print(f"  {regressed} preset(s) REGRESSED and were written with the "
+              f"loss on the record: a committed certificate showed a "
+              f"mechanism this panel does not", file=sys.stderr)
     return 0 if written else 1
 
 
@@ -998,9 +1040,10 @@ def write_structure_rows(panel_path: str) -> int:
     per seed in the artefact; `structure_blocks` reads those readings and
     signs them against `facts.REAL_VIX_AR1`. The engine is not called.
 
-    THE BAR, READ BEFORE THE BLOCKS ARE REPLACED, and refused per preset
-    rather than per run -- one preset that regressed is not a reason to
-    leave the other seventeen carrying a stale certificate. On the first run
+    THE BAR, READ BEFORE THE BLOCKS ARE REPLACED, per preset rather than per
+    run. It refused a regression until the owner's ruling of 2026-09-23 and
+    reports it since (`PASS_BAR_RULING`): the record is written and carries
+    the loss under `REGRESSION_FIELD`. On the first run
     of this mode every preset takes the first-lay-down branch, because none
     has ever carried the block.
     """
@@ -1008,7 +1051,7 @@ def write_structure_rows(panel_path: str) -> int:
     from tradefloor import envelope
 
     written = 0
-    refused = 0
+    regressed = 0
     skipped = 0
     for name in sorted(panel["presets"]):
         path = OUT / f"{name}.json"
@@ -1027,14 +1070,12 @@ def write_structure_rows(panel_path: str) -> int:
                   f"is nothing to sign against the tape")
             skipped += 1
             continue
+        # Refused per preset until the owner's ruling of 2026-09-23;
+        # REPORTED since (`PASS_BAR_RULING`): written, with the loss carried.
         bar = structure_bar(blocks, record)
-        if not bar["passed"]:
-            print(f"  REFUSED {name}: " + bar["reason"]
-                  + ". The certificate on disk passes a structural row this "
-                    "panel refuses, and writing would erase the comparison",
-                  file=sys.stderr)
-            refused += 1
-            continue
+        for line in note_regression(record, dict(record), structure=bar):
+            print(f"  {name}: {line}", file=sys.stderr)
+            regressed += 1
         record.update(blocks)
         ordered = {}
         for key, value in record.items():
@@ -1062,10 +1103,10 @@ def write_structure_rows(panel_path: str) -> int:
               if not bar.get("first") else
               "  structure bar    FIRST     " + bar["reason"])
         written += 1
-    if refused:
-        print(f"  {refused} preset(s) REFUSED: a committed certificate "
-              f"passes a structural row this panel refuses", file=sys.stderr)
-        return 1
+    if regressed:
+        print(f"  {regressed} preset(s) REGRESSED and were written with the "
+              f"loss on the record: a committed certificate passed a "
+              f"structural row this panel refuses", file=sys.stderr)
     if skipped:
         print(f"  {skipped} preset(s) skipped: no per-seed rows retained")
     return 0 if written else 1

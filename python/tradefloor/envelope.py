@@ -370,19 +370,22 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: ungraded, since the retain repair, and nothing about that changes: what
 #: is new is that a verdict is now taken on it and refused on.
 #:
-#: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above,
-#: and this default is REFUSED on it. The recomposed pt-v19 (2026-09-20)
-#: reads 0.954280 as the median of thirty seeds at 252 days, 0.0243 above
-#: the tape's centre, with k = 25 of 30 seeds above the centre against a
-#: cut of 21, and 22 of 30 on the held-out seeds. The 2026-09-14 vector read
-#: 0.959419 with k = 21, exactly at the cut, and 28 held out. The outgoing
-#: pt-v18 PASSES on both panels, at k = 20 and k = 18. The block is
-#: laid down carrying that refusal rather than withheld until it is green:
-#: the gate is a non-regression bar, a preset with no prior record has
-#: nothing to regress from, and a row nobody can see is a row nobody fixes.
-#: A model that repairs it locks the PASS in for every model after it.
+#: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above.
+#: pt-v19's fifth composition (2026-09-23) reads 0.933726 as the median of
+#: thirty seeds at 252 days and PASSES on both panels, k = 18 of 30 at 252
+#: and 17 held out against a cut of 21. The fourth composition read 0.946534
+#: and was refused on the held-out seeds (k = 23); the recomposed pt-v19 of
+#: 2026-09-20 read 0.954280, 0.0243 above the tape's centre, with k = 25 and
+#: 22; the 2026-09-14 vector 0.959419 with k = 21, exactly at the cut, and
+#: 28 held out. The outgoing pt-v18 PASSES on both panels, at k = 20 and
+#: k = 18. The block was first laid down carrying a refusal rather than
+#: withheld until it was green: a row nobody can see is a row nobody fixes.
+#: By the owner's ruling of 2026-09-23 (design repo
+#: `programme/longrun/CRITERIA.md`) the row is REPORTED and investigated and
+#: does not gate a preset; the pass bar is the long-run criteria and every
+#: ruled band.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.946534,
+    "vix_ar1_debiased": 0.933726,
 }
 
 #: The default preset's RISE in each structural row from 252 to 504 days,
@@ -390,7 +393,7 @@ CERTIFIED_STRUCTURE: dict[str, float] = {
 #: `facts.structure_rise_verdict`). None until the record carries the block;
 #: `test_structure_gate` binds it to the record once it does.
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": 0.007062,
+    "vix_ar1_debiased": 0.014322,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and

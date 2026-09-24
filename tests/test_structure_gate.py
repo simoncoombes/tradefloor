@@ -20,10 +20,21 @@ shape, one storey over from the one the mechanism bar closed this morning.
 
 WHAT THE BAR IS AND IS NOT. Subset / non-regression, both panels: a preset
 may not read REFUSED on a row its own committed record reads PASS. It is NOT
-a threshold on the verdict. pt-v19 lays its record down REFUSED on both
-panels and ships, because there is no prior record to regress from. The
+a threshold on the verdict. pt-v19 laid its record down REFUSED on both
+panels and shipped, because there was no prior record to regress from. The
 tests below assert that pair of facts together, because either alone reads
 as a different design.
+
+WHAT IT GATES SINCE 2026-09-23. The owner's ruling (design repo
+`programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-
+would-notice-programme-longrun-criteria`) makes the pass bar the fifteen
+long-run criteria and every ruled band: "the certification's VIX persistence
+rows ... are reported and investigated but do not gate". The bar's logic is
+unchanged and still tested to fire -- on a FIXED HISTORICAL RECORD, pt-v18's
+and pt-v19's fourth composition's certificates as they stood that day
+(`tests/fixtures/records/certificates-2026-09-23.json`), so the tests do not
+move with whatever the shipped preset measures -- and the shipped preset's
+own test reads its certificate as a report beside the verdict that gates.
 """
 from __future__ import annotations
 
@@ -53,8 +64,18 @@ RECORDS = (pathlib.Path(__file__).resolve().parent.parent
            / "python" / "tradefloor" / "presets")
 
 
+HISTORICAL = (pathlib.Path(__file__).resolve().parent / "fixtures"
+              / "records" / "certificates-2026-09-23.json")
+
+
 def record(name: str) -> dict:
+    """A COMMITTED record: what ships, and moves with every re-measurement."""
     return json.loads((RECORDS / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def historical(name: str) -> dict:
+    """A FROZEN record ("pt-v18" or "pt-v19-fourth"), for the bar's logic."""
+    return json.loads(HISTORICAL.read_text(encoding="utf-8"))["records"][name]
 
 
 def panels(values, row: str = VIX_AR1_ROW) -> list[dict]:
@@ -155,17 +176,18 @@ def test_a_panel_that_stopped_measuring_the_row_is_absent_not_passed():
 def test_the_bar_refuses_a_preset_whose_structural_row_went_PASS_to_REFUSED():
     """THE TEST THAT PROVES THE CHANGE DOES ANYTHING AT ALL.
 
-    pt-v18's committed certificate PASSES `vix_ar1_debiased` on the
-    held-out seeds; pt-v19's REFUSES it there, at the cut. Read one against
-    the other and the bar refuses, names the row, names the panel, and
-    quotes the `k` and the cut that decided it. These are the two shipped
-    presets' real readings, not a construction: the regression this gate
-    exists for has already happened once between two adjacent defaults.
-    (Until the 2026-09-21 composition the 252 panel carried this test;
-    pt-v19 passes there now and is refused by one seed held out.)
+    pt-v18's certificate PASSES `vix_ar1_debiased` on the held-out seeds;
+    pt-v19's fourth composition REFUSED it there. Read one against the other
+    and the bar refuses, names the row, names the panel, and quotes the `k`
+    and the cut that decided it. These are two shipped defaults' real
+    readings, not a construction: the regression this gate exists for
+    happened once between two adjacent defaults. (Until the 2026-09-21
+    composition the 252 panel carried this test. The fifth composition of
+    2026-09-23 passes on both panels, so the pair is read from the frozen
+    record rather than the live one.)
     """
-    was = record("pt-v18")["structure_heldout_seeds"]
-    now = record("pt-v19")["structure_heldout_seeds"]
+    was = historical("pt-v18")["structure_heldout_seeds"]
+    now = historical("pt-v19-fourth")["structure_heldout_seeds"]
     assert was["passed"] == [VIX_AR1_ROW]
     assert now["refused"] == [VIX_AR1_ROW]
 
@@ -191,7 +213,7 @@ def test_a_row_that_leaves_the_certificate_is_a_loss_and_not_a_shorter_list():
     `refused <= recorded_refused` passes on exactly the change that removed
     the row from the gate.
     """
-    was = record("pt-v18")["structure_252"]
+    was = historical("pt-v18")["structure_252"]
     gone = block(passed=(), refused=())
     assert set(gone["refused"]) <= set(was["refused"])   # the naive test passes
     verdict = envelope.structure_bar(gone, was)
@@ -204,7 +226,9 @@ def test_passing_more_than_the_record_clears_the_bar_and_is_named():
     """The direction that is NOT a regression. A model that repairs the row
     locks the PASS in for every model after it, so the gain is named rather
     than silent."""
-    was = record("pt-v19")["structure_heldout_seeds"]   # refused at the cut
+    # Refused above the cut, on the fourth composition's frozen record.
+    was = historical("pt-v19-fourth")["structure_heldout_seeds"]
+    assert was["refused"] == [VIX_AR1_ROW]
     better = block(passed=[VIX_AR1_ROW])
     verdict = envelope.structure_bar(better, was)
     assert verdict["passed"] is True
@@ -216,7 +240,7 @@ def test_a_preset_with_no_structural_record_is_refused_at_library_level():
     """Subset against nothing is an absence, and an absence is not a result.
     The one exception is the tool that WRITES the first record, and it is
     written at that call site rather than here."""
-    now = record("pt-v19")["structure_252"]
+    now = historical("pt-v19-fourth")["structure_252"]
     verdict = envelope.structure_bar(now, None)
     assert verdict["passed"] is False
     assert "no committed structural certificate" in verdict["reason"]
@@ -230,7 +254,7 @@ def test_the_bar_refuses_a_certificate_read_at_another_horizon():
     """A structural row's tape centre is per horizon -- 0.929939 at 252 and
     0.959348 at 504 -- so a subset taken across two of them signs against
     two different points."""
-    now = record("pt-v19")["structure_252"]
+    now = historical("pt-v19-fourth")["structure_252"]
     assert REAL_VIX_AR1[252] != REAL_VIX_AR1[504]
     verdict = envelope.structure_bar(dict(now, horizon_days=504), now,
                                      horizon_days=252)
@@ -239,17 +263,17 @@ def test_the_bar_refuses_a_certificate_read_at_another_horizon():
 
 
 def test_the_bar_reads_both_panels_and_either_one_failing_is_a_failure():
-    """BOTH, never one. The shipped default reads k = 20 of 30 at 252 and
-    k = 21 of 30 on the held-out seeds -- one under the cut and one exactly
-    at it, on the same preset and the same build. Against pt-v18, which
-    passes both, the 252 panel clears and the held-out one does not, and
-    the bar fails. A bar reading either panel alone would spend the
-    protection the second is there for.
+    """BOTH, never one. pt-v19's fourth composition read k = 19 of 30 at 252
+    and k = 23 on the held-out seeds -- one under the cut and one over it,
+    on the same preset and the same build. Against pt-v18, which passes
+    both, the 252 panel clears and the held-out one does not, and the bar
+    fails. A bar reading either panel alone would spend the protection the
+    second is there for. (Both read from the frozen record.)
     """
     assert envelope.STRUCTURE_BAR_PANELS == ("structure_252",
                                              "structure_heldout_seeds")
-    v19 = record("pt-v19")
-    v18 = record("pt-v18")
+    v19 = historical("pt-v19-fourth")
+    v18 = historical("pt-v18")
     verdict = envelope.structure_record_bar(v19, v18)
     assert verdict["passed"] is False
     assert verdict["panels"]["structure_252"]["passed"] is True
@@ -275,7 +299,7 @@ def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
     sys.path.insert(0, str(RECORDS.parent.parent.parent / "tools" / "presets"))
     record_tool = pytest.importorskip("record")
 
-    v19 = record("pt-v19")
+    v19 = historical("pt-v19-fourth")
     first = record_tool.structure_bar(v19, None)
     assert first["passed"] is True and first["first"] is True
     assert "LAYS ONE DOWN" in first["reason"]
@@ -286,7 +310,7 @@ def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
     assert record_tool.structure_bar(v19, bare)["first"] is True
     # And against a committed record it is the library rule, unmodified.
     assert record_tool.structure_bar(v19, v19)["passed"] is True
-    regressed = record_tool.structure_bar(v19, record("pt-v18"))
+    regressed = record_tool.structure_bar(v19, historical("pt-v18"))
     assert regressed["passed"] is False and regressed["first"] is False
     assert regressed["lost"] == [VIX_AR1_ROW]
 
@@ -315,46 +339,64 @@ def test_every_committed_record_carries_a_structural_certificate(path):
 
 
 @pytest.mark.ship_bar
-def test_the_shipped_preset_holds_its_structural_certificate_on_both_panels():
-    """THE SECOND GATE, IN THE SHIP BAR, BY NAME.
+def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_that_gates():
+    """THE SECOND GATE'S CERTIFICATE, REPORTED BESIDE THE SHIP BAR, BY NAME.
 
-    This one is RED-BY-READING and green as a bar, and the two halves have
-    to be read together. The shipped preset REFUSES `vix_ar1_debiased` on
-    both panels -- that is on its record, by name, with its `k` and its cut
-    -- and it still clears the bar, because the bar is non-regression and
-    pt-v19 has no earlier structural record to regress from.
+    This test used to hold the shipped preset to non-regression on its own
+    structural certificate. The owner's ruling of 2026-09-23 (design repo
+    `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-
+    user-would-notice-programme-longrun-criteria`) moved that: the pass bar
+    is the fifteen long-run criteria plus every ruled band, and "the
+    certification's VIX persistence rows ... are reported and investigated
+    but do not gate".
 
-    That is deliberate and it is Simon's "you can't fix what you can't
-    see": the row is visible on every record and gated against LOSS, not
-    blocked today. The first model that repairs it lays down a PASS, and
-    from that record on no model may lose it again -- at which point this
-    test starts refusing releases.
+    So what is asserted is what the ruling asks of the record: it CARRIES
+    the row on both panels and the rise, readable by the bar and rendered in
+    the line a reader sees; the reading is pinned so it cannot change in
+    silence; the published table agrees with it; and beside it sit the two
+    things that do gate -- the long-run verdict, which passes, and every
+    ruled band in on all four protocols.
     """
     rec = record(envelope.PRESET)
+    for field in envelope.STRUCTURE_BAR_PANELS:
+        b = rec[field]
+        assert b["horizon_days"] == 252 and b["seeds"] == SEEDS, field
+        assert sorted(b["passed"] + b["refused"]) == [VIX_AR1_ROW], field
+        assert b["absent"] == [] and b["measured"]["commit"], field
     verdict = envelope.structure_record_bar(rec, rec)
     assert verdict["passed"] is True, verdict["reason"]
+    line = envelope.structure_bar_line(verdict)
+    assert "structure bar" in line and "PASS" in line
 
-    # The reading the release carries, asserted so it cannot change in
-    # silence. Re-pinned at the third composition of 2026-09-21: PASS at
-    # 252 with k 19 of 30 (cut 21), REFUSED on the held-out seeds with
-    # k 23, where the second composition read 20 and 21 (at the cut), the
-    # 2026-09-20 record 25 and 22 and the 2026-09-14 one 21 and 28.
+    # The reading the release carries, REPORTED, and asserted so it cannot
+    # change in silence. Re-pinned at the fifth composition of 2026-09-23:
+    # PASS on both panels, k 18 at 252 and k 17 held out (cut 21). The
+    # fourth composition read PASS at 19 and REFUSED above at 23 held out;
+    # the second 20 and 21 (at the cut), the 2026-09-20 record 25 and 22,
+    # the 2026-09-14 one 21 and 28. The fifth composition's 504-session
+    # certification row is refused below (k 10), which the record box
+    # reports beside the verdict and which the ruling does not gate.
     row = rec["structure_252"]["rows"][VIX_AR1_ROW]
     assert rec["structure_252"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (19, 21, None)
+    assert (row["k"], row["cut"], row["side"]) == (18, 21, None)
     assert rec["structure_252"]["at_the_cut"] == []
     row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
-    assert rec["structure_heldout_seeds"]["refused"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (23, 21, "above")
+    assert rec["structure_heldout_seeds"]["passed"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (17, 21, None)
     assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)
             == envelope.CERTIFIED_STRUCTURE[VIX_AR1_ROW])
 
-    # And the line a reader sees, which is the other half of "by name".
-    line = envelope.structure_bar_line(verdict)
-    assert "structure bar" in line and "PASS" in line
+    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    lr = rec["long_run"]
+    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
+    assert all(r["pass"] for r in lr["rows"])
+    # ... and every ruled band in, on all four protocols.
+    assert rec["misses"] == {p: [] for p in rec["misses"]}
+    assert set(rec["misses"]) == {"252", "504", "heldout_universe",
+                                  "heldout_seeds"}
 
 
 # -- the rise, since 2026-09-21 ----------------------------------------------
@@ -448,9 +490,11 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
         # The shipped default's PAIRED rise is the tape's since the
         # 2026-09-21 composition: +0.0116 [+0.0007, +0.0270] against the
-        # tape's paired +0.0120, on the record box. (The 2026-09-20 record
-        # read -0.0024 [-0.0058, +0.0065]: one pole. The regime level on the
-        # VIX law is what makes calm years and a rise.)
+        # tape's paired +0.0120, on the record box; +0.0071 on the fourth
+        # composition and +0.0143 [+0.0064, +0.0280] on the fifth (2026-09-23),
+        # reported and not gated by the owner's ruling of that day. (The
+        # 2026-09-20 record read -0.0024 [-0.0058, +0.0065]: one pole. The
+        # regime level on the VIX law is what makes calm years and a rise.)
         assert row["verdict"] == "matches", row
         assert row["ci90"][0] <= row["tape_rise"] <= row["ci90"][1]
         assert (round(row["median_rise"], 6)
