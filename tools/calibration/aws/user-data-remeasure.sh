@@ -12,6 +12,28 @@
 #       --type c8g.24xlarge --var BRANCH=<branch> --var DEADMAN_MIN=90 \
 #       --var REGISTER_KEY=in/<run>-register.tgz
 #
+# For 0.8.5 the branch is release/0.8.5 and the run is remeasure-0.8.5, so
+# fleet.py writes to s3://dia-test-101631415962-us-east-2-an/pretium-calib/
+# out/remeasure-0.8.5/. Run it after pt-v20 is merged into release/0.8.5 and
+# pushed (the box clones by branch name), with TRADEFLOOR_DOCS at the docs
+# repository's release/0.8.5 checkout, built for that commit:
+#
+#   tar czf register.tgz -C "$TRADEFLOOR_DOCS" tools/remeasure/inventory.json \
+#       tools/docs/learn/experiments.json tools/docs/learn/preset-records.json
+#   python fleet.py upload --file register.tgz \
+#       --key in/remeasure-0.8.5-register.tgz
+#   python fleet.py launch --run remeasure-0.8.5 --user-data <this file> \
+#       --type c8g.24xlarge --var BRANCH=release/0.8.5 --var DEADMAN_MIN=90 \
+#       --var REGISTER_KEY=in/remeasure-0.8.5-register.tgz
+#   python fleet.py status --run remeasure-0.8.5
+#   python fleet.py collect --run remeasure-0.8.5 --out tools/remeasure/out-0.8.5
+#   python fleet.py reap --run remeasure-0.8.5
+#
+# Cost, from the spot floor on 2026-09-24 ($0.913 an hour for c8g.24xlarge
+# in us-east-2c): about 30 minutes of box time, the Rust build and
+# provisioning included, so about $0.45, and $1.37 at most if the 90-minute
+# dead-man switch fires.
+#
 # The register lives in tradefloor-docs, which is private, so the box gets it
 # from S3 rather than by cloning. The tarball carries the data files the
 # register's bound rows read, laid out as in the docs checkout, because a
