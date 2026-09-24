@@ -283,13 +283,13 @@ jobs:
             exit 1
           fi
 
-          # Each file now holds THREE digests -- simulation, metadata and the
-          # combined -- so the comparison is per FILE, not per line. Hashing
-          # each file and counting unique hashes asks the right question
-          # ("does every target report the same three?"); concatenating and
-          # `sort -u` would count three distinct digests as three
-          # disagreements and fail on a green run, which is how a gate stops
-          # meaning anything.
+          # Each file now holds FOUR digests -- the combined, simulation,
+          # metadata and the session with the simulated rate indices -- so
+          # the comparison is per FILE, not per line. Hashing each file and
+          # counting unique hashes asks the right question ("does every
+          # target report the same four?"); concatenating and `sort -u`
+          # would count four distinct digests as four disagreements and fail
+          # on a green run, which is how a gate stops meaning anything.
           unique=$(for f in digests/*.txt; do shasum -a 256 < "$f" | cut -d' ' -f1; done | sort -u | wc -l)
           if [ "$unique" -ne 1 ]; then
             echo

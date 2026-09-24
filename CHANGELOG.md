@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+**Bonds.** Three simulated rate indices can join a roster: `UST2Y` and
+`UST10Y`, constant-maturity 2-year and 10-year treasury indices, and
+`IGCORP`, an investment-grade corporate bond index. None is a real security.
+`Universe.random(n, seed=..., bonds=True)` appends them after the equities
+and `tf.bonds()` builds them. Each returns `yield / 252 - D * dy + 0.5 * C *
+dy^2` a day off the engine's own curve, with duration and convexity of 1.9
+and 4.6, 8.5 and 84, and 7.0 and 100. They trade through the same books,
+fills, portfolio, tape and TCA as the equities.
+
+**Scenarios and cash.** `pin_macro` and the scenario registry take the
+2-year and 10-year yields, and `curve_shock.yml` moves the whole curve 200bp
+on day 50: `UST10Y` -15.35%, `UST2Y` -3.71% and `IGCORP` -12.30% that day.
+`rate_shock.yml` is unchanged and reaches the 10-year only over the weeks
+after. `baselines.Balanced` is a 60/40 book with a drift band, and
+`evaluate(..., cash_interest=True)` pays cash the policy rate.
+
+**What does not move.** Without the indices, every digest and every preset.
+With them, every equity price, draw and macro value is identical to
+the run without, because they take no draws and write nothing back. A new
+`bondsSha256` covers a session with them.
+
+**Still off.** The engine's curve is quieter than the real one: the 2-year
+moves 0.46bp a day against 5.2bp over 2015-2025 and the 10-year 3.1bp against
+5.35bp, and bond and stock returns are uncorrelated where IEF reads -0.16 and
+LQD +0.27.
+
+<!-- release-note-ends -->
+
+### The pricing and the books
+
+`rust/src/rates.rs` holds the pricing, the curve reads and the books, and
+documents every number. An index level reprices whenever the yield it reads
+has moved: at the open after the close's macro step, and on the first tick
+after a pin. Carry accrues once, at the first open after a close. Nothing
+interpolates toward a later yield, and no tracking noise is added, so no
+price can reveal a yield before the close that sets it. `IGCORP` reads the
+10-year plus a credit spread that is re-marked whenever the engine sets the
+corporate yield or a caller pins it, so it carries rate risk between
+central-bank meetings and reads a held corporate yield exactly.
+
+The books are the equity maker's ladder around the index level, with a
+0.6bp spread before cent rounding for the treasuries and 0.8bp for the
+corporate index, widening with the VIX by the equity rule, and depth from
+the median dollar volume of SHY, IEF and LQD over 2015-2025. A trade leaves
+the maker holding inventory that skews its quotes by up to a half spread and
+decays with a 15-minute half-life, so impact on an index is transient.
+
+### Measured
+
+Every packaged scenario's effect on the three indices is in
+`tests/test_bonds.py` and in each scenario file's notes. A 60/40 book of
+equal-weight equities and a 6.5-year bond sleeve through each scenario is
+`tools/bonds/sixty_forty.py`; the comparison with real bond markets is
+`tools/bonds/realism.py`, against FRED's DGS2 and DGS10 and Yahoo's SPY,
+SHY, IEF and LQD.
+
 ## 0.9.0
 
 **An agent's orders now reach the market once.** Every harness passed an

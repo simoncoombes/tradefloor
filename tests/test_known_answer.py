@@ -66,6 +66,25 @@ def test_known_answer_digest_matches_the_committed_baseline():
     assert known_answer.known_answer_digest() == baseline["sha256"]
 
 
+def test_a_session_with_the_rate_indices_matches_its_baseline():
+    """The simulated rate indices' own digest, beside the three above.
+
+    A separate digest so that adding UST2Y, UST10Y and IGCORP moved none of
+    the others: a roster without them is the market it always was. This is
+    the claim that a roster with them is one market on every platform too,
+    which the determinism workflow checks on each wheel target through this
+    file, and across targets through the line `known_answer.py` prints.
+    """
+    baseline = json.loads(
+        (HERE / "known_answer.json").read_text(encoding="utf-8")
+    )
+    assert known_answer.bonds_digest() == baseline["bondsSha256"], (
+        "the rate indices' digest moved. Either their pricing, books or tape "
+        "changed and bondsSha256 must be regenerated with the change, or a "
+        "platform disagrees."
+    )
+
+
 def test_known_answer_is_stable_within_a_process():
     assert known_answer.known_answer_digest() == known_answer.known_answer_digest()
 
@@ -107,10 +126,12 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
-    # THREE digests, in a fixed order: combined, simulation, metadata. The CI
-    # gate greps all of them and compares the SET across platforms, so the
-    # count and the order are both contractual -- .github/workflows/
-    # determinism.yml hashes each target's file and requires one unique hash.
+    # FOUR digests, in a fixed order: combined, simulation, metadata, and
+    # the session with the simulated rate indices. The CI gate greps all of
+    # them and compares the SET across platforms, so the count and the order
+    # are both contractual -- .github/workflows/determinism.yml hashes each
+    # target's file and requires one unique hash, which holds for four as it
+    # did for three.
     #
     # It used to be exactly one, and the count was asserted for the same
     # reason it is asserted now: a gate that greps an ambiguous number of
@@ -118,7 +139,8 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # landed, this test and that workflow had to move together -- leaving the
     # workflow alone would have made it count three digests as three
     # disagreements and fail every green run.
-    assert len(digests) == 3, result.stdout
+    assert len(digests) == 4, result.stdout
     assert digests[0] == known_answer.known_answer_digest()
     assert digests[1] == known_answer.simulation_digest()
     assert digests[2] == known_answer.metadata_digest()
+    assert digests[3] == known_answer.bonds_digest()
