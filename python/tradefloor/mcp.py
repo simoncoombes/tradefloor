@@ -575,6 +575,11 @@ def _scorecard_row(s: Any) -> dict[str, Any]:
         "rejected": s.rejected,
         "errors": list(s.errors),
         "strategy_fingerprint": s.strategy_fingerprint,
+        # Only when set, so every ordinary row is the row it was. A strategy
+        # here is data and runs sandboxed, so `trusted` never appears; the
+        # oracle, and a blend holding one, read hidden state by declaration.
+        **({"uses_hidden_state": True} if s.uses_hidden_state else {}),
+        **({"tampered": True} if s.tampered else {}),
     }
 
 

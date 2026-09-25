@@ -125,6 +125,7 @@ if TYPE_CHECKING:
 from ._core import Engine, GameRng
 from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
+from .sandbox import economy_of, hidden_state
 
 # The stream the random baseline draws on. Distinct from the market stream, so
 # a random agent's decisions cannot perturb the market it is trading in --
@@ -554,9 +555,12 @@ class Oracle:
     market once.
     """
 
-    #: Marks an agent that sees past the observation wall. The harness does not
-    #: enforce anything with it; it is here so a results table can label the
-    #: row rather than presenting a privileged agent as a peer.
+    #: Marks an agent that sees past the observation wall, and is how it gets
+    #: there: the harness hands an agent that declares it ``obs.hidden``, a
+    #: read-only :class:`~tradefloor.sandbox.HiddenState`, and records
+    #: ``uses_hidden_state`` on its scorecard so a results table can label
+    #: the row rather than presenting a privileged agent as a peer. No agent
+    #: gets the live engine unless the run passed ``trusted_agents=True``.
     privileged = True
 
     def __init__(self, *, top_k: int = 5, gross: float = 1.0,
@@ -568,7 +572,7 @@ class Oracle:
         # remembered from the last `act`. Held here rather than threaded
         # through the protocol, which would complicate every agent that does
         # not explain itself.
-        self._engine: Engine | None = None
+        self._engine: Any = None
 
     def fork(self) -> "Oracle":
         """An independent copy for another arm of a forked world.
@@ -608,11 +612,12 @@ class Oracle:
                 and model.get("earnings_cycle_depth", 0.0) == 0.0)
 
     def act(self, obs: Observation) -> dict[str, float]:
-        self._engine = obs.engine
-        model = dict(obs.engine.model_params)
+        truth = hidden_state(obs)
+        self._engine = truth
+        model = dict(truth.model_params)
         if not self.cross_sectional(model):
             return self._act_on_expected_returns(obs, model)
-        s = _f64(obs.engine.column("mispricing_s"))
+        s = _f64(truth.column("mispricing_s"))
         k = min(self.top_k, len(s) // 2)
         if k < 1:
             return {}
@@ -621,7 +626,7 @@ class Oracle:
         return rebalance(obs, _book(obs.tickers, cheap, dear, self.gross, k),
                          max_participation=self.max_participation)
 
-    def expected_returns(self, engine: Engine,
+    def expected_returns(self, engine: Any,
                          model: dict[str, Any]) -> tuple[dict[int, float], float]:
         """Each equity's expected log return over the next session, from state
         no trader can see, split into a per-name part and a common drift.
@@ -633,6 +638,9 @@ class Oracle:
         value's: nominal output growth, the buyback yield where the preset
         counts buybacks, and the pull of the aggregate earnings cycle toward
         its phase's level. Returns ``({index: per-name part}, drift)``.
+
+        ``engine`` is the live engine or the read-only
+        :class:`~tradefloor.sandbox.HiddenState` a privileged agent is handed.
         """
         s = _f64(engine.column("mispricing_s"))
         mom = _f64(engine.column("mispricing_momentum"))
@@ -643,7 +651,7 @@ class Oracle:
                for i in range(len(s)) if tickers[i] not in RATE_TICKERS}
         macro = engine.macro_fields
         drift = (macro["gdp_growth"] + macro["inflation_rate"]) / 252.0
-        economy = engine.state_snapshot()["economy"]
+        economy = economy_of(engine)
         if model.get("market_pe_buybacks", 0.0) != 0.0 and economy["market_pe"] > 0:
             drift += model["buyback_payout_share"] / economy["market_pe"] / 252.0
         depth = model.get("earnings_cycle_depth", 0.0)
@@ -670,7 +678,7 @@ class Oracle:
         """
         if obs.step_of_day != 0:
             return {}
-        own, drift = self.expected_returns(obs.engine, model)
+        own, drift = self.expected_returns(hidden_state(obs), model)
         if not own:
             return {}
         names = sorted(own)

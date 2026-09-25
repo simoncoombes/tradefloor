@@ -36,6 +36,16 @@ The observation carries prices, the book and the agent's own portfolio. It does
 NOT carry ``mispricing_s``, fair value, or the factor attribution. Those are
 what the agent is supposed to infer, and handing them over would make the
 exercise trivial. They are used for SCORING, on the other side of the wall.
+
+Until 0.8.5 that was a statement about the fields and not about the engine:
+``obs.engine`` was the live engine, and an agent could fork it and trade on
+the fork's future or write the market with ``set_fundamentals``. It is now a
+read-only :class:`~tradefloor.sandbox.MarketView`, the portfolio is a
+read-only :class:`~tradefloor.sandbox.PortfolioView`, and the harness checks
+the engine's state hash around every call into agent code. An agent that
+needs hidden state declares ``privileged = True`` and reads ``obs.hidden``;
+research that needs the live engine passes ``trusted_agents=True``. The
+scorecard records all three. See :mod:`tradefloor.sandbox`.
 """
 
 from __future__ import annotations
@@ -45,6 +55,8 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from .portfolio import Portfolio
+from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
+                      declares_hidden_state)
 from .universe_util import fingerprint_of
 
 if TYPE_CHECKING:
@@ -124,10 +136,10 @@ class Observation:
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
-                 "_adv", "steps_per_day")
+                 "_adv", "steps_per_day", "hidden")
 
     def __init__(self, step, day, tickers, prices, portfolio, engine, adv,
-                 steps_per_day=1):
+                 steps_per_day=1, hidden=None):
         # Run-wide, NOT within-day. See the class docstring: `step_of_day` is
         # the one that resets, and is what a per-day guard wants.
         self.step = step
@@ -139,9 +151,17 @@ class Observation:
         self.steps_per_day = steps_per_day
         self.tickers = tickers
         self.prices = prices
+        # Under every harness in this package these are a read-only
+        # `PortfolioView` and `MarketView` (see `tradefloor.sandbox`), unless
+        # the run passed `trusted_agents=True`, in which case they are the
+        # live objects. An observation built by hand holds whatever it was
+        # given.
         self.portfolio = portfolio
         self.engine = engine
         self._adv = adv
+        #: Read-only hidden state, for an agent that declared
+        #: ``privileged = True``; None for every other agent.
+        self.hidden = hidden
 
     @property
     def step_of_day(self) -> int:
@@ -238,7 +258,8 @@ class Scorecard:
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
-                 "strategy_fingerprint", "model_fingerprint")
+                 "strategy_fingerprint", "model_fingerprint", "trusted",
+                 "uses_hidden_state", "tampered")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -246,7 +267,8 @@ class Scorecard:
         explanations: list[tuple[str, str]], explanation_accuracy: float | None,
         final_net_worth: float, errors: list[str], seed: int = -1,
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
-        model_fingerprint: str = "",
+        model_fingerprint: str = "", trusted: bool = False,
+        uses_hidden_state: bool = False, tampered: bool = False,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -278,15 +300,33 @@ class Scorecard:
         # leaderboard row under a non-shipped model can never present as
         # the benchmark market.
         self.model_fingerprint = model_fingerprint
+        #: The agent was handed the live engine (``trusted_agents=True``)
+        #: rather than the read-only market view. Nothing on the card can
+        #: say what it did with it, so a trusted result is not a peer of a
+        #: sandboxed one.
+        self.trusted = trusted
+        #: The agent declared ``privileged = True`` and was handed hidden
+        #: state as ``obs.hidden``: a measuring instrument like the Oracle,
+        #: not a competitor.
+        self.uses_hidden_state = uses_hidden_state
+        #: Agent code changed the engine or its own portfolio outside the
+        #: order path. ``errors`` names the step. The score is of a market
+        #: the agent rewrote and ranks nothing.
+        self.tampered = tampered
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
 
     def __repr__(self) -> str:
+        flags = "".join(
+            f", {flag}" for flag, on in (("TAMPERED", self.tampered),
+                                         ("trusted", self.trusted),
+                                         ("hidden-state",
+                                          self.uses_hidden_state)) if on)
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
-            f"impact={self.impact_bps:+.2f}bps)"
+            f"impact={self.impact_bps:+.2f}bps{flags})"
         )
 
 
@@ -355,6 +395,7 @@ def evaluate(
     scenario: Any = None,
     model: str | ModelParams | None = None,
     cash_interest: bool = False,
+    trusted_agents: bool = False,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -388,6 +429,17 @@ def evaluate(
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
     default: cash earns nothing, as it always has here.
+
+    Agents are sandboxed. ``obs.engine`` is a read-only
+    :class:`~tradefloor.sandbox.MarketView` and ``obs.portfolio`` a read-only
+    :class:`~tradefloor.sandbox.PortfolioView`; an agent with
+    ``privileged = True`` also gets ``obs.hidden`` and its card says
+    ``uses_hidden_state``. ``trusted_agents=True`` hands every agent the live
+    engine and portfolio instead, and every card says ``trusted``. Either
+    way the engine's state hash is compared around each ``act`` and
+    ``explain``, and an agent that changed anything is scored
+    ``tampered=True`` with an error line naming the step. See
+    :mod:`tradefloor.sandbox`.
 
     Returns a scorecard per agent, keyed by name.
     """
@@ -424,7 +476,7 @@ def evaluate(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
-            cash_interest,
+            cash_interest, bool(trusted_agents),
         )
     return results
 
@@ -453,13 +505,22 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
-                  model=None, cash_interest=False) -> Scorecard:
+                  model=None, cash_interest=False,
+                  trusted=False) -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
                           cash_interest=cash_interest)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
+    # What the agent is handed. Built once: every view reads the live
+    # engine when it is called, so it is always the present.
+    privileged = declares_hidden_state(agent)
+    shown_engine = engine if trusted else MarketView(engine)
+    shown_portfolio = portfolio if trusted else PortfolioView(portfolio, engine)
+    hidden = HiddenState(engine) if privileged else None
+    guard = TamperGuard(engine, (portfolio,))
+    tampered = False
 
     trades = 0
     turnover = 0.0
@@ -483,21 +544,31 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             adv = _f64(engine.column("avg_volume"))
         engine.open_market()
         for _ in range(steps_per_day):
-            obs = Observation(step, day, tickers, _f64(engine.prices()),
-                              portfolio, engine, adv, steps_per_day)
+            # The roster and the depth are copies, so an agent that sorts or
+            # edits what it was shown edits its own copy and not the lists
+            # this loop indexes by.
+            obs = Observation(step, day, list(tickers), _f64(engine.prices()),
+                              shown_portfolio, shown_engine,
+                              adv if trusted else tuple(adv), steps_per_day,
+                              hidden=hidden)
             # The within-day tick the fill lands on: agents act at the START of
             # a step, so `ticks_per_step` ticks per completed step have
             # run this day. This is what makes the fills table joinable
             # to bars and truth on (day, tick, instrument_id).
             portfolio.stamp(day, step, (step % steps_per_day) * ticks_per_step)
             try:
-                orders = agent.act(obs) or {}
+                with guard:
+                    orders = agent.act(obs) or {}
             except Exception as exc:                      # noqa: BLE001
                 # An agent that throws is scored, not crashed. A harness that
                 # died on one bad agent would lose every other agent's result
                 # in the same run.
                 errors.append(f"step {step}: {type(exc).__name__}: {exc}")
                 orders = {}
+            if guard.tampered:
+                tampered = True
+                errors.append(f"step {step}: tampered: agent code changed "
+                              f"the market during act() ({guard.what})")
 
             for ticker, quantity in orders.items():
                 if not quantity:
@@ -534,10 +605,15 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         if callable(explain):
             actual = _dominant_factor(engine)
             try:
-                claimed = explain(day)
+                with guard:
+                    claimed = explain(day)
             except Exception as exc:                      # noqa: BLE001
                 errors.append(f"day {day} explain: {type(exc).__name__}: {exc}")
                 claimed = None
+            if guard.tampered:
+                tampered = True
+                errors.append(f"day {day} explain: tampered: agent code "
+                              f"changed the market ({guard.what})")
             if claimed is not None and actual is not None:
                 explanations.append((claimed, actual))
 
@@ -578,6 +654,9 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         universe_fingerprint=fingerprint,
         strategy_fingerprint=strategy_fingerprint,
         model_fingerprint=engine.model_fingerprint,
+        trusted=trusted,
+        uses_hidden_state=privileged,
+        tampered=tampered,
     )
 
 

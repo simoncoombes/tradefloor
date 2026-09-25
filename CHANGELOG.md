@@ -397,6 +397,44 @@ for each published release, once the owner switches it on (`RELEASING.md`,
 the README gains a section on citing a version and a preset, with a BibTeX
 entry whose DOI is a placeholder until Zenodo mints one.
 
+### Agents see a read-only market
+
+An independent audit found that every harness handed agents the live engine
+as `obs.engine`. An agent that forked it and ran the fork one step ahead made
+11.4 per cent in five days on four seeds of four, and one that called
+`set_fundamentals` on a name it held made 184 per cent. Neither scorecard
+carried an error or a flag.
+
+`obs.engine` is now a read-only `tradefloor.MarketView` in `evaluate`,
+`rank`, `World` and its cohorts, and `tca.analyse`. It serves prices, the
+public columns, each book, bars, the published macro fields without
+`qe_pe_boost`, the curve and which names have news today. `obs.portfolio` is
+a read-only `PortfolioView`. Anything else raises `tf.SandboxError`, which
+names the opt-in. An agent with `privileged = True`, as the Oracle and an
+`oracle` strategy signal have, also gets `obs.hidden`, a read-only
+`HiddenState`, and its scorecard says `uses_hidden_state`.
+`trusted_agents=True` hands every agent the live engine and portfolio as
+before. The scorecard says `trusted`, `rank` marks the row and a World's
+manifest records it under `agent_access`.
+
+Each harness also compares the engine's state hash, fundamentals and
+recording counters, and each portfolio, before and after every `act` and
+`explain`. An agent that changed anything is scored `tampered` with an error
+line naming the step, `rank` leaves it out of its table and says so, and
+`tca.analyse` refuses it. The check reads and draws nothing, so every
+known-answer digest is unchanged. The gym environment hands its policy arrays
+and the MCP tools run strategies as data, so neither handed agent code the
+engine. `tests/test_sandbox.py` reproduces both of the audit's agents.
+
+This is a guard and not a security boundary. Code in the same process can
+still walk the interpreter to the engine, and any write it makes is caught,
+but a second engine it builds from a guessed seed writes nothing and is not.
+
+**What breaks.** An agent that called anything on `obs.engine` beyond the
+view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
+scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
+or pass `trusted_agents=True`.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

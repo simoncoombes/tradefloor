@@ -1549,10 +1549,42 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 
+## The agent's observation
+
+An agent sees the market through a read-only view (`sandbox.py`). The
+harness loops in `harness.py`, `counterfactual.py` and `tca.py` hand
+`act(obs)` the following:
+
+- `obs.prices`, `obs.tickers`, `obs.avg_volume(t)` and `obs.book(t)`, the
+  last prints, the roster, $\bar A_i$ and a copy of the book at the step's
+  start;
+- `obs.engine`, a `MarketView`: the columns price, previous close, previous
+  tick price, open, high, low, volume, $\bar A_i$, market cap, last daily
+  return, $\beta_i$, short interest and float; `bars`; the macro fields
+  except `qe_pe_boost`; the curve; and which names and sectors have news
+  today, without its size;
+- `obs.portfolio`, a read-only view of the agent's own cash, positions and
+  fills.
+
+Nothing in the observation carries $s_i$, its momentum $\mu_i$, the maker's
+inventory, the GARCH variance $h_{i,d}$, the attribution, the news impact,
+the model's dials or the generator state. An agent that declares
+`privileged = True` also receives `obs.hidden`, a read-only view of all of
+those, and its scorecard records `uses_hidden_state`.
+`trusted_agents=True` hands every agent the live engine instead, and every
+scorecard records `trusted`.
+
+Around each call into agent code the harness compares `Engine.state_hash`,
+the fundamentals, the recording counters and each portfolio's state. A
+difference marks the scorecard `tampered`. The comparison only reads, so no
+digest depends on it.
+
 ## The Oracle baseline
 
 `baselines.Oracle` is the reference that reads state no trader can see. Its
-rule is picked from the preset's own dials, never from the preset's name.
+rule is picked from the preset's own dials, never from the preset's name. It
+reads that state through `obs.hidden`, the capability its `privileged = True`
+declares, and never through the live engine.
 
 - **Cross-sectional rule** (every preset through pt-v19: `fair_value_news_share`, `fair_value_market_share` and `earnings_cycle_depth` all 0.0). Every stock-specific move is mispricing that reverts, so the spread of $s$ across names is the edge. At every step it goes long the `top_k` lowest $s$ and short the `top_k` highest, equal weight, dollar-neutral.
 - **Expected-return rule** (any of those dials off zero, as on pt-v20). The cross-section of $s$ is small there: its spread falls from 0.30 to 0.015 and its rank IC against the next day's return from -0.44 to -0.03, so the old rule loses money on 3 of 8 seeds. Once a day, at the open, it forms each equity's expected log return over the session.
