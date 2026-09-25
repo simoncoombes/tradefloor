@@ -228,9 +228,9 @@ _SNAPSHOT_KEYS = (
     # epicentre) and the pin a scenario set (-2 for no pin). All four are
     # the state a run with `crisis_epicentre_extra` off zero carries, and
     # all four read their defaults on every preset before pt-v19. pt-v19
-    # ships the dial at 1.93, so on the default they move whenever the VIX
-    # crosses `crisis_vix_threshold`. This read "on every shipped preset"
-    # until 2026-09-24.
+    # and pt-v20 ship the dial at 1.93, so on the default they move
+    # whenever the VIX crosses `crisis_vix_threshold`. This read "on every
+    # shipped preset" until 2026-09-24.
     "crisis_in_episode", "crisis_sessions_under",
     "crisis_epicentre", "crisis_epicentre_pin",
     "nominal_output_base", "volume_state",

@@ -63,9 +63,9 @@ How far a `federal_funds_rate` pin reaches inside the first central-bank
 meeting window **depends on the preset**. Measured on this build, on
 ``Universe.random(20, seed=4)`` at sim seed 5, with a 250bp policy-only ramp
 over thirty days read at 40 days: pt-v12 and pt-v14 move twenty instruments
-by exactly 0.00%, and the shipped default, pt-v19, moves the median one down
-2.56% (pt-v16 2.67%, pt-v18 2.15%; this read 3.34% for the default of
-2026-08-30).
+by exactly 0.00%, and the shipped default, pt-v20, moves the median one down
+3.38% (pt-v19 2.56%, pt-v16 2.67%, pt-v18 2.15%; this read 3.34% for the
+default of 2026-08-30).
 
 `daily_credit_floor_gain` is the difference. It re-asserts both credit floors
 on every daily step rather than at meeting cadence, so from pt-v15 onward the
