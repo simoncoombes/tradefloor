@@ -223,8 +223,9 @@ class Externality:
                 f"that channel. To hold those entries at zero, pin the "
                 f"gauge in both worlds by building the cohort with "
                 f"pins={{'vix': 15.0}} and running this again, and on "
-                f"pt-v20, which moves the corporate bond yield at every "
-                f"close with the market, pin 'corporate_bond_yield' too.")
+                f"pt-v20, whose flight to quality moves the 10-year and so "
+                f"the corporate bond yield with the session's return, pin "
+                f"'corporate_bond_yield' too.")
         idle = [b for b in self.labels if not self.trades[b]]
         if idle:
             out.append(

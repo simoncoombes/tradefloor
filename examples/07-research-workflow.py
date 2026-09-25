@@ -184,9 +184,11 @@ def main() -> dict:
     # And with the macro channels pinned the subtraction is byte-exact, the
     # guarantee the RNG stream split actually makes, now demonstrated at the
     # boundary where it holds. Two channels on pt-v20, the default from
-    # 0.8.5: the VIX, and the corporate bond yield, which pt-v20 moves at
-    # every close with the market (`corporate_yield_daily`). With the VIX
-    # alone pinned, one untouched name here closes 5e-6 bps apart.
+    # 0.8.5: the VIX, and the corporate bond yield, which follows the
+    # 10-year every session while the flight to quality moves the 10-year
+    # with the session's return (`flight_to_quality_day`,
+    # `corporate_yield_daily`). With the VIX alone pinned, one untouched
+    # name here closes apart; with both pinned none does.
     pinned = tf.tca.analyse(
         Momentum(), seed=7, universe=universe, days=10,
         scenario=tf.Scenario().hold(vix=15.0, corporate_bond_yield=0.055))

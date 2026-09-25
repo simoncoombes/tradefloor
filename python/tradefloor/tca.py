@@ -297,9 +297,11 @@ class Execution:
         variance target, so ``test_tca.py`` can still assert
         emptiness there. When the untouched names must be byte-exact, pin
         VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
-        on pt-v20, the default from 0.8.5, the corporate bond yield too,
-        since that preset moves it at every close with the market
-        (``corporate_yield_daily``): ``hold(vix=15.0,
+        on pt-v20, the default from 0.8.5, the corporate bond yield too:
+        its flight to quality moves the 10-year with the session's index
+        return, and the corporate yield follows the 10-year every session
+        (``flight_to_quality_day``, ``corporate_yield_daily``). A pinned
+        corporate yield holds through the close. ``hold(vix=15.0,
         corporate_bond_yield=0.055)``, verified empty on the ten-day run
         above, where the VIX alone leaves one name 5e-6 bps apart. Anything
         here that was not traded and survives both pins means something
