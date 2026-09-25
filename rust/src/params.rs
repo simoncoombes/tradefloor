@@ -6901,8 +6901,9 @@ impl ModelParams {
     /// and recovers in an expansion, and `market_factor_sigma` and
     /// `jump_intensity_market` take the transient part down by as much.
     /// With less market noise a name's volume tracks its own move more
-    /// tightly, so `volume_move_response` 0.8 keeps that tie inside the
-    /// certified band.
+    /// tightly, so `volume_move_response` 0.6 keeps that tie inside the
+    /// certified band at every horizon. `garch_beta` 0.85 gives a name's
+    /// volatility back the short-lag memory the permanent share took.
     ///
     /// A LIMIT. The model's inflation almost never leaves the under-3-per-
     /// cent regime, so stocks and Treasuries are always in flight to
@@ -6963,10 +6964,25 @@ impl ModelParams {
         // a smaller share of a name's volume, which then tracks its own move
         // more tightly: the 504-session certification panel's
         // `volume_abs_return_corr` read 0.639 against the band's 0.63 (box
-        // ptv20g2). The same-day response to a move at 0.8 puts it at 0.618,
-        // and the other three cells stay in (design repository,
-        // programme/results/ptv20/d1screen.py).
-        p.volume_move_response = 0.8;
+        // ptv20g2). 0.8 put it at 0.618 there, but it kept rising with the
+        // horizon and crossed 0.63 from 1,260 sessions (0.641 at 2,520 on
+        // the release's envelope run). At 2,520 sessions (nine histories,
+        // the certified roster) it reads 0.633 at 0.8, 0.621 at 0.7 and
+        // 0.609 at 0.6, where pt-v19 reads 0.616; 0.6 holds it under the
+        // ceiling at every horizon measured (design repository,
+        // programme/results/ptv20/d1screen.py and the fifth registration).
+        p.volume_move_response = 0.6;
+        // VOLATILITY MEMORY. With every stock-specific shock permanent and
+        // the market factor cut, a name's |return| lag-1 autocorrelation
+        // fell to 0.034 on the one-year panel (pt-v19 0.049, the decade
+        // band's floor 0.04). A name's GJR persistence restores it: 0.85
+        // reads 0.044 at 252 sessions and 0.053 at 504 (grid ptv20e5, 30
+        // histories; 0.88 reads 0.052 and 0.060), and every long-run row
+        // and certification cell holds. It takes the GJR's first-moment
+        // persistence, alpha + beta + gamma/2, from 0.942 to 1.001, so the
+        // per-name variance is held by its 0.25x floor and 5x ceiling
+        // rather than by its own reversion.
+        p.garch_beta = 0.85;
         p
     }
 
