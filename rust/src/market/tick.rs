@@ -36,7 +36,7 @@
 //! and not the tape is not a breaker. See D6 in the port notes.
 
 use crate::economy::EconomyState;
-use crate::fair_value::{compute_fair_value_with, CompanyValuationInputs, EconomyValuationInputs};
+use crate::fair_value::{CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
 use crate::microstructure::{
     decompose, settle_price_through_book, settle_price_through_book_with_orders,
@@ -372,10 +372,13 @@ pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 
     // every reader of the restated earnings -- the valuation, the market
     // P/E, the overnight open, the opening -- reads it with no second path.
     // A branch at zero depth: every preset through pt-v19 never sees it.
-    if p.earnings_cycle_depth == 0.0 || economy.earnings_cycle == 0.0 {
+    // Under `earnings_anticipation_half_life` the valuation prices the
+    // earnings path it expects, not only today's point on it.
+    let level = economy.earnings_cycle + economy.earnings_anticipation;
+    if p.earnings_cycle_depth == 0.0 || level == 0.0 {
         scale
     } else {
-        scale * mathx::exp(economy.earnings_cycle)
+        scale * mathx::exp(level)
     }
 }
 
@@ -1095,9 +1098,9 @@ pub fn simulate_market_tick(
         } else {
             scale_valuation(grown, buyback)
         };
-        let breakdown = compute_fair_value_with(
+        let breakdown = crate::fair_value::compute_fair_value_at(
             &valuation, &econ_view, p.fair_value_book_floor,
-            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate);
+            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
@@ -1678,9 +1681,9 @@ pub fn published_fair_value(
         qe_pe_boost: Some(economy.qe_pe_boost),
         qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
-    compute_fair_value_with(
+    crate::fair_value::compute_fair_value_at(
         &valuation, &econ_view, p.fair_value_book_floor,
-        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate)
+        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value
 }
 

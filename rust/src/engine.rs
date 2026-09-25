@@ -1133,7 +1133,89 @@ impl Engine {
         if engine.params.earnings_cycle_depth != 0.0 {
             engine.economy.earnings_cycle = engine.earnings_cycle_target();
         }
+        engine.refresh_earnings_anticipation();
         engine
+    }
+
+    /// The anticipated earnings level's phase terms, `g_p` in
+    /// [`crate::economy::cycle::phase_cycle`] order, and its weight `c` on
+    /// the current level. `None` with the anticipation or the cycle off.
+    ///
+    /// # The derivation
+    ///
+    /// The valuation reads `A = E[ integral rho e^(-rho s) e(t+s) ds ]`, the
+    /// earnings cycle's level averaged over the future with a discount of
+    /// `rho = ln 2 / earnings_anticipation_half_life` a session. The level
+    /// follows the engine's own law, `de = kappa (T_p - e)` with `kappa =
+    /// ln 2 / earnings_cycle_half_life` toward the phase's target `T_p`
+    /// (`-depth` in a contraction or a trough, `+depth * upside` otherwise),
+    /// and the phase leaves at the rate `lambda_p = 1 / E[T_p]`, its mean
+    /// sojourn on the engine's own hazard table (`mean_sojourn_days_for`),
+    /// to the next phase of the cycle. Trying `A = c e + g_p` in the
+    /// generator equation `rho A = rho e + kappa (T_p - e) dA/de +
+    /// lambda_p (A_next - A)` gives `c = rho / (rho + kappa)` and
+    /// `(rho + lambda_p) g_p = kappa c T_p + lambda_p g_next`, five linear
+    /// equations around the cycle, solved here in closed form.
+    ///
+    /// So a turn of phase moves `A` at once, by `g_next - g_p`, and a
+    /// trough, from which a recovery is nearer than from a contraction,
+    /// already reads above a contraction while the level is still falling:
+    /// the price's trough leads the earnings'. The sojourns are treated as
+    /// exponential, where the table's are Weibull; that is the one
+    /// approximation.
+    pub fn earnings_anticipation_terms(&self) -> Option<([f64; 5], f64)> {
+        let p = &self.params;
+        if p.earnings_anticipation_half_life <= 0.0 || p.earnings_cycle_depth == 0.0 {
+            return None;
+        }
+        let rho = std::f64::consts::LN_2 / p.earnings_anticipation_half_life;
+        let kappa = std::f64::consts::LN_2 / p.earnings_cycle_half_life;
+        let c = rho / (rho + kappa);
+        let (mean, _) = crate::economy::cycle::stationary_phase_shares_for(&self.cycle_spec());
+        let phases = crate::economy::cycle::phase_cycle();
+        let target = |ph: crate::economy::CyclePhase| match ph {
+            crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                -p.earnings_cycle_depth
+            }
+            _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+        };
+        let mut a = [0.0; 5];
+        let mut b = [0.0; 5];
+        for k in 0..5 {
+            let lambda = if mean[k] > 0.0 { 1.0 / mean[k] } else { 0.0 };
+            a[k] = kappa * c * target(phases[k]) / (rho + lambda);
+            b[k] = lambda / (rho + lambda);
+        }
+        // g_k = a_k + b_k g_(k+1): unroll once around the cycle for g_0,
+        // then walk backwards.
+        let mut acc_a = 0.0;
+        let mut acc_b = 1.0;
+        for k in 0..5 {
+            acc_a += acc_b * a[k];
+            acc_b *= b[k];
+        }
+        let mut g = [0.0; 5];
+        g[0] = acc_a / (1.0 - acc_b);
+        for k in (1..5).rev() {
+            let next = if k == 4 { g[0] } else { g[k + 1] };
+            g[k] = a[k] + b[k] * next;
+        }
+        Some((g, c))
+    }
+
+    /// Keep `economy.earnings_anticipation` current: `A - e`, or 0.0 with
+    /// the anticipation off. Called wherever the phase or the level moves.
+    pub fn refresh_earnings_anticipation(&mut self) {
+        self.economy.earnings_anticipation = match self.earnings_anticipation_terms() {
+            None => 0.0,
+            Some((g, c)) => {
+                let k = crate::economy::cycle::phase_cycle()
+                    .iter()
+                    .position(|ph| *ph == self.economy.cycle_phase)
+                    .unwrap_or(0);
+                g[k] + c * self.economy.earnings_cycle - self.economy.earnings_cycle
+            }
+        };
     }
 
     /// The level the earnings cycle is pulled toward in the current phase:
@@ -3760,9 +3842,10 @@ impl Engine {
                 }
                 _ => valuation,
             };
-            let fv = crate::fair_value::compute_fair_value_with(
+            let fv = crate::fair_value::compute_fair_value_at(
                 &valuation, &econ_view, p.fair_value_book_floor,
                 p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
+                p.rate_pe_sensitivity,
             )
             .fair_value;
             let price = crate::mathx::min(
@@ -4686,6 +4769,7 @@ impl Engine {
             self.economy.corporate_bond_yield = corporate_pinned_at;
         }
         self.macro_pins_today = 0;
+        self.refresh_earnings_anticipation();
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,

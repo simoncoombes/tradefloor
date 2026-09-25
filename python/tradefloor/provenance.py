@@ -378,6 +378,10 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "earnings_anticipation_half_life":
+        "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
+        "returns None and the valuation reads the earnings cycle's level "
+        "alone (0.8.5, pt-v20 work, grid ptv20e6)",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -4066,6 +4070,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # `rate_pe_sensitivity` became a dial at 0.8.5 at the constant that
+    # stood, 1.5, which no record derives; the 2022 measurement that would
+    # set it is design repo programme/ptv20-scenario-size.md section 5.
+    "rate_pe_sensitivity",
     # `macro_calendar_days_per_year`, `macro_compound_days_per_year` and
     # `cycle_stationary_opening` left on 2026-09-23 with pt-v19's fifth
     # composition, which moves all three and carries an entry for each: the

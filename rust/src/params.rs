@@ -552,6 +552,28 @@ pub struct ModelParams {
     /// alone and takes no draw. Read only with `earnings_cycle_depth`
     /// non-zero.
     pub earnings_cycle_sigma: f64,
+    /// Half-life, in sessions, of the discount the valuation puts on the
+    /// earnings cycle's expected path. 0.0, which every preset through
+    /// pt-v19 carries, prices today's level alone, so a recession reaches
+    /// prices only as fast as earnings fall and a recovery only as they
+    /// recover: the index cannot fall at the turn and look through the dip,
+    /// as the S&P 500 did in 2020 (trough 23 March, earnings' trough the
+    /// quarter to June). Off zero, fair value reads the level averaged over
+    /// the expected path, `A = c e + g_phase`, from the cycle's own hazards
+    /// and the level's own pull (`Engine::earnings_anticipation_terms`):
+    /// a turn of phase moves it at once, and a trough reads above a
+    /// contraction because a recovery is near. Read only with
+    /// `earnings_cycle_depth` non-zero.
+    pub earnings_anticipation_half_life: f64,
+    /// P/E compression per unit of discount rate above neutral, times a
+    /// name's growth duration: the target multiple's rate adjustment is
+    /// `1 - (yield - neutral) * rate_pe_sensitivity * duration`. 1.5, which
+    /// every preset through pt-v19 carries, is the constant that stood,
+    /// about 2 per cent of fair value per 100 bp of the corporate yield at
+    /// the median duration; the S&P 500's trailing P/E fell 4.9 to 5.5 per
+    /// cent per 100 bp of Baa over 2022 (design repository,
+    /// programme/ptv20-scenario-size.md section 5).
+    pub rate_pe_sensitivity: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -4983,6 +5005,8 @@ impl ModelParams {
             earnings_cycle_upside: 0.0,
             earnings_cycle_half_life: 60.0,
             earnings_cycle_sigma: 0.0,
+            earnings_anticipation_half_life: 0.0,
+            rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7201,6 +7225,8 @@ impl ModelParams {
             "earnings_cycle_upside" => self.earnings_cycle_upside,
             "earnings_cycle_half_life" => self.earnings_cycle_half_life,
             "earnings_cycle_sigma" => self.earnings_cycle_sigma,
+            "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
+            "rate_pe_sensitivity" => self.rate_pe_sensitivity,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7438,6 +7464,8 @@ impl ModelParams {
             "earnings_cycle_upside" => out.earnings_cycle_upside = value,
             "earnings_cycle_half_life" => out.earnings_cycle_half_life = value,
             "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
+            "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
+            "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7809,6 +7837,18 @@ impl ModelParams {
             return Err(format!(
                 "earnings_cycle_half_life is {}. It is a half-life in sessions, in [1, 2520].",
                 self.earnings_cycle_half_life));
+        }
+        if !(self.earnings_anticipation_half_life >= 0.0
+            && self.earnings_anticipation_half_life <= 5040.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
+                self.earnings_anticipation_half_life));
+        }
+        if !(self.rate_pe_sensitivity >= 0.0 && self.rate_pe_sensitivity <= 10.0) {
+            return Err(format!(
+                "rate_pe_sensitivity is {}. It is P/E compression per unit of yield, in [0, 10].",
+                self.rate_pe_sensitivity));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8243,6 +8283,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_cycle_upside",
         "earnings_cycle_half_life",
         "earnings_cycle_sigma",
+        "earnings_anticipation_half_life",
+        "rate_pe_sensitivity",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",
@@ -8341,7 +8383,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
     }
     Some(match name {
         "daily_shock_cap" => mispricing::DAILY_SHOCK_CAP,
-        "rate_pe_sensitivity" => fv::RATE_PE_SENSITIVITY,
         "rate_adjustment_floor" => fv::RATE_ADJUSTMENT_FLOOR,
         "growth_duration_scale" => fv::GROWTH_DURATION_SCALE,
         "loss_making_price_to_book" => fv::LOSS_MAKING_PRICE_TO_BOOK,
@@ -8363,7 +8404,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
 fn carried_read_only_pairs() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = [
         "daily_shock_cap",
-        "rate_pe_sensitivity",
         "rate_adjustment_floor",
         "growth_duration_scale",
         "loss_making_price_to_book",
