@@ -192,7 +192,9 @@ from .universe_util import fingerprint_of
 
 #: Macro fields reported in a trace row and in the fork agreement. Not every
 #: field the engine carries -- these are the ones a macro experiment is about,
-#: and a row is meant to be readable.
+#: and a row is meant to be readable. They are read from `macro_state`, so
+#: `cycle` is the phase as published: under `cycle_publication_lag` a trace
+#: row shows a turn that many sessions after it happens.
 MACRO_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "vix",
                 "inflation_rate", "cycle")
 

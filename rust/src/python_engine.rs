@@ -2806,6 +2806,11 @@ impl PyEngine {
     /// Rates come back FRACTIONAL, matching what the constructor takes, so a
     /// value read here can be written straight back without a conversion --
     /// which is the whole point of having one denomination at the boundary.
+    ///
+    /// `cycle` is the phase as PUBLISHED: under `cycle_publication_lag`, the
+    /// phase of that many sessions before, so a turn reaches it when it is
+    /// announced. `state_snapshot()["economy"]["cycle_phase"]` is the true
+    /// phase.
     #[getter]
     fn macro_state(&self) -> PyMacro {
         let e = self.inner.economy();

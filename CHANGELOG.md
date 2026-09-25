@@ -81,6 +81,75 @@ to 10.3 at its floor, and the three crisis rows are inside their bands.
 mispricing and crowd coefficients. No per-preset digest moves, and pt-v20's
 row is `149d72de`.
 
+### Macro data as the agencies publish it
+
+An independent audit of pt-v20 found that timing rules on the reported macro
+data beat buy-and-hold. Holding the roster and going to cash while
+`macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
+over holding, in 30 of 30 21-year histories. The owner decided that macro
+data is published the way the real agencies publish it. The true state
+drives prices, and observers read the published state. Five dials do this,
+each 0 on every preset before pt-v20, and `docs/MODEL.md` gives their rules
+under "True and published state". The snapshot and the state hash carry the
+state a dial adds (`cycle_history`, `gdp_publication`,
+`unemployment_impulse`) only while that dial is set, so every preset before
+pt-v20 replays and hashes as it did.
+
+`cycle_publication_lag` publishes the business-cycle phase that many
+sessions late, as the NBER dates a turn about a year after it happens.
+`macro_fields["cycle"]`, `macro_state.cycle`, a World's trace rows and the
+LLM adapters' observations report the phase of that many sessions before,
+and the opening phase until the lag has passed. Prices, the earnings cycle,
+the cycle's hazards and the central bank read the true phase. A scenario
+that sets the phase sets the true one at once, so `recession.yml`'s
+contraction on day 50 acts on the model that day and is published that many
+sessions later. pt-v20 sets <PTV20-VALUE> sessions.
+
+`gdp_publication_lag` reports GDP growth as the BEA does, as the mean of the
+true daily growth over each quarter of the macro calendar (63 sessions on
+pt-v20), released that many sessions after the quarter's last day.
+`macro_fields["gdp_growth"]` and `macro_table()`, and so a dataset export's
+`macro.arrow`, carry that figure, and the opening growth before the first
+release. Output, earnings, unemployment and the central bank read the true
+daily growth, and a `macro.growth` intervention and the Oracle's drift now
+read it from `state_snapshot()`. pt-v20 sets <PTV20-VALUE> sessions.
+
+`unemployment_adjustment_half_life` makes unemployment respond to a turn
+over months. The monthly step moved the rate by the whole of what the
+phase's trend and Okun's law asked for, so the first step after a
+contraction began rose about 1.2 points, four times the spread of a monthly
+change otherwise, and announced the turn. Off zero, an impulse closes
+`1 - 0.5^(month / half_life)` of its gap to that drive at each monthly step,
+with a month of 21 sessions on pt-v20. At 84 sessions the first rise is
+about 0.16 points. It moves the true rate, and so inflation, the central
+bank and the cycle's hazards. pt-v20 sets <PTV20-VALUE> sessions.
+
+`fear_greed_published_inputs` makes the fear and greed index read the
+published phase and growth. Its target carried a phase bonus (+15 in an
+expansion, -25 in a contraction) and three times the true daily growth, so
+it fell about 35 points in the five sessions after a contraction began. With
+the switch on it moves when the turn is published. Nothing on the price path
+reads the index, so the switch moves no price. pt-v20 sets <PTV20-VALUE>.
+
+`macro_publication_repricing` prices the close's macro step at the moment it
+is published. The policy rate, the corporate yield and the cycle could be
+read after the close, but prices took them only at the next session's first
+tick, so an agent that read a hike sold at the price from before it. With
+the switch on, each traded name is re-marked as the step ends to the price
+its mispricing implies on the new state, and `pin_macro` re-marks the same
+way. The mispricing itself is unchanged and no draw is taken. pt-v20 sets
+<PTV20-VALUE>.
+
+For users, the change is in what an observer reads. On pt-v20,
+`macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
+values, and a turn of the cycle reaches `macro_fields`, `macro_state`, trace
+rows and a hosted market log's cycle events that many sessions after it
+happens. A phase or a growth rate written with `pin_macro` reads back from
+`macro_fields` only once it is published. `state_snapshot()["economy"]`
+still holds the true phase and growth. Sandboxed agents cannot read it. Code
+that needs the true state, such as an oracle or a regime label, reads it
+there. Nothing changes on pt-v19 or any earlier preset.
+
 ### The flow fix and its measurement
 
 Every harness passed an agent's fills to `run_session` as `order_flow`,

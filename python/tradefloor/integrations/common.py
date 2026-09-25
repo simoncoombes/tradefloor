@@ -116,7 +116,9 @@ from ..counterfactual import MACRO_FIELDS
 #: ``counterfactual.MACRO_FIELDS`` itself, so the two cannot drift apart over
 #: what a macro experiment covers -- the library has already settled which
 #: macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
-#: model coefficient no exchange publishes.
+#: model coefficient no exchange publishes. ``cycle`` is the phase as
+#: published (``cycle_publication_lag``), so a framework learns of a turn
+#: of the cycle when it is announced.
 OBSERVABLE_MACRO = MACRO_FIELDS
 
 #: The sides a decision may name. HOLD carries no quantity and produces no

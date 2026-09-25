@@ -250,10 +250,17 @@ class Engine:
     tickers: list[str]
     draws_consumed: int
     len: int
+    # `cycle` here is the phase as published: under `cycle_publication_lag`,
+    # the phase of that many sessions before.
     macro_state: Macro
     # Every field `pin_macro` writes, in the units it takes. Distinct from
     # `macro_state`, which is the seven-field `Macro` object, and from
     # `state_snapshot()["economy"]`, which is the core's percent form.
+    # `cycle` and `gdp_growth` are the published figures: under
+    # `cycle_publication_lag` the phase of that many sessions before, and
+    # under `gdp_publication_lag` the last quarter's mean growth as released.
+    # A pinned phase or growth reads back only once it is published.
+    # `state_snapshot()["economy"]` holds the true phase and growth.
     macro_fields: dict[str, Any]
     model: ModelParams
     model_fingerprint: str

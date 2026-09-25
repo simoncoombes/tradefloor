@@ -72,7 +72,10 @@ new: 115.00` rather than restating the recipe.
 That read and that write have to be in the same units, or a `multiply` by 1.4
 is a factor of a hundred out on a plausible-looking trajectory. Both go
 through `Engine.macro_fields`, which is the read side of `pin_macro` in
-`pin_macro`'s own denomination, for exactly this reason.
+`pin_macro`'s own denomination, for exactly this reason. One field reads
+elsewhere: under `gdp_publication_lag`, `macro_fields["gdp_growth"]` is the
+last quarter's published mean, so a `macro.growth` operation reads the true
+growth from `state_snapshot()["economy"]`, in the same units.
 """
 
 from __future__ import annotations
@@ -246,7 +249,9 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit.
+    field for field and unit for unit, with one exception: `gdp_growth` reads
+    the true growth from the snapshot, because under `gdp_publication_lag`
+    `macro_fields` reports the published quarterly figure.
     """
     def read(engine: Engine) -> Any:
         if field == "gdp_growth":
@@ -569,7 +574,9 @@ _register(_make_macro_target(
         "The business-cycle phase. Immediate through the universe's stress "
         "intensity, and it retargets GDP growth, unemployment and the "
         "recession probability at the next monthly step. `set` only: a "
-        "phase is a name. Measured, set to contraction: -3.61%."
+        "phase is a name. Measured, set to contraction: -3.61%. It sets "
+        "the true phase at once; under `cycle_publication_lag` "
+        "`macro_fields[\"cycle\"]` reports it that many sessions later."
     ),
     check=_cycle_check, format=str, numeric=False,
 ))

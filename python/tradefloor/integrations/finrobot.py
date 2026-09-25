@@ -54,9 +54,10 @@ https://github.com/simoncoombes/tradefloor-experiments.
 ``OBSERVABLE_MACRO`` is the macro half of the list, bound to
 ``counterfactual.MACRO_FIELDS`` on purpose: the library has already settled
 which macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
-model coefficient no exchange publishes. ``tests/test_finrobot.py`` runs the
-mapping against an engine proxy that raises on the forbidden attributes, so a
-future edit reaching for one fails on the access.
+model coefficient no exchange publishes. Its ``cycle`` is the phase as
+published, late under ``cycle_publication_lag``. ``tests/test_finrobot.py``
+runs the mapping against an engine proxy that raises on the forbidden
+attributes, so a future edit reaching for one fails on the access.
 
 Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
 not come off the engine either. The caller supplies them as ``fundamentals``.
