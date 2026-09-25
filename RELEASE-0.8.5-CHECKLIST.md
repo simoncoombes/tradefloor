@@ -97,8 +97,8 @@ venv that holds a build of the final engine commit:
 - [ ] Open the PR `release/0.8.5` into `main`. The required checks are
       `all targets agree` and `the suite is green`, and the protection is
       strict, so the branch has to be up to date with `main`.
-- [ ] Before the tag, the owner switches Zenodo on (step 8), or 0.8.5 gets
-      no DOI.
+- [x] Zenodo's GitHub integration is on for `simoncoombes/tradefloor`
+      (the owner, 2026-09-25), so the 0.8.5 GitHub release gets a DOI.
 - [ ] The owner merges.
 
 ## 6. Tag and publish
@@ -132,11 +132,16 @@ venv that holds a build of the final engine commit:
       `flip/a`, `flip/b`, `flip/c`, `envgaps/pt-v20`, `remeasure/pt-v20`,
       and in the docs repo `figures/pt-v20`.
 
-## 8. Zenodo (the owner's)
+## 8. Zenodo
 
-- [ ] Before the tag: sign in at https://zenodo.org with GitHub, open
-      https://zenodo.org/account/settings/github/, press "Sync now" and
-      switch `simoncoombes/tradefloor` on (`RELEASING.md`, "DOI (Zenodo)").
-- [ ] After the release: check the record's title, author and licence, and
-      copy the concept DOI into `CITATION.cff` (`doi:`), the README's BibTeX
-      entry and the docs Install page.
+- [x] The owner switched Zenodo's GitHub integration on for
+      `simoncoombes/tradefloor` on 2026-09-25 (`RELEASING.md`, "DOI
+      (Zenodo)").
+- [ ] After the 0.8.5 GitHub release: open the new Zenodo record, check its
+      title, author and licence against `.zenodo.json`, and read the concept
+      DOI from it.
+- [ ] Put the concept DOI in `CITATION.cff` (`doi:`), in the README's
+      "Citing tradefloor" BibTeX entry in place of `10.5281/zenodo.XXXXXXX`,
+      and on the docs Install page. That is a documentation change, which an
+      LTS patch allows, and the docs change goes through a PR into the docs
+      repo's `main`.
