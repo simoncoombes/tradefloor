@@ -457,8 +457,16 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `vix_anchor_memory` off zero; every other snapshot omits it.
     # So are the rate instruments, only on an engine that holds them, and
     # the agent-facing book, only once an agent has used it.
+    # From pt-v20 the fair-value levels and the unapplied opening draws are
+    # carried, together, on a model that can move a level.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "rates", "book"} & carried)
+        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z"}
+        & carried)
+    if ("fair_value_offset" in carried) != ("opening_z" in carried):
+        raise ValidationError(
+            "this snapshot carries one of fair_value_offset and opening_z "
+            "without the other. The engine writes both or neither, so it was "
+            "edited or assembled from two snapshots.")
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -553,6 +561,25 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot.get("vix_log_level", 0.0))
     if "vix_anchor_slow" in snapshot:
         _f64(buf, snapshot["vix_anchor_slow"])
+    # The aggregate earnings cycle, only on a model with the cycle on, and
+    # then the fair-value levels and the unapplied opening draws, only on a
+    # model that can move a level: `Engine::state_hash`'s order and rule.
+    if "earnings_cycle" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["earnings_cycle"])
+    if "fair_value_offset" in snapshot:
+        for name in ("fair_value_offset", "opening_z"):
+            if len(snapshot[name]) % 8:
+                raise ValidationError(
+                    f"snapshot field {name!r} carries {len(snapshot[name])} "
+                    "bytes, which is not a whole number of f64s.")
+        raw = snapshot["fair_value_offset"]
+        for value in _column(raw, len(raw) // 8, "fair_value_offset"):
+            _f64(buf, value)
+        raw = snapshot["opening_z"]
+        values = _column(raw, len(raw) // 8, "opening_z")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the
@@ -591,11 +618,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _maybe_f64(buf, event["price_impact"])
 
     economy = snapshot["economy"]
-    if set(economy) != set(_ECONOMY_KEYS):
+    # `earnings_cycle` only on a model with the cycle on; hashed above, beside
+    # the other states a dial turns on.
+    economy_expected = set(_ECONOMY_KEYS) | ({"earnings_cycle"} & set(economy))
+    if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
-            f"missing {sorted(set(_ECONOMY_KEYS) - set(economy))}, unexpected "
-            f"{sorted(set(economy) - set(_ECONOMY_KEYS))}."
+            f"missing {sorted(economy_expected - set(economy))}, unexpected "
+            f"{sorted(set(economy) - economy_expected)}."
         )
     for name in _ECONOMY_FIELDS:
         value = economy[name]
@@ -888,6 +918,12 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "sector_variance", "jump_excitation", "sector_day_factor",
                    "pending_jump", "pending_overnight")
 
+#: Byte buffers only some snapshots carry: the fair-value levels and the
+#: unapplied opening draws on a model that can move a level (pt-v20 on), and
+#: the agent-facing book's consumed depth once an agent has used it. Encoded
+#: where present and left out where not.
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z")
+
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,
 #: which is what `hashlib.hexdigest` produces and what `bytes.fromhex` will
@@ -1161,6 +1197,13 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
                       for name, buf in snapshot["columns"].items()}
     for name in _LEDGER_BUFFERS:
         out[name] = base64.b64encode(snapshot[name]).decode("ascii")
+    for name in _LEDGER_OPTIONAL_BUFFERS:
+        if name in snapshot:
+            out[name] = base64.b64encode(snapshot[name]).decode("ascii")
+    if "book" in snapshot:
+        book = dict(snapshot["book"])
+        book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
+        out["book"] = book
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
@@ -1174,6 +1217,13 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
                       for name, text in payload["columns"].items()}
     for name in _LEDGER_BUFFERS:
         out[name] = base64.b64decode(payload[name])
+    for name in _LEDGER_OPTIONAL_BUFFERS:
+        if name in payload:
+            out[name] = base64.b64decode(payload[name])
+    if "book" in payload:
+        book = dict(payload["book"])
+        book["taken"] = base64.b64decode(book["taken"])
+        out["book"] = book
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out

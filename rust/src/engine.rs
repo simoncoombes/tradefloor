@@ -836,6 +836,34 @@ impl Engine {
         Ok(())
     }
 
+    /// The opening draws not yet applied: one standard normal per name of
+    /// the roster the engine was built with and one for the market's common
+    /// level, until the first open that is not closed takes them, and empty
+    /// after it. For checkpoints and forks. `state_hash` has covered them
+    /// since pt-v20 composed, and a snapshot that dropped them rebuilt a
+    /// pre-open engine that opened at other draws and hashed apart.
+    pub fn opening_z(&self) -> &[f64] {
+        &self.opening_z
+    }
+
+    /// Put the unapplied opening draws back. Empty is a legal state (the
+    /// opening has happened), and any other length must be the roster's
+    /// plus one, the length the engine drew.
+    pub fn set_opening_z(&mut self, values: &[f64]) -> Result<(), String> {
+        if !values.is_empty() && values.len() != self.companies.len() + 1 {
+            return Err(format!(
+                "this snapshot carries {} opening draws and the roster holds {} \
+                 companies, which draws {}. The draws are positional against the \
+                 roster, so this restore is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len(),
+                self.companies.len() + 1
+            ));
+        }
+        self.opening_z = values.to_vec();
+        Ok(())
+    }
+
     /// Whether this engine's model can move a fair-value level, which is
     /// when the snapshot and the state hash carry them. Off on every preset
     /// through pt-v19, so their snapshots and hashes are the ones they were.

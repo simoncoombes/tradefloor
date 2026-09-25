@@ -3685,6 +3685,9 @@ impl PyEngine {
         // is the one it was.
         if self.inner.carries_fair_value_offsets() {
             out.set_item("fair_value_offset", f64_bytes(py, &self.inner.fair_value_offsets()))?;
+            // The opening draws the hash covers beside the levels: empty once
+            // the market has opened, the roster's plus one before it.
+            out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
         }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
@@ -4115,6 +4118,16 @@ impl PyEngine {
                 .collect();
             self.inner
                 .set_fair_value_offsets(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(raw) = snapshot.get_item("opening_z")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_opening_z(&values)
                 .map_err(ValidationError::new_err)?;
         }
         for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {

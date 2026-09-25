@@ -234,7 +234,13 @@ def _walk(snapshot):
 #: `vix_anchor_memory` off zero (`manifest.state_hash`). pt-v19 carries it
 #: since its fifth composition (2026-09-23) and pt-v18 does not, so the walk
 #: below runs on both and each must cover exactly what it carries.
-CONDITIONAL_KEYS = {"pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
+#: pt-v20 carries two more, together: the fair-value levels and the
+#: unapplied opening draws, because it can move a level; and its economy
+#: carries `earnings_cycle`, because the cycle is on.
+CONDITIONAL_KEYS = {"pt-v20": {"vix_anchor_slow", "fair_value_offset",
+                               "opening_z"},
+                    "pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
+CONDITIONAL_ECONOMY_KEYS = {"pt-v20": {"earnings_cycle"}}
 
 
 @pytest.mark.parametrize("preset", sorted(CONDITIONAL_KEYS))
@@ -275,7 +281,9 @@ def test_the_hash_moves_when_any_snapshot_field_moves(preset):
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("columns.")} == set(mf._STATE_HASH_COLUMNS)
     assert {name.split(".", 1)[1] for name in named
-            if name.startswith("economy.")} == set(mf._ECONOMY_KEYS)
+            if name.startswith("economy.")} == (
+                set(mf._ECONOMY_KEYS)
+                | CONDITIONAL_ECONOMY_KEYS.get(preset, set()))
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("central_bank.")} == set(
                 mf._CENTRAL_BANK_FIELDS)
@@ -1235,3 +1243,29 @@ def test_the_hash_reads_every_field_of_an_overlay_entry():
 
     # the prices are untouched, so this is the overlay and nothing else
     assert list(one.prices()) == list(plain.prices())
+
+
+def test_a_pre_open_pt_v20_snapshot_restores_its_opening_draws():
+    """The unapplied opening draws are state, and the snapshot carries them.
+
+    pt-v20 opens each name's mispricing, and the market's common level, at
+    draws taken when the engine is built and applied at the first open. The
+    state hash covered them and the snapshot did not, so a snapshot taken
+    before the open and restored into an engine of another seed opened at
+    that engine's draws: it hashed apart at once and traded other prices a
+    day later. pt-v19 takes no opening draws and carries none.
+    """
+    source = tf.Engine(seed=SEED, universe=UNIVERSE, model="pt-v20")
+    snapshot = source.state_snapshot()
+    assert len(snapshot["opening_z"]) == 8 * (len(UNIVERSE) + 1)
+    other = tf.Engine(seed=SEED + 1, universe=UNIVERSE, model="pt-v20")
+    other.restore_state(snapshot)
+    assert other.state_hash() == source.state_hash() == state_hash(snapshot)
+    for engine in (source, other):
+        engine.run_days(1, record=False, ticks_per_day=TICKS)
+    assert other.state_snapshot()["opening_z"] == b""
+    assert other.state_hash() == source.state_hash()
+    assert list(other.prices()) == list(source.prices())
+    assert "opening_z" not in tf.Engine(
+        seed=SEED, universe=UNIVERSE, model="pt-v19").state_snapshot()
+
