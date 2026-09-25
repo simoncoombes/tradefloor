@@ -1033,8 +1033,8 @@ Every change in the model price at a fixed published valuation is booked to
 one of ten factors, which `engine.truth()` reports
 (`market/factors.rs:61-63`, `market/tick.rs:1144-1161`). An eleventh column,
 the fair-value shift, books what left $s$ for the fair-value level. It is
-added on the branch `fix/ptv20-core` (commit `08f236f`, `market/factors.rs`,
-`python_arrow.rs`) for this release, and each tick books as follows:
+added for this release on the branch `fix/ptv20-core` (commit `fe8bcef`,
+`market/factors.rs`, `python_arrow.rs`), and each tick books as follows:
 
 | Slot | Factor | Amount |
 |---|---|---|
@@ -1681,7 +1681,13 @@ a moving value.
 morning. The macro step still runs at every close, starting from the pinned
 value, and every other field follows from it; the next morning the pin
 overwrites the pinned field again (`python_engine.rs:2970-3018`). When the
-pin ends, the economy carries on from the last value.
+pin ends, the economy carries on from the last value. Two fixes on
+`fix/ptv20-core` for this release (commits `cd15126` and `fe8bcef`) close
+a leak the daily corporate yield opened on pt-v20: a pinned corporate yield
+now holds through the close, a meeting's re-anchoring included, and a
+pinned VIX adds no VIX term to the corporate yield's daily move. Before
+them, holding the VIX at 45 walked the yield from 2.81% to 2.42% in five
+sessions.
 
 ### Target channels
 
