@@ -3025,6 +3025,9 @@ impl PyEngine {
             vix_sets_variance,
         });
 
+        // What the market stands on before the write, for the re-mark
+        // below; `None` with `macro_publication_repricing` off.
+        let marks = self.inner.published_macro_marks();
         let e = self.inner.economy_mut();
         if let Some(v) = vix {
             e.vix = v;
@@ -3100,6 +3103,10 @@ impl PyEngine {
         if corporate_bond_yield.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
         }
+        // A pin is published the moment it is written, so with
+        // `macro_publication_repricing` on the price takes it now rather
+        // than at the next tick (`Engine::reprice_to_published_macro`).
+        self.inner.reprice_to_published_macro(marks);
         Ok(())
     }
 

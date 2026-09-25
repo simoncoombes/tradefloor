@@ -856,6 +856,11 @@ PERTURBATIONS = [
     # phase and growth are the true ones, and with them set nothing a price
     # reads is downstream of the index (tests/test_fear_greed_published.py).
     ("fear_greed_published_inputs", 1.0, False),
+    # LIVE on the probe: pt-v20 moves the corporate yield at every close
+    # (`corporate_yield_daily`), so every close's macro step moves fair
+    # value, and with the switch on the price takes it as the step ends
+    # (`Engine::reprice_to_published_macro`) rather than at the next tick.
+    ("macro_publication_repricing", 1.0, True),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an

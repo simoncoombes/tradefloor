@@ -5452,13 +5452,124 @@ impl Engine {
         } else {
             0.0
         };
-        self.advance_day(&DayAdvanceRequest {
+        // The fair values the market stands on BEFORE the step, taken only
+        // with `macro_publication_repricing` on: the step's decision is
+        // readable the moment it ends, so the price takes it then.
+        let marks = self.published_macro_marks();
+        let outcome = self.advance_day(&DayAdvanceRequest {
             volatility: 1.0,
             active_shocks: &[],
             market_return_pct,
             game_day,
             timestamp: game_day * 24 * 60,
-        })
+        });
+        self.reprice_to_published_macro(marks);
+        outcome
+    }
+
+    /// Every name's fair value as the tick would read it on the state now
+    /// standing, at its current price and day, for
+    /// [`Engine::reprice_to_published_macro`]. `None`, computing nothing,
+    /// with `macro_publication_repricing` off. NaN for a name the re-mark
+    /// leaves alone: bankrupt, private, or not yet traded (no `s`), whose
+    /// first tick adopts its premium lazily and so moves nothing anyway.
+    pub fn published_macro_marks(&self) -> Option<Vec<f64>> {
+        if self.params.macro_publication_repricing == 0.0 {
+            return None;
+        }
+        Some(
+            self.companies
+                .iter()
+                .map(|c| {
+                    if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none()
+                        || !(c.stock.price > 0.0)
+                    {
+                        f64::NAN
+                    } else {
+                        crate::market::tick::tick_fair_value(
+                            &self.params, &self.economy, self.nominal_output_base,
+                            self.current_day, c, c.stock.price)
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    /// THE PRICE TAKES A MACRO DECISION WHEN IT IS PUBLISHED
+    /// (`macro_publication_repricing`).
+    ///
+    /// The close's macro step -- the economy, the cycle, the central bank's
+    /// meeting, the corporate yield it re-anchors -- is readable from the
+    /// moment it ends (`macro_fields`, `macro_state`, a World's trace), but
+    /// fair value only reached the price at the next session's first tick.
+    /// Everything in between, the evening and the opening step of any
+    /// harness, traded at the price from before the decision. Here each
+    /// name that has traded is re-marked as the step ends to the price its
+    /// premium over fair value implies on the published state: `price =
+    /// (last / fv_before) * fv_after(price)`, both fair values computed as
+    /// the tick computes them (`market::tick::tick_fair_value`) on the same
+    /// day, `fv_after` at the new price because the buyback term reads it.
+    /// The name's mispricing `s` is left as it was. The next tick therefore
+    /// starts on the model price the published state implies, and the move
+    /// sits between the day's last print and
+    /// the next open, which is where a decision announced after the close
+    /// lands on a real tape. `pin_macro` re-marks the same way, so a
+    /// scenario's written state is priced the moment it is readable too.
+    ///
+    /// No draw, no new state: the price is the state it writes, with the
+    /// market cap and the day's high and low beside it (the latter are
+    /// reset at the next open when the re-mark comes after a close).
+    /// `marks` is [`Engine::published_macro_marks`] taken before the change;
+    /// `None` does nothing.
+    pub fn reprice_to_published_macro(&mut self, marks: Option<Vec<f64>>) {
+        let Some(before) = marks else {
+            return;
+        };
+        let p = &self.params;
+        let economy = &self.economy;
+        let base = self.nominal_output_base;
+        let day = self.current_day;
+        for (c, &fv0) in self.companies.iter_mut().zip(before.iter()) {
+            if !(fv0 > 0.0) || c.is_bankrupt || !c.is_public {
+                continue;
+            }
+            let last = c.stock.price;
+            let fv1 = crate::market::tick::tick_fair_value(p, economy, base, day, c, last);
+            if !(fv1 > 0.0) || fv1 == fv0 {
+                continue;
+            }
+            // The price the name's mispricing implies on the published
+            // state: `price = (last / fv0) * fv(price)`. Fair value reads
+            // the price itself through the buyback term (the yield is
+            // earnings over price), so the first step, `last * fv1 / fv0`,
+            // is exact only with `buyback_payout_share` at 0.0; with it on,
+            // a re-mark that stopped there leaves the next tick to raise
+            // fair value by the buyback yield the lower price implies, and
+            // measured on pt-v20 with its leading dials that handed back 14
+            // bp of a 79 bp hike in the first 65 minutes. The fixed point
+            // is a contraction (the term's elasticity is the buyback yield
+            // times the years elapsed, well under one), so a few steps
+            // settle it; the loop stops when a step moves nothing, or at
+            // sixteen, and takes no draw.
+            let ratio = last / fv0;
+            let clamp = |x: f64| crate::mathx::min(crate::mathx::max(x, 0.01), p.price_hard_cap);
+            let mut price = clamp(ratio * fv1);
+            if p.buyback_payout_share != 0.0 {
+                for _ in 0..16 {
+                    let fv = crate::market::tick::tick_fair_value(p, economy, base, day, c, price);
+                    let next = clamp(ratio * fv);
+                    if next == price {
+                        break;
+                    }
+                    price = next;
+                }
+            }
+            let stock = &mut c.stock;
+            stock.price = price;
+            stock.high = crate::mathx::max(stock.high, price);
+            stock.low = crate::mathx::min(stock.low, price);
+            stock.market_cap = price * stock.shares_outstanding;
+        }
     }
 
     // ── State access ──────────────────────────────────────────────────────
@@ -8563,6 +8674,119 @@ mod tests {
         for i in 0..leaves.len() {
             for j in (i + 1)..leaves.len() {
                 assert_ne!(leaves[i], leaves[j], "days {i} and {j} share a leaf");
+            }
+        }
+    }
+
+    /// pt-v20 with every branch of the valuation live: the buyback term,
+    /// the earnings cycle and its anticipation, and the re-mark itself.
+    fn engine_repricing(seed: u32, on: bool) -> Engine {
+        let mut p = ModelParams::preset("pt-v20").expect("pt-v20 ships");
+        p.buyback_payout_share = 0.75;
+        p.earnings_anticipation_half_life = 126.0;
+        p.rate_pe_sensitivity = 3.0;
+        p.macro_publication_repricing = if on { 1.0 } else { 0.0 };
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            p,
+        )
+    }
+
+    #[test]
+    fn tick_fair_value_is_the_ticks_own_fundamental_to_the_bit() {
+        // The re-mark reads fair value through `tick_fair_value`, a copy of
+        // the tick's phase 2. If the two ever part, the re-mark prices a
+        // state the tick does not, and the first tick moves again.
+        //
+        // The tick's `fundamental` is the fair value AFTER its own
+        // permanent share of the minute's shocks (`fair_value_news_share`),
+        // which the re-mark has no reason to read, so both shares are off
+        // here and the column is the valuation the tick started from. The
+        // opening's levels, the nominal path, the earnings cycle and the
+        // buyback term (the day set, so it is live) all stay on.
+        let mut e = engine_repricing(21, false);
+        e.params.fair_value_news_share = 0.0;
+        e.params.fair_value_market_share = 0.0;
+        for day in 1..=3i64 {
+            e.set_current_day(day);
+            e.open_market();
+            for m in 0..30 {
+                let start = e.clone();
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                for (i, c) in start.companies().iter().enumerate() {
+                    // A name's first tick runs the opening, which writes its
+                    // fair-value level inside the tick; the re-mark never
+                    // reads a name that has not traded.
+                    if c.stock.mispricing_s.is_none() {
+                        continue;
+                    }
+                    let fv = crate::market::tick::tick_fair_value(
+                        start.params(), start.economy(), start.nominal_output_base(),
+                        start.current_day(), c, c.stock.price);
+                    assert_eq!(fv.to_bits(), e.tick_fundamental()[i].to_bits(),
+                               "day {day} minute {m} name {i}");
+                }
+            }
+            e.close_day(day);
+        }
+    }
+
+    #[test]
+    fn the_close_prices_what_its_macro_step_publishes() {
+        let mut on = engine_repricing(33, true);
+        let mut off = engine_repricing(33, false);
+        for day in 1..=6i64 {
+            for e in [&mut on, &mut off] {
+                // The day set, so the buyback term reads the price.
+                e.set_current_day(day);
+                e.open_market();
+                for m in 0..40 {
+                    e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                }
+                e.close_market(&DayCloseRequest {
+                    daily_innovations: &[None, None, None],
+                    sector_base_variances: &[0.0004, 0.0004, 0.0004],
+                    avg_volume: crate::market::AvgVolumePolicy::Hold,
+                });
+            }
+            // Pinned apart so every day's step moves fair value.
+            let bump = if day % 2 == 0 { 0.5 } else { -0.4 };
+            on.economy_mut().corporate_bond_yield += bump;
+            off.economy_mut().corporate_bond_yield += bump;
+            let last: Vec<f64> = on.prices();
+            let marks = on.published_macro_marks().expect("on");
+            assert!(off.published_macro_marks().is_none(), "off computes nothing");
+            let s_before: Vec<Option<f64>> =
+                on.companies().iter().map(|c| c.stock.mispricing_s).collect();
+            on.advance_macro_day(day);
+            off.advance_macro_day(day);
+            for (i, c) in on.companies().iter().enumerate() {
+                // The re-marked price is the one the name's mispricing
+                // implies on the published state, fair value read at that
+                // very price (the buyback term reads it).
+                let fv1 = crate::market::tick::tick_fair_value(
+                    on.params(), on.economy(), on.nominal_output_base(),
+                    on.current_day(), c, c.stock.price);
+                let want = last[i] / marks[i] * fv1;
+                assert!((c.stock.price / want - 1.0).abs() < 1e-13,
+                        "day {day} name {i}: {} against {want}", c.stock.price);
+                assert_eq!(c.stock.mispricing_s, s_before[i], "the re-mark leaves s alone");
+                assert!((c.stock.price / last[i] - 1.0).abs() > 1e-6, "the step moved fair value");
+            }
+            // Off, the close's price is the last print, as it always was.
+            let off_prices = off.prices();
+            let off_last: Vec<f64> = off.companies().iter().map(|c| c.stock.price).collect();
+            assert_eq!(off_prices, off_last);
+            // Put the pair back on one market for the next day, so each day
+            // tests the step alone.
+            let synced: Vec<f64> = on.prices();
+            for (c, p) in off.companies_mut().iter_mut().zip(synced.iter()) {
+                c.stock.price = *p;
+                c.stock.market_cap = *p * c.stock.shares_outstanding;
             }
         }
     }

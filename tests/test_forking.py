@@ -1052,6 +1052,9 @@ def _nothing_dormant():
                    closing_auction=1.0,
                    flight_to_quality_day=1.0,
                    corporate_yield_daily=1.0,
+                   # The close's macro step priced as it is published, a
+                   # switch too.
+                   macro_publication_repricing=1.0,
                    news_absorption_half_life=0.6,
                    news_absorption_drift_share=0.12,
                    news_absorption_drift_half_life=42.0,

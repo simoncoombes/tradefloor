@@ -1687,6 +1687,46 @@ pub fn published_fair_value(
     .fair_value
 }
 
+/// A name's fair value as the tick's phase 2 computes it: the nominal
+/// restatement, the name's own fair-value level, the buyback term at
+/// `price`, then the valuation. The same operations in the same order, so
+/// on the state a tick starts from it is the tick's `fundamental` to the
+/// bit (`tests` below and `Engine::reprice_to_published_macro`, which reads
+/// it before and after the close's macro step at one price and one day).
+pub fn tick_fair_value(
+    p: &ModelParams,
+    economy: &EconomyState,
+    nominal_output_base: f64,
+    elapsed_days: i64,
+    company: &TickCompany,
+    price: f64,
+) -> f64 {
+    let nominal = nominal_scale(p, economy, nominal_output_base);
+    let grown = if nominal == 1.0 {
+        company.valuation()
+    } else {
+        scale_valuation(company.valuation(), nominal)
+    };
+    let v_level = company.stock.fair_value_offset.unwrap_or(0.0);
+    let grown = if v_level == 0.0 {
+        grown
+    } else {
+        scale_valuation(grown, mathx::exp(v_level))
+    };
+    let buyback = buyback_scale(p, grown.eps, price, elapsed_days);
+    let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
+    let econ_view = EconomyValuationInputs {
+        corporate_bond_yield: Some(economy.corporate_bond_yield),
+        federal_funds_rate: economy.federal_funds_rate,
+        qe_pe_boost: Some(economy.qe_pe_boost),
+        qe_assets_ratio: Some(economy.qe_assets_ratio),
+    };
+    crate::fair_value::compute_fair_value_at(
+        &valuation, &econ_view, p.fair_value_book_floor,
+        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
+    .fair_value
+}
+
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {
     // `Math.max(-CAP, Math.min(CAP, s))` — the min/max spelling, not the
     // ternary, matching the source.
