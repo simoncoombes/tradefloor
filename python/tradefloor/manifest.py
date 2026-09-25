@@ -124,6 +124,7 @@ from ._core import (
     MispricingState,
     ModelParams,
     ValidationError,
+    check_seed,
     fair_value,
     model_preset,
     sectors,
@@ -1442,8 +1443,9 @@ class RunManifest:
             "model": engine.model_fingerprint,
             "order_log": _sha(_canonical(log)),
         }
+        seed = check_seed(seed)
         fingerprints["inputs"] = _sha(_canonical(
-            {"seed": int(seed), **fingerprints}))
+            {"seed": seed, **fingerprints}))
 
         doc = {
             "schema": MANIFEST_SCHEMA,
@@ -1460,7 +1462,7 @@ class RunManifest:
                 "model": dict(engine.model_params),
                 "era": {"probe": ERA_PROBE, "digest": era_fingerprint()},
             },
-            "seed": int(seed),
+            "seed": seed,
             "universe": universe_payload,
             "universe_source": universe_source,
             "macro": macro_payload,
@@ -2205,8 +2207,13 @@ def _sample_days(count: int, k: int, seed: int) -> list[int]:
     library's generator would do the arithmetic, and its ``sample`` is not a
     published sequence: a verification whose sampled days moved between
     Python versions could not be repeated by the reader it was reported to.
+
+    ``seed`` is any integer from 0 to ``2**64 - 1``. Until 0.8.5 it was masked
+    to its low 32 bits here, so ``2**32 + 5`` drew seed 5's days and ``-1``
+    drew ``2**32 - 1``'s. Every seed below ``2**32`` draws the days it drew;
+    one above now draws its own, and a negative one is refused.
     """
-    rng = GameRng(int(seed) & 0xFFFFFFFF, _VERIFY_STREAM)
+    rng = GameRng(check_seed(seed), _VERIFY_STREAM)
     pool = list(range(count))
     for i in range(k):
         j = i + int(rng.next_int(0, count - 1 - i))

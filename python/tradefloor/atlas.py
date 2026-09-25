@@ -99,7 +99,7 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
-from ._core import ValidationError
+from ._core import ValidationError, check_seed
 
 #: The default box around a shipped value when a caller names a parameter
 #: without a range: a quarter to four times it, matching the calibration
@@ -129,7 +129,7 @@ def latin_hypercube(n: int, dims: int, seed: int) -> list[list[float]]:
     """
     from ._core import GameRng
 
-    rng = GameRng(int(seed), 7717)
+    rng = GameRng(check_seed(seed), 7717)
     columns: list[list[float]] = []
     for _ in range(dims):
         strata = [(i + rng.next_float()) / n for i in range(n)]

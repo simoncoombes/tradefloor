@@ -44,6 +44,7 @@ import struct
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
+from ._core import check_seed
 from .portfolio import Portfolio
 from .universe_util import fingerprint_of
 
@@ -362,7 +363,8 @@ def evaluate(
     -- but a verdict from a single seed is a measurement of
     that seed as much as of the agents. See :func:`tradefloor.rank` for the
     across-seed version, and :func:`leaderboard` for the measured size of the
-    effect.
+    effect. ``seed`` is any integer from 0 to ``2**64 - 1``; every seed below
+    ``2**32`` is the market it was when seeds were 32-bit.
 
     ``max_leverage`` defaults to 2x rather than to unlimited. An agent that can
     trade arbitrary size is not being tested against the market: the book makes
@@ -392,6 +394,7 @@ def evaluate(
     Returns a scorecard per agent, keyed by name.
     """
     from .spec import StrategySpec
+    seed = check_seed(seed)
     if not agents:
         raise ValidationError("no agents given")
     if days < 1 or steps_per_day < 1 or ticks_per_step < 1:

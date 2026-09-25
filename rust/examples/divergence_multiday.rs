@@ -143,7 +143,7 @@ pub struct DayResult {
 
 pub fn run(doc: &Json) -> Vec<DayResult> {
     let spec = &doc["spec"];
-    let tick_seed = spec["tickSeed"].as_u64().unwrap() as u32;
+    let tick_seed = u64::from(spec["tickSeed"].as_u64().unwrap() as u32);
     let ticks_per_day = spec["ticksPerDay"].as_i64().unwrap();
     let volatility = bits(spec["volatility"].as_str().unwrap());
     let sector_keys: Vec<String> =

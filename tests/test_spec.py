@@ -297,8 +297,10 @@ def test_seed_is_required_exactly_when_randomness_exists():
     # deterministic strategies must not fingerprint apart.
     with pytest.raises(ValidationError, match="deterministic"):
         StrategySpec({"kind": "momentum"}, seed=3)
-    with pytest.raises(ValidationError, match="32 bits"):
-        StrategySpec({"kind": "random"}, seed=2 ** 32)
+    # 64-bit from 0.8.5: 2**32 is a seed, 2**64 is not.
+    assert StrategySpec({"kind": "random"}, seed=2 ** 32).seed == 2 ** 32
+    with pytest.raises(ValidationError, match=r"2\*\*64 - 1"):
+        StrategySpec({"kind": "random"}, seed=2 ** 64)
     with pytest.raises(ValidationError):
         StrategySpec({"kind": "random"}, seed=-1)
 

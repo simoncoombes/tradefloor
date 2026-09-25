@@ -704,3 +704,7 @@ if __name__ == "__main__":
     import known_answer_presets
     print(f"  presets  "
           f"{known_answer_presets.combined_digest(known_answer_presets.preset_digests())}")
+    # A seed above 2**32 (0.8.5), so the cross-target comparison covers
+    # 64-bit seeding as well as the 32-bit seeds every line above runs on.
+    import known_answer_seed64
+    print(f"  highseed {known_answer_seed64.high_seed_digest()}")

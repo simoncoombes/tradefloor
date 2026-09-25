@@ -77,6 +77,7 @@ from typing import Any, Literal
 
 import tradefloor as tf
 from tradefloor import baselines, envelope
+from tradefloor._core import check_seed
 from tradefloor.facts import REAL_MARKETS, band_distance
 
 try:
@@ -178,6 +179,22 @@ def _fail(msg: str) -> dict[str, Any]:
     loop this server is trying to support.
     """
     return {"ok": False, "error": msg}
+
+
+def _seed_refusal(**named: Any) -> dict[str, Any] | None:
+    """A `_fail` for the first argument that is not a seed, else None.
+
+    Checked before any engine is built, so a seed outside 0 to 2**64 - 1
+    comes back as a result naming the range rather than as an exception
+    from inside a run. A list is checked entry by entry.
+    """
+    for name, value in named.items():
+        for item in (value if isinstance(value, (list, tuple)) else [value]):
+            try:
+                check_seed(item, name)
+            except tf.ValidationError as exc:
+                return _fail(str(exc))
+    return None
 
 
 def _provenance(**extra: Any) -> dict[str, Any]:
@@ -470,7 +487,7 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
         return universe, concentrated, {"instruments": rows}
 
     size = int(doc.get("size", 40))
-    seed = int(doc.get("seed", 111))
+    seed = check_seed(doc.get("seed", 111), "universe seed")
     sectors = doc.get("sectors")
     universe, concentrated = _build_universe(size, seed, sectors)
     return universe, concentrated, {"size": size, "seed": seed,
@@ -827,6 +844,8 @@ def evaluate_strategies(
     nothing without knowing what buy-and-hold did on the same market, and a
     model handed a bare number will report the bare number.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -914,6 +933,8 @@ def rank_strategies(
     seeds = seeds or [1, 2, 3, 4, 5, 6]
     if not 2 <= len(seeds) <= MAX_SEEDS:
         return _fail(f"seeds must be 2..{MAX_SEEDS} values, got {len(seeds)}")
+    if (refused := _seed_refusal(seed=seeds)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -1254,6 +1275,8 @@ def run_stress_scenario(
     seed with and without the scenario is the counterfactual the simulator
     exists to provide, so this tool always returns both.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -1396,6 +1419,8 @@ def explain_price_move(
     fall was order-flow pressure and the rest was noise -- unless something
     computed it, and something did.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
     try:
@@ -1501,6 +1526,8 @@ def explain(
     days, and returns what it measured. It exposes no replay, because a
     replay runs engines and a tool call answers inside a conversation.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
     try:

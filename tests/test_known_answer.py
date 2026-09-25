@@ -21,6 +21,7 @@ sys.path.insert(0, str(HERE))
 import known_answer  # noqa: E402
 import known_answer_book  # noqa: E402
 import known_answer_presets  # noqa: E402
+import known_answer_seed64  # noqa: E402
 import tradefloor  # noqa: E402
 
 
@@ -143,6 +144,32 @@ def test_every_shipped_preset_matches_its_own_baseline():
     assert known_answer_presets.combined_digest(measured) == baseline["sha256"]
 
 
+def test_a_seed_above_two_to_the_thirty_two_matches_its_baseline():
+    """64-bit seeding's gate, beside the 32-bit seeds every other digest runs.
+
+    Seeds are 64-bit from 0.8.5, and every seed below 2**32 kept its market:
+    the digests above did not move when they widened. This is the other
+    half, a wide seed through the raw generator, the universe, the engine's
+    substreams and a surgery, which must be one market on every platform.
+    A mismatch means 64-bit seeding changed, which its contract in
+    `rust/src/rng.rs` forbids, or a platform disagrees. Neither is fixed by
+    regenerating the baseline.
+    """
+    baseline = json.loads(
+        (HERE / "known_answer_seed64.json").read_text(encoding="utf-8")
+    )
+    assert baseline["seed64KatVersion"] == known_answer_seed64.SEED64_KAT_VERSION
+    assert (baseline["seed"], baseline["surgerySeed"], baseline["preset"],
+            baseline["sessions"], baseline["ticks"]) == (
+        known_answer_seed64.HIGH_SEED, known_answer_seed64.SURGERY_SEED,
+        known_answer_seed64.PRESET, known_answer_seed64.SESSIONS,
+        known_answer_seed64.TICKS)
+    assert baseline["seed"] >= 2**32
+    assert known_answer_seed64.high_seed_digest() == baseline["sha256"], (
+        "the 64-bit seed's market moved. Either the wide derivation changed, "
+        "which no release may do, or a platform disagrees.")
+
+
 def test_the_preset_digests_tell_the_presets_apart():
     """A harness that gave two presets one digest could not see a change that
     turned one into the other, so every shipped preset's must differ."""
@@ -194,12 +221,13 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
-    # FIVE digests, in a fixed order: combined, simulation, metadata, the
-    # session with the simulated rate indices, and every shipped preset's
-    # digest combined. The CI gate greps all of them and compares the SET
-    # across platforms, so the count and the order are both contractual --
-    # .github/workflows/determinism.yml hashes each target's file and
-    # requires one unique hash, which holds for five as it did for three.
+    # SIX digests, in a fixed order: combined, simulation, metadata, the
+    # session with the simulated rate indices, every shipped preset's
+    # digest combined, and a seed above 2**32. The CI gate greps all of them
+    # and compares the SET across platforms, so the count and the order are
+    # both contractual -- .github/workflows/determinism.yml hashes each
+    # target's file and requires one unique hash, which holds for six as it
+    # did for three.
     #
     # It used to be exactly one, and the count was asserted for the same
     # reason it is asserted now: a gate that greps an ambiguous number of
@@ -207,7 +235,7 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # landed, this test and that workflow had to move together -- leaving the
     # workflow alone would have made it count three digests as three
     # disagreements and fail every green run.
-    assert len(digests) == 5, result.stdout
+    assert len(digests) == 6, result.stdout
     assert digests[0] == known_answer.known_answer_digest()
     assert digests[1] == known_answer.simulation_digest()
     assert digests[2] == known_answer.metadata_digest()
@@ -215,3 +243,5 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # FIVE since 0.8.5: every shipped preset's digest, combined.
     assert digests[4] == known_answer_presets.combined_digest(
         known_answer_presets.preset_digests())
+    # SIX since 0.8.5, when seeds became 64-bit: a seed above 2**32.
+    assert digests[5] == known_answer_seed64.high_seed_digest()

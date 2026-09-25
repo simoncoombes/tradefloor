@@ -106,6 +106,7 @@ import json
 from typing import Any, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
+from ._core import check_seed
 
 CHECKPOINT_SCHEMA = 1
 
@@ -120,7 +121,7 @@ class Checkpoint:
                  log: Sequence[dict], macro: Macro | None = None,
                  label: str = "", model: dict | None = None,
                  written_by: str | None = None, era: str | None = None) -> None:
-        self.seed = int(seed)
+        self.seed = check_seed(seed)
         self.universe = list(universe)
         self.log = [dict(entry) for entry in log]
         self.macro = macro

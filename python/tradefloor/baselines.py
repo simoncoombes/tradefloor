@@ -122,7 +122,7 @@ if TYPE_CHECKING:
     # for everyone who is not a type checker.
     from ._core import FactorName
 
-from ._core import Engine, GameRng
+from ._core import Engine, GameRng, check_seed
 from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
 
@@ -245,7 +245,7 @@ class RandomTrader:
 
     def __init__(self, *, seed: int = 0, gross: float = 0.5,
                  max_participation: float = 0.02):
-        self.rng = GameRng(int(seed), RANDOM_AGENT_STREAM)
+        self.rng = GameRng(check_seed(seed), RANDOM_AGENT_STREAM)
         self.gross = float(gross)
         self.max_participation = float(max_participation)
 
@@ -731,7 +731,8 @@ def reference_agents(*, seed: int = 0) -> dict[str, Any]:
     ``seed`` only seeds the random baseline. It is deliberately separate from
     the market seed: reusing one number for both would couple the noise floor
     to the market it is measured in, and two markets could then differ for a
-    reason that had nothing to do with the market.
+    reason that had nothing to do with the market. Any integer from 0 to
+    ``2**64 - 1``.
     """
     return {
         "buy_and_hold": BuyAndHold(),
