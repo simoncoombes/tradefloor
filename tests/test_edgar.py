@@ -12,6 +12,7 @@ import pytest
 
 import tradefloor
 from tradefloor.edgar import LOADER_VERSION, Snapshot, filter_rows, to_instruments
+from tradefloor.scenario import _opening_books_day_zero
 
 ROWS = [
     dict(ticker="ALPHA", sector="technology", eps=6.10,
@@ -235,15 +236,16 @@ def test_matching_the_macro_matters():
     the tick's own noise. A mismatched rate regime leaves it around 1e-1, two
     orders of magnitude larger.
 
-    ON pt-v19, BY NAME, since pt-v20 became the default at 0.8.5 (0.0005
-    against 0.0997 there). This is a property of a preset that adopts the
+    On a preset whose opening adopts the day-zero premium as the mispricing
+    (0.0005 against 0.0997 on pt-v19). This is a property of a preset that adopts the
     day-zero premium of price over fair value as the mispricing, which is
     every preset through pt-v19. pt-v20 draws its opening mispricing
     (`opening_market_sigma` 0.1, `opening_mispricing_sigma` 0.016) and books
     the rest of each name's premium as its fair-value level, so a macro
     mismatch opens as a fair-value level and not as mispricing: matched and
     mismatched open with the same s there, max |s| 0.19996 after one tick
-    on both. That is asserted below too, so it cannot change in silence.
+    on both. The test reads the dial to decide which claim a preset owes,
+    as `scenario.compare` does, and runs both and the default.
     """
     def max_abs_s(model, **macro):
         u = tradefloor.Universe.from_edgar(snapshot(), model=model, **MACRO)
@@ -254,11 +256,20 @@ def test_matching_the_macro_matters():
         return max(abs(x) for x in arr(e.column("mispricing_s")))
 
     other = dict(federal_funds_rate=0.08, corporate_bond_yield=0.10)
-    near = max_abs_s("pt-v19", **MACRO)
-    far = max_abs_s("pt-v19", **other)
-    assert near < 0.01
-    assert far > 10 * near
-    assert max_abs_s("pt-v20", **MACRO) == max_abs_s("pt-v20", **other)
+    # Which claim a preset owes is read from the dial, as `compare()` reads
+    # it: `opening_market_sigma` off zero books the day-zero gap into fair
+    # value.
+    for model in ("pt-v19", "pt-v20", None):
+        books = _opening_books_day_zero(model)
+        near = max_abs_s(model, **MACRO)
+        far = max_abs_s(model, **other)
+        if books:
+            assert far == near, model
+        else:
+            assert near < 0.01, model
+            assert far > 10 * near, model
+    assert not _opening_books_day_zero("pt-v19")
+    assert _opening_books_day_zero("pt-v20")
 
 
 def test_loading_is_reproducible():

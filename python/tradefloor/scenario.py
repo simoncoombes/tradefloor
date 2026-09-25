@@ -2026,9 +2026,71 @@ def _refuse_self_comparison(scenario: Scenario, days: int) -> None:
         f"values held flat -- which for a constant path IS the scenario. "
         f"The default baseline isolates a PATH from the level it starts at, "
         f"so it only means anything for a scenario that moves. To measure a "
-        f"held level, name the world WITHOUT it: "
-        f"compare(scenario, ..., baseline=Scenario().hold(<the calm levels>)). "
-        f"To measure a path, give the scenario one."
+        f"held level on a preset whose opening does not book the day-0 gap "
+        f"into fair value (every preset through pt-v19), name the world "
+        f"WITHOUT it: compare(scenario, ..., "
+        f"baseline=Scenario().hold(<the calm levels>)). On a preset that "
+        f"does (pt-v20, the default from 0.8.5) a level held from day 0 is "
+        f"priced in at the open: apply it as a step after day 0 instead, "
+        f"for example Scenario().step('federal_funds_rate', before=0.02, "
+        f"after=0.03, at=5). To measure a path, give the scenario one."
+    )
+
+
+def _opening_books_day_zero(model: Any) -> bool:
+    """Whether this model opens the market at fair value under any day-0 levels.
+
+    Read from the dial, not the preset name. Off zero,
+    `opening_market_sigma` opens the market's common mispricing at a draw of
+    its own and books the rest of each name's day-zero premium into its
+    fair-value level, so the levels a world holds on day 0 are its starting
+    state and every price opens as if they had always held.
+    """
+    if model is None:
+        params = ModelParams.from_preset()
+    elif isinstance(model, str):
+        params = ModelParams.from_preset(model)
+    else:
+        params = model
+    return params.to_dict().get("opening_market_sigma", 0.0) != 0.0
+
+
+def _refuse_day_zero_levels(scenario: Scenario, baseline: Scenario,
+                            days: int, model: Any) -> None:
+    """Refuse a comparison whose worlds differ only in what holds on day 0.
+
+    On a model that opens at fair value (`_opening_books_day_zero`), two
+    worlds whose day-0 levels differ open at the same prices relative to
+    their own fair values, so a level held from day 0 moves nothing and the
+    comparison reports a confident 0.00%. The level is part of the world's
+    starting state there, and its effect is measured by applying it later.
+    A scenario that also moves after day 0, or fires an intervention after
+    it, measures that and is let through.
+    """
+    if not _opening_books_day_zero(model):
+        return
+    horizon = range(1, days)
+    moves_later = (
+        any(scenario.at(d) != scenario.at(0) for d in horizon)
+        or any(baseline.at(d) != baseline.at(0) for d in horizon)
+        or any(0 < item.at < days for item in scenario.interventions)
+        or any(0 < item.at < days for item in baseline.interventions))
+    if scenario.at(0) == baseline.at(0) or moves_later:
+        return
+    differ = sorted(field for field in set(scenario.at(0)) | set(baseline.at(0))
+                    if scenario.at(0).get(field) != baseline.at(0).get(field))
+    raise ValidationError(
+        f"compare() would report a confident 0.00%: the two worlds differ only "
+        f"in the levels they hold from day 0 ({', '.join(differ)}), and on "
+        f"this model the opening books the day-0 gap into fair value "
+        f"(opening_market_sigma is off zero, as on pt-v20, the default from "
+        f"0.8.5). A level held from day 0 is priced in at the open, so both "
+        f"worlds open at fair value and nothing moves. To measure a level's "
+        f"effect, apply it as a step after day 0, for example "
+        f"Scenario().step('federal_funds_rate', before=0.02, after=0.03, at=5), "
+        f"against the same world without the step. On a preset without that "
+        f"opening (every preset through pt-v19, model='pt-v19') the held level "
+        f"measures against a calm-levels baseline as before."
     )
 
 
@@ -2103,6 +2165,8 @@ def compare(
             f"rather than as 'no shock was applied'. Give the baseline the "
             f"levels the shocked world does NOT have."
         )
+    else:
+        _refuse_day_zero_levels(scenario, baseline, days, kwargs.get("model"))
 
     def run(which: Scenario):
         return run_scenario(which, seed=seed, universe=universe, days=days,
