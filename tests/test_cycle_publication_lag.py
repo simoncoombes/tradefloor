@@ -213,3 +213,16 @@ def test_a_snapshot_without_a_history_reseeds_from_its_phase():
 def test_a_lag_that_is_not_a_whole_number_of_sessions_is_refused(value):
     with pytest.raises(tf.ValidationError, match="cycle_publication_lag"):
         tf.ModelParams.from_preset("pt-v20", cycle_publication_lag=value)
+
+
+def test_a_cycle_intervention_reads_the_true_phase():
+    """An operation's audit trail records the phase the economy ran on, the
+    value `pin_macro` writes, not the one published months later."""
+    from tradefloor.interventions import TARGETS
+
+    e = tf.Engine(seed=4, universe=UNIVERSE, model=lagged())
+    opening = e.macro_fields["cycle"]
+    pinned = "trough" if opening != "trough" else "peak"
+    e.pin_macro(cycle=pinned)
+    assert TARGETS["macro.cycle"].read(e) == pinned
+    assert e.macro_fields["cycle"] == opening

@@ -249,9 +249,10 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit, with one exception: `gdp_growth` reads
-    the true growth from the snapshot, because under `gdp_publication_lag`
-    `macro_fields` reports the published quarterly figure.
+    field for field and unit for unit, with two exceptions: `gdp_growth` and
+    `cycle` read the true values from the snapshot, because under
+    `gdp_publication_lag` and `cycle_publication_lag` `macro_fields` reports
+    the published ones.
     """
     def read(engine: Engine) -> Any:
         if field == "gdp_growth":
@@ -262,6 +263,11 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
             # `macro_fields["gdp_growth"]` to the bit with the dial at 0.0:
             # both are the core's percent over 100.
             return engine.state_snapshot()["economy"]["gdp_growth"] / 100.0
+        if field == "cycle":
+            # The TRUE phase, the one `pin_macro` writes: the published phase
+            # lags it by `cycle_publication_lag` sessions. The same name as
+            # `macro_fields["cycle"]` with the dial at 0.0.
+            return engine.state_snapshot()["economy"]["cycle_phase"]
         return engine.macro_fields[field]
 
     def write(engine: Engine, value: Any) -> None:
