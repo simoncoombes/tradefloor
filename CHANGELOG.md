@@ -325,19 +325,20 @@ The log now carries the write as `set_fundamentals`, and replay restores it.
 
 ### The model specification and the support policy
 
-`docs/MODEL.md` states the pt-v19 model as equations read off the code: the
-macro economy and central bank, fair value, the mispricing and its factor
-structure, news, jumps, the three variance processes, the VIX, crisis
-regimes, the market maker and book, agent order flow, volume and scenarios.
-Each equation names its source line, and each parameter carries its pt-v19
-value, timescale and how it was set (measured, derived, fitted, chosen or
-guard). It says at the top that it still describes pt-v19; pt-v20's
-additions are documented in `ModelParams.pt_v20` and in `provenance.py`.
+`docs/MODEL.md` states the pt-v20 model as equations read off the code: the
+macro economy and central bank, fair value and its level, the mispricing and
+its factor structure, news, jumps, the three variance processes, the VIX,
+crisis regimes, the market maker and the agent-facing book, agent order flow,
+volume, the rate indices and scenarios. Each equation names its source line,
+and each parameter carries its pt-v20 value, timescale and how it was set
+(measured, derived, fitted, chosen or guard). A pt-v19 section gives every
+equation and value where the earlier default differs.
 
 `docs/STATISTICS.md` names the sets of realism statistics behind the counts
 the documentation quotes, with every member: the one-year table (19, of
 which `facts.measure()` reads 18), the two-year panel (15 rows, 14 graded)
-and the long-run criteria (17 from this release, 15 in 0.8.x records).
+and the long-run criteria (17 from this release, 15 in 0.8.x records), with
+the 28 rows registered for pt-v20.
 
 `docs/SUPPORT.md` takes effect with this tag. The LTS line covers 0.8.5 and
 the patch releases after it, with fixes that leave every known-answer digest
