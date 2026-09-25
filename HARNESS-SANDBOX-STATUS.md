@@ -46,8 +46,12 @@ Paused on handover. Branched from `origin/release/0.8.5` at 2c8b32b.
 - The full suite on the BASE commit gives 21 failed, 4063 passed. The 21
   failures are all recorded-fixture replays refused because pt-v20's dials moved
   (garch_beta, volume_move_response), plus the pt-v20 preset record.
-- NOT YET RUN: the full Python suite on this branch, and `cargo test`. The
-  cargo run was still going at the pause. No Rust files changed.
+- `cargo test --release`: 461 passed, 2 failed, both in `market::garch`
+  (`every_shipped_preset_has_a_stationary_variance_process` and
+  `the_widest_beta_a_preset_admits_has_a_finite_fourth_moment`). This branch
+  changes no Rust, so both come from the base commit's pt-v20 GARCH dials. The
+  pt-v20 work on fix/ptv20-core should confirm that.
+- NOT YET RUN: the full Python suite on this branch.
 
 ## Next steps
 
@@ -55,7 +59,7 @@ Paused on handover. Branched from `origin/release/0.8.5` at 2c8b32b.
    failures. Expect no new ones. Watch for pinned scorecard `as_dict` keys,
    pinned rank `as_dict` or report text, and examples under
    `TRADEFLOOR_SLOW_TESTS=1`.
-2. Run `cargo test --manifest-path rust/Cargo.toml`.
+2. Confirm the two GARCH cargo failures also fail on the base commit.
 3. Re-run the audit probe
    (`scratchpad/audit/probe_harness.py`): sandboxed, peek and mutate end with
    SandboxError errors and no gain. Under `trusted_agents=True`, mutate is
