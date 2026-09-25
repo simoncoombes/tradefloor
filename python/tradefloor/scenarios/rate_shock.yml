@@ -22,13 +22,18 @@
 # is not a rate shock.
 #
 # For the simulated rate indices this is NOT a parallel curve shift, because
-# neither treasury yield is written. The corporate index reprices on the day
-# (IGCORP -12.30% on day 50), the 2-year follows the policy rate at that
-# evening's close (UST2Y about -3.2% on day 51), and the 10-year drifts up to
-# the new policy rate over the following weeks (UST10Y -14.77% below the
-# unshocked world by day 120). Measured on `Universe.random(20, seed=101,
-# bonds=True)`, seeds 3/11/29. For the whole curve on one day, which is the
-# usual stress for a bond book, use curve_shock.yml.
+# neither treasury yield is written. Measured on `Universe.random(20,
+# seed=101, bonds=True)`, median of seeds 3/11/29, each against the same seed
+# without the shock. On pt-v20, the default from 0.8.5: the corporate index
+# reprices on the day (IGCORP -12.01% on day 50); the 2-year, which has its
+# own process and closes 5% of its gap to the policy rate each session, moves
+# -0.11% on day 51 and reaches -3.29% by day 120; and the 10-year drifts up
+# to the new policy rate over the following weeks (UST10Y -14.86% by day
+# 120). On pt-v19 the 2-year is rewritten from the policy rate at every
+# close, so it moves -3.19% on day 51 and holds there (-3.18% by day 120),
+# with IGCORP -12.41% on day 50 and UST10Y -14.77% by day 120. For the whole
+# curve on one day, which is the usual stress for a bond book, use
+# curve_shock.yml.
 
 version: 1
 
