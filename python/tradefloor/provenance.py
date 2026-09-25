@@ -383,6 +383,11 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "fair_value_market_vol_cap":
+        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
+        "the only reader. A ceiling on the volatility whose market shocks "
+        "are permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
     "fair_value_market_linear":
         "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
         "the only reader. Chooses the plain loading on the market draw as the "

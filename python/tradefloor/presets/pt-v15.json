@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v15",
   "fingerprint": "pt-v15",
-  "coefficient_digest": "1b6d800bf92629c298bdced0f2157acc30c9ea0d1a8b04c9bc935b47f605a86e",
+  "coefficient_digest": "518ed43511b14b1be0a38d5e767b95ec1f15e327ada7f090d542da50894437a5",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -48,6 +48,7 @@
     "fair_value_floor": 0.01,
     "fair_value_market_linear": 0.0,
     "fair_value_market_share": 0.0,
+    "fair_value_market_vol_cap": 0.0,
     "fair_value_news_share": 0.0,
     "fed_liftoff_rule": 0.0,
     "fill_impact_coefficient": 0.0,

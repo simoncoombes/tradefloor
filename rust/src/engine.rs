@@ -4363,7 +4363,8 @@ impl Engine {
         // keeps the whole jump: it reports what moved the price.
         if !s_before.is_empty() {
             let psi = self.params.fair_value_news_share;
-            let psim = self.params.fair_value_market_share;
+            let psim = crate::market::tick::market_permanent_share(
+                &self.params, self.market_vol.sigma_daily());
             let common = market - compensator;
             for (index, company) in self.companies.iter_mut().enumerate() {
                 let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {

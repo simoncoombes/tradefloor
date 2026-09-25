@@ -918,6 +918,10 @@ PERTURBATIONS = [
     # market shock `fair_value_market_share` makes permanent, and the
     # default carries no market share. tests/test_market_linear.py holds it.
     ("fair_value_market_linear", 1.0, False),
+    # INERT on this probe for the same reason: a ceiling on the volatility
+    # whose market shocks the market share makes permanent, and the default
+    # carries no market share. tests/test_market_linear.py holds it.
+    ("fair_value_market_vol_cap", 1.5, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

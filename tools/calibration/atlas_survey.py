@@ -358,6 +358,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_beta_down_asym_lag_recentre": (0.0, 1.0),
     # A switch: which part of a market shock the market share takes.
     "fair_value_market_linear": (0.0, 1.0),
+    # A multiple of the market factor's base sigma; 1 to 3 is where the
+    # market's daily sigma spends most of its time (median 0.78, 99th
+    # percentile 4.9 on pt-v20).
+    "fair_value_market_vol_cap": (0.0, 4.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

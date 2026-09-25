@@ -661,6 +661,22 @@ pub struct ModelParams {
     /// hundred sessions after the VIX peak (desk, seed 101). A switch. Read
     /// only with `fair_value_market_share` non-zero. In [0, 1].
     pub fair_value_market_linear: f64,
+    /// A ceiling, in multiples of `market_factor_sigma`, on the market
+    /// volatility whose shocks `fair_value_market_share` makes permanent.
+    /// 0.0, which every preset through pt-v20 carries, is no ceiling: the
+    /// share applies to every market shock whatever the regime.
+    ///
+    /// Off zero, a market shock drawn at a daily sigma above `this *
+    /// market_factor_sigma` moves fair value by the share times `this *
+    /// market_factor_sigma / sigma` of it, and the rest stays in `s` and
+    /// reverts on the mispricing's half-life: ordinary news is permanent,
+    /// and the excess a fear regime adds is transient. Reversion
+    /// concentrates in turbulent periods in the data (Poterba and Summers
+    /// 1988 on 1926-40; Kim, Nelson and Startz 1991; Spierdijk, Bikker and
+    /// van den Hoek 2012). The same ceiling applies to the market jump's
+    /// permanent share. Read only with `fair_value_market_share` non-zero.
+    /// In [0, 32].
+    pub fair_value_market_vol_cap: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5060,6 +5076,7 @@ impl ModelParams {
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
+            fair_value_market_vol_cap: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7282,6 +7299,7 @@ impl ModelParams {
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
+            "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7523,6 +7541,7 @@ impl ModelParams {
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
+            "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -7894,6 +7913,11 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.fair_value_market_vol_cap >= 0.0 && self.fair_value_market_vol_cap <= 32.0) {
+            return Err(format!(
+                "fair_value_market_vol_cap is {}. It is a multiple of market_factor_sigma, in [0, 32]; 0 is no ceiling.",
+                self.fair_value_market_vol_cap));
         }
         if !(self.fair_value_market_linear >= 0.0 && self.fair_value_market_linear <= 1.0) {
             return Err(format!(
@@ -8356,6 +8380,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_news_share",
         "fair_value_market_share",
         "fair_value_market_linear",
+        "fair_value_market_vol_cap",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

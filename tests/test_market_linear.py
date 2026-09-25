@@ -1,4 +1,5 @@
-"""Which part of a market shock is permanent (`fair_value_market_linear`).
+"""Which part of a market shock is permanent (`fair_value_market_linear`,
+`fair_value_market_vol_cap`).
 
 Under `fair_value_market_share` a share of every market shock moves the
 names' fair-value levels for good. At 0.0 that is the whole market input;
@@ -80,6 +81,43 @@ def test_it_differs_from_the_whole_input_on_a_tilted_market():
         e.run_days(10, record=False)
         runs.append(offsets(e))
     assert runs[0] != runs[1]
+
+
+def test_the_ceiling_is_inert_without_a_market_share_and_below_itself():
+    # Without a market share the ceiling reads nothing; with one, a ceiling
+    # far above any sigma the market reaches is the share itself.
+    for extra, same in (({}, True), ({"fair_value_market_share": 1.0}, True)):
+        runs = []
+        for cap in (0.0, 32.0):
+            e = tf.Engine(seed=7, universe=UNIVERSE, model=tf.ModelParams.from_preset(
+                "pt-v20", fair_value_market_vol_cap=cap, **extra))
+            e.run_days(20, record=False)
+            runs.append(floats(e.prices()))
+        assert (runs[0] == runs[1]) == same
+
+
+def test_a_low_ceiling_keeps_market_shocks_in_s():
+    # At a ceiling of a hundredth of the base sigma almost every market shock
+    # stays in `s`: the fair-value levels move far less than with no ceiling.
+    moves = []
+    for cap in (0.0, 0.01):
+        model = tf.ModelParams.from_preset(
+            "pt-v20", fair_value_market_share=1.0, fair_value_market_linear=1.0,
+            fair_value_market_vol_cap=cap, fair_value_news_share=0.0,
+            endogenous_news_intensity=0.0, jump_intensity_market=0.0,
+            jump_intensity_idio=0.0, opening_mispricing_sigma=0.0, opening_market_sigma=0.0)
+        e = tf.Engine(seed=7, universe=UNIVERSE, model=model)
+        e.run_days(1, record=False)
+        before = offsets(e)
+        e.run_days(10, record=False, first_day=1)
+        moves.append(sum(abs(b - a) for a, b in zip(before, offsets(e))))
+    assert moves[1] < 0.05 * moves[0]
+
+
+@pytest.mark.parametrize("value", [-0.1, 32.5])
+def test_the_ceiling_is_bounded(value):
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v20", fair_value_market_vol_cap=value)
 
 
 @pytest.mark.parametrize("value", [-0.1, 1.1])
