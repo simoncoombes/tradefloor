@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v10",
   "fingerprint": "pt-v10",
-  "coefficient_digest": "92b261cc43f25c530a0ea28089b45622ca992bdb95a6e1a0938789af7d4dd49c",
+  "coefficient_digest": "b72406bb46a80dd0a09b69ca17e28c36655fdb85958c47e43ceda7dca96b7a61",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -31,6 +31,7 @@
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
     "cycle_hazard_per_month": 0.0,
+    "cycle_publication_lag": 0.0,
     "cycle_stationary_opening": 0.0,
     "cycle_us_calibration": 0.0,
     "daily_credit_floor_gain": 0.0,

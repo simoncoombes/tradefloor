@@ -2789,7 +2789,12 @@ impl PyEngine {
             qe_pe_boost: e.qe_pe_boost,
             qe_assets_ratio: e.qe_assets_ratio,
             fear_greed_index: e.fear_greed_index,
-            cycle: cycle_name(e.cycle_phase).to_string(),
+            // The phase as PUBLISHED: under `cycle_publication_lag` the
+            // phase of that many sessions before, so this `Macro` written
+            // back into a constructor opens where an observer believed the
+            // economy was. `state_snapshot()["economy"]["cycle_phase"]` is
+            // the true phase, for a restore and for an oracle.
+            cycle: cycle_name(self.inner.published_cycle_phase()).to_string(),
         }
     }
 
@@ -3116,6 +3121,10 @@ impl PyEngine {
     /// denomination `pin_macro` takes: fractional rates, VIX in points,
     /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
     /// write it back.
+    ///
+    /// One exception to "read it back": under `cycle_publication_lag`,
+    /// `cycle` is the phase as PUBLISHED, that many sessions late, so a
+    /// phase pinned today reads back only once it is published.
     #[getter]
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
@@ -3148,7 +3157,10 @@ impl PyEngine {
             crate::units::percent_to_fraction(e.tariff_rate),
         )?;
         out.set_item("oil_price", e.oil_price)?;
-        out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        // The phase as published (`cycle_publication_lag`): the phase of that
+        // many sessions before, the phase the economy is in at 0.0. A pin
+        // writes the true phase, which this reports once it is published.
+        out.set_item("cycle", cycle_name(self.inner.published_cycle_phase()))?;
         out.set_item(
             "treasury_yield_2y",
             crate::units::percent_to_fraction(e.treasury_yield_2y),
@@ -3818,6 +3830,14 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        // The published-phase history, oldest first, only while
+        // `cycle_publication_lag` keeps one, so every other snapshot is the
+        // dict it was. A restore without it re-seeds from the true phase.
+        if self.inner.params().cycle_publication_lag != 0.0 {
+            let history: Vec<&str> =
+                self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
+            econ.set_item("cycle_history", history)?;
+        }
         // The aggregate earnings cycle, only when the model moves it, so
         // every earlier preset's snapshot is the dict it was.
         if self.inner.params().earnings_cycle_depth != 0.0 {
@@ -4387,6 +4407,22 @@ impl PyEngine {
             }
             // Derived from the phase and the level just restored.
             self.inner.refresh_earnings_anticipation();
+            // The published-phase history (`cycle_publication_lag`). A
+            // snapshot without it, under the dial, re-seeds from the phase
+            // just restored: the phase is then published as it stands.
+            match d.get_item("cycle_history")? {
+                Some(v) => {
+                    let names: Vec<String> = v.extract()?;
+                    let mut history = Vec::with_capacity(names.len());
+                    for name in &names {
+                        history.push(CyclePhase::from_name(name).ok_or_else(|| {
+                            ValidationError::new_err(format!("unknown cycle phase {name:?}"))
+                        })?);
+                    }
+                    self.inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
+                }
+                None => self.inner.seed_cycle_history(),
+            }
         }
         if let Some(raw) = snapshot.get_item("central_bank")? {
             let d = raw.downcast::<PyDict>()?;

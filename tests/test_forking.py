@@ -1066,7 +1066,10 @@ def _nothing_dormant():
                    book_depth_exponent=0.5,
                    book_depth_reach=1.0,
                    book_refill_half_life=27.0,
-                   fill_impact_coefficient=0.314)
+                   fill_impact_coefficient=0.314,
+                   # A whole number of sessions, and short enough that the
+                   # published-phase history turns over inside the run.
+                   cycle_publication_lag=5.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

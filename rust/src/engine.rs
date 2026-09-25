@@ -594,6 +594,15 @@ pub struct Engine {
     /// pristine state takes no part in a tick, the state hash or the
     /// snapshot, so every such run is the one it was before this existed.
     book: crate::agent_book::BookState,
+
+    /// The phases the economy held at the last `cycle_publication_lag + 1`
+    /// closes, oldest first; the front is the phase published
+    /// ([`Engine::published_cycle_phase`]). Seeded at construction with the
+    /// opening phase, so until the lag's worth of sessions has closed the
+    /// opening phase is what an observer reads. Empty, never touched,
+    /// unsnapshotted and unhashed while the dial is 0.0, which every preset
+    /// carries, so such an engine is the engine it was before this existed.
+    cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
 }
 
 impl Engine {
@@ -1110,6 +1119,7 @@ impl Engine {
             last_market_targets: None,
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
+            cycle_history: std::collections::VecDeque::new(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -1134,7 +1144,86 @@ impl Engine {
             engine.economy.earnings_cycle = engine.earnings_cycle_target();
         }
         engine.refresh_earnings_anticipation();
+        // After the burn-in and the stationary opening, so the phase the
+        // run opens in is the one published until the lag has elapsed.
+        engine.seed_cycle_history();
         engine
+    }
+
+    /// `cycle_publication_lag` in sessions; 0 is off.
+    pub fn cycle_publication_lag(&self) -> usize {
+        self.params.cycle_publication_lag as usize
+    }
+
+    /// The business-cycle phase as published: the phase the economy held at
+    /// the close `cycle_publication_lag` sessions ago, or the opening phase
+    /// while fewer than that many sessions have closed. With the dial at 0.0
+    /// the phase the economy is in, `economy().cycle_phase`.
+    ///
+    /// Every route that REPORTS the phase reads this; everything that PRICES
+    /// or MOVES on it (the earnings cycle and its anticipation, the cycle's
+    /// hazards, the stress intensity, the central bank) reads the true phase.
+    pub fn published_cycle_phase(&self) -> crate::economy::CyclePhase {
+        if self.params.cycle_publication_lag == 0.0 {
+            return self.economy.cycle_phase;
+        }
+        self.cycle_history.front().copied().unwrap_or(self.economy.cycle_phase)
+    }
+
+    /// The phase history the published phase is read from, oldest first:
+    /// `cycle_publication_lag + 1` phases, the last the current one as of
+    /// the last close. Empty with the dial at 0.0.
+    pub fn cycle_history(&self) -> &std::collections::VecDeque<crate::economy::CyclePhase> {
+        &self.cycle_history
+    }
+
+    /// Put a phase history back (a restore). Refuses one whose length is not
+    /// `cycle_publication_lag + 1`, or any history while the dial is 0.0.
+    pub fn set_cycle_history(
+        &mut self,
+        history: Vec<crate::economy::CyclePhase>,
+    ) -> Result<(), String> {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            if history.is_empty() {
+                return Ok(());
+            }
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and this engine's cycle_publication_lag is 0, so it keeps none",
+                history.len()));
+        }
+        if history.len() != lag + 1 {
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and cycle_publication_lag {} keeps {}",
+                history.len(), lag, lag + 1));
+        }
+        self.cycle_history = history.into();
+        Ok(())
+    }
+
+    /// Fill the history with the current phase: the opening, or a restore
+    /// from a snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_cycle_history(&mut self) {
+        let lag = self.cycle_publication_lag();
+        self.cycle_history.clear();
+        if lag > 0 {
+            self.cycle_history.extend(std::iter::repeat(self.economy.cycle_phase).take(lag + 1));
+        }
+    }
+
+    /// Record the phase the close has left the economy in, and drop the
+    /// oldest. Nothing with the dial at 0.0.
+    fn record_cycle_phase(&mut self) {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        self.cycle_history.push_back(self.economy.cycle_phase);
+        while self.cycle_history.len() > lag + 1 {
+            self.cycle_history.pop_front();
+        }
     }
 
     /// The anticipated earnings level's phase terms, `g_p` in
@@ -4770,6 +4859,9 @@ impl Engine {
         }
         self.macro_pins_today = 0;
         self.refresh_earnings_anticipation();
+        // The close's phase into the published history. The burn-in runs
+        // this too, and the construction's seeding overwrites what it left.
+        self.record_cycle_phase();
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
@@ -6106,6 +6198,14 @@ impl Engine {
             hash_f64(&mut buf, value);
         }
         hash_str(&mut buf, e.cycle_phase.as_str());
+        // The published-phase history, only while `cycle_publication_lag`
+        // keeps one, so every other engine's hash is the one it was.
+        if self.params.cycle_publication_lag != 0.0 {
+            hash_u32(&mut buf, self.cycle_history.len() as u32);
+            for phase in &self.cycle_history {
+                hash_str(&mut buf, phase.as_str());
+            }
+        }
 
         // The central bank.
         let bank = &self.central_bank;
@@ -6841,6 +6941,60 @@ mod tests {
             sectors(),
             crate::params::PT_V19,
         )
+    }
+
+    /// `cycle_publication_lag`: off, the published phase is the true one and
+    /// no history is kept or hashed; on, the published phase is the phase
+    /// of `lag` closes before, the opening phase until then, and a pin is
+    /// the true phase at once and published `lag` closes after the close
+    /// that carried it.
+    #[test]
+    fn the_published_phase_lags_the_true_one_only_under_the_dial() {
+        use crate::economy::CyclePhase;
+        let off = engine(7);
+        assert!(off.cycle_history().is_empty());
+        assert_eq!(off.published_cycle_phase(), off.economy().cycle_phase);
+
+        let lag = 4usize;
+        let params = crate::params::ModelParams {
+            cycle_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let opening = e.economy().cycle_phase;
+        assert_eq!(e.cycle_history().len(), lag + 1);
+        let turned = if opening == CyclePhase::Trough { CyclePhase::Peak } else { CyclePhase::Trough };
+        e.economy_mut().cycle_phase = turned;
+        assert_eq!(e.published_cycle_phase(), opening);
+        let mut truth = vec![opening];
+        for day in 1..=12i64 {
+            e.advance_macro_day(day);
+            truth.push(e.economy().cycle_phase);
+            let d = day as usize;
+            assert_eq!(e.published_cycle_phase(), truth[d.saturating_sub(lag)], "day {d}");
+        }
+        assert_ne!(truth[1], opening);
+        // Hashed while set: the same engine with one phase of history
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut history: Vec<CyclePhase> = other.cycle_history().iter().copied().collect();
+        history[0] = if history[0] == CyclePhase::Expansion {
+            CyclePhase::Recovery
+        } else {
+            CyclePhase::Expansion
+        };
+        other.set_cycle_history(history).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        assert!(other.set_cycle_history(vec![opening; lag]).is_err());
+        assert!(engine(7).clone().set_cycle_history(vec![opening]).is_err());
     }
 
     fn request(hour: i64, minute: i64) -> TickRequest<'static> {

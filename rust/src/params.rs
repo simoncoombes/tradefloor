@@ -574,6 +574,20 @@ pub struct ModelParams {
     /// cent per 100 bp of Baa over 2022 (design repository,
     /// programme/ptv20-scenario-size.md section 5).
     pub rate_pe_sensitivity: f64,
+    /// Sessions between a turn of the business cycle and its publication.
+    /// 0.0, which every preset carries, publishes the phase the economy is
+    /// in. Off zero, every route that reports the phase -- `macro_fields`,
+    /// `macro_state`, and what reads them: a World's trace rows, a hosted
+    /// market log's cycle events -- reports the phase of this many sessions
+    /// before, as the NBER dates a recession about a year after it began,
+    /// and a turn is announced when it is published. The true phase stays
+    /// internal: the earnings cycle, the anticipated earnings path, the
+    /// hazards and the stress read it, and a scenario that sets the phase
+    /// sets the true one at once. Before this many sessions have closed
+    /// the opening phase is published. A whole number of sessions; the
+    /// engine keeps the last `lag + 1` phases (`Engine::published_cycle_phase`),
+    /// and its snapshot and state hash carry them only while this is set.
+    pub cycle_publication_lag: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -5007,6 +5021,7 @@ impl ModelParams {
             earnings_cycle_sigma: 0.0,
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
+            cycle_publication_lag: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7227,6 +7242,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => self.earnings_cycle_sigma,
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
+            "cycle_publication_lag" => self.cycle_publication_lag,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7466,6 +7482,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
+            "cycle_publication_lag" => out.cycle_publication_lag = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7849,6 +7866,13 @@ impl ModelParams {
             return Err(format!(
                 "rate_pe_sensitivity is {}. It is P/E compression per unit of yield, in [0, 10].",
                 self.rate_pe_sensitivity));
+        }
+        if !(self.cycle_publication_lag >= 0.0 && self.cycle_publication_lag <= 2520.0
+            && self.cycle_publication_lag.fract() == 0.0)
+        {
+            return Err(format!(
+                "cycle_publication_lag is {}. It is a whole number of sessions, in [0, 2520]; 0 is off.",
+                self.cycle_publication_lag));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8285,6 +8309,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_cycle_sigma",
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
+        "cycle_publication_lag",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",

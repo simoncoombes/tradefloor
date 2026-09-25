@@ -656,8 +656,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     economy = snapshot["economy"]
     # `earnings_cycle` only on a model with the cycle on; hashed above, beside
-    # the other states a dial turns on.
-    economy_expected = set(_ECONOMY_KEYS) | ({"earnings_cycle"} & set(economy))
+    # the other states a dial turns on. `cycle_history` only on a model with
+    # `cycle_publication_lag` set; hashed after the phase, below.
+    economy_expected = set(_ECONOMY_KEYS) | (
+        {"earnings_cycle", "cycle_history"} & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -681,6 +683,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     for value in trend:
         _f64(buf, value)
     _text(buf, economy["cycle_phase"])
+    # The published-phase history, oldest first, LENGTH-PREFIXED, only while
+    # `cycle_publication_lag` keeps one: `Engine::state_hash`'s order and rule.
+    if "cycle_history" in economy:
+        history = list(economy["cycle_history"])
+        _u32(buf, len(history))
+        for phase in history:
+            _text(buf, phase)
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):

@@ -383,6 +383,12 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "cycle_publication_lag":
+        "inert at 0.0 as shipped: `Engine::published_cycle_phase` returns "
+        "the phase the economy is in and no history is kept. It moves what "
+        "the engine reports as the phase, never a price or a draw (0.8.5, "
+        "pt-v20 work: the published phase predicted returns, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "
