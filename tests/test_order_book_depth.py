@@ -52,6 +52,11 @@ LIVE = dict(book_depth_coefficient=0.75, book_depth_exponent=0.5,
 DIALS = tuple(LIVE)
 ROSTER = tf.Universe.random(20, seed=93001)
 
+#: The last preset with every dial off, which the "off" arms below run on.
+#: The default takes the book from pt-v20, so an engine built without a
+#: model is no longer an engine without one.
+OFF = "pt-v19"
+
 
 def f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
@@ -129,10 +134,11 @@ def test_an_untraded_market_is_the_same_at_any_setting_of_the_dials():
 
 
 def test_with_the_dials_off_an_agent_trades_as_it_always_did():
-    """No dial on: `Portfolio.execute` prices off a snapshot of the book,
-    nothing reaches the engine's book, the log carries no order and the
-    snapshot no book, so every traded run is the run it was."""
-    e = warmed()
+    """No dial on, which is pt-v19: `Portfolio.execute` prices off a
+    snapshot of the book, nothing reaches the engine's book, the log carries
+    no order and the snapshot no book, so every traded run is the run it
+    was."""
+    e = warmed(OFF)
     assert not e.book_live
     p = tf.Portfolio(cash=1e7)
     fill = p.execute(e, ROSTER[0].ticker, 1_000)
@@ -143,10 +149,10 @@ def test_with_the_dials_off_an_agent_trades_as_it_always_did():
 
 
 def test_the_depth_alone_leaves_execution_where_it_was():
-    """The latent depth on and the book not shared: the portfolio still
-    prices off a snapshot, and the snapshot now has depth to price size
-    against. The flow still travels through `fills`."""
-    e = warmed(tf.ModelParams.from_preset(book_depth_coefficient=0.75))
+    """The latent depth on and the book not shared, on pt-v19: the
+    portfolio still prices off a snapshot, and the snapshot now has depth to
+    price size against. The flow still travels through `fills`."""
+    e = warmed(tf.ModelParams.from_preset(OFF, book_depth_coefficient=0.75))
     assert not e.book_live
     i = index_by_volume(ROSTER, "thinnest")
     t = ROSTER[i].ticker
@@ -161,10 +167,10 @@ def test_the_depth_alone_leaves_execution_where_it_was():
 
 
 def test_an_order_past_the_ladder_walks_deeper_levels_instead_of_being_cut_off():
-    """Off, the maker's ten levels hold a few percent of daily volume and a
-    larger order fills what they hold. On, the same order fills in full, at
-    an average that rises with size."""
-    off, on = warmed(), warmed(live())
+    """Off (pt-v19), the maker's ten levels hold a few percent of daily
+    volume and a larger order fills what they hold. On, the same order fills
+    in full, at an average that rises with size."""
+    off, on = warmed(OFF), warmed(live())
     for which in ("thinnest", "thickest"):
         i = index_by_volume(ROSTER, which)
         t = ROSTER[i].ticker
@@ -693,13 +699,13 @@ class Buyer:
 
 
 def test_a_cohort_takes_levels_from_each_other():
-    """Two agents buying one name every step. Off the shared book they fill
-    at the same price; on it the second in label order pays more, and each
+    """Two agents buying one name every step. Off the shared book (pt-v19)
+    they fill at the same price; on it the second in label order pays more, and each
     one's permanent impact is its own."""
     u = tf.Universe.random(8, seed=99)
     t, q = u[0].ticker, round(0.03 * u[0].avg_volume)
     prices = {}
-    for name, model in (("off", None), ("live", live())):
+    for name, model in (("off", OFF), ("live", live())):
         w = World(seed=42, universe=u, model=model, cash=1e9, max_leverage=None,
                   agents={"a": Buyer(t, q), "b": Buyer(t, q)})
         w.run(days=1)
@@ -711,13 +717,13 @@ def test_a_cohort_takes_levels_from_each_other():
 
 def test_externalities_show_agents_taking_levels_from_each_other():
     """`levels[a][b]`: what b's execution cost against each step's opening
-    mid changes by when a stops trading. Off the shared book it is zero;
-    on it, a (first in the arrival order) makes b's fills dearer by the
-    levels it takes, and b barely reaches a, which met the book first."""
+    mid changes by when a stops trading. Off the shared book (pt-v19) it
+    is zero; on it, a (first in the arrival order) makes b's fills dearer by
+    the levels it takes, and b barely reaches a, which met the book first."""
     u = tf.Universe.random(8, seed=99)
     t, q = u[0].ticker, round(0.03 * u[0].avg_volume)
     out = {}
-    for name, model in (("off", None), ("live", live())):
+    for name, model in (("off", OFF), ("live", live())):
         w = World(seed=42, universe=u, model=model, cash=1e9, max_leverage=None,
                   agents={"a": Buyer(t, q), "b": Buyer(t, q)})
         out[name] = tf.externalities(w, days=1)
@@ -879,18 +885,21 @@ def test_evaluate_trades_through_the_live_book_and_counts_the_flow_once():
     """`tf.evaluate` on a live book: the agent's order executes in the
     engine under its portfolio's owner, the harness's `fills=` carries
     nothing for it, and the engine applies the flow once, on the next tick.
-    A buy of 30% of daily volume fills in full, where the ladder alone would
-    have cut it off."""
+    A buy of 30% of daily volume fills in full, where the ladder alone, on
+    pt-v19, would have cut it off."""
     i = index_by_volume(ROSTER, "thickest")
     t, q = ROSTER[i].ticker, round(0.3 * ROSTER[i].avg_volume)
     live_card = tf.evaluate({"a": BuyOnce(t, q)}, seed=92001, universe=ROSTER,
                             days=1, model=live(), max_leverage=None,
                             cash=1e12)["a"]
     off_card = tf.evaluate({"a": BuyOnce(t, q)}, seed=92001, universe=ROSTER,
-                           days=1, max_leverage=None, cash=1e12)["a"]
+                           days=1, model=OFF, max_leverage=None,
+                           cash=1e12)["a"]
     assert live_card.trades == off_card.trades == 1
     assert live_card.turnover > 2 * off_card.turnover, "size was priced, not cut"
-    assert live_card.model_fingerprint.startswith("custom-")
+    # The dials on the default's base are pt-v20 itself. On pt-v19's base,
+    # the default until 0.8.5, they fingerprinted as "custom-".
+    assert live_card.model_fingerprint == "pt-v20"
 
 
 def test_a_counterfactual_world_on_a_live_book_logs_its_orders_and_replays():

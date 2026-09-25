@@ -8,8 +8,8 @@ UNIVERSE = tradefloor.Universe.random(5, seed=3)
 TICKER = UNIVERSE[0].ticker
 
 
-def market(seed=42, ticks=60):
-    e = tradefloor.Engine(seed=seed, universe=UNIVERSE)
+def market(seed=42, ticks=60, model=None):
+    e = tradefloor.Engine(seed=seed, universe=UNIVERSE, model=model)
     e.open_market()
     e.run_session(9, 30, 3, ticks)
     return e
@@ -146,7 +146,12 @@ def test_pending_flow_is_what_the_market_should_feel():
     # Execution prices the fill; flow applies the pressure. A harness that
     # executed without feeding flow back would have a trader with realistic
     # fills and an invisible footprint.
-    e = market()
+    #
+    # On pt-v19, where the portfolio prices off a snapshot of the book and
+    # the harness carries the flow. On pt-v20, the default, the order
+    # executes in the engine's own book, the engine applies its flow, and
+    # there is nothing left for the harness to feed.
+    e = market(model="pt-v19")
     p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, TICKER, 30_000)
     p.execute(e, TICKER, -10_000)
@@ -154,6 +159,13 @@ def test_pending_flow_is_what_the_market_should_feel():
 
     p.clear_flow()
     assert p.pending_flow() == {}
+
+    live = market(model="pt-v20")
+    assert live.book_live
+    q = tradefloor.Portfolio(cash=1e9)
+    q.execute(live, TICKER, 30_000)
+    q.execute(live, TICKER, -10_000)
+    assert q.pending_flow() == {}
 
 
 def test_flow_fed_back_actually_moves_the_market():

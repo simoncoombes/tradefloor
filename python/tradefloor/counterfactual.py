@@ -105,35 +105,35 @@ once a day for the whole cohort.
 
 ## Whether agents take each other's liquidity depends on the model
 
-On every shipped preset they do not. :meth:`Portfolio.execute` prices a fill
-through ``book.sweep_cost``, which walks the levels to compute an average and
-removes nothing from the book. So two agents buying the same name on the
-same step meet the same ladder and fill at the same price, and the ladder
-after both of them is the ladder before either. Measured on this build, on
-``Universe.random(8, seed=99)`` at seed 42, two agents each buying 10,000
-shares of the first name at step 0: both fill at 83.96118999999999 against a
-first ask level of 9,762 shares at 83.96 that neither of them moved, and the
-sweep walks past that level to a worst price of 84.01, so the equality is a
-claim about a ladder that did not move rather than two fills at the top of
-the book. ``test_externality.py`` pins it. The cohort's whole footprint
-reaches the market once, as the merged ``fills`` of that step's session, on
-its first tick, so an agent meets another's trading from the next step on
-and never inside the step it happened.
+On every preset through pt-v19 they do not. :meth:`Portfolio.execute` prices
+a fill through ``book.sweep_cost``, which walks the levels to compute an
+average and removes nothing from the book. So two agents buying the same
+name on the same step meet the same ladder and fill at the same price, and
+the ladder after both of them is the ladder before either. Measured on this
+build under pt-v19, on ``Universe.random(8, seed=99)`` at seed 42, two
+agents each buying 10,000 shares of the first name at step 0: both fill at
+83.971666 against a first ask level of 9,762 shares at 83.97 that neither of
+them moved, and the sweep walks past that level to a worst price of 84.04,
+so the equality is a claim about a ladder that did not move rather than two
+fills at the top of the book. ``test_externality.py`` pins it. The cohort's
+whole footprint reaches the market once, as the merged ``fills`` of that
+step's session, on its first tick, so an agent meets another's trading from
+the next step on and never inside the step it happened.
 
-Under a model with ``book_shared`` on (``Engine.book_live``), each
-portfolio's orders execute in the engine's book, under the portfolio's
-label (its ``owner``). Label order is then arrival order: the second agent
-meets the book the first left, pays for the levels the first took, and can
-hit the first's resting limit order. Each agent's flow reaches the market
-once, on the next tick, and is attributed to it (``Engine.take_impacts``).
-An agent's value in the ``act()`` mapping may be a :class:`tradefloor.Limit`
-as well as a number: it takes what the book holds at its price and the rest
-waits, in the book's queue with ``book_resting`` on, until it fills, is
-replaced by the agent's next ``Limit`` on that name, or is cancelled with
-:class:`tradefloor.Cancel`. What fills during a session is collected into
-the agent's portfolio after the session, and a live-book row carries it
-under ``book_fills``. ``tests/test_order_book_depth.py`` measures both
-regimes.
+Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20,
+the default, has it, each portfolio's orders execute in the engine's book,
+under the portfolio's label (its ``owner``). Label order is then arrival
+order: the second agent meets the book the first left, pays for the levels
+the first took, and can hit the first's resting limit order. Each agent's
+flow reaches the market once, on the next tick, and is attributed to it
+(``Engine.take_impacts``). An agent's value in the ``act()`` mapping may be
+a :class:`tradefloor.Limit` as well as a number: it takes what the book
+holds at its price and the rest waits, in the book's queue with
+``book_resting`` on, until it fills, is replaced by the agent's next
+``Limit`` on that name, or is cancelled with :class:`tradefloor.Cancel`.
+What fills during a session is collected into the agent's portfolio after
+the session, and a live-book row carries it under ``book_fills``.
+``tests/test_order_book_depth.py`` measures both regimes.
 
 Label order therefore decides, off, three things and no price: the order
 agents are asked, the order their flows are summed into the merged mapping,

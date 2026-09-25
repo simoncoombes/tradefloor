@@ -136,16 +136,32 @@ def test_cost_scales_with_size_while_the_book_can_fill_it():
     assert large.shortfall_bps() == pytest.approx(small.shortfall_bps(), rel=0.05)
 
 
-def test_an_order_larger_than_the_book_fills_partially_and_says_so():
+#: Two sizes, as fractions of daily volume, that are both past what each
+#: preset's book holds for the first name (9,713 shares a day). pt-v19's
+#: book is the maker's displayed ladder, 483 shares. pt-v20's walks latent
+#: depth to one day's volume behind it (``book_depth_reach`` 1.0), 10,195
+#: shares, which 0.05 and 0.5 (pt-v19's pair) now fill in full.
+PAST_THE_BOOK = {"pt-v19": (0.05, 0.5), "pt-v20": (1.5, 10.0)}
+
+
+@pytest.mark.parametrize("preset", sorted(PAST_THE_BOOK))
+def test_an_order_larger_than_the_book_fills_partially_and_says_so(preset):
     """The cheapest execution is the one that did not happen.
 
-    A request for 4,856 shares fills 483 -- the entire displayed depth -- and
-    every larger request fills the same 483. Reported through `partial`
-    rather than by silently returning a small fill, because a low shortfall on
-    an order that mostly did not execute is not a good execution.
+    On pt-v19 a request for 4,856 shares fills 483, the entire displayed
+    depth, and every larger request fills the same 483. On pt-v20 a request
+    for 14,569 fills 10,195, the ladder and a day's latent depth, and every
+    larger request fills the same 10,195. Reported through `partial` rather
+    than by silently returning a small fill, because a low shortfall on an
+    order that mostly did not execute is not a good execution.
+
+    No leverage limit, so the order meets the book and not the limit: on
+    pt-v20 a buy of half a day's volume fills in full and 2x leverage
+    refuses it.
     """
-    modest = analyse(BuyOnce(0.05))
-    huge = analyse(BuyOnce(0.5))
+    small, large = PAST_THE_BOOK[preset]
+    modest = analyse(BuyOnce(small), model=preset, cash=1e12, max_leverage=None)
+    huge = analyse(BuyOnce(large), model=preset, cash=1e12, max_leverage=None)
     assert modest.partial_fills()
     assert huge.partial_fills()
     assert huge.fills[0]["requested"] > modest.fills[0]["requested"] * 5

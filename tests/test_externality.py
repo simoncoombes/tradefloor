@@ -17,6 +17,8 @@ was nothing for anyone to do to anyone.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import tradefloor as tf
@@ -26,6 +28,10 @@ from tradefloor.externality import Externality, externalities
 SEED = 42
 ROSTER_SEED = 99
 NAMES = 8
+
+#: The last preset whose agents price off a snapshot of the book and take no
+#: levels from each other. The default shares the book from pt-v20.
+SNAPSHOT_PRESET = "pt-v19"
 
 
 def roster():
@@ -200,7 +206,7 @@ def test_the_cohort_flow_reaches_the_market_as_one_merged_order_flow():
 
 
 def test_agents_do_not_take_each_others_liquidity_within_a_step():
-    """`Portfolio.execute` reads the ladder and removes nothing.
+    """`Portfolio.execute` reads the ladder and removes nothing, on pt-v19.
 
     So label order decides which agent is asked first, which flow is summed
     first and whose rejection is written first, and no price. Two agents
@@ -211,9 +217,14 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     the levels an earlier one took. The behaviour was always right and the
     sentence was wrong, which is the failure a test states rather than a
     paragraph.
+
+    pt-v20, the default, shares the agent-facing book, and there a later
+    agent does pay the levels an earlier one took;
+    `test_order_book_depth.py::test_a_cohort_takes_levels_from_each_other`
+    holds that.
     """
     cash = 50_000_000.0
-    both = cohort(cash=cash,
+    both = cohort(cash=cash, model=SNAPSHOT_PRESET,
                   agents={"alpha": Buyer(0, at=0, shares=10_000.0),
                           "beta": Buyer(0, at=0, shares=10_000.0)})
     both.run(days=1)
@@ -223,7 +234,7 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     assert alpha["worst_price"] == beta["worst_price"]
 
     # And the ladder both of them swept is the ladder neither of them moved.
-    fresh = tf.Engine(seed=SEED, universe=roster())
+    fresh = tf.Engine(seed=SEED, universe=roster(), model=SNAPSHOT_PRESET)
     fresh.open_market()
     ticker = fresh.tickers[0]
     before = _levels(fresh, ticker)
@@ -231,10 +242,10 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     assert _levels(fresh, ticker) == before
 
     # Sorting order decides no price and no market.
-    first = cohort(cash=cash,
+    first = cohort(cash=cash, model=SNAPSHOT_PRESET,
                    agents={"aa": Buyer(0, at=0, shares=3_000.0),
                            "zz": Buyer(0, at=0, shares=9_000.0)})
-    second = cohort(cash=cash,
+    second = cohort(cash=cash, model=SNAPSHOT_PRESET,
                     agents={"aa": Buyer(0, at=0, shares=9_000.0),
                             "zz": Buyer(0, at=0, shares=3_000.0)})
     first.run(days=1)
@@ -568,7 +579,8 @@ class OnceOnly:
         return {t: self.shares for t in obs.tickers[self.lo:self.hi]}
 
 
-def test_an_idle_agents_column_moves_through_marking():
+@pytest.mark.parametrize("preset", (SNAPSHOT_PRESET, "pt-v20"))
+def test_an_idle_agents_column_moves_through_marking(preset):
     """What the idle caveat attributes the movement to.
 
     An agent that filled nothing over the window has the same cash and
@@ -577,13 +589,21 @@ def test_an_idle_agents_column_moves_through_marking():
     says exactly that, and this is the check that it is saying the right
     thing rather than a plausible thing.
 
-    The two figures agree to about 1.5e-11 on 25.0 rather than to the
-    bit, because `pnl_since` reaches the total by differencing two net
+    The two figures agree to a rounding of the net worth rather than to
+    the bit, because `pnl_since` reaches the total by differencing two net
     worths and this sums the per-position differences, which is a
-    different summation order over the same values.
+    different summation order over the same values. Measured on pt-v19:
+    -25.0 against a sum 5.7e-12 away (it read "about 1.5e-11 on 25.0"
+    before 0.8.5). On pt-v20: -0.0173 against a sum 2.9e-9 away, under one
+    ulp (3.7e-9) of the 20,006,008 net worth the total is differenced from.
+    pt-v20's final prices in this fixture are off the cent grid and move by
+    about 1e-5 between the arms, so the rounding shows at a size pt-v19's
+    cent moves never reach, and the relative tolerance alone would hold a
+    0.0173 to 1.7e-11, below one ulp of the net worth.
     """
     universe = list(tf.Universe.random(20, seed=11))
     world = World(seed=SEED, universe=universe, cash=20_000_000.0,
+                  model=preset,
                   agents={"idle": OnceOnly(0, 10, at=0),
                           "active": OnceOnly(10, 20, at=9)})
     world.run(days=1)
@@ -602,9 +622,11 @@ def test_an_idle_agents_column_moves_through_marking():
     in_arm = dict(zip(tickers, _prices(arm.engine)))
     marking = sum(position.quantity * (in_arm[t] - in_full[t])
                   for t, position in held.items())
+    assert marking != 0.0, "the idle fixture's holdings did not move"
 
-    assert result.matrix["active"]["idle"] == pytest.approx(marking,
-                                                            rel=1e-9)
+    worth = full.portfolios["idle"].net_worth(full.engine)
+    assert result.matrix["active"]["idle"] == pytest.approx(
+        marking, rel=1e-9, abs=2 * math.ulp(worth))
 
 
 class Half:
