@@ -296,6 +296,40 @@ under pt-v20. A run that worked before gives the same result: the change only
 lets through runs that used to fail. `tests/test_suite_markets.py` runs all
 twenty markets on pt-v19 and pt-v20.
 
+### Found and fixed on the way to the default
+
+Making pt-v20 the default exposed defects the suite could not see while it
+ran pt-v19, each fixed without moving a digest that had already shipped.
+
+- The agent-facing Oracle had no edge on pt-v20: moving each name's own
+  shocks into fair value shrinks the cross-sectional spread of the
+  mispricing from 0.30 to 0.015. `baselines.Oracle` now picks its rule from
+  the preset's dials. Where the edge is cross-sectional it trades it as
+  before; otherwise it trades each equity's expected return over the
+  session, as a net position plus a residual cross-sectional book. On
+  pt-v20 over 30 days it is positive on 12 of 12 markets. Capture is quoted
+  on a 30-day fixture, and a blend's oracle component reads the same rule.
+- `truth()` and `attribution` gain an eleventh factor, `fair_value_shift`,
+  last in `Engine.FACTORS`, so the columns sum to the change in
+  `mispricing_s` on every preset (pt-v20 missed by up to 0.0087 a row).
+- Under `corporate_yield_daily` a pinned VIX leaked into the corporate
+  yield, which fell from 2.809 to 2.421 per cent over five sessions of
+  `hold(vix=45)`. A pinned session now takes no VIX term, a pinned
+  corporate yield holds through the close, and the yield's daily move is
+  capped at 0.50 points (Moody's Baa never moved more than 0.48 in a
+  session, 1986-2026). `bondsSha256` moves to `cd6d532d` because its
+  session pins the corporate yield.
+- Snapshots carry pt-v20's unapplied opening draws, and the Python state
+  hash and the ledger know its new keys.
+- `compare()` refuses a comparison whose worlds differ only in levels held
+  from day 0 on a preset whose opening books the day-0 gap into fair value
+  (`opening_market_sigma` off zero), and names the step that measures the
+  level instead.
+- A macro path that leaves out the business-cycle phase lets pt-v20 run its
+  own cycle. Notebook 09's real 2020-21 path now carries the NBER phases,
+  and on it pt-v20's simulated index falls 28.5 per cent and is back at its
+  high by 17 June 2020.
+
 ### Two packaged scenarios recalibrated
 
 The owner's decision, from the design repo's

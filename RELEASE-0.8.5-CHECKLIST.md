@@ -1,186 +1,100 @@
 # Release 0.8.5 checklist
 
-What is left between `release/0.8.5` as pushed and 0.8.5 on PyPI, in order.
-Everything above step 1 is done: the branch merges `fix/agent-flow-once`,
-`feature/order-book-depth`, `feature/bonds` and `docs/model-spec`, the
-Rust and Python suites pass on it, and the four known-answer digests are
-unchanged. `RELEASING.md` is the runbook, and each step below names the
-section of it that applies. The last step is the owner's.
+What is left between `release/0.8.5` and 0.8.5 on PyPI, in order.
+`RELEASING.md` is the runbook, and each step names the section of it that
+applies. The last step is the owner's.
 
-The branch also carries five commits cherry-picked from `dev`: c618089 and
-d1cb9a6 (the docs register, which step 4 reads), a46575e (`envelope.check`
-accepts four measured roster mixes), fbdcac1 and d445d9c. The one `dev`
-commit left out is 1c653e7, an openai-agents re-record that today's
-re-record on `fix/agent-flow-once` supersedes.
+## The branch today
 
-## Digests on the branch today
+`release/0.8.5` merges `fix/agent-flow-once`, `feature/order-book-depth`,
+`feature/bonds`, `docs/model-spec`, `preset/pt-v20`, `fixtures/pt-v20`,
+`fix/ptv20-core` (the Oracle, `fair_value_shift`, the corporate-yield fixes)
+and `docs/model-spec-v20`, plus five commits cherry-picked from `dev`
+(c618089, d1cb9a6, a46575e, fbdcac1, d445d9c; 1c653e7 is superseded).
+pt-v20 is the default. The full Python suite passes (4,084 passed, 63
+skipped, 1 xfailed) and `cargo test` passes 552 of 552.
 
-| digest | value | moves when pt-v20 lands |
-|---|---|---|
-| `simulationSha256` | `1e683b96...` | yes, the default preset moves |
-| `sha256` (known answer) | `c22d4a02...` | yes |
-| `metadataSha256` | `8804ef0e...` | yes |
-| `bondsSha256` | `522aeb76...` | yes, its session runs the default preset |
-| book `sha256` | `b83323a6...` | yes: `preset/pt-v20` re-bases it to `c765d6a6...` with `BOOK_KAT_VERSION` still 1 |
-| presets (18 rows) | combined `0fea3038...` | only by gaining pt-v20's row. The other eighteen rows are frozen |
+| digest | value |
+|---|---|
+| `simulationSha256` (KAT 28) | `b0ef10ef...` |
+| `sha256` (known answer) | `92c9cb7c...` |
+| `metadataSha256` | `8804ef0e...` |
+| `bondsSha256` | `cd6d532d...` |
+| book `sha256` | `1e7f1884...` (BOOK_KAT_VERSION 1) |
+| presets, 19 rows | combined `33d4efcf...`; pt-v20's row `149d72de...` |
 
-The per-preset digests (`tests/known_answer_presets.json`) were checked
-against `preset/pt-v20` at 9fce931: a build of it gives the same eighteen
-digests for pt-v1 to pt-v19 as this branch. Each of the eighteen also
-matches the published 0.8.1 wheel, with the two treasury yields that 0.8.1
-does not report left out.
+The eighteen per-preset rows before pt-v20 match the published 0.8.1 wheel
+with the two treasury yields left out.
 
-## 1. Merge the preset
+## 1. The last pt-v20 regrade
 
-- [ ] Wait for E3 to push `preset/pt-v20` with every criteria row passing.
-- [ ] `git merge --no-ff origin/preset/pt-v20` on `release/0.8.5`. A trial
-      merge of 9fce931 conflicted in three files, all on comments and blank
-      lines: `python/tradefloor/manifest.py`, `rust/src/engine.rs` and
-      `tests/test_known_answer.py`. The code on both sides is the same
-      (rates hashed after the equities and before the book). Keep the
-      release branch's text. `CHANGELOG.md` and `README.md` merged cleanly.
-- [ ] Walk `RELEASING.md` section 5b, since the default moves: the envelope
-      (`PRESET`, `CERTIFIED`, `MEASURED_504`), the preset record and its
-      level and crisis block from a paired run, `KAT_VERSION` and
-      `tests/known_answer.json` regenerated on two architectures, test
-      expectations pinned to pt-v19, and anything recorded against the
-      market. The five LLM fixtures were re-recorded on pt-v19; a replay
-      under a different preset raises `ReplayMiss`, so re-record them or
-      name `pt-v19` where the notebooks replay them.
-- [ ] Prose that names the default: the README (the realism section and
-      "`pt-v19` became the default in 0.8.0"), the BibTeX `note` and the
-      citing example, `rust/README.md`, `docs/SUPPORT.md`, and the
-      `python/` sweep in 5b item 6. `tools/release/check.py` catches the
-      README's two lines.
-- [ ] `docs/MODEL.md` describes pt-v19 and has a "Coming in pt-v20"
-      section. Either bring it to pt-v20 or say at the top that it
-      describes pt-v19. `library_docs.py` in the docs repository rewrites
-      the name of the preset after the default, so check its output.
-- [ ] Add pt-v20's row to `tests/known_answer_presets.json` with
-      `python tests/known_answer_presets.py`, and change nothing else in
-      that file; `test_known_answer.py` fails until the row is there.
-      Update the combined `sha256` and the note, and the
-      `[PLACEHOLDER pt-v20]` sentence about it in the changelog.
-- [ ] `envelope.check()` accepts the four concentrated roster mixes only
-      on pt-v19 (a46575e). Once pt-v20 is the default, measure the mixes
-      on it or say that `check()` refuses them there.
-- [ ] Optional: the liquidity-crisis FinRobot study is skipped by the slow
-      notebook test until `tests/fixtures/finrobot/liquidity-crisis.json`
-      (60 calls) and its four replications are re-recorded.
+- [ ] E3 regrades pt-v20 on the pooled 90 histories: the 28 registered rows
+      and the new D2 row for the driven 2020 path. It may change
+      `volume_move_response` for the ten-year gap.
+- [ ] If any dial moves: merge `fix/ptv20-core`, then re-run RELEASING 5b
+      for the new vector. That means the record and its level block
+      (`tools/presets/level_panel.py` on both presets, `level_rows.py`,
+      `record.py --level-rows`, `envelope_tables.py --write`),
+      `KAT_VERSION` 29 with `tests/known_answer.json` regenerated, and
+      pt-v20's row in `tests/known_answer_presets.json` regenerated.
+      pt-v20 has not shipped, so its row may still change; the other
+      eighteen may not.
+- [ ] The CHANGELOG's pt-v20 figures, the README's realism section,
+      MODEL.md's values and notebooks 00 to 06 and 09 follow any change.
 
-## 2. Fill the placeholders
+## 2. The docs branch against the final engine
 
-- [ ] Engine: `grep -n "PLACEHOLDER pt-v20" CHANGELOG.md` finds seven, two of
-      them in the release note. The note is 248 words with the placeholder
-      sentences in it and the budget is 250, so pt-v20's numbers have to
-      fit in about the 45 words those two sentences hold.
-      `python tools/release/check.py --version 0.8.5` counts it.
-- [ ] Docs: `grep -rn "\[PLACEHOLDER\|\[REMEASURE" tools/docs/learn` in
-      `tradefloor-docs`. The build lists them on a preview and refuses them
-      on a live build. The release notes page has three
-      `[PLACEHOLDER new default]` markers. The presets page shows a
-      placeholder row for any default it has no entry for: add a pt-v20
-      entry to `PRESETS` in `handoff/Presets.dc.html` and pt-v19 drops to
-      reproduction only with its `retired` text. The same page's meta
-      description and "The era boundary" paragraph name pt-v19 as the
-      default. The docs pages cannot name pt-v20 until the mirrored
-      `params.rs` registers it, because `build.check_presets` refuses a
-      preset the package does not ship.
-- [ ] Rebuild and re-run everything:
+In `tradefloor-docs` on `release/0.8.5`, with `TRADEFLOOR_PYTHON` naming a
+venv that holds a build of the final engine commit:
 
-      maturin develop --release
-      python -m pytest tests/ -q
-      TRADEFLOOR_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
-      cd rust && cargo test --offline --release
-      python tools/release/check.py --version 0.8.5
-
-      On this machine the one Python failure at f19e254 was
-      `test_the_sdks_client_survives_consecutive_decisions`, whose control
-      stops failing on openai 3.14.0 and openai-agents 0.22.2. It passes
-      on openai 3.19.2 and openai-agents 0.22.3, the versions the fixture
-      was recorded with.
-- [ ] Push `release/0.8.5`. The AWS box clones by branch name.
-
-## 3. The docs branch against the merged engine
-
-`tradefloor-docs` `release/0.8.5` (d9e47ba) passes all fifteen steps of
-`tools/docs/check.py` against a build of this branch at f19e254. Its CI
-installs `tradefloor==0.8.5` from PyPI, so it stays red until the tag. The
-register's lines are set for the live build, which runs two lines below the
-preview on every page, so `resync.py --lines` reports them as moved on a
-preview build.
-
-In `tradefloor-docs` on `release/0.8.5`, with `TRADEFLOOR_PYTHON` naming an
-interpreter that holds a build of the engine branch:
-
-- [ ] `python tools/docs/learn/mirrors.py --source <engine checkout> --ref origin/release/0.8.5`
-- [ ] `python tools/docs/learn/library_docs.py`
-- [ ] Regenerate `params.py`, `api.py`, `records.py`, `envelope.py` and
-      `experiments.py`, then document the API pt-v20 adds (5c), and
-      re-read every traded figure on the pages against the new default.
-      With the book dials on in pt-v20, every page that says the seven
-      dials are 0.0 on every shipped preset, or that `book_live` is False,
-      becomes wrong for the default: Core types (`#agent-book`), the
-      Parameters book-dial note and fingerprint example, the Counterfactual
-      API rows and the release notes. The TCA round trip, the untouched
-      names, the grid and the rebalance figures, the rate-index curve
-      readings, the treasury targets and `curve_shock` all move with the
-      preset.
-- [ ] Commit the sources, `python tools/docs/learn/build.py` (preview),
-      commit the build, run it once more so the dates settle, and
-      `python tools/docs/check.py`.
+- [ ] `python tools/docs/learn/regenerate.py --source <engine checkout> --ref origin/release/0.8.5`
+      (mirrors, library pages, inventories, experiments, build, commits).
+- [ ] Merge the figures branch (`figures/pt-v20`) once its gate is clean.
+- [ ] `python tools/docs/check.py` passes all fifteen steps.
 - [ ] `python tools/remeasure/resync.py --lines` from the engine checkout
-      with `TRADEFLOOR_DOCS` set, and commit the register in the docs repo.
-- [ ] Push the docs branch.
+      with `TRADEFLOOR_DOCS` set, and commit the register.
+- [ ] The docs repo's CI installs `tradefloor==0.8.5` from PyPI, so it stays
+      red until the tag.
 
-## 4. The remeasure box (RELEASING step 4)
+## 3. The remeasure box (RELEASING step 4)
 
 - [ ] From `tradefloor-design`, with `TRADEFLOOR_DOCS` at the docs checkout
-      of step 3, run the commands in the header of
+      of step 2, run the commands in the header of
       `tools/calibration/aws/user-data-remeasure.sh`: upload the register
       tarball as `in/remeasure-0.8.5-register.tgz`, launch run
       `remeasure-0.8.5` on c8g.24xlarge with `BRANCH=release/0.8.5`, then
       `status`, `collect` into `tools/remeasure/out-0.8.5` and `reap`.
-- [ ] Cost: spot c8g.24xlarge was $0.913 an hour in us-east-2c on
-      2026-09-24. About 30 minutes of box time with the build, so about
-      $0.45. The dead-man switch caps it at 90 minutes, $1.37.
-- [ ] Check `meta.groups_run` says a full run, then read "Doc edits
-      needed". Each MOVED row is an edit in the docs repo (and in the
-      register, which `resync.py --report` and `--apply` help with).
-      Rebuild the docs and repeat until the report is clean.
-- [ ] Commit `tools/remeasure/out-0.8.5/` on the engine branch and push.
+      About $0.45 at the spot floor, $1.37 at most.
+- [ ] Read "Doc edits needed", fix each MOVED row in the docs repo, rebuild,
+      and repeat until clean, then commit `tools/remeasure/out-0.8.5/` on
+      the engine branch.
 
-## 5. The determinism gate (RELEASING step 7)
+## 4. The determinism gate (RELEASING step 7)
 
 - [ ] `gh workflow run determinism.yml --ref release/0.8.5 -f targets=all`
-- [ ] Read the run you started, not the newest in the list, and check its
-      `headSha` is the branch head.
+- [ ] Read the run you started and check its `headSha` is the branch head.
+      This is the second architecture for KAT 28's digests, which were
+      produced on macOS arm64.
 
-## 6. The pull request to main
+## 5. The pull request to main
 
-- [ ] Open the PR `release/0.8.5` into `main`. The required checks on
-      `main` are `all targets agree` and `the suite is green` (the runbook
-      says `build`; the branch protection names these two), and the
-      protection is strict, so the branch has to be up to date with `main`.
-- [ ] If the dispatch in step 5 ran before the PR's last commit, dispatch
-      it again for the head.
-- [ ] Before the tag, the owner switches Zenodo on (step 9), or 0.8.5 gets
+- [ ] Open the PR `release/0.8.5` into `main`. The required checks are
+      `all targets agree` and `the suite is green`, and the protection is
+      strict, so the branch has to be up to date with `main`.
+- [ ] Before the tag, the owner switches Zenodo on (step 8), or 0.8.5 gets
       no DOI.
 - [ ] The owner merges.
 
-## 7. Tag and publish
+## 6. Tag and publish
 
 - [ ] `git fetch && git rev-parse origin/main` against the merge commit.
-- [ ] `CITATION.cff` `date-released:` is the day of the tag. It says
-      2026-09-24 now.
+- [ ] `CITATION.cff` `date-released:` is the day of the tag.
 - [ ] `git tag -a v0.8.5 -m "..." origin/main` and `git push origin v0.8.5`.
-      That runs `release.yml`: five wheels and the sdist, the verify job,
-      PyPI and crates.io in parallel by Trusted Publishing, then the
-      GitHub release cut from the section above `<!-- release-note-ends -->`.
-      Nothing to run by hand. A crates.io version cannot be replaced.
-- [ ] Watch both registries publish.
+      `release.yml` builds, verifies, publishes to PyPI and crates.io, and
+      writes the GitHub release from the section above
+      `<!-- release-note-ends -->`. A crates.io version cannot be replaced.
 
-## 8. After the tag
+## 7. After the tag
 
 - [ ] Install from outside the tree and ask it what it is:
 
@@ -188,33 +102,25 @@ interpreter that holds a build of the engine branch:
       /tmp/rel/bin/python -c "import tradefloor as tf; print(tf.version(), tf.model_preset()['name'])"
       /tmp/rel/bin/pip install --no-binary :all: tradefloor==0.8.5
 
-- [ ] Reproduce the known-answer digests inside the installed wheel against
-      `tests/known_answer.json` and `tests/known_answer_book.json` from the
-      tag.
-- [ ] docs.rs: `https://docs.rs/tradefloor/0.8.5`. A 404 in the first
-      minutes is the queue; compare with an earlier version after ten.
-- [ ] The docs site, RELEASING step 5: a venv with the released wheel,
-      `mirrors.py --source <engine> --ref v0.8.5`, `params.py --check
-      --python /tmp/rel/bin/python`, `api.py`, `build.py --target live`
-      (it refuses any marker left from step 2), `check.py`, then a PR into
-      `main` in `tradefloor-docs`. The owner merges, which deploys. Then
-      `curl -sI https://tradefloor.dev/` and
-      `python tools/docs/learn/indexnow.py`.
-- [ ] Merge `main` into `dev`, as the runbook's last shipping step says.
-      `dev` already holds c618089 and d1cb9a6, so those merge as no-ops.
-- [ ] Delete the working branches: `integration/0.8.5` (superseded by this
-      branch) and, in the docs repository, `release/0.8.5-api` and
-      `release/0.8.5-figures`.
+- [ ] Reproduce every known-answer digest inside the installed wheel against
+      `tests/known_answer.json`, `known_answer_book.json` and
+      `known_answer_presets.json` from the tag.
+- [ ] docs.rs: `https://docs.rs/tradefloor/0.8.5`.
+- [ ] The docs site: mirror from `v0.8.5`, regenerate against the released
+      wheel (`params.py --check --python /tmp/rel/bin/python`),
+      `build.py --target live` (it refuses any `[PLACEHOLDER` or
+      `[REMEASURE` marker left), `check.py`, a PR into `main`, merged by the
+      owner, then `curl -sI https://tradefloor.dev/` and `indexnow.py`.
+- [ ] Merge `main` into `dev`.
+- [ ] Delete the working branches and worktrees: `integration/0.8.5`,
+      `flip/a`, `flip/b`, `flip/c`, `envgaps/pt-v20`, `remeasure/pt-v20`,
+      and in the docs repo `figures/pt-v20`.
 
-## 9. Zenodo (the owner's)
+## 8. Zenodo (the owner's)
 
 - [ ] Before the tag: sign in at https://zenodo.org with GitHub, open
       https://zenodo.org/account/settings/github/, press "Sync now" and
-      switch `simoncoombes/tradefloor` on. Zenodo archives only GitHub
-      releases published after the switch (`RELEASING.md`, "DOI (Zenodo)").
-- [ ] After the release: open the new record, check the title, author and
-      licence, and copy the concept DOI.
-- [ ] Put the concept DOI in `CITATION.cff` (`doi:`), in the README's
-      BibTeX entry in place of `10.5281/zenodo.XXXXXXX`, and on the docs
-      Install page. That is a documentation change, which an LTS patch
-      allows.
+      switch `simoncoombes/tradefloor` on (`RELEASING.md`, "DOI (Zenodo)").
+- [ ] After the release: check the record's title, author and licence, and
+      copy the concept DOI into `CITATION.cff` (`doi:`), the README's BibTeX
+      entry and the docs Install page.
