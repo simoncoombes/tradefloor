@@ -1750,16 +1750,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # argument for reading the record and the table against each other
         # rather than either alone.
         "kind": "derived",
-        "presets": {"pt-v19": 0.7905, "pt-v20": 0.85},
-        "pt_v20": "pt-v20 departs from the identity on a measurement: with "
-                  "every stock-specific shock permanent and the market "
-                  "factor cut, 0.7905 left a name's |return| lag-1 "
-                  "autocorrelation at 0.034 on the one-year panel (pt-v19 "
-                  "0.049, the decade band's floor 0.04); 0.85 reads 0.044 "
-                  "and holds every registered row (design repository, "
-                  "grid ptv20e5, seventh registration). Its first-moment "
-                  "persistence is 1.001, held by the variance floor and "
-                  "ceiling",
+        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905},
         "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
                     "persistence identity solved for beta at the SHIPPED "
                     "alpha and gamma, with rho the tape's own per-name "

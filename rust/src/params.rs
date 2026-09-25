@@ -6900,8 +6900,7 @@ impl ModelParams {
     /// `jump_intensity_market` take the transient part down by as much.
     /// With less market noise a name's volume tracks its own move more
     /// tightly, so `volume_move_response` 0.6 keeps that tie inside the
-    /// certified band at every horizon. `garch_beta` 0.85 gives a name's
-    /// volatility back the short-lag memory the permanent share took.
+    /// certified band at every horizon.
     ///
     /// A LIMIT. The model's inflation almost never leaves the under-3-per-
     /// cent regime, so stocks and Treasuries are always in flight to
@@ -6970,17 +6969,6 @@ impl ModelParams {
         // ceiling at every horizon measured (design repository,
         // programme/results/ptv20/d1screen.py and the fifth registration).
         p.volume_move_response = 0.6;
-        // VOLATILITY MEMORY. With every stock-specific shock permanent and
-        // the market factor cut, a name's |return| lag-1 autocorrelation
-        // fell to 0.034 on the one-year panel (pt-v19 0.049, the decade
-        // band's floor 0.04). A name's GJR persistence restores it: 0.85
-        // reads 0.044 at 252 sessions and 0.053 at 504 (grid ptv20e5, 30
-        // histories; 0.88 reads 0.052 and 0.060), and every long-run row
-        // and certification cell holds. It takes the GJR's first-moment
-        // persistence, alpha + beta + gamma/2, from 0.942 to 1.001, so the
-        // per-name variance is held by its 0.25x floor and 5x ceiling
-        // rather than by its own reversion.
-        p.garch_beta = 0.85;
         p
     }
 
