@@ -826,3 +826,28 @@ def test_an_undefined_percentage_move_is_refused_rather_than_sorted():
     assert sorted(values)[0] != min(values) or max(values) != 3.0, (
         "a NaN no longer breaks sort/min/max; the guard in compare() can go"
     )
+
+
+def test_the_packaged_recession_ends():
+    """The recession holds contraction for fifteen months and then lets the
+    cycle go on (audit major 4: it used to pin contraction, growth and credit
+    for good, so the index never recovered). Nothing in it is permanent, its
+    last word on the cycle is a trough written once, and the model's own
+    cycle then carries the economy out of it."""
+    scenario = Scenario.load("recession")
+    assert all(item.shape != "permanent" for item in scenario.interventions)
+    cycle = sorted((item for item in scenario.interventions
+                    if item.target == "macro.cycle"), key=lambda item: item.at)
+    assert [(item.value, item.shape) for item in cycle] == [
+        ("contraction", "hold"), ("trough", "impulse")]
+    assert cycle[1].at == cycle[0].last_day + 1
+
+    engine = tradefloor.Engine(
+        seed=2, universe=list(tradefloor.Universe.random(8, seed=1)))
+    phases = []
+    for day in range(460):
+        scenario.apply(engine, day)
+        engine.run_days(1)
+        phases.append(engine.macro_fields["cycle"])
+    assert phases[cycle[1].at] == "trough"
+    assert phases[-1] in ("recovery", "expansion")
