@@ -687,9 +687,13 @@ def test_applying_a_scenario_to_one_fork_does_not_touch_another():
         if day == 3:
             inside_window = (stress.column("avg_volume"),
                              control.column("avg_volume"))
+            # Inside the window, where the scenario acts. After it closes the
+            # two converge: on pt-v20 the close prints at the model price and
+            # the thinner book's effect on the mispricing decays, so by day
+            # ten every rounded close agrees again on this roster.
+            assert prices(stress) != prices(control)
 
     assert prices(control) == prices(lonely)
-    assert prices(stress) != prices(control)
     assert control.column("avg_volume") == lonely.column("avg_volume")
     # Thin INSIDE the window. Asserting this at the end of the run instead is
     # what an earlier version of this test did, and it passed for the wrong
