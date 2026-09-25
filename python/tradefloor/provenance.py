@@ -418,6 +418,22 @@ OUT_OF_SCOPE = {
         "None, so `reprice_to_published_macro` writes nothing and the close's "
         "macro step reaches prices at the next session's first tick "
         "(0.8.5, pt-v20 audit finding 3)",
+    "fair_value_market_vol_cap":
+        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
+        "the only reader. A ceiling on the volatility whose market shocks "
+        "are permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
+    "fair_value_market_linear":
+        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
+        "the only reader. Chooses the plain loading on the market draw as the "
+        "permanent part (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
+    "market_beta_down_asym_lag_recentre":
+        "inert at 0.0 as shipped: the recentring offset is not scaled on a "
+        "lagged session, and the lagged tilt's mean (about -8 per cent a "
+        "year of the market input on pt-v20) sits in `s` as a constant "
+        "discount while `fair_value_market_share` is 0.0 (0.8.5, pt-v20 "
+        "work: audit major 5, the long-horizon reversion)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

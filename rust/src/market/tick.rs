@@ -797,6 +797,23 @@ fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
     mathx::max(mathx::min(raw, 4.0), 0.25)
 }
 
+/// The share of a market shock that moves fair value for good at the
+/// market's current daily sigma: `fair_value_market_share`, scaled down by
+/// `fair_value_market_vol_cap` once the sigma is above that multiple of
+/// `market_factor_sigma`. The share itself at a cap of 0.0, bit for bit.
+pub fn market_permanent_share(p: &crate::params::ModelParams, market_sigma_daily: f64) -> f64 {
+    let share = p.fair_value_market_share;
+    if p.fair_value_market_vol_cap == 0.0 {
+        return share;
+    }
+    let ceiling = p.fair_value_market_vol_cap * p.market_factor_sigma;
+    if market_sigma_daily > ceiling {
+        share * (ceiling / market_sigma_daily)
+    } else {
+        share
+    }
+}
+
 pub fn simulate_market_tick(
     companies: &mut [TickCompany],
     inputs: &TickInputs,
@@ -1231,9 +1248,17 @@ pub fn simulate_market_tick(
             let dv = if p.fair_value_market_share == 0.0 {
                 own_noise + own_news
             } else {
-                let psim = p.fair_value_market_share;
+                let psim = market_permanent_share(p, inputs.market_sigma_daily);
+                // Under `fair_value_market_linear` only the plain loading on
+                // the draw is permanent; the tilt, the lagged wire, the
+                // crisis injection and the amplifier stay in `s`.
+                let market_draw = if p.fair_value_market_linear == 0.0 {
+                    raw.noise_market
+                } else {
+                    raw.noise_market_linear
+                };
                 own_noise + own_news
-                    + psim * (raw.noise_market * noise_scale)
+                    + psim * (market_draw * noise_scale)
                     + psim * (raw.company_news_market * scale)
             };
             // The component slots keep the WHOLE shock, deliberately: they
