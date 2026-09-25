@@ -765,9 +765,21 @@ class _BlendAgent:
                 if kind == "mean_reversion":
                     attractiveness = [-a for a in attractiveness]
             elif kind == "oracle":
-                s = struct.unpack(
-                    "<%dd" % n, obs.engine.column("mispricing_s"))
-                attractiveness = [-x for x in s]
+                # The same dial-chosen reading the Oracle trades on
+                # (`baselines.Oracle.cross_sectional`): minus the mispricing
+                # where the cross-section carries the edge, and otherwise
+                # each name's expected return over the session. A blend is a
+                # ranked, dollar-neutral book, so the common drift the bare
+                # Oracle also trades as a net position ranks nothing here.
+                from .baselines import Oracle
+                model = dict(obs.engine.model_params)
+                if Oracle.cross_sectional(model):
+                    s = struct.unpack(
+                        "<%dd" % n, obs.engine.column("mispricing_s"))
+                    attractiveness = [-x for x in s]
+                else:
+                    own, _ = Oracle().expected_returns(obs.engine, model)
+                    attractiveness = [own.get(i, 0.0) for i in range(n)]
             else:  # random: a uniformly random ranking, one draw per name
                 attractiveness = [self._rng.next_float() for _ in range(n)]
 
