@@ -283,14 +283,15 @@ jobs:
             exit 1
           fi
 
-          # Each file now holds FIVE digests -- the combined, simulation,
-          # metadata, the session with the simulated rate indices, and every
+          # Each file now holds SIX digests -- the combined, simulation,
+          # metadata, the session with the simulated rate indices, every
           # shipped preset's own digest combined (tests/known_answer_presets.py,
+          # from 0.8.5), and a seed above 2**32 (tests/known_answer_seed64.py,
           # from 0.8.5) -- so the comparison is per FILE, not per line.
           # Hashing each file and counting unique hashes asks the right
-          # question ("does every target report the same five?");
-          # concatenating and `sort -u` would count five distinct digests
-          # as five disagreements and fail
+          # question ("does every target report the same six?");
+          # concatenating and `sort -u` would count six distinct digests
+          # as six disagreements and fail
           # on a green run, which is how a gate stops meaning anything.
           unique=$(for f in digests/*.txt; do shasum -a 256 < "$f" | cut -d' ' -f1; done | sort -u | wc -l)
           if [ "$unique" -ne 1 ]; then

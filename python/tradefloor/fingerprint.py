@@ -115,6 +115,14 @@ the same set in a different order both satisfy the same commitment and
 build two different batteries, and a verifier that cares which cell got
 which seed checks the reveal's order against a record kept alongside it,
 not against the commitment alone.
+
+Draw sealed seeds from the whole range, ``secrets.randbits(64)`` for each
+cell. A seed is any integer from 0 to ``2**64 - 1``, and a hidden seed is
+only as hidden as the range it was drawn from: below ``2**32`` there are
+2**32 markets per roster, few enough to find by simulating every one
+against a market's first prices, and a sealed battery drawn there can be
+opened without the reveal. Across 64 bits that search is 2**32 times
+longer.
 """
 
 from __future__ import annotations
@@ -124,7 +132,7 @@ import hashlib
 import json
 from typing import TYPE_CHECKING, Any, NamedTuple, Sequence
 
-from ._core import ValidationError
+from ._core import ValidationError, check_seed
 from .counterfactual import Resample, World, _gross, _net, _shape
 from .render import TextRenderer
 from .scenario import Scenario
@@ -640,6 +648,11 @@ def commit(seeds: Sequence[int], salt: bytes) -> str:
     would make two salts that read identically on screen hash
     differently, and a commitment scheme that can fail that way for a
     typo is not one worth calling a commitment.
+
+    Each seed is any integer from 0 to ``2**64 - 1`` and is checked here, at
+    the commitment, so a list the engine would refuse cannot be committed to
+    and found wanting only at the reveal. See the module docs for why a
+    sealed seed should be drawn from all 64 bits.
     """
     if isinstance(salt, str):
         raise ValidationError(
@@ -647,7 +660,7 @@ def commit(seeds: Sequence[int], salt: bytes) -> str:
             "hashed as raw bytes; encoding a str implicitly is a choice "
             "this function will not make silently, because two salts "
             "that read identically could then hash differently.")
-    canonical = json.dumps(sorted(int(s) for s in seeds),
+    canonical = json.dumps(sorted(check_seed(s) for s in seeds),
                            separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical + bytes(salt)).hexdigest()
 
@@ -658,7 +671,14 @@ def reveal(commitment: str, seeds: Sequence[int], salt: bytes) -> bool:
     Refuses by returning ``False`` rather than raising: a verifier checks
     a reveal, and the answer to "does this match" is exactly the boolean
     this returns, for a different seed list, a different salt, or both.
+    A list holding something that is not a seed (a negative integer, one of
+    ``2**64`` or more, a float) could never have been committed to, so it is
+    ``False`` too.
     """
+    try:
+        seeds = [check_seed(s) for s in seeds]
+    except ValidationError:
+        return False
     return commit(seeds, salt) == commitment
 
 
@@ -682,7 +702,7 @@ def sealed_battery(seeds: Sequence[int], salt: bytes,
     :func:`reveal` says about the set.
     """
     base = _build(version)
-    seeds = [int(s) for s in seeds]
+    seeds = [check_seed(s) for s in seeds]
     if len(seeds) != len(base.cells):
         raise ValidationError(
             f"sealed_battery needs {len(base.cells)} seeds for battery "

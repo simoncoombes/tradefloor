@@ -618,7 +618,7 @@ impl Engine {
     /// changes. A 30-name universe and a 100-name universe from one seed have
     /// nothing to do with each other.
     pub fn new(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -983,7 +983,7 @@ impl Engine {
     /// preset-constructed engine reproduces the const build's trajectories
     /// bit for bit, draw for draw — the phase-1 acceptance gate.
     pub fn with_params(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -1018,7 +1018,7 @@ impl Engine {
     /// is what a caller naming an opening asked for, and it is what every
     /// preset before pt-v18 did.
     pub fn with_params_from_opening(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -6734,7 +6734,7 @@ mod tests {
         }
     }
 
-    fn engine(seed: u32) -> Engine {
+    fn engine(seed: u64) -> Engine {
         Engine::new(
             seed,
             vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
@@ -6748,7 +6748,7 @@ mod tests {
     /// agent's fills reach the first tick's `order_volumes`. pt-v20, the
     /// default from 0.8.5, turns `fill_impact_coefficient` on and routes them
     /// through the agent-facing book's pending flow instead.
-    fn engine_v19(seed: u32) -> Engine {
+    fn engine_v19(seed: u64) -> Engine {
         Engine::with_params(
             seed,
             vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
@@ -6813,7 +6813,7 @@ mod tests {
             }
             e.prices()
         };
-        let seeds: Vec<Vec<f64>> = (1u32..=4).map(run).collect();
+        let seeds: Vec<Vec<f64>> = (1u64..=4).map(run).collect();
         for (i, a) in seeds.iter().enumerate() {
             for b in seeds.iter().skip(i + 1) {
                 assert!(
@@ -8079,8 +8079,8 @@ mod tests {
 /// Returns `None` for an unknown preset.
 pub fn fixed_simulation_digest(
     size: usize,
-    universe_seed: u32,
-    seed: u32,
+    universe_seed: u64,
+    seed: u64,
     days: usize,
     ticks: usize,
     preset: &str,

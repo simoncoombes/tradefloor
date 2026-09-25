@@ -284,7 +284,7 @@ fn run_day(engine: &mut Engine, day: i64, ticks: i64) {
     });
 }
 
-fn engine(seed: u32) -> Engine {
+fn engine(seed: u64) -> Engine {
     let companies = (0..8)
         .map(|i| company(&format!("C{i}"), 80.0 + 10.0 * i as f64))
         .collect();

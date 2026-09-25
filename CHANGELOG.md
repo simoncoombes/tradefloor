@@ -397,6 +397,41 @@ for each published release, once the owner switches it on (`RELEASING.md`,
 the README gains a section on citing a version and a preset, with a BibTeX
 entry whose DOI is a placeholder until Zenodo mints one.
 
+### 64-bit seeds
+
+A seed is any integer from 0 to 2**64 - 1, on every surface that takes one:
+`Engine`, `EngineBatch`, `Universe.random`, `GameRng`, `evaluate`, the
+reference agents, `World` and its surgery seeds, the gym, `run_many`,
+`sweep`, `rank`, the battery and its commit and reveal, `Checkpoint`,
+`RunManifest`, the local MCP server and the WebAssembly build. Until now the
+engine refused anything from 2**32 up with pyo3's "out of range integral
+type conversion attempted". A reviewer who builds AI evaluations pointed out
+what that allowed: a hidden seed has 2**32 values per roster, so a sealed
+battery could be opened by simulating every seed against a market's first
+prices, about 19,000 core-hours per market with the published engine.
+
+Every seed below 2**32 gives the market it gave before. Their high 32 bits
+are zero, and the derivation lets those bits in only when they are non-zero,
+so no digest in `tests/known_answer.json`, `known_answer_book.json` or the
+nineteen rows of `known_answer_presets.json` moved. A seed from 2**32 up
+gets its own streams: every stream starts from all 64 bits of a SplitMix64
+mix of the whole seed, on a PCG sequence no 32-bit seed uses, and for one
+stream the map from seed to starting state is a bijection, so two seeds
+never share a stream. `rust/src/rng.rs` states the formula, and
+`docs/MODEL.md` has it under "Seeds". `tests/known_answer_seed64.py` hashes
+a market on seed 2**63 + 12345, and the determinism workflow now compares
+six digests per platform.
+
+A seed outside the range, a negative one, a float or a bool raises
+`ValidationError` naming the range, where a float was truncated before in
+several Python surfaces. `manifest.verify` masked its sampling seed to 32
+bits, so a seed of 2**32 + 5 drew seed 5's days and -1 drew 2**32 - 1's;
+it now takes the whole seed and refuses a negative one. `reveal` returns
+False for a list holding a value the engine would refuse. In WebAssembly a
+seed is a Number up to `Number.MAX_SAFE_INTEGER` or a BigInt, and a larger
+Number is refused rather than rounded. Draw a sealed seed with
+`secrets.randbits(64)`.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

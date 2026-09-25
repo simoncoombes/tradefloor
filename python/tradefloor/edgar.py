@@ -52,6 +52,7 @@ from ._core import (
     Instrument,
     ValidationError,
     apply_mispricing,
+    check_seed,
     fair_value,
     model_preset,
     sector_daily_sigma,
@@ -246,7 +247,8 @@ def to_instruments(
     That is not a fudge: it is the distribution the model itself implies, and
     the width is computed from the AR(2) parameters rather than chosen. The
     draw uses its own RNG stream, so seeding a universe's dispersion cannot
-    perturb the market it is built for.
+    perturb the market it is built for. ``s_seed`` is any integer from 0 to
+    ``2**64 - 1``.
 
     The macro arguments are the conditions the fair value is computed under.
     They must match the macro the engine then runs, or every company starts
@@ -257,7 +259,7 @@ def to_instruments(
         raise ValidationError(
             f"initial_s must be \"zero\" or \"stationary\", got {initial_s!r}"
         )
-    rng = GameRng(int(s_seed), MISPRICING_STREAM)
+    rng = GameRng(check_seed(s_seed, "s_seed"), MISPRICING_STREAM)
     # THE MODEL, for the same reason the macro is taken: a price computed
     # under one valuation and run under another starts mispriced by the
     # difference. `neutral_discount_rate` is the rate at which the multiple

@@ -72,6 +72,34 @@ use crate::economy::{create_initial_economy_state, create_initial_central_bank_s
 use crate::market::GameTime;
 use crate::market::TickCompany;
 
+/// Read a seed from JavaScript: a Number that is a safe integer, or a BigInt.
+///
+/// Seeds are `u64` from 0.8.5, and a JavaScript Number holds integers
+/// exactly only up to `2^53 - 1` (`Number.MAX_SAFE_INTEGER`). So both are
+/// taken. A Number keeps working for every seed a page already passes, and
+/// a BigInt reaches the whole range, `0n` to `2n ** 64n - 1n`. A Number
+/// above the safe range is refused rather than rounded: `2 ** 63 + 12345`
+/// written as a Number is already `2 ** 63 + 12288` before this sees it,
+/// and running that would be a different market from the one the caller
+/// wrote down. A bare `u64` parameter would take a BigInt only and throw
+/// on every Number, which is why this is not one.
+fn seed_from_js(value: &JsValue, name: &str) -> Result<u64, JsError> {
+    const RANGE: &str = "an integer from 0 to 2**64 - 1: a Number up to \
+                         Number.MAX_SAFE_INTEGER, or a BigInt for the whole range";
+    if let Some(n) = value.as_f64() {
+        if n.fract() == 0.0 && (0.0..=9_007_199_254_740_991.0).contains(&n) {
+            return Ok(n as u64);
+        }
+        return Err(JsError::new(&format!("{name} must be {RANGE}, got {n}")));
+    }
+    if value.is_bigint() {
+        return u64::try_from(value.clone()).map_err(|_| JsError::new(&format!(
+            "{name} must be {RANGE}, got a BigInt outside it")));
+    }
+    let kind = value.js_typeof().as_string().unwrap_or_default();
+    Err(JsError::new(&format!("{name} must be {RANGE}, got a value of type {kind}")))
+}
+
 /// The library version, so a page can report what it is running.
 #[wasm_bindgen]
 pub fn version() -> String {
@@ -109,9 +137,19 @@ impl Sim {
     /// `preset` names a shipped coefficient set; an unknown name is an error
     /// rather than a silent fallback, because a market running coefficients
     /// nobody chose would still report a preset's name.
+    ///
+    /// `universe_seed` and `seed` are each a Number up to
+    /// `Number.MAX_SAFE_INTEGER` or a BigInt up to `2n ** 64n - 1n`.
     #[wasm_bindgen(constructor)]
-    pub fn new(size: usize, universe_seed: u32, seed: u32, preset: &str)
+    pub fn new(size: usize,
+               #[wasm_bindgen(unchecked_param_type = "number | bigint")]
+               universe_seed: JsValue,
+               #[wasm_bindgen(unchecked_param_type = "number | bigint")]
+               seed: JsValue,
+               preset: &str)
                -> Result<Sim, JsError> {
+        let universe_seed = seed_from_js(&universe_seed, "universe_seed")?;
+        let seed = seed_from_js(&seed, "seed")?;
         if size < 2 {
             return Err(JsError::new(
                 "a universe needs at least two instruments"));
@@ -236,9 +274,15 @@ impl Sim {
 /// and the Python surface hash the same thing the same way. A digest
 /// rebuilt independently on each side would be a fork of the check itself.
 #[wasm_bindgen(js_name = priceDigest)]
-pub fn price_digest(size: usize, universe_seed: u32, seed: u32,
+pub fn price_digest(size: usize,
+                    #[wasm_bindgen(unchecked_param_type = "number | bigint")]
+                    universe_seed: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number | bigint")]
+                    seed: JsValue,
                     days: usize, ticks: usize, preset: &str)
                     -> Result<String, JsError> {
+    let universe_seed = seed_from_js(&universe_seed, "universe_seed")?;
+    let seed = seed_from_js(&seed, "seed")?;
     crate::engine::fixed_simulation_digest(
         size, universe_seed, seed, days, ticks, preset)
         .ok_or_else(|| JsError::new(&format!("unknown preset {preset:?}")))

@@ -55,7 +55,7 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 pub struct PyEngineBatch {
     engines: Vec<Engine>,
     buffers: Vec<SessionBuffer>,
-    seeds: Vec<u32>,
+    seeds: Vec<u64>,
     tickers: Vec<String>,
     /// Whether `open_market` has been called and a day is in progress.
     ///
@@ -78,6 +78,7 @@ impl PyEngineBatch {
     /// Seeds must be distinct. Two members with the same seed would be the
     /// same market twice, which is almost always a mistake in a sweep and is
     /// silent if allowed: the results look like two samples and are one.
+    /// Each is any integer from 0 to `2**64 - 1`, as on `Engine`.
     ///
     /// `model` selects the coefficient set, exactly as on `Engine`: one
     /// model for every member, because a batch is N seeds of the same
@@ -86,11 +87,12 @@ impl PyEngineBatch {
     #[new]
     #[pyo3(signature = (*, seeds, universe, macro_state = None, model = None))]
     fn new(
-        seeds: Vec<u32>,
+        seeds: Vec<crate::python::Seed>,
         universe: Vec<crate::python_engine::PyInstrument>,
         macro_state: Option<crate::python_engine::PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let seeds: Vec<u64> = seeds.into_iter().map(|s| s.0).collect();
         if seeds.is_empty() {
             return Err(ValidationError::new_err("no seeds given"));
         }
@@ -309,7 +311,7 @@ impl PyEngineBatch {
     }
 
     #[getter]
-    fn seeds(&self) -> Vec<u32> {
+    fn seeds(&self) -> Vec<u64> {
         self.seeds.clone()
     }
 

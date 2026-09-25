@@ -46,7 +46,7 @@ fn measure_normal_draw_divergence() {
     println!("{}", "-".repeat(54));
 
     for s in &file.series {
-        let mut rng = GameRng::new(s.input.seed, s.input.sequence);
+        let mut rng = GameRng::new(s.input.seed.into(), s.input.sequence);
         let (mut n, mut bad, mut first) = (0usize, 0usize, usize::MAX);
         for (i, want_hex) in s.output.iter().take(s.input.draws).enumerate() {
             let want = u64::from_str_radix(want_hex, 16).expect("bad hex");

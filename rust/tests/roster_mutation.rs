@@ -59,7 +59,7 @@ fn company(id: &str, price: f64) -> TickCompany {
     }
 }
 
-fn engine(seed: u32, n: usize) -> Engine {
+fn engine(seed: u64, n: usize) -> Engine {
     let companies = (0..n)
         .map(|i| company(&format!("C{i}"), 100.0 + i as f64))
         .collect();
@@ -372,7 +372,7 @@ fn idio_on() -> ModelParams {
     p
 }
 
-fn engine_with(seed: u32, n: usize, params: ModelParams) -> Engine {
+fn engine_with(seed: u64, n: usize, params: ModelParams) -> Engine {
     let companies = (0..n)
         .map(|i| company(&format!("C{i}"), 100.0 + i as f64))
         .collect();
@@ -500,7 +500,7 @@ fn the_per_day_draw_count_is_the_rosters_width_from_the_mutation_onward() {
     // stayed at its construction width. That is what the width assertions
     // here stand in for: the pre-fix engine is not available to compare
     // against, and the stale width is the whole of what it did differently.
-    const SEED: u32 = 42;
+    const SEED: u64 = 42;
     let mut e = engine_with(SEED, 4, idio_on());
     e.open_market();
     close(&mut e);
@@ -535,7 +535,7 @@ fn the_per_day_draw_count_is_the_rosters_width_from_the_mutation_onward() {
 fn a_fixed_roster_draws_what_it_always_drew() {
     // The other half of the authorised change: a run that never mutates its
     // roster takes the draws it always took, so nothing about it moves.
-    const SEED: u32 = 42;
+    const SEED: u64 = 42;
     let mut e = engine_with(SEED, 4, idio_on());
     for _ in 0..3 {
         e.open_market();
