@@ -310,13 +310,22 @@ four quarters, holds them two and restores them over four. The index is
 -44.7 per cent at 120 sessions, the depth of 2008 (-45 from Lehman to March
 2009), where the old file read -5.8 on pt-v19 and -28.7 on pt-v20.
 
+The recession also ends. As first recalibrated it held the cycle in
+contraction for good, so the index was still about 60 per cent (log) under
+its unshocked twin two years on. It now holds contraction for 15 months,
+sets the cycle to trough on day 365 and lets the model's own cycle carry it
+into recovery; growth and credit are released with it. The first 315
+sessions, and every figure above, are unchanged. On pt-v20 the paired index
+is lowest at day 365, -62 per cent, and back to -4 per cent (log) by day
+700. The rebound is faster than 2009's: the file says by how much and why.
+
 `liquidity_crisis.yml` takes the VIX x3.5 where it went x2.0 and cuts
 earnings 15 per cent over two months, back over four, with depth and credit
 as before. The index is -10.0 per cent at 21 sessions and -33.9 at worst,
 against March 2020's -28.8 and -33.9, where the old file read -1.5 at 21
 sessions. The model prices a company off its current earnings with no
 forward-looking valuation, so it cannot fall as fast as March 2020 did, and
-each file says so. The fingerprints are `sha256:ba41a923...` and
+each file says so. The fingerprints are `sha256:0aa14327...` and
 `sha256:7d8c8cc8...`. `rate_shock.yml` keeps its shocks and its fingerprint.
 
 The earnings shocks write through `Engine.set_fundamentals`, which the order
