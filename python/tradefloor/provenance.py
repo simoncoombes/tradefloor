@@ -3844,17 +3844,21 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "date": "2026-09-24",
     },
     "book_refill_half_life": {
-        "kind": "measured",
+        # DERIVED, not measured: 27 ticks was chosen inside the literature's
+        # resilience range and the refill arm then measured what it gives,
+        # which is a consequence of the value rather than an estimate of it.
+        "kind": "derived",
         "presets": {"pt-v20": 27.0},
-        "source": "tools/calibration/impact_curve.py refill arm (E4)",
+        "identity": "a refill half-life inside the resilience the literature "
+                    "reports for large-cap US equities, minutes to an hour; "
+                    "27 one-minute ticks. The refill arm of "
+                    "tools/calibration/impact_curve.py measures what it gives: "
+                    "at 10 per cent of V a second order pays 23.1 bp more at "
+                    "k=0, 9.7 at 30 ticks and 1.6 at 130 (pt-v20 run)",
+        "terms": {"27.0": "ticks, one tick a simulated minute"},
+        "source": "feature/order-book-depth hand-off (E4); "
+                  "tools/calibration/impact_curve.py (refill)",
         "date": "2026-09-24",
-        "script": "tools/calibration/impact_curve.py (refill)",
-        "estimator": "the half-life in ticks at which a second order's extra "
-                     "temporary cost after a first decays as E4's hand-off "
-                     "measured; the literature's resilience of minutes to an "
-                     "hour",
-        "residual": "at 10 per cent of V the second order pays 23.1 bp more "
-                    "at k=0, 9.7 at 30 ticks and 1.6 at 130 (pt-v20 run)",
     },
     "fill_impact_coefficient": {
         "kind": "derived",
@@ -3865,6 +3869,64 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {"0.314": "gamma, US equity program trades"},
         "source": "Almgren et al. 2005; feature/order-book-depth hand-off (E4)",
         "date": "2026-09-24",
+    },
+    # Three dials pt-v20 FITTED on the design repo's co-tune grid (box
+    # ptv20e4, 90 pooled 21-year histories; programme/ptv20-registration.md)
+    # and graded by name on box ptv20g3. The ledger has no `fitted` kind, so
+    # they are entered as measured: the estimator is the grid's selection
+    # rule and the residual is what the grid read. The pt-v16 to pt-v19
+    # value is the one those presets were certified with, carried as the
+    # grid's paired control and unmeasured beyond that.
+    "market_factor_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.007593024924589399,
+                    "pt-v18": 0.007593024924589399,
+                    "pt-v19": 0.007593024924589399, "pt-v20": 0.006454071},
+        "source": "programme/ptv20-registration.md, the co-tune grid; "
+                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "date": "2026-09-24",
+        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): 17 arms of "
+                  "pt-v20 with the earnings cycle, crossed with this dial at "
+                  "x1.0, x0.85 and x0.70 of pt-v19's, 90 pooled histories",
+        "estimator": "FITTED: the arm that passes every long-run row and B9's "
+                     "annual spread with the most room, D35m85j50, takes 0.85 "
+                     "of pt-v19's value",
+        "residual": "without the 0.85 cut every earnings depth fails B3, 2.43 "
+                    "to 2.49 bear markets a decade against a ceiling of 2.24; "
+                    "at 0.85 with the half jump rate B3 reads 2.07; the 0.70 "
+                    "cut fails B1 (2.6 per cent of sessions above VIX 30)",
+    },
+    "jump_intensity_market": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.0565753337, "pt-v18": 0.0565753337,
+                    "pt-v19": 0.0565753337, "pt-v20": 0.02828766685},
+        "source": "programme/ptv20-registration.md, the co-tune grid; "
+                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "date": "2026-09-24",
+        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): the market jump "
+                  "rate at x1.0 and x0.5 of pt-v19's, crossed with the grid's "
+                  "other levers, 90 pooled histories",
+        "estimator": "FITTED: the chosen arm D35m85j50 halves the rate",
+        "residual": "B3 2.07 and B9's annual spread 16.78 at x0.5, against "
+                    "2.14 and 15.89 on the same arm at x1.0 (D35m85); B1 6.0 "
+                    "to 5.8 per cent",
+    },
+    "volume_move_response": {
+        "kind": "measured",
+        "presets": {"pt-v16": 1.0, "pt-v18": 1.0, "pt-v19": 1.0,
+                    "pt-v20": 0.8},
+        "source": "programme/ptv20-registration.md, fourth registration; "
+                  "programme/results/ptv20/d1screen.py (design repository)",
+        "date": "2026-09-24",
+        "script": "results/ptv20/d1screen.py: the 504-session certification "
+                  "panel's volume_abs_return_corr on pt-v20 at 0.85, 0.80 "
+                  "and 0.75, the certification protocol",
+        "estimator": "FITTED: the value that puts the 504-session panel's "
+                     "volume_abs_return_corr back under its ceiling of 0.63 "
+                     "with room while every other certification cell holds",
+        "residual": "0.625, 0.618 and 0.612 at 0.85, 0.80 and 0.75, against "
+                    "0.639 at 1.0 (box ptv20g2); at 0.80 the 252-session "
+                    "panel and both held-out cells stay at 15 of 15",
     },
     "treasury_2y_noise": {
         "kind": "measured",
@@ -4096,13 +4158,11 @@ UNPROVENANCED = (
     "inflation_reversion",
     "informed_flow_fraction",
     "jump_intensity_idio",
-    "jump_intensity_market",
     "jump_mean_market",
     "jump_momentum_share",
     "jump_sigma_idio",
     "jump_sigma_market",
     "jump_vix_coupling",
-    "market_factor_sigma",
     "market_vol_ceiling_multiple",
     "market_vol_floor_multiple",
     "market_vol_slow_vix_damp",
@@ -4132,7 +4192,6 @@ UNPROVENANCED = (
     "volume_move_cap",
     "volume_move_floor",
     "volume_move_noise",
-    "volume_move_response",
     "volume_persistence",
     "volume_variance_gain",
 )

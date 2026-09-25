@@ -59,9 +59,17 @@
 //!
 //! The engine sets `corporate_bond_yield` at central-bank meetings (and, on
 //! presets with `daily_credit_floor_gain`, lifts it to a floor over the
-//! 10-year). Between those moments it does not move while the 10-year does.
-//! An index priced off that field directly would carry no rate risk between
-//! meetings and then jump, which would mislead anyone measuring its risk.
+//! 10-year). On every preset through pt-v19 it does not move between those
+//! moments while the 10-year does, and an index priced off that field
+//! directly would carry no rate risk between meetings and then jump, which
+//! would mislead anyone measuring its risk. pt-v20 (`corporate_yield_daily`)
+//! moves it at every close with the 10-year and the VIX, and the rule below
+//! prices both the same way.
+//!
+//! The 2-year follows `0.85 * policy + 0.15 * 10-year`. Through pt-v19 the
+//! engine rewrites it as that formula at every close; pt-v20
+//! (`treasury_2y_noise` off zero) gives it its own noise and pulls it 5% of
+//! the way toward the formula each session.
 //!
 //! So `IGCORP` reads the 10-year plus a credit spread, and the spread is
 //! re-marked to `corporate_bond_yield - treasury_yield_10y` every time the

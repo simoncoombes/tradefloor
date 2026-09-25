@@ -604,11 +604,16 @@ _register(_make_macro_target(
     units="fraction",
     note=(
         "The 2-year treasury yield. The UST2Y rate index reads it and nothing in "
-        "the equity market does. The chain recomputes it at every close as "
-        "0.85 x the policy rate + 0.15 x the 10-year, so a write lasts until "
-        "that close: hold it, or move the policy rate with it. Measured, "
-        "+200bp: UST2Y -3.71% on the day under either shape; by day 120 "
-        "+0.05% as an impulse and -2.95% held. Equities 0.00% either way."
+        "the equity market does. On pt-v20, the default from 0.8.5, the 2-year "
+        "is its own process, closing 5% of its gap to 0.85 x the policy rate + "
+        "0.15 x the 10-year each session, so a write decays over weeks; on "
+        "every preset through pt-v19 the chain recomputes it as that formula at "
+        "every close, so a write lasts until that close. Hold it, or move the "
+        "policy rate with it. Measured, +200bp at day 50 on Universe.random(20, "
+        "seed=101, bonds=True), median of seeds 3, 11 and 29 against the same "
+        "seed unshocked: UST2Y -3.71% on the day under either shape on both "
+        "presets; by day 120 +0.14% as an impulse and -3.16% held on pt-v20 "
+        "(pt-v19 +0.05% and -3.17%). Equities 0.00% either way."
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))

@@ -607,7 +607,9 @@ pub struct ModelParams {
     /// (earnings and book) the valuation reads, so the market P/E and the
     /// buyback yield read the same earnings the price does, and it carries
     /// an Ito term so `E[exp(v)]` stays one and the index's expected return
-    /// does not move. Market and sector shocks stay in `s`. In [0, 1].
+    /// does not move. The market-wide part of each shock stays in `s`
+    /// (`fair_value_market_share` moves that); the sector part goes with
+    /// the name's own, as listed above. In [0, 1].
     pub fair_value_news_share: f64,
     /// The share of each MARKET-WIDE shock that moves fair value for good:
     /// the name's loading on the market factor's draw, market-wide news and

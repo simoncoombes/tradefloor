@@ -2852,9 +2852,12 @@ impl PyEngine {
     /// the curve the rate instruments read (`UST2Y`, `UST10Y`, and `IGCORP`
     /// through the 10-year). The chain keeps running from a pinned value: the
     /// 10-year closes 5% of its gap to the policy rate plus a term premium
-    /// every session, and the 2-year is recomputed at every close as
-    /// `0.85 * policy + 0.15 * 10-year`, so a 2-year pinned alone lasts until
-    /// that close. A parallel curve shift therefore pins the policy rate and
+    /// every session. The 2-year follows `0.85 * policy + 0.15 * 10-year`:
+    /// on every preset through pt-v19 it is recomputed as that at every close,
+    /// so a 2-year pinned alone lasts until that close, and on pt-v20
+    /// (`treasury_2y_noise` off zero) it closes 5% of its gap to it each
+    /// session, so a pinned 2-year decays over weeks. A parallel curve shift
+    /// therefore pins the policy rate and
     /// the 10-year with it, which is what `scenarios/curve_shock.yml` does.
     /// Equities read neither directly: they are discounted off
     /// `corporate_bond_yield`, which the next central-bank meeting recomputes
