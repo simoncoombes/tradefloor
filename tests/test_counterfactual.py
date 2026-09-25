@@ -611,11 +611,20 @@ def test_a_forked_random_baseline_draws_what_the_original_would_draw():
 
 
 def test_a_forked_oracle_forgets_the_engine_it_was_reading():
+    """The Oracle keeps the read-only hidden-state view of the world it last
+    read, never the live engine, and a fork starts with none."""
+    from tradefloor.sandbox import HiddenState
+
+    def reads(agent, engine):
+        held = agent._engine
+        return (isinstance(held, HiddenState)
+                and held._HiddenState__raw is engine)
+
     world = World(seed=SEED, universe=tf.Universe.random(8, seed=7),
                   agent=tf.baselines.Oracle())
     world.run(days=1)
-    assert world.agent._engine is world.engine
+    assert reads(world.agent, world.engine)
     (arm,) = world.fork("arm")
     assert arm.agent._engine is None
     arm.run(days=1)
-    assert arm.agent._engine is arm.engine
+    assert reads(arm.agent, arm.engine)

@@ -446,6 +446,61 @@ seed is a Number up to `Number.MAX_SAFE_INTEGER` or a BigInt, and a larger
 Number is refused rather than rounded. Draw a sealed seed with
 `secrets.randbits(64)`.
 
+### Agents see a read-only market
+
+An independent audit found that every harness handed agents the live engine
+as `obs.engine`. An agent that forked it and ran the fork one step ahead made
+11.4 per cent in five days on four seeds of four, and one that called
+`set_fundamentals` on a name it held made 184 per cent. Neither scorecard
+carried an error or a flag.
+
+`obs.engine` is now a read-only `tradefloor.MarketView` in `evaluate`,
+`rank`, `World` and its cohorts, and `tca.analyse`. It serves prices, the
+public columns, each book, bars, the published macro fields without
+`qe_pe_boost`, the curve and which names have news today. `obs.portfolio` is
+a read-only `PortfolioView`. Anything else raises `tf.SandboxError`, which
+names the opt-in. An agent with `privileged = True`, as the Oracle and an
+`oracle` strategy signal have, also gets `obs.hidden`, a read-only
+`HiddenState`, and its scorecard says `uses_hidden_state`.
+`trusted_agents=True` hands every agent the live engine and portfolio as
+before. The scorecard says `trusted`, `rank` marks the row and a World's
+manifest records it under `agent_access`.
+
+Each harness also compares the engine's state hash, fundamentals and
+recording counters, and each portfolio, before and after every `act` and
+`explain`. An agent that changed anything is scored `tampered` with an error
+line naming the step, `rank` leaves it out of its table and says so, and
+`tca.analyse` refuses it. The check reads and draws nothing, so every
+known-answer digest is unchanged. `tests/test_sandbox.py` reproduces both of
+the audit's agents.
+
+A second probe, on pt-v20, read three more things through the live engine:
+the economy block of `state_snapshot()` (the true business-cycle phase,
+`months_in_current_phase`, `phase_gdp_target`, `recession_probability` and
+`earnings_cycle`), `Engine.earnings_anticipation`, which jumps on the close
+of every true turn, and the fundamental, as log price less `mispricing_s`.
+The view refuses all three, and its macro fields are now an allowlist of
+published figures (`tf.sandbox.PUBLISHED_MACRO`), so a field the engine gains
+later is refused until it is listed. The gym environment's policy sees only
+arrays, but `env.engine` and `env.portfolio` were the live objects to any
+training code holding the env; they are now the same views, and
+`TradingEnv(trusted_agents=True)` gives the live ones back. The framework
+adapters are agents under `evaluate` and `World`, so they hold the view and
+their frameworks are shown the same payload as before. The MCP tools run
+strategies with `trusted_agents=False`, stated at each call. One test per
+route holds the refusals and the reads a trader keeps. The view's `curve`
+and `rate_instruments` are properties now, as the engine's are; as methods
+they raised on every call.
+
+This is a guard and not a security boundary. Code in the same process can
+still walk the interpreter to the engine, and any write it makes is caught,
+but a second engine it builds from a guessed seed writes nothing and is not.
+
+**What breaks.** An agent that called anything on `obs.engine` beyond the
+view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
+scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
+or pass `trusted_agents=True`.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

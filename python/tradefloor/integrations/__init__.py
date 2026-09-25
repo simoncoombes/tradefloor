@@ -8,16 +8,21 @@ the same way, so this subpackage is a place and not a file:
                        forks, interventions, comparison
 
 A framework adapter MUST NOT touch engine state, and it is worth being
-precise about what enforces that: validation, not confinement. Every
-decision is validated before anything is executed -- but the adapter
-receives the :class:`~tradefloor.harness.Observation`, and the Observation
-carries the live engine, exactly as it does for any ordinary agent. The
-boundary is EQUAL to an agent's, not tighter. The allowlist serializer and
-the mutation checks in ``tests/test_integrations.py`` catch a cooperating
-author's accident; nothing here sandboxes the seam against code that
-reaches for ``obs.engine`` on purpose, and no docstring should tell an
-author otherwise -- an author who believes the harness holds a property
-does not defend it themselves.
+precise about what enforces that. Every decision is validated before
+anything is executed, and the adapter receives the
+:class:`~tradefloor.harness.Observation` exactly as any ordinary agent does:
+the boundary is EQUAL to an agent's, not tighter. Since 0.8.5 that boundary
+is a read-only :class:`~tradefloor.sandbox.MarketView` rather than the live
+engine, and the harness compares the engine's state hash around every
+``act``, so a write is refused or flagged whoever made it. Under
+``trusted_agents=True`` the Observation carries the live engine again, and
+then the allowlist serializer and the mutation checks in
+``tests/test_integrations.py`` are what catch a cooperating author's
+accident. Neither is a security boundary against code in the same process
+that walks the interpreter to the engine on purpose (see
+:mod:`tradefloor.sandbox`), and no docstring should tell an author
+otherwise -- an author who believes the harness holds a property does not
+defend it themselves.
 
 ``common.py`` is the shared half of every adapter -- the observation
 allowlist, the decision model and its two-stage validation, transcripts and

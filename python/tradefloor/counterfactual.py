@@ -184,6 +184,8 @@ from .checkpoint import Checkpoint, branch
 from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Cancel, Limit, Portfolio
+from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
+                      declares_hidden_state)
 from .interventions import Intervention
 from . import noise as _noise
 from .render import Renderer, check_renderer
@@ -301,6 +303,14 @@ class World:
     ``max_leverage`` are per agent, so a three-agent cohort starts with
     three times the capital of a one-agent world and each of the three is
     capped on its own book.
+
+    Agents are sandboxed as :func:`tradefloor.evaluate` sandboxes them: each
+    observation carries a read-only market view and a read-only view of the
+    agent's own portfolio, a ``privileged`` agent also gets ``obs.hidden``,
+    and ``trusted_agents=True`` hands over the live engine and portfolio
+    instead. The engine's state hash is compared around every ``act``; a
+    change is recorded in :attr:`tampered` under the agent's label, in its
+    :meth:`summary` and in :meth:`manifest`. See :mod:`tradefloor.sandbox`.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
@@ -309,7 +319,7 @@ class World:
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
-                 "_adv", "_ran", "_step_mids")
+                 "_adv", "_ran", "_step_mids", "trusted_agents", "tampered")
 
     def __init__(
         self,
@@ -328,6 +338,7 @@ class World:
         model: str | ModelParams | None = None,
         label: str = "",
         on_refusal: str = "raise",
+        trusted_agents: bool = False,
     ) -> None:
         if steps_per_day < 1 or ticks_per_step < 1:
             raise ValidationError(
@@ -348,6 +359,13 @@ class World:
         self.ticks_per_step = int(ticks_per_step)
         self.start = start
         self.on_refusal = on_refusal
+        #: Agents are handed the live engine and portfolio rather than the
+        #: read-only views. Recorded in the summary and the manifest.
+        self.trusted_agents = bool(trusted_agents)
+        #: Every step on which agent code changed the engine or a portfolio,
+        #: by label, as the error line that says what changed. Empty on an
+        #: honest run.
+        self.tampered: dict[str, list[str]] = {}
         if on_refusal == "skip":
             # Resolved here rather than on the step it first matters, so a
             # missing integrations layer is a construction error and not a
@@ -613,13 +631,19 @@ class World:
                 # other's orders from this one.
                 observed: dict[str, Observation] = {}
                 for label, portfolio in self._portfolios.items():
-                    observed[label] = Observation(
-                        self._step, day, tickers, prices, portfolio,
-                        self.engine, self._adv, self.steps_per_day)
+                    observed[label] = self._observation(
+                        label, portfolio, day, tickers, prices)
                     portfolio.stamp(day, self._step, tick)
 
-                asked = {label: self._ask_agent(label, obs)
-                         for label, obs in observed.items()}
+                guard = TamperGuard(self.engine, self._portfolios.values())
+                asked = {}
+                for label, obs in observed.items():
+                    with guard:
+                        asked[label] = self._ask_agent(label, obs)
+                    if guard.tampered:
+                        self.tampered.setdefault(label, []).append(
+                            f"step {self._step}: tampered: agent code "
+                            f"changed the market during act() ({guard.what})")
                 self._step_mids = {}
                 # Execution in label order, against the one book. Off a live
                 # book the order fixes which agent's rejection is written
@@ -655,6 +679,45 @@ class World:
                 ledger.close(self.engine)
             self._day += 1
         return self
+
+    def _observation(self, label: str, portfolio: Portfolio, day: int,
+                     tickers: Sequence[str],
+                     prices: list[float]) -> Observation:
+        """What one agent is shown this step.
+
+        Built per step, because :meth:`fork` swaps the engine and the
+        ``portfolio`` setter swaps a book after construction. Every list is
+        the agent's own copy, so one agent in a cohort cannot edit what the
+        next is shown.
+        """
+        agent = self._agents[label]
+        hidden = (HiddenState(self.engine)
+                  if declares_hidden_state(agent) else None)
+        if self.trusted_agents:
+            return Observation(self._step, day, tickers, prices, portfolio,
+                               self.engine, self._adv, self.steps_per_day,
+                               hidden=hidden)
+        return Observation(self._step, day, list(tickers), list(prices),
+                           PortfolioView(portfolio, self.engine),
+                           MarketView(self.engine), tuple(self._adv),
+                           self.steps_per_day, hidden=hidden)
+
+    def _agent_access(self) -> dict[str, Any] | None:
+        """How agents were given the market, when that is not the default.
+
+        None for a sandboxed run with no privileged agent and no tampering,
+        so the documents of every such run are the ones they were.
+        """
+        access: dict[str, Any] = {}
+        if self.trusted_agents:
+            access["trusted_agents"] = True
+        hidden = [label for label, agent in self._agents.items()
+                  if declares_hidden_state(agent)]
+        if hidden:
+            access["hidden_state"] = hidden
+        if self.tampered:
+            access["tampered"] = {k: list(v) for k, v in self.tampered.items()}
+        return access or None
 
     def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict,
              synced: dict | None = None) -> dict[str, Any]:
@@ -1079,7 +1142,12 @@ class World:
                           # "raise" would die on output its sibling counted
                           # and continued past, and the surviving arm's
                           # column would be the only one anybody read.
-                          on_refusal=self.on_refusal)
+                          on_refusal=self.on_refusal,
+                          # Carried for the same reason, and the record of
+                          # tampering with it: both arms share the history
+                          # in which it happened.
+                          trusted_agents=self.trusted_agents)
+            child.tampered = copy.deepcopy(self.tampered)
             child.engine = engine
             child._portfolios = {key: copy.deepcopy(book)
                                  for key, book in self._portfolios.items()}
@@ -1511,7 +1579,8 @@ class World:
                                         if self.pins or self.applied
                                         else None),
                               strategy=strategy,
-                              label=label or self.label)
+                              label=label or self.label,
+                              agent_access=self._agent_access())
 
     def replay(self) -> Engine:
         """A fresh engine rebuilt from this world's whole log.
@@ -1609,6 +1678,14 @@ class World:
             # has always had, and those are pinned.
             out["agent"] = label
             out["frozen"] = label in self._frozen
+        # Only when they say something, for the same reason: a sandboxed,
+        # honest run's summary is the one it always was.
+        if self.trusted_agents:
+            out["trusted_agents"] = True
+        if declares_hidden_state(self._agents[label]):
+            out["uses_hidden_state"] = True
+        if self.tampered.get(label):
+            out["tampered"] = list(self.tampered[label])
         return out
 
     def __repr__(self) -> str:

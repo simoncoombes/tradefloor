@@ -771,13 +771,15 @@ class _BlendAgent:
                 # ranked, dollar-neutral book, so the common drift the bare
                 # Oracle also trades as a net position ranks nothing here.
                 from .baselines import Oracle
-                model = dict(obs.engine.model_params)
+                from .sandbox import hidden_state
+                truth = hidden_state(obs)
+                model = dict(truth.model_params)
                 if Oracle.cross_sectional(model):
                     s = struct.unpack(
-                        "<%dd" % n, obs.engine.column("mispricing_s"))
+                        "<%dd" % n, truth.column("mispricing_s"))
                     attractiveness = [-x for x in s]
                 else:
-                    own, _ = Oracle().expected_returns(obs.engine, model)
+                    own, _ = Oracle().expected_returns(truth, model)
                     attractiveness = [own.get(i, 0.0) for i in range(n)]
             else:  # random: a uniformly random ranking, one draw per name
                 attractiveness = [self._rng.next_float() for _ in range(n)]
@@ -830,7 +832,8 @@ class _DailyCadence:
         # wrapped agent's "one-day lookback" resolves to one daily
         # observation rather than to however many steps the harness runs.
         # (`_adv` is the harness's own field; this wrapper is part of the
-        # same package and hands it on unchanged.)
+        # same package and hands it on unchanged, as it does the hidden
+        # state a privileged strategy was granted.)
         return self._inner.act(Observation(
             obs.day, obs.day, obs.tickers, obs.prices, obs.portfolio,
-            obs.engine, obs._adv, 1))
+            obs.engine, obs._adv, 1, hidden=getattr(obs, "hidden", None)))

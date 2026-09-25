@@ -21,6 +21,8 @@ from .portfolio import Cancel, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
+from . import sandbox
+from .sandbox import HiddenState, MarketView, PortfolioView, SandboxError
 from .replay import replay
 from . import edgar
 from . import envelope
@@ -115,6 +117,7 @@ __all__ = [
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
     "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "Observation",
+    "sandbox", "MarketView", "HiddenState", "PortfolioView", "SandboxError",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",

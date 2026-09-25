@@ -63,6 +63,17 @@ selecting another of the twelve is a library call.
 
 **Anything that writes.** Every tool is read-only and pure: same arguments,
 same bytes, on every platform.
+
+**The live engine, to a strategy.** A strategy here is data, and it runs
+through `evaluate` and `rank` with `trusted_agents=False`, stated at each
+call: it is handed the read-only market view every sandboxed agent gets
+(see `tradefloor.sandbox`), so it cannot read the true business-cycle
+phase, the economy block, the mispricing or the fundamentals, fork the
+market or write it. The `oracle` signal is the one declared exception, and
+its row says `uses_hidden_state`. There is no opt-in: a tool call cannot
+carry the code that would need one. `explain_price_move` and `explain`
+answer the experimenter about a run of their own, after it has run; no
+strategy is running inside them, so they hand no agent anything.
 """
 
 from __future__ import annotations
@@ -592,6 +603,11 @@ def _scorecard_row(s: Any) -> dict[str, Any]:
         "rejected": s.rejected,
         "errors": list(s.errors),
         "strategy_fingerprint": s.strategy_fingerprint,
+        # Only when set, so every ordinary row is the row it was. A strategy
+        # here is data and runs sandboxed, so `trusted` never appears; the
+        # oracle, and a blend holding one, read hidden state by declaration.
+        **({"uses_hidden_state": True} if s.uses_hidden_state else {}),
+        **({"tampered": True} if s.tampered else {}),
     }
 
 
@@ -870,6 +886,9 @@ def evaluate_strategies(
         scores = tf.evaluate(
             entrants, seed=seed, universe=roster, days=days,
             steps_per_day=steps_per_day, cash=cash, max_leverage=max_leverage,
+            # Stated rather than defaulted: a strategy here is never handed
+            # the live engine. See the module docstring.
+            trusted_agents=False,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -960,6 +979,7 @@ def rank_strategies(
         ranking = tf.rank(
             make_agents, seeds=seeds, universe=roster, days=days,
             steps_per_day=steps_per_day, max_leverage=max_leverage,
+            trusted_agents=False,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -1338,7 +1358,8 @@ def run_stress_scenario(
 
     try:
         shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
-                              days=days, scenario=built)
+                              days=days, scenario=built,
+                              trusted_agents=False)
         # The control is the same world WITHOUT the thing being tested. For a
         # macro PATH that is no scenario at all. For a scenario carrying
         # INTERVENTIONS it is the same pins with the interventions removed --
@@ -1347,7 +1368,8 @@ def run_stress_scenario(
         against = (built.without_interventions() if built.interventions
                    else None)
         control = tf.evaluate(entrants(), seed=seed, universe=roster,
-                              days=days, scenario=against or None)
+                              days=days, scenario=against or None,
+                              trusted_agents=False)
     except tf.ValidationError as exc:
         return _fail(str(exc))
 

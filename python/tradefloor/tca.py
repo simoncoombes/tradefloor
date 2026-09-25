@@ -120,6 +120,8 @@ from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import Observation, session_clock
 from .portfolio import Portfolio
+from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
+                      declares_hidden_state)
 from .universe_util import as_universe, fingerprint_of
 
 
@@ -362,6 +364,7 @@ def analyse(
     start: tuple[int, int, int] = (9, 30, 3),
     scenario: Any = None,
     model: str | ModelParams | None = None,
+    trusted_agents: bool = False,
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
@@ -380,6 +383,13 @@ def analyse(
     reason they share a scenario: a shortfall priced against a baseline
     under a different model would measure the model gap, not the trading.
     The :class:`Execution` records ``model_fingerprint``.
+
+    The agent is sandboxed as :func:`tradefloor.evaluate` sandboxes it: a
+    read-only market view and portfolio view, ``obs.hidden`` for a
+    ``privileged`` agent, and the live engine only under
+    ``trusted_agents=True``. An agent that changes the market from inside
+    ``act`` is refused with a :class:`ValidationError`, because a shortfall
+    against a market the agent rewrote measures nothing.
 
     Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
     TCA cannot make, because the benchmark it compares against is a market
@@ -401,6 +411,11 @@ def analyse(
     engine = fresh()
     tickers = engine.tickers
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
+    shown_engine = engine if trusted_agents else MarketView(engine)
+    shown_portfolio = (portfolio if trusted_agents
+                       else PortfolioView(portfolio, engine))
+    hidden = HiddenState(engine) if declares_hidden_state(agent) else None
+    guard = TamperGuard(engine, (portfolio,))
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
@@ -415,9 +430,18 @@ def analyse(
             # run this day. This is what makes the fills table joinable
             # to bars and truth on (day, tick, instrument_id).
             portfolio.stamp(day, step, (step % steps_per_day) * ticks_per_step)
-            obs = Observation(step, day, tickers, prices, portfolio, engine,
-                              adv, steps_per_day)
-            for ticker, quantity in (agent.act(obs) or {}).items():
+            obs = Observation(step, day, list(tickers), list(prices),
+                              shown_portfolio, shown_engine,
+                              adv if trusted_agents else tuple(adv),
+                              steps_per_day, hidden=hidden)
+            with guard:
+                orders = agent.act(obs) or {}
+            if guard.tampered:
+                raise ValidationError(
+                    f"step {step}: the agent changed the market during act() "
+                    f"({guard.what}), so there is no execution to price. "
+                    "See tradefloor.sandbox.")
+            for ticker, quantity in orders.items():
                 if not quantity:
                     continue
                 try:
