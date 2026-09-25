@@ -195,29 +195,53 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     # four seeds. Raised to there rather than to the first setting that binds
     # on seed 2024, so the margin survives the next preset that runs calmer
     # still, which is the lesson of having done this twice.
+    #
+    # THE PERMANENT SHARE IS OFF WHERE THE SUM IS READ, since 0.8.5. pt-v20,
+    # the default, ships `fair_value_news_share` 1.0, which moves a name's
+    # own shocks out of `s` into its fair-value level `v` while the
+    # component slots keep the whole shock, so the slots sum to the move in
+    # `s + v` and not in `s` (`market/tick.rs`, the permanent-share block,
+    # says so). The truth table carries `s` and not `v`, so on the shipped
+    # pt-v20 the sum reads -0.3027 against a change of +0.0629 on name 0,
+    # and misses on every tick of a quiet run too. The identity is asserted
+    # where it is defined: pt-v19, which ships the share at 0.0, and pt-v20
+    # with the share at 0.0. The breaker binds on 82 rows there, on 84 on the
+    # shipped pt-v20 and on 152 on pt-v19, and the shipped default is
+    # asserted to bind as well.
     universe = tradefloor.Universe.random(20, seed=5)
     scenario = (tradefloor.Scenario()
                 .hold(vix=15.0, corporate_bond_yield=0.055)
                 .ramp("vix", start=400.0, end=15.0, over=20, begin=5)
                 .step("qe_pe_boost", before=0.0, after=-0.95, at=5))
-    engine = tradefloor.Engine(seed=2024, universe=universe)
-    for day in range(25):
-        scenario.apply(engine, day)
-        engine.run_days(1, first_day=day, record=True)
 
-    table = pa.table(engine.truth()).to_pydict()
-    fired = [v for v in table["circuit_breaker"] if v != 0.0]
-    assert fired, "the breaker never bound, so this proves nothing"
+    def truth(model):
+        engine = tradefloor.Engine(seed=2024, universe=universe, model=model)
+        for day in range(25):
+            scenario.apply(engine, day)
+            engine.run_days(1, first_day=day, record=True)
+        return pa.table(engine.truth()).to_pydict()
 
-    # And with it recorded, the columns reconstruct the move exactly.
-    rows = list(zip(table["instrument_id"], table["mispricing_s"],
-                    *(table[c] for c in tradefloor.Engine.FACTORS)))
-    first = [r for r in rows if r[0] == 0]
-    delta = first[-1][1] - first[0][1]
-    total = sum(sum(r[2:]) for r in first[1:])
-    assert delta == pytest.approx(total, abs=1e-12), (
-        f"components sum to {total:+.6f} against a change of {delta:+.6f}"
-    )
+    shipped = truth(tradefloor.ModelParams.from_preset())
+    assert [v for v in shipped["circuit_breaker"] if v != 0.0], (
+        "the breaker never bound on the shipped default")
+
+    for model in (tradefloor.ModelParams.from_preset("pt-v19"),
+                  tradefloor.ModelParams.from_preset(
+                      "pt-v20", fair_value_news_share=0.0)):
+        table = truth(model)
+        fired = [v for v in table["circuit_breaker"] if v != 0.0]
+        assert fired, "the breaker never bound, so this proves nothing"
+
+        # And with it recorded, the columns reconstruct the move exactly.
+        rows = list(zip(table["instrument_id"], table["mispricing_s"],
+                        *(table[c] for c in tradefloor.Engine.FACTORS)))
+        first = [r for r in rows if r[0] == 0]
+        delta = first[-1][1] - first[0][1]
+        total = sum(sum(r[2:]) for r in first[1:])
+        assert delta == pytest.approx(total, abs=1e-12), (
+            f"{model.fingerprint}: components sum to {total:+.6f} against a "
+            f"change of {delta:+.6f}"
+        )
 
 
 def test_every_column_can_differ_between_two_markets():

@@ -72,7 +72,7 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
-from ._core import ValidationError
+from ._core import ValidationError, preset_names
 from . import facts as _facts
 from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
@@ -405,6 +405,9 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: is new is that a verdict is now taken on it and refused on.
 #:
 #: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above.
+#: pt-v20, the default since 0.8.5, reads 0.932337 as the median of thirty
+#: seeds at 252 days (box ptv20g3, `presets/pt-v20.json`) and PASSES on
+#: both panels, k = 15 of 30 at 252 and 15 held out against a cut of 21.
 #: pt-v19's fifth composition (2026-09-23) reads 0.933726 as the median of
 #: thirty seeds at 252 days and PASSES on both panels, k = 18 of 30 at 252
 #: and 17 held out against a cut of 21. The fourth composition read 0.946534
@@ -419,15 +422,16 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: does not gate a preset; the pass bar is the long-run criteria and every
 #: ruled band.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.933726,
+    "vix_ar1_debiased": 0.932337,  # pt-v19: 0.933726
 }
 
 #: The default preset's RISE in each structural row from 252 to 504 days,
 #: the second gate's one verdict since 2026-09-21 (`facts.REAL_VIX_AR1_RISE`,
 #: `facts.structure_rise_verdict`). None until the record carries the block;
-#: `test_structure_gate` binds it to the record once it does.
+#: `test_structure_gate` binds it to the record once it does. pt-v20 reads
+#: +0.015596, 90% interval +0.0041 to +0.0270, against the tape's +0.0120.
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": 0.014322,
+    "vix_ar1_debiased": 0.015596,  # pt-v19: 0.014322
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -789,8 +793,12 @@ ROSTER_SHAPES: dict[str, dict[str, int]] = {
 #: collected, and `tests/test_envelope.py` re-scores it against the tables
 #: below.
 #:
-#: `check` accepts a concentrated roster only while `PRESET` is the preset
-#: named here, so a new default loses the grant until it is measured again.
+#: `check` accepts a concentrated roster only for a question on the preset
+#: named here. The preset is `check`'s `preset` argument, `PRESET` when it
+#: is not passed, so a new default loses the grant until it is measured
+#: again. Since 0.8.5 the default is pt-v20 and the mixes are pt-v19's, so
+#: a caller whose run names pt-v19 keeps the grant and every other caller
+#: is refused.
 ROSTER_MEASUREMENT: dict[str, Any] = {
     "preset": "pt-v19",
     "run": "docs080b",
@@ -1259,8 +1267,8 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="roster-concentration",
-        summary=("a concentrated roster is measured for four sector mixes "
-                 "and the shape rows only"),
+        summary=("a concentrated roster is measured on pt-v19 only, for "
+                 "four sector mixes and the shape rows"),
         detail=(
             "`Universe.random()` assigns sectors round-robin over the twelve "
             "in `sectors.SECTORS`, so a roster is as close to balanced as its "
@@ -1295,10 +1303,14 @@ GAPS: tuple[Gap, ...] = (
             "0.3063 balanced to 0.3751 all-technology at 252 days, and stays "
             "inside its band.\n\n"
             "`check` accepts a roster named as one of the four mixes, for "
-            "example `sector_concentrated=\"tech_heavy\"`, when the preset "
-            "is pt-v19, the horizon is 504 days or less, and every named "
-            "statistic is a shape row that mix held at that horizon "
-            "(`ROSTER_SHAPE_ROWS`). Two limits remain and come back as "
+            "example `sector_concentrated=\"tech_heavy\"`, when the question "
+            "names pt-v19 as its preset (`preset=\"pt-v19\"`), the horizon "
+            "is 504 days or less, and every named statistic is a shape row "
+            "that mix held at that horizon (`ROSTER_SHAPE_ROWS`). The "
+            "default has been pt-v20 since 0.8.5 and the mixes have not "
+            "been measured on it, so `check` refuses a concentrated roster "
+            "on pt-v20, and on any preset but pt-v19, and says the mixes "
+            "were measured on pt-v19 only. Two limits remain and come back as "
             "warnings: each mix is one roster draw, and the bands come from "
             "broad real-market windows, so a single-sector portfolio is "
             "graded on a broad market's ruler.\n\n"
@@ -1313,7 +1325,9 @@ GAPS: tuple[Gap, ...] = (
             "10.3 (`ROSTER_INDEX_DRIFT`). sector_excess_corr on an "
             "all-technology roster and corr_persistence_acf1 past 252 days "
             "were not graded, for the reasons above. The measurement ran no "
-            "horizon past 504 days and no preset but pt-v19.\n\n"
+            "horizon past 504 days and no preset but pt-v19. Measuring the "
+            "mixes on pt-v20 is the same run on the new default: thirty "
+            "seeds, five mixes, 252 and 504 days.\n\n"
             "NARROWED 2026-09-24. Until then `check` refused every "
             "sector-concentrated question, whatever it named, and the gap's "
             "statistics were cross_sectional_corr, annualised_vol_pct and "
@@ -1332,8 +1346,9 @@ GAPS: tuple[Gap, ...] = (
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
-            "or crisis row, past 504 days, or for a sector mix other than "
-            "the four measured"
+            "or crisis row, past 504 days, on any preset but pt-v19 (the "
+            "default pt-v20 included), or for a sector mix other than the "
+            "four measured"
         ),
         statistics=_facts.LEVEL + _facts.CRISIS + ("sector_excess_corr",),
     ),
@@ -1526,11 +1541,11 @@ def _roster_horizon(horizon_days: int) -> int | None:
 
 
 def _roster_refusal(shape: str | None, horizon_days: int,
-                    wanted: Sequence[str]) -> str | None:
+                    wanted: Sequence[str], preset: str) -> str | None:
     """Why a concentrated roster is refused, or None when it is covered.
 
-    Covered means: a mix from `ROSTER_SHAPES`, the preset the measurement
-    ran on, a horizon it ran to, and statistics named, every one of them a
+    Covered means: a mix from `ROSTER_SHAPES`, a question on the preset the
+    measurement ran on, a horizon it ran to, and statistics named, every one of them a
     shape row the mix held at that horizon. Everything else is refused
     with the reason, so a caller can see which part of the question the
     measurement does not reach.
@@ -1544,11 +1559,13 @@ def _roster_refusal(shape: str | None, horizon_days: int,
             f"roster is one of them, pass its name as `sector_concentrated`. "
             f"Otherwise measure your own roster, since no other mix was "
             f"measured")
-    if PRESET != m["preset"]:
+    if preset != m["preset"]:
         return (
-            f"the {shape} mix was {_roster_source()}, and this module "
-            f"describes {PRESET}. Re-run {m['tool']} on {PRESET} before "
-            f"citing it for a concentrated roster")
+            f"the {shape} mix was {_roster_source()}, and the question is "
+            f"on {preset}. The four mixes were measured on {m['preset']} "
+            f"only. Re-run {m['tool']} on {preset} before citing it for a "
+            f"concentrated roster, or pass preset={m['preset']!r} if the "
+            f"run names {m['preset']}")
     h = _roster_horizon(horizon_days)
     if h is None:
         return (
@@ -1605,6 +1622,7 @@ def check(
     sector_concentrated: bool | str = False,
     scenario_magnitude: bool = False,
     macro_regime: bool = False,
+    preset: str | None = None,
 ) -> Verdict:
     """Does this question fall inside the envelope?
 
@@ -1626,9 +1644,17 @@ def check(
     `roster-concentration` gap. A name from `ROSTER_SHAPES` says which
     measured mix the roster is, and is accepted when the horizon is 504
     days or less and every named statistic is a shape row that mix held
-    (`ROSTER_SHAPE_ROWS`). Any other name raises. `scenario_magnitude`
+    (`ROSTER_SHAPE_ROWS`) and the question is on the preset the mixes were
+    measured on, which is pt-v19. Any other name raises. `scenario_magnitude`
     says the result depends on the SIZE of a scenario's effect rather than
     its direction.
+
+    `preset` names the preset the question's run uses, and defaults to
+    `PRESET`, the shipped default this module describes. It decides one
+    thing: the roster mixes were measured on pt-v19 only, so a concentrated
+    roster is refused on any other preset, the default pt-v20 included.
+    Every other table here describes `PRESET` whatever is passed, and a
+    verdict on another preset says so in a warning. An unknown name raises.
 
     Returns a `Verdict`, which is falsy when the answer is no. Every reason
     names the measurement behind it, so a refusal can be checked rather
@@ -1650,6 +1676,11 @@ def check(
             f"unknown statistics {sorted(unknown)}; expected keys of "
             f"facts.REAL_MARKETS: {sorted(REAL_MARKETS)}"
         )
+    if preset is None:
+        preset = PRESET
+    elif preset not in preset_names():
+        raise ValidationError(
+            f"unknown preset {preset!r}; the presets are {preset_names()}")
     if (isinstance(sector_concentrated, str)
             and sector_concentrated not in ROSTER_SHAPES):
         raise ValidationError(
@@ -1832,7 +1863,7 @@ def check(
         # the roster measurement covers and refuses the rest by name.
         shape = (sector_concentrated if isinstance(sector_concentrated, str)
                  else None)
-        why = _roster_refusal(shape, horizon_days, wanted)
+        why = _roster_refusal(shape, horizon_days, wanted, preset)
         if why is None:
             h = _roster_horizon(horizon_days)
             warnings.append(
@@ -1882,6 +1913,13 @@ def check(
             "through a scenario, and note that the crisis cadence responds to "
             "STAGFLATION rather than to high inflation alone"
         ))
+
+    if preset != PRESET:
+        warnings.append(
+            f"the question is on {preset} and this module's tables describe "
+            f"{PRESET}. The roster grant is measured on "
+            f"{ROSTER_MEASUREMENT['preset']}, and every other part of this "
+            f"answer is {PRESET}'s")
 
     if not wanted:
         warnings.append(

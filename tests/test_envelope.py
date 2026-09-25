@@ -101,8 +101,19 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # saturating channel, and a row at -1 per cent alone would have scored
     # that defect as passing for three eras. Both buckets passing is not a
     # reason to drop one.
-    EXPECTED_RED = set()
+    #
+    # `index_drift_pct` RETURNS AT pt-v20 (0.8.5), on this table and not on
+    # its ruler. These rows are graded here on `REAL_MARKETS`, the 2015-2025
+    # decade pair, where the level row's floor is 2.90; pt-v20 reads +1.1446
+    # on the level protocol (pt-v19: +7.6462, in). On the ruled basis the
+    # record grades it on, 1.1 to 10.3 from 98 years of ^GSPC, it is in, at
+    # the floor, and the three crisis rows are in on both. Both readings are
+    # asserted, so the row cannot leave either table in silence.
+    EXPECTED_RED = {"index_drift_pct"}
+    ruled, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
+        env.CERTIFIED_HORIZON_DAYS]
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
+        assert band_distance(v, *ruled[k]) == 0, (k, v, ruled[k])
         assert k in LEVEL + CRISIS
         red = band_distance(v, *REAL_MARKETS[k]) != 0
         if k in EXPECTED_RED:
@@ -172,34 +183,78 @@ def test_a_concentrated_roster_with_no_mix_named_is_outside():
         assert "docs080b" in v.reasons[0]
 
 
+#: The preset the roster mixes were measured on. The grant below is
+#: pt-v19's and is asked on pt-v19 by name: the default moved to pt-v20 at
+#: 0.8.5 and the mixes were not measured on it, so on the default `check`
+#: refuses them (`test_the_roster_grant_is_refused_on_the_default`).
+ROSTER_PRESET = env.ROSTER_MEASUREMENT["preset"]
+
+
 @pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
 def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
-    """The grant: every row the mix held, at a horizon it was measured to."""
+    """The grant: every row the mix held, at a horizon it was measured to,
+    on the preset it was measured on (pt-v19, named since pt-v20 became the
+    default)."""
     held = env.ROSTER_SHAPE_ROWS[mix][252]
     # The decay-shape gap refuses abs_return_acf20 on every roster, so it
     # is asked apart from the rest.
     rows = [k for k in held if k != "abs_return_acf20"]
-    v = env.check(horizon_days=252, statistics=rows, sector_concentrated=mix)
+    v = env.check(horizon_days=252, statistics=rows, sector_concentrated=mix,
+                  preset=ROSTER_PRESET)
     assert v.inside, v.reasons
     assert any(w.startswith(f"the roster is the {mix} mix")
                for w in v.warnings)
     v = env.check(horizon_days=252, statistics=["abs_return_acf20"],
-                  sector_concentrated=mix)
+                  sector_concentrated=mix, preset=ROSTER_PRESET)
     assert [g.id for g in v.gaps] == ["decay-shape"]
     # Past 252 the horizon gap refuses on any roster. The roster gap does
     # not add itself for a row the mix held at 504.
     v = env.check(horizon_days=504,
                   statistics=list(env.ROSTER_SHAPE_ROWS[mix][504]),
-                  sector_concentrated=mix)
+                  sector_concentrated=mix, preset=ROSTER_PRESET)
     assert "roster-concentration" not in [g.id for g in v.gaps]
 
 
 @pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
+def test_the_roster_grant_is_refused_on_the_default(mix):
+    """pt-v20 is the default and the mixes were measured on pt-v19 only.
+
+    The grant the test above asks on pt-v19 is refused on pt-v20, whether
+    the caller names it or leaves the default, and the reason says which
+    preset the mixes were measured on. The refusal holds until
+    tools/calibration/roster_shapes.py runs on pt-v20.
+    """
+    assert env.PRESET == "pt-v20" and ROSTER_PRESET == "pt-v19"
+    rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
+            if k != "abs_return_acf20"]
+    for named in ({}, {"preset": "pt-v20"}):
+        v = env.check(horizon_days=252, statistics=rows,
+                      sector_concentrated=mix, **named)
+        assert not v.inside, named
+        assert [g.id for g in v.gaps] == ["roster-concentration"], named
+        assert "measured on pt-v19 only" in v.reasons[0], v.reasons
+        assert "pt-v20" in v.reasons[0], v.reasons
+    # The same question on pt-v19 is granted, with a warning that the rest
+    # of the answer is the default's.
+    v = env.check(horizon_days=252, statistics=rows,
+                  sector_concentrated=mix, preset="pt-v19")
+    assert v.inside, v.reasons
+    assert any(w.startswith("the question is on pt-v19") for w in v.warnings)
+
+
+def test_check_refuses_a_preset_that_does_not_exist():
+    with pytest.raises(tradefloor.ValidationError, match="pt-v20"):
+        env.check(horizon_days=252, preset="pt-v99")
+
+
+@pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
 def test_a_measured_mix_is_still_refused_where_the_measurement_stops(mix):
+    """Asked on pt-v19, where the grant exists, so each refusal below is the
+    limit it names and not the preset."""
     from tradefloor.facts import LEVEL, CRISIS
 
     def refused(**q):
-        v = env.check(sector_concentrated=mix, **q)
+        v = env.check(sector_concentrated=mix, preset=ROSTER_PRESET, **q)
         return not v.inside and "roster-concentration" in [
             g.id for g in v.gaps]
 
@@ -219,13 +274,14 @@ def test_a_measured_mix_is_still_refused_where_the_measurement_stops(mix):
 
 
 def test_sector_excess_corr_is_refused_on_an_all_technology_roster():
-    """Undefined with one sector, so the measurement could not grade it."""
+    """Undefined with one sector, so the measurement could not grade it.
+    Asked on pt-v19, the preset the mixes were measured on."""
     v = env.check(horizon_days=252, statistics=["sector_excess_corr"],
-                  sector_concentrated="all_technology")
+                  sector_concentrated="all_technology", preset=ROSTER_PRESET)
     assert not v.inside
     assert "undefined" in v.reasons[0]
     v = env.check(horizon_days=252, statistics=["sector_excess_corr"],
-                  sector_concentrated="tech_heavy")
+                  sector_concentrated="tech_heavy", preset=ROSTER_PRESET)
     assert v.inside, v.reasons
 
 
@@ -249,6 +305,10 @@ def test_the_roster_tables_are_the_committed_measurement():
     The record is the fleet run's output as collected. Its medians are
     scored here with this build's `score`, so a band that moves, or a table
     edited by hand, fails here.
+
+    The run is pt-v19's, and pt-v19 stopped being the default at 0.8.5. The
+    balanced mix is read against pt-v19's own record, which carries the
+    tables `CERTIFIED` and `MEASURED_504` held until then.
     """
     import json
     import sys
@@ -257,7 +317,11 @@ def test_the_roster_tables_are_the_committed_measurement():
     root = Path(__file__).resolve().parent.parent
     m = env.ROSTER_MEASUREMENT
     record = json.loads((root / m["record"]).read_text(encoding="utf-8"))
-    assert record["preset"] == m["preset"] == env.PRESET
+    # pt-v19's run, and the default is pt-v20: `check` refuses the mixes on
+    # the default for that reason (test_the_roster_grant_is_refused_on_the_
+    # default). This read `== env.PRESET` while pt-v19 was the default.
+    assert record["preset"] == m["preset"] == "pt-v19"
+    assert m["preset"] != env.PRESET
     assert tuple(record["seeds"]) == m["seeds"]
     assert record["shapes"] == {"balanced": {}, **env.ROSTER_SHAPES}
     sys.path.insert(0, str(root / "tools" / "calibration"))
@@ -267,12 +331,14 @@ def test_the_roster_tables_are_the_committed_measurement():
         sys.path.remove(str(root / "tools" / "calibration"))
     assert roster_shapes.SHAPES == record["shapes"]
 
-    # The balanced mix is the certified roster on the shipped vector: it
-    # reads both certified tables to the four places they carry.
-    for h, table in ((252, env.CERTIFIED), (504, env.MEASURED_504)):
+    # The balanced mix is the certified roster on pt-v19's vector: it reads
+    # both of pt-v19's certified panels to the four places the tables carry.
+    # Until 0.8.5 those panels were `CERTIFIED` and `MEASURED_504`.
+    measured_on = tradefloor.preset_record(m["preset"])
+    for h, panel in ((252, "panel_252"), (504, "panel_504")):
         med = record["results"][f"balanced@{h}"]["median"]
         for k in SHAPE:
-            assert round(med[k], 4) == table[k], (h, k)
+            assert round(med[k], 4) == round(measured_on[panel][k], 4), (h, k)
 
     for mix in env.ROSTER_SHAPES:
         for h in m["horizons"]:

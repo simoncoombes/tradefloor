@@ -234,22 +234,31 @@ def test_matching_the_macro_matters():
     Measured: matching macro leaves |s| around 1e-3 after one tick, which is
     the tick's own noise. A mismatched rate regime leaves it around 1e-1, two
     orders of magnitude larger.
+
+    ON pt-v19, BY NAME, since pt-v20 became the default at 0.8.5 (0.0005
+    against 0.0997 there). This is a property of a preset that adopts the
+    day-zero premium of price over fair value as the mispricing, which is
+    every preset through pt-v19. pt-v20 draws its opening mispricing
+    (`opening_market_sigma` 0.1, `opening_mispricing_sigma` 0.016) and books
+    the rest of each name's premium as its fair-value level, so a macro
+    mismatch opens as a fair-value level and not as mispricing: matched and
+    mismatched open with the same s there, max |s| 0.19996 after one tick
+    on both. That is asserted below too, so it cannot change in silence.
     """
-    u = tradefloor.Universe.from_edgar(snapshot(), **MACRO)
+    def max_abs_s(model, **macro):
+        u = tradefloor.Universe.from_edgar(snapshot(), model=model, **MACRO)
+        e = tradefloor.Engine(seed=1, universe=u, model=model,
+                              macro_state=tradefloor.Macro(**macro))
+        e.open_market()
+        e.tick(9, 30, 3)
+        return max(abs(x) for x in arr(e.column("mispricing_s")))
 
-    matched = tradefloor.Engine(seed=1, universe=u, macro_state=tradefloor.Macro(**MACRO))
-    matched.open_market()
-    matched.tick(9, 30, 3)
-
-    mismatched = tradefloor.Engine(seed=1, universe=u, macro_state=tradefloor.Macro(
-        federal_funds_rate=0.08, corporate_bond_yield=0.10))
-    mismatched.open_market()
-    mismatched.tick(9, 30, 3)
-
-    near = max(abs(x) for x in arr(matched.column("mispricing_s")))
-    far = max(abs(x) for x in arr(mismatched.column("mispricing_s")))
+    other = dict(federal_funds_rate=0.08, corporate_bond_yield=0.10)
+    near = max_abs_s("pt-v19", **MACRO)
+    far = max_abs_s("pt-v19", **other)
     assert near < 0.01
     assert far > 10 * near
+    assert max_abs_s("pt-v20", **MACRO) == max_abs_s("pt-v20", **other)
 
 
 def test_loading_is_reproducible():
@@ -678,16 +687,29 @@ def test_zero_start_takes_about_a_half_life_to_catch_up():
     that harvests it sees nothing until shocks accumulate. Measured across 60
     trading days: a zero-start universe climbs from 0.014 to 0.091 while a
     stationary-start one sits near 0.10 the whole time.
+
+    ON pt-v19, BY NAME, since pt-v20 became the default at 0.8.5: after one
+    day 0.1188 stationary against 0.0073 zero there. The limitation is a
+    property of a preset that adopts the day-zero premium as the
+    mispricing. pt-v20 draws each name's opening mispricing itself
+    (`opening_mispricing_sigma` 0.016) and books the loader's premium as
+    the fair-value level, so both starts read 0.0166 after one day, and
+    that is asserted too.
     """
     snap = wide_snapshot(40)
 
-    def dispersion_after(mode, days):
-        u = tradefloor.Universe(to_instruments(snap, initial_s=mode, s_seed=11, **MACRO))
-        e = tradefloor.Engine(seed=5, universe=u, macro_state=tradefloor.Macro(**MACRO))
+    def dispersion_after(mode, days, model):
+        u = tradefloor.Universe(to_instruments(snap, initial_s=mode, s_seed=11,
+                                               model=model, **MACRO))
+        e = tradefloor.Engine(seed=5, universe=u, model=model,
+                              macro_state=tradefloor.Macro(**MACRO))
         e.run_days(days, ticks_per_day=390, record=False)
         return statistics.pstdev(arr(e.column("mispricing_s")))
 
-    assert dispersion_after("stationary", 1) > 4 * dispersion_after("zero", 1)
+    assert (dispersion_after("stationary", 1, "pt-v19")
+            > 4 * dispersion_after("zero", 1, "pt-v19"))
+    assert (dispersion_after("stationary", 1, "pt-v20")
+            == pytest.approx(dispersion_after("zero", 1, "pt-v20"), rel=1e-9))
 
 
 def test_a_tail_draw_cannot_start_outside_the_model_s_cap():
