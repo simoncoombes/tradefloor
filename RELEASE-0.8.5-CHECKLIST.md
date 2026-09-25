@@ -39,9 +39,13 @@ gaps. Two branches still land, and every step below waits for both.
       sensitivity, added to pt-v20, then a regrade of every registered row.
       pt-v20's dials at 99969c7 (`volume_move_response` 0.6, `garch_beta`
       0.85) are merged but not final.
-- [ ] E7's `feature/seed64`: 64-bit seeds. Seeds below 2**32 stay
-      bit-identical, so every digest is unchanged; check that on the merge
-      with `tests/known_answer.py` and `tests/known_answer_presets.py`.
+- [ ] E7's `feature/seed64` (d589c04): 64-bit seeds. Seeds below 2**32
+      stay bit-identical, so every digest is unchanged, and a sixth
+      known-answer line pins a seed above 2**32 on pt-v19 (`cef62229...`).
+      Checked ahead of the merge on a build of d589c04: the known answer,
+      bonds, book and all nineteen per-preset digests equal release/0.8.5's,
+      and the eighteen frozen rows still match the 0.8.1 wheel. Merge it
+      with E3's final branch and check again on the merged build.
 - [ ] Once the dials are final, re-run RELEASING 5b for the final vector:
       pt-v20's record with its level block (`tools/presets/level_panel.py`
       on pt-v20 and pt-v19, `level_rows.py`, `record.py --level-rows`),
@@ -57,6 +61,10 @@ gaps. Two branches still land, and every step below waits for both.
       MODEL.md's values, notebooks 00 to 06 and 09, and the five LLM
       fixtures (re-recorded once, after the dials are final) follow the
       final vector.
+- [ ] An independent adversarial audit of pt-v20 on the final vector, after
+      RELEASING 5b and before the PR: no open blockers or majors. Any
+      finding goes back to E3 for a fix and a regrade, and every step above
+      is re-run on the fixed vector before the PR.
 
 ## 2. The docs branch against the final engine
 
