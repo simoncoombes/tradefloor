@@ -383,6 +383,11 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "macro_publication_repricing":
+        "inert at 0.0 as shipped: `Engine::published_macro_marks` returns "
+        "None, so `reprice_to_published_macro` writes nothing and the close's "
+        "macro step reaches prices at the next session's first tick "
+        "(0.8.5, pt-v20 audit finding 3)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

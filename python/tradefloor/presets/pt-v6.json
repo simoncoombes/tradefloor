@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v6",
   "fingerprint": "pt-v6",
-  "coefficient_digest": "48103891f0617b37f7a18b73a0ac40aa9c4fc0c4fb1e87f55239b6f06e7fb5d3",
+  "coefficient_digest": "7a3ce238de32cf97010ad1e60674c8068402aa85b0e891e11fd0777270cfd4c8",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -100,6 +100,7 @@
     "macro_burn_in_days": 0.0,
     "macro_calendar_days_per_year": 365.0,
     "macro_compound_days_per_year": 365.0,
+    "macro_publication_repricing": 0.0,
     "market_beta_down_asym": 0.0,
     "market_beta_down_asym_lag": 0.0,
     "market_beta_down_asym_lag_live": 0.0,

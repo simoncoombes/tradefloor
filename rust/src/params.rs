@@ -574,6 +574,30 @@ pub struct ModelParams {
     /// cent per 100 bp of Baa over 2022 (design repository,
     /// programme/ptv20-scenario-size.md section 5).
     pub rate_pe_sensitivity: f64,
+    /// Whether a name's price takes the change the close's macro step makes
+    /// to its fair value at the moment the step is published, rather than
+    /// at the next session's first tick. 0.0, which every preset through
+    /// pt-v20 carries, leaves it to the tick: the central bank meets at the
+    /// close, the new policy rate, corporate yield and cycle are readable
+    /// from then on, and the price stays at the day's last print until the
+    /// first tick of the next session re-values the name, so an agent that
+    /// reads the decision fills at the price from before it. On pt-v20 with
+    /// its leading dials (anticipation 126, rate sensitivity 3, buyback
+    /// share 0.75) the index's first 65 minutes after a published hike fell
+    /// 76 bp (se 5) from that price and after a cut rose 171 (se 36), and
+    /// the published corporate yield's overnight change correlated -0.32
+    /// with the next session's return (pt-v20 audit, finding 3). A real
+    /// FOMC statement is priced within minutes: event studies read the
+    /// S&P 500's whole response inside a 30-minute window around it
+    /// (Gurkaynak, Sack and Swanson 2005; Bernanke and Kuttner 2005). 1.0
+    /// re-marks every name that has traded as the step ends, to the price
+    /// its premium over fair value implies on the published state, so its
+    /// mispricing `s` is unchanged and the next tick starts from the model
+    /// price the published state implies. A `pin_macro` re-marks the same
+    /// way. The move sits between the day's last print and the next open,
+    /// where a decision announced after the close lands. No draw. A switch.
+    /// See `Engine::reprice_to_published_macro`.
+    pub macro_publication_repricing: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -5007,6 +5031,7 @@ impl ModelParams {
             earnings_cycle_sigma: 0.0,
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
+            macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7227,6 +7252,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => self.earnings_cycle_sigma,
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
+            "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7466,6 +7492,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
+            "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7808,6 +7835,7 @@ impl ModelParams {
                           ("closing_auction", self.closing_auction),
                           ("flight_to_quality_day", self.flight_to_quality_day),
                           ("corporate_yield_daily", self.corporate_yield_daily),
+                          ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting)] {
             if !(v == 0.0 || v == 1.0) {
@@ -8285,6 +8313,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_cycle_sigma",
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
+        "macro_publication_repricing",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",
