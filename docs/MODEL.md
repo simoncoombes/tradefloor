@@ -1554,69 +1554,24 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 `baselines.Oracle` is the reference that reads state no trader can see. Its
 rule is picked from the preset's own dials, never from the preset's name.
 
-- **Cross-sectional rule** (every preset through pt-v19: `fair_value_news_share`,
-  `fair_value_market_share` and `earnings_cycle_depth` all 0.0). Every
-  stock-specific move is mispricing that reverts, so the spread of $s$ across
-  names is the edge. At every step it goes long the `top_k` lowest $s$ and
-  short the `top_k` highest, equal weight, dollar-neutral.
-- **Expected-return rule** (any of those dials off zero, as on pt-v20). The
-  cross-section of $s$ is small there: its spread falls from 0.30 to 0.015 and
-  its rank IC against the next day's return from -0.44 to -0.03, so the old
-  rule loses money on 3 of 8 seeds. Once a day, at the open, it forms each
-  equity's expected log return over the session:
-  - $(\phi_\tau^{390} - 1)s_i + \theta\mu_i$, the mispricing's reversion and
-    herding, which carry the market-wide transient mispricing and any
-    residual;
-  - plus the fair value's drift: nominal output growth, the buyback yield,
-    and the earnings cycle's pull toward its phase's level.
+- **Cross-sectional rule** (every preset through pt-v19: `fair_value_news_share`, `fair_value_market_share` and `earnings_cycle_depth` all 0.0). Every stock-specific move is mispricing that reverts, so the spread of $s$ across names is the edge. At every step it goes long the `top_k` lowest $s$ and short the `top_k` highest, equal weight, dollar-neutral.
+- **Expected-return rule** (any of those dials off zero, as on pt-v20). The cross-section of $s$ is small there: its spread falls from 0.30 to 0.015 and its rank IC against the next day's return from -0.44 to -0.03, so the old rule loses money on 3 of 8 seeds. Once a day, at the open, it forms each equity's expected log return over the session.
 
-  The residual across names is traded as the cross-sectional rule trades
-  $s$. The common part is a net position spread over every equity, long or
-  short by its sign. The gross splits between the two in proportion to what
-  each earns per unit of gross.
+The expected return under the second rule has two parts: the mispricing's
+reversion and herding, $(\phi_\tau^{390} - 1)s_i + \theta\mu_i$, which carry
+the market-wide transient mispricing and any residual, plus the fair value's
+drift, which is nominal output growth, the buyback yield and the earnings
+cycle's pull toward its phase's level. The residual across names is traded
+as the cross-sectional rule trades $s$. The common part is a net position
+spread over every equity, long or short by its sign. The gross splits
+between the two in proportion to what each earns per unit of gross.
 
 Measured on pt-v20, over 30 days on rosters `Universe.random(20, seed=3, 42,
 11)` at sim seeds 0-3:
+
 - the Oracle is positive on 12 of 12 markets;
 - it is ahead of every price-only reference agent on 11 of 12;
-- the exception is buy-and-hold, in a month the market rose 2.2 per cent
-  against the Oracle's 1.4.
-
-Its edge is market-wide and a few basis points a day, so over five days it is
-behind buy-and-hold as often as not. Quote a capture ratio with its horizon.
-
-## The Oracle baseline
-
-`baselines.Oracle` is the reference that reads state no trader can see. Its
-rule is picked from the preset's own dials, never from the preset's name.
-
-- **Cross-sectional rule** (every preset through pt-v19: `fair_value_news_share`,
-  `fair_value_market_share` and `earnings_cycle_depth` all 0.0). Every
-  stock-specific move is mispricing that reverts, so the spread of $s$ across
-  names is the edge. At every step it goes long the `top_k` lowest $s$ and
-  short the `top_k` highest, equal weight, dollar-neutral.
-- **Expected-return rule** (any of those dials off zero, as on pt-v20). The
-  cross-section of $s$ is small there: its spread falls from 0.30 to 0.015 and
-  its rank IC against the next day's return from -0.44 to -0.03, so the old
-  rule loses money on 3 of 8 seeds. Once a day, at the open, it forms each
-  equity's expected log return over the session:
-  - $(\phi_\tau^{390} - 1)s_i + \theta\mu_i$, the mispricing's reversion and
-    herding, which carry the market-wide transient mispricing and any
-    residual;
-  - plus the fair value's drift: nominal output growth, the buyback yield,
-    and the earnings cycle's pull toward its phase's level.
-
-  The residual across names is traded as the cross-sectional rule trades
-  $s$. The common part is a net position spread over every equity, long or
-  short by its sign. The gross splits between the two in proportion to what
-  each earns per unit of gross.
-
-Measured on pt-v20, over 30 days on rosters `Universe.random(20, seed=3, 42,
-11)` at sim seeds 0-3:
-- the Oracle is positive on 12 of 12 markets;
-- it is ahead of every price-only reference agent on 11 of 12;
-- the exception is buy-and-hold, in a month the market rose 2.2 per cent
-  against the Oracle's 1.4.
+- the exception is buy-and-hold, in a month the market rose 2.2 per cent against the Oracle's 1.4.
 
 Its edge is market-wide and a few basis points a day, so over five days it is
 behind buy-and-hold as often as not. Quote a capture ratio with its horizon.
