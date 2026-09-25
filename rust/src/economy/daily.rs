@@ -315,6 +315,17 @@ pub struct YieldDials {
     pub corporate_pinned: bool,
 }
 
+/// The largest move the corporate yield takes in one session under
+/// `corporate_yield_daily`, in percentage points either way. The VIX term
+/// is 2 bp a point times the cycle's multiplier (2.8 in a contraction), so a
+/// 20-point VIX session would move it 1.1 points unbounded. Moody's Baa
+/// yield (FRED DBAA, 10,624 sessions 1986-2026) never moved more than 0.48
+/// in a session (18 March 2020; 0.43 on 10 October 2008), its 99.99th
+/// percentile is 0.43 and its 99.9th 0.25. 0.50 sits just above the largest
+/// recorded move. Read only with `corporate_yield_daily` on, so no preset
+/// through pt-v19 reads it.
+pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
+
 impl Default for YieldDials {
     fn default() -> Self {
         Self {
@@ -1598,7 +1609,11 @@ pub fn update_economy_daily(
         } else {
             0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
         };
-        let moved = (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term;
+        let moved = clamp(
+            (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term,
+            -CORPORATE_DAILY_MOVE_CAP,
+            CORPORATE_DAILY_MOVE_CAP,
+        );
         new_state.corporate_bond_yield = mathx::max(
             economy.corporate_bond_yield + moved,
             new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
