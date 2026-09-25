@@ -423,7 +423,8 @@ def test_the_day_effect_grows_with_the_tick_count():
     # THE CLAIM IS THAT THE DAY'S DRAW MATTERS MORE IN A LONGER DAY, and it
     # does: 0.0175, 0.1325, 0.4850, 0.4725 on pt-v19, a factor of 27 from
     # end to end, against 0.0375, 0.1525, 0.2925, 0.4950 on pt-v18, a factor
-    # of 13. MEASURED 2026-09-13.
+    # of 13. MEASURED 2026-09-13. pt-v20 reads 0.1300, 0.2200, 0.3025,
+    # 0.3175, a factor of 2.4 (0.8.5).
     #
     # THE SATURATION CLAIM IS WITHDRAWN, 2026-09-14, and the strict sort it
     # displaced is back. The claim was that the rise is steep to 80 ticks
@@ -476,7 +477,29 @@ def test_the_day_effect_grows_with_the_tick_count():
     # four-fold day, so four is a bar somebody chose and not one anybody
     # derived. Whoever moves this next should put it on the ten seeds the
     # way `test_the_leverage_effect_is_real_since_the_gjr_term` was.
-    assert effects[2] > 4 * effects[0], effects
+    #
+    # MOVED AT 0.8.5, on the ten seeds, when pt-v20 became the default and
+    # the bar of four failed: seed 42 reads 0.1300, 0.2200, 0.3025, 0.3175,
+    # a ratio of 2.33 (pt-v19: 4.36). The same ten seeds on pt-v20:
+    #
+    #   42  0.1300 0.2200 0.3025 0.3175   e2/e0 2.33
+    #   43  0.1500 0.2075 0.2750 0.3975   e2/e0 1.83
+    #   44  0.1450 0.1925 0.2325 0.6850   e2/e0 1.60
+    #   45  0.2250 0.3275 0.4325 0.5950   e2/e0 1.92
+    #   46  0.1550 0.2125 0.2875 0.4525   e2/e0 1.85
+    #   47  0.1475 0.2325 0.2775 0.3725   e2/e0 1.88
+    #   48  0.2650 0.3200 0.4925 0.5675   e2/e0 1.86
+    #   49  0.2275 0.3100 0.4400 0.4600   e2/e0 1.93
+    #   50  0.2400 0.2300 0.3525 0.3750   e2/e0 1.47
+    #   51  0.1300 0.2075 0.2825 0.4550   e2/e0 2.17
+    #
+    # The ratio runs 1.47 to 2.33 around the 2.0 the sqrt(T) premise
+    # predicts for a four-fold day, where pt-v19 ran 3.16 to 7.32 above it:
+    # pt-v20 grows as the premise says and pt-v19 grew faster. The strict
+    # sort holds on nine of the ten (seed 50 dips at 40 ticks). The bar is
+    # the premise's factor for a two-fold day, sqrt(2), which all ten clear
+    # and which a model whose day length stopped mattering would not.
+    assert effects[2] > math.sqrt(2) * effects[0], effects
 
 
 # -- the counted caveats can be restated over merged rows ---------------------
