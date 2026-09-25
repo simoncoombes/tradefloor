@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v13",
   "fingerprint": "pt-v13",
-  "coefficient_digest": "0652b50f21b0bf2e7b3cb0f10d9d53dd3bf93b901a6fde35207aa25aa207cf9d",
+  "coefficient_digest": "9d873ec2bd9585d3a62f6252042a510f701e9a343bd0241c21714c1f22764bd3",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -188,6 +188,7 @@
     "treasury_10y_noise": 0.03,
     "treasury_2y_noise": 0.0,
     "trough_growth_floor": 0.0,
+    "unemployment_adjustment_half_life": 0.0,
     "universe_stress_decay": 0.0,
     "universe_stress_weight": 0.0,
     "usd_crisis_vix_threshold": 25.5,

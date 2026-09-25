@@ -847,6 +847,11 @@ PERTURBATIONS = [
     # growth output and earnings compound. tests/test_gdp_publication_lag.py
     # holds the figure itself.
     ("gdp_publication_lag", 21.0, False),
+    # LIVE: the probe's economy burns in for hundreds of sessions, and the
+    # partially adjusted unemployment rate it opens at reaches inflation,
+    # the bank and the curve. tests/test_unemployment_adjustment.py holds
+    # the mechanism.
+    ("unemployment_adjustment_half_life", 84.0, True),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an
@@ -1393,6 +1398,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # The macro calendar (2026-09-23): it moves which days are release,
     # quarter and meeting days, so which state-dependent sites fire.
     "macro_calendar_days_per_year",
+    # Unemployment's partial adjustment (2026-09-25): a macro dial by
+    # intent. The rate it moves feeds the bank's meetings and the cycle's
+    # transition roll through the 755-day burn-in, so which state-dependent
+    # sites fire moves with it; the market stream stays put.
+    "unemployment_adjustment_half_life",
     # THREE ARRIVED WITH THE FIFTH COMPOSITION (2026-09-23), and all three
     # through the drawn opening it switched on: at seed 42 the burn-in now
     # runs from an expansion past its minimum duration, where the cycle's

@@ -607,6 +607,23 @@ pub struct ModelParams {
     /// agency publishes on the quarter's last day (`Engine::published_gdp_growth`).
     /// The snapshot and the state hash carry its state only while this is set.
     pub gdp_publication_lag: f64,
+    /// The half-life, in sessions, of unemployment's response to its
+    /// cyclical drivers. 0.0, which every preset carries, is off: at each
+    /// monthly release the rate moves by the whole of what the phase's trend
+    /// and Okun's law on the day's growth ask for, so the first release
+    /// after a contraction begins carries a rise of about 1.2 pp (desk seeds
+    /// 201-212, 2026-09-25), four times the spread of a release otherwise,
+    /// and announces the turn. At 84 sessions it is 0.16 pp.
+    /// Off zero, the monthly change is an impulse partially adjusted toward
+    /// that drive, closing `1 - 0.5^(month / half_life)` of the gap at each
+    /// release (`EconomyState::unemployment_impulse`), so the rise builds
+    /// over months: UNRATE went from 4.3 to 5.5 over the 2001 recession and
+    /// from 5.0 to 9.5 over December 2007 to June 2009, a first month of
+    /// 0.1 to 0.3 pp each time. The NAIRU pull and the noise act as before.
+    /// It moves the TRUE unemployment rate and so everything that reads it
+    /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
+    /// and the state hash carry the impulse only while this is set.
+    pub unemployment_adjustment_half_life: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -5042,6 +5059,7 @@ impl ModelParams {
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
             cycle_publication_lag: 0.0,
             gdp_publication_lag: 0.0,
+            unemployment_adjustment_half_life: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7264,6 +7282,7 @@ impl ModelParams {
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
             "cycle_publication_lag" => self.cycle_publication_lag,
             "gdp_publication_lag" => self.gdp_publication_lag,
+            "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7505,6 +7524,7 @@ impl ModelParams {
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
             "cycle_publication_lag" => out.cycle_publication_lag = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
+            "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7903,6 +7923,14 @@ impl ModelParams {
                 "gdp_publication_lag is {}. It is a whole number of sessions after a quarter's \
                  last day, in [0, 2520]; 0 is off (growth reported daily).",
                 self.gdp_publication_lag));
+        }
+        if !(self.unemployment_adjustment_half_life >= 0.0
+            && self.unemployment_adjustment_half_life <= 2520.0)
+        {
+            return Err(format!(
+                "unemployment_adjustment_half_life is {}. It is a half-life in sessions, \
+                 in [0, 2520]; 0 is off.",
+                self.unemployment_adjustment_half_life));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8341,6 +8369,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "rate_pe_sensitivity",
         "cycle_publication_lag",
         "gdp_publication_lag",
+        "unemployment_adjustment_half_life",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",

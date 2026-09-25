@@ -1073,7 +1073,10 @@ def _nothing_dormant():
                    # A whole number of sessions, as pt-v20 would carry it;
                    # tests/test_gdp_publication_lag.py carries the figure
                    # across a restore through its releases.
-                   gdp_publication_lag=21.0)
+                   gdp_publication_lag=21.0,
+                   # A few months, so the impulse is well short of its drive
+                   # and a restore that lost it would move the next release.
+                   unemployment_adjustment_half_life=84.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

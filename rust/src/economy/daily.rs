@@ -277,6 +277,11 @@ pub struct DailyInputs<'a> {
     /// shipped behaviour exactly. See
     /// [`crate::params::ModelParams::phase_target_range_draw`].
     pub phase_target_range_draw: f64,
+    /// The share of the gap between the cyclical drive and the unemployment
+    /// impulse closed at each monthly release: `1 - 0.5^(month / half_life)`
+    /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
+    /// and the release adds the drive whole, as it always has.
+    pub unemployment_adjustment: f64,
     /// The yield curve's daily dials (pt-v20). See [`YieldDials`].
     pub yields: YieldDials,
 }
@@ -349,6 +354,7 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
+            unemployment_adjustment: 0.0,
             yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
@@ -642,6 +648,24 @@ pub fn expected_return_spike_at_level(
     0.5 * (gain * down * moment(exponent) - gain_up * up * moment(exponent_up))
 }
 
+/// The monthly change in unemployment its cyclical drivers ask for: the
+/// phase's trend, Okun's law on `growth` (1 pp of growth below 2% is 0.2 pp
+/// a month) and the recovery's hiring above 1% growth. The three terms of
+/// the monthly release beside the NAIRU pull and the noise, with the same
+/// arithmetic; read by the release under `unemployment_adjustment_half_life`
+/// and by the engine to seed the impulse.
+pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f64) -> f64 {
+    let gdp_effect = (2.0 - growth) * 0.20;
+    let recovery_effect = if (phase == CyclePhase::Expansion || phase == CyclePhase::Recovery)
+        && growth > 1.0
+    {
+        -growth * 0.08
+    } else {
+        0.0
+    };
+    unemployment_trend * 0.3 + gdp_effect + recovery_effect
+}
+
 /// One simulated day of the macro chain.
 ///
 /// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
@@ -795,16 +819,38 @@ pub fn update_economy_daily(
         {
             recovery_effect = -new_state.gdp_growth * 0.08;
         }
-        new_state.unemployment_rate = clamp(
-            economy.unemployment_rate
-                + phase.unemployment_trend * 0.3
-                + gdp_effect
-                + nairu_pull
-                + recovery_effect
-                + random_normal(rng, 0.0, 0.06 * volatility),
-            2.5,
-            15.0,
-        );
+        // `unemployment_adjustment_half_life`: the cyclical drive reaches
+        // the rate through a partial adjustment, so a turn's step in growth
+        // and in the phase's trend builds into the monthly change over
+        // months, as unemployment rises through a real recession. A branch,
+        // so 0.0 is the expression that stood, operation for operation; the
+        // one noise draw is taken in the same place either way.
+        new_state.unemployment_rate = if inputs.unemployment_adjustment == 0.0 {
+            clamp(
+                economy.unemployment_rate
+                    + phase.unemployment_trend * 0.3
+                    + gdp_effect
+                    + nairu_pull
+                    + recovery_effect
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        } else {
+            let drive = unemployment_drive(
+                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth);
+            let impulse = economy.unemployment_impulse
+                + inputs.unemployment_adjustment * (drive - economy.unemployment_impulse);
+            new_state.unemployment_impulse = impulse;
+            clamp(
+                economy.unemployment_rate
+                    + impulse
+                    + nairu_pull
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        };
 
         let unemployment_change = new_state.unemployment_rate - economy.unemployment_rate;
         new_state.jobs_created = clamp(
@@ -1862,6 +1908,52 @@ mod vix_level_identity {
             assert_eq!(vix_after(&inputs), want, "moved at sigma = {}",
                        i as f64 * 0.05);
         }
+    }
+
+    /// `unemployment_adjustment`: off, a monthly release moves the rate by
+    /// the whole drive and leaves the impulse alone; on, it moves it by the
+    /// impulse, which closes that share of its gap to the drive, and every
+    /// other term (the NAIRU pull, the noise) is the one that stood.
+    #[test]
+    fn the_unemployment_release_adds_the_partially_adjusted_impulse() {
+        let mut e = economy();
+        e.cycle_phase = CyclePhase::Contraction;
+        e.gdp_growth = -1.5;
+        e.unemployment_impulse = 0.05;
+        // A month start.
+        let off_inputs = DailyInputs { game_day: DAYS_PER_MONTH, ..Default::default() };
+        let off = update_economy_daily(&e, &off_inputs, &mut Silent(0.5));
+        assert_eq!(off.unemployment_impulse, 0.05);
+        let a = 0.2;
+        let on_inputs = DailyInputs {
+            game_day: DAYS_PER_MONTH,
+            unemployment_adjustment: a,
+            ..Default::default()
+        };
+        let on = update_economy_daily(&e, &on_inputs, &mut Silent(0.5));
+        // Growth is set before unemployment reads it, the same in both.
+        assert_eq!(on.gdp_growth, off.gdp_growth);
+        // The drive the release read, from the two rises: off moves the rate
+        // by drive + pull + noise and on by impulse + pull + noise, with
+        // impulse = 0.05 + a (drive - 0.05), so the gap is (1 - a)(drive - 0.05).
+        let gap = (off.unemployment_rate - e.unemployment_rate)
+            - (on.unemployment_rate - e.unemployment_rate);
+        let drive = 0.05 + gap / (1.0 - a);
+        assert!((on.unemployment_impulse - (0.05 + a * (drive - 0.05))).abs() < 1e-12);
+        // It is the drive `unemployment_drive` gives on the release's growth
+        // (read before the day's later adjustments to growth, hence the
+        // tolerance): the contraction's trend and Okun's law on a growth
+        // near -4 per cent, about 1.3 pp a month, of which a fifth arrives.
+        let phase = phase_characteristics_for(e.cycle_phase, false);
+        let approx = unemployment_drive(phase.unemployment_trend, e.cycle_phase, on.gdp_growth);
+        assert!((drive - approx).abs() < 0.01, "{drive} {approx}");
+        assert!(drive > 1.0 && on.unemployment_rate - off.unemployment_rate < -0.9);
+        // Off a month start nothing moves either way.
+        let mid = DailyInputs { game_day: DAYS_PER_MONTH + 1, unemployment_adjustment: a,
+                                ..Default::default() };
+        let quiet = update_economy_daily(&e, &mid, &mut Silent(0.5));
+        assert_eq!(quiet.unemployment_impulse, 0.05);
+        assert_eq!(quiet.unemployment_rate, e.unemployment_rate);
     }
 
     /// And the mirror: at the identity it is read, monotonically, because

@@ -3873,6 +3873,12 @@ impl PyEngine {
                 self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
             econ.set_item("cycle_history", history)?;
         }
+        // Unemployment's impulse, in percentage points a month, only while
+        // `unemployment_adjustment_half_life` is set. A restore without it
+        // re-seeds from the economy restored.
+        if self.inner.params().unemployment_adjustment_half_life != 0.0 {
+            econ.set_item("unemployment_impulse", economy.unemployment_impulse)?;
+        }
         // The published GDP growth figure's state, in the economy's percent,
         // only while `gdp_publication_lag` is set, so every other snapshot is
         // the dict it was. `gdp_growth` above is the TRUE daily growth. A
@@ -4478,6 +4484,25 @@ impl PyEngine {
                     self.inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
                 }
                 None => self.inner.seed_cycle_history(),
+            }
+            // Unemployment's impulse (`unemployment_adjustment_half_life`).
+            // Refused where the dial is off; re-seeded from the economy just
+            // restored where the snapshot carries none.
+            match d.get_item("unemployment_impulse")? {
+                Some(v) => {
+                    if self.inner.params().unemployment_adjustment_half_life == 0.0 {
+                        return Err(ValidationError::new_err(
+                            "this snapshot carries an unemployment impulse, and this \
+                             engine's unemployment_adjustment_half_life is 0, so it keeps none"));
+                    }
+                    let impulse: f64 = v.extract()?;
+                    if !impulse.is_finite() {
+                        return Err(ValidationError::new_err(
+                            "this snapshot's unemployment_impulse is not finite"));
+                    }
+                    self.inner.economy_mut().unemployment_impulse = impulse;
+                }
+                None => self.inner.seed_unemployment_impulse(),
             }
             // The published GDP growth figure (`gdp_publication_lag`), put
             // back once `day_count` is: a snapshot without it re-seeds from

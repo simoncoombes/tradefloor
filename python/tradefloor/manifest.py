@@ -659,9 +659,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # the other states a dial turns on. `cycle_history` only on a model with
     # `cycle_publication_lag` set; hashed after the phase, below.
     # `gdp_publication` only on a model with `gdp_publication_lag` set;
-    # hashed after the history.
+    # hashed after the history. `unemployment_impulse` only on a model with
+    # `unemployment_adjustment_half_life` set; hashed before it.
     economy_expected = set(_ECONOMY_KEYS) | (
-        {"earnings_cycle", "cycle_history", "gdp_publication"} & set(economy))
+        {"earnings_cycle", "cycle_history", "gdp_publication",
+         "unemployment_impulse"} & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -692,6 +694,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(history))
         for phase in history:
             _text(buf, phase)
+    # Unemployment's impulse, only while `unemployment_adjustment_half_life`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "unemployment_impulse" in economy:
+        _f64(buf, economy["unemployment_impulse"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.

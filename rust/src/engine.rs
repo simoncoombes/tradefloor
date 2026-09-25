@@ -1165,6 +1165,9 @@ impl Engine {
                 cb.next_meeting_date = cb.last_meeting_date + cal.scale_days(45) * 24 * 60;
             }
         }
+        // Unemployment's impulse opens at the drive of the economy it opens
+        // in, so the adjustment starts stationary; the burn-in then runs it.
+        engine.seed_unemployment_impulse();
         if settle_opening {
             engine.burn_in_economy();
         }
@@ -1183,6 +1186,30 @@ impl Engine {
         // Likewise the growth the run opens at, as day 0 of quarter 0.
         engine.seed_gdp_publication(0);
         engine
+    }
+
+    /// The share of the gap to its drive unemployment's impulse closes at a
+    /// monthly release, from `unemployment_adjustment_half_life`; 0.0 off.
+    fn unemployment_adjustment(&self) -> f64 {
+        let h = self.params.unemployment_adjustment_half_life;
+        if h == 0.0 {
+            return 0.0;
+        }
+        1.0 - crate::mathx::pow(0.5, self.macro_calendar().month_f64() / h)
+    }
+
+    /// Set unemployment's impulse to what its cyclical drivers ask for in
+    /// the economy as it stands: at construction, or on a restore from a
+    /// snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_unemployment_impulse(&mut self) {
+        if self.params.unemployment_adjustment_half_life == 0.0 {
+            return;
+        }
+        let e = &self.economy;
+        let phase = crate::economy::phase_characteristics_for(
+            e.cycle_phase, self.params.cycle_us_calibration != 0.0);
+        self.economy.unemployment_impulse = crate::economy::daily::unemployment_drive(
+            phase.unemployment_trend, e.cycle_phase, e.gdp_growth);
     }
 
     /// `gdp_publication_lag` in sessions; 0 is off.
@@ -4939,6 +4966,7 @@ impl Engine {
                 oil_seasonality_target: self.params.oil_seasonality_target,
                 trough_growth_floor: self.params.trough_growth_floor,
                 phase_target_range_draw: self.params.phase_target_range_draw,
+                unemployment_adjustment: self.unemployment_adjustment(),
                 yields: crate::economy::daily::YieldDials {
                     treasury_10y_noise: self.params.treasury_10y_noise,
                     treasury_2y_noise: self.params.treasury_2y_noise,
@@ -6356,6 +6384,11 @@ impl Engine {
             for phase in &self.cycle_history {
                 hash_str(&mut buf, phase.as_str());
             }
+        }
+        // Unemployment's impulse, only while
+        // `unemployment_adjustment_half_life` is set.
+        if self.params.unemployment_adjustment_half_life != 0.0 {
+            hash_f64(&mut buf, e.unemployment_impulse);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the

@@ -396,6 +396,15 @@ OUT_OF_SCOPE = {
         "(0.8.5, pt-v20 work: the daily growth stepped at every turn of the "
         "cycle and gave the turn away, design repo "
         "programme/ptv20-status-2026-09-25.md)",
+    "unemployment_adjustment_half_life":
+        "inert at 0.0 as shipped: `DailyInputs::unemployment_adjustment` is "
+        "0.0 and the monthly release adds the whole cyclical drive, the "
+        "expression that stood; the impulse is never read or written. It "
+        "moves the TRUE unemployment rate when set (0.8.5, pt-v20 work: the "
+        "first release after a contraction began rose about 1.2 pp, four "
+        "times the spread of a release otherwise, and announced the turn; "
+        "84 sessions takes it to 0.16 pp, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "
