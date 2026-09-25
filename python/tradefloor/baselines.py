@@ -304,19 +304,21 @@ class _Trend:
     ``T`` approximates a 390-tick day per cadence (3x130 and 6x65 are
     exact; 12 does not divide 390, so that row runs 12x32 = 384 ticks):
 
-        3 steps/day x 130 ticks, lookback 3     +37.55%
-        6 steps/day x  65 ticks, lookback 6      +9.79%
-       12 steps/day x  32 ticks, lookback 12    -27.46%
+        3 steps/day x 130 ticks, lookback 3      -8.65%
+        6 steps/day x  65 ticks, lookback 6     -12.82%
+       12 steps/day x  32 ticks, lookback 12    -23.69%
 
-    The same signal over the same horizon earns about a quarter as much when
-    traded twice as often, and turns into a 27-point LOSS when traded four
+    The same signal over the same horizon loses half as much again when
+    traded twice as often, and nearly three times as much when traded four
     times as often. Nothing charges a fee: the orders simply cross a real
     spread and consume real depth more times. This is the impact model making
     "trade more" expensive on its own, which is the same mechanism that makes
-    "trade bigger" expensive. (Earlier docstrings read +103.13/+59.33/+24.08
-    pre-GJR and +97.45/+33.84/+0.10 before the pt-v12 era boundary. The three
-    above were re-measured on pretium 0.3.0 under `pt-v12`. Re-measure after
-    any engine change rather than carrying these forward.)
+    "trade bigger" expensive. (Re-measured on 0.8.5 under `pt-v20`; `pt-v19`
+    read -13.24/-27.36/-46.53 on the same build, where the tape's one-step
+    reversal charged every rebalance as well. Earlier docstrings read
+    +37.55/+9.79/-27.46 on pretium 0.3.0 under `pt-v12`, +103.13/+59.33/
+    +24.08 pre-GJR and +97.45/+33.84/+0.10 before the pt-v12 era boundary.
+    Re-measure after any engine change rather than carrying these forward.)
     """
 
     sign = 1.0
