@@ -18,13 +18,13 @@
 #   30 per cent off every company's earnings in a contraction and gives it
 #   back in the recovery, at a 60-session half-life. This file's own cut
 #   stacks on it. Together they fall about 54 per cent by day 301, where
-#   S&P 500 operating earnings fell about half from their 2007 peak to early
-#   2009. They stay down to day 427, then the file gives back a fifth of its
-#   cut's level over four quarters and the rest over the next four. With the
-#   cycle's own recovery, earnings are then about 78 per cent of their
-#   pre-shock level a year after day 428 and all of it two years after.
-#   Operating earnings were about 90 per cent of the peak in 2010 and past
-#   it in 2011.
+#   S&P 500 operating earnings (four quarters trailing) fell 57 per cent,
+#   from $91.47 in Q2 2007 to $39.61 in Q3 2009. They stay down to day 427,
+#   then the file gives back a fifth of its cut's level over four quarters
+#   and the rest over the next four. With the cycle's own recovery, earnings
+#   are then about 78 per cent of their pre-shock level a year after day 428
+#   and all of it two years after. Operating earnings were about $84 in 2010
+#   (92 per cent of the peak) and about $96 in 2011, past it.
 # - Credit is 150 basis points wider for the 18 months of the NBER
 #   contraction. It then comes back to its day-50 level over a year, and
 #   eases 110 basis points more over the next 18 months, then is released
