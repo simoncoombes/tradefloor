@@ -212,6 +212,11 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
+    "rate_pe_sensitivity":
+        "the P/E compression per unit of yield, a constant (1.5) until it "
+        "became a dial at 0.8.5 at the value it carried. Read on the shipped "
+        "path at every valuation of every name, so 1.5 is a choice, and one "
+        "the 2022 P/E response measures at about three times that",
     "earnings_cycle_half_life":
         "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
         "how fast earnings reach the phase's level. Unread while "
@@ -378,6 +383,45 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "cycle_publication_lag":
+        "inert at 0.0 as shipped: `Engine::published_cycle_phase` returns "
+        "the phase the economy is in and no history is kept. It moves what "
+        "the engine reports as the phase, never a price or a draw (0.8.5, "
+        "pt-v20 work: the published phase predicted returns, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
+    "gdp_publication_lag":
+        "inert at 0.0 as shipped: `Engine::published_gdp_growth` returns "
+        "the growth the economy runs at and no quarter is averaged. It moves "
+        "what the engine reports as GDP growth, never a price or a draw "
+        "(0.8.5, pt-v20 work: the daily growth stepped at every turn of the "
+        "cycle and gave the turn away, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
+    "unemployment_adjustment_half_life":
+        "inert at 0.0 as shipped: `DailyInputs::unemployment_adjustment` is "
+        "0.0 and the monthly release adds the whole cyclical drive, the "
+        "expression that stood; the impulse is never read or written. It "
+        "moves the TRUE unemployment rate when set (0.8.5, pt-v20 work: the "
+        "first release after a contraction began rose about 1.2 pp, four "
+        "times the spread of a release otherwise, and announced the turn; "
+        "84 sessions takes it to 0.16 pp, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
+    "fear_greed_published_inputs":
+        "inert at 0.0 as shipped: `DailyInputs::fear_greed_published` is "
+        "None and the index reads the economy's own phase and growth, the "
+        "expression that stood; with both publication lags at 0 the switch "
+        "is inert as well. Nothing a price, the bank, the cycle or a draw "
+        "reads is downstream of the index (0.8.5, pt-v20 work: the index "
+        "fell about 35 points in the five sessions after a contraction "
+        "began, design repo programme/ptv20-status-2026-09-25.md)",
+    "macro_publication_repricing":
+        "inert at 0.0 as shipped: `Engine::published_macro_marks` returns "
+        "None, so `reprice_to_published_macro` writes nothing and the close's "
+        "macro step reaches prices at the next session's first tick "
+        "(0.8.5, pt-v20 audit finding 3)",
+    "earnings_anticipation_half_life":
+        "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
+        "returns None and the valuation reads the earnings cycle's level "
+        "alone (0.8.5, pt-v20 work, grid ptv20e6)",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -1750,16 +1794,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # argument for reading the record and the table against each other
         # rather than either alone.
         "kind": "derived",
-        "presets": {"pt-v19": 0.7905, "pt-v20": 0.85},
-        "pt_v20": "pt-v20 departs from the identity on a measurement: with "
-                  "every stock-specific shock permanent and the market "
-                  "factor cut, 0.7905 left a name's |return| lag-1 "
-                  "autocorrelation at 0.034 on the one-year panel (pt-v19 "
-                  "0.049, the decade band's floor 0.04); 0.85 reads 0.044 "
-                  "and holds every registered row (design repository, "
-                  "grid ptv20e5, seventh registration). Its first-moment "
-                  "persistence is 1.001, held by the variance floor and "
-                  "ceiling",
+        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905},
         "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
                     "persistence identity solved for beta at the SHIPPED "
                     "alpha and gamma, with rho the tape's own per-name "
@@ -4120,6 +4155,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # `rate_pe_sensitivity` became a dial at 0.8.5 at the constant that
+    # stood, 1.5, which no record derives (POST_BASELINE says why it is in
+    # scope); the 2022 measurement that would set it is design repo
+    # programme/ptv20-scenario-size.md section 5.
+    "rate_pe_sensitivity",
     # `macro_calendar_days_per_year`, `macro_compound_days_per_year` and
     # `cycle_stationary_opening` left on 2026-09-23 with pt-v19's fifth
     # composition, which moves all three and carries an entry for each: the

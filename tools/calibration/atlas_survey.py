@@ -298,6 +298,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "earnings_cycle_depth": (0.0, 0.6),
     "earnings_cycle_upside": (0.0, 0.3),
     "earnings_cycle_sigma": (0.0, 0.005),
+    "earnings_anticipation_half_life": (0.0, 504.0),
+    # Moves what the engine reports as the phase, never a price.
+    "cycle_publication_lag": (0.0, 504.0),
+    # Moves what the engine reports as GDP growth, never a price.
+    "gdp_publication_lag": (0.0, 126.0),
+    # Unemployment's partial adjustment, 0 to half a year.
+    "unemployment_adjustment_half_life": (0.0, 126.0),
+    # A switch: the fear/greed index reads the published phase and growth.
+    "fear_greed_published_inputs": (0.0, 1.0),
+    "macro_publication_repricing": (0.0, 1.0),
     # The agent-facing book (2026-09-24): read only on an agent's path.
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),

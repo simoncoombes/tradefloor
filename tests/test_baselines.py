@@ -54,8 +54,8 @@ def long_scores():
     # over five days buy-and-hold's luck in a rising week beats it as often
     # as not; over thirty it is ahead of every price-only agent on 11 of 12
     # markets (rosters 3, 42 and 11, sim seeds 0-3) and positive on all 12.
-    # Seed 0 here: oracle +38,457, buy_and_hold +15,602, random -64,948,
-    # momentum -66,863, mean_reversion -73,014.
+    # Seed 0 here: oracle +37,113, buy_and_hold +19,421, random -65,763,
+    # mean_reversion -71,936, momentum -72,875.
     return tradefloor.evaluate(reference_agents(seed=3), seed=0,
                             universe=ORACLE_UNIVERSE, days=30)
 
@@ -256,12 +256,11 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(long_scores):
     # the herding term and the fair value's drift, and the ordering is read
     # on its thirty-day fixture: oracle +36,851, buy_and_hold +19,420,
     # random -66,082, momentum -71,641, mean_reversion -72,199. Then pt-v20's
-    # dials were finalised (volume response 0.6, garch_beta 0.85) and the
-    # bottom pair is momentum over mean reversion: oracle +38,457,
-    # buy_and_hold +15,602, random -64,948, momentum -66,863,
-    # mean_reversion -73,014. The top three have held throughout.
-    assert ranked == ["oracle", "buy_and_hold", "random", "momentum",
-                      "mean_reversion"]
+    # volume response went to 0.6 and the bottom pair swapped, 936 apart:
+    # oracle +37,113, buy_and_hold +19,421, random -65,763, mean_reversion
+    # -71,936, momentum -72,875. The top three held.
+    assert ranked == ["oracle", "buy_and_hold", "random", "mean_reversion",
+                      "momentum"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

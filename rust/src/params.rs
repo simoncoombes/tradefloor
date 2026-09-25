@@ -552,6 +552,113 @@ pub struct ModelParams {
     /// alone and takes no draw. Read only with `earnings_cycle_depth`
     /// non-zero.
     pub earnings_cycle_sigma: f64,
+    /// Half-life, in sessions, of the discount the valuation puts on the
+    /// earnings cycle's expected path. 0.0, which every preset through
+    /// pt-v19 carries, prices today's level alone, so a recession reaches
+    /// prices only as fast as earnings fall and a recovery only as they
+    /// recover: the index cannot fall at the turn and look through the dip,
+    /// as the S&P 500 did in 2020 (trough 23 March, earnings' trough the
+    /// quarter to June). Off zero, fair value reads the level averaged over
+    /// the expected path, `A = c e + g_phase`, from the cycle's own hazards
+    /// and the level's own pull (`Engine::earnings_anticipation_terms`):
+    /// a turn of phase moves it at once, and a trough reads above a
+    /// contraction because a recovery is near. Read only with
+    /// `earnings_cycle_depth` non-zero.
+    pub earnings_anticipation_half_life: f64,
+    /// P/E compression per unit of discount rate above neutral, times a
+    /// name's growth duration: the target multiple's rate adjustment is
+    /// `1 - (yield - neutral) * rate_pe_sensitivity * duration`. 1.5, which
+    /// every preset through pt-v19 carries, is the constant that stood,
+    /// about 2 per cent of fair value per 100 bp of the corporate yield at
+    /// the median duration; the S&P 500's trailing P/E fell 4.9 to 5.5 per
+    /// cent per 100 bp of Baa over 2022 (design repository,
+    /// programme/ptv20-scenario-size.md section 5).
+    pub rate_pe_sensitivity: f64,
+    /// Sessions between a turn of the business cycle and its publication.
+    /// 0.0, which every preset carries, publishes the phase the economy is
+    /// in. Off zero, every route that reports the phase -- `macro_fields`,
+    /// `macro_state`, and what reads them: a World's trace rows, a hosted
+    /// market log's cycle events -- reports the phase of this many sessions
+    /// before, as the NBER dates a recession about a year after it began,
+    /// and a turn is announced when it is published. The true phase stays
+    /// internal: the earnings cycle, the anticipated earnings path, the
+    /// hazards and the stress read it, and a scenario that sets the phase
+    /// sets the true one at once. Before this many sessions have closed
+    /// the opening phase is published. A whole number of sessions; the
+    /// engine keeps the last `lag + 1` phases (`Engine::published_cycle_phase`),
+    /// and its snapshot and state hash carry them only while this is set.
+    pub cycle_publication_lag: f64,
+    /// Sessions between the end of a quarter and the publication of its GDP
+    /// growth, as the BEA's advance estimate comes about a month after the
+    /// quarter. 0.0, which every preset carries, is off: `gdp_growth` is
+    /// reported daily, as the economy runs it. Off zero, every route that
+    /// reports growth -- `macro_fields["gdp_growth"]` and the recorded
+    /// `macro_table()`, and what reads them: a dataset export's
+    /// `macro.arrow`, an explanation's state -- reports a QUARTERLY figure,
+    /// the mean of the true daily growth over the macro calendar's quarter
+    /// (`MacroCalendar::days_per_quarter`, 63 sessions on the 252-session
+    /// calendar, 90 on the shipped one; day 0, the opening, is the first
+    /// day of quarter 0), released on the close this many sessions after
+    /// the quarter's last day. Before the first release the opening growth
+    /// is published. The true daily growth stays internal: output, earnings,
+    /// unemployment, the cycle's hazards and the central bank read it, a pin
+    /// sets it at once, and `state_snapshot()` carries it. A whole number of
+    /// sessions; lag 0 with quarterly averaging is not offered, since no
+    /// agency publishes on the quarter's last day (`Engine::published_gdp_growth`).
+    /// The snapshot and the state hash carry its state only while this is set.
+    pub gdp_publication_lag: f64,
+    /// The half-life, in sessions, of unemployment's response to its
+    /// cyclical drivers. 0.0, which every preset carries, is off: at each
+    /// monthly release the rate moves by the whole of what the phase's trend
+    /// and Okun's law on the day's growth ask for, so the first release
+    /// after a contraction begins carries a rise of about 1.2 pp (desk seeds
+    /// 201-212, 2026-09-25), four times the spread of a release otherwise,
+    /// and announces the turn. At 84 sessions it is 0.16 pp.
+    /// Off zero, the monthly change is an impulse partially adjusted toward
+    /// that drive, closing `1 - 0.5^(month / half_life)` of the gap at each
+    /// release (`EconomyState::unemployment_impulse`), so the rise builds
+    /// over months: UNRATE went from 4.3 to 5.5 over the 2001 recession and
+    /// from 5.0 to 9.5 over December 2007 to June 2009, a first month of
+    /// 0.1 to 0.3 pp each time. The NAIRU pull and the noise act as before.
+    /// It moves the TRUE unemployment rate and so everything that reads it
+    /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
+    /// and the state hash carry the impulse only while this is set.
+    pub unemployment_adjustment_half_life: f64,
+    /// A switch, 0.0 or 1.0. 0.0, which every preset carries, is off: the
+    /// fear/greed index's target reads the business-cycle phase (a bonus of
+    /// +15 in an expansion to -25 in a contraction) and the GDP growth the
+    /// economy runs at, so it falls about 35 points in the five sessions
+    /// after a contraction begins and announces the turn. On, it reads them
+    /// as published (`cycle_publication_lag`, `gdp_publication_lag`), so it
+    /// steps when the turn is published, which is public already. It moves
+    /// the index itself, and through it consumer confidence, housing,
+    /// copper and gold; nothing a price, the bank, the cycle or a draw
+    /// reads. With both lags at 0 it is the index that stood. No state.
+    pub fear_greed_published_inputs: f64,
+    /// Whether a name's price takes the change the close's macro step makes
+    /// to its fair value at the moment the step is published, rather than
+    /// at the next session's first tick. 0.0, which every preset through
+    /// pt-v20 carries, leaves it to the tick: the central bank meets at the
+    /// close, the new policy rate, corporate yield and cycle are readable
+    /// from then on, and the price stays at the day's last print until the
+    /// first tick of the next session re-values the name, so an agent that
+    /// reads the decision fills at the price from before it. On pt-v20 with
+    /// its leading dials (anticipation 126, rate sensitivity 3, buyback
+    /// share 0.75) the index's first 65 minutes after a published hike fell
+    /// 76 bp (se 5) from that price and after a cut rose 171 (se 36), and
+    /// the published corporate yield's overnight change correlated -0.32
+    /// with the next session's return (pt-v20 audit, finding 3). A real
+    /// FOMC statement is priced within minutes: event studies read the
+    /// S&P 500's whole response inside a 30-minute window around it
+    /// (Gurkaynak, Sack and Swanson 2005; Bernanke and Kuttner 2005). 1.0
+    /// re-marks every name that has traded as the step ends, to the price
+    /// its premium over fair value implies on the published state, so its
+    /// mispricing `s` is unchanged and the next tick starts from the model
+    /// price the published state implies. A `pin_macro` re-marks the same
+    /// way. The move sits between the day's last print and the next open,
+    /// where a decision announced after the close lands. No draw. A switch.
+    /// See `Engine::reprice_to_published_macro`.
+    pub macro_publication_repricing: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -4985,6 +5092,13 @@ impl ModelParams {
             earnings_cycle_upside: 0.0,
             earnings_cycle_half_life: 60.0,
             earnings_cycle_sigma: 0.0,
+            earnings_anticipation_half_life: 0.0,
+            rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
+            cycle_publication_lag: 0.0,
+            gdp_publication_lag: 0.0,
+            unemployment_adjustment_half_life: 0.0,
+            fear_greed_published_inputs: 0.0,
+            macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -6902,8 +7016,7 @@ impl ModelParams {
     /// `jump_intensity_market` take the transient part down by as much.
     /// With less market noise a name's volume tracks its own move more
     /// tightly, so `volume_move_response` 0.6 keeps that tie inside the
-    /// certified band at every horizon. `garch_beta` 0.85 gives a name's
-    /// volatility back the short-lag memory the permanent share took.
+    /// certified band at every horizon.
     ///
     /// A LIMIT. The model's inflation almost never leaves the under-3-per-
     /// cent regime, so stocks and Treasuries are always in flight to
@@ -6972,17 +7085,6 @@ impl ModelParams {
         // ceiling at every horizon measured (design repository,
         // programme/results/ptv20/d1screen.py and the fifth registration).
         p.volume_move_response = 0.6;
-        // VOLATILITY MEMORY. With every stock-specific shock permanent and
-        // the market factor cut, a name's |return| lag-1 autocorrelation
-        // fell to 0.034 on the one-year panel (pt-v19 0.049, the decade
-        // band's floor 0.04). A name's GJR persistence restores it: 0.85
-        // reads 0.044 at 252 sessions and 0.053 at 504 (grid ptv20e5, 30
-        // histories; 0.88 reads 0.052 and 0.060), and every long-run row
-        // and certification cell holds. It takes the GJR's first-moment
-        // persistence, alpha + beta + gamma/2, from 0.942 to 1.001, so the
-        // per-name variance is held by its 0.25x floor and 5x ceiling
-        // rather than by its own reversion.
-        p.garch_beta = 0.85;
         p
     }
 
@@ -7215,6 +7317,13 @@ impl ModelParams {
             "earnings_cycle_upside" => self.earnings_cycle_upside,
             "earnings_cycle_half_life" => self.earnings_cycle_half_life,
             "earnings_cycle_sigma" => self.earnings_cycle_sigma,
+            "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
+            "rate_pe_sensitivity" => self.rate_pe_sensitivity,
+            "cycle_publication_lag" => self.cycle_publication_lag,
+            "gdp_publication_lag" => self.gdp_publication_lag,
+            "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
+            "fear_greed_published_inputs" => self.fear_greed_published_inputs,
+            "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7452,6 +7561,13 @@ impl ModelParams {
             "earnings_cycle_upside" => out.earnings_cycle_upside = value,
             "earnings_cycle_half_life" => out.earnings_cycle_half_life = value,
             "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
+            "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
+            "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
+            "cycle_publication_lag" => out.cycle_publication_lag = value,
+            "gdp_publication_lag" => out.gdp_publication_lag = value,
+            "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
+            "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
+            "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7794,6 +7910,7 @@ impl ModelParams {
                           ("closing_auction", self.closing_auction),
                           ("flight_to_quality_day", self.flight_to_quality_day),
                           ("corporate_yield_daily", self.corporate_yield_daily),
+                          ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting)] {
             if !(v == 0.0 || v == 1.0) {
@@ -7823,6 +7940,47 @@ impl ModelParams {
             return Err(format!(
                 "earnings_cycle_half_life is {}. It is a half-life in sessions, in [1, 2520].",
                 self.earnings_cycle_half_life));
+        }
+        if !(self.earnings_anticipation_half_life >= 0.0
+            && self.earnings_anticipation_half_life <= 5040.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
+                self.earnings_anticipation_half_life));
+        }
+        if !(self.rate_pe_sensitivity >= 0.0 && self.rate_pe_sensitivity <= 10.0) {
+            return Err(format!(
+                "rate_pe_sensitivity is {}. It is P/E compression per unit of yield, in [0, 10].",
+                self.rate_pe_sensitivity));
+        }
+        if !(self.cycle_publication_lag >= 0.0 && self.cycle_publication_lag <= 2520.0
+            && self.cycle_publication_lag.fract() == 0.0)
+        {
+            return Err(format!(
+                "cycle_publication_lag is {}. It is a whole number of sessions, in [0, 2520]; 0 is off.",
+                self.cycle_publication_lag));
+        }
+        if !(self.gdp_publication_lag >= 0.0 && self.gdp_publication_lag <= 2520.0
+            && self.gdp_publication_lag.fract() == 0.0)
+        {
+            return Err(format!(
+                "gdp_publication_lag is {}. It is a whole number of sessions after a quarter's \
+                 last day, in [0, 2520]; 0 is off (growth reported daily).",
+                self.gdp_publication_lag));
+        }
+        if !(self.unemployment_adjustment_half_life >= 0.0
+            && self.unemployment_adjustment_half_life <= 2520.0)
+        {
+            return Err(format!(
+                "unemployment_adjustment_half_life is {}. It is a half-life in sessions, \
+                 in [0, 2520]; 0 is off.",
+                self.unemployment_adjustment_half_life));
+        }
+        if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
+            return Err(format!(
+                "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
+                 true phase and growth) or 1 (it reads them as published).",
+                self.fear_greed_published_inputs));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8257,6 +8415,13 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_cycle_upside",
         "earnings_cycle_half_life",
         "earnings_cycle_sigma",
+        "earnings_anticipation_half_life",
+        "rate_pe_sensitivity",
+        "cycle_publication_lag",
+        "gdp_publication_lag",
+        "unemployment_adjustment_half_life",
+        "fear_greed_published_inputs",
+        "macro_publication_repricing",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",
@@ -8355,7 +8520,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
     }
     Some(match name {
         "daily_shock_cap" => mispricing::DAILY_SHOCK_CAP,
-        "rate_pe_sensitivity" => fv::RATE_PE_SENSITIVITY,
         "rate_adjustment_floor" => fv::RATE_ADJUSTMENT_FLOOR,
         "growth_duration_scale" => fv::GROWTH_DURATION_SCALE,
         "loss_making_price_to_book" => fv::LOSS_MAKING_PRICE_TO_BOOK,
@@ -8377,7 +8541,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
 fn carried_read_only_pairs() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = [
         "daily_shock_cap",
-        "rate_pe_sensitivity",
         "rate_adjustment_floor",
         "growth_duration_scale",
         "loss_making_price_to_book",

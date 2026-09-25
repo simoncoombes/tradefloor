@@ -594,6 +594,47 @@ pub struct Engine {
     /// pristine state takes no part in a tick, the state hash or the
     /// snapshot, so every such run is the one it was before this existed.
     book: crate::agent_book::BookState,
+
+    /// The phases the economy held at the last `cycle_publication_lag + 1`
+    /// closes, oldest first; the front is the phase published
+    /// ([`Engine::published_cycle_phase`]). Seeded at construction with the
+    /// opening phase, so until the lag's worth of sessions has closed the
+    /// opening phase is what an observer reads. Empty, never touched,
+    /// unsnapshotted and unhashed while the dial is 0.0, which every preset
+    /// carries, so such an engine is the engine it was before this existed.
+    cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
+
+    /// The GDP growth figure as published under `gdp_publication_lag`, and
+    /// what it is computed from: the quarter being averaged and the
+    /// quarters averaged and awaiting release. Seeded at construction with
+    /// the opening growth. Default, never touched, unsnapshotted and
+    /// unhashed while the dial is 0.0, which every preset carries.
+    gdp_publication: GdpPublication,
+}
+
+/// The state behind the published GDP growth figure
+/// (`gdp_publication_lag`), in the economy's percent.
+///
+/// Quarters are the macro calendar's own ([`crate::economy::MacroCalendar::days_per_quarter`]):
+/// day `d` belongs to quarter `d.div_euclid(q)`, the quarter whose first
+/// close takes the quarterly GDP step in `economy::daily`, and day 0, the
+/// opening, belongs to quarter 0. A quarter's figure is the mean of the true
+/// growth after each of its closes (the opening's value on day 0), and it is
+/// released on the close `lag` sessions after the quarter's last day.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GdpPublication {
+    /// The figure an observer reads: the last quarter released, or the
+    /// opening growth before the first release.
+    pub published: f64,
+    /// The quarter being averaged.
+    pub quarter: i64,
+    /// Closes averaged so far in that quarter.
+    pub count: u32,
+    /// Their growth, summed.
+    pub sum: f64,
+    /// Quarters averaged and not yet released, oldest first: the close on
+    /// which each is released, and its figure.
+    pub pending: std::collections::VecDeque<(i64, f64)>,
 }
 
 impl Engine {
@@ -1110,6 +1151,8 @@ impl Engine {
             last_market_targets: None,
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
+            cycle_history: std::collections::VecDeque::new(),
+            gdp_publication: GdpPublication::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -1122,6 +1165,9 @@ impl Engine {
                 cb.next_meeting_date = cb.last_meeting_date + cal.scale_days(45) * 24 * 60;
             }
         }
+        // Unemployment's impulse opens at the drive of the economy it opens
+        // in, so the adjustment starts stationary; the burn-in then runs it.
+        engine.seed_unemployment_impulse();
         if settle_opening {
             engine.burn_in_economy();
         }
@@ -1133,7 +1179,306 @@ impl Engine {
         if engine.params.earnings_cycle_depth != 0.0 {
             engine.economy.earnings_cycle = engine.earnings_cycle_target();
         }
+        engine.refresh_earnings_anticipation();
+        // After the burn-in and the stationary opening, so the phase the
+        // run opens in is the one published until the lag has elapsed.
+        engine.seed_cycle_history();
+        // Likewise the growth the run opens at, as day 0 of quarter 0.
+        engine.seed_gdp_publication(0);
         engine
+    }
+
+    /// The share of the gap to its drive unemployment's impulse closes at a
+    /// monthly release, from `unemployment_adjustment_half_life`; 0.0 off.
+    fn unemployment_adjustment(&self) -> f64 {
+        let h = self.params.unemployment_adjustment_half_life;
+        if h == 0.0 {
+            return 0.0;
+        }
+        1.0 - crate::mathx::pow(0.5, self.macro_calendar().month_f64() / h)
+    }
+
+    /// Set unemployment's impulse to what its cyclical drivers ask for in
+    /// the economy as it stands: at construction, or on a restore from a
+    /// snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_unemployment_impulse(&mut self) {
+        if self.params.unemployment_adjustment_half_life == 0.0 {
+            return;
+        }
+        let e = &self.economy;
+        let phase = crate::economy::phase_characteristics_for(
+            e.cycle_phase, self.params.cycle_us_calibration != 0.0);
+        self.economy.unemployment_impulse = crate::economy::daily::unemployment_drive(
+            phase.unemployment_trend, e.cycle_phase, e.gdp_growth);
+    }
+
+    /// `gdp_publication_lag` in sessions; 0 is off.
+    pub fn gdp_publication_lag(&self) -> i64 {
+        self.params.gdp_publication_lag as i64
+    }
+
+    /// GDP growth as published, in percent: the mean of the true daily
+    /// growth over the last macro-calendar quarter released, released
+    /// `gdp_publication_lag` sessions after that quarter's last close, and
+    /// the opening growth until the first release. With the dial at 0.0 the
+    /// growth the economy runs at, `economy().gdp_growth`.
+    ///
+    /// Every route that REPORTS growth reads this; everything that MOVES on
+    /// it (output, earnings, unemployment, the cycle's hazards, the central
+    /// bank) reads the true figure.
+    pub fn published_gdp_growth(&self) -> f64 {
+        if self.params.gdp_publication_lag == 0.0 {
+            return self.economy.gdp_growth;
+        }
+        self.gdp_publication.published
+    }
+
+    /// The published figure and the quarters behind it. Default with the
+    /// dial at 0.0.
+    pub fn gdp_publication(&self) -> &GdpPublication {
+        &self.gdp_publication
+    }
+
+    /// Put the published figure's state back (a restore). Refuses any
+    /// state while the dial is 0.0, a quarter with no close averaged,
+    /// non-finite figures, and releases out of order.
+    pub fn set_gdp_publication(&mut self, state: GdpPublication) -> Result<(), String> {
+        if self.params.gdp_publication_lag == 0.0 {
+            return Err(
+                "this snapshot carries a published GDP growth state, and this \
+                 engine's gdp_publication_lag is 0, so it keeps none".to_string());
+        }
+        if state.count == 0 {
+            return Err(
+                "this snapshot's published GDP growth state averages no close \
+                 in its quarter; gdp_publication_lag's state always holds one".to_string());
+        }
+        let finite = state.published.is_finite() && state.sum.is_finite()
+            && state.pending.iter().all(|&(_, v)| v.is_finite());
+        if !finite {
+            return Err(
+                "this snapshot's published GDP growth state (gdp_publication_lag) \
+                 carries a non-finite figure".to_string());
+        }
+        if state.pending.iter().zip(state.pending.iter().skip(1)).any(|(a, b)| a.0 >= b.0) {
+            return Err(
+                "this snapshot's pending GDP releases (gdp_publication_lag) are \
+                 not in release order".to_string());
+        }
+        self.gdp_publication = state;
+        Ok(())
+    }
+
+    /// Start the published figure at the growth the economy holds now,
+    /// taken as the value of `day`, the last day closed: the opening (day
+    /// 0), or a restore from a snapshot that carried no state. The quarter
+    /// `day` falls in is averaged from this value on; nothing is pending.
+    /// Nothing with the dial at 0.0.
+    pub fn seed_gdp_publication(&mut self, day: i64) {
+        if self.params.gdp_publication_lag == 0.0 {
+            self.gdp_publication = GdpPublication::default();
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let g = self.economy.gdp_growth;
+        self.gdp_publication = GdpPublication {
+            published: g,
+            quarter: day.div_euclid(q),
+            count: 1,
+            sum: g,
+            pending: std::collections::VecDeque::new(),
+        };
+    }
+
+    /// The close of `day` into the published figure: a new quarter closes
+    /// the one before (its mean queued for release `lag` sessions after its
+    /// last day), the day's growth joins its quarter, and every release due
+    /// by this close is published, the latest last. Nothing with the dial
+    /// at 0.0.
+    fn record_gdp_growth(&mut self, day: i64) {
+        let lag = self.gdp_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let quarter = day.div_euclid(q);
+        let growth = self.economy.gdp_growth;
+        let p = &mut self.gdp_publication;
+        if quarter != p.quarter {
+            if p.count > 0 {
+                let last_day = (p.quarter + 1) * q - 1;
+                p.pending.push_back((last_day + lag, p.sum / f64::from(p.count)));
+            }
+            p.quarter = quarter;
+            p.count = 0;
+            p.sum = 0.0;
+        }
+        p.sum += growth;
+        p.count += 1;
+        while let Some(&(release, value)) = p.pending.front() {
+            if release > day {
+                break;
+            }
+            p.published = value;
+            p.pending.pop_front();
+        }
+    }
+
+    /// `cycle_publication_lag` in sessions; 0 is off.
+    pub fn cycle_publication_lag(&self) -> usize {
+        self.params.cycle_publication_lag as usize
+    }
+
+    /// The business-cycle phase as published: the phase the economy held at
+    /// the close `cycle_publication_lag` sessions ago, or the opening phase
+    /// while fewer than that many sessions have closed. With the dial at 0.0
+    /// the phase the economy is in, `economy().cycle_phase`.
+    ///
+    /// Every route that REPORTS the phase reads this; everything that PRICES
+    /// or MOVES on it (the earnings cycle and its anticipation, the cycle's
+    /// hazards, the stress intensity, the central bank) reads the true phase.
+    pub fn published_cycle_phase(&self) -> crate::economy::CyclePhase {
+        if self.params.cycle_publication_lag == 0.0 {
+            return self.economy.cycle_phase;
+        }
+        self.cycle_history.front().copied().unwrap_or(self.economy.cycle_phase)
+    }
+
+    /// The phase history the published phase is read from, oldest first:
+    /// `cycle_publication_lag + 1` phases, the last the current one as of
+    /// the last close. Empty with the dial at 0.0.
+    pub fn cycle_history(&self) -> &std::collections::VecDeque<crate::economy::CyclePhase> {
+        &self.cycle_history
+    }
+
+    /// Put a phase history back (a restore). Refuses one whose length is not
+    /// `cycle_publication_lag + 1`, or any history while the dial is 0.0.
+    pub fn set_cycle_history(
+        &mut self,
+        history: Vec<crate::economy::CyclePhase>,
+    ) -> Result<(), String> {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            if history.is_empty() {
+                return Ok(());
+            }
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and this engine's cycle_publication_lag is 0, so it keeps none",
+                history.len()));
+        }
+        if history.len() != lag + 1 {
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and cycle_publication_lag {} keeps {}",
+                history.len(), lag, lag + 1));
+        }
+        self.cycle_history = history.into();
+        Ok(())
+    }
+
+    /// Fill the history with the current phase: the opening, or a restore
+    /// from a snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_cycle_history(&mut self) {
+        let lag = self.cycle_publication_lag();
+        self.cycle_history.clear();
+        if lag > 0 {
+            self.cycle_history.extend(std::iter::repeat(self.economy.cycle_phase).take(lag + 1));
+        }
+    }
+
+    /// Record the phase the close has left the economy in, and drop the
+    /// oldest. Nothing with the dial at 0.0.
+    fn record_cycle_phase(&mut self) {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        self.cycle_history.push_back(self.economy.cycle_phase);
+        while self.cycle_history.len() > lag + 1 {
+            self.cycle_history.pop_front();
+        }
+    }
+
+    /// The anticipated earnings level's phase terms, `g_p` in
+    /// [`crate::economy::cycle::phase_cycle`] order, and its weight `c` on
+    /// the current level. `None` with the anticipation or the cycle off.
+    ///
+    /// # The derivation
+    ///
+    /// The valuation reads `A = E[ integral rho e^(-rho s) e(t+s) ds ]`, the
+    /// earnings cycle's level averaged over the future with a discount of
+    /// `rho = ln 2 / earnings_anticipation_half_life` a session. The level
+    /// follows the engine's own law, `de = kappa (T_p - e)` with `kappa =
+    /// ln 2 / earnings_cycle_half_life` toward the phase's target `T_p`
+    /// (`-depth` in a contraction or a trough, `+depth * upside` otherwise),
+    /// and the phase leaves at the rate `lambda_p = 1 / E[T_p]`, its mean
+    /// sojourn on the engine's own hazard table (`mean_sojourn_days_for`),
+    /// to the next phase of the cycle. Trying `A = c e + g_p` in the
+    /// generator equation `rho A = rho e + kappa (T_p - e) dA/de +
+    /// lambda_p (A_next - A)` gives `c = rho / (rho + kappa)` and
+    /// `(rho + lambda_p) g_p = kappa c T_p + lambda_p g_next`, five linear
+    /// equations around the cycle, solved here in closed form.
+    ///
+    /// So a turn of phase moves `A` at once, by `g_next - g_p`, and a
+    /// trough, from which a recovery is nearer than from a contraction,
+    /// already reads above a contraction while the level is still falling:
+    /// the price's trough leads the earnings'. The sojourns are treated as
+    /// exponential, where the table's are Weibull; that is the one
+    /// approximation.
+    pub fn earnings_anticipation_terms(&self) -> Option<([f64; 5], f64)> {
+        let p = &self.params;
+        if p.earnings_anticipation_half_life <= 0.0 || p.earnings_cycle_depth == 0.0 {
+            return None;
+        }
+        let rho = std::f64::consts::LN_2 / p.earnings_anticipation_half_life;
+        let kappa = std::f64::consts::LN_2 / p.earnings_cycle_half_life;
+        let c = rho / (rho + kappa);
+        let (mean, _) = crate::economy::cycle::stationary_phase_shares_for(&self.cycle_spec());
+        let phases = crate::economy::cycle::phase_cycle();
+        let target = |ph: crate::economy::CyclePhase| match ph {
+            crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                -p.earnings_cycle_depth
+            }
+            _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+        };
+        let mut a = [0.0; 5];
+        let mut b = [0.0; 5];
+        for k in 0..5 {
+            let lambda = if mean[k] > 0.0 { 1.0 / mean[k] } else { 0.0 };
+            a[k] = kappa * c * target(phases[k]) / (rho + lambda);
+            b[k] = lambda / (rho + lambda);
+        }
+        // g_k = a_k + b_k g_(k+1): unroll once around the cycle for g_0,
+        // then walk backwards.
+        let mut acc_a = 0.0;
+        let mut acc_b = 1.0;
+        for k in 0..5 {
+            acc_a += acc_b * a[k];
+            acc_b *= b[k];
+        }
+        let mut g = [0.0; 5];
+        g[0] = acc_a / (1.0 - acc_b);
+        for k in (1..5).rev() {
+            let next = if k == 4 { g[0] } else { g[k + 1] };
+            g[k] = a[k] + b[k] * next;
+        }
+        Some((g, c))
+    }
+
+    /// Keep `economy.earnings_anticipation` current: `A - e`, or 0.0 with
+    /// the anticipation off. Called wherever the phase or the level moves.
+    pub fn refresh_earnings_anticipation(&mut self) {
+        self.economy.earnings_anticipation = match self.earnings_anticipation_terms() {
+            None => 0.0,
+            Some((g, c)) => {
+                let k = crate::economy::cycle::phase_cycle()
+                    .iter()
+                    .position(|ph| *ph == self.economy.cycle_phase)
+                    .unwrap_or(0);
+                g[k] + c * self.economy.earnings_cycle - self.economy.earnings_cycle
+            }
+        };
     }
 
     /// The level the earnings cycle is pulled toward in the current phase:
@@ -3760,9 +4105,10 @@ impl Engine {
                 }
                 _ => valuation,
             };
-            let fv = crate::fair_value::compute_fair_value_with(
+            let fv = crate::fair_value::compute_fair_value_at(
                 &valuation, &econ_view, p.fair_value_book_floor,
                 p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
+                p.rate_pe_sensitivity,
             )
             .fair_value;
             let price = crate::mathx::min(
@@ -4620,6 +4966,15 @@ impl Engine {
                 oil_seasonality_target: self.params.oil_seasonality_target,
                 trough_growth_floor: self.params.trough_growth_floor,
                 phase_target_range_draw: self.params.phase_target_range_draw,
+                unemployment_adjustment: self.unemployment_adjustment(),
+                // The phase and growth as an observer reads them tonight,
+                // before the step: the same moment the economy's own are
+                // read at with the switch off.
+                fear_greed_published: if self.params.fear_greed_published_inputs != 0.0 {
+                    Some((self.published_cycle_phase(), self.published_gdp_growth()))
+                } else {
+                    None
+                },
                 yields: crate::economy::daily::YieldDials {
                     treasury_10y_noise: self.params.treasury_10y_noise,
                     treasury_2y_noise: self.params.treasury_2y_noise,
@@ -4686,6 +5041,14 @@ impl Engine {
             self.economy.corporate_bond_yield = corporate_pinned_at;
         }
         self.macro_pins_today = 0;
+        self.refresh_earnings_anticipation();
+        // The close's phase into the published history. The burn-in runs
+        // this too, and the construction's seeding overwrites what it left.
+        self.record_cycle_phase();
+        // The close's growth into the published figure's quarter, and any
+        // release now due. The burn-in runs this too, and the
+        // construction's seeding overwrites what it left.
+        self.record_gdp_growth(request.game_day);
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
@@ -5089,13 +5452,124 @@ impl Engine {
         } else {
             0.0
         };
-        self.advance_day(&DayAdvanceRequest {
+        // The fair values the market stands on BEFORE the step, taken only
+        // with `macro_publication_repricing` on: the step's decision is
+        // readable the moment it ends, so the price takes it then.
+        let marks = self.published_macro_marks();
+        let outcome = self.advance_day(&DayAdvanceRequest {
             volatility: 1.0,
             active_shocks: &[],
             market_return_pct,
             game_day,
             timestamp: game_day * 24 * 60,
-        })
+        });
+        self.reprice_to_published_macro(marks);
+        outcome
+    }
+
+    /// Every name's fair value as the tick would read it on the state now
+    /// standing, at its current price and day, for
+    /// [`Engine::reprice_to_published_macro`]. `None`, computing nothing,
+    /// with `macro_publication_repricing` off. NaN for a name the re-mark
+    /// leaves alone: bankrupt, private, or not yet traded (no `s`), whose
+    /// first tick adopts its premium lazily and so moves nothing anyway.
+    pub fn published_macro_marks(&self) -> Option<Vec<f64>> {
+        if self.params.macro_publication_repricing == 0.0 {
+            return None;
+        }
+        Some(
+            self.companies
+                .iter()
+                .map(|c| {
+                    if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none()
+                        || !(c.stock.price > 0.0)
+                    {
+                        f64::NAN
+                    } else {
+                        crate::market::tick::tick_fair_value(
+                            &self.params, &self.economy, self.nominal_output_base,
+                            self.current_day, c, c.stock.price)
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    /// THE PRICE TAKES A MACRO DECISION WHEN IT IS PUBLISHED
+    /// (`macro_publication_repricing`).
+    ///
+    /// The close's macro step -- the economy, the cycle, the central bank's
+    /// meeting, the corporate yield it re-anchors -- is readable from the
+    /// moment it ends (`macro_fields`, `macro_state`, a World's trace), but
+    /// fair value only reached the price at the next session's first tick.
+    /// Everything in between, the evening and the opening step of any
+    /// harness, traded at the price from before the decision. Here each
+    /// name that has traded is re-marked as the step ends to the price its
+    /// premium over fair value implies on the published state: `price =
+    /// (last / fv_before) * fv_after(price)`, both fair values computed as
+    /// the tick computes them (`market::tick::tick_fair_value`) on the same
+    /// day, `fv_after` at the new price because the buyback term reads it.
+    /// The name's mispricing `s` is left as it was. The next tick therefore
+    /// starts on the model price the published state implies, and the move
+    /// sits between the day's last print and
+    /// the next open, which is where a decision announced after the close
+    /// lands on a real tape. `pin_macro` re-marks the same way, so a
+    /// scenario's written state is priced the moment it is readable too.
+    ///
+    /// No draw, no new state: the price is the state it writes, with the
+    /// market cap and the day's high and low beside it (the latter are
+    /// reset at the next open when the re-mark comes after a close).
+    /// `marks` is [`Engine::published_macro_marks`] taken before the change;
+    /// `None` does nothing.
+    pub fn reprice_to_published_macro(&mut self, marks: Option<Vec<f64>>) {
+        let Some(before) = marks else {
+            return;
+        };
+        let p = &self.params;
+        let economy = &self.economy;
+        let base = self.nominal_output_base;
+        let day = self.current_day;
+        for (c, &fv0) in self.companies.iter_mut().zip(before.iter()) {
+            if !(fv0 > 0.0) || c.is_bankrupt || !c.is_public {
+                continue;
+            }
+            let last = c.stock.price;
+            let fv1 = crate::market::tick::tick_fair_value(p, economy, base, day, c, last);
+            if !(fv1 > 0.0) || fv1 == fv0 {
+                continue;
+            }
+            // The price the name's mispricing implies on the published
+            // state: `price = (last / fv0) * fv(price)`. Fair value reads
+            // the price itself through the buyback term (the yield is
+            // earnings over price), so the first step, `last * fv1 / fv0`,
+            // is exact only with `buyback_payout_share` at 0.0; with it on,
+            // a re-mark that stopped there leaves the next tick to raise
+            // fair value by the buyback yield the lower price implies, and
+            // measured on pt-v20 with its leading dials that handed back 14
+            // bp of a 79 bp hike in the first 65 minutes. The fixed point
+            // is a contraction (the term's elasticity is the buyback yield
+            // times the years elapsed, well under one), so a few steps
+            // settle it; the loop stops when a step moves nothing, or at
+            // sixteen, and takes no draw.
+            let ratio = last / fv0;
+            let clamp = |x: f64| crate::mathx::min(crate::mathx::max(x, 0.01), p.price_hard_cap);
+            let mut price = clamp(ratio * fv1);
+            if p.buyback_payout_share != 0.0 {
+                for _ in 0..16 {
+                    let fv = crate::market::tick::tick_fair_value(p, economy, base, day, c, price);
+                    let next = clamp(ratio * fv);
+                    if next == price {
+                        break;
+                    }
+                    price = next;
+                }
+            }
+            let stock = &mut c.stock;
+            stock.price = price;
+            stock.high = crate::mathx::max(stock.high, price);
+            stock.low = crate::mathx::min(stock.low, price);
+            stock.market_cap = price * stock.shares_outstanding;
+        }
     }
 
     // ── State access ──────────────────────────────────────────────────────
@@ -6022,6 +6496,34 @@ impl Engine {
             hash_f64(&mut buf, value);
         }
         hash_str(&mut buf, e.cycle_phase.as_str());
+        // The published-phase history, only while `cycle_publication_lag`
+        // keeps one, so every other engine's hash is the one it was.
+        if self.params.cycle_publication_lag != 0.0 {
+            hash_u32(&mut buf, self.cycle_history.len() as u32);
+            for phase in &self.cycle_history {
+                hash_str(&mut buf, phase.as_str());
+            }
+        }
+        // Unemployment's impulse, only while
+        // `unemployment_adjustment_half_life` is set.
+        if self.params.unemployment_adjustment_half_life != 0.0 {
+            hash_f64(&mut buf, e.unemployment_impulse);
+        }
+        // The published GDP growth figure's state, only while
+        // `gdp_publication_lag` is set, so every other engine's hash is the
+        // one it was.
+        if self.params.gdp_publication_lag != 0.0 {
+            let p = &self.gdp_publication;
+            hash_f64(&mut buf, p.published);
+            hash_i64(&mut buf, p.quarter);
+            hash_u32(&mut buf, p.count);
+            hash_f64(&mut buf, p.sum);
+            hash_u32(&mut buf, p.pending.len() as u32);
+            for &(release, value) in &p.pending {
+                hash_i64(&mut buf, release);
+                hash_f64(&mut buf, value);
+            }
+        }
 
         // The central bank.
         let bank = &self.central_bank;
@@ -6757,6 +7259,127 @@ mod tests {
             sectors(),
             crate::params::PT_V19,
         )
+    }
+
+    /// `cycle_publication_lag`: off, the published phase is the true one and
+    /// no history is kept or hashed; on, the published phase is the phase
+    /// of `lag` closes before, the opening phase until then, and a pin is
+    /// the true phase at once and published `lag` closes after the close
+    /// that carried it.
+    #[test]
+    fn the_published_phase_lags_the_true_one_only_under_the_dial() {
+        use crate::economy::CyclePhase;
+        let off = engine(7);
+        assert!(off.cycle_history().is_empty());
+        assert_eq!(off.published_cycle_phase(), off.economy().cycle_phase);
+
+        let lag = 4usize;
+        let params = crate::params::ModelParams {
+            cycle_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let opening = e.economy().cycle_phase;
+        assert_eq!(e.cycle_history().len(), lag + 1);
+        let turned = if opening == CyclePhase::Trough { CyclePhase::Peak } else { CyclePhase::Trough };
+        e.economy_mut().cycle_phase = turned;
+        assert_eq!(e.published_cycle_phase(), opening);
+        let mut truth = vec![opening];
+        for day in 1..=12i64 {
+            e.advance_macro_day(day);
+            truth.push(e.economy().cycle_phase);
+            let d = day as usize;
+            assert_eq!(e.published_cycle_phase(), truth[d.saturating_sub(lag)], "day {d}");
+        }
+        assert_ne!(truth[1], opening);
+        // Hashed while set: the same engine with one phase of history
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut history: Vec<CyclePhase> = other.cycle_history().iter().copied().collect();
+        history[0] = if history[0] == CyclePhase::Expansion {
+            CyclePhase::Recovery
+        } else {
+            CyclePhase::Expansion
+        };
+        other.set_cycle_history(history).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        assert!(other.set_cycle_history(vec![opening; lag]).is_err());
+        assert!(engine(7).clone().set_cycle_history(vec![opening]).is_err());
+    }
+
+    /// `gdp_publication_lag`: off, the published growth is the true one and
+    /// no state is kept or hashed; on, it is the mean of each macro-calendar
+    /// quarter's true growth (day 0, the opening, included), released `lag`
+    /// closes after the quarter's last day, and the opening growth until then.
+    #[test]
+    fn the_published_growth_is_the_quarter_mean_released_late_only_under_the_dial() {
+        let off = engine(7);
+        assert_eq!(off.gdp_publication(), &GdpPublication::default());
+        assert_eq!(off.published_gdp_growth(), off.economy().gdp_growth);
+
+        let lag = 5i64;
+        let params = crate::params::ModelParams {
+            gdp_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let q = e.macro_calendar().days_per_quarter();
+        let opening = e.economy().gdp_growth;
+        assert_eq!(e.published_gdp_growth(), opening);
+        let mut truth = vec![opening];
+        let mut published = vec![opening];
+        for day in 1..=(2 * q + lag) {
+            e.advance_macro_day(day);
+            truth.push(e.economy().gdp_growth);
+            published.push(e.published_gdp_growth());
+        }
+        let mean = |k: i64| -> f64 {
+            let mut sum = 0.0;
+            for d in (k * q)..((k + 1) * q) {
+                sum += truth[d as usize];
+            }
+            sum / q as f64
+        };
+        for d in 0..published.len() as i64 {
+            let want = if d >= 2 * q - 1 + lag {
+                mean(1)
+            } else if d >= q - 1 + lag {
+                mean(0)
+            } else {
+                opening
+            };
+            assert_eq!(published[d as usize], want, "day {d}");
+        }
+        // Hashed while set: the same engine with one pending figure
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut state = other.gdp_publication().clone();
+        state.sum += 1.0;
+        other.set_gdp_publication(state).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        let mut empty = e.gdp_publication().clone();
+        empty.count = 0;
+        assert!(e.clone().set_gdp_publication(empty).is_err());
+        assert!(engine(7).clone().set_gdp_publication(GdpPublication {
+            count: 1,
+            ..GdpPublication::default()
+        }).is_err());
     }
 
     fn request(hour: i64, minute: i64) -> TickRequest<'static> {
@@ -8051,6 +8674,119 @@ mod tests {
         for i in 0..leaves.len() {
             for j in (i + 1)..leaves.len() {
                 assert_ne!(leaves[i], leaves[j], "days {i} and {j} share a leaf");
+            }
+        }
+    }
+
+    /// pt-v20 with every branch of the valuation live: the buyback term,
+    /// the earnings cycle and its anticipation, and the re-mark itself.
+    fn engine_repricing(seed: u32, on: bool) -> Engine {
+        let mut p = ModelParams::preset("pt-v20").expect("pt-v20 ships");
+        p.buyback_payout_share = 0.75;
+        p.earnings_anticipation_half_life = 126.0;
+        p.rate_pe_sensitivity = 3.0;
+        p.macro_publication_repricing = if on { 1.0 } else { 0.0 };
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            p,
+        )
+    }
+
+    #[test]
+    fn tick_fair_value_is_the_ticks_own_fundamental_to_the_bit() {
+        // The re-mark reads fair value through `tick_fair_value`, a copy of
+        // the tick's phase 2. If the two ever part, the re-mark prices a
+        // state the tick does not, and the first tick moves again.
+        //
+        // The tick's `fundamental` is the fair value AFTER its own
+        // permanent share of the minute's shocks (`fair_value_news_share`),
+        // which the re-mark has no reason to read, so both shares are off
+        // here and the column is the valuation the tick started from. The
+        // opening's levels, the nominal path, the earnings cycle and the
+        // buyback term (the day set, so it is live) all stay on.
+        let mut e = engine_repricing(21, false);
+        e.params.fair_value_news_share = 0.0;
+        e.params.fair_value_market_share = 0.0;
+        for day in 1..=3i64 {
+            e.set_current_day(day);
+            e.open_market();
+            for m in 0..30 {
+                let start = e.clone();
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                for (i, c) in start.companies().iter().enumerate() {
+                    // A name's first tick runs the opening, which writes its
+                    // fair-value level inside the tick; the re-mark never
+                    // reads a name that has not traded.
+                    if c.stock.mispricing_s.is_none() {
+                        continue;
+                    }
+                    let fv = crate::market::tick::tick_fair_value(
+                        start.params(), start.economy(), start.nominal_output_base(),
+                        start.current_day(), c, c.stock.price);
+                    assert_eq!(fv.to_bits(), e.tick_fundamental()[i].to_bits(),
+                               "day {day} minute {m} name {i}");
+                }
+            }
+            e.close_day(day);
+        }
+    }
+
+    #[test]
+    fn the_close_prices_what_its_macro_step_publishes() {
+        let mut on = engine_repricing(33, true);
+        let mut off = engine_repricing(33, false);
+        for day in 1..=6i64 {
+            for e in [&mut on, &mut off] {
+                // The day set, so the buyback term reads the price.
+                e.set_current_day(day);
+                e.open_market();
+                for m in 0..40 {
+                    e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                }
+                e.close_market(&DayCloseRequest {
+                    daily_innovations: &[None, None, None],
+                    sector_base_variances: &[0.0004, 0.0004, 0.0004],
+                    avg_volume: crate::market::AvgVolumePolicy::Hold,
+                });
+            }
+            // Pinned apart so every day's step moves fair value.
+            let bump = if day % 2 == 0 { 0.5 } else { -0.4 };
+            on.economy_mut().corporate_bond_yield += bump;
+            off.economy_mut().corporate_bond_yield += bump;
+            let last: Vec<f64> = on.prices();
+            let marks = on.published_macro_marks().expect("on");
+            assert!(off.published_macro_marks().is_none(), "off computes nothing");
+            let s_before: Vec<Option<f64>> =
+                on.companies().iter().map(|c| c.stock.mispricing_s).collect();
+            on.advance_macro_day(day);
+            off.advance_macro_day(day);
+            for (i, c) in on.companies().iter().enumerate() {
+                // The re-marked price is the one the name's mispricing
+                // implies on the published state, fair value read at that
+                // very price (the buyback term reads it).
+                let fv1 = crate::market::tick::tick_fair_value(
+                    on.params(), on.economy(), on.nominal_output_base(),
+                    on.current_day(), c, c.stock.price);
+                let want = last[i] / marks[i] * fv1;
+                assert!((c.stock.price / want - 1.0).abs() < 1e-13,
+                        "day {day} name {i}: {} against {want}", c.stock.price);
+                assert_eq!(c.stock.mispricing_s, s_before[i], "the re-mark leaves s alone");
+                assert!((c.stock.price / last[i] - 1.0).abs() > 1e-6, "the step moved fair value");
+            }
+            // Off, the close's price is the last print, as it always was.
+            let off_prices = off.prices();
+            let off_last: Vec<f64> = off.companies().iter().map(|c| c.stock.price).collect();
+            assert_eq!(off_prices, off_last);
+            // Put the pair back on one market for the next day, so each day
+            // tests the step alone.
+            let synced: Vec<f64> = on.prices();
+            for (c, p) in off.companies_mut().iter_mut().zip(synced.iter()) {
+                c.stock.price = *p;
+                c.stock.market_cap = *p * c.stock.shares_outstanding;
             }
         }
     }
