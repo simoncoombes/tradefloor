@@ -1,0 +1,11 @@
++ python tools/calibration/macro_range.py --candidates /home/ec2-user/out/macro-candidates.json --seeds 30 --years 5 --workers 48 --out /home/ec2-user/out/macro.json
+2 candidates x 30 seeds x 1260 days = 60 runs on 48 workers
+  25/60
+  50/60
+pt-v20               peak  3.09  sd 0.60  mean 2.60  ar1 0.916  crisis-days  0.1%  seeds>4% 5/30
+pt-v19               peak  3.11  sd 0.59  mean 2.70  ar1 0.922  crisis-days  0.0%  seeds>4% 2/30
+wrote /home/ec2-user/out/macro.json
+
+real	0m55.154s
+user	26m53.954s
+sys	0m0.670s

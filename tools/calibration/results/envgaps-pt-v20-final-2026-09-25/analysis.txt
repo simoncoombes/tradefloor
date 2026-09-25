@@ -1,0 +1,65 @@
+== decay
+pt-v20 slope -0.5507 sd 0.0988 undefined 0.002
+  lag   1 +0.0439 se 0.0042 z +10.52 pos 30/30 real 0.1071 ratio 0.41
+  lag   2 +0.0474 se 0.0061 z +7.73 pos 30/30
+  lag   3 +0.0372 se 0.0058 z +6.38 pos 29/30
+  lag   5 +0.0348 se 0.0034 z +10.34 pos 30/30 real 0.0518 ratio 0.67
+  lag   8 +0.0184 se 0.0039 z +4.77 pos 22/30 real 0.0453 ratio 0.41
+  lag  12 +0.0133 se 0.0044 z +3.06 pos 24/30 real 0.0295 ratio 0.45
+  lag  20 +0.0102 se 0.0033 z +3.08 pos 23/30 real 0.0286 ratio 0.36
+  lag  30 -0.0016 se 0.0054 z -0.30 pos 14/30 real 0.0179 ratio -0.09
+  lag  45 -0.0086 se 0.0032 z -2.73 pos 11/30
+  lag  60 -0.0090 se 0.0023 z -4.00 pos 7/30 real 0.0054 ratio -1.68
+pt-v19 slope -0.5147 sd 0.1086 undefined 0.012
+  lag   1 +0.0486 se 0.0067 z +7.29 pos 30/30 real 0.1071 ratio 0.45
+  lag   2 +0.0336 se 0.0041 z +8.14 pos 29/30
+  lag   3 +0.0359 se 0.0074 z +4.87 pos 28/30
+  lag   5 +0.0237 se 0.0049 z +4.87 pos 27/30 real 0.0518 ratio 0.46
+  lag   8 +0.0208 se 0.0043 z +4.79 pos 23/30 real 0.0453 ratio 0.46
+  lag  12 +0.0185 se 0.0039 z +4.71 pos 26/30 real 0.0295 ratio 0.63
+  lag  20 +0.0085 se 0.0042 z +2.00 pos 21/30 real 0.0286 ratio 0.30
+  lag  30 +0.0033 se 0.0047 z +0.69 pos 16/30 real 0.0179 ratio 0.18
+  lag  45 -0.0074 se 0.0055 z -1.35 pos 14/30
+  lag  60 -0.0044 se 0.0035 z -1.27 pos 13/30 real 0.0054 ratio -0.82
+== driven
+  pt-v20 beta vix       -0.00082 ratio 0.16 sign-right 6/7
+  pt-v20 beta credit    -1.66315 ratio 0.22 sign-right 7/7
+  pt-v20 beta valuation +0.16968 ratio 0.13 sign-right 7/7
+  pt-v20 corr vix       -0.082
+  pt-v20 corr credit    -0.106
+  pt-v20 corr valuation +0.090
+  pt-v20 sd ratio 1.162 (1.05 to 1.34)
+  pt-v20 |r| vs VIX +0.359
+  pt-v20 seed 2020 events agree 3/6
+     2020-02-19 S&P peak, selloff begins     -7.0% vs -9.6% yes
+     2020-03-03 Fed emergency cut 50bp       +14.5% vs -1.4% NO
+     2020-03-16 VIX record close 82.69       +9.0% vs -7.4% NO
+     2020-03-23 trough, unlimited QE         +7.4% vs +13.6% yes
+     2020-11-09 vaccine efficacy             -4.4% vs +3.4% NO
+     2021-11-26 Omicron                      +0.3% vs +3.2% yes
+  pt-v20 agree by seed {'101': 4, '102': 4, '103': 2, '104': 3, '105': 4, '106': 5, '2020': 3}
+  pt-v19 beta vix       -0.00083 ratio 0.17 sign-right 7/7
+  pt-v19 beta credit    -1.56484 ratio 0.21 sign-right 7/7
+  pt-v19 beta valuation +0.15939 ratio 0.13 sign-right 7/7
+  pt-v19 corr vix       -0.092
+  pt-v19 corr credit    -0.127
+  pt-v19 corr valuation +0.088
+  pt-v19 sd ratio 1.104 (0.98 to 1.25)
+  pt-v19 |r| vs VIX +0.332
+  pt-v19 seed 2020 events agree 3/6
+     2020-02-19 S&P peak, selloff begins     -6.0% vs -9.6% yes
+     2020-03-03 Fed emergency cut 50bp       +15.2% vs -1.4% NO
+     2020-03-16 VIX record close 82.69       +8.6% vs -7.4% NO
+     2020-03-23 trough, unlimited QE         +5.6% vs +13.6% yes
+     2020-11-09 vaccine efficacy             -2.8% vs +3.4% NO
+     2021-11-26 Omicron                      +0.7% vs +3.2% yes
+  pt-v19 agree by seed {'101': 3, '102': 2, '103': 2, '104': 2, '105': 4, '106': 5, '2020': 3}
+== macro
+  pt-v20 {'peak_median': 3.0913, 'peak_max': 4.1083, 'sd_median': 0.5959, 'mean_median': 2.5951, 'ar1_median': 0.9158, 'crisis_day_pct': 0.0767, 'seeds_reaching_4pct': 5}
+  pt-v19 {'peak_median': 3.1085, 'peak_max': 4.1642, 'sd_median': 0.5912, 'mean_median': 2.7042, 'ar1_median': 0.9217, 'crisis_day_pct': 0.0, 'seeds_reaching_4pct': 2}
+== long horizon
+  252d ruled 13/13 out [] | decade 14/14 out []
+  504d ruled 13/13 out [] | decade 13/14 out [('sector_excess_corr', 0.1022, (0.11, 0.22))]
+  756d ruled 13/13 out [] | decade 13/14 out [('sector_excess_corr', 0.1035, (0.11, 0.22))]
+  1260d ruled 13/13 out [] | decade 13/14 out [('sector_excess_corr', 0.1069, (0.11, 0.22))]
+  2520d ruled 13/13 out [] | decade 12/14 out [('sector_excess_corr', 0.1078, (0.11, 0.22)), ('corr_persistence_acf1', 0.5544, (0.19, 0.49))]

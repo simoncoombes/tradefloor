@@ -1,0 +1,15 @@
++ cd /home/ec2-user/src
++ free -g
+               total        used        free      shared  buff/cache   available
+Mem:             185           0         182           0           2         183
+Swap:              0           0           0
++ echo '[{"label":"pt-v20","base":"pt-v20","overrides":{}},{"label":"pt-v19","base":"pt-v19","overrides":{}}]'
++ echo 'decay exit 0'
++ echo 'driven exit 0'
++ echo 'macro exit 0'
++ echo 'memory exit 0'
++ echo 'long exit 0'
++ free -g
+               total        used        free      shared  buff/cache   available
+Mem:             185           3         179           0           2         180
+Swap:              0           0           0

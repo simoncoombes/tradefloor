@@ -1,0 +1,36 @@
++ python /home/ec2-user/scripts/driven.py pt-v20,pt-v19 2020,101,102,103,104,105,106 /home/ec2-user/out/driven.json 14
+real {'vix': -0.005, 'credit': -7.44538, 'valuation': 1.27185} corr {'vix': -0.622, 'credit': -0.592, 'valuation': 0.803} sd 0.02358
+pt-v20 beta vix       median -0.00082  range -0.00137 .. +0.00004  real -0.00500  ratio 0.164
+pt-v20 beta credit    median -1.66315  range -4.58407 .. -1.18918  real -7.44538  ratio 0.223
+pt-v20 beta valuation median +0.16968  range +0.11118 .. +0.39139  real +1.27185  ratio 0.133
+pt-v20 corr vix       median -0.082  real -0.622
+pt-v20 corr credit    median -0.106  real -0.592
+pt-v20 corr valuation median +0.090  real +0.803
+pt-v20 sd ratio median 1.162 range 1.051 .. 1.341
+pt-v20 |r| vs VIX median +0.359
+pt-v20 seed 2020 event study: sign agreement 3/6
+    2020-02-19 S&P peak, selloff begins     sim -7.0% real -9.6% yes
+    2020-03-03 Fed emergency cut 50bp       sim +14.5% real -1.4% NO
+    2020-03-16 VIX record close 82.69       sim +9.0% real -7.4% NO
+    2020-03-23 trough, unlimited QE         sim +7.4% real +13.6% yes
+    2020-11-09 vaccine efficacy             sim -4.4% real +3.4% NO
+    2021-11-26 Omicron                      sim +0.3% real +3.2% yes
+pt-v19 beta vix       median -0.00083  range -0.00121 .. -0.00014  real -0.00500  ratio 0.166
+pt-v19 beta credit    median -1.56484  range -4.20273 .. -1.08871  real -7.44538  ratio 0.210
+pt-v19 beta valuation median +0.15939  range +0.10757 .. +0.37570  real +1.27185  ratio 0.125
+pt-v19 corr vix       median -0.092  real -0.622
+pt-v19 corr credit    median -0.127  real -0.592
+pt-v19 corr valuation median +0.088  real +0.803
+pt-v19 sd ratio median 1.104 range 0.976 .. 1.249
+pt-v19 |r| vs VIX median +0.332
+pt-v19 seed 2020 event study: sign agreement 3/6
+    2020-02-19 S&P peak, selloff begins     sim -6.0% real -9.6% yes
+    2020-03-03 Fed emergency cut 50bp       sim +15.2% real -1.4% NO
+    2020-03-16 VIX record close 82.69       sim +8.6% real -7.4% NO
+    2020-03-23 trough, unlimited QE         sim +5.6% real +13.6% yes
+    2020-11-09 vaccine efficacy             sim -2.8% real +3.4% NO
+    2021-11-26 Omicron                      sim +0.7% real +3.2% yes
+
+real	0m14.959s
+user	3m9.761s
+sys	0m12.356s
