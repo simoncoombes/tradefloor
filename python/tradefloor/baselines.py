@@ -113,6 +113,7 @@ will read: ``tf.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 from __future__ import annotations
 
 import copy
+import math
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -467,6 +468,28 @@ class Balanced:
 class Oracle:
     """Trades the true mispricing. A measuring instrument, not a competitor.
 
+    **Two rules, picked from the preset's dials** (:meth:`cross_sectional`),
+    never from its name. Where every stock-specific move is mispricing
+    (every preset through pt-v19), it trades the cross-section of ``s`` as
+    described below. Where the preset moves part of each shock into fair
+    value or cycles aggregate earnings (pt-v20), the cross-section of ``s``
+    is small: its spread falls from 0.30 to 0.015, its rank IC against the
+    next day's return from -0.44 to -0.03, and the cross-sectional rule
+    loses money on 3 of 8 seeds. There it trades each name's expected
+    return over the next session from state no trader sees (see
+    :meth:`expected_returns` and :meth:`_act_on_expected_returns`): the
+    market-wide transient mispricing and herding, the fair value's drift and
+    the earnings cycle's pull, as a net position plus a residual
+    cross-sectional book, once a day. Measured on pt-v20 over 30 days
+    (rosters ``Universe.random(20, seed=3 / 42 / 11)``, sim seeds 0-3): positive
+    on 12 of 12 markets and ahead of every price-only reference agent on 11
+    of 12, the twelfth being buy-and-hold in a month the market rose. Its
+    edge is market-wide and a few basis points a day, so over five days it
+    is behind buy-and-hold as often as not.
+
+    The rest of this docstring describes the cross-sectional rule and was
+    measured under pt-v19.
+
     Reads ``mispricing_s`` straight out of the engine, so it knows without
     estimation error which instruments sit above and below fair value. Prices
     are ``fair_value * exp(s)``, so positive ``s`` is expensive: it goes short
@@ -569,8 +592,26 @@ class Oracle:
         memo[id(self)] = twin
         return twin
 
+    @staticmethod
+    def cross_sectional(model: dict[str, Any]) -> bool:
+        """Whether the preset's own dials put the edge in the cross-section.
+
+        True when no part of a name's shocks moves its fair value for good
+        (``fair_value_news_share`` and ``fair_value_market_share`` 0.0) and
+        aggregate earnings have no cycle (``earnings_cycle_depth`` 0.0):
+        every preset through pt-v19. Then every stock-specific move is
+        mispricing that reverts, and the spread of ``s`` across names is
+        the edge. Read from the dials, never from the preset's name.
+        """
+        return (model.get("fair_value_news_share", 0.0) == 0.0
+                and model.get("fair_value_market_share", 0.0) == 0.0
+                and model.get("earnings_cycle_depth", 0.0) == 0.0)
+
     def act(self, obs: Observation) -> dict[str, float]:
         self._engine = obs.engine
+        model = dict(obs.engine.model_params)
+        if not self.cross_sectional(model):
+            return self._act_on_expected_returns(obs, model)
         s = _f64(obs.engine.column("mispricing_s"))
         k = min(self.top_k, len(s) // 2)
         if k < 1:
@@ -579,6 +620,82 @@ class Oracle:
         cheap, dear = order[:k], order[-k:]
         return rebalance(obs, _book(obs.tickers, cheap, dear, self.gross, k),
                          max_participation=self.max_participation)
+
+    def expected_returns(self, engine: Engine,
+                         model: dict[str, Any]) -> tuple[dict[int, float], float]:
+        """Each equity's expected log return over the next session, from state
+        no trader can see, split into a per-name part and a common drift.
+
+        The per-name part is the mispricing's own law over a day: reversion
+        ``(phi^390 - 1) s`` and the herding term ``theta * momentum``, which
+        carry the market-wide transient mispricing and whatever
+        cross-sectional residual is left. The common drift is the fair
+        value's: nominal output growth, the buyback yield where the preset
+        counts buybacks, and the pull of the aggregate earnings cycle toward
+        its phase's level. Returns ``({index: per-name part}, drift)``.
+        """
+        s = _f64(engine.column("mispricing_s"))
+        mom = _f64(engine.column("mispricing_momentum"))
+        phi = model["s_phi_tick"] ** 390
+        theta = model["momentum_theta"]
+        tickers = engine.tickers
+        own = {i: (phi - 1.0) * s[i] + theta * mom[i]
+               for i in range(len(s)) if tickers[i] not in RATE_TICKERS}
+        macro = engine.macro_fields
+        drift = (macro["gdp_growth"] + macro["inflation_rate"]) / 252.0
+        economy = engine.state_snapshot()["economy"]
+        if model.get("market_pe_buybacks", 0.0) != 0.0 and economy["market_pe"] > 0:
+            drift += model["buyback_payout_share"] / economy["market_pe"] / 252.0
+        depth = model.get("earnings_cycle_depth", 0.0)
+        if depth != 0.0:
+            down = economy["cycle_phase"] in ("contraction", "trough")
+            target = -depth if down else depth * model["earnings_cycle_upside"]
+            pull = 1.0 - 0.5 ** (1.0 / model["earnings_cycle_half_life"])
+            drift += pull * (target - economy["earnings_cycle"])
+        return own, drift
+
+    def _act_on_expected_returns(self, obs: Observation,
+                                 model: dict[str, Any]) -> dict[str, float]:
+        """The rule for a preset whose edge is not in the cross-section.
+
+        Once a day, at the open. Each equity's expected return (see
+        :meth:`expected_returns`) is a common part, the mean across names
+        plus the fair value's drift, and a residual. The residual is traded
+        as the cross-sectional rule is, long the ``top_k`` highest and short
+        the ``top_k`` lowest; the common part as a net position spread
+        equally over every equity, long or short with its sign. The gross is
+        split between the two in proportion to what each earns per unit of
+        gross: ``|common|`` against half the residual spread between the two
+        books. Net exposure stays inside ``gross``.
+        """
+        if obs.step_of_day != 0:
+            return {}
+        own, drift = self.expected_returns(obs.engine, model)
+        if not own:
+            return {}
+        names = sorted(own)
+        centre = math.fsum(own.values()) / len(own)
+        common = centre + drift
+        residual = {i: own[i] - centre for i in names}
+        k = min(self.top_k, len(names) // 2)
+        order = sorted(names, key=lambda i: (residual[i], obs.tickers[i]))
+        longs, shorts = (order[-k:], order[:k]) if k else ([], [])
+        spread = ((math.fsum(residual[i] for i in longs) / k
+                   - math.fsum(residual[i] for i in shorts) / k) / 2.0
+                  if k else 0.0)
+        total = abs(common) + spread
+        share = abs(common) / total if total > 0 else 0.0
+        weights = {ticker: 0.0 for ticker in obs.tickers}
+        if k:
+            per = (1.0 - share) * self.gross / (2 * k)
+            for i in longs:
+                weights[obs.tickers[i]] += per
+            for i in shorts:
+                weights[obs.tickers[i]] -= per
+        net = math.copysign(share * self.gross / len(names), common)
+        for i in names:
+            weights[obs.tickers[i]] += net
+        return rebalance(obs, weights, max_participation=self.max_participation)
 
     def explain(self, day: int) -> str | None:
         """The factor that actually dominated. Correct by construction.
