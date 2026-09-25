@@ -201,25 +201,35 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     mean reversion: buy-and-hold is ahead on pooled capture and wins 9 of
     12 paired seeds, p = 0.146, which the sign test does not confirm.
 
+    Re-measured when pt-v20 became the default (0.8.5), which moved every
+    stock-specific shock into fair value and took the price-only edge away,
+    as C4b now grades: mean reversion and random split 6 to 6 (p = 1.0).
+    The pairs are re-dealt. The strong pair is buy-and-hold against random,
+    11 to 1 at p = 0.0063. The weak pair is mean reversion against
+    momentum: mean reversion is ahead on pooled capture (-0.907 against
+    -1.035) and wins 8 of 12 paired seeds, p = 0.388, which the sign test
+    does not confirm. Two of the twelve seeds are unmeasurable, where the
+    Oracle lost money over the ten days.
+
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
     """
-    strong = ranking.separation("mean_reversion", "random")
-    weak = ranking.separation("buy_and_hold", "mean_reversion")
+    strong = ranking.separation("buy_and_hold", "random")
+    weak = ranking.separation("mean_reversion", "momentum")
     assert strong["p_value"] < 0.05, (
-        f"mean reversion did not separate from random: {strong}"
+        f"buy-and-hold did not separate from random: {strong}"
     )
     assert not weak["decisive"]
     assert weak["p_value"] > strong["p_value"], (
-        "the sign test gave buy-and-hold-vs-mean-reversion at least as much "
-        "confidence as mean-reversion-vs-random; it is not discriminating"
+        "the sign test gave mean-reversion-vs-momentum at least as much "
+        "confidence as buy-and-hold-vs-random; it is not discriminating"
     )
     # And the ordering the aggregate suggests is the one the sign test
     # refuses to confirm, and reporting both exists for that.
     table = {r.name: r.pooled_capture for r in ranking.table()}
-    assert table["mean_reversion"] > table["random"]
-    assert table["buy_and_hold"] > table["mean_reversion"]
+    assert table["buy_and_hold"] > table["random"]
+    assert table["mean_reversion"] > table["momentum"]
 
 
 def test_separation_is_symmetric_in_its_verdict(ranking):
