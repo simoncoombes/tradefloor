@@ -3879,7 +3879,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "Almgren et al. 2005; feature/order-book-depth hand-off (E4)",
         "date": "2026-09-24",
     },
-    # Three dials pt-v20 FITTED on the design repo's co-tune grid (box
+    # Two dials pt-v20 FITTED on the design repo's co-tune grid (box
     # ptv20e4, 90 pooled 21-year histories; programme/ptv20-registration.md)
     # and graded by name on box ptv20g3. The ledger has no `fitted` kind, so
     # they are entered as measured: the estimator is the grid's selection
@@ -3919,23 +3919,6 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "residual": "B3 2.07 and B9's annual spread 16.78 at x0.5, against "
                     "2.14 and 15.89 on the same arm at x1.0 (D35m85); B1 6.0 "
                     "to 5.8 per cent",
-    },
-    "volume_move_response": {
-        "kind": "measured",
-        "presets": {"pt-v16": 1.0, "pt-v18": 1.0, "pt-v19": 1.0,
-                    "pt-v20": 0.8},
-        "source": "programme/ptv20-registration.md, fourth registration; "
-                  "programme/results/ptv20/d1screen.py (design repository)",
-        "date": "2026-09-24",
-        "script": "results/ptv20/d1screen.py: the 504-session certification "
-                  "panel's volume_abs_return_corr on pt-v20 at 0.85, 0.80 "
-                  "and 0.75, the certification protocol",
-        "estimator": "FITTED: the value that puts the 504-session panel's "
-                     "volume_abs_return_corr back under its ceiling of 0.63 "
-                     "with room while every other certification cell holds",
-        "residual": "0.625, 0.618 and 0.612 at 0.85, 0.80 and 0.75, against "
-                    "0.639 at 1.0 (box ptv20g2); at 0.80 the 252-session "
-                    "panel and both held-out cells stay at 15 of 15",
     },
     "treasury_2y_noise": {
         "kind": "measured",
@@ -4201,6 +4184,12 @@ UNPROVENANCED = (
     "volume_move_cap",
     "volume_move_floor",
     "volume_move_noise",
+    # pt-v20 returned `volume_move_response` to 0.6, pt-v1's own value, on
+    # the D1 screen and grid ptv20e5 (the volume-return correlation crossed
+    # its ceiling from 1,260 sessions at 0.8), so the difference rule no
+    # longer asks about pt-v20 here, and pt-v16 to pt-v19's 1.0 stays as it
+    # was.
+    "volume_move_response",
     "volume_persistence",
     "volume_variance_gain",
 )
