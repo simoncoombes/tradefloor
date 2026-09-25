@@ -450,6 +450,84 @@ def check_a_recorded_decision_can_be_asked_again(make_agent):
     assert ci.parse_decision(again).actions
 
 
+#: What a probe of pt-v20 read through the live engine: the economy block's
+#: true business-cycle state, and the earnings cycle's anticipated offset,
+#: which jumps at the true turn. None may reach a framework or an adapter.
+HIDDEN_ECONOMY = ("cycle_phase", "months_in_current_phase",
+                  "phase_gdp_target", "recession_probability",
+                  "earnings_cycle", "earnings_anticipation")
+
+
+class _Holds:
+    """Hands the harness's observation to the adapter and keeps it, so the
+    check can ask what the adapter was holding."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.held = []
+
+    def act(self, obs):
+        self.held.append(obs)
+        return self.inner.act(obs)
+
+
+def check_the_adapter_is_handed_the_market_view(make_agent):
+    """Run by a harness, an adapter holds the read-only market view, as any
+    agent does: the true phase, the economy block, the anticipation, the
+    mispricing, the fundamentals, fork and writes are refused, and prices,
+    the book, the published macro and its own account are served. Under
+    ``trusted_agents=True`` it holds the live engine. The framework's
+    payload is the same bytes either way, so a recorded observation keeps
+    its shape and its replay key."""
+    from tradefloor.sandbox import MarketView, PortfolioView, SandboxError
+
+    payloads = {}
+    held = {}
+    for trusted in (False, True):
+        seen = []
+
+        def respond(payload, seen=seen):
+            seen.append(json.dumps(payload, sort_keys=True))
+            return {"actions": []}
+
+        holder = _Holds(make_agent(respond))
+        card = tf.evaluate({"a": holder}, seed=7, universe=universe(),
+                           days=1, trusted_agents=trusted)["a"]
+        assert not card.errors, card.errors
+        assert seen, "the framework was never consulted"
+        payloads[trusted] = seen
+        held[trusted] = holder.held[0]
+
+    assert payloads[False] == payloads[True], (
+        "the sandbox changed what the framework is shown")
+    for text in payloads[False]:
+        macro = json.loads(text)["macro"]
+        assert set(macro) == set(ci.OBSERVABLE_MACRO)
+        assert not set(macro) & set(HIDDEN_ECONOMY)
+
+    obs = held[False]
+    assert isinstance(obs.engine, MarketView)
+    assert isinstance(obs.portfolio, PortfolioView)
+    for name in ("state_snapshot", "earnings_anticipation", "fundamentals",
+                 "fork", "set_fundamentals", "pin_macro", "macro_table",
+                 "attribution", "truth", "model_params"):
+        with pytest.raises(SandboxError):
+            getattr(obs.engine, name)
+    with pytest.raises(SandboxError):
+        obs.engine.column("mispricing_s")
+    with pytest.raises(SandboxError):
+        obs.portfolio.execute
+    assert obs.engine.prices() and obs.engine.column("volume")
+    assert obs.book(obs.tickers[0]).mid_price is not None
+    assert not set(obs.engine.macro_fields) & set(HIDDEN_ECONOMY)
+    assert obs.engine.macro_state.cycle
+    assert obs.portfolio.net_worth(obs.engine) > 0
+
+    live = held[True]
+    assert isinstance(live.engine, tf.Engine)
+    assert "cycle_phase" in live.engine.state_snapshot()["economy"]
+
+
 #: Every check above, in one list, so an adapter's test file can parametrize
 #: over it and a failure names the clause that broke.
 CONTRACT_CHECKS = [
@@ -471,6 +549,7 @@ CONTRACT_CHECKS = [
     check_the_replay_key_derives_from_the_input,
     check_the_state_carries_an_instructions_identity,
     check_the_adapter_never_reaches_ground_truth,
+    check_the_adapter_is_handed_the_market_view,
 ]
 
 

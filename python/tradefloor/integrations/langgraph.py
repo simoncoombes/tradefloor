@@ -222,8 +222,9 @@ def render(payload: dict[str, Any], *, instructions: str = INSTRUCTIONS,
     the same market on a different run.
 
     Rendered from the PAYLOAD only, never from the Observation. The
-    Observation carries ``.engine``, which knows fair value, the factor
-    attribution and the macro path the run has not reached; the payload is
+    Observation carries ``.engine``, which under ``trusted_agents=True`` is
+    the live engine and knows fair value, the factor attribution and the
+    macro path the run has not reached; the payload is
     the allowlisted view, and rendering from it is what makes the
     ground-truth boundary checkable by a test that cannot see inside this
     function.

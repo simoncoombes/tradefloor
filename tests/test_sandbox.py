@@ -387,3 +387,243 @@ def test_the_integrations_payload_is_unchanged_by_the_view():
                 trusted_agents=True)
     assert payloads["sandboxed"] == payloads["trusted"]
     assert len(payloads["sandboxed"]) == 6
+
+
+# -- every route, against the probe of pt-v20 --------------------------------
+#
+# A probe on pt-v20 read three things through the live engine that the
+# published business cycle is meant to hold back: the economy block of
+# `state_snapshot()` (the true phase, the months in it, the phase's GDP
+# target, the recession probability, the earnings cycle), the engine's
+# `earnings_anticipation`, which jumps on the close of every true turn, and
+# the fundamental, as log(price) less `mispricing_s`. Each route below is
+# held to refusing all three, and the rest of the hidden state, while
+# serving what a trader sees.
+
+HIDDEN_ECONOMY = {"cycle_phase", "months_in_current_phase",
+                  "phase_gdp_target", "recession_probability",
+                  "earnings_cycle", "earnings_anticipation"}
+
+#: Reads that must be refused, as (label, how).
+REFUSED = (
+    ("economy", lambda e: e.state_snapshot()["economy"]),
+    ("anticipation", lambda e: e.earnings_anticipation),
+    ("mispricing", lambda e: e.column("mispricing_s")),
+    ("fundamentals", lambda e: e.fundamentals()),
+    ("macro table", lambda e: e.macro_table()),
+    ("model params", lambda e: e.model_params),
+    ("fork", lambda e: e.fork(1)),
+    ("write", lambda e: e.pin_macro(vix=80.0)),
+)
+
+
+def _allowed(engine, portfolio, *, view=True):
+    """What a trader can read, all of which the view must serve."""
+    ticker = engine.tickers[0]
+    macro = engine.macro_fields
+    assert not set(macro) & HIDDEN_ECONOMY
+    if view:
+        assert set(macro) <= tf.sandbox.PUBLISHED_MACRO
+    assert {"cycle", "gdp_growth", "vix"} <= set(macro)
+    return {
+        "prices": engine.prices(),
+        "volume": engine.column("volume"),
+        "bid": engine.book(ticker).best_bid,
+        "cycle": engine.macro_state.cycle,
+        "macro": {k: macro[k] for k in tf.sandbox.PUBLISHED_MACRO
+                  if k in macro},
+        "curve": dict(engine.curve),
+        "rates": engine.rate_instruments,
+        "net_worth": portfolio.net_worth(engine),
+        "cash": portfolio.cash,
+    }
+
+
+class Probe:
+    """Tries every hidden read once, catching the refusal, then reads what
+    a trader can. Never trades. ``live``: handed the live engine, so it
+    reads and does not fork or write, which would change the market."""
+
+    def __init__(self, live=False):
+        self.live = live
+        self.refused: dict[str, str] = {}
+        self.read: dict[str, object] = {}
+        self.allowed = None
+
+    def act(self, obs):
+        if self.allowed is None:
+            for label, how in REFUSED:
+                if self.live and label in ("fork", "write"):
+                    continue
+                try:
+                    self.read[label] = how(obs.engine)
+                except SandboxError as exc:
+                    self.refused[label] = str(exc)
+                except AttributeError:
+                    # The live engine of a build without the dial:
+                    # `earnings_anticipation` arrives with pt-v20's fixes.
+                    self.read[label] = None
+            self.allowed = _allowed(obs.engine, obs.portfolio,
+                                    view=not self.live)
+        return {}
+
+
+def _held_to_the_view(probe):
+    assert set(probe.refused) == {label for label, _ in REFUSED}, probe.read
+    assert "true business-cycle phase" in probe.refused["economy"]
+    assert "jumps" in probe.refused["anticipation"]
+    assert "fundamental" in probe.refused["mispricing"]
+    assert probe.allowed["prices"] and probe.allowed["net_worth"] > 0
+
+
+def test_route_evaluate_refuses_the_probe():
+    probe = Probe()
+    card = tf.evaluate({"probe": probe}, seed=3, universe=U, days=1)["probe"]
+    assert not card.errors
+    _held_to_the_view(probe)
+    # The opt-in hands the live engine back, and says so.
+    trusted = Probe(live=True)
+    card = tf.evaluate({"probe": trusted}, seed=3, universe=U, days=1,
+                       trusted_agents=True)["probe"]
+    assert card.trusted and not card.tampered and not card.errors
+    economy = trusted.read["economy"]
+    assert {"cycle_phase", "recession_probability"} <= set(economy)
+    assert trusted.read["mispricing"]
+    assert trusted.allowed == probe.allowed
+
+
+def test_route_world_refuses_the_probe():
+    probe = Probe()
+    world = tf.World(seed=3, universe=U, agents={"probe": probe})
+    world.run(1)
+    _held_to_the_view(probe)
+    trusted = Probe(live=True)
+    tf.World(seed=3, universe=U, agents={"probe": trusted},
+             trusted_agents=True).run(1)
+    assert "cycle_phase" in trusted.read["economy"]
+
+
+def test_route_tca_refuses_the_probe():
+    probe = Probe()
+    tf.tca.analyse(probe, seed=3, universe=U, days=1)
+    _held_to_the_view(probe)
+
+
+def test_route_rank_refuses_the_probe():
+    probes = []
+
+    def entrants():
+        agents = tf.reference_agents(seed=1)
+        probes.append(Probe())
+        agents["probe"] = probes[-1]
+        return agents
+
+    tf.rank(entrants, seeds=[1, 2], universe=U, days=1)
+    assert len(probes) == 2
+    for probe in probes:
+        _held_to_the_view(probe)
+
+
+def test_route_hidden_state_is_declared_and_still_reads_nothing_it_was_not_given():
+    """A privileged agent reads the economy by declaration, and its card
+    says so. It still gets no fork, no writes and no anticipation getter."""
+
+    class Declared(Probe):
+        privileged = True
+
+        def act(self, obs):
+            self.economy = obs.hidden.economy()
+            for name in ("fork", "pin_macro", "earnings_anticipation",
+                         "state_snapshot"):
+                assert not hasattr(obs.hidden, name)
+            return super().act(obs)
+
+    agent = Declared()
+    card = tf.evaluate({"d": agent}, seed=3, universe=U, days=1)["d"]
+    assert card.uses_hidden_state and not card.trusted
+    assert "cycle_phase" in agent.economy
+    _held_to_the_view(agent)       # obs.engine is the market view regardless
+
+
+def test_route_gym_env_hands_training_code_the_view():
+    pytest.importorskip("numpy")
+    from tradefloor.gym import TradingEnv
+
+    def run(trusted):
+        env = TradingEnv(universe=U, seed=3, days=1, steps_per_day=3,
+                         ticks_per_step=40, trusted_agents=trusted)
+        obs, info = env.reset()
+        trace = [obs.tobytes()]
+        for k in range(3):
+            action = [0.1 * ((i + k) % 3 - 1) for i in range(len(U))]
+            obs, reward, *_ = env.step(action)
+            trace.append((obs.tobytes(), reward))
+        return env, info, trace
+
+    env, info, sandboxed = run(False)
+    assert "trusted" not in info
+    assert isinstance(env.engine, MarketView)
+    assert isinstance(env.portfolio, PortfolioView)
+    assert env.engine is env.engine        # one view per episode
+    for label, how in REFUSED:
+        with pytest.raises(SandboxError):
+            how(env.engine)
+    with pytest.raises(SandboxError):
+        env.portfolio.execute
+    with pytest.raises(AttributeError):       # the env swaps it, not you
+        env.engine = None
+    _allowed(env.engine, env.portfolio)
+
+    live, info, trusted = run(True)
+    assert info["trusted"] is True
+    assert isinstance(live.engine, tf.Engine)
+    assert "cycle_phase" in live.engine.state_snapshot()["economy"]
+    # The view is access control only: the same market, step for step.
+    assert sandboxed == trusted
+    assert env._engine.state_hash() == live.engine.state_hash()
+
+
+def test_route_mcp_runs_strategies_sandboxed(monkeypatch):
+    pytest.importorskip("mcp")
+    from tradefloor import mcp
+
+    calls = []
+    real_evaluate, real_rank = tf.evaluate, tf.rank
+
+    def evaluate(*args, **kwargs):
+        calls.append(("evaluate", kwargs.get("trusted_agents")))
+        return real_evaluate(*args, **kwargs)
+
+    def rank(*args, **kwargs):
+        calls.append(("rank", kwargs.get("trusted_agents")))
+        return real_rank(*args, **kwargs)
+
+    monkeypatch.setattr(tf, "evaluate", evaluate)
+    monkeypatch.setattr(tf, "rank", rank)
+    momentum = {"signal": {"kind": "momentum", "lookback_days": 1.0},
+                "portfolio": {"top_k": 2}}
+    oracle = {"signal": {"kind": "oracle"}, "portfolio": {"top_k": 2}}
+    results = [
+        mcp.evaluate_strategies({"m": momentum, "o": oracle}, days=1,
+                                universe_size=8),
+        mcp.rank_strategies({"m": momentum}, seeds=[1, 2], days=1,
+                            universe_size=8),
+        mcp.run_stress_scenario("rate_shock", universe_size=8, days=2),
+    ]
+    assert all(r.get("ok") for r in results), results
+    assert calls and all(trusted is False for _, trusted in calls), calls
+    rows = {r["name"]: r for r in results[0]["scores"]}
+    assert rows["o"].get("uses_hidden_state") is True
+    assert "uses_hidden_state" not in rows["m"]
+
+    def keys(value):
+        if isinstance(value, dict):
+            for k, v in value.items():
+                yield k
+                yield from keys(v)
+        elif isinstance(value, list):
+            for v in value:
+                yield from keys(v)
+
+    for r in results:
+        assert not set(keys(r)) & (HIDDEN_ECONOMY | {"mispricing_s"})

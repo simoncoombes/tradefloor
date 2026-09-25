@@ -1560,15 +1560,19 @@ harness loops in `harness.py`, `counterfactual.py` and `tca.py` hand
   start;
 - `obs.engine`, a `MarketView`: the columns price, previous close, previous
   tick price, open, high, low, volume, $\bar A_i$, market cap, last daily
-  return, $\beta_i$, short interest and float; `bars`; the macro fields
-  except `qe_pe_boost`; the curve; and which names and sectors have news
-  today, without its size;
+  return, $\beta_i$, short interest and float; `bars`; the published macro
+  fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as
+  published); the curve; and which names and sectors have news today,
+  without its size;
 - `obs.portfolio`, a read-only view of the agent's own cash, positions and
   fills.
 
 Nothing in the observation carries $s_i$, its momentum $\mu_i$, the maker's
-inventory, the GARCH variance $h_{i,d}$, the attribution, the news impact,
-the model's dials or the generator state. An agent that declares
+inventory, the GARCH variance $h_{i,d}$, the fundamentals, the attribution,
+the news impact, the model's dials, the generator state or the economy's
+own state: the true phase, the months in it, the phase's GDP target, the
+recession probability, the earnings cycle and its anticipated offset. The
+gym environment's `env.engine` and `env.portfolio` are the same views. An agent that declares
 `privileged = True` also receives `obs.hidden`, a read-only view of all of
 those, and its scorecard records `uses_hidden_state`.
 `trusted_agents=True` hands every agent the live engine instead, and every

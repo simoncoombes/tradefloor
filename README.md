@@ -91,7 +91,9 @@ read-only market view: prices, the public columns, each book, bars, the
 published macro fields, the curve and which names have news today.
 `obs.portfolio` reads the agent's own positions and cannot trade. Forking the
 engine, writing to it and reading the hidden state all raise
-`tf.SandboxError`.
+`tf.SandboxError`. The hidden state includes the true business-cycle phase;
+the macro fields carry the phase as published. The gym environment's `env.engine` and
+`env.portfolio` are the same views.
 
 The Oracle reads hidden state by declaring `privileged = True`, which gives
 it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for

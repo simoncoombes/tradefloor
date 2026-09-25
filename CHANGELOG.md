@@ -422,9 +422,26 @@ recording counters, and each portfolio, before and after every `act` and
 `explain`. An agent that changed anything is scored `tampered` with an error
 line naming the step, `rank` leaves it out of its table and says so, and
 `tca.analyse` refuses it. The check reads and draws nothing, so every
-known-answer digest is unchanged. The gym environment hands its policy arrays
-and the MCP tools run strategies as data, so neither handed agent code the
-engine. `tests/test_sandbox.py` reproduces both of the audit's agents.
+known-answer digest is unchanged. `tests/test_sandbox.py` reproduces both of
+the audit's agents.
+
+A second probe, on pt-v20, read three more things through the live engine:
+the economy block of `state_snapshot()` (the true business-cycle phase,
+`months_in_current_phase`, `phase_gdp_target`, `recession_probability` and
+`earnings_cycle`), `Engine.earnings_anticipation`, which jumps on the close
+of every true turn, and the fundamental, as log price less `mispricing_s`.
+The view refuses all three, and its macro fields are now an allowlist of
+published figures (`tf.sandbox.PUBLISHED_MACRO`), so a field the engine gains
+later is refused until it is listed. The gym environment's policy sees only
+arrays, but `env.engine` and `env.portfolio` were the live objects to any
+training code holding the env; they are now the same views, and
+`TradingEnv(trusted_agents=True)` gives the live ones back. The framework
+adapters are agents under `evaluate` and `World`, so they hold the view and
+their frameworks are shown the same payload as before. The MCP tools run
+strategies with `trusted_agents=False`, stated at each call. One test per
+route holds the refusals and the reads a trader keeps. The view's `curve`
+and `rate_instruments` are properties now, as the engine's are; as methods
+they raised on every call.
 
 This is a guard and not a security boundary. Code in the same process can
 still walk the interpreter to the engine, and any write it makes is caught,

@@ -28,6 +28,20 @@ It is measured AFTER the market moves, so it includes the cost of the agent's
 own footprint. An environment that rewarded the paper value of a position at
 the price it was bought at would pay for trading rather than for being right.
 
+## The env holds the market; training code gets a view of it
+
+The observation is an array and carries nothing but returns, holdings and
+cash. The env object is another matter: training code holds it, and until
+0.8.5 ``env.engine`` was the live engine, with the true business-cycle
+phase in ``state_snapshot()["economy"]``, the mispricing among its columns
+and ``fork`` to run the market ahead. ``env.engine`` and ``env.portfolio``
+are now the read-only :class:`~tradefloor.sandbox.MarketView` and
+:class:`~tradefloor.sandbox.PortfolioView` every harness hands an agent,
+and ``trusted_agents=True`` gives back the live objects, as it does for
+:func:`tradefloor.evaluate`. The env itself steps the live engine either
+way, so the market, the rewards and the observations are the same bytes
+with the view or without it. See :mod:`tradefloor.sandbox`.
+
 ## Episodes end; they do not reset in place
 
 ``reset`` builds a new engine, because that is what a reset IS here. A method
@@ -44,6 +58,7 @@ from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import session_clock
 from .portfolio import Portfolio
+from .sandbox import MarketView, PortfolioView
 from .universe_util import as_universe
 
 # A name that is "a module or None", and a base class that is "Env or object",
@@ -101,6 +116,7 @@ class TradingEnv(_Base):
         max_leverage: float | None = 2.0,
         start: tuple[int, int, int] = (9, 30, 3),
         model: str | ModelParams | None = None,
+        trusted_agents: bool = False,
     ) -> None:
         _require(_np, "numpy", "numpy")
 
@@ -119,6 +135,9 @@ class TradingEnv(_Base):
         self.starting_cash = float(cash)
         self.max_leverage = max_leverage
         self.start = start
+        #: ``env.engine`` and ``env.portfolio`` are the live objects rather
+        #: than read-only views. See the module docstring.
+        self.trusted_agents = bool(trusted_agents)
 
         if self.days < 1 or self.steps_per_day < 1 or self.ticks_per_step < 1:
             raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
@@ -150,11 +169,28 @@ class TradingEnv(_Base):
                 low=-_np.inf, high=_np.inf, shape=(2 * self.n + 1,), dtype=_np.float64
             )
 
-        self.engine: Engine | None = None
-        self.portfolio: Portfolio | None = None
+        # The live market, which only the env steps. `engine` and
+        # `portfolio` below are what anything holding the env sees.
+        self._engine: Engine | None = None
+        self._portfolio: Portfolio | None = None
+        self._shown: tuple[Any, Any] = (None, None)
         self._step = 0
         self._prev_prices = None
         self._prev_worth = 0.0
+
+    @property
+    def engine(self) -> Any:
+        """This episode's market, as a read-only
+        :class:`~tradefloor.sandbox.MarketView`; the live engine under
+        ``trusted_agents=True``. None before :meth:`reset`."""
+        return self._engine if self.trusted_agents else self._shown[0]
+
+    @property
+    def portfolio(self) -> Any:
+        """This episode's book, as a read-only
+        :class:`~tradefloor.sandbox.PortfolioView`; the live portfolio
+        under ``trusted_agents=True``. None before :meth:`reset`."""
+        return self._portfolio if self.trusted_agents else self._shown[1]
 
     # -- gym API ----------------------------------------------------------
 
@@ -176,23 +212,31 @@ class TradingEnv(_Base):
             super().reset(seed=seed)
 
         episode_seed = self.base_seed if seed is None else int(seed)
-        self.engine = Engine(seed=episode_seed, universe=self.universe,
-                             macro_state=self.macro, model=self.model)
-        self.portfolio = Portfolio(cash=self.starting_cash,
-                                   max_leverage=self.max_leverage)
+        engine = Engine(seed=episode_seed, universe=self.universe,
+                        macro_state=self.macro, model=self.model)
+        portfolio = Portfolio(cash=self.starting_cash,
+                              max_leverage=self.max_leverage)
+        self._engine, self._portfolio = engine, portfolio
+        # Built once per episode, so `env.engine` is one object for the
+        # episode and a new one after the next reset, as it always was.
+        self._shown = (MarketView(engine), PortfolioView(portfolio, engine))
         self._step = 0
-        self.engine.open_market()
+        engine.open_market()
         self._prev_prices = self._prices()
-        self._prev_worth = self.portfolio.net_worth(self.engine)
+        self._prev_worth = portfolio.net_worth(engine)
         # The info dict names the episode's market: the seed that drew it
         # and the model that priced it, so a training log can cite both.
-        return self._observe(), {"seed": episode_seed,
-                                 "model_fingerprint":
-                                     self.engine.model_fingerprint}
+        info = {"seed": episode_seed,
+                "model_fingerprint": engine.model_fingerprint}
+        if self.trusted_agents:
+            # Only when set, so every sandboxed info dict is the one it was.
+            info["trusted"] = True
+        return self._observe(), info
 
     def step(self, action):
-        if self.engine is None or self.portfolio is None:
+        if self._engine is None or self._portfolio is None:
             raise ValidationError("call reset() before step()")
+        engine, portfolio = self._engine, self._portfolio
 
         action = _np.asarray(action, dtype=_np.float64).reshape(-1)
         if action.shape[0] != self.n:
@@ -211,20 +255,20 @@ class TradingEnv(_Base):
         # The clock advances within the day, so an episode traverses trading
         # days rather than replaying each one's opening minutes. See
         # `harness.session_clock` for the measurement.
-        self.engine.run_session(
+        engine.run_session(
             *session_clock(self.start, self._step % self.steps_per_day,
                            self.ticks_per_step),
             self.ticks_per_step,
-            fills=self.portfolio.pending_flow())
-        self.portfolio.clear_flow()
+            fills=portfolio.pending_flow())
+        portfolio.clear_flow()
 
         self._step += 1
         if self._step % self.steps_per_day == 0:
-            self.engine.close_market()
+            engine.close_market()
             if self._step < self.max_steps:
-                self.engine.open_market()
+                engine.open_market()
 
-        worth = self.portfolio.net_worth(self.engine)
+        worth = portfolio.net_worth(engine)
         # Reward is the step's P&L, measured AFTER the market moved, so it
         # includes the cost of the agent's own footprint.
         reward = worth - self._prev_worth
@@ -235,8 +279,8 @@ class TradingEnv(_Base):
 
         info = {
             "net_worth": worth,
-            "cash": self.portfolio.cash,
-            "leverage": self.portfolio.leverage(self.engine),
+            "cash": portfolio.cash,
+            "leverage": portfolio.leverage(engine),
             "rejected": rejected,
             "step": self._step,
         }
@@ -248,23 +292,23 @@ class TradingEnv(_Base):
         # Asserted rather than assumed: these helpers are only reachable after
         # reset(), but nothing enforced that across a method boundary, and a
         # helper called early would have failed on None with a worse message.
-        assert self.engine is not None, "engine not built - call reset()"
+        assert self._engine is not None, "engine not built - call reset()"
         import struct
         return _np.array(
-            struct.unpack("<%dd" % self.n, self.engine.prices()), dtype=_np.float64
+            struct.unpack("<%dd" % self.n, self._engine.prices()), dtype=_np.float64
         )
 
     def _rebalance(self, weights) -> int:
         """Trade towards the target weights. Returns how many trades were refused."""
-        assert self.engine is not None and self.portfolio is not None
+        assert self._engine is not None and self._portfolio is not None
         prices = self._prices()
-        worth = self.portfolio.net_worth(self.engine)
+        worth = self._portfolio.net_worth(self._engine)
         rejected = 0
-        for i, ticker in enumerate(self.engine.tickers):
+        for i, ticker in enumerate(self._engine.tickers):
             if prices[i] <= 0:
                 continue
             target = weights[i] * worth / prices[i]
-            delta = target - self.portfolio.positions.get(
+            delta = target - self._portfolio.positions.get(
                 ticker, _Zero
             ).quantity
             # A threshold, so floating-point dust does not generate a trade
@@ -272,7 +316,7 @@ class TradingEnv(_Base):
             if abs(delta) < 1.0:
                 continue
             try:
-                self.portfolio.execute(self.engine, ticker, delta)
+                self._portfolio.execute(self._engine, ticker, delta)
             except (OrderError, ValidationError):
                 # A refused trade is information, not a failure. Being unable
                 # to reach a target -- because the book is thin or leverage is
@@ -282,7 +326,7 @@ class TradingEnv(_Base):
         return rejected
 
     def _observe(self):
-        assert self.engine is not None and self.portfolio is not None
+        assert self._engine is not None and self._portfolio is not None
         prices = self._prices()
         # Log returns, not levels: a level says nothing without its history,
         # and the range across a roster spans two orders of magnitude.
@@ -291,16 +335,16 @@ class TradingEnv(_Base):
         returns = _np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
         self._prev_prices = prices
 
-        worth = self.portfolio.net_worth(self.engine)
+        worth = self._portfolio.net_worth(self._engine)
         denom = worth if worth > 0 else 1.0
         holdings = _np.array(
             [
-                self.portfolio.positions.get(t, _Zero).quantity * p / denom
-                for t, p in zip(self.engine.tickers, prices)
+                self._portfolio.positions.get(t, _Zero).quantity * p / denom
+                for t, p in zip(self._engine.tickers, prices)
             ],
             dtype=_np.float64,
         )
-        cash_fraction = _np.array([self.portfolio.cash / denom], dtype=_np.float64)
+        cash_fraction = _np.array([self._portfolio.cash / denom], dtype=_np.float64)
         return _np.ascontiguousarray(
             _np.concatenate([returns, holdings, cash_fraction]), dtype=_np.float64
         )
@@ -309,8 +353,9 @@ class TradingEnv(_Base):
         return None
 
     def close(self):  # pragma: no cover
-        self.engine = None
-        self.portfolio = None
+        self._engine = None
+        self._portfolio = None
+        self._shown = (None, None)
 
 
 class _ZeroPosition:

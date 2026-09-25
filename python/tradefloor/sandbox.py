@@ -14,8 +14,9 @@ and nothing else:
 
 - prices, the columns a data vendor publishes (:data:`PUBLIC_COLUMNS`), each
   instrument's book and the bars of the sessions already run
-- the published macro fields and the curve (everything but ``qe_pe_boost``,
-  a model coefficient no exchange publishes)
+- the published macro fields (:data:`PUBLISHED_MACRO`, an allowlist) and
+  the curve. ``cycle`` there is the phase as published, late, the way the
+  NBER dates a turn; the true phase is not served
 - which names and sectors have news today, without the size or direction of
   the move, because the engine's own field is the move the story will have
   made by the close
@@ -24,10 +25,33 @@ and nothing else:
 
 Anything else raises :class:`SandboxError`, which names the opt-in. That
 covers ``fork``, every ``set_*``, ``pin_macro``, ``tick``, ``run_session``,
-``truth``, ``attribution``, ``state_snapshot`` (it carries the generator
-state, so a copy restored elsewhere runs the future) and the hidden columns
-``mispricing_s``, ``mispricing_momentum``, ``maker_inventory`` and
-``garch_variance``.
+``truth``, ``attribution``, ``fundamentals``, ``earnings_anticipation``
+(it jumps on the close of the true turn, before the turn is published),
+``state_snapshot`` (it carries the generator state, so a copy restored
+elsewhere runs the future, and the economy block: the true phase,
+``months_in_current_phase``, ``phase_gdp_target``,
+``recession_probability`` and ``earnings_cycle``) and the hidden columns
+``mispricing_s`` (log price less it is the fundamental),
+``mispricing_momentum``, ``maker_inventory`` and ``garch_variance``.
+:data:`HIDDEN_STATE` says why for the names a probe reached for.
+
+## Every route gets the same view
+
+- :func:`tradefloor.evaluate`, :func:`tradefloor.rank` and
+  :func:`tradefloor.tca.analyse`: the observation's ``engine`` and
+  ``portfolio``.
+- :class:`tradefloor.World`: the same, per agent, per step.
+- The framework adapters (callable, OpenAI Agents, PydanticAI, LangGraph,
+  FinRobot) are agents under those harnesses, so they hold the same
+  observation, and the framework itself is shown only the serialised
+  payload built from the view.
+- :class:`tradefloor.gym.TradingEnv`: the observation is an array of
+  returns and holdings, and ``env.engine`` and ``env.portfolio`` are the
+  views, so training code holding the env cannot read past them either.
+- The MCP server: a strategy is data, run through ``evaluate`` and
+  ``rank`` with no opt-in. See :mod:`tradefloor.mcp` for its research
+  tools, which answer the experimenter after a run and hand no strategy
+  anything.
 
 ## Hidden state is a declared capability
 
@@ -40,9 +64,10 @@ says ``uses_hidden_state=True``. It still gets no fork and no writes.
 ## The opt-in: ``trusted_agents=True``
 
 For research that needs the live engine, :func:`tradefloor.evaluate`,
-:func:`tradefloor.rank`, :class:`tradefloor.World` and
-:func:`tradefloor.tca.analyse` take ``trusted_agents=True``, which hands
-every agent the live engine and the live portfolio exactly as before 0.8.5.
+:func:`tradefloor.rank`, :class:`tradefloor.World`,
+:func:`tradefloor.tca.analyse` and :class:`tradefloor.gym.TradingEnv` take
+``trusted_agents=True``, which hands every agent the live engine and the
+live portfolio exactly as before 0.8.5.
 The scorecard says ``trusted=True``, a ranking marks the row and a World's
 manifest records it.
 
@@ -87,8 +112,47 @@ PUBLIC_COLUMNS = frozenset({
 #: Macro fields withheld from the view. ``qe_pe_boost`` is the P/E the model
 #: grants for quantitative easing: a coefficient, not a statistic anybody
 #: publishes. The integrations settled this first
-#: (``integrations.common.OBSERVABLE_MACRO``).
+#: (``integrations.common.OBSERVABLE_MACRO``). Kept as the record of what
+#: was withheld by name; the view itself serves :data:`PUBLISHED_MACRO`.
 WITHHELD_MACRO = frozenset({"qe_pe_boost"})
+
+#: The ``Engine.macro_fields`` keys the market view serves: the figures an
+#: agency, an exchange or a vendor publishes. An allowlist, so a field the
+#: engine gains later is refused until somebody decides a trader could read
+#: it. ``cycle`` and ``gdp_growth`` are the engine's PUBLISHED figures:
+#: ``cycle`` reads the phase as announced (``cycle_publication_lag``, the
+#: NBER's delay), and a GDP publication dial has to put the BEA-style
+#: figure under ``gdp_growth`` the same way. The true phase, the months
+#: spent in it, the phase's GDP target, the recession probability and the
+#: earnings cycle live in ``state_snapshot()["economy"]``, which the view
+#: does not serve.
+PUBLISHED_MACRO = frozenset({
+    "vix", "federal_funds_rate", "corporate_bond_yield", "inflation_rate",
+    "cycle", "gdp_growth", "unemployment_rate", "oil_price", "tariff_rate",
+    "treasury_yield_10y", "treasury_yield_2y", "fear_greed_index",
+})
+
+#: Engine state a probe of pt-v20 read through the live engine, and why each
+#: is refused. Named so the refusal says what the thing is; anything not
+#: served is refused whether it is named here or not.
+HIDDEN_STATE = {
+    "state_snapshot": "the whole engine state: the generator (so a copy "
+                      "restored elsewhere runs the future) and the economy "
+                      "block, which holds the true business-cycle phase, "
+                      "months_in_current_phase, phase_gdp_target, "
+                      "recession_probability and earnings_cycle",
+    "earnings_anticipation": "the earnings cycle's anticipated offset, which "
+                             "jumps on the close of every true turn of phase, "
+                             "before the turn is published",
+    "fundamentals": "the fundamental each price is anchored to",
+    "session_mispricing_s": "the mispricing, tick by tick: log(price) less "
+                            "it is the fundamental",
+    "truth": "the answer key, tick by tick",
+    "attribution": "the factor decomposition of every move",
+    "model_params": "the model's dials, the cycle's hazards among them",
+    "macro_table": "the full macro path, the true phase included",
+    "fork": "a copy of the market that can be run ahead: look-ahead",
+}
 
 _OPT_IN = ("Agents see a read-only market view. An agent that needs hidden "
            "state declares `privileged = True` and reads `obs.hidden`; "
@@ -106,6 +170,10 @@ class SandboxError(AttributeError):
 
 
 def _refuse(what: str, name: str) -> SandboxError:
+    why = HIDDEN_STATE.get(name)
+    if why:
+        return SandboxError(f"{what} has no {name!r}: it is {why}, which no "
+                            f"trader can see. {_OPT_IN}")
     return SandboxError(f"{what} has no {name!r}. {_OPT_IN}")
 
 
@@ -183,8 +251,11 @@ class MarketView:
         """One of :data:`PUBLIC_COLUMNS`, as little-endian f64 bytes."""
         if field not in PUBLIC_COLUMNS:
             raise SandboxError(
-                f"column {field!r} is simulator state, not market data. "
-                f"The market view serves {sorted(PUBLIC_COLUMNS)}. {_OPT_IN}")
+                f"column {field!r} is simulator state, not market data"
+                + ("; log price less it is the fundamental"
+                   if field.startswith("mispricing_s") else "")
+                + f". The market view serves {sorted(PUBLIC_COLUMNS)}. "
+                f"{_OPT_IN}")
         return self.__engine.column(field)
 
     def book(self, ticker: str):
@@ -204,14 +275,22 @@ class MarketView:
 
     @property
     def macro_fields(self) -> dict[str, Any]:
+        """The published macro fields (:data:`PUBLISHED_MACRO`)."""
         return {k: v for k, v in self.__engine.macro_fields.items()
-                if k not in WITHHELD_MACRO}
+                if k in PUBLISHED_MACRO}
 
+    @property
     def curve(self) -> dict[str, float]:
-        return dict(self.__engine.curve())
+        """The yield curve, as ``Engine.curve`` (a property there too)
+        gives it, copied. Until this was a property it raised on every
+        call, because the engine's is not a method."""
+        return dict(self.__engine.curve)
 
+    @property
     def rate_instruments(self) -> list[dict[str, Any]]:
-        return [dict(row) for row in self.__engine.rate_instruments()]
+        """Each rate index's quote, as ``Engine.rate_instruments`` (a
+        property there too) gives it, copied. Fixed with ``curve``."""
+        return [dict(row) for row in self.__engine.rate_instruments]
 
     def news(self) -> list[dict[str, Any]]:
         """Today's company and sector news: who, not how much.
