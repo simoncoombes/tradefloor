@@ -6620,6 +6620,21 @@ mod tests {
         )
     }
 
+    /// [`engine`] under pt-v19: the snapshot-priced flow path, where an
+    /// agent's fills reach the first tick's `order_volumes`. pt-v20, the
+    /// default from 0.8.5, turns `fill_impact_coefficient` on and routes them
+    /// through the agent-facing book's pending flow instead.
+    fn engine_v19(seed: u32) -> Engine {
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            crate::params::PT_V19,
+        )
+    }
+
     fn request(hour: i64, minute: i64) -> TickRequest<'static> {
         TickRequest {
             time: GameTime {
@@ -7143,12 +7158,12 @@ mod tests {
         let variances = vec![0.000225; 3];
         let fills = vec![("A".to_string(), OrderVolume { buy: 40_000.0, sell: 0.0 })];
 
-        let mut once = engine(11);
+        let mut once = engine_v19(11);
         once.open_market();
         let mut buf = SessionBuffer::new();
         once.run_session(&stepped(65, 0, &[], &fills, &innovations, &variances), &mut buf);
 
-        let mut spelled = engine(11);
+        let mut spelled = engine_v19(11);
         spelled.open_market();
         spelled.tick(&TickRequest {
             order_volumes: &fills,
@@ -7187,7 +7202,7 @@ mod tests {
             .unwrap();
 
         let run = |standing: &[(String, OrderVolume)], fills: &[(String, OrderVolume)]| {
-            let mut e = engine(11);
+            let mut e = engine_v19(11);
             e.open_market();
             let mut buf = SessionBuffer::new();
             e.run_session(&stepped(65, 0, standing, fills, &innovations, &variances), &mut buf);
@@ -7615,8 +7630,18 @@ mod tests {
         // Two identical engines, one told that every company doubled its
         // earnings. If the prices came out the same, syncing fundamentals
         // would be pointless work.
+        //
+        // The revision lands after the open. Before it, pt-v20's stationary
+        // opening (the default from 0.8.5) adopts any premium into the
+        // mispricing so the opening price holds, and a revision there moved
+        // no price inside a 60-tick session; after the open it moves the
+        // price on every preset.
         let mut stale = engine(11);
         let mut fresh = engine(11);
+        for e in [&mut stale, &mut fresh] {
+            e.open_market();
+            e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        }
 
         let n = fresh.len();
         let (eps, book, growth) = fresh.fundamentals();
@@ -7626,8 +7651,7 @@ mod tests {
             .expect("one value per company");
 
         for e in [&mut stale, &mut fresh] {
-            e.open_market();
-            e.run_session(&session(60, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+            e.run_session(&stepped(60, 30, &[], &[], &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
         }
 
         let a = stale.prices();

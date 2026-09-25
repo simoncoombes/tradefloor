@@ -8699,7 +8699,9 @@ mod tests {
         // could not move the default by accident; the move is deliberate
         // now, and the assertion moved with it.
         assert_eq!(crate::params::PT_V19.fingerprint(), "pt-v19");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v19");
+        // pt-v20 took the default at 0.8.5, on the same deliberate move.
+        assert_eq!(crate::params::PT_V20.fingerprint(), "pt-v20");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v20");
     }
 
     #[test]
