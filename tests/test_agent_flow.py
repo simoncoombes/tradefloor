@@ -21,6 +21,14 @@ session's first tick, and a refusal of the old one. What this file holds:
   fill costs at least the permanent impact its own order leaves behind;
 - the log: new sessions record ``fills`` and ``flow_per_tick``, and a log
   written before 0.8.5 still replays into the market it recorded.
+
+Two presets carry an agent's trades two ways. On pt-v19 ``Portfolio.execute``
+prices an order off a snapshot of the book and the harness hands the flow to
+the next session as ``fills``. On pt-v20, the default, the agent-facing book
+is live: the order executes in the engine's own book, the engine applies its
+flow on the next tick under the linear law (``fill_impact_coefficient``), and
+``fills`` carries nothing for it. The entry-point tests run on both, and the
+tests that feed a snapshot-priced portfolio's ``pending_flow`` name pt-v19.
 """
 
 from __future__ import annotations
@@ -38,6 +46,13 @@ from tradefloor.harness import session_clock
 ROSTER = tf.Universe.random(20, seed=93001)
 TICKS = 65
 STEPS = 6
+
+#: The preset without the agent-facing book and the one with it. An agent's
+#: fills reach the market through ``fills`` on the first and through the
+#: engine's book on the second.
+SNAPSHOT_PRESET = "pt-v19"
+BOOK_PRESET = "pt-v20"
+FLOW_PRESETS = (SNAPSHOT_PRESET, BOOK_PRESET)
 
 
 def f64(buf: bytes) -> list[float]:
@@ -69,43 +84,72 @@ def test_run_session_refuses_order_flow_and_logs_nothing():
     assert len(e.order_log) == before
 
 
-def test_fills_are_one_tick_of_order_flow_then_nothing():
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_fills_are_one_tick_of_order_flow_then_nothing(preset):
     """The whole contract, as the market the tick loop already defines: a
-    session carrying ``fills`` is the same market, to the bit, as one tick
-    carrying them as ``order_flow`` and the rest of the session without."""
+    session carrying ``fills`` is the same market, to the bit, as a one-tick
+    session carrying them and the rest of the session without.
+
+    On pt-v19 it is also one tick carrying them as ``order_flow``. On pt-v20
+    the linear law prices them as agent flow through the engine's book
+    instead, which a raw tick's ``order_flow`` does not reach, so that
+    spelling is the imbalance law's alone."""
     t = ROSTER[thinnest(ROSTER)].ticker
     fills = {t: (1_000.0, 0.0), ROSTER[3].ticker: (0.0, 25_000.0)}
 
-    once = Engine(seed=92001, universe=ROSTER)
+    once = Engine(seed=92001, universe=ROSTER, model=preset)
     once.open_market()
     once.run_session(10, 35, 3, TICKS, fills=fills)
 
-    spelled = Engine(seed=92001, universe=ROSTER)
-    spelled.open_market()
-    spelled.tick(10, 35, 3, order_flow=fills)
-    spelled.run_session(10, 36, 3, TICKS - 1)
+    split = Engine(seed=92001, universe=ROSTER, model=preset)
+    split.open_market()
+    split.run_session(10, 35, 3, 1, fills=fills)
+    split.run_session(10, 36, 3, TICKS - 1)
 
-    assert once.prices() == spelled.prices()
-    assert once.draws_consumed == spelled.draws_consumed
+    assert once.prices() == split.prices()
+    assert once.draws_consumed == split.draws_consumed
+
+    if preset == SNAPSHOT_PRESET:
+        spelled = Engine(seed=92001, universe=ROSTER, model=preset)
+        spelled.open_market()
+        spelled.tick(10, 35, 3, order_flow=fills)
+        spelled.run_session(10, 36, 3, TICKS - 1)
+        assert once.prices() == spelled.prices()
+        assert once.draws_consumed == spelled.draws_consumed
 
 
-def test_a_step_counts_an_order_once_where_a_standing_flow_counts_it_65_times():
+#: What 1,000 shares of the thinnest name, passed as ``fills``, moves ``s``
+#: by. pt-v19 prices it by the imbalance law, one tick of order flow; pt-v20
+#: by the linear law, ``gamma sigma q / V`` with ``gamma`` 0.314.
+ONCE = {SNAPSHOT_PRESET: 6.730769e-4, BOOK_PRESET: 5.401555e-4}
+
+#: What the same 1,000 shares moves ``s`` by as ONE tick of order flow, the
+#: imbalance law's, which a standing ``flow_per_tick`` applies on every tick
+#: under either preset.
+ONE_TICK_OF_FLOW = 6.730769e-4
+
+
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_a_step_counts_an_order_once_where_a_standing_flow_counts_it_65_times(preset):
     """Measured on the thinnest name of the suite's first roster (average
-    volume 10,337 shares): 1,000 shares moves ``s`` by 6.73 bp once, and by
-    437.5 bp held for a 65-tick step, which is what every harness did."""
+    volume 10,337 shares): 1,000 shares passed as ``fills`` moves ``s`` by
+    6.73 bp on pt-v19 and 5.40 bp on pt-v20, the same over a one-tick
+    session as over a 65-tick step, and by 437.5 bp held for a 65-tick step,
+    which is what every harness did."""
     i = thinnest(ROSTER)
     t = ROSTER[i].ticker
 
-    def impact(**kwargs) -> float:
-        e = Engine(seed=92001, universe=ROSTER)
+    def impact(ticks=TICKS, **kwargs) -> float:
+        e = Engine(seed=92001, universe=ROSTER, model=preset)
         e.open_market()
-        e.run_session(9, 30, 3, TICKS, **kwargs)
+        e.run_session(9, 30, 3, ticks, **kwargs)
         return flow_attribution(e, i)
 
     once = impact(fills={t: (1_000.0, 0.0)})
     held = impact(flow_per_tick={t: (1_000.0, 0.0)})
-    assert once == pytest.approx(6.730769e-4, rel=1e-6)
-    assert held / once == pytest.approx(65.0, rel=1e-9)
+    assert once == pytest.approx(ONCE[preset], rel=1e-6)
+    assert impact(1, fills={t: (1_000.0, 0.0)}) == once
+    assert held == pytest.approx(65.0 * ONE_TICK_OF_FLOW, rel=1e-6)
 
 
 def test_an_untraded_step_is_unchanged():
@@ -146,20 +190,28 @@ class BuyOnceThenHold:
 
 
 def reference_net_worth(ticker: str, shares: float, *, seed: int, days: int,
-                        standing: bool = False) -> float:
+                        model: str, standing: bool = False) -> float:
     """The same trade, stepped by hand with the flow applied through
     `Engine.tick` on the minute after the fill. ``standing`` holds it on
-    every tick of the step instead, which is what the harnesses did."""
-    e = Engine(seed=seed, universe=ROSTER)
+    every tick of the step instead, which is what the harnesses did.
+
+    On a live book the engine applies the flow itself and the portfolio
+    holds none, so the step runs as it is. ``standing`` then holds the
+    filled shares on every tick on top of that."""
+    e = Engine(seed=seed, universe=ROSTER, model=model)
     p = Portfolio(cash=1_000_000.0, max_leverage=2.0)
     step = 0
     for _ in range(days):
         e.open_market()
         for k in range(STEPS):
             if step == 0:
-                p.execute(e, ticker, shares)
+                fill = p.execute(e, ticker, shares)
             flow = p.pending_flow()
             p.clear_flow()
+            if e.book_live:
+                assert flow == {}, "the engine's book carries the flow"
+                flow = ({ticker: (fill["quantity"], 0.0)}
+                        if standing and step == 0 else {})
             h, m, d = session_clock((9, 30, 3), k, TICKS)
             if flow and not standing:
                 e.tick(h, m, d, order_flow=flow)
@@ -180,75 +232,111 @@ def trade():
 
 @pytest.fixture(scope="module")
 def expected(trade):
+    """The reference net worth on each preset."""
     ticker, shares = trade
-    once = reference_net_worth(ticker, shares, seed=92001, days=2)
-    held = reference_net_worth(ticker, shares, seed=92001, days=2,
-                               standing=True)
-    # The two must differ, or none of the equalities below could tell a
-    # harness that applies the flow once from one that holds it.
-    assert once != held
-    return once
+    out = {}
+    for preset in FLOW_PRESETS:
+        once = reference_net_worth(ticker, shares, seed=92001, days=2,
+                                   model=preset)
+        held = reference_net_worth(ticker, shares, seed=92001, days=2,
+                                   model=preset, standing=True)
+        # The two must differ, or none of the equalities below could tell a
+        # harness that applies the flow once from one that holds it.
+        assert once != held, preset
+        out[preset] = once
+    return out
 
 
-def test_evaluate_applies_the_flow_once(trade, expected):
+def applied_once_in_the_book(engine: Engine, ticker: str,
+                             bought: dict[str, float]) -> None:
+    """On a live book: no session carried the agents' fills, and the engine
+    applied each agent's flow once, on the first tick of the day."""
+    sessions = [x for x in engine.order_log if x["op"] == "run_session"]
+    assert all(not x["fills"] and not x["flow_per_tick"] for x in sessions)
+    rows = engine.take_impacts()
+    assert sorted((r["agent"], r["ticker"], r["bought"], r["sold"]) for r in rows) == (
+        sorted((agent, ticker, q, 0.0) for agent, q in bought.items()))
+    assert all(r["day"] == 0 and r["tick"] == 0 for r in rows)
+
+
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_evaluate_applies_the_flow_once(trade, expected, preset):
     ticker, shares = trade
     card = tf.evaluate({"a": BuyOnceThenHold(ticker, shares)}, seed=92001,
-                       universe=ROSTER, days=2)["a"]
-    assert card.final_net_worth == expected
+                       universe=ROSTER, days=2, model=preset)["a"]
+    assert card.final_net_worth == expected[preset]
 
 
-def test_the_gym_environment_applies_the_flow_once(trade):
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_the_gym_environment_applies_the_flow_once(trade, preset):
     np = pytest.importorskip("numpy")
     from tradefloor.gym import TradingEnv
     ticker, _ = trade
-    env = TradingEnv(universe=ROSTER, seed=92001, days=1)
+    env = TradingEnv(universe=ROSTER, seed=92001, days=1, model=preset)
     env.reset()
     action = np.zeros(len(ROSTER))
     action[ROSTER.tickers().index(ticker)] = 0.001
     env.step(action)
+    if env.engine.book_live:
+        (order,) = [x for x in env.engine.order_log if x["op"] == "submit"]
+        applied_once_in_the_book(env.engine, ticker,
+                                 {order["agent"]: order["quantity"]})
+        return
     sessions = [x for x in env.engine.order_log if x["op"] == "run_session"]
     assert sessions[0]["fills"], "the step's trade reached the session"
     assert sessions[0]["flow_per_tick"] == {}
 
 
-def test_tca_applies_the_flow_once(trade, expected):
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_tca_applies_the_flow_once(trade, expected, preset):
     from tradefloor import tca
     ticker, shares = trade
     execution = tca.analyse(BuyOnceThenHold(ticker, shares), seed=92001,
-                            universe=ROSTER, days=2)
+                            universe=ROSTER, days=2, model=preset)
     final = dict(zip(execution.tickers, execution.actual_path[-1]))
     held = execution.portfolio.positions[ticker].quantity
-    assert execution.portfolio.cash + held * final[ticker] == expected
+    assert execution.portfolio.cash + held * final[ticker] == expected[preset]
 
 
-def test_a_counterfactual_world_applies_the_flow_once(trade, expected):
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_a_counterfactual_world_applies_the_flow_once(trade, expected, preset):
     from tradefloor.counterfactual import World
     ticker, shares = trade
-    world = World(seed=92001, universe=ROSTER,
+    world = World(seed=92001, universe=ROSTER, model=preset,
                   agent=BuyOnceThenHold(ticker, shares))
     world.run(days=2)
-    assert world.trace[-1]["net_worth"] == expected
+    assert world.trace[-1]["net_worth"] == expected[preset]
+    if world.engine.book_live:
+        applied_once_in_the_book(world.engine, ticker, {
+            world.portfolio.owner: world.portfolio.fills[0]["quantity"]})
+        return
     sessions = [x for x in world.engine.order_log if x["op"] == "run_session"]
     assert sessions[0]["fills"] and not sessions[0]["flow_per_tick"]
     assert all(not x["fills"] for x in sessions[1:])
 
 
-def test_a_cohort_sends_its_merged_fills_once(trade):
+@pytest.mark.parametrize("preset", FLOW_PRESETS)
+def test_a_cohort_sends_its_merged_fills_once(trade, preset):
     """Two agents buying the same name in one step: the market sees their
-    sum, once, on the step's first tick. Each fills what the unconsumed book
-    holds (800 shares of this name fill 513 each), so the sum is read off
-    their fills rather than off what they asked for."""
+    sum, once, on the step's first tick. On pt-v19 each fills what the
+    unconsumed ladder holds (800 shares of this name fill 513 each), so the
+    sum is read off their fills rather than off what they asked for. On
+    pt-v20 each fills 800 in the shared book and the engine applies each
+    agent's flow once."""
     from tradefloor.counterfactual import World
     ticker, shares = trade
-    world = World(seed=92001, universe=ROSTER,
+    world = World(seed=92001, universe=ROSTER, model=preset,
                   agents={"a": BuyOnceThenHold(ticker, shares),
                           "b": BuyOnceThenHold(ticker, shares)})
     world.run(days=1)
+    filled = {name: sum(f["quantity"] for f in p.fills)
+              for name, p in world.portfolios.items()}
+    assert all(q > 0 for q in filled.values())
+    if world.engine.book_live:
+        applied_once_in_the_book(world.engine, ticker, filled)
+        return
     sessions = [x for x in world.engine.order_log if x["op"] == "run_session"]
-    filled = sum(f["quantity"] for p in world.portfolios.values()
-                 for f in p.fills)
-    assert filled > 0
-    assert sessions[0]["fills"][ticker] == [filled, 0.0]
+    assert sessions[0]["fills"][ticker] == [sum(filled.values()), 0.0]
     assert all(not x["fills"] and not x["flow_per_tick"] for x in sessions[1:])
 
 
@@ -259,8 +347,13 @@ def round_trip(universe, seed: int, index: int, shares: float, *,
                feed: str | None) -> dict:
     """Buy at the first step of day 1, flatten at the second, after one
     untraded day. ``feed`` is how the flow reaches the market: ``fills``,
-    ``flow_per_tick`` (the pre-0.8.5 harness) or None (not at all)."""
-    e = Engine(seed=seed, universe=universe)
+    ``flow_per_tick`` (the pre-0.8.5 harness) or None (not at all).
+
+    On pt-v19, whose portfolio prices off a snapshot and holds the flow for
+    the harness to feed. On pt-v20 the engine's book applies the flow itself
+    and ``feed`` has nothing to carry; ``test_order_book_depth.py`` runs the
+    same round trips through that book."""
+    e = Engine(seed=seed, universe=universe, model=SNAPSHOT_PRESET)
     p = Portfolio(cash=1e10)
     t = e.tickers[index]
     e.open_market()
@@ -320,9 +413,10 @@ def held_rows():
 
 def test_no_round_trip_profits_from_its_own_impact(once_rows):
     """Buy, then sell a step later, on every name of three 20-name rosters
-    at one share, 1% and 2% of daily volume: 180 round trips. What feeding
-    its own flow adds to the P&L never covers what the book charged for the
-    trip, so the trip is a loss before the market's own move in every case.
+    at one share, 1% and 2% of daily volume on pt-v19, whose harness feeds
+    the flow: 180 round trips. What feeding its own flow adds to the P&L
+    never covers what the book charged for the trip, so the trip is a loss
+    before the market's own move in every case.
 
     Measured 2026-09-24 on 400 trips (five rosters, four sizes): no trip's
     own-impact gain exceeded its cost, and the largest gain, +31.7 bp on a
@@ -334,21 +428,21 @@ def test_no_round_trip_profits_from_its_own_impact(once_rows):
 
 
 def test_the_pre_fix_harness_fails_the_same_test(held_rows):
-    """Non-vacuity. Holding the flow for the step, as the harness did, pays
-    for itself in a quarter of the trips: measured on 400, 17% of one-share
-    trips and 26% of 2% trips gained more from their own impact than they
-    paid, by up to 232 bp. A test that the old harness passed would prove
-    nothing."""
+    """Non-vacuity, on pt-v19 with the round trips above. Holding the flow
+    for the step, as the harness did, pays for itself in a quarter of the
+    trips: measured on 400, 17% of one-share trips and 26% of 2% trips
+    gained more from their own impact than they paid, by up to 232 bp. A
+    test that the old harness passed would prove nothing."""
     over = [r for r in held_rows if r["gain_bp"] > r["cost_bp"]]
     assert len(over) >= len(held_rows) // 10
 
 
 def test_a_one_share_agent_sees_no_impact_of_its_own(once_rows, held_rows):
     """One share moves the print the agent meets at its next step by
-    nothing on average: measured on the 60 one-share trips here, a mean
-    within 2 bp of zero, where holding the flow for the step made it +9 bp
-    on the 100 of the investigation's grid. Case by case it is the same
-    settlement noise the round trips carry."""
+    nothing on average: measured on the 60 one-share trips here, on
+    pt-v19, a mean within 2 bp of zero, where holding the flow for the step
+    made it +9 bp on the 100 of the investigation's grid. Case by case it is
+    the same settlement noise the round trips carry."""
     once = [r["self_bp"] for r in once_rows if r["frac"] == 0.0]
     held = [r["self_bp"] for r in held_rows if r["frac"] == 0.0]
     assert abs(sum(once) / len(once)) < 2.0

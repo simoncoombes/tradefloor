@@ -312,8 +312,8 @@ def test_no_price_reveals_tomorrows_yield():
 
 # -- the packaged scenarios ------------------------------------------------------
 
-def _scenario_run(scenario, days, seed=3):
-    e = tf.Engine(seed=seed, universe=universe(8))
+def _scenario_run(scenario, days, seed=3, model=None):
+    e = tf.Engine(seed=seed, universe=universe(8), model=model)
     closes = []
     for d in range(days):
         if scenario is not None:
@@ -367,13 +367,34 @@ def test_a_scenario_path_can_pin_the_treasury_curve():
 
 
 def test_the_rate_shock_reaches_the_2_year_at_that_evenings_close():
+    """On pt-v19, whose 2-year is the formula (0.85 of the policy rate and
+    0.15 of the 10-year), rewritten at every close: the shock reaches it
+    whole that evening. Measured -3.45 per cent on day 51. pt-v20 gives
+    the 2-year its own process; the test below measures that one."""
     scenario = tf.Scenario.load("rate_shock")
-    shocked = _scenario_run(scenario, 53)
-    base = _scenario_run(None, 53)
+    shocked = _scenario_run(scenario, 53, model="pt-v19")
+    base = _scenario_run(None, 53, model="pt-v19")
     day50 = shocked[50]["UST2Y"] / shocked[49]["UST2Y"] - base[50]["UST2Y"] / base[49]["UST2Y"]
     day51 = shocked[51]["UST2Y"] / shocked[50]["UST2Y"] - base[51]["UST2Y"] / base[50]["UST2Y"]
     assert abs(day50) < 1e-4
     assert -0.035 < day51 < -0.030
+
+
+def test_the_rate_shock_reaches_pt_v20s_2_year_over_the_following_weeks():
+    """pt-v20's 2-year (``treasury_2y_noise`` 0.022) closes 5 per cent of
+    its gap to the formula each session, so the shock reaches it over
+    weeks rather than that evening. Nothing on day 50; -0.11 per cent
+    below the unshocked world on day 51, where pt-v19 moves -3.45; then a
+    gap that widens every session, -1.30 per cent by day 60 and -2.14 by
+    day 70."""
+    scenario = tf.Scenario.load("rate_shock")
+    shocked = _scenario_run(scenario, 71, model="pt-v20")
+    base = _scenario_run(None, 71, model="pt-v20")
+    gap = [s["UST2Y"] / b["UST2Y"] - 1.0 for s, b in zip(shocked, base)]
+    assert abs(gap[50]) < 1e-4
+    assert -0.002 < gap[51] < -0.0005
+    assert all(gap[d + 1] < gap[d] for d in range(51, 70))
+    assert -0.025 < gap[70] < -0.018
 
 
 def test_a_held_corporate_yield_holds_the_corporate_index():

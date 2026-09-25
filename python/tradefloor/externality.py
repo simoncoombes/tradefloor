@@ -71,12 +71,13 @@ And b's own reaction to the market a made, which is in the number too.
 Separating that one needs a third arm in which b sees a's prices and
 answers as though it did not, and there is no such arm.
 
-None of the three is the order book. On every shipped preset agents in a
-cohort take no levels from each other, because :meth:`Portfolio.execute`
-reads the ladder and removes nothing. Under a model with ``book_shared`` on
-they do: an agent later in a step's arrival order meets the book an earlier
-one left. That arrives through fills rather than prices, so it is measured
-apart, as :attr:`Externality.levels`: ``levels[a][b]`` is what b's
+None of the three is the order book. On every preset through pt-v19 agents
+in a cohort take no levels from each other, because
+:meth:`Portfolio.execute` reads the ladder and removes nothing. Under a
+model with ``book_shared`` on, as pt-v20, the default, has it, they do: an
+agent later in a step's arrival order meets the book an earlier one left.
+That arrives through fills rather than prices, so it is measured apart, as
+:attr:`Externality.levels`: ``levels[a][b]`` is what b's
 execution cost against each step's opening mid changes by when a stops
 trading, positive when a made b's fills dearer. It is zero, to the cent,
 wherever the book is not shared, and it is in ``matrix`` as well, where it
