@@ -8680,7 +8680,7 @@ mod tests {
 
     /// pt-v20 with every branch of the valuation live: the buyback term,
     /// the earnings cycle and its anticipation, and the re-mark itself.
-    fn engine_repricing(seed: u32, on: bool) -> Engine {
+    fn engine_repricing(seed: u64, on: bool) -> Engine {
         let mut p = ModelParams::preset("pt-v20").expect("pt-v20 ships");
         p.buyback_payout_share = 0.75;
         p.earnings_anticipation_half_life = 126.0;
