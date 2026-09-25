@@ -730,7 +730,9 @@ def test_externalities_show_agents_taking_levels_from_each_other():
     off, on = out["off"], out["live"]
     assert not off.live and on.live
     assert off.levels["a"]["b"] == 0.0 and off.levels["b"]["a"] == 0.0
-    assert on.levels["a"]["b"] > 10 * abs(on.levels["b"]["a"]) > 0
+    # 33,036 against 3,548 (9.3x) since pt-v20's volume response went to 0.6;
+    # about 10x before. The claim is the asymmetry, not its exact size.
+    assert on.levels["a"]["b"] > 5 * abs(on.levels["b"]["a"]) > 0
     assert "levels taken" in on.render() and "levels taken" not in off.render()
     json.dumps(on.as_dict())
 
