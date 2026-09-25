@@ -3029,6 +3029,12 @@ impl PyEngine {
         if vix_sets_variance {
             self.inner.set_vix_sets_variance_pending(true);
         }
+        // A PINNED VIX CHARGES THE CREDIT SPREAD NOTHING TONIGHT: the close's
+        // VIX move is the law's reversion from the level written here. Only
+        // turned on, as the mark above is. See `Engine::vix_pinned_today`.
+        if vix.is_some() {
+            self.inner.set_vix_pinned_today(true);
+        }
         Ok(())
     }
 
@@ -3653,6 +3659,9 @@ impl PyEngine {
         if self.inner.vix_sets_variance_pending() {
             out.set_item("vix_sets_variance_pending", true)?;
         }
+        if self.inner.vix_pinned_today() {
+            out.set_item("vix_pinned_today", true)?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -4224,6 +4233,12 @@ impl PyEngine {
             None => false,
         };
         self.inner.set_vix_sets_variance_pending(pending);
+        // Absent means no VIX pin was standing today when it was taken.
+        let pinned: bool = match snapshot.get_item("vix_pinned_today")? {
+            Some(v) => v.extract()?,
+            None => false,
+        };
+        self.inner.set_vix_pinned_today(pinned);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

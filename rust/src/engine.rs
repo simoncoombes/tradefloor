@@ -465,6 +465,15 @@ pub struct Engine {
     /// epicentre pin is: a fork taken between the pin and the close that
     /// dropped it would close a forced session as a free one.
     vix_sets_variance_pending: bool,
+    /// A caller wrote the VIX today (`pin_macro` with a VIX), so tonight's
+    /// close charges the corporate yield no VIX term: the close's VIX move
+    /// is the law's reversion from the written level, which the next pin
+    /// discards (`economy::daily`, the corporate yield between meetings).
+    /// Set only while `corporate_yield_daily` is on, cleared by the close,
+    /// and carried by the snapshot and the state hash only while true, as
+    /// `vix_sets_variance_pending` is, so no engine that never pins, and no
+    /// preset through pt-v19, hashes or snapshots differently.
+    vix_pinned_today: bool,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -1066,6 +1075,7 @@ impl Engine {
             crisis_epicentre: -1,
             crisis_epicentre_pin: None,
             vix_sets_variance_pending: false,
+            vix_pinned_today: false,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -3394,6 +3404,18 @@ impl Engine {
         self.vix_sets_variance_pending = on;
     }
 
+    /// Whether tonight's close charges the corporate yield no VIX term,
+    /// because the VIX was pinned today. See `vix_pinned_today`.
+    pub fn vix_pinned_today(&self) -> bool {
+        self.vix_pinned_today
+    }
+
+    /// Mark (or restore) today's VIX pin. A mark is kept only while
+    /// `corporate_yield_daily` is on, the one reader.
+    pub fn set_vix_pinned_today(&mut self, on: bool) {
+        self.vix_pinned_today = on && self.params.corporate_yield_daily != 0.0;
+    }
+
     /// The VIX-ratio denominator a FORCED close uses.
     ///
     /// Off `market_vol_vix_excursion` the denominator is the anchor, a
@@ -4544,6 +4566,7 @@ impl Engine {
                     flight_to_quality_gain: self.params.flight_to_quality_gain,
                     flight_to_quality_day: self.params.flight_to_quality_day,
                     corporate_yield_daily: self.params.corporate_yield_daily,
+                    vix_pinned: self.vix_pinned_today,
                 },
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
@@ -4552,6 +4575,8 @@ impl Engine {
             },
             rng,
         );
+        // The close has read today's VIX pin; tomorrow's is its own.
+        self.vix_pinned_today = false;
         rng.site(Site::EconomyCycle, 0);
         let spec = self.cycle_spec();
         self.economy = check_cycle_transition_for(&self.economy, rng, &spec);
@@ -5835,6 +5860,11 @@ impl Engine {
         // that was never forced hashes as it did before the mark existed.
         if self.vix_sets_variance_pending {
             hash_bool(&mut buf, true);
+        }
+        // Today's VIX pin, likewise only while true. The two marks are
+        // distinguished by a tag, so neither alone hashes as the other.
+        if self.vix_pinned_today {
+            hash_f64(&mut buf, 7.0);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

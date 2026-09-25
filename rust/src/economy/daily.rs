@@ -304,6 +304,11 @@ pub struct YieldDials {
     /// A switch: 1.0 moves the corporate yield every session. See
     /// [`crate::params::ModelParams::corporate_yield_daily`].
     pub corporate_yield_daily: f64,
+    /// A caller pinned the VIX before this session (`Engine::vix_pinned_today`).
+    /// The close's VIX move is then the VIX law's reversion from a level the
+    /// caller wrote, which the next pin discards, so the corporate yield
+    /// takes no VIX term from it. Read only with `corporate_yield_daily` on.
+    pub vix_pinned: bool,
 }
 
 impl Default for YieldDials {
@@ -314,6 +319,7 @@ impl Default for YieldDials {
             flight_to_quality_gain: 0.02,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
+            vix_pinned: false,
         }
     }
 }
@@ -1553,6 +1559,21 @@ pub fn update_economy_daily(
     // VIX slope (2 bp a point, times the cycle phase's multiplier) on the
     // session's VIX change: increments, so a scenario's write to the level
     // survives, and the next meeting re-anchors the level to the formula.
+    //
+    // A PINNED VIX TAKES NO VIX TERM. When a caller wrote the VIX before the
+    // session (`Scenario().hold(vix=...)`, `pin_macro(vix=...)`), the close
+    // moves it by the VIX law's reversion from the written level, and the
+    // next morning's pin writes the level back without passing through here.
+    // Charging the close's move to the credit spread then ratchets it: under
+    // hold(vix=45) the corporate yield fell 2.81 -> 2.42 per cent in five
+    // sessions with the 10-year flat. It also carried the market return,
+    // which moves the close's VIX, into every name's discount rate, so two
+    // worlds that differ only by one agent's trades no longer agreed on the
+    // names it never touched, against the advice to pin the VIX for exactly
+    // that. The 10-year's own move still passes through, and with it the
+    // flight to quality (`flight_to_quality_day`), which reads the session's
+    // index return: that is a second path from one agent's flow to names it
+    // never touched, which a VIX pin does not hold (`tca.Execution.moved`).
     if inputs.yields.corporate_yield_daily != 0.0 {
         let cycle_spread_multiplier = match economy.cycle_phase {
             CyclePhase::Contraction => 2.8,
@@ -1561,8 +1582,12 @@ pub fn update_economy_daily(
             CyclePhase::Peak => 1.1,
             CyclePhase::Expansion => 1.0,
         };
-        let moved = (new_state.treasury_yield_10y - economy.treasury_yield_10y)
-            + 0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix);
+        let vix_term = if inputs.yields.vix_pinned {
+            0.0
+        } else {
+            0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
+        };
+        let moved = (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term;
         new_state.corporate_bond_yield = mathx::max(
             economy.corporate_bond_yield + moved,
             new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
