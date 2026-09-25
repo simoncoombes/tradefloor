@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v19",
   "fingerprint": "pt-v19",
-  "coefficient_digest": "aaae04fdca6ff3981dd1ccbb7a1439371939af9d154176ef18a40bbf7a2b6493",
+  "coefficient_digest": "0ffe035bde555e1521a947c6e1fbd3e936ccfe5c788d3087c581bd56adc7d179",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -12,6 +12,7 @@
     "book_resting": 0.0,
     "book_shared": 0.0,
     "buyback_payout_share": 0.3333333333333333,
+    "buyback_yield_cap": 0.0,
     "cascade_gain": 1.0,
     "cascade_symmetry": 1.0,
     "closing_auction": 0.0,

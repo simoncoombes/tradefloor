@@ -418,6 +418,11 @@ OUT_OF_SCOPE = {
         "None, so `reprice_to_published_macro` writes nothing and the close's "
         "macro step reaches prices at the next session's first tick "
         "(0.8.5, pt-v20 audit finding 3)",
+    "buyback_yield_cap":
+        "inert at 0.0 as shipped: `market::tick::buyback_scale` compounds "
+        "the uncapped yield. Keeps the term's elasticity under one for a "
+        "name whose price collapses toward the floor (0.8.5, pt-v20 work: "
+        "the close's re-mark diverged on a 0.10 name, grid ptv20vr6)",
     "fair_value_vix_discount":
         "inert at 0.0 as shipped: `market::tick::with_vix_discount` returns "
         "fair value unscaled without reading the VIX. A transient discount "

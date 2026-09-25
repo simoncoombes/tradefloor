@@ -268,6 +268,12 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
         return 1.0;
     }
     let b = p.buyback_payout_share * eps / price;
+    // The yield is read at TODAY's price and applied over every elapsed
+    // year, so a name whose price collapses toward the 0.01 floor reads a
+    // yield of hundreds and a fair value of exp(hundreds): the re-mark's
+    // fixed point then diverges and the price jumps by orders of magnitude
+    // (`buyback_yield_cap`). A branch at 0.0, the arithmetic that stood.
+    let b = if p.buyback_yield_cap == 0.0 { b } else { mathx::min(b, p.buyback_yield_cap) };
     mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
 }
 

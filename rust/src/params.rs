@@ -781,6 +781,22 @@ pub struct ModelParams {
     /// which every preset carries, is unread while the discount is 0.0.
     /// In (0, 200].
     pub fair_value_vix_knee: f64,
+    /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
+    /// price` that the buyback term compounds over the elapsed years. 0.0,
+    /// which every preset carries, is none.
+    ///
+    /// The term reads the yield at today's price and applies it over the
+    /// whole elapsed time, so a name whose price collapses toward the 0.01
+    /// floor reads a yield of hundreds, its fair value runs to exp(hundreds)
+    /// and the close's re-mark (whose fixed point assumes the term's
+    /// elasticity is well under one) diverges: on the leading pt-v20 arm
+    /// with the market permanent share, a name went from 0.10 to 38,220 in
+    /// one close and the index rose 86-fold (seed 821, session 4851), and
+    /// the W100k15d20 control shows the same on 1 of 90 held-out histories.
+    /// Off zero, the yield is capped at this, so the term's elasticity
+    /// stays under one. Read only with `buyback_payout_share` non-zero.
+    /// In [0, 1].
+    pub buyback_yield_cap: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5188,6 +5204,7 @@ impl ModelParams {
             fair_value_market_vol_cap: 0.0,
             fair_value_vix_discount: 0.0,
             fair_value_vix_knee: 30.0,
+            buyback_yield_cap: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7418,6 +7435,7 @@ impl ModelParams {
             "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
             "fair_value_vix_discount" => self.fair_value_vix_discount,
             "fair_value_vix_knee" => self.fair_value_vix_knee,
+            "buyback_yield_cap" => self.buyback_yield_cap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7667,6 +7685,7 @@ impl ModelParams {
             "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
             "fair_value_vix_discount" => out.fair_value_vix_discount = value,
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
+            "buyback_yield_cap" => out.buyback_yield_cap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8039,6 +8058,11 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
+            return Err(format!(
+                "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
+                self.buyback_yield_cap));
         }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
@@ -8553,6 +8577,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_market_vol_cap",
         "fair_value_vix_discount",
         "fair_value_vix_knee",
+        "buyback_yield_cap",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",
