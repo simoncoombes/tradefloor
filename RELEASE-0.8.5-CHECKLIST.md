@@ -16,31 +16,47 @@ skipped, 1 xfailed) and `cargo test` passes 552 of 552.
 
 | digest | value |
 |---|---|
-| `simulationSha256` (KAT 28) | `b0ef10ef...` |
-| `sha256` (known answer) | `92c9cb7c...` |
+| `simulationSha256` (KAT 28) | `4528d93a...` |
+| `sha256` (known answer) | `f4a81e0b...` |
 | `metadataSha256` | `8804ef0e...` |
-| `bondsSha256` | `cd6d532d...` |
+| `bondsSha256` | `b8798418...` |
 | book `sha256` | `1e7f1884...` (BOOK_KAT_VERSION 1) |
-| presets, 19 rows | combined `33d4efcf...`; pt-v20's row `149d72de...` |
+| presets, 19 rows | combined `f131be87...`; pt-v20's row `9befa413...` |
+
+These are at pt-v20's dials of 99969c7 and move again with the final ones.
+The book digest and the eighteen rows before pt-v20 do not.
 
 The eighteen per-preset rows before pt-v20 match the published 0.8.1 wheel
 with the two treasury yields left out.
 
-## 1. The last pt-v20 regrade
+## 1. The last engine changes
 
-- [ ] E3 regrades pt-v20 on the pooled 90 histories: the 28 registered rows
-      and the new D2 row for the driven 2020 path. It may change
-      `volume_move_response` for the ten-year gap.
-- [ ] If any dial moves: merge `fix/ptv20-core`, then re-run RELEASING 5b
-      for the new vector. That means the record and its level block
-      (`tools/presets/level_panel.py` on both presets, `level_rows.py`,
-      `record.py --level-rows`, `envelope_tables.py --write`),
-      `KAT_VERSION` 29 with `tests/known_answer.json` regenerated, and
-      pt-v20's row in `tests/known_answer_presets.json` regenerated.
-      pt-v20 has not shipped, so its row may still change; the other
-      eighteen may not.
+The owner widened 0.8.5 on 2026-09-25 to close the reviewers' remaining
+gaps. Two branches still land, and every step below waits for both.
+
+- [ ] E3's final `fix/ptv20-core`: forward-looking valuation (so the model
+      can fall as fast as March 2020) and the 2022 rate-to-P/E
+      sensitivity, added to pt-v20, then a regrade of every registered row.
+      pt-v20's dials at 99969c7 (`volume_move_response` 0.6, `garch_beta`
+      0.85) are merged but not final.
+- [ ] E7's `feature/seed64`: 64-bit seeds. Seeds below 2**32 stay
+      bit-identical, so every digest is unchanged; check that on the merge
+      with `tests/known_answer.py` and `tests/known_answer_presets.py`.
+- [ ] Once the dials are final, re-run RELEASING 5b for the final vector:
+      pt-v20's record with its level block (`tools/presets/level_panel.py`
+      on pt-v20 and pt-v19, `level_rows.py`, `record.py --level-rows`),
+      `envelope_tables.py --write`, the default's known answer in
+      `tests/known_answer.json`, and pt-v20's row in
+      `tests/known_answer_presets.json`. KAT 28 has never shipped, so it is
+      re-based in place rather than bumped; the eighteen rows before pt-v20
+      may not change.
+- [ ] Re-run the envelope gap measurements on the final vector
+      (`tools/calibration/aws/user-data-envgaps.sh`, one box, about $0.15)
+      and fold them into `envelope.py` and `loss.py`.
 - [ ] The CHANGELOG's pt-v20 figures, the README's realism section,
-      MODEL.md's values and notebooks 00 to 06 and 09 follow any change.
+      MODEL.md's values, notebooks 00 to 06 and 09, and the five LLM
+      fixtures (re-recorded once, after the dials are final) follow the
+      final vector.
 
 ## 2. The docs branch against the final engine
 
