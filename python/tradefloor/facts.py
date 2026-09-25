@@ -17,15 +17,17 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days the default preset, pt-v19, holds all fourteen shape
+**At 252 days the default preset, pt-v20, holds all fourteen shape
 statistics in band on the ruled bands `envelope.score` grades with, and at
 504 days all thirteen the ruled 504-day table can read**
 (`corr_persistence_acf1` is unreadable there). On the 2015-2025 decade bands
-of `REAL_MARKETS` one row is out at both horizons: `sector_excess_corr`,
-0.0904 at 252 days and 0.0906 at 504 against a floor of 0.11. The committed
-record `python/tradefloor/presets/pt-v19.json` is what says so and
-`tests/test_preset_records.py` holds `envelope.CERTIFIED` and
-`MEASURED_504` to it. This headline named pt-v16's record and read "all
+of `REAL_MARKETS` every shape row is in at both horizons, and the closest to
+its edge is `sector_excess_corr`, 0.1112 at 504 days against a floor of
+0.11. The committed record `python/tradefloor/presets/pt-v20.json` is what
+says so and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
+`MEASURED_504` to it. This headline named pt-v19 until 0.8.5, whose
+`sector_excess_corr` was out on the decade bands at both horizons, 0.0904
+at 252 days and 0.0906 at 504. It named pt-v16's record and read "all
 fourteen" at both horizons until 2026-09-23, which was pt-v16 on the decade
 bands. It read "thirteen at 504, the one that
 misses is `volume_change_acf1`" until 2026-09-05: that described pt-v10 and
@@ -121,9 +123,10 @@ reproduces them to about a percent (annualised volatility 41.1 against the
 41.5 below, return autocorrelation +0.244 against +0.249, volume-change
 autocorrelation -0.448 against -0.446), and pt-v1 is still selectable and
 still reads that way. Several of the failures they describe are closed at
-the shipped pt-v19: return autocorrelation reads -0.013, annualised
-volatility 22.8%, lag-one clustering 0.049 and volume-change
-autocorrelation -0.279, all in band. Read `envelope.CERTIFIED` or
+the shipped pt-v20: return autocorrelation reads +0.013, annualised
+volatility 20.1%, lag-one clustering 0.034 and volume-change
+autocorrelation -0.258, all in band (pt-v19: -0.013, 22.8%, 0.049 and
+-0.279). Read `envelope.CERTIFIED` or
 `tradefloor.preset_record()` for the shipped preset's figures.
 
 ## What lands

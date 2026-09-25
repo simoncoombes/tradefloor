@@ -220,6 +220,12 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # and +2.20, the oracle's +206.34 to +2.97. Over five days neither
     # signal pays its costs, which is what a price-only rule should do.
     # The oracle has still never moved.
+    #
+    # Re-measured when pt-v20 became the default: oracle +0.703%,
+    # buy_and_hold +0.279%, momentum -0.947%, random -1.766%,
+    # mean_reversion -1.941%. The order held. The oracle's lead shrank from
+    # 4.65 points to 0.42, because pt-v20 moves each name's own shocks into
+    # its fair value and leaves little cross-sectional mispricing to trade.
     assert ranked == ["oracle", "buy_and_hold", "momentum", "random",
                       "mean_reversion"]
 
@@ -625,15 +631,25 @@ def test_trading_more_often_loses_money_on_the_same_signal():
     """The impact model making "trade more" unprofitable, on its own.
 
     Horizon held at exactly one day; only the rebalance frequency changes.
-    Measured on seed 2026, 40 instruments, 30 days:
+    Measured on seed 2026, 40 instruments, 30 days, on pt-v20:
 
-        3 steps/day   +49.71%
-        6 steps/day   +32.70%
-       12 steps/day    +0.18%
+        3 steps/day    -8.65%    (pt-v19: -13.24%)
+        6 steps/day   -12.82%    (pt-v19: -27.36%)
+       12 steps/day   -23.69%    (pt-v19: -46.53%)
 
     Re-measured after a stepped day stopped re-opening the market at every
-    step. The numbers moved and the shape did not: this
-    asserts the ORDERING, and the ordering is the mechanism.
+    step (then +49.71, +32.70 and +0.18), and again when pt-v20 became the
+    default. The numbers moved and the shape did not: this asserts the
+    ORDERING, and the ordering is the mechanism.
+
+    The spread narrows on pt-v20, from 33.3 points to 15.0, and the tape is
+    why. pt-v20 centres the quote on the model price, which takes out the
+    one-step reversal pt-v19's prints carried (a 65-minute lag-one
+    autocorrelation of -0.187), and a momentum rule that rebalances every
+    step bought into that reversal each time. pt-v20 with
+    `quote_model_weight` and `closing_auction` back at 0.0 reads -21.45,
+    -33.67 and -51.03, a spread of 29.6. What is left on pt-v20 is the cost
+    of crossing the book, which still grows with the rebalance count.
 
     Nothing charges a fee. The orders simply cross a real spread and consume
     real depth four times as often. This is the same mechanism that makes
@@ -655,7 +671,10 @@ def test_trading_more_often_loses_money_on_the_same_signal():
     # against measured values of +49.71 and +0.18: a knife edge that failed on
     # a change to something else entirely, which is a test measuring its own
     # calibration rather than the model.
-    assert returns[0] - returns[2] > 25.0, (
+    #
+    # 11.0 on pt-v20, which measures 15.0 (pt-v19: 25.0 against 33.3), about
+    # the same share of the measurement the old bound was.
+    assert returns[0] - returns[2] > 11.0, (
         f"quadrupling the trade rate cost only {returns[0] - returns[2]:.1f} "
         "points; the impact model has stopped biting"
     )
