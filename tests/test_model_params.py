@@ -852,6 +852,10 @@ PERTURBATIONS = [
     # the bank and the curve. tests/test_unemployment_adjustment.py holds
     # the mechanism.
     ("unemployment_adjustment_half_life", 84.0, True),
+    # INERT by construction: with the publication lags at 0 the published
+    # phase and growth are the true ones, and with them set nothing a price
+    # reads is downstream of the index (tests/test_fear_greed_published.py).
+    ("fear_greed_published_inputs", 1.0, False),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an

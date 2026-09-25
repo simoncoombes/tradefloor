@@ -405,6 +405,14 @@ OUT_OF_SCOPE = {
         "times the spread of a release otherwise, and announced the turn; "
         "84 sessions takes it to 0.16 pp, design repo "
         "programme/ptv20-status-2026-09-25.md)",
+    "fear_greed_published_inputs":
+        "inert at 0.0 as shipped: `DailyInputs::fear_greed_published` is "
+        "None and the index reads the economy's own phase and growth, the "
+        "expression that stood; with both publication lags at 0 the switch "
+        "is inert as well. Nothing a price, the bank, the cycle or a draw "
+        "reads is downstream of the index (0.8.5, pt-v20 work: the index "
+        "fell about 35 points in the five sessions after a contraction "
+        "began, design repo programme/ptv20-status-2026-09-25.md)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

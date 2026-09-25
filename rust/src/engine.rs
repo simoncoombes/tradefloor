@@ -4967,6 +4967,14 @@ impl Engine {
                 trough_growth_floor: self.params.trough_growth_floor,
                 phase_target_range_draw: self.params.phase_target_range_draw,
                 unemployment_adjustment: self.unemployment_adjustment(),
+                // The phase and growth as an observer reads them tonight,
+                // before the step: the same moment the economy's own are
+                // read at with the switch off.
+                fear_greed_published: if self.params.fear_greed_published_inputs != 0.0 {
+                    Some((self.published_cycle_phase(), self.published_gdp_growth()))
+                } else {
+                    None
+                },
                 yields: crate::economy::daily::YieldDials {
                     treasury_10y_noise: self.params.treasury_10y_noise,
                     treasury_2y_noise: self.params.treasury_2y_noise,

@@ -282,6 +282,10 @@ pub struct DailyInputs<'a> {
     /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
     /// and the release adds the drive whole, as it always has.
     pub unemployment_adjustment: f64,
+    /// The business-cycle phase and the GDP growth (percent) the fear/greed
+    /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
+    /// or `None` for the economy's own, as it always read them.
+    pub fear_greed_published: Option<(CyclePhase, f64)>,
     /// The yield curve's daily dials (pt-v20). See [`YieldDials`].
     pub yields: YieldDials,
 }
@@ -355,6 +359,7 @@ impl<'a> Default for DailyInputs<'a> {
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
             unemployment_adjustment: 0.0,
+            fear_greed_published: None,
             yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
@@ -1667,7 +1672,14 @@ pub fn update_economy_daily(
     }
 
     // ── Fear/greed ────────────────────────────────────────────────────────
-    let fear_greed_phase_bonus = match economy.cycle_phase {
+    // `fear_greed_published_inputs`: the phase and growth the index reads
+    // are the published ones the engine passes in, the economy's own with
+    // the switch off (`None`), which is the expression that stood.
+    let (fear_greed_phase, fear_greed_growth) = match inputs.fear_greed_published {
+        Some((phase, growth)) => (phase, growth),
+        None => (economy.cycle_phase, economy.gdp_growth),
+    };
+    let fear_greed_phase_bonus = match fear_greed_phase {
         CyclePhase::Expansion => 15.0,
         CyclePhase::Peak => 5.0,
         CyclePhase::Contraction => -25.0,
@@ -1675,7 +1687,7 @@ pub fn update_economy_daily(
         CyclePhase::Recovery => 10.0,
     };
     let market_sentiment = inputs.market_return_pct * 5.0;
-    let fear_greed_base = 50.0 + economy.gdp_growth * 3.0 - (economy.vix - 15.0) * 0.8
+    let fear_greed_base = 50.0 + fear_greed_growth * 3.0 - (economy.vix - 15.0) * 0.8
         + fear_greed_phase_bonus
         + market_sentiment;
     new_state.fear_greed_index = clamp(

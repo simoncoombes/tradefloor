@@ -1076,7 +1076,9 @@ def _nothing_dormant():
                    gdp_publication_lag=21.0,
                    # A few months, so the impulse is well short of its drive
                    # and a restore that lost it would move the next release.
-                   unemployment_adjustment_half_life=84.0)
+                   unemployment_adjustment_half_life=84.0,
+                   # A switch.
+                   fear_greed_published_inputs=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

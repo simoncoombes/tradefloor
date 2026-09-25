@@ -305,6 +305,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "gdp_publication_lag": (0.0, 126.0),
     # Unemployment's partial adjustment, 0 to half a year.
     "unemployment_adjustment_half_life": (0.0, 126.0),
+    # A switch: the fear/greed index reads the published phase and growth.
+    "fear_greed_published_inputs": (0.0, 1.0),
     # The agent-facing book (2026-09-24): read only on an agent's path.
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),

@@ -663,6 +663,8 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": False},
     "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
     # on an agent's path, so no untraded statistic moves with any of them.

@@ -624,6 +624,17 @@ pub struct ModelParams {
     /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
     /// and the state hash carry the impulse only while this is set.
     pub unemployment_adjustment_half_life: f64,
+    /// A switch, 0.0 or 1.0. 0.0, which every preset carries, is off: the
+    /// fear/greed index's target reads the business-cycle phase (a bonus of
+    /// +15 in an expansion to -25 in a contraction) and the GDP growth the
+    /// economy runs at, so it falls about 35 points in the five sessions
+    /// after a contraction begins and announces the turn. On, it reads them
+    /// as published (`cycle_publication_lag`, `gdp_publication_lag`), so it
+    /// steps when the turn is published, which is public already. It moves
+    /// the index itself, and through it consumer confidence, housing,
+    /// copper and gold; nothing a price, the bank, the cycle or a draw
+    /// reads. With both lags at 0 it is the index that stood. No state.
+    pub fear_greed_published_inputs: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -5060,6 +5071,7 @@ impl ModelParams {
             cycle_publication_lag: 0.0,
             gdp_publication_lag: 0.0,
             unemployment_adjustment_half_life: 0.0,
+            fear_greed_published_inputs: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7283,6 +7295,7 @@ impl ModelParams {
             "cycle_publication_lag" => self.cycle_publication_lag,
             "gdp_publication_lag" => self.gdp_publication_lag,
             "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
+            "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7525,6 +7538,7 @@ impl ModelParams {
             "cycle_publication_lag" => out.cycle_publication_lag = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
             "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
+            "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7931,6 +7945,12 @@ impl ModelParams {
                 "unemployment_adjustment_half_life is {}. It is a half-life in sessions, \
                  in [0, 2520]; 0 is off.",
                 self.unemployment_adjustment_half_life));
+        }
+        if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
+            return Err(format!(
+                "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
+                 true phase and growth) or 1 (it reads them as published).",
+                self.fear_greed_published_inputs));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8370,6 +8390,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_publication_lag",
         "gdp_publication_lag",
         "unemployment_adjustment_half_life",
+        "fear_greed_published_inputs",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",
