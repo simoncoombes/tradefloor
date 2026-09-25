@@ -865,9 +865,9 @@ idiosyncratic jumps a year, of standard deviation 7.5%.
 | $c_J$ | `jump_vix_coupling` | 0.2626 | fitted | |
 | | `jump_mean_compensated` | 1.0 | derived | a compensated Poisson process |
 
-### The ten factors
+### The eleven factors
 
-Every change in $s$ is booked to one of ten factors, which `engine.truth()`
+Every change in $s$ is booked to one of eleven factors, which `engine.truth()`
 reports (`market/factors.rs:61-63`, `market/tick.rs:1088-1105`), each tick as follows:
 
 | Slot | Factor | Amount |
@@ -882,9 +882,13 @@ reports (`market/factors.rs:61-63`, `market/tick.rs:1088-1105`), each tick as fo
 | 7 | circuit breaker | the change in $s$ when the breaker binds |
 | 8 | jump | the jump's change in $s$, at the close |
 | 9 | overnight | the overnight change in $s$ (zero on pt-v19) |
+| 10 | fair value shift | $-\Delta v$: the permanent share of the name's own shocks, which leaves $s$ for its fair-value level $v$ (zero through pt-v19) |
 
-Over a day the ten sum to the change in $s$, to rounding, except on a tick
-where the $\pm\bar s$ cap binds, which no slot records.
+Over a day the eleven sum to the change in $s$, to rounding, except on a tick
+where the $\pm\bar s$ cap binds, which no slot records. On pt-v20 slots 3, 6
+and 8 report the whole shock, which is what moved the price, and slot 10 takes
+back out the part that went to fair value for good. So slots 0-9 sum to the
+price's move at a fixed valuation, and all eleven to the move in $s$.
 
 ## Volatility
 

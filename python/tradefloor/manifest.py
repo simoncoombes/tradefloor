@@ -460,7 +460,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # From pt-v20 the fair-value levels and the unapplied opening draws are
     # carried, together, on a model that can move a level.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z"}
+        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z",
+         # Carried only while set: a forced close pending tonight, today's
+         # macro pins the corporate yield reads, and a jump's fair-value
+         # shift waiting for its tape row.
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -513,8 +517,26 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _text(buf, snapshot["model_fingerprint"])
 
     from ._core import Engine  # the attribution width, one slot per factor
-    for name, width in (("attribution", len(Engine.FACTORS)), ("tick_components", 8),
-                        ("tick_fundamental", 1), ("tick_anchor", 1),
+    # The fair-value shift is the last slot of an attribution row and of a
+    # tick row. It is hashed after both, and only for an engine carrying
+    # fair-value offsets (whose snapshot has the "fair_value_offset" key), as
+    # `Engine::state_hash_with_pending` does, so every other engine hashes as
+    # it did before the slot existed.
+    width_a, width_t = len(Engine.FACTORS), 9
+    rows_a = _column(snapshot["attribution"], n * width_a, "attribution")
+    rows_t = _column(snapshot["tick_components"], n * width_t, "tick_components")
+    for i in range(n):
+        for value in rows_a[i * width_a:(i + 1) * width_a - 1]:
+            _f64(buf, value)
+    for i in range(n):
+        for value in rows_t[i * width_t:(i + 1) * width_t - 1]:
+            _f64(buf, value)
+    fv_a = [rows_a[(i + 1) * width_a - 1] for i in range(n)]
+    fv_t = [rows_t[(i + 1) * width_t - 1] for i in range(n)]
+    if ("fair_value_offset" in snapshot or any(fv_a) or any(fv_t)):
+        for value in fv_a + fv_t:
+            _f64(buf, value)
+    for name, width in (("tick_fundamental", 1), ("tick_anchor", 1),
                         # The day's noise split, its idiosyncratic scale and
                         # the pending jump move, hashed here because they sit
                         # beside the accumulators above in the snapshot and
@@ -590,6 +612,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, float(snapshot.get("crisis_sessions_under", 0)))
     _f64(buf, float(snapshot.get("crisis_epicentre", -1)))
     _f64(buf, float(snapshot.get("crisis_epicentre_pin", -2)))
+    # A forced close pending tonight, and today's macro pins, each only
+    # while set, as the engine hashes them.
+    if snapshot.get("vix_sets_variance_pending"):
+        _flag(buf, True)
+    if snapshot.get("macro_pins_today"):
+        _f64(buf, 7.0)
+        _f64(buf, float(snapshot["macro_pins_today"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -601,6 +630,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                 f"snapshot field {name!r} carries {len(raw)} bytes, which is "
                 "not a whole number of f64s.")
         values = _column(raw, len(raw) // 8, name)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The jump's fair-value shift waiting for its tape row: a key only while
+    # non-empty, and hashed only then.
+    if snapshot.get("pending_fair_value"):
+        raw = snapshot["pending_fair_value"]
+        values = _column(raw, len(raw) // 8, "pending_fair_value")
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
@@ -922,7 +959,7 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: unapplied opening draws on a model that can move a level (pt-v20 on), and
 #: the agent-facing book's consumed depth once an agent has used it. Encoded
 #: where present and left out where not.
-_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z")
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

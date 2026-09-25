@@ -595,6 +595,22 @@ impl PyEngine {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
+        // The fair-value shift: the tick's own, then on the first row the
+        // close's jump's, beside the jump (below), so the columns sum to the
+        // change in `s` on that row too.
+        let fv = crate::market::factors::FAIR_VALUE_SLOT;
+        let first = self.day_buffer.components[fv].len();
+        self.day_buffer.components[fv]
+            .extend_from_slice(&self.buffer.components[crate::market::factors::TICK_FAIR_VALUE][..n]);
+        self.day_buffer.components[fv].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_fair_value.is_empty() {
+            for (i, v) in self.pending_fair_value.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[fv].get_mut(first + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_fair_value.clear();
+        }
         // The eighth series is the daily jump. It happens at the close, so
         // no tick carries it, and the row where its effect is OBSERVED is the
         // first tick of the next day: `s` there already includes it. Zeroed
@@ -637,6 +653,10 @@ impl PyEngine {
         let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[crate::market::factors::JUMP_SLOT]).collect();
         if jumps.iter().any(|v| *v != 0.0) {
             self.pending_jump = jumps;
+        }
+        let shifts: Vec<f64> = self.inner.jump_fair_value_moves().to_vec();
+        if shifts.iter().any(|v| *v != 0.0) {
+            self.pending_fair_value = shifts;
         }
     }
 
@@ -1036,6 +1056,10 @@ pub struct PyEngine {
     /// The overnight move the last open applied to `s`, waiting for the
     /// row where its effect is observed: the first tick of the same day.
     pending_overnight: Vec<f64>,
+    /// The close's jump's `fair_value_shift`, waiting for the row where the
+    /// jump is observed, as `pending_jump` waits. Empty unless the preset
+    /// carries fair-value offsets and a name's jump moved one.
+    pending_fair_value: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -1539,6 +1563,7 @@ impl PyEngine {
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),
+            pending_fair_value: Vec::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
             day_count: 0,
@@ -3029,6 +3054,16 @@ impl PyEngine {
         if vix_sets_variance {
             self.inner.set_vix_sets_variance_pending(true);
         }
+        // A PINNED VIX CHARGES THE CREDIT SPREAD NOTHING TONIGHT: the close's
+        // VIX move is the law's reversion from the level written here. Only
+        // turned on, as the mark above is. See `Engine::vix_pinned_today`.
+        // A pinned corporate yield holds through tonight's close.
+        if vix.is_some() {
+            self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
+        }
+        if corporate_bond_yield.is_some() {
+            self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
+        }
         Ok(())
     }
 
@@ -3467,7 +3502,7 @@ impl PyEngine {
     fn state_hash(&self) -> String {
         let bytes = self.inner.state_hash_with_pending(
             self.day_count, self.market_open,
-            &self.pending_jump, &self.pending_overnight);
+            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value);
         let mut hex = String::with_capacity(64);
         for byte in bytes {
             hex.push_str(&format!("{byte:02x}"));
@@ -3565,7 +3600,7 @@ impl PyEngine {
         let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
+        let flat = |rows: &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
         out.set_item("attribution", f64_bytes(py, &flat10(self.inner.attribution())))?;
@@ -3653,6 +3688,9 @@ impl PyEngine {
         if self.inner.vix_sets_variance_pending() {
             out.set_item("vix_sets_variance_pending", true)?;
         }
+        if self.inner.macro_pins_today() != 0 {
+            out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3715,6 +3753,11 @@ impl PyEngine {
         // `test_forking.py` names them rather than seeing them move a market.
         out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
         out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
+        // A key only while non-empty, so every snapshot of an engine without
+        // fair-value offsets is the one it was.
+        if !self.pending_fair_value.is_empty() {
+            out.set_item("pending_fair_value", f64_bytes(py, &self.pending_fair_value))?;
+        }
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
         // omitting it made a mid-day restore run the rest of the day with the
@@ -4074,6 +4117,17 @@ impl PyEngine {
                 }
             }
         }
+        // Absent means no jump's fair-value shift was waiting.
+        self.pending_fair_value = match snapshot.get_item("pending_fair_value")? {
+            Some(raw) => {
+                let bytes: &[u8] = raw.extract()?;
+                bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect()
+            }
+            None => Vec::new(),
+        };
         if let Some(raw) = snapshot.get_item("volume_idio")? {
             let bytes: &[u8] = raw.extract()?;
             let values: Vec<f64> = bytes
@@ -4224,6 +4278,12 @@ impl PyEngine {
             None => false,
         };
         self.inner.set_vix_sets_variance_pending(pending);
+        // Absent means no pin was standing today when it was taken.
+        let pins: u8 = match snapshot.get_item("macro_pins_today")? {
+            Some(v) => v.extract()?,
+            None => 0,
+        };
+        self.inner.set_macro_pins_today(pins);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {
@@ -4664,6 +4724,8 @@ impl PyEngine {
                 &std::array::from_fn(|k| {
                     if k < crate::market::factors::S_COMPONENT_KEYS.len() {
                         self.written(&self.buffer.components[k]).to_vec()
+                    } else if k == crate::market::factors::FAIR_VALUE_SLOT {
+                        self.written(&self.buffer.components[crate::market::factors::TICK_FAIR_VALUE]).to_vec()
                     } else {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
                     }
@@ -5419,6 +5481,7 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::S_COMPONENT_KEYS[7],
     crate::market::factors::JUMP_COMPONENT_KEY,
     crate::market::factors::OVERNIGHT_COMPONENT_KEY,
+    crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
 ];
 
 /// Every field `column()` accepts, in one place.

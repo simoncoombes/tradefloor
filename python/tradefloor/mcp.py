@@ -1462,6 +1462,10 @@ def explain_price_move(
             "No agent traded in this run, so `order_flow_impact` reflects "
             "background flow only. Use `evaluate_strategies` to see a "
             "strategy's own footprint.",
+            "`fair_value_shift` is the part of the day's news and noise that "
+            "changed the stock's fair value for good, entered as a negative "
+            "because it left the mispricing. The other factors report the "
+            "whole shock; on presets through pt-v19 this one is zero.",
         ],
         "provenance": _provenance(
             seed=seed, day=day,

@@ -1045,7 +1045,7 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
 #: Every per-slot array a snapshot carries, and the f64 slots each holds per
 #: instrument. The columns are added at runtime, since the snapshot names
 #: them itself.
-_PER_SLOT = {"attribution": len(tf.Engine.FACTORS), "tick_components": 8, "tick_fundamental": 1,
+_PER_SLOT = {"attribution": len(tf.Engine.FACTORS), "tick_components": 9, "tick_fundamental": 1,
              "tick_anchor": 1, "volume_idio": 1}
 
 

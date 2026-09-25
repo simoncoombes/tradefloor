@@ -41,12 +41,16 @@ The root is the move, ``log(close / previous close)``, with the close
 read from the replayed day and the previous close from the copy taken
 before the open.
 
-Its children are twelve contributions, of kind ``factor``. Ten are the
-``truth()`` columns for the name on that day, in ``Engine.FACTORS``
-order, and they sum to the day's change in ``mispricing_s``. Two more
-close the arithmetic: ``fair_value`` is the day's change in log
-fundamental value and ``book`` is the change in the log distance from the
-model price to the print. All twelve are measured, so their sum against
+Its children are thirteen contributions, of kind ``factor``. Eleven are
+the ``truth()`` columns for the name on that day, in ``Engine.FACTORS``
+order, and they sum to the day's change in ``mispricing_s``. The last of
+them, ``fair_value_shift``, is minus the part of the day's shocks that
+moved the name's fair value for good rather than its mispricing (pt-v20's
+permanent share; zero on every earlier preset). Two more close the
+arithmetic: ``fair_value`` is the day's change in log fundamental value,
+which carries that same permanent part with the opposite sign, and
+``book`` is the change in the log distance from the model price to the
+print. All thirteen are measured, so their sum against
 the move is an identity the engine can fail;
 :meth:`Explanation.check` states the residual rather than asserting it.
 Where the day before is not on the tape its closing levels are unknown,
@@ -184,7 +188,7 @@ class Mechanism(NamedTuple):
     offset: int = 0
 
 
-#: The Rust that produced each contribution. The ten ``truth()`` columns
+#: The Rust that produced each contribution. The eleven ``truth()`` columns
 #: in ``Engine.FACTORS`` order, then the two that close the arithmetic
 #: between the mispricing decomposition and the tape.
 MECHANISMS: tuple[Mechanism, ...] = (
@@ -301,6 +305,16 @@ MECHANISMS: tuple[Mechanism, ...] = (
              "market::tick::sector_sigma_for"),
     ),
     Mechanism(
+        # What left the mispricing for the fair-value level: the permanent
+        # share of the name's own noise and news on each tick, and of its
+        # own jump at the close. The columns above report the whole shock.
+        factor="fair_value_shift",
+        function="market::tick::simulate_market_tick",
+        state=("mispricing_s",),
+        dials=("fair_value_news_share", "fair_value_market_share"),
+        via=("engine::Engine::apply_jumps",),
+    ),
+    Mechanism(
         factor="fair_value",
         function="fair_value::compute_fair_value_with",
         macro=("qe_pe_boost",),
@@ -323,11 +337,11 @@ MECHANISMS: tuple[Mechanism, ...] = (
     ),
 )
 
-#: The contributions the root carries, in order: the ten ``truth()``
+#: The contributions the root carries, in order: the eleven ``truth()``
 #: columns and the two that close the arithmetic to the printed move.
 #:
 #: Named for what they are rather than ``FACTORS``, which is what
-#: ``Engine.FACTORS`` calls the ten. Two names for two different lists
+#: ``Engine.FACTORS`` calls the eleven. Two names for two different lists
 #: is a trap for anyone importing both.
 CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 
@@ -337,7 +351,7 @@ CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 #: The three are per-tick sums off the print table and their parent is a
 #: change in a level, so they are not a re-split of it in any obvious
 #: sense; that they add up to it is arithmetic worth stating. Writing A
-#: for the anchor's move, which is the other ten contributions, the
+#: for the anchor's move, which is the other twelve contributions, the
 #: identity is that summed shock plus summed absorbed telescopes to the
 #: printed move, so summed absorbed plus (summed shock minus A) is the
 #: move minus A, which is the book contribution. Each is measured on its
@@ -357,11 +371,11 @@ DEPTH: tuple[tuple[str, str], ...] = (
 #: The kinds a node can be.
 KINDS = ("move", "factor", "mechanism", "state", "draw")
 
-#: How close the twelve contributions have to come to the move before
+#: How close the thirteen contributions have to come to the move before
 #: :meth:`Explanation.check` calls it a miss, and how close a replayed
 #: value has to come to the recorded one. The truth test holds the
 #: decomposition to 1e-15 over one day's rows; this is the same order,
-#: loosened for the eleven-term sum and the two logs the move is taken
+#: loosened for the thirteen-term sum and the two logs the move is taken
 #: through.
 TOLERANCE = 1e-12
 
@@ -839,7 +853,7 @@ class Explanation:
         # change in each of the three. Both of the two here are MEASURED
         # against the day before's closing levels rather than taken as
         # what the mispricing leaves over: a remainder would make the
-        # eleven sum to the move whatever the engine had done, and the
+        # thirteen sum to the move whatever the engine had done, and the
         # sum is the claim.
         #
         # Those levels are on the tape of the day before. Without it the
@@ -902,7 +916,7 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        Four claims, each stated as a line per miss. The eleven
+        Four claims, each stated as a line per miss. The thirteen
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
         the replay reproduces both the nine columns the run recorded and

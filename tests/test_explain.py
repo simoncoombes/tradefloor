@@ -72,10 +72,28 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     _, result = one()
     names = [child.name for child in result.root.children]
     assert names == list(ex.CONTRIBUTIONS)
-    assert list(ex.CONTRIBUTIONS)[:10] == list(tf.Engine.FACTORS)
-    assert list(ex.CONTRIBUTIONS)[10:] == ["fair_value", "book"]
+    assert list(ex.CONTRIBUTIONS)[:11] == list(tf.Engine.FACTORS)
+    assert list(ex.CONTRIBUTIONS)[11:] == ["fair_value", "book"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
+
+
+@pytest.mark.parametrize("preset", tf.preset_names())
+def test_the_check_passes_exactly_on_every_preset(preset):
+    """`check()` holds on every shipped preset, pt-v20's permanent share
+    included. Before `fair_value_shift` the ten tape columns missed the
+    change in `s` on pt-v20 by what went to fair value, and the tree's sum
+    was off by that much minus the valuation's own move."""
+    e = engine(days=3, keep=(1, 1), preset=preset)
+    result = e.explain(e.tickers[0], 1)
+    assert result.check() == [], preset
+    total = math.fsum(child.value for child in result.root.children)
+    assert abs(result.move - total) < ex.TOLERANCE, preset
+    shift = next(c.value for c in result.root.children
+                 if c.name == "fair_value_shift")
+    carries = tf.ModelParams.from_preset(preset).to_dict()[
+        "fair_value_news_share"] != 0.0
+    assert (shift != 0.0) == carries, (preset, shift)
 
 
 def test_the_contributions_sum_to_the_move():
@@ -901,7 +919,7 @@ HAS_PRINTS = hasattr(tf.Engine, "prints")
 #: because the MCP test `importorskip`s an optional extra, so every local
 #: run and every measurement box SKIPPED it, and the pushes to `dev` ran no
 #: CI. The first pull request to run CI on this lineage found it.
-WALK_NODES = (55 + 8) if HAS_PRINTS else (53 + 8)
+WALK_NODES = (55 + 8 + 3) if HAS_PRINTS else (53 + 8 + 3)
 needs_prints = pytest.mark.skipif(
     not HAS_PRINTS, reason="Engine.prints() is not on this build")
 
@@ -1494,8 +1512,9 @@ def sources(mech) -> str:
 
 def test_the_table_covers_every_contribution_once():
     # Twelve since the overnight move joined the ten tape columns.
-    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 12
-    assert len({m.factor for m in ex.MECHANISMS}) == 12
+    # Thirteen since pt-v20's fair-value shift joined them.
+    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 13
+    assert len({m.factor for m in ex.MECHANISMS}) == 13
 
 
 def test_every_mechanism_names_a_rust_function_that_exists():
@@ -1542,6 +1561,8 @@ EXPECTED = {
              ("mispricing_s", "mispricing_s_prev_close")),
     "overnight": (("overnight_variance_ratio",),
                   ("mispricing_s", "mispricing_s_prev_close", "price")),
+    "fair_value_shift": (("fair_value_news_share", "fair_value_market_share"),
+                         ("mispricing_s",)),
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
                     "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),
@@ -1588,8 +1609,9 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # An exact count means a new dial fails here until it is declared,
     # which is the point, so the number moving with a dial is correct
     # rather than maintenance.
-    assert declared == 43
-    assert sum(1 for m in ex.MECHANISMS if m.dials) == 10
+    # 45 and eleven since the fair-value shift's two joined.
+    assert declared == 45
+    assert sum(1 for m in ex.MECHANISMS if m.dials) == 11
 
 
 def test_every_declared_state_field_is_a_column_that_its_rust_reads():
@@ -1602,8 +1624,9 @@ def test_every_declared_state_field_is_a_column_that_its_rust_reads():
             assert re.search(r"\b" + name + r"\b", text), (mech.factor, name)
             declared += 1
     # 18 since the overnight move's three state fields joined.
-    assert declared == 18
-    assert sum(1 for m in ex.MECHANISMS if m.state) == 10
+    # 19 and eleven since the fair-value shift's one joined.
+    assert declared == 19
+    assert sum(1 for m in ex.MECHANISMS if m.state) == 11
 
 
 def test_every_declared_macro_field_is_a_macro_field_that_its_rust_reads():

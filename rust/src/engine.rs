@@ -80,6 +80,11 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 /// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
 
+/// `Engine::macro_pins_today`: the VIX was pinned today.
+pub const PIN_VIX: u8 = 1;
+/// `Engine::macro_pins_today`: the corporate yield was pinned today.
+pub const PIN_CORPORATE: u8 = 2;
+
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
 ///
@@ -296,6 +301,11 @@ pub struct Engine {
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
     overnight_moves: Vec<f64>,
+    /// What each name's `s` gave up to its fair value at the last close's
+    /// jump, in roster order (`fair_value_shift`), 0.0 where nothing moved.
+    /// Per-day state like `overnight_moves`: the tape books it onto the row
+    /// where the jump is observed, beside the jump.
+    jump_fair_value_moves: Vec<f64>,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -366,7 +376,7 @@ pub struct Engine {
     /// apart: `fundamental` is the valuation, `anchor` is
     /// `fundamental * exp(s)` -- the price the model wanted before the book
     /// touched it -- and the printed price is what the book actually settled.
-    tick_components: Vec<[f64; 8]>,
+    tick_components: Vec<[f64; crate::market::factors::TICK_COMPONENT_COUNT]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
     /// This tick's print decomposition, per company slot: the shock that
@@ -465,6 +475,17 @@ pub struct Engine {
     /// epicentre pin is: a fork taken between the pin and the close that
     /// dropped it would close a forced session as a free one.
     vix_sets_variance_pending: bool,
+    /// What a caller pinned today, for tonight's corporate yield
+    /// (`economy::daily`, the corporate yield between meetings). Bit
+    /// [`PIN_VIX`]: the close charges the corporate yield no VIX term, since
+    /// the close's VIX move is the law's reversion from the written level,
+    /// which the next pin discards. Bit [`PIN_CORPORATE`]: the pinned
+    /// corporate yield holds through the close. Set only while
+    /// `corporate_yield_daily` is on, cleared by the close, and carried by
+    /// the snapshot and the state hash only while non-zero, as
+    /// `vix_sets_variance_pending` is, so no engine that never pins, and no
+    /// preset through pt-v19, hashes or snapshots differently.
+    macro_pins_today: u8,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -1032,13 +1053,14 @@ impl Engine {
                 Vec::new()
             },
             overnight_moves: vec![0.0; companies_len],
+            jump_fair_value_moves: vec![0.0; companies_len],
             companies,
             economy,
             central_bank,
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
             noise_parts: vec![[0.0; 3]; companies_len],
             noise_own_scale2: vec![0.0; companies_len],
-            tick_components: vec![[0.0; 8]; companies_len],
+            tick_components: vec![[0.0; crate::market::factors::TICK_COMPONENT_COUNT]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
             // rather than as "not yet computed".
@@ -1066,6 +1088,7 @@ impl Engine {
             crisis_epicentre: -1,
             crisis_epicentre_pin: None,
             vix_sets_variance_pending: false,
+            macro_pins_today: 0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -2249,7 +2272,7 @@ impl Engine {
         // is true, and keeps the columns summing to a Δs of zero. Carrying the
         // previous tick's values forward would invent activity.
         for slot in self.tick_components.iter_mut() {
-            *slot = [0.0; 8];
+            *slot = [0.0; crate::market::factors::TICK_COMPONENT_COUNT];
         }
         // The print decomposition is zeroed on the same argument and for the
         // same reason: a company that did not tick moved by nothing, so its
@@ -2284,7 +2307,7 @@ impl Engine {
                 outcome.s_components.get(n),
             ) {
                 for (k, value) in computed.iter().enumerate() {
-                    acc[k] += value;
+                    acc[crate::market::factors::attribution_slot_for_tick(k)] += value;
                 }
             }
             if let (Some(row), Some(computed)) = (
@@ -2944,7 +2967,7 @@ impl Engine {
     /// This tick's `s` decomposition per company slot, in
     /// [`crate::market::factors::S_COMPONENT_KEYS`] order. Zero for a company
     /// that did not tick.
-    pub fn tick_components(&self) -> &[[f64; 8]] {
+    pub fn tick_components(&self) -> &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]] {
         &self.tick_components
     }
 
@@ -3045,19 +3068,32 @@ impl Engine {
         anchor: &[f64],
     ) -> Result<(), String> {
         let n = self.companies.len();
-        // Nine-wide attribution rows predate the overnight slot; they
-        // restore with that slot at zero, which is what such a day held.
-        let attribution: Vec<f64> = if n > 0 && attribution.len() == n * (crate::market::factors::COMPONENT_COUNT - 1) {
-            attribution
-                .chunks_exact(crate::market::factors::COMPONENT_COUNT - 1)
+        // Nine-wide attribution rows predate the overnight slot and ten-wide
+        // ones the fair-value shift; each restores with the slots it lacks at
+        // zero, which is what such a day held. Likewise eight-wide tick rows.
+        let width = crate::market::factors::COMPONENT_COUNT;
+        let attribution: Vec<f64> = match (n, attribution.len()) {
+            (n, len) if n > 0 && (len == n * (width - 1) || len == n * (width - 2)) => {
+                let old = len / n;
+                attribution
+                    .chunks_exact(old)
+                    .flat_map(|c| c.iter().copied().chain(std::iter::repeat(0.0).take(width - old)))
+                    .collect()
+            }
+            _ => attribution.to_vec(),
+        };
+        let tick_width = crate::market::factors::TICK_COMPONENT_COUNT;
+        let components: Vec<f64> = if n > 0 && components.len() == n * (tick_width - 1) {
+            components
+                .chunks_exact(tick_width - 1)
                 .flat_map(|c| c.iter().copied().chain(std::iter::once(0.0)))
                 .collect()
         } else {
-            attribution.to_vec()
+            components.to_vec()
         };
         for (name, len, want) in [
             ("attribution", attribution.len(), n * crate::market::factors::COMPONENT_COUNT),
-            ("tick_components", components.len(), n * 8),
+            ("tick_components", components.len(), n * tick_width),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
         ] {
@@ -3074,8 +3110,12 @@ impl Engine {
             })
             .collect();
         self.tick_components = components
-            .chunks_exact(8)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
+            .chunks_exact(tick_width)
+            .map(|c| {
+                let mut row = [0.0; crate::market::factors::TICK_COMPONENT_COUNT];
+                row.copy_from_slice(c);
+                row
+            })
             .collect();
         self.tick_fundamental = fundamental.to_vec();
         self.tick_anchor = anchor.to_vec();
@@ -3394,6 +3434,26 @@ impl Engine {
         self.vix_sets_variance_pending = on;
     }
 
+    /// Today's pins that tonight's corporate yield reads, as bits
+    /// ([`PIN_VIX`], [`PIN_CORPORATE`]). See `macro_pins_today`.
+    pub fn macro_pins_today(&self) -> u8 {
+        self.macro_pins_today
+    }
+
+    /// Add today's pins (an OR; the close clears them). Kept only while
+    /// `corporate_yield_daily` is on, the one reader.
+    pub fn mark_macro_pins_today(&mut self, bits: u8) {
+        if self.params.corporate_yield_daily != 0.0 {
+            self.macro_pins_today |= bits & (PIN_VIX | PIN_CORPORATE);
+        }
+    }
+
+    /// Restore the marks from a snapshot, as they were.
+    pub fn set_macro_pins_today(&mut self, bits: u8) {
+        self.macro_pins_today = 0;
+        self.mark_macro_pins_today(bits);
+    }
+
     /// The VIX-ratio denominator a FORCED close uses.
     ///
     /// Off `market_vol_vix_excursion` the denominator is the anchor, a
@@ -3463,7 +3523,7 @@ impl Engine {
         self.noise_own_scale2.clear();
         self.noise_own_scale2.resize(self.companies.len(), 0.0);
         self.tick_components.clear();
-        self.tick_components.resize(self.companies.len(), [0.0; 8]);
+        self.tick_components.resize(self.companies.len(), [0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.clear();
         self.tick_fundamental.resize(self.companies.len(), f64::NAN);
         self.tick_anchor.clear();
@@ -3718,6 +3778,12 @@ impl Engine {
     /// process, in roster order; 0.0 where nothing moved.
     pub fn overnight_moves(&self) -> &[f64] {
         &self.overnight_moves
+    }
+
+    /// What each name's `s` gave up to its fair value at the last close's
+    /// jump, in roster order; 0.0 where nothing moved.
+    pub fn jump_fair_value_moves(&self) -> &[f64] {
+        &self.jump_fair_value_moves
     }
 
     /// Close-of-day bookkeeping. Zero draws.
@@ -4110,6 +4176,8 @@ impl Engine {
     /// leave that comparison failing until somebody regenerated the body.
     #[rustfmt::skip]
     fn apply_jumps(&mut self) {
+        self.jump_fair_value_moves.clear();
+        self.jump_fair_value_moves.resize(self.companies.len(), 0.0);
         // The permanent share's reading of the jump (`fair_value_news_share`):
         // each name's `s` before the generated body, so the company's own
         // jump can be told from the market's after it. Empty, and nothing
@@ -4233,6 +4301,15 @@ impl Engine {
                 }
                 let s_new = after - dv;
                 company.stock.mispricing_s = Some(s_new);
+                // What left `s` for `v`, booked where the tape can find it:
+                // the attribution's `fair_value_shift` and, for the tape's
+                // row where the jump is observed, `jump_fair_value_moves`.
+                if let Some(acc) = self.attribution.get_mut(index) {
+                    acc[crate::market::factors::FAIR_VALUE_SLOT] += s_new - after;
+                }
+                if let Some(slot) = self.jump_fair_value_moves.get_mut(index) {
+                    *slot = s_new - after;
+                }
                 if let Some(prev) = company.stock.mispricing_s_prev_close {
                     let carried = (1.0 - self.params.jump_momentum_share) * dv;
                     company.stock.mispricing_s_prev_close = Some(prev - carried);
@@ -4366,6 +4443,11 @@ impl Engine {
         rng: &mut impl Rng,
     ) -> DayAdvanceOutcome {
         let phase_before = self.economy.cycle_phase;
+        // Today's pins and the corporate yield a pin wrote, for the end of
+        // the step: a pinned corporate yield holds through tonight's close,
+        // a meeting's re-anchoring included (`macro_pins_today`).
+        let pins_today = self.macro_pins_today;
+        let corporate_pinned_at = self.economy.corporate_bond_yield;
 
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
@@ -4544,6 +4626,8 @@ impl Engine {
                     flight_to_quality_gain: self.params.flight_to_quality_gain,
                     flight_to_quality_day: self.params.flight_to_quality_day,
                     corporate_yield_daily: self.params.corporate_yield_daily,
+                    vix_pinned: self.macro_pins_today & PIN_VIX != 0,
+                    corporate_pinned: self.macro_pins_today & PIN_CORPORATE != 0,
                 },
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
@@ -4594,6 +4678,14 @@ impl Engine {
         let announcement_variant = meeting.announcement_variant;
         self.central_bank = meeting.central_bank;
         self.economy = meeting.economy;
+        // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE, the meeting's
+        // re-anchoring to the formula included, on a preset that moves it
+        // daily (the mark is kept only there). The close has read today's
+        // pins; tomorrow's are their own.
+        if pins_today & PIN_CORPORATE != 0 {
+            self.economy.corporate_bond_yield = corporate_pinned_at;
+        }
+        self.macro_pins_today = 0;
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
@@ -5171,7 +5263,7 @@ impl Engine {
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
         self.noise_own_scale2.push(0.0);
-        self.tick_components.push([0.0; 8]);
+        self.tick_components.push([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
@@ -5667,7 +5759,7 @@ impl Engine {
     /// Empty slices for a caller that has none, which is every core-only
     /// caller and every test below.
     pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
-        self.state_hash_with_pending(day_count, market_open, &[], &[])
+        self.state_hash_with_pending(day_count, market_open, &[], &[], &[])
     }
 
     /// [`Engine::state_hash`], carrying the wrapper's pending tape state.
@@ -5677,6 +5769,7 @@ impl Engine {
         market_open: bool,
         pending_jump: &[f64],
         pending_overnight: &[f64],
+        pending_fair_value: &[f64],
     ) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
@@ -5719,15 +5812,31 @@ impl Engine {
         }
         hash_str(&mut buf, &self.params.fingerprint());
 
-        // The day accumulators, in snapshot order.
+        // The day accumulators, in snapshot order. The fair-value shift's
+        // slot, the last in both, follows the rest and only on an engine that
+        // carries fair-value offsets, the one place it can be non-zero, so
+        // every engine without them hashes as it did before the slot.
+        // Also wherever a slot is non-zero, so an edited slot on an engine
+        // without offsets is still covered.
+        let fv_hashed = self.carries_fair_value_offsets()
+            || self.attribution.iter().any(|r| r[crate::market::factors::FAIR_VALUE_SLOT] != 0.0)
+            || self.tick_components.iter().any(|r| r[crate::market::factors::TICK_FAIR_VALUE] != 0.0);
         for row in &self.attribution {
-            for value in row {
+            for value in &row[..crate::market::factors::FAIR_VALUE_SLOT] {
                 hash_f64(&mut buf, *value);
             }
         }
         for row in &self.tick_components {
-            for value in row {
+            for value in &row[..crate::market::factors::TICK_FAIR_VALUE] {
                 hash_f64(&mut buf, *value);
+            }
+        }
+        if fv_hashed {
+            for row in &self.attribution {
+                hash_f64(&mut buf, row[crate::market::factors::FAIR_VALUE_SLOT]);
+            }
+            for row in &self.tick_components {
+                hash_f64(&mut buf, row[crate::market::factors::TICK_FAIR_VALUE]);
             }
         }
         for value in &self.tick_fundamental {
@@ -5836,6 +5945,12 @@ impl Engine {
         if self.vix_sets_variance_pending {
             hash_bool(&mut buf, true);
         }
+        // Today's pins, likewise only while any is set, behind a tag so the
+        // marks cannot hash as the forced close's.
+        if self.macro_pins_today != 0 {
+            hash_f64(&mut buf, 7.0);
+            hash_f64(&mut buf, self.macro_pins_today as f64);
+        }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty
@@ -5843,6 +5958,15 @@ impl Engine {
         for pending in [pending_jump, pending_overnight] {
             hash_u32(&mut buf, pending.len() as u32);
             for value in pending {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        // The jump's fair-value shift waiting for its tape row, beside the
+        // jump. Only while non-empty, which only a preset with fair-value
+        // offsets can make it, so every other engine hashes as it did.
+        if !pending_fair_value.is_empty() {
+            hash_u32(&mut buf, pending_fair_value.len() as u32);
+            for value in pending_fair_value {
                 hash_f64(&mut buf, *value);
             }
         }
@@ -6415,7 +6539,7 @@ pub struct SessionBuffer {
     /// `S_COMPONENT_KEYS` order. Seven flat buffers rather than one of
     /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
     /// contiguous run of its own values.
-    pub components: [Vec<f64>; 8],
+    pub components: [Vec<f64>; crate::market::factors::TICK_COMPONENT_COUNT],
     /// The print decomposition, each `ticks * companies`: the shock that
     /// arrived and the depth that absorbed it, in log units.
     pub shock: Vec<f64>,
@@ -6437,7 +6561,7 @@ pub struct SessionBuffer {
 /// same-typed buffers and a transposition there would compile, run, and
 /// mislabel every row of every column it touched.
 pub struct TickTruth<'a> {
-    pub components: &'a [[f64; 8]],
+    pub components: &'a [[f64; crate::market::factors::TICK_COMPONENT_COUNT]],
     pub fundamental: &'a [f64],
     pub anchor: &'a [f64],
     pub shock: &'a [f64],
@@ -6514,7 +6638,7 @@ impl SessionBuffer {
                 self.liquidity_share[base + i] =
                     truth.liquidity_share.get(i).copied().unwrap_or(0.0);
             }
-            let row = truth.components.get(i).copied().unwrap_or([0.0; 8]);
+            let row = truth.components.get(i).copied().unwrap_or([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
             }

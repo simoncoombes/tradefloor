@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from .spec import StrategySpec
 
 
-# The ten components, as literals a checker can match against
+# The eleven components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #
@@ -67,15 +67,20 @@ if TYPE_CHECKING:
 # the tick loop, so the eight above did not reconstruct a day on which one
 # fired, on any preset carrying jumps (§74). The tenth, `overnight`, arrived
 # on 2026-09-04: `apply_overnight` moves `s` at the open before any tick,
-# and the tape books it on the day's first row.
+# and the tape books it on the day's first row. The eleventh,
+# `fair_value_shift`, arrived with pt-v20 (0.8.5): the part of the day's news
+# and noise that changed the name's fair value for good, entered as a negative
+# because it left the mispricing. The ten above report the whole shock, which
+# is what moved the price; zero on every preset through pt-v19.
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
     Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
+    Literal["fair_value_shift"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
      "order_flow_impact", "short_squeeze_effect", "random_noise",
-     "circuit_breaker", "jump", "overnight")
+     "circuit_breaker", "jump", "overnight", "fair_value_shift")
 
 
 def _f64(buf: bytes) -> list[float]:
