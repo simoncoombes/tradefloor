@@ -946,6 +946,12 @@ PERTURBATIONS = [
     # whose market shocks the market share makes permanent, and the default
     # carries no market share. tests/test_market_linear.py holds it.
     ("fair_value_market_vol_cap", 1.5, False),
+    # INERT on this probe: the discount applies only while the VIX is above
+    # its knee (30), and the probe's three calm days sit below it.
+    # tests/test_vix_discount.py holds the mechanism.
+    ("fair_value_vix_discount", 0.2, False),
+    # INERT: read only with fair_value_vix_discount non-zero.
+    ("fair_value_vix_knee", 25.0, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

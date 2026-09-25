@@ -762,6 +762,25 @@ pub struct ModelParams {
     /// permanent share. Read only with `fair_value_market_share` non-zero.
     /// In [0, 32].
     pub fair_value_market_vol_cap: f64,
+    /// Volatility feedback: a discount on every name's fair value while the
+    /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
+    /// knee))`. 0.0, which every preset through pt-v20 carries, is none.
+    ///
+    /// A function of the VIX alone and no state, so it is transient by
+    /// construction: it deepens a fall while fear is high and is given back
+    /// as the VIX comes down, at the VIX's own pace, and it moves nothing
+    /// that a permanent share or the mispricing's pull carries. Higher
+    /// expected volatility raises the required return and lowers the price
+    /// (French, Schwert and Stambaugh 1987; Campbell and Hentschel 1992).
+    /// Under `macro_publication_repricing` the close's VIX reaches prices at
+    /// the close, with the day's move; without it, at the next tick. Read
+    /// wherever fair value is: the tick, the overnight opening print, the
+    /// re-mark and the stationary opening. In [0, 1].
+    pub fair_value_vix_discount: f64,
+    /// The VIX level above which `fair_value_vix_discount` applies. 30.0,
+    /// which every preset carries, is unread while the discount is 0.0.
+    /// In (0, 200].
+    pub fair_value_vix_knee: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5167,6 +5186,8 @@ impl ModelParams {
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
             fair_value_market_vol_cap: 0.0,
+            fair_value_vix_discount: 0.0,
+            fair_value_vix_knee: 30.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7395,6 +7416,8 @@ impl ModelParams {
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
             "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
+            "fair_value_vix_discount" => self.fair_value_vix_discount,
+            "fair_value_vix_knee" => self.fair_value_vix_knee,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7642,6 +7665,8 @@ impl ModelParams {
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
             "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
+            "fair_value_vix_discount" => out.fair_value_vix_discount = value,
+            "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8014,6 +8039,16 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
+            return Err(format!(
+                "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
+                self.fair_value_vix_discount));
+        }
+        if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
+            return Err(format!(
+                "fair_value_vix_knee is {}. It is a VIX level, in (0, 200].",
+                self.fair_value_vix_knee));
         }
         if !(self.fair_value_market_vol_cap >= 0.0 && self.fair_value_market_vol_cap <= 32.0) {
             return Err(format!(
@@ -8516,6 +8551,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_market_share",
         "fair_value_market_linear",
         "fair_value_market_vol_cap",
+        "fair_value_vix_discount",
+        "fair_value_vix_knee",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

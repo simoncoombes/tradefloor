@@ -371,6 +371,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # market's daily sigma spends most of its time (median 0.78, 99th
     # percentile 4.9 on pt-v20).
     "fair_value_market_vol_cap": (0.0, 4.0),
+    # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
+    # about a quarter off fair value, past any measured feedback.
+    "fair_value_vix_discount": (0.0, 0.3),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

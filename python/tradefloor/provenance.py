@@ -418,6 +418,15 @@ OUT_OF_SCOPE = {
         "None, so `reprice_to_published_macro` writes nothing and the close's "
         "macro step reaches prices at the next session's first tick "
         "(0.8.5, pt-v20 audit finding 3)",
+    "fair_value_vix_discount":
+        "inert at 0.0 as shipped: `market::tick::with_vix_discount` returns "
+        "fair value unscaled without reading the VIX. A transient discount "
+        "on fair value while the VIX is above `fair_value_vix_knee` (0.8.5, "
+        "pt-v20 work: audit major 5 and minor 13, the 2020 fall's depth "
+        "and timing under a permanent market share)",
+    "fair_value_vix_knee":
+        "unread at its 30.0 while `fair_value_vix_discount` is 0.0 (0.8.5, "
+        "pt-v20 work)",
     "fair_value_market_vol_cap":
         "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
         "the only reader. A ceiling on the volatility whose market shocks "

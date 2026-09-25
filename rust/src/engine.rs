@@ -4048,6 +4048,7 @@ impl Engine {
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let night_vix = self.economy.vix;
         let econ_view = crate::fair_value::EconomyValuationInputs {
             corporate_bond_yield: Some(self.economy.corporate_bond_yield),
             federal_funds_rate: self.economy.federal_funds_rate,
@@ -4111,6 +4112,7 @@ impl Engine {
                 p.rate_pe_sensitivity,
             )
             .fair_value;
+            let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
             let price = crate::mathx::min(
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
