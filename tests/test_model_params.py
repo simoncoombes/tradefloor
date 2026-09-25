@@ -159,10 +159,23 @@ PERTURBATIONS = [
     # Per-name idio volatility as beta^k (§47). Every name has a beta and
     # the exponent bites on the first tick, so the probe sees it at once.
     ("idio_sigma_beta_exponent", 1.5, True),
-    # Gain on the QE valuation channel (§76). qe_pe_boost is supplied only
-    # by a driven scenario and the probe runs none, so the multiplier has
-    # nothing to scale.
-    ("qe_pe_gain", 0.5, False),
+    # Gain on the QE valuation channel (§76). INERT through pt-v19 because
+    # qe_pe_boost was 0.0 at the probe: the bank buys assets only at the
+    # zero bound, and pt-v19's burn-in at seed 42 stays in its opening
+    # expansion with fed funds at 3.25 per cent.
+    #
+    # LIVE ON pt-v20 (0.8.5), through the bank's own QE rather than a
+    # scenario. pt-v20's burn-in at seed 42 turns the cycle: peak by day 35,
+    # contraction by 230, trough by 405, recovery by 450 and expansion by
+    # 605 (sampled every five days). The contraction takes fed funds to
+    # zero, `economy/central_bank.rs` writes `qe_pe_boost = 0.10 *
+    # purchases / 120`, and the probe opens with the boost at 0.0375 and
+    # `qe_assets_ratio` at 1.0116. So `fair_value.rs`'s `qe_adjustment`,
+    # `1 + qe_gain * boost + qe_stock_term(..)`, is off 1.0 on every tick.
+    # The move is a fraction of a cent on most names and the print rounds it
+    # away: volume moves on eight names and one name's low by a cent, and
+    # no macro field differs at the probe's close.
+    ("qe_pe_gain", 0.5, True),
     # The dollar's crisis gate (0.4.3). Lowering it to 15 does fire the
     # safe-haven drift, but the dollar reaches equities only through the
     # macro chain: usd_index moves inflation, inflation moves the economy,
@@ -347,8 +360,14 @@ PERTURBATIONS = [
     ("macro_calendar_days_per_year", 365.0, True),
     # Off, the bank never lifts off zero on its Taylor rule, so the burn-in's
     # rate path and the valuation that reads it move (fed funds 3.25 against
-    # 2.75 at the probe's opening, seed 42). It also moves the economy
-    # stream, measured and located in ECONOMY_STREAM_MOVERS below.
+    # 2.75 at the probe's opening, seed 42, on pt-v19). On pt-v20 the burn-in
+    # reaches the zero bound in its contraction (see `qe_pe_gain` above) and
+    # the rule first lifts the rate between burn-in days 716 and 720, so the
+    # probe opens at 0.50 per cent with the rule and 0.0 without. The rate
+    # reaches fair value through the discount, by less than the print's
+    # cent, so volume moves and the printed columns do not. It moved the
+    # economy stream on pt-v19 and does not on pt-v20: see
+    # ECONOMY_STREAM_MOVERS below.
     ("fed_liftoff_rule", 0.0, True),
     # LIVE on this probe since the fifth composition, and the reason it read
     # inert is the reason it moves now. The US table changes phase durations
@@ -649,7 +668,17 @@ PERTURBATIONS = [
     # the linear 1.0, which is the one value at which the branch is
     # bit-identical to the arithmetic that predates the dial.
     ("vix_return_exponent", 1.4, True),
-    ("vix_return_clamp", 0.12, True),
+    # INERT ON pt-v20 (0.8.5), and live on pt-v19. The clamp truncates the
+    # session's index return before the fear channel reads it
+    # (`economy/daily.rs`, `current_mkt_ret_vix`, the day's return under
+    # the identity). On pt-v19 the probe's first session falls 0.45 per
+    # cent, so 0.12 binds on day one and every later session reads a
+    # different VIX. On pt-v20 the first two sessions fall 0.04 and 0.10
+    # per cent, inside the clamp, and the third falls 1.01: the clamp binds
+    # there and moves that close's VIX from 21.1425 to 20.4335, which no
+    # tick after it reads. At 0.08 it binds on the second session and moves
+    # volume, `mispricing_s` and `garch_variance`, measured.
+    ("vix_return_clamp", 0.12, False),
     ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
@@ -732,10 +761,18 @@ PERTURBATIONS = [
     # session; the fair-value share splits every stock-specific shock from
     # the first tick; the opening spread re-draws each name's opening
     # mispricing, and so its whole path.
-    ("quote_model_weight", 1.0, True),
-    # The cross prints the session's 15:59 tick, and the probe's sessions
-    # stop at 10:47, so no probe session has a close to cross.
-    ("closing_auction", 1.0, False),
+    #
+    # RE-VALUED at 0.8.5, when pt-v20 became the default: the 1.0 that
+    # stood here for the tape and the cross is the default's own. The
+    # weight moves to 0.5, the blend of the last print and the model price
+    # (`market/tick.rs`, the `quote_from` branch between 0.0 and 1.0), which
+    # moves every column on the first session; the cross goes back to 0.0,
+    # the value every preset through pt-v19 ships.
+    ("quote_model_weight", 0.5, True),
+    # The cross prints the session's 15:59 tick (`market/tick.rs`,
+    # `intraday_t == 389/390`), and the probe's sessions stop at 10:47, so
+    # no probe session has a close to cross, on or off.
+    ("closing_auction", 0.0, False),
     ("fair_value_news_share", 0.5, True),
     ("opening_mispricing_sigma", 0.05, True),
     # The market-wide share splits the market factor's draw from the first
@@ -745,25 +782,54 @@ PERTURBATIONS = [
     # close, and the corporate yield reaches every price through fair value
     # on the next session.
     ("treasury_10y_noise", 0.06, True),
-    ("treasury_2y_noise", 0.02, True),
-    # Inert on the probe: the preset under test here is the default, whose
-    # 0.02 gain the switch reads, and the probe's three sessions of 78 ticks
-    # never move the index far enough for a 0.02-point shift to reach a
-    # printed price through fair value in the window.
-    ("flight_to_quality_day", 1.0, False),
-    # Read only behind the gate the shipped rule never crosses; with the
-    # switch off nothing reaches it.
-    ("flight_to_quality_gain", 0.05, False),
-    ("corporate_yield_daily", 1.0, True),
-    # The aggregate earnings cycle (pt-v20). Inert on the probe: with the
-    # upside at its default 0.0 every phase but a contraction or a trough
-    # pulls the level toward 0.0, and the probe's economy opens in neither,
-    # so the level opens at 0.0 and stays there. The others are read only
-    # with a depth.
+    # Perturbed back to 0.0 at 0.8.5, since pt-v20's 0.022 is the default
+    # (0.02 stood here against pt-v19's 0.0). Off, the 2-year is the
+    # formula of the policy rate and the 10-year and takes no normal
+    # (`economy/daily.rs`, `own_2y`): 395 fewer economy draws over the
+    # burn-in and the probe, which displaces every later economy draw, so
+    # the macro path and every column move. 0.02 against 0.022 moves
+    # neither, measured: the 2-year's own path reaches no price in three
+    # sessions.
+    ("treasury_2y_noise", 0.0, True),
+    # The flight to quality, both dials LIVE on pt-v20 (0.8.5), where they
+    # read inert against pt-v19's default. `economy/daily.rs`: with
+    # `flight_to_quality_day` on, the 10-year shifts by the session's own
+    # index return times the gain with no gate, while inflation is under 3
+    # per cent (2.5 at the probe); off, it reads the previous closing
+    # minute behind a 0.5 per cent gate that return never crosses. pt-v20
+    # ships the day switch on at a gain of 0.008, so each probe close moves
+    # the 10-year, and `corporate_yield_daily` carries that into fair
+    # value's discount on the next session. The switch goes back to 0.0,
+    # pt-v19's value, which moves price, high, low, volume and market cap;
+    # 0.05 on the gain moves every column.
+    ("flight_to_quality_day", 0.0, True),
+    ("flight_to_quality_gain", 0.05, True),
+    # Back to 0.0 at 0.8.5, pt-v19's value, since 1.0 is pt-v20's. Off, the
+    # corporate yield moves only at a meeting and fair value's discount sits
+    # still between them; on, it moves every session by the 10-year's move
+    # and the VIX slope. Every column moves.
+    ("corporate_yield_daily", 0.0, True),
+    # The aggregate earnings cycle (pt-v20). Inert on the probe for depth,
+    # upside and half-life. RE-TRACED at 0.8.5 on pt-v20, which ships depth
+    # 0.35 and upside 0.09: the reason that stood here ("the upside at its
+    # default 0.0 ... the level opens at 0.0") was pt-v19's. `engine.rs`
+    # sets the level at construction to the target of the phase the economy
+    # opens in, `+depth * upside` in an expansion, and books it into the
+    # names' fair-value levels so no opening price moves. The probe opens in
+    # an expansion and stays in it, so the level sits on its target, the
+    # pull `pull * (target - level)` is zero every session, and nothing a
+    # price reads changes.
     ("earnings_cycle_depth", 0.3, False),
     ("earnings_cycle_upside", 0.1, False),
     ("earnings_cycle_half_life", 30.0, False),
-    ("earnings_cycle_sigma", 0.002, False),
+    # LIVE on pt-v20, inert on pt-v19. With a depth, a non-zero sigma adds a
+    # normal to the level every session (`engine.rs`, `Site::EconomyCycle`
+    # 1), so the level leaves its target on the probe's first session and
+    # `nominal_scale` carries `exp(level)` into every valuation. The draw is
+    # taken on every burn-in session too, 1,121 more economy draws, so it
+    # moves the economy stream (ECONOMY_STREAM_MOVERS). pt-v19 ships depth
+    # 0.0 and the branch is not entered.
+    ("earnings_cycle_sigma", 0.002, True),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an
@@ -771,13 +837,19 @@ PERTURBATIONS = [
     # model's own flow runs is the maker's ladder at any setting.
     # `test_order_book_depth.py` moves them with agents in the market. The
     # companions carry the parents each is refused without.
+    #
+    # RE-VALUED at 0.8.5, when pt-v20 took the book as the default: the
+    # shared book, resting orders, refill half-life and fill impact that
+    # stood here are pt-v20's own values. The two switches go back to 0.0,
+    # pt-v19's; the refill to 10.0 and the fill impact to 0.5, off both
+    # presets' values. Inert at every one, measured, for the reason above.
     ("book_depth_coefficient", 0.5, False),
     ("book_depth_exponent", 0.6, False),
     ("book_depth_reach", 2.0, False),
-    ("book_shared", 1.0, False),
-    ("book_refill_half_life", 27.0, False),
-    ("book_resting", 1.0, False),
-    ("fill_impact_coefficient", 0.314, False),
+    ("book_shared", 0.0, False),
+    ("book_refill_half_life", 10.0, False),
+    ("book_resting", 0.0, False),
+    ("fill_impact_coefficient", 0.5, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -887,10 +959,18 @@ PERTURBATIONS = [
     # drawn opening off it is inert on both again, measured, which is the
     # old reason still standing where its condition does.
     ("cycle_hazard_per_month", 0.5, True),
-    # The floor waits on a phase the probe never reaches: it moves only the
-    # trough's growth range, and a certified year reaches no trough at all,
-    # let alone three days from an opening expansion.
-    ("trough_growth_floor", 0.5, False),
+    # The floor moves only the trough's growth range (`economy/daily.rs`,
+    # `effective_gdp_range`, which returns the declared range unless the
+    # phase is a trough). INERT through pt-v19, whose burn-in at seed 42
+    # never leaves its opening expansion.
+    #
+    # LIVE ON pt-v20 (0.8.5): its burn-in passes through a trough from about
+    # day 405 to 450 (see `qe_pe_gain`), and the first macro field to differ
+    # does so by day 420, in the trough: growth -2.021 against -1.991 per
+    # cent. The difference reaches fair value by less than the print's cent
+    # on most names, so volume moves on every name and one name's high by
+    # a cent.
+    ("trough_growth_floor", 0.5, True),
     # MOVES the market on the probe, and the entry is a DECOMPOSITION
     # rather than a verdict, because three readings of it were wrong
     # before this one.
@@ -1040,9 +1120,14 @@ PERTURBATIONS = [
     ("market_vol_vix_smooth", 10.0, True),
     # Gain on the QE STOCK channel, which reads `qe_pe_stock_gain * ln(ratio)`.
     # The economy ships `qe_assets_ratio` at exactly 1.0 and ln(1) is 0, so
-    # the gain has nothing to scale until a scenario moves the ratio. A PAIR,
-    # like the endogenous news dials above.
-    ("qe_pe_stock_gain", 0.5, False),
+    # the gain has nothing to scale until the ratio moves. A PAIR, like the
+    # endogenous news dials above, and inert through pt-v19 for that reason.
+    #
+    # LIVE ON pt-v20 (0.8.5): the bank's own QE in pt-v20's burn-in (see
+    # `qe_pe_gain`) leaves the ratio at 1.0116 when the probe opens, so the
+    # term is 0.5 * ln(1.0116) on every tick. Volume moves on seven names
+    # and one name's low by a cent; the print rounds the rest away.
+    ("qe_pe_stock_gain", 0.5, True),
     # How much of a VIX jump survives into the next day. A PAIR with
     # `vix_jump_intensity`: with the intensity at its shipped 0.0 there is no
     # jump to decay, so the ratio has nothing to act on.
@@ -1253,8 +1338,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # pt-v20's 2-year takes its own normal each session when its noise is
     # on: the draw IS the mechanism, as for the VIX jump below.
     "treasury_2y_noise",
+    # pt-v20's earnings cycle takes a normal each session when its sigma is
+    # on, the same shape again.
+    "earnings_cycle_sigma",
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
-    "cycle_stationary_opening", "inflation_reversion",
+    "cycle_stationary_opening",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -1282,9 +1370,9 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # market path that feeds it (`market_factor_sigma`, `price_hard_cap`, the
     # three jump dials) or through the OPEC arm's own decision day
     # (`oil_supply_response`, `oil_seasonality_target`).
-    "market_factor_sigma", "usd_crisis_vix_threshold", "price_hard_cap",
-    "jump_intensity_idio", "jump_mean_market", "jump_sigma_market",
-    "vix_return_gain_up", "oil_supply_response", "oil_seasonality_target",
+    "market_factor_sigma", "usd_crisis_vix_threshold",
+    "jump_intensity_idio",
+    "vix_return_gain_up", "oil_seasonality_target",
     # The macro calendar (2026-09-23): it moves which days are release,
     # quarter and meeting days, so which state-dependent sites fire.
     "macro_calendar_days_per_year",
@@ -1314,7 +1402,21 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # with the rule and 84.11 (the comfort band) without, so one arm takes
     # the second uniform and the other does not. It also needs the US table:
     # with `cycle_us_calibration` at 0.0 it moves no economy draw.
-    "cycle_hazard_per_month", "cycle_us_calibration", "fed_liftoff_rule",
+    "cycle_hazard_per_month", "cycle_us_calibration",
+    # SIX LEFT WITH pt-v20 (0.8.5), and all six still move the market:
+    # `inflation_reversion`, `fed_liftoff_rule`, and four of the nine that
+    # arrived with 0.8.0, `price_hard_cap`, `jump_mean_market`,
+    # `jump_sigma_market` and `oil_supply_response`. Each reached the stream
+    # by nudging pt-v19's burn-in across one state-dependent site. pt-v20's
+    # burn-in at seed 42 runs a different path (a full turn of the cycle to
+    # a trough and back, see `qe_pe_gain` in the table), and none of the six
+    # moves the economy draw count at any burn-in length from 0 to 755 in
+    # steps of 15, nor over the probe: measured. The jump sizes still move
+    # the derived anchor (23.34 against 18.05 at `jump_sigma_market` 0.05)
+    # and the lift-off still moves the rate from day 716, and no draw site's
+    # firing follows either. The other five of the nine stay, and move the
+    # stream by +4 to +56 draws on pt-v20 where each moved it by +1 on
+    # pt-v19.
 })
 
 
@@ -1436,6 +1538,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "book_depth_exponent": {"book_depth_coefficient": 0.5},
     "book_depth_reach": {"book_depth_coefficient": 0.5},
     "book_refill_half_life": {"book_depth_coefficient": 0.5, "book_shared": 1.0},
+    # The shared book goes off in its row, and the refill it would read is
+    # refused without it, so the refill is off in both arms: 0.0 against
+    # pt-v20's 27, as the depth companions above carry 0.5 against its 0.75.
+    "book_shared": {"book_refill_half_life": 0.0},
     # The excursion reads the VIX's distance above the identity's read-back,
     # so it is refused off the identity; a no-op on the default.
     "market_vol_vix_excursion": {"vix_level_identity": 1.0},
