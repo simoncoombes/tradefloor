@@ -195,10 +195,16 @@ def test_every_registered_target_reads_and_writes_the_engine():
             target.write(engine, "contraction")
             assert target.read(engine) == "contraction"
             continue
+        # A target that reads zero is written 0.01, a value inside every
+        # numeric target's domain. It was 1.0 until 0.8.5, and no rate read
+        # zero until pt-v20 became the default: pt-v20's burn-in at seed 1
+        # reaches the zero bound, so `macro.policy_rate` reads 0.0, and 1.0
+        # is a rate of 100 per cent, which `pin_macro` refuses. On pt-v19
+        # only `macro.qe_pe_boost` read zero.
         if isinstance(before, tuple):
             after = tuple(v * 0.5 for v in before)
         else:
-            after = (before * 0.5) if before else 1.0
+            after = (before * 0.5) if before else 0.01
         target.write(engine, after)
         assert target.read(engine) == pytest.approx(after), name
 
