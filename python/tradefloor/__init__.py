@@ -714,8 +714,10 @@ class FlowImpact:
         shares against the first name of ``Universe.random(20, seed=7)``
         run for ten days leaks nothing at sim seeds 2026 and 7 and moves
         one untouched name +22.8 bps at sim seed 11. Pin VIX in both
-        worlds to restore byte-exactness; ``tradefloor.tca``'s ``moved()``
-        docstring carries the full measurement of the channel.
+        worlds to restore byte-exactness, and on pt-v20 the corporate bond
+        yield too, which that preset moves at every close with the market;
+        ``tradefloor.tca``'s ``moved()`` docstring carries the full
+        measurement of the channel.
 
         So on a one-day run impact is exactly attributable to the names
         traded, and on a longer one it is attributable up to the fear

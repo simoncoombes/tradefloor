@@ -78,6 +78,13 @@ people measured this and produced three numbers by conflating them.
 
 ``fair_value`` reconstructs EXACTLY. It is a pure function of six inputs,
 four supplied and two observable, so there is nothing approximate about it.
+On pt-v19 and every preset before it, that public function IS the engine's
+anchor. From pt-v20, the default since 0.8.5, it is not: the engine's fair
+value carries a level of its own -- the part of each name's opening premium
+the published fundamentals do not explain, news that moves value for good,
+and an earnings cycle -- so the published fundamentals are a noisy read of
+it, and the inversion below misses by more (0.09 against 0.02 on the test
+roster after four days).
 
 ``mispricing_s`` is closely APPROXIMABLE and not recoverable. The engine
 applies it as ``fair_value * exp(s)``, so the inversion is

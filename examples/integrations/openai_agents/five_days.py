@@ -91,15 +91,20 @@ DAYS = 5
 #: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
 #: refusals.
 #:
-#: Ten, because it gives the five-day rule five usable days instead of one
-#: and stays inside the funding limit. The RULE is untouched: lowering its
-#: threshold until this market tripped it would be fitting a demonstration
-#: to a market, and the threshold is the thing being demonstrated.
+#: Ten until 0.8.5, because it gave the five-day rule five usable days
+#: instead of one and stayed inside the funding limit. Twenty since: on
+#: pt-v20, the default from 0.8.5, no name on this roster falls two per
+#: cent over five days in the first fifteen, so ten days trades nothing.
+#: Measured on pt-v20: 5, 8, 10, 12 and 15 days 0 trades, 20 days 9 with
+#: none refused, 25 days 15 to 17 (callable and openai_agents meet market
+#: refusals there). The RULE is untouched: lowering its threshold until
+#: this market tripped it would be fitting a demonstration to a market,
+#: and the threshold is the thing being demonstrated.
 #:
 #: The recorded model runs stay at `DAYS`. A language model reads the
 #: observation rather than waiting for a window, and both recordings trade
 #: on five days.
-OFFLINE_DAYS = 10
+OFFLINE_DAYS = 20
 
 #: The model a live run calls, the key variable it needs, and the per-decision
 #: turn budget. Replay -- the committed default -- needs none of them.

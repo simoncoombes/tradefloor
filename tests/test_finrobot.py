@@ -122,12 +122,13 @@ class Recorded(fr.FinRobotAdapter):
         return self.script(prompt) if callable(self.script) else self.script
 
 
-def one_observation(agent=None, *, days: int = 1) -> tuple[World, object]:
+def one_observation(agent=None, *, days: int = 1,
+                    model: str | None = None) -> tuple[World, object]:
     """Run a world far enough to have an observation with some history."""
     agent = agent or Scripted(answer())
     world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0,
                   pins={"federal_funds_rate": 0.04,
-                        "corporate_bond_yield": 0.055})
+                        "corporate_bond_yield": 0.055}, model=model)
     world.run(days=days)
     return world, agent
 
@@ -827,19 +828,26 @@ def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
         book_value_per_share=f["book_value_per_share"],
         federal_funds_rate=macro["federal_funds_rate"],
         corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+    # The macro the engine actually holds, not the pins: from 0.8.5 the
+    # default preset (pt-v20) moves the corporate yield every session
+    # (`corporate_yield_daily`), so two days in it reads 5.537% under a pin
+    # of 5.5%. The payload carries the engine's value, which is the point.
+    held = world.engine.macro_state
     direct = tf.fair_value(
         eps=3.0, sector="technology", revenue_growth=0.30,
-        book_value_per_share=15.0, federal_funds_rate=0.04,
-        corporate_bond_yield=0.055).fair_value
+        book_value_per_share=15.0,
+        federal_funds_rate=held.federal_funds_rate,
+        corporate_bond_yield=held.corporate_bond_yield).fair_value
     assert reconstructed == direct, (
         "fair_value is a pure function of six inputs and the payload carries "
         "all six, so this is an equality and not an approximation")
 
 
-#: How close `log(price / fair_value)` lands to the engine's `mispricing_s`.
-#: Measured, not chosen: the error is roster- and moment-dependent, so this
-#: is a ceiling generous enough not to be flaky and tight enough to fail if
-#: the relationship stops holding at all.
+#: How close `log(price / fair_value)` lands to the engine's `mispricing_s`
+#: on a preset whose fair value IS the public function: pt-v19 and earlier.
+#: Measured, not chosen: on this roster pt-v19 misses by 0.019, 0.024 and
+#: 0.025 after 2, 4 and 10 days, so this is a ceiling generous enough not to
+#: be flaky and tight enough to fail if the relationship stops holding.
 #:
 #: It lives here rather than in a docstring for a reason. Three people
 #: measured this claim and produced three numbers -- "exact", "a tenth of a
@@ -851,17 +859,56 @@ def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
 MISPRICING_TOLERANCE = 0.05
 
 
+def _public_inversion_error(model: str, days: int = 4) -> float:
+    """|log(price / public fair value) - mispricing_s| for TECH_A."""
+    import math
+    import struct
+
+    world, _agent = one_observation(days=days, model=model)
+    engine = world.engine
+    n = len(engine.tickers)
+    prices = list(struct.unpack("<%dd" % n, engine.prices()))
+    truth = list(struct.unpack("<%dd" % n, engine.column("mispricing_s")))
+    facts = {"TECH_A": {"sector": "technology", "eps": 3.0,
+                        "book_value_per_share": 15.0, "revenue_growth": 0.30}}
+    macro = fr.observe(_observation(world), history=[],
+                       fundamentals=facts)["macro"]
+    f = facts["TECH_A"]
+    value = tf.fair_value(
+        eps=f["eps"], sector=f["sector"], revenue_growth=f["revenue_growth"],
+        book_value_per_share=f["book_value_per_share"],
+        federal_funds_rate=macro["federal_funds_rate"],
+        corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+    return abs(math.log(prices[0] / value) - truth[0])
+
+
+def test_from_pt_v20_the_anchor_is_not_the_public_valuation():
+    """pt-v20, the default from 0.8.5, gives fair value a level of its own:
+    the part of each name's opening premium the published fundamentals do
+    not explain (`opening_mispricing_sigma`), news that moves it for good
+    (`fair_value_news_share`) and an earnings cycle. So the public
+    `fair_value` is no longer the engine's anchor, and inverting it misses
+    `mispricing_s` by more than the pt-v19 tolerance: 0.087, 0.091 and
+    0.065 after 2, 4 and 10 days on this roster. That is the change pt-v20
+    was built to make, since a value screen that reconstructs the anchor
+    is an edge real markets do not offer."""
+    for days in (2, 4, 10):
+        assert _public_inversion_error("pt-v20", days) > MISPRICING_TOLERANCE
+
+
 def test_the_state_variable_is_approximable_but_not_recoverable():
-    """The other half, and the half that is NOT exact.
+    """The other half, and the half that is NOT exact, on pt-v19.
 
     `mispricing_s` is a state variable, not a ratio that can be read off a
     price. The traded price carries microstructure on top of the anchor, so
-    even the correct inversion lands near rather than on it.
+    even the correct inversion lands near rather than on it. Pinned to
+    pt-v19, the last preset whose anchor is the public function; see the
+    test above for pt-v20.
     """
     import math
     import struct
 
-    world, _agent = one_observation(days=4)
+    world, _agent = one_observation(days=4, model="pt-v19")
     engine = world.engine
     n = len(engine.tickers)
     prices = list(struct.unpack("<%dd" % n, engine.prices()))
@@ -922,8 +969,12 @@ def test_no_hidden_value_appears_in_the_text_finrobot_receives():
         blob = world.engine.attribution(factor)
         hidden += list(struct.unpack("<%dd" % (len(blob) // 8), blob))
 
+    # Only a value whose four-place rendering carries a digit can leak
+    # that way. Under 5e-5 it renders as 0.0000, which the text holds for
+    # its own reasons: on pt-v20 a `company_news` attribution of 4.1e-6
+    # "matched" a zero in the block.
     leaked = [v for v in hidden
-              if v and abs(v) > 1e-9 and f"{v:.4f}" in text]
+              if abs(v) >= 5e-5 and f"{v:.4f}" in text]
     assert not leaked, (
         f"values only the simulator knows appear in the FinRobot input: "
         f"{leaked}")

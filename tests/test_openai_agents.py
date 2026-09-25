@@ -1376,26 +1376,36 @@ def test_the_committed_recording_replays_end_to_end():
     # the market once instead of on every tick of the step. The market the
     # model saw after its first trade moved, so the digests did. The values
     # the flow fix replaced: trades 7, pnl 22490.0, turnover 1939890.0.
-    assert card.trades == 10, card.trades
-    assert card.pnl == pytest.approx(18930.0), card.pnl
-    assert card.turnover == pytest.approx(2257400.0), card.turnover
+    #
+    # And RE-RECORDED once more for 0.8.5, when pt-v20 became the default.
+    # The values the pt-v20 recording replaced (pt-v19, fills applied
+    # once): trades 10, pnl 18930.0, turnover 2257400.0.
+    assert card.trades == 1, card.trades
+    assert card.pnl == pytest.approx(7042.0, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(934500.0), card.turnover
 
-    # AND THE REFUSAL STAYS GONE, which is a fact about this market and
-    # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
+    # AND THE REFUSALS ARE BACK, which is a fact about this run and not a
+    # bug. gpt-5.2 sized inside the limits on pt-v18's market and the
     # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
     # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
-    # that leg; on the fourth and fifth compositions it stayed inside the
-    # cap every day and there is nothing to refuse. Each of those is the
+    # that leg; on the fourth and fifth compositions, and on 0.8.5's pt-v19
+    # run, it stayed inside the cap every day. On pt-v20 it sat in cash for
+    # four days and then asked for three names at once on day 4, 3.26x
+    # equity against the 2.00x cap: the first order filled and the market
+    # refused the other two, at 2.11x and 2.08x. Each of those is the
     # environment doing its job on a decision the agent made, not a replay
     # failure.
     #
     # Pinned exactly rather than bounded, and the reason both lines exist:
     # a replay failure lands in this same list, so counting the refusals is
-    # not enough -- the second assertion says the list is EMPTY, which a
-    # missing-digest error would not leave it. Previously: rejected 1, one
-    # leverage refusal.
-    assert card.rejected == 0, card.errors
-    assert card.errors == [], card.errors
+    # not enough -- the second assertion says every entry is one of the two
+    # leverage refusals, which a missing-digest error would not be.
+    # Previously: rejected 0, no errors.
+    assert card.rejected == 2, card.errors
+    assert card.errors == [
+        "step 24: trade would take leverage to 2.11x, above the 2.00x limit",
+        "step 24: trade would take leverage to 2.08x, above the 2.00x limit",
+    ], card.errors
 
 
 @needs_fixture
