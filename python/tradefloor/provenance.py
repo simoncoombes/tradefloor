@@ -383,6 +383,12 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "market_beta_down_asym_lag_recentre":
+        "inert at 0.0 as shipped: the recentring offset is not scaled on a "
+        "lagged session, and the lagged tilt's mean (about -8 per cent a "
+        "year of the market input on pt-v20) sits in `s` as a constant "
+        "discount while `fair_value_market_share` is 0.0 (0.8.5, pt-v20 "
+        "work: audit major 5, the long-horizon reversion)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

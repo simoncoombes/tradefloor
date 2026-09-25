@@ -909,6 +909,11 @@ PERTURBATIONS = [
     # named preset breaks the assertion below for a reason that has
     # nothing to do with the parameter.
     ("market_beta_down_asym_recentre", 0.5, True),
+    # Gives back the part of the tilt's mean the lagged wire multiplies in,
+    # on a session after a down day. Gated on the tilt, the wire and the
+    # recentring all being on, which the default carries, so the probe's
+    # market moves once a lagged session comes.
+    ("market_beta_down_asym_lag_recentre", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

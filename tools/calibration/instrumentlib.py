@@ -158,6 +158,7 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

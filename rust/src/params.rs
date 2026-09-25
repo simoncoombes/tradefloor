@@ -2238,6 +2238,32 @@ pub struct ModelParams {
     /// offset added before it would itself be amplified, delivering the
     /// form times `E[A]` rather than the form.
     pub market_beta_down_asym_recentre: f64,
+    /// How much of the first moment the down-day wire adds to the tilt is
+    /// given back. 0.0, which every preset through pt-v20 carries, is
+    /// bit-identical. 1.0 returns the whole of it.
+    ///
+    /// `market_beta_down_asym_recentre` gives back the tilt's mean at a
+    /// lag multiplier of one. On a session after a down day
+    /// (`market_beta_down_asym_lag`) the whole transmission, the tilt
+    /// included, is multiplied by `1 + lag`, so the tilt's mean is
+    /// `(1 + lag)` times the form and `lag * a * beta * s / sqrt(2 pi)` of
+    /// it is left in every name every tick of that session. At pt-v20's
+    /// 0.025 and 0.46 that is about -8 per cent a year of the cap-weighted
+    /// market input (desk: -11.3 per cent a year with the wire, -3.5 with
+    /// it off, se 3 to 4, seeds 101-104, 756 sessions). While every market
+    /// shock sits in `s` the pull turns it into a constant discount of
+    /// about 2 per cent and it costs no drift; under
+    /// `fair_value_market_share` it accumulates in the fair-value level and
+    /// is a drift (grid ptv20g1: the index's long-run return 5.6, 1.3 and
+    /// -3.1 per cent at shares 0, 0.5 and 1).
+    ///
+    /// Off zero, on a lagged session the recentring offset is multiplied by
+    /// `1 + this * lag`, so at 1.0 it gives back the lagged tilt's mean
+    /// exactly as `market_beta_down_asym_recentre` gives back the unlagged
+    /// one, after the amplifier and with the same one per cent left. Read
+    /// only with `market_beta_down_asym_recentre`, `market_beta_down_asym`
+    /// and `market_beta_down_asym_lag` all non-zero. In [0, 1].
+    pub market_beta_down_asym_lag_recentre: f64,
 
     /// Suppression of a name's idiosyncratic shock on a down tick of the
     /// market factor, with the up tick inflated to hold the unconditional
@@ -4883,6 +4909,7 @@ impl ModelParams {
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_lag_live: 0.0,
             market_beta_down_asym_recentre: 0.0,
+            market_beta_down_asym_lag_recentre: 0.0,
             market_idio_down_suppress: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
@@ -7123,6 +7150,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_lag_live" => self.market_beta_down_asym_lag_live,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
+            "market_beta_down_asym_lag_recentre" => self.market_beta_down_asym_lag_recentre,
             "market_idio_down_suppress" => self.market_idio_down_suppress,
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
@@ -7362,6 +7390,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_lag_live" => out.market_beta_down_asym_lag_live = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
+            "market_beta_down_asym_lag_recentre" => out.market_beta_down_asym_lag_recentre = value,
             "market_idio_down_suppress" => out.market_idio_down_suppress = value,
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
@@ -7845,6 +7874,13 @@ impl ModelParams {
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
         }
+        if !(self.market_beta_down_asym_lag_recentre >= 0.0
+            && self.market_beta_down_asym_lag_recentre <= 1.0)
+        {
+            return Err(format!(
+                "market_beta_down_asym_lag_recentre is {}. It is the share of the lagged tilt's mean given back, in [0, 1].",
+                self.market_beta_down_asym_lag_recentre));
+        }
         if !(self.rate_pe_sensitivity >= 0.0 && self.rate_pe_sensitivity <= 10.0) {
             return Err(format!(
                 "rate_pe_sensitivity is {}. It is P/E compression per unit of yield, in [0, 10].",
@@ -8257,6 +8293,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym_lag",
         "market_beta_down_asym_lag_live",
         "market_beta_down_asym_recentre",
+        "market_beta_down_asym_lag_recentre",
         "market_idio_down_suppress",
         "oil_opec_symmetry",
         "oil_seasonality_target",
