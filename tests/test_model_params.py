@@ -830,6 +830,13 @@ PERTURBATIONS = [
     # moves the economy stream (ECONOMY_STREAM_MOVERS). pt-v19 ships depth
     # 0.0 and the branch is not entered.
     ("earnings_cycle_sigma", 0.002, True),
+    # LIVE on pt-v20 (depth 0.35) but INERT on this probe: the probe's
+    # economy sits in one phase at its target level throughout, so the
+    # anticipated level is a constant offset, and the stationary opening
+    # books a constant into the names' fair-value levels, moving no price.
+    # It moves prices at a turn of phase (tests/test_anticipation.py).
+    ("earnings_anticipation_half_life", 126.0, False),
+    ("rate_pe_sensitivity", 3.0, True),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an

@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v19",
   "fingerprint": "pt-v19",
-  "coefficient_digest": "198a61840af81cc40de5e71016685367891d21772fa27443c2f8050c20e692d1",
+  "coefficient_digest": "26fe19fcbdb87911d15a35bafb390e76612929d1613e35346c9ac970822e1288",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -36,6 +36,7 @@
     "daily_credit_floor_gain": 1.0,
     "daily_shock_cap": 0.15,
     "default_sector_anchor_pe": 18.0,
+    "earnings_anticipation_half_life": 0.0,
     "earnings_cycle_depth": 0.0,
     "earnings_cycle_half_life": 60.0,
     "earnings_cycle_sigma": 0.0,

@@ -176,6 +176,19 @@ pub fn compute_target_pe(
     qe_stock_gain: f64,
     neutral_rate: f64,
 ) -> TargetPe {
+    compute_target_pe_at(company, economy, qe_gain, qe_stock_gain, neutral_rate, RATE_PE_SENSITIVITY)
+}
+
+/// [`compute_target_pe`] at a given rate sensitivity
+/// (`ModelParams::rate_pe_sensitivity`).
+pub fn compute_target_pe_at(
+    company: &CompanyValuationInputs,
+    economy: &EconomyValuationInputs,
+    qe_gain: f64,
+    qe_stock_gain: f64,
+    neutral_rate: f64,
+    rate_pe_sensitivity: f64,
+) -> TargetPe {
     let sector_anchor_pe = sector_anchor_pe(company.sector_avg_pe);
     let discount = discount_rate(economy);
 
@@ -186,7 +199,7 @@ pub fn compute_target_pe(
 
     let rate_adjustment = mathx::max(
         RATE_ADJUSTMENT_FLOOR,
-        1.0 - (discount - neutral_rate) * RATE_PE_SENSITIVITY * duration_multiplier,
+        1.0 - (discount - neutral_rate) * rate_pe_sensitivity * duration_multiplier,
     );
 
     // `qe_pe_gain` is 1.0 on every preset before it, so this is bit-inert
@@ -268,10 +281,26 @@ pub fn compute_fair_value_with(
     qe_stock_gain: f64,
     neutral_rate: f64,
 ) -> FairValueBreakdown {
+    compute_fair_value_at(company, economy, book_floor, qe_gain, qe_stock_gain, neutral_rate,
+                          RATE_PE_SENSITIVITY)
+}
+
+/// [`compute_fair_value_with`] at a given rate sensitivity
+/// (`ModelParams::rate_pe_sensitivity`).
+pub fn compute_fair_value_at(
+    company: &CompanyValuationInputs,
+    economy: &EconomyValuationInputs,
+    book_floor: f64,
+    qe_gain: f64,
+    qe_stock_gain: f64,
+    neutral_rate: f64,
+    rate_pe_sensitivity: f64,
+) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
-        let pe = compute_target_pe(company, economy, qe_gain, qe_stock_gain, neutral_rate);
+        let pe = compute_target_pe_at(company, economy, qe_gain, qe_stock_gain, neutral_rate,
+                                      rate_pe_sensitivity);
         // The floor is a BRANCH at zero, not arithmetic, for the same reason
         // `market_vol_slow_weight` is: every preset before this parameter
         // existed must reproduce bit for bit, and that is the only spelling

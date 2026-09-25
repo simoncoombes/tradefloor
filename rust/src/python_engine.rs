@@ -3061,6 +3061,9 @@ impl PyEngine {
         if vix.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
         }
+        // A pinned phase is news of a turn, which the anticipated earnings
+        // price at once (`earnings_anticipation_half_life`).
+        self.inner.refresh_earnings_anticipation();
         if corporate_bond_yield.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
         }
@@ -3070,6 +3073,14 @@ impl PyEngine {
     /// Whether tonight's close will SET the market factor's variance from
     /// the VIX, because a scenario forced the VIX today with
     /// `vix_sets_variance` on. Cleared by the close.
+    /// The anticipated earnings level's offset over the earnings cycle's
+    /// current level, which the valuation reads beside it
+    /// (`earnings_anticipation_half_life`); 0.0 with it off.
+    #[getter]
+    fn earnings_anticipation(&self) -> f64 {
+        self.inner.economy().earnings_anticipation
+    }
+
     #[getter]
     fn vix_sets_variance_pending(&self) -> bool {
         self.inner.vix_sets_variance_pending()
@@ -4374,6 +4385,8 @@ impl PyEngine {
                     ValidationError::new_err(format!("unknown cycle phase {name:?}"))
                 })?;
             }
+            // Derived from the phase and the level just restored.
+            self.inner.refresh_earnings_anticipation();
         }
         if let Some(raw) = snapshot.get_item("central_bank")? {
             let d = raw.downcast::<PyDict>()?;

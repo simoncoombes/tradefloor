@@ -298,6 +298,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "earnings_cycle_depth": (0.0, 0.6),
     "earnings_cycle_upside": (0.0, 0.3),
     "earnings_cycle_sigma": (0.0, 0.005),
+    "earnings_anticipation_half_life": (0.0, 504.0),
     # The agent-facing book (2026-09-24): read only on an agent's path.
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),
