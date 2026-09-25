@@ -680,33 +680,54 @@ def test_a_pinned_fear_gauge_removes_the_whole_cross_effect():
     Pinning VIX in both worlds collapses every entry between agents on
     disjoint names to exactly zero, which is what makes the attribution
     in the caveat a measurement rather than a story. The existence test
-    above would pass on any leak; this one says which leak it is.
+    above would pass on any leak; this one says which leak it is. On
+    pt-v20 the corporate yield moves at every close with the market (the
+    flight to quality moves the 10-year, which it follows), so the control
+    pins it too, and a pinned corporate yield holds through the close.
     """
-    for preset in ("pt-v19", "pt-v20"):
-        model = tf.ModelParams.from_preset(preset, flight_to_quality_day=0.0)
+    for preset, pins in (("pt-v19", {"vix": 15.0}),
+                         ("pt-v20", {"vix": 15.0,
+                                     "corporate_bond_yield": 0.055})):
+        model = tf.ModelParams.from_preset(preset)
         for days in (4, 10):
-            result = _disjoint(pins={"vix": 15.0}, days=days, model=model)
+            result = _disjoint(pins=pins, days=days, model=model)
             assert result.matrix["low"]["high"] == 0.0, (preset, days)
             assert result.matrix["high"]["low"] == 0.0, (preset, days)
             assert not any("holds and trades no name" in line
                            for line in result.caveats())
 
 
-def test_the_flight_to_quality_is_the_channel_a_vix_pin_leaves_open():
-    """pt-v20's second path from one agent's flow to names it never traded.
+def test_a_vix_pin_alone_leaves_pt_v20s_credit_channel_open():
+    """Why the control names the corporate yield on pt-v20.
 
     With `flight_to_quality_day` on, the session's index return moves the
     10-year, the corporate yield follows the 10-year every session, and
-    every name is discounted at it. A pinned VIX does not hold that, which
-    is why the caveat hands over the dial as the second control, and why
-    the test above switches it off. Measured here so the caveat's claim is
-    a measurement: non-zero with the VIX pinned and the dial on.
+    every name is discounted at it. A pinned VIX does not hold that, so the
+    entry is non-zero and the caveat hands over the second pin.
     """
     result = _disjoint(pins={"vix": 15.0}, days=4,
                        model=tf.ModelParams.from_preset("pt-v20"))
     assert result.matrix["high"]["low"] != 0.0
-    assert any("flight_to_quality_day=0.0" in line
-               for line in result.caveats())
+    assert any("corporate_bond_yield" in line for line in result.caveats())
+
+
+def test_a_pinned_corporate_yield_holds_through_the_close():
+    """A pinned macro value is the value, overnight included, on every preset.
+
+    pt-v20's `corporate_yield_daily` moved the corporate yield at the close
+    by the 10-year's change, so a pinned level drifted after every session
+    (0.054865 after day 1 of a 0.055 pin) and came back only with the next
+    morning's pin. pt-v19 held it. Both hold it now.
+    """
+    universe = list(tf.Universe.random(8, seed=99))
+    for preset in ("pt-v19", "pt-v20"):
+        e = tf.Engine(seed=42, universe=universe, model=preset)
+        for _ in range(5):
+            e.pin_macro(corporate_bond_yield=0.055)
+            e.open_market()
+            e.run_session(9, 30, 3, 30)
+            e.close_market()
+            assert e.macro_fields["corporate_bond_yield"] == 0.055, preset
 
 
 def test_a_pinned_vix_moves_the_corporate_yield_by_nothing():

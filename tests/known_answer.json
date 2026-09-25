@@ -1,5 +1,6 @@
 {
-  "bondsSha256": "3d5bdd8c3325720c404e429f38437a86c8e715ff2c344ab36d47479828a632a2",
+  "bondsNote": "Re-based 2026-09-24 on fix/ptv20-core: the session pins the corporate yield on day 2, and on pt-v20, the default, a pinned corporate yield now holds through the close (before, corporate_yield_daily moved it at the close by the 10-year's change, so it was not the pinned value overnight). A traded, pinned session; the simulation, metadata and per-preset digests are unchanged.",
+  "bondsSha256": "cd6d532df8c9f46d0297335033e5f234771626b67d9bafdf78de3170ab14960d",
   "bytes": 16920,
   "days": 250,
   "katVersion": 28,

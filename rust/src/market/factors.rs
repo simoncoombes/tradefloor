@@ -60,7 +60,8 @@ pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 /// out, for the reason `rng::stream::COUNT` gives.
 pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
 pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
-pub const COMPONENT_COUNT: usize = OVERNIGHT_SLOT + 1;
+pub const FAIR_VALUE_SLOT: usize = OVERNIGHT_SLOT + 1;
+pub const COMPONENT_COUNT: usize = FAIR_VALUE_SLOT + 1;
 
 /// A name's loading on its sector factor, from its beta (§108).
 ///
@@ -399,6 +400,29 @@ pub const S_COMPONENT_KEYS: [&str; 8] = [
     // change of -0.190 (§79).
     "circuit_breaker",
 ];
+
+/// The fair-value shift's name: minus the part of a move's shocks that went
+/// to the name's fair value for good instead of its mispricing, under
+/// `fair_value_news_share` and `fair_value_market_share` (pt-v20). The other
+/// factors report the whole shock, which is what moved the PRICE; this one
+/// takes the permanent part back out of `s`, so every factor together sums
+/// to the change in `mispricing_s`, and every factor but this one to the
+/// change in `s` plus the fair-value level, the price's own move at a fixed
+/// valuation. Exactly zero on every preset through pt-v19. The last factor,
+/// so every earlier one keeps its position.
+pub const FAIR_VALUE_COMPONENT_KEY: &str = "fair_value_shift";
+
+/// The tick's own rows: the eight `S_COMPONENT_KEYS`, then the tick's
+/// fair-value shift at [`TICK_FAIR_VALUE`].
+pub const TICK_COMPONENT_COUNT: usize = S_COMPONENT_KEYS.len() + 1;
+
+/// The fair-value shift's index in a tick row.
+pub const TICK_FAIR_VALUE: usize = S_COMPONENT_KEYS.len();
+
+/// The attribution slot a tick row's index `k` accumulates into.
+pub const fn attribution_slot_for_tick(k: usize) -> usize {
+    if k == TICK_FAIR_VALUE { FAIR_VALUE_SLOT } else { k }
+}
 
 /// Total impact coefficient for order flow, before the informed fraction.
 pub const ORDER_FLOW_COEFFICIENT: f64 = 50.0;

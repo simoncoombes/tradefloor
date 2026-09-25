@@ -660,7 +660,7 @@ pub struct TickOutcome {
     /// the crowd, actually DID to the mispricing on this tick. They sum to
     /// `Δs` -- so a consumer can verify the label against the outcome rather
     /// than trusting it.
-    pub s_components: Vec<[f64; 8]>,
+    pub s_components: Vec<[f64; crate::market::factors::TICK_COMPONENT_COUNT]>,
     /// The `random_noise` slot of `s_components` split into market, sector
     /// and idiosyncratic, per active company, at the same scale the slot
     /// carries. The three sum to that slot up to the order the sum above is
@@ -1053,7 +1053,7 @@ pub fn simulate_market_tick(
 
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
-    let mut s_components = vec![[0.0f64; 8]; active_count];
+    let mut s_components = vec![[0.0f64; crate::market::factors::TICK_COMPONENT_COUNT]; active_count];
     let mut noise_parts = vec![[0.0f64; 3]; active_count];
     let mut noise_own_scale2 = vec![0.0f64; active_count];
     let mut crowd_leans = vec![0.0; active_count];
@@ -1157,6 +1157,8 @@ pub fn simulate_market_tick(
                 all_noises[i] * intraday_vol_mult,
                 // The breaker's slot, filled below if it binds.
                 0.0,
+                // The fair-value shift's, filled below under the permanent share.
+                0.0,
             ]
         } else {
             // Closed: no reversion, no crowd, and the squeeze term is not
@@ -1170,6 +1172,7 @@ pub fn simulate_market_tick(
                 with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 0.0,
                 all_noises[i],
+                0.0,
                 0.0,
             ]
         };
@@ -1234,10 +1237,13 @@ pub fn simulate_market_tick(
             // report what moved the PRICE (the attribution an agent's
             // explanation is scored against), and the close feeds slot 6 to
             // the name's GJR as the day's innovation, which is the full
-            // move whichever of `s` and `v` carries it. Under this dial the
-            // slots therefore sum to the move in `s + v`, not in `s` alone.
+            // move whichever of `s` and `v` carries it. `fair_value_shift`
+            // books what left `s` for `v`, so all the slots together sum to
+            // the change in `s`, and all but that one to the change in `s + v`.
             if dv != 0.0 {
+                let before = s_val;
                 s_val = s_val - dv;
+                s_components[i][crate::market::factors::TICK_FAIR_VALUE] += s_val - before;
                 let step = dv - 0.5 * dv * dv;
                 companies[idx].stock.fair_value_offset = Some(v_level + step);
                 fv_moved = fv * mathx::exp(step);

@@ -75,11 +75,12 @@ pub fn bars_schema() -> SchemaRef {
 /// `mispricing_s` isolates the valuation gap. Three quantities that are easy
 /// to conflate, kept apart on purpose.
 ///
-/// **The decomposition.** Ten columns, in `FACTOR_NAMES` order, giving
+/// **The decomposition.** Eleven columns, in `FACTOR_NAMES` order, giving
 /// every contribution to this tick's change in `s`: the eight
 /// `S_COMPONENT_KEYS`, then the daily jump and the overnight move, which
 /// land outside the tick loop and are booked onto the row where each is
-/// observed. `reversion`, `momentum` and `crowd_lean` are the model's own
+/// observed, then `fair_value_shift`, minus the part of the shocks that
+/// moved the name's fair value instead of `s` (pt-v20's permanent share). `reversion`, `momentum` and `crowd_lean` are the model's own
 /// dynamics; `company_news`, `order_flow_impact`, `short_squeeze_effect`
 /// and `random_noise` are the shocks. They sum to `Δs`.
 ///
@@ -126,6 +127,15 @@ pub fn truth_schema() -> SchemaRef {
     // before any tick; booked on the day's first row.
     fields.push(Field::new(
         crate::market::factors::OVERNIGHT_COMPONENT_KEY,
+        DataType::Float64,
+        false,
+    ));
+    // The fair-value shift: minus what left `s` for the name's fair value
+    // under the permanent share (pt-v20), on each tick and, beside the jump,
+    // on the row where the close's jump is observed. Zero on every preset
+    // through pt-v19. With it every component column sums to `Δs`.
+    fields.push(Field::new(
+        crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
         DataType::Float64,
         false,
     ));

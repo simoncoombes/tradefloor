@@ -88,7 +88,7 @@ a paired sign test.
 
 | | |
 |---|---|
-| `engine.truth()` | why each price moved: ten factors that sum to the move, to 1e-16 |
+| `engine.truth()` | why each price moved: eleven factors that sum to the mispricing's move, to 1e-16 |
 | `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
 | counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
@@ -267,7 +267,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
 | [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
 | [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The ten factors that sum to every move |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The eleven factors that sum to every move |
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |

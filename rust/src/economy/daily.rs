@@ -309,6 +309,10 @@ pub struct YieldDials {
     /// caller wrote, which the next pin discards, so the corporate yield
     /// takes no VIX term from it. Read only with `corporate_yield_daily` on.
     pub vix_pinned: bool,
+    /// A caller pinned the corporate yield before this session. The pinned
+    /// level then holds through the close, as it does on every preset
+    /// without `corporate_yield_daily`: the daily move is not applied.
+    pub corporate_pinned: bool,
 }
 
 impl Default for YieldDials {
@@ -320,6 +324,7 @@ impl Default for YieldDials {
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
             vix_pinned: false,
+            corporate_pinned: false,
         }
     }
 }
@@ -1574,7 +1579,13 @@ pub fn update_economy_daily(
     // flight to quality (`flight_to_quality_day`), which reads the session's
     // index return: that is a second path from one agent's flow to names it
     // never touched, which a VIX pin does not hold (`tca.Execution.moved`).
-    if inputs.yields.corporate_yield_daily != 0.0 {
+    //
+    // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE. A caller that wrote
+    // the level wants that level for the session and the night after it,
+    // which is what every preset without the daily move gives: without this
+    // the close moved it by the 10-year's change and the next morning's pin
+    // put it back, so it was never the pinned value overnight.
+    if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
         let cycle_spread_multiplier = match economy.cycle_phase {
             CyclePhase::Contraction => 2.8,
             CyclePhase::Trough => 3.5,

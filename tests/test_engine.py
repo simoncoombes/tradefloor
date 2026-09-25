@@ -506,6 +506,10 @@ def test_attribution_reports_every_component_that_moves_a_price():
         # The tenth arrived 2026-09-04: `apply_overnight` moves `s` at the
         # open before any tick, and the tape books it on the day's first row.
         "overnight",
+        # The eleventh arrived with pt-v20 (0.8.5): what left `s` for the
+        # fair-value level under the permanent share, which the ten report
+        # as the whole shock. Zero on every earlier preset.
+        "fair_value_shift",
     ]
 
 

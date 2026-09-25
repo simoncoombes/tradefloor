@@ -36,6 +36,10 @@ COMPONENTS = [
     "circuit_breaker",
     "jump",
     "overnight",
+    # What left `s` for the fair-value level under pt-v20's permanent share;
+    # zero on every earlier preset. Without it the columns above sum to the
+    # move in `s + v` on pt-v20, missing `Δs` by up to 0.0087 on every row.
+    "fair_value_shift",
 ]
 
 LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
@@ -75,6 +79,21 @@ def test_the_components_sum_to_the_change_in_mispricing():
     res = residuals(table, n)
     assert max(res) < 1e-15
     assert statistics.median(res) < 1e-16
+
+
+@pytest.mark.parametrize("preset", tradefloor.preset_names())
+def test_every_preset_reconstructs_the_change_in_mispricing(preset):
+    """The same identity on every shipped preset, pt-v20's permanent share
+    included, over three days so the close's jump and the next open's
+    overnight move are on the tape too. `fair_value_shift` is non-zero on
+    pt-v20 and exactly zero before it."""
+    _, table, n = run(days=3, model=preset)
+    assert max(residuals(table, n)) < 1e-15, preset
+    params = tradefloor.ModelParams.from_preset(preset).to_dict()
+    moved = any(table["fair_value_shift"])
+    carries = (params.get("fair_value_news_share", 0.0) != 0.0
+               or params.get("fair_value_market_share", 0.0) != 0.0)
+    assert moved == carries, (preset, moved, carries)
 
 
 def test_the_reconstruction_still_holds_with_news_and_order_flow():
@@ -373,7 +392,7 @@ def test_attribution_equals_the_tape_for_every_factor():
             f"{tape:+.6e}"
         )
         checked += 1
-    assert checked == 10, f"only {checked} factors compared"
+    assert checked == 11, f"only {checked} factors compared"
     # And at least one of them must be non-zero, or this compared zeros.
     assert any(second[f] != 0.0
                for f in tradefloor.Engine.FACTORS if f in truth.column_names)
