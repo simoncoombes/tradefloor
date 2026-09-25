@@ -258,9 +258,9 @@
   "default_since": "0.8.5",
   "measured": {
     "tradefloor_version": "0.8.5",
-    "commit": "6aea5ac52b93c332a028ede58a3d36b3963182ea",
+    "commit": "40f3f391f77bddead32f5809e46daa1187fd449c",
     "workers": 48,
-    "wall_seconds": 60.2,
+    "wall_seconds": 60.0,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
@@ -1846,7 +1846,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "6aea5ac52b93c332a028ede58a3d36b3963182ea",
+      "commit": "40f3f391f77bddead32f5809e46daa1187fd449c",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
@@ -1917,7 +1917,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "6aea5ac52b93c332a028ede58a3d36b3963182ea",
+      "commit": "40f3f391f77bddead32f5809e46daa1187fd449c",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
@@ -1990,7 +1990,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "6aea5ac52b93c332a028ede58a3d36b3963182ea",
+      "commit": "40f3f391f77bddead32f5809e46daa1187fd449c",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
@@ -2123,23 +2123,23 @@
     }
   },
   "crisis_lever": {
-    "ratio": 3.599888236911072,
-    "vol_at_vix_5": 23.725407862169284,
-    "vol_at_vix_65": 85.40881667894067,
+    "ratio": 5.265073067860896,
+    "vol_at_vix_5": 16.11969395362656,
+    "vol_at_vix_65": 84.87136649739932,
     "real": 6.16
   },
   "long_run": {
     "criteria": "programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24); C5-C8 registered 2026-09-24 in programme/ptv20-registration.md",
     "verdict": "pass",
-    "passed": 28,
-    "of": 28,
+    "passed": 29,
+    "of": 29,
     "rows": [
       {
         "id": "A1",
         "words": "worst month's volatility in the 2008 and 2020 replays within 30% of real",
         "value": [
-          86.7,
-          75.4
+          86.8,
+          72.3
         ],
         "real": [
           84.3,
@@ -2152,8 +2152,8 @@
         "id": "A2",
         "words": "maximum drawdown in the 2008 and 2020 replays within 30% of real",
         "value": [
-          0.469,
-          0.353
+          0.463,
+          0.351
         ],
         "real": [
           0.568,
@@ -2166,8 +2166,8 @@
         "id": "A3",
         "words": "peak stock correlation in the 2008 and 2020 replays within 0.15 of real",
         "value": [
-          0.782,
-          0.778
+          0.777,
+          0.773
         ],
         "real": [
           0.748,
@@ -2203,7 +2203,7 @@
       {
         "id": "B4",
         "words": "10% corrections per decade",
-        "value": 4.83,
+        "value": 4.85,
         "real": 3.65,
         "rule": "1/2x to 2x",
         "pass": true
@@ -2211,7 +2211,7 @@
       {
         "id": "B5",
         "words": "sessions down more than 5% per decade",
-        "value": 6.2,
+        "value": 6.1,
         "real": 6.2,
         "rule": "1/2x to 2x",
         "pass": true
@@ -2235,7 +2235,7 @@
       {
         "id": "B8",
         "words": "long-run index return, % a year",
-        "value": 5.7,
+        "value": 5.6,
         "real": 6.25,
         "rule": "within 2 points of the honest target",
         "pass": true
@@ -2244,8 +2244,8 @@
         "id": "B9",
         "words": "sd of annual index log returns, years 2-21, per cent; the start-up drift: sd of the first 60 sessions' index return over the steady state's, across 50 markets",
         "value": [
-          16.785,
-          1.191
+          16.6343,
+          1.143
         ],
         "real": [
           17.4,
@@ -2257,7 +2257,7 @@
       {
         "id": "C1",
         "words": "crash rate in years 3-21 against years 1-2",
-        "value": 0.88,
+        "value": 0.87,
         "real": 1.0,
         "rule": "2/3x to 1.5x",
         "pass": true
@@ -2296,8 +2296,8 @@
         "id": "C4b",
         "words": "the price-only rule furthest over its line on tf-suite-2026.1 (named in `worst`): median points over buy-and-hold, markets beaten of 20",
         "value": [
-          -0.2,
-          10
+          0.6,
+          11
         ],
         "real": [
           0.0,
@@ -2312,7 +2312,7 @@
         "id": "C5",
         "words": "stock-level (idiosyncratic) variance ratio at 60 sessions, median name, 30 histories of 2,660 sessions",
         "value": [
-          0.9468
+          0.9451
         ],
         "real": [
           0.9242
@@ -2378,7 +2378,7 @@
         "id": "R1",
         "words": "sd of the 2-year Treasury yield's daily change, bp (FRED DGS2 2015-2025)",
         "value": [
-          4.4802
+          4.4704
         ],
         "real": [
           5.226
@@ -2390,7 +2390,7 @@
         "id": "R2",
         "words": "sd of the 10-year Treasury yield's daily change, bp (FRED DGS10)",
         "value": [
-          4.7221
+          4.6946
         ],
         "real": [
           5.406
@@ -2402,7 +2402,7 @@
         "id": "R3",
         "words": "daily correlation of the roster index with a Treasury bond's return (minus the 10-year's change; SPY against IEF)",
         "value": [
-          -0.154
+          -0.1539
         ],
         "real": [
           -0.161
@@ -2414,7 +2414,7 @@
         "id": "R4",
         "words": "daily correlation of the roster index with an IG bond's return (minus the corporate yield's change; SPY against LQD)",
         "value": [
-          0.2312
+          0.2333
         ],
         "real": [
           0.272
@@ -2426,12 +2426,26 @@
         "id": "E1",
         "words": "the aggregate earnings fall around a contraction, median over the 30 histories' contractions (Shiller 1953-2020)",
         "value": [
-          -0.2796
+          -0.2789
         ],
         "real": [
           -0.17
         ],
         "rule": "in -0.40 to -0.046",
+        "pass": true
+      },
+      {
+        "id": "D2",
+        "words": "the driven 2020-21 market: the index's maximum drawdown and the sessions from the pre-crash high back to it, medians over histories (driven2020.py)",
+        "value": [
+          0.4085,
+          227.5
+        ],
+        "real": [
+          0.339,
+          126
+        ],
+        "rule": "drawdown in 0.237 to 0.441 and sessions in 63 to 252",
         "pass": true
       },
       {
@@ -2444,26 +2458,26 @@
       }
     ],
     "measured": {
-      "engine_commit": "6aea5ac52b93c332a028ede58a3d36b3963182ea",
+      "engine_commit": "40f3f391f77bddead32f5809e46daa1187fd449c",
       "seeds": 90,
       "years": 21,
-      "box": "ptv20g3",
-      "date": "2026-09-24",
+      "box": "ptv20g4b",
+      "date": "2026-09-25",
       "fingerprint": "pt-v20",
       "base": "pt-v20",
       "dials": {},
-      "longrun_report": "results/ptv20/box-g3/longrun-report.json",
-      "certgrade": "results/ptv20/certgrade-g3.json",
+      "longrun_report": "results/ptv20/box-g4b/longrun-report.json",
+      "certgrade": "results/ptv20/certgrade-g4b.json",
       "edge": {
-        "source": "results/ptv20/box-g3/edge.json",
+        "source": "results/ptv20/box-g4b/edge.json",
         "base": "pt-v19",
         "seeds": 10,
         "first_seed": 101,
         "days": 300
       },
       "c4": {
-        "source": "results/ptv20/box-g3/c4a.json, results/ptv20/box-g3/c4b.json",
-        "tradefloor_version": "0.8.5 at 6aea5ac52b93"
+        "source": "results/ptv20/box-g4b/c4a.json, results/ptv20/box-g4b/c4b.json",
+        "tradefloor_version": "0.8.5 at 40f3f391f77b"
       },
       "computed_by": "programme/longrun/criteria.py",
       "note": "computed by programme/longrun/criteria.py from the long-run report, the certification grade and the edge named here"
