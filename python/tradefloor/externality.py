@@ -222,7 +222,9 @@ class Externality:
                 f"later. tradefloor.Execution.moved documents and measures "
                 f"that channel. To hold those entries at zero, pin the "
                 f"gauge in both worlds by building the cohort with "
-                f"pins={{'vix': 15.0}} and running this again.")
+                f"pins={{'vix': 15.0}} and running this again, and on "
+                f"pt-v20, which moves the corporate bond yield at every "
+                f"close with the market, pin 'corporate_bond_yield' too.")
         idle = [b for b in self.labels if not self.trades[b]]
         if idle:
             out.append(

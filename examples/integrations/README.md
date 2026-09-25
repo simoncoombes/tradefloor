@@ -60,17 +60,20 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.62% | +0.00 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.62% | +0.00 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +6.24% | -1.55 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 9 | -1.31% | +0.05 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 9 | -1.31% | +0.05 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 9 | -3.34% | +0.96 bps |
 | [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 0 | +0.00% | +0.00 bps |
 
-Re-measured at 0.8.5, where an agent's fills stopped being counted on every
-tick of a step and reach the market once. The same three trades now move
-the prices they are marked at far less: callable and openai_agents read
-+1.60% and -1.10 bps before, and pydantic_ai +6.28% and +2.51 bps. The
-impact column is the end-of-run price against the untraded run, and at
-these sizes it is mostly which way the tape's noise fell.
+Re-measured at 0.8.5 twice over. The default preset moved to pt-v20, and on
+its market the three offline examples trade nothing over ten days, so they
+now run twenty (below). And an agent's fills stopped being counted on every
+tick of a step and reach the market once. On pt-v19 with the fills applied
+once, over ten days, the rows read callable and openai_agents 3 trades
++1.62% +0.00 bps and pydantic_ai 3 trades +6.24% -1.55 bps; before the fill
+change, +1.60% -1.10 bps and +6.28% +2.51 bps. The impact column is the
+end-of-run price against the untraded run, and at these sizes it is mostly
+which way the tape's noise fell.
 
 Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
 price in these markets moved with it -- and measured again each time pt-v19
@@ -79,23 +82,24 @@ there were callable and openai_agents 2 trades +1.20% +0.47 bps,
 pydantic_ai 2 trades +4.77% -0.27 bps, and langgraph 1 trade +0.63%
 +25.71 bps; at the fourth composition before that, callable and
 openai_agents 3 trades +1.47%, pydantic_ai 3 trades +5.78% +1.55 bps, and
-langgraph +0.62% +18.99 bps. The langgraph row now reads no trades at all:
-it runs five days, not ten, and on this market no name in its roster falls
+langgraph +0.62% +18.99 bps. The langgraph row reads no trades at all: it
+runs five days, not ten, and on pt-v19's market no name in its roster fell
 more than two per cent over five days on any of them -- the deepest, HELX,
-falls 1.83 per cent on day 1 -- so the rule buys nothing, has nothing to
-trim, and holds every day. Nothing
-else about these examples changed: the rule, the rosters, the seed and the
-horizons are the ones 0.7.0 shipped, so every difference in the table
-above is the market and not the demonstration.
+fell 1.83 per cent on day 1 -- so the rule bought nothing, had nothing to
+trim, and held every day. It still trades nothing on pt-v20. Nothing else
+about these examples changed until 0.8.5: the rule, the rosters, the seed
+and the horizons were the ones 0.7.0 shipped, so every difference in the
+table above was the market and not the demonstration.
 
-The three offline examples run ten days rather than five, which is a
-choice 0.7.0 made and this release keeps. They share one mean-reversion
-rule that acts on a five-day move past two per cent, and on a five-day run
-it gets a single usable reading -- which was enough on pt-v16's market and
-was not on pt-v18's, whose worst five-day fall over this roster is 1.85 per
-cent. Measured again on the fifth composition of pt-v19: five days
-trades not at all, ten days three times, so ten still gives the rule the
-readings five does not. The rule is
+The three offline examples run twenty days, where 0.7.0 moved them from
+five to ten. They share one mean-reversion rule that acts on a five-day
+move past two per cent, and on a five-day run it gets a single usable
+reading -- which was enough on pt-v16's market and was not on pt-v18's,
+whose worst five-day fall over this roster is 1.85 per cent. On pt-v19 ten
+days traded three times. On pt-v20, the default from 0.8.5, no name falls
+two per cent over five days in the first fifteen: 5, 8, 10, 12 and 15 days
+trade nothing, 20 days nine times with nothing refused, and 25 days meet
+market refusals in two of the three. So twenty. The rule is
 untouched, because lowering its trigger until this market tripped it would
 be fitting the demonstration to the market, and the trigger is the thing
 being demonstrated. The two recorded MODEL runs still use five days: a

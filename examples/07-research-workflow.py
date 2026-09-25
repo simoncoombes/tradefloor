@@ -111,17 +111,24 @@ def main() -> dict:
           f"{verdict['wins_b']} across seeds, p={verdict['p_value']:.3f}"
           f"{'' if verdict['decisive'] else '  (not separated)'}")
 
-    # The spread of the leader across single seeds is wider than its whole
-    # margin over the runner-up. That is the finding, asserted so that a
-    # change which quietly narrows the spread has to explain itself.
+    # The spread of the leader across single seeds against its margin over
+    # the runner-up. Until 0.8.5 the spread was always the wider, and this
+    # asserted it. On pt-v20, the default from 0.8.5, it is not: the Oracle
+    # loses money on five of these eight five-day markets, so capture is
+    # measurable on three, the ratios are large, and buy-and-hold leads
+    # mean reversion by 5.37 against a spread of 4.01 -- and wins all eight
+    # paired seeds. So what is asserted is that a margin wider than the
+    # spread only stands where the paired test backs it: a leader that is
+    # neither inside its own noise nor separated would be the coin flip in
+    # nicer clothes this section warns about.
     span = first.capture_range[1] - first.capture_range[0]
     margin = first.pooled_capture - second.pooled_capture
     report["span_exceeds_margin"] = span > margin
-    assert span > margin, (
-        f"per-seed spread {span:.3f} no longer exceeds the {margin:.3f} "
-        "margin between the top two -- if that is real, single-seed "
-        "evaluation just became defensible and this warning should change"
-    )
+    assert span > margin or verdict["p_value"] < 0.05, (
+        f"per-seed spread {span:.3f} is under the {margin:.3f} margin between "
+        f"the top two and the sign test does not separate them "
+        f"(p={verdict['p_value']:.3f}): the table names a leader nothing "
+        "supports")
     print(f"     one seed swings the leader by {span:.3f}, against a "
           f"{margin:.3f} margin over second place")
 
@@ -174,17 +181,22 @@ def main() -> dict:
           f"fear gauge, the largest {largest:.1f} bps against a "
           f"{median_direct:.1f} bps median direct impact")
 
-    # And with VIX pinned the macro channel is closed, so the subtraction is
-    # byte-exact, the guarantee the RNG stream split actually makes, now
-    # demonstrated at the boundary where it holds.
-    pinned = tf.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
-                            scenario=tf.Scenario().hold(vix=15.0))
+    # And with the macro channels pinned the subtraction is byte-exact, the
+    # guarantee the RNG stream split actually makes, now demonstrated at the
+    # boundary where it holds. Two channels on pt-v20, the default from
+    # 0.8.5: the VIX, and the corporate bond yield, which pt-v20 moves at
+    # every close with the market (`corporate_yield_daily`). With the VIX
+    # alone pinned, one untouched name here closes 5e-6 bps apart.
+    pinned = tf.tca.analyse(
+        Momentum(), seed=7, universe=universe, days=10,
+        scenario=tf.Scenario().hold(vix=15.0, corporate_bond_yield=0.055))
     report["leaked_pinned"] = pinned.untouched_moved()
     assert not report["leaked_pinned"], (
-        f"impact leaked into untraded names under a pinned VIX: "
+        f"impact leaked into untraded names under a pinned macro: "
         f"{report['leaked_pinned']}"
     )
-    print("     under a pinned VIX: none, byte-exact, as they must be")
+    print("     under a pinned VIX and corporate yield: none, byte-exact, "
+          "as they must be")
 
     # 4b. The book that made those costs. Impact here is not a formula applied
     #     to a size -- it is depth being consumed, so it can be watched

@@ -296,10 +296,14 @@ class Execution:
         structurally immune, its final prices predating the first repriced
         variance target, so ``test_tca.py`` can still assert
         emptiness there. When the untouched names must be byte-exact, pin
-        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``,
-        verified empty on the ten-day run above. Anything here that was not
-        traded and survives a pinned VIX means something genuinely leaked
-        between the worlds.
+        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
+        on pt-v20, the default from 0.8.5, the corporate bond yield too,
+        since that preset moves it at every close with the market
+        (``corporate_yield_daily``): ``hold(vix=15.0,
+        corporate_bond_yield=0.055)``, verified empty on the ten-day run
+        above, where the VIX alone leaves one name 5e-6 bps apart. Anything
+        here that was not traded and survives both pins means something
+        genuinely leaked between the worlds.
         """
         out = {}
         for i, ticker in enumerate(self.tickers):
@@ -310,7 +314,8 @@ class Execution:
     def untouched_moved(self) -> list[str]:
         """Names the trader never touched whose final price still differs.
 
-        Empty on a one-day analysis and under a pinned VIX; on a multi-day
+        Empty on a one-day analysis and under a pinned VIX (and, on pt-v20,
+        a pinned corporate bond yield); on a multi-day
         run a small remainder is the fear-gauge channel, not a leak. See
         :meth:`moved` for the measurement and the bounds.
         """

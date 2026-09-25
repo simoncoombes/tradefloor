@@ -1508,13 +1508,13 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: was pt-v16. A blanket value across all seven would write a false
 #: provenance into two of them.
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v19",
+    "callable/five-days.json": "pt-v20",
     "finrobot/liquidity-crisis.json": "pt-v16",
     "finrobot/rate-ladder.json": "pt-v16",
-    "finrobot/rate-shock.json": "pt-v19",
-    "langgraph/rate-shock.json": "pt-v19",
-    "openai_agents/five-days.json": "pt-v19",
-    "pydantic_ai/rate-shock.json": "pt-v19",
+    "finrobot/rate-shock.json": "pt-v20",
+    "langgraph/rate-shock.json": "pt-v20",
+    "openai_agents/five-days.json": "pt-v20",
+    "pydantic_ai/rate-shock.json": "pt-v20",
 }
 
 
