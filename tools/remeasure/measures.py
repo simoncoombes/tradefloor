@@ -216,8 +216,9 @@ def g_arith(ctx: Ctx) -> dict:
 def g_truth_residual(ctx: Ctx) -> dict:
     """The factor columns sum to the change in mispricing_s.
 
-    Every page that states this sums all of `Engine.FACTORS`, which is ten
-    names since the circuit breaker, jump and overnight columns were added,
+    Every page that states this sums all of `Engine.FACTORS`, which is
+    eleven names since 0.8.5 added fair_value_shift (ten before it, since
+    the circuit breaker, jump and overnight columns were added),
     and the glossary states the WORST residual over the run. This summed a
     hard-coded seven and was graded on the median, so it checked a sum no
     page describes: on any day a jump or the breaker fired, seven columns
@@ -430,13 +431,17 @@ def g_ranking(ctx: Ctx) -> dict:
 
     # the prose behind the table: mean-reversion's one win is barely above
     # 1.0, buy-and-hold's is the largest per-seed capture on the whole grid
+    # A capture exists only where the reference made money, as in
+    # `capture_ratio`: on pt-v20 the ten-day Oracle can lose on a seed.
     def beat_captures(name):
         return [pnl / ref for pnl, ref in zip(records[name].pnls,
-                                              rk.reference_pnls) if pnl > ref]
-    grid_max = max(pnl / ref
-                   for name in ("momentum", "mean_reversion", "buy_and_hold",
-                                "random")
-                   for pnl, ref in zip(records[name].pnls, rk.reference_pnls))
+                                              rk.reference_pnls)
+                if ref > 0 and pnl > ref]
+    grid_max = max((pnl / ref
+                    for name in ("momentum", "mean_reversion", "buy_and_hold",
+                                 "random")
+                    for pnl, ref in zip(records[name].pnls, rk.reference_pnls)
+                    if ref > 0), default=float("nan"))
     mr_beat = max(beat_captures("mean_reversion"), default=float("nan"))
     bh_beat = max(beat_captures("buy_and_hold"), default=float("nan"))
 
@@ -474,7 +479,9 @@ def g_ranking(ctx: Ctx) -> dict:
         "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
         "mr3_gt1_count": len(gt1),
         "mr3_gt1_on_thin4": len(gt1 & thin4),
-        "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
+        # Over the seeds where a capture exists (`AgentRecord.measured`).
+        "mr3_mean_of_ratios": (sum(mr3.measured) / len(mr3.measured)
+                               if mr3.measured else float("nan")),
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
         "momentum_capture_lo": mom.capture_range[0],
@@ -675,7 +682,7 @@ def g_macro_chain(ctx: Ctx) -> dict:
     per: dict[int, set] = defaultdict(set)
     reprice_days: set[int] = set()
     # Per instrument, the days its fair value changed. The page's table says
-    # fundamental_value moves "every day" on pt-v19, which is a claim about
+    # fundamental_value moves "every day" on pt-v20, which is a claim about
     # each name rather than about the roster as a whole.
     changed_on: dict[int, set] = defaultdict(set)
     last: dict[int, float] = {}
@@ -901,12 +908,12 @@ _TCA_SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 def g_tca_example(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's worked figures, method stated on the
     page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
-    one six-step day. Measured on pt-v19 at 0.8.5, where an agent's fills
-    reach the market once. Entry: 97 shares (1% ADV) at the first step costs
-    +20.18 bps on every seed measured. Round trip (sell three steps later):
-    +12.67 to +28.75 bps over sim seeds 2026,1,2,3,4,5,7,11, a cost on all
-    8, median +18.01. Before 0.8.5 the fill was counted on every tick of
-    the step and the range crossed zero. Partial fill: a request for 4,856
+    one six-step day. Round trip (sell three steps later) on pt-v20 at
+    0.8.5: +13.65 to +21.62 bps over sim seeds 2026,1,2,3,4,5,7,11, a cost
+    on all 8, median +18.22 (pt-v19: +12.67 to +28.75, median +18.01).
+    Entry on pt-v19: 97 shares (1% ADV) at the first step costs +20.18 bps
+    on every seed measured. Before 0.8.5 the fill was counted on every tick
+    of the step and the range crossed zero. Partial fill: a request for 4,856
     shares (half ADV, sim seed 2026) fills 483 - the whole displayed
     depth - and requests of 9,713 and 48,563 fill the same 483, on every
     seed measured."""
@@ -956,12 +963,16 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. Measured on pt-v19 at 0.8.5: the agent trades 57 names, none of
-    the 3 untouched names moves, and the median direct impact is 10.10 bps.
-    Nothing leaks at one to four days either. Before 0.8.5 the agent's
-    fills were counted on every tick of the step, and that flow was large
-    enough to reach the untouched names through the VIX. Pinning VIX
-    returns untouched_moved() to empty, byte-exact. Mirrors the assertions
+    days. Measured on pt-v20 at 0.8.5: the agent trades 58 names, both
+    untouched names move by under 3e-6 bps, and the median direct impact
+    is 0.0018 bps (pt-v19: 57 names, none of 3 untouched moves, 10.10 bps).
+    Before 0.8.5 the agent's fills were counted on every tick of the step,
+    and that flow was large enough to reach the untouched names through
+    the VIX. On pt-v20 the flight to quality carries the session's return
+    into the corporate yield too, so the control pins both, as
+    `Execution.moved` says: hold(vix=15.0) alone leaves one name moved, and
+    hold(vix=15.0, corporate_bond_yield=0.055) returns untouched_moved() to
+    empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
 
@@ -971,7 +982,8 @@ def g_tca_ripple(ctx: Ctx) -> dict:
 
     jobs = {
         "full": lambda: analyse(10),
-        "pinned": lambda: analyse(10, Scenario().hold(vix=15.0)),
+        "pinned": lambda: analyse(10, Scenario().hold(
+            vix=15.0, corporate_bond_yield=0.055)),
         "d1": lambda: analyse(1),
         "d2": lambda: analyse(2),
         "d3": lambda: analyse(3),
