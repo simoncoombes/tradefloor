@@ -658,8 +658,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `earnings_cycle` only on a model with the cycle on; hashed above, beside
     # the other states a dial turns on. `cycle_history` only on a model with
     # `cycle_publication_lag` set; hashed after the phase, below.
+    # `gdp_publication` only on a model with `gdp_publication_lag` set;
+    # hashed after the history.
     economy_expected = set(_ECONOMY_KEYS) | (
-        {"earnings_cycle", "cycle_history"} & set(economy))
+        {"earnings_cycle", "cycle_history", "gdp_publication"} & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -690,6 +692,31 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(history))
         for phase in history:
             _text(buf, phase)
+    # The published GDP growth figure's state, only while
+    # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
+    # the pending releases LENGTH-PREFIXED, each its day then its figure.
+    if "gdp_publication" in economy:
+        gdp = economy["gdp_publication"]
+        keys = {"published", "quarter", "count", "sum",
+                "pending_days", "pending_values"}
+        if set(gdp) != keys:
+            raise ValidationError(
+                "this snapshot's gdp_publication is not the one the state "
+                f"hash covers: missing {sorted(keys - set(gdp))}, "
+                f"unexpected {sorted(set(gdp) - keys)}.")
+        days, values = list(gdp["pending_days"]), list(gdp["pending_values"])
+        if len(days) != len(values):
+            raise ValidationError(
+                f"this snapshot's gdp_publication has {len(days)} pending "
+                f"release days and {len(values)} pending figures.")
+        _f64(buf, gdp["published"])
+        _i64(buf, gdp["quarter"])
+        _u32(buf, gdp["count"])
+        _f64(buf, gdp["sum"])
+        _u32(buf, len(days))
+        for day, value in zip(days, values):
+            _i64(buf, day)
+            _f64(buf, value)
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):

@@ -642,8 +642,11 @@ class Oracle:
         own = {i: (phi - 1.0) * s[i] + theta * mom[i]
                for i in range(len(s)) if tickers[i] not in RATE_TICKERS}
         macro = engine.macro_fields
-        drift = (macro["gdp_growth"] + macro["inflation_rate"]) / 252.0
         economy = engine.state_snapshot()["economy"]
+        # The TRUE growth, which output compounds: `macro_fields` reports
+        # the published quarterly figure under `gdp_publication_lag`. The
+        # core's percent over 100 is `macro_fields`' own figure at 0.0.
+        drift = (economy["gdp_growth"] / 100.0 + macro["inflation_rate"]) / 252.0
         if model.get("market_pe_buybacks", 0.0) != 0.0 and economy["market_pe"] > 0:
             drift += model["buyback_payout_share"] / economy["market_pe"] / 252.0
         depth = model.get("earnings_cycle_depth", 0.0)

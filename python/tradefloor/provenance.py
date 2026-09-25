@@ -389,6 +389,13 @@ OUT_OF_SCOPE = {
         "the engine reports as the phase, never a price or a draw (0.8.5, "
         "pt-v20 work: the published phase predicted returns, design repo "
         "programme/ptv20-status-2026-09-25.md)",
+    "gdp_publication_lag":
+        "inert at 0.0 as shipped: `Engine::published_gdp_growth` returns "
+        "the growth the economy runs at and no quarter is averaged. It moves "
+        "what the engine reports as GDP growth, never a price or a draw "
+        "(0.8.5, pt-v20 work: the daily growth stepped at every turn of the "
+        "cycle and gave the turn away, design repo "
+        "programme/ptv20-status-2026-09-25.md)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

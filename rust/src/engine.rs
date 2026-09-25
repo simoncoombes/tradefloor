@@ -603,6 +603,38 @@ pub struct Engine {
     /// unsnapshotted and unhashed while the dial is 0.0, which every preset
     /// carries, so such an engine is the engine it was before this existed.
     cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
+
+    /// The GDP growth figure as published under `gdp_publication_lag`, and
+    /// what it is computed from: the quarter being averaged and the
+    /// quarters averaged and awaiting release. Seeded at construction with
+    /// the opening growth. Default, never touched, unsnapshotted and
+    /// unhashed while the dial is 0.0, which every preset carries.
+    gdp_publication: GdpPublication,
+}
+
+/// The state behind the published GDP growth figure
+/// (`gdp_publication_lag`), in the economy's percent.
+///
+/// Quarters are the macro calendar's own ([`crate::economy::MacroCalendar::days_per_quarter`]):
+/// day `d` belongs to quarter `d.div_euclid(q)`, the quarter whose first
+/// close takes the quarterly GDP step in `economy::daily`, and day 0, the
+/// opening, belongs to quarter 0. A quarter's figure is the mean of the true
+/// growth after each of its closes (the opening's value on day 0), and it is
+/// released on the close `lag` sessions after the quarter's last day.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GdpPublication {
+    /// The figure an observer reads: the last quarter released, or the
+    /// opening growth before the first release.
+    pub published: f64,
+    /// The quarter being averaged.
+    pub quarter: i64,
+    /// Closes averaged so far in that quarter.
+    pub count: u32,
+    /// Their growth, summed.
+    pub sum: f64,
+    /// Quarters averaged and not yet released, oldest first: the close on
+    /// which each is released, and its figure.
+    pub pending: std::collections::VecDeque<(i64, f64)>,
 }
 
 impl Engine {
@@ -1120,6 +1152,7 @@ impl Engine {
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
             cycle_history: std::collections::VecDeque::new(),
+            gdp_publication: GdpPublication::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -1147,7 +1180,121 @@ impl Engine {
         // After the burn-in and the stationary opening, so the phase the
         // run opens in is the one published until the lag has elapsed.
         engine.seed_cycle_history();
+        // Likewise the growth the run opens at, as day 0 of quarter 0.
+        engine.seed_gdp_publication(0);
         engine
+    }
+
+    /// `gdp_publication_lag` in sessions; 0 is off.
+    pub fn gdp_publication_lag(&self) -> i64 {
+        self.params.gdp_publication_lag as i64
+    }
+
+    /// GDP growth as published, in percent: the mean of the true daily
+    /// growth over the last macro-calendar quarter released, released
+    /// `gdp_publication_lag` sessions after that quarter's last close, and
+    /// the opening growth until the first release. With the dial at 0.0 the
+    /// growth the economy runs at, `economy().gdp_growth`.
+    ///
+    /// Every route that REPORTS growth reads this; everything that MOVES on
+    /// it (output, earnings, unemployment, the cycle's hazards, the central
+    /// bank) reads the true figure.
+    pub fn published_gdp_growth(&self) -> f64 {
+        if self.params.gdp_publication_lag == 0.0 {
+            return self.economy.gdp_growth;
+        }
+        self.gdp_publication.published
+    }
+
+    /// The published figure and the quarters behind it. Default with the
+    /// dial at 0.0.
+    pub fn gdp_publication(&self) -> &GdpPublication {
+        &self.gdp_publication
+    }
+
+    /// Put the published figure's state back (a restore). Refuses any
+    /// state while the dial is 0.0, a quarter with no close averaged,
+    /// non-finite figures, and releases out of order.
+    pub fn set_gdp_publication(&mut self, state: GdpPublication) -> Result<(), String> {
+        if self.params.gdp_publication_lag == 0.0 {
+            return Err(
+                "this snapshot carries a published GDP growth state, and this \
+                 engine's gdp_publication_lag is 0, so it keeps none".to_string());
+        }
+        if state.count == 0 {
+            return Err(
+                "this snapshot's published GDP growth state averages no close \
+                 in its quarter; gdp_publication_lag's state always holds one".to_string());
+        }
+        let finite = state.published.is_finite() && state.sum.is_finite()
+            && state.pending.iter().all(|&(_, v)| v.is_finite());
+        if !finite {
+            return Err(
+                "this snapshot's published GDP growth state (gdp_publication_lag) \
+                 carries a non-finite figure".to_string());
+        }
+        if state.pending.iter().zip(state.pending.iter().skip(1)).any(|(a, b)| a.0 >= b.0) {
+            return Err(
+                "this snapshot's pending GDP releases (gdp_publication_lag) are \
+                 not in release order".to_string());
+        }
+        self.gdp_publication = state;
+        Ok(())
+    }
+
+    /// Start the published figure at the growth the economy holds now,
+    /// taken as the value of `day`, the last day closed: the opening (day
+    /// 0), or a restore from a snapshot that carried no state. The quarter
+    /// `day` falls in is averaged from this value on; nothing is pending.
+    /// Nothing with the dial at 0.0.
+    pub fn seed_gdp_publication(&mut self, day: i64) {
+        if self.params.gdp_publication_lag == 0.0 {
+            self.gdp_publication = GdpPublication::default();
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let g = self.economy.gdp_growth;
+        self.gdp_publication = GdpPublication {
+            published: g,
+            quarter: day.div_euclid(q),
+            count: 1,
+            sum: g,
+            pending: std::collections::VecDeque::new(),
+        };
+    }
+
+    /// The close of `day` into the published figure: a new quarter closes
+    /// the one before (its mean queued for release `lag` sessions after its
+    /// last day), the day's growth joins its quarter, and every release due
+    /// by this close is published, the latest last. Nothing with the dial
+    /// at 0.0.
+    fn record_gdp_growth(&mut self, day: i64) {
+        let lag = self.gdp_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let quarter = day.div_euclid(q);
+        let growth = self.economy.gdp_growth;
+        let p = &mut self.gdp_publication;
+        if quarter != p.quarter {
+            if p.count > 0 {
+                let last_day = (p.quarter + 1) * q - 1;
+                p.pending.push_back((last_day + lag, p.sum / f64::from(p.count)));
+            }
+            p.quarter = quarter;
+            p.count = 0;
+            p.sum = 0.0;
+        }
+        p.sum += growth;
+        p.count += 1;
+        while let Some(&(release, value)) = p.pending.front() {
+            if release > day {
+                break;
+            }
+            p.published = value;
+            p.pending.pop_front();
+        }
     }
 
     /// `cycle_publication_lag` in sessions; 0 is off.
@@ -4862,6 +5009,10 @@ impl Engine {
         // The close's phase into the published history. The burn-in runs
         // this too, and the construction's seeding overwrites what it left.
         self.record_cycle_phase();
+        // The close's growth into the published figure's quarter, and any
+        // release now due. The burn-in runs this too, and the
+        // construction's seeding overwrites what it left.
+        self.record_gdp_growth(request.game_day);
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
@@ -6206,6 +6357,21 @@ impl Engine {
                 hash_str(&mut buf, phase.as_str());
             }
         }
+        // The published GDP growth figure's state, only while
+        // `gdp_publication_lag` is set, so every other engine's hash is the
+        // one it was.
+        if self.params.gdp_publication_lag != 0.0 {
+            let p = &self.gdp_publication;
+            hash_f64(&mut buf, p.published);
+            hash_i64(&mut buf, p.quarter);
+            hash_u32(&mut buf, p.count);
+            hash_f64(&mut buf, p.sum);
+            hash_u32(&mut buf, p.pending.len() as u32);
+            for &(release, value) in &p.pending {
+                hash_i64(&mut buf, release);
+                hash_f64(&mut buf, value);
+            }
+        }
 
         // The central bank.
         let bank = &self.central_bank;
@@ -6995,6 +7161,73 @@ mod tests {
         assert_ne!(other.state_hash(12, false), before);
         assert!(other.set_cycle_history(vec![opening; lag]).is_err());
         assert!(engine(7).clone().set_cycle_history(vec![opening]).is_err());
+    }
+
+    /// `gdp_publication_lag`: off, the published growth is the true one and
+    /// no state is kept or hashed; on, it is the mean of each macro-calendar
+    /// quarter's true growth (day 0, the opening, included), released `lag`
+    /// closes after the quarter's last day, and the opening growth until then.
+    #[test]
+    fn the_published_growth_is_the_quarter_mean_released_late_only_under_the_dial() {
+        let off = engine(7);
+        assert_eq!(off.gdp_publication(), &GdpPublication::default());
+        assert_eq!(off.published_gdp_growth(), off.economy().gdp_growth);
+
+        let lag = 5i64;
+        let params = crate::params::ModelParams {
+            gdp_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let q = e.macro_calendar().days_per_quarter();
+        let opening = e.economy().gdp_growth;
+        assert_eq!(e.published_gdp_growth(), opening);
+        let mut truth = vec![opening];
+        let mut published = vec![opening];
+        for day in 1..=(2 * q + lag) {
+            e.advance_macro_day(day);
+            truth.push(e.economy().gdp_growth);
+            published.push(e.published_gdp_growth());
+        }
+        let mean = |k: i64| -> f64 {
+            let mut sum = 0.0;
+            for d in (k * q)..((k + 1) * q) {
+                sum += truth[d as usize];
+            }
+            sum / q as f64
+        };
+        for d in 0..published.len() as i64 {
+            let want = if d >= 2 * q - 1 + lag {
+                mean(1)
+            } else if d >= q - 1 + lag {
+                mean(0)
+            } else {
+                opening
+            };
+            assert_eq!(published[d as usize], want, "day {d}");
+        }
+        // Hashed while set: the same engine with one pending figure
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut state = other.gdp_publication().clone();
+        state.sum += 1.0;
+        other.set_gdp_publication(state).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        let mut empty = e.gdp_publication().clone();
+        empty.count = 0;
+        assert!(e.clone().set_gdp_publication(empty).is_err());
+        assert!(engine(7).clone().set_gdp_publication(GdpPublication {
+            count: 1,
+            ..GdpPublication::default()
+        }).is_err());
     }
 
     fn request(hour: i64, minute: i64) -> TickRequest<'static> {

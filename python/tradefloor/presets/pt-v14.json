@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "a703c375dcf66b5452e2ab930d78f4ed65df9a63abfee8fb4a7bb5858497cd3a",
+  "coefficient_digest": "8f05c7d700e96bd9ec9c86418085e6bce202171e09f15c21be70169bcb234622",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -73,6 +73,7 @@
     "garch_omega_sector_scaled": 0.0,
     "garch_vix_coupling": 0.14219611,
     "garch_vix_exponent": 2.0,
+    "gdp_publication_lag": 0.0,
     "gold_equilibrium_base": 2200.0,
     "gold_mean_reversion": 0.002,
     "growth_duration_scale": 2.0,

@@ -842,6 +842,11 @@ PERTURBATIONS = [
     # a price or a draw reads. tests/test_cycle_publication_lag.py holds
     # the lag itself.
     ("cycle_publication_lag", 252.0, False),
+    # INERT on every probe by construction: it moves what the engine
+    # REPORTS as GDP growth (`macro_fields`, `macro_table`), never the
+    # growth output and earnings compound. tests/test_gdp_publication_lag.py
+    # holds the figure itself.
+    ("gdp_publication_lag", 21.0, False),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an

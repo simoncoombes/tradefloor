@@ -278,6 +278,34 @@ pub struct PyMacro {
     pub cycle: String,
 }
 
+/// A snapshot's `economy["gdp_publication"]` block (`gdp_publication_lag`),
+/// every key required.
+fn gdp_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::GdpPublication> {
+    let d = v.downcast::<PyDict>().map_err(|_| {
+        ValidationError::new_err("snapshot economy.gdp_publication is not a dict")
+    })?;
+    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
+        d.get_item(key)?.ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "snapshot economy.gdp_publication has no {key:?} (gdp_publication_lag)"))
+        })
+    };
+    let days: Vec<i64> = need("pending_days")?.extract()?;
+    let values: Vec<f64> = need("pending_values")?.extract()?;
+    if days.len() != values.len() {
+        return Err(ValidationError::new_err(format!(
+            "snapshot economy.gdp_publication has {} pending release days and {} \
+             pending figures (gdp_publication_lag)", days.len(), values.len())));
+    }
+    Ok(crate::engine::GdpPublication {
+        published: need("published")?.extract()?,
+        quarter: need("quarter")?.extract()?,
+        count: need("count")?.extract()?,
+        sum: need("sum")?.extract()?,
+        pending: days.into_iter().zip(values).collect(),
+    })
+}
+
 #[pymethods]
 impl PyMacro {
     #[new]
@@ -3122,9 +3150,12 @@ impl PyEngine {
     /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
     /// write it back.
     ///
-    /// One exception to "read it back": under `cycle_publication_lag`,
+    /// Two exceptions to "read it back": under `cycle_publication_lag`,
     /// `cycle` is the phase as PUBLISHED, that many sessions late, so a
-    /// phase pinned today reads back only once it is published.
+    /// phase pinned today reads back only once it is published; and under
+    /// `gdp_publication_lag`, `gdp_growth` is the last quarter's mean growth
+    /// as released, so a pinned growth reaches it only through its quarter.
+    /// `state_snapshot()["economy"]` holds the true values (in percent).
     #[getter]
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
@@ -3144,9 +3175,13 @@ impl PyEngine {
         )?;
         out.set_item("qe_pe_boost", e.qe_pe_boost)?;
         out.set_item("fear_greed_index", e.fear_greed_index)?;
+        // Growth as published (`gdp_publication_lag`): the last quarter
+        // released, its mean daily growth, the growth the economy runs at
+        // with the dial at 0.0. A pin writes the true growth, which reaches
+        // this only through the quarter it falls in.
         out.set_item(
             "gdp_growth",
-            crate::units::percent_to_fraction(e.gdp_growth),
+            crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
         )?;
         out.set_item(
             "unemployment_rate",
@@ -3838,6 +3873,23 @@ impl PyEngine {
                 self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
             econ.set_item("cycle_history", history)?;
         }
+        // The published GDP growth figure's state, in the economy's percent,
+        // only while `gdp_publication_lag` is set, so every other snapshot is
+        // the dict it was. `gdp_growth` above is the TRUE daily growth. A
+        // restore without this block re-seeds from the growth restored.
+        if self.inner.params().gdp_publication_lag != 0.0 {
+            let p = self.inner.gdp_publication();
+            let block = PyDict::new_bound(py);
+            block.set_item("published", p.published)?;
+            block.set_item("quarter", p.quarter)?;
+            block.set_item("count", p.count)?;
+            block.set_item("sum", p.sum)?;
+            let days: Vec<i64> = p.pending.iter().map(|&(d, _)| d).collect();
+            let values: Vec<f64> = p.pending.iter().map(|&(_, v)| v).collect();
+            block.set_item("pending_days", days)?;
+            block.set_item("pending_values", values)?;
+            econ.set_item("gdp_publication", block)?;
+        }
         // The aggregate earnings cycle, only when the model moves it, so
         // every earlier preset's snapshot is the dict it was.
         if self.inner.params().earnings_cycle_depth != 0.0 {
@@ -3914,6 +3966,10 @@ impl PyEngine {
             .get_item("tickers")?
             .ok_or_else(|| ValidationError::new_err("snapshot has no 'tickers'"))?
             .extract()?;
+        // The economy block's published-GDP state, read with the economy and
+        // applied after `day_count`: `None` with no economy block, `Some(None)`
+        // for one without the state.
+        let mut gdp_publication: Option<Option<crate::engine::GdpPublication>> = None;
         if tickers != self.inner.ids() {
             return Err(ValidationError::new_err(
                 "snapshot roster does not match this engine. Columns are                  positional, so restoring across rosters would attach every                  value to the wrong instrument.",
@@ -4423,6 +4479,13 @@ impl PyEngine {
                 }
                 None => self.inner.seed_cycle_history(),
             }
+            // The published GDP growth figure (`gdp_publication_lag`), put
+            // back once `day_count` is: a snapshot without it re-seeds from
+            // the growth just restored, as of the day it was taken.
+            gdp_publication = Some(match d.get_item("gdp_publication")? {
+                Some(v) => Some(gdp_publication_from(&v)?),
+                None => None,
+            });
         }
         if let Some(raw) = snapshot.get_item("central_bank")? {
             let d = raw.downcast::<PyDict>()?;
@@ -4479,6 +4542,13 @@ impl PyEngine {
         // for: something the engine carries drove the market and was not
         // restored with it.
         self.inner.set_current_day(i64::from(self.day_count));
+        match gdp_publication {
+            Some(Some(state)) => {
+                self.inner.set_gdp_publication(state).map_err(ValidationError::new_err)?
+            }
+            Some(None) => self.inner.seed_gdp_publication(i64::from(self.day_count)),
+            None => {}
+        }
 
         // The rate instruments. Required exactly when this engine holds them,
         // and for the same tickers in the same order: a snapshot restored
@@ -4605,7 +4675,9 @@ impl PyEngine {
             corporate_bond_yield: crate::units::percent_to_fraction(e.corporate_bond_yield),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
             unemployment_rate: crate::units::percent_to_fraction(e.unemployment_rate),
-            gdp_growth: crate::units::percent_to_fraction(e.gdp_growth),
+            // As published (`gdp_publication_lag`), as `macro_fields`
+            // reports it: the true daily growth with the dial at 0.0.
+            gdp_growth: crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
             qe_pe_boost: e.qe_pe_boost,
             fear_greed_index: e.fear_greed_index,
             universe_stress: self.inner.universe_stress(),

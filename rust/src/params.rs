@@ -588,6 +588,25 @@ pub struct ModelParams {
     /// engine keeps the last `lag + 1` phases (`Engine::published_cycle_phase`),
     /// and its snapshot and state hash carry them only while this is set.
     pub cycle_publication_lag: f64,
+    /// Sessions between the end of a quarter and the publication of its GDP
+    /// growth, as the BEA's advance estimate comes about a month after the
+    /// quarter. 0.0, which every preset carries, is off: `gdp_growth` is
+    /// reported daily, as the economy runs it. Off zero, every route that
+    /// reports growth -- `macro_fields["gdp_growth"]` and the recorded
+    /// `macro_table()`, and what reads them: a dataset export's
+    /// `macro.arrow`, an explanation's state -- reports a QUARTERLY figure,
+    /// the mean of the true daily growth over the macro calendar's quarter
+    /// (`MacroCalendar::days_per_quarter`, 63 sessions on the 252-session
+    /// calendar, 90 on the shipped one; day 0, the opening, is the first
+    /// day of quarter 0), released on the close this many sessions after
+    /// the quarter's last day. Before the first release the opening growth
+    /// is published. The true daily growth stays internal: output, earnings,
+    /// unemployment, the cycle's hazards and the central bank read it, a pin
+    /// sets it at once, and `state_snapshot()` carries it. A whole number of
+    /// sessions; lag 0 with quarterly averaging is not offered, since no
+    /// agency publishes on the quarter's last day (`Engine::published_gdp_growth`).
+    /// The snapshot and the state hash carry its state only while this is set.
+    pub gdp_publication_lag: f64,
     /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
     /// which every preset through pt-v19 carries, is the literal that stood:
     /// with the pull toward the policy rate it gives a daily change of about
@@ -5022,6 +5041,7 @@ impl ModelParams {
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
             cycle_publication_lag: 0.0,
+            gdp_publication_lag: 0.0,
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
@@ -7243,6 +7263,7 @@ impl ModelParams {
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
             "cycle_publication_lag" => self.cycle_publication_lag,
+            "gdp_publication_lag" => self.gdp_publication_lag,
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
@@ -7483,6 +7504,7 @@ impl ModelParams {
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
             "cycle_publication_lag" => out.cycle_publication_lag = value,
+            "gdp_publication_lag" => out.gdp_publication_lag = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
@@ -7873,6 +7895,14 @@ impl ModelParams {
             return Err(format!(
                 "cycle_publication_lag is {}. It is a whole number of sessions, in [0, 2520]; 0 is off.",
                 self.cycle_publication_lag));
+        }
+        if !(self.gdp_publication_lag >= 0.0 && self.gdp_publication_lag <= 2520.0
+            && self.gdp_publication_lag.fract() == 0.0)
+        {
+            return Err(format!(
+                "gdp_publication_lag is {}. It is a whole number of sessions after a quarter's \
+                 last day, in [0, 2520]; 0 is off (growth reported daily).",
+                self.gdp_publication_lag));
         }
         if !(self.earnings_cycle_sigma >= 0.0 && self.earnings_cycle_sigma <= 0.05) {
             return Err(format!(
@@ -8310,6 +8340,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
         "cycle_publication_lag",
+        "gdp_publication_lag",
         "treasury_10y_noise",
         "treasury_2y_noise",
         "flight_to_quality_gain",

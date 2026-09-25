@@ -1069,7 +1069,11 @@ def _nothing_dormant():
                    fill_impact_coefficient=0.314,
                    # A whole number of sessions, and short enough that the
                    # published-phase history turns over inside the run.
-                   cycle_publication_lag=5.0)
+                   cycle_publication_lag=5.0,
+                   # A whole number of sessions, as pt-v20 would carry it;
+                   # tests/test_gdp_publication_lag.py carries the figure
+                   # across a restore through its releases.
+                   gdp_publication_lag=21.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

@@ -249,6 +249,14 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     field for field and unit for unit.
     """
     def read(engine: Engine) -> Any:
+        if field == "gdp_growth":
+            # The TRUE growth, the value `pin_macro` writes, in its units.
+            # Under `gdp_publication_lag` `macro_fields` reports the last
+            # quarter released, and an operation anchored there would write
+            # a figure months stale into the economy. Equal to
+            # `macro_fields["gdp_growth"]` to the bit with the dial at 0.0:
+            # both are the core's percent over 100.
+            return engine.state_snapshot()["economy"]["gdp_growth"] / 100.0
         return engine.macro_fields[field]
 
     def write(engine: Engine, value: Any) -> None:
