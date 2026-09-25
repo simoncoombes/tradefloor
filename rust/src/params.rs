@@ -643,6 +643,24 @@ pub struct ModelParams {
     /// repository, programme/results/ptv20/). Off zero, that share joins the
     /// name's fair-value level, as the stock-level share does. In [0, 1].
     pub fair_value_market_share: f64,
+    /// Which part of a market shock `fair_value_market_share` makes
+    /// permanent. 0.0, which every preset through pt-v20 carries, is the
+    /// whole of the name's market input. 1.0 is its plain loading on the
+    /// draw, `beta * F`, which has zero mean in every regime; the down-tick
+    /// tilt, the lagged down-day wire, the crisis injection, the crash
+    /// amplifier and the recentring stay in `s` and revert.
+    ///
+    /// Those terms are not zero-mean once the market is volatile: the
+    /// amplifier fires on a threshold in BASELINE sigmas, so at a high VIX it
+    /// multiplies the tilted down side on most ticks, and the recentring
+    /// gives back only the unamplified, unlagged form. In `s` that is a
+    /// discount that grows with the VIX and reverts as it falls, which is
+    /// how a replayed crash reaches its depth. Made permanent, it is a drift
+    /// that runs as long as the VIX is high: on the driven 2020 path at a
+    /// share of 1.0 the cap-weighted fair-value level falls about 0.45 in the
+    /// hundred sessions after the VIX peak (desk, seed 101). A switch. Read
+    /// only with `fair_value_market_share` non-zero. In [0, 1].
+    pub fair_value_market_linear: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5041,6 +5059,7 @@ impl ModelParams {
             corporate_yield_daily: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
+            fair_value_market_linear: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7262,6 +7281,7 @@ impl ModelParams {
             "corporate_yield_daily" => self.corporate_yield_daily,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
+            "fair_value_market_linear" => self.fair_value_market_linear,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7502,6 +7522,7 @@ impl ModelParams {
             "corporate_yield_daily" => out.corporate_yield_daily = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
+            "fair_value_market_linear" => out.fair_value_market_linear = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -7873,6 +7894,11 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.fair_value_market_linear >= 0.0 && self.fair_value_market_linear <= 1.0) {
+            return Err(format!(
+                "fair_value_market_linear is {}. It is a switch, in [0, 1].",
+                self.fair_value_market_linear));
         }
         if !(self.market_beta_down_asym_lag_recentre >= 0.0
             && self.market_beta_down_asym_lag_recentre <= 1.0)
@@ -8329,6 +8355,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_yield_daily",
         "fair_value_news_share",
         "fair_value_market_share",
+        "fair_value_market_linear",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

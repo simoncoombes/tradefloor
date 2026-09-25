@@ -631,6 +631,12 @@ pub struct LiveFactors {
     /// [`crate::params::ModelParams::garch_innovation_commensurate`] is
     /// non-zero.
     pub noise_market: f64,
+    /// The name's plain loading on the tick's market draw, `beta * F`: the
+    /// part of `noise_market` before the down-tick tilt, the lagged wire,
+    /// the crisis injection, the crash amplifier and the recentring. Zero
+    /// mean by construction. Read only under
+    /// [`crate::params::ModelParams::fair_value_market_linear`].
+    pub noise_market_linear: f64,
     pub noise_sector: f64,
     pub noise_idio: f64,
     /// The scale the idiosyncratic draw above was taken at, with the name's
@@ -1217,6 +1223,7 @@ pub fn calculate_live_factors(
         short_squeeze_effect,
         random_noise,
         noise_market,
+        noise_market_linear: beta * shared.market_factor,
         noise_sector,
         noise_idio,
         noise_idio_unit,

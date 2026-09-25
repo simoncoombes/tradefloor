@@ -1232,8 +1232,16 @@ pub fn simulate_market_tick(
                 own_noise + own_news
             } else {
                 let psim = p.fair_value_market_share;
+                // Under `fair_value_market_linear` only the plain loading on
+                // the draw is permanent; the tilt, the lagged wire, the
+                // crisis injection and the amplifier stay in `s`.
+                let market_draw = if p.fair_value_market_linear == 0.0 {
+                    raw.noise_market
+                } else {
+                    raw.noise_market_linear
+                };
                 own_noise + own_news
-                    + psim * (raw.noise_market * noise_scale)
+                    + psim * (market_draw * noise_scale)
                     + psim * (raw.company_news_market * scale)
             };
             // The component slots keep the WHOLE shock, deliberately: they

@@ -356,6 +356,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The same share for the lagged wire's multiple of the tilt. Its top is
     # where the correction is exact, as for the entry above.
     "market_beta_down_asym_lag_recentre": (0.0, 1.0),
+    # A switch: which part of a market shock the market share takes.
+    "fair_value_market_linear": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
