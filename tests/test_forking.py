@@ -1249,6 +1249,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
     "pending_overnight":
         "the overnight move, waiting for the same row and for the same "
         "reason as pending_jump.",
+    "opening_z":
+        "the opening draws not yet applied. This guard forks mid-day, after "
+        "the first open has taken the draws, so the snapshot carries an "
+        "empty buffer and an engine restored without it holds the same "
+        "empty one. tests/test_sampled_verification.py::test_a_pre_open_"
+        "pt_v20_snapshot_restores_its_opening_draws forks before the open, "
+        "where a snapshot without them opened at the other engine's draws.",
     "crisis_in_episode":
         "the crisis episode, and this scenario cannot reach it because its "
         "macro is FIXED: `CRISIS` holds VIX at 45, above the 30.88 threshold, "
