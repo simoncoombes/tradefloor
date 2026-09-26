@@ -445,6 +445,8 @@ class Ranking:
                 "oracle": self.oracle,
                 "reference_pnls": list(self.reference_pnls),
                 "agents": {n: r.as_dict() for n, r in self.records.items()},
+                **({"tampered": {n: list(s) for n, s in self.tampered.items()}}
+                   if self.tampered else {}),
             }
         return {
             "seeds": list(self.seeds),
@@ -475,19 +477,21 @@ class Ranking:
                 if record.name == "buy_and_hold":
                     lines.append(f"  {record.name:16s}  the benchmark  "
                                  f"median pnl {record.median_pnl:+12,.0f}  "
-                                 f"wins {record.wins}/{len(record.pnls)}")
+                                 f"wins {record.wins}/{len(record.pnls)}"
+                                 f"{record.marks}")
                     continue
                 if excess is None or ahead is None:
                     lines.append(f"  {record.name:16s}  no buy-and-hold to "
                                  f"compare  median pnl "
-                                 f"{record.median_pnl:+12,.0f}")
+                                 f"{record.median_pnl:+12,.0f}{record.marks}")
                     continue
                 measured = sum(1 for v in record.excess_pnls if v is not None)
                 lines.append(
                     f"  {record.name:16s}  vs buy-and-hold "
                     f"{excess:+12,.0f} a seed  ahead {ahead}/{measured}  "
-                    f"wins {record.wins}/{len(record.pnls)}"
+                    f"wins {record.wins}/{len(record.pnls)}{record.marks}"
                 )
+            lines.extend(self._excluded_lines())
             lines.append(f"  {self.capture_withheld}")
             return "\n".join(lines)
         for record in self.table():
@@ -506,11 +510,7 @@ class Ranking:
                 f"per-seed [{span[0]:+.3f}, {span[1]:+.3f}]  "
                 f"wins {record.wins}/{len(record.pnls)}{record.marks}"
             )
-        for name, seeds in sorted(self.tampered.items()):
-            lines.append(
-                f"  EXCLUDED {name}: its code changed the market during "
-                f"act() on seed(s) {', '.join(str(s) for s in seeds)}, so "
-                "its score is not a score. See Scorecard.errors.")
+        lines.extend(self._excluded_lines())
         if self.unmeasurable:
             shown = ", ".join(str(s) for s in self.unmeasurable[:8])
             more = ", ..." if len(self.unmeasurable) > 8 else ""
@@ -520,6 +520,16 @@ class Ranking:
                 "against it would flip sign."
             )
         return "\n".join(lines)
+
+    def _excluded_lines(self) -> list[str]:
+        """One line per agent left out for changing the market, in either
+        form of the report: with a capture, or against buy-and-hold where
+        the capture is withheld."""
+        return [
+            f"  EXCLUDED {name}: its code changed the market during "
+            f"act() on seed(s) {', '.join(str(s) for s in seeds)}, so "
+            "its score is not a score. See Scorecard.errors."
+            for name, seeds in sorted(self.tampered.items())]
 
     def __repr__(self) -> str:
         return (f"Ranking({len(self.records)} agents, {len(self.seeds)} seeds, "
