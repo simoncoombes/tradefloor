@@ -164,16 +164,58 @@ def test_battery_names_one_cell_per_shipped_scenario():
     assert sorted(cell.scenario for cell in b.cells) == version_one
     assert set(version_one) <= set(tf.Scenario.available())
     # Every cell shares the library's own decision cadence and runs long
-    # enough to reach its own scenario's shock: the six shipped scenarios'
-    # earliest interventions fire at day 30 (`policy_regime_shift`) and
-    # day 55 (`oil_price_spike`); see the `at:` fields under
-    # `python/tradefloor/scenarios/`.
+    # enough to reach its own scenario's shock, which is day 50 for five of
+    # the six; see the next test.
     assert all(cell.steps == 6 for cell in b.cells)
     assert all(cell.days >= 55 for cell in b.cells)
     # Seeds and roster seeds are pairwise distinct, so no two cells are
     # the same world twice under a different scenario label.
     assert len({cell.seed for cell in b.cells}) == 6
     assert len({cell.roster_seed for cell in b.cells}) == 6
+
+
+def test_the_battery_docstring_says_what_version_one_pins():
+    """Version 1 pins six names. The docstring once said they were "the six
+    scenarios `Scenario.available()` ships today", which stopped being true
+    when `curve_shock` shipped."""
+    doc = tf.fingerprint.__doc__
+    names = {cell.scenario for cell in tf.battery(1).cells}
+    later = set(tf.Scenario.available()) - names
+    assert later == {"curve_shock"}
+    assert "ships today" not in doc
+    assert "``curve_shock``" in doc and "cannot be added" in doc
+    for name in names:
+        assert f"``{name}``" in doc
+
+
+def test_version_one_leaves_about_ten_days_after_each_shock():
+    """The figures the module docstring quotes, read off the scenarios.
+
+    Five of the six fire their main shock at day 50, so a 60-day cell has
+    ten days after it. `policy_regime_shift` moves at days 30, 40 and 50.
+    Three shocks are still running at day 60, and the docstring names the
+    day each one ends."""
+    cells = {cell.scenario: cell for cell in tf.battery(1).cells}
+    first = {name: min(i.at for i in tf.Scenario.load(name).shocks)
+             for name in cells}
+    policy = first.pop("policy_regime_shift")
+    assert first == dict.fromkeys(first, 50)
+    assert sorted({i.at for i in tf.Scenario.load(
+        "policy_regime_shift").interventions}) == [30, 40, 50]
+    assert policy == 40
+    assert {cell.days - 50 for cell in cells.values()} == {10}
+
+    doc = " ".join(tf.fingerprint.__doc__.split())
+    for name, target, last in (("liquidity_crisis", "macro.vix", 74),
+                               ("liquidity_crisis", "market.liquidity", 74),
+                               ("geopolitical_conflict", "macro.vix", 79),
+                               ("recession", "macro.cycle", 364)):
+        shock = next(i for i in tf.Scenario.load(name).shocks
+                     if i.target == target and i.at == 50)
+        assert shock.at + shock.duration - 1 == last
+        assert last > cells[name].days
+        assert f"to day {last}" in doc
+    assert "at day 30, tariffs at day 40 and inflation at day 50" in doc
 
 
 def test_battery_version_is_immutable():
@@ -650,6 +692,31 @@ def test_reveal_does_not_care_about_the_seed_lists_order():
 def test_commit_refuses_a_string_salt():
     with pytest.raises(tf.ValidationError, match="salt must be bytes"):
         tf.commit([1, 2, 3], "not bytes")
+
+
+def test_reveal_raises_only_for_a_string_salt():
+    """As its docstring says: every other bad reveal is False."""
+    commitment = tf.commit([11, 22, 33, 44, 55, 66], b"salt")
+    assert tf.reveal(commitment, [-1, 22, 33, 44, 55, 66], b"salt") is False
+    assert tf.reveal(commitment, [2**64, 22, 33, 44, 55, 66], b"salt") is False
+    assert tf.reveal(commitment, [1.5, 22, 33, 44, 55, 66], b"salt") is False
+    with pytest.raises(tf.ValidationError, match="salt must be bytes"):
+        tf.reveal(commitment, [11, 22, 33, 44, 55, 66], "salt")
+
+
+def test_the_commit_reveal_example_in_the_docstring_holds():
+    """The module docstring's example, short of running the agent: seeds
+    drawn from 64 bits, one per cell, commit, seal, reveal."""
+    import secrets
+
+    seeds = [secrets.randbits(64) for _ in tf.battery().cells]
+    salt = secrets.token_bytes(16)
+    commitment = tf.commit(seeds, salt)
+    sealed = tf.sealed_battery(seeds, salt)
+    assert [cell.seed for cell in sealed.cells] == seeds
+    assert tf.reveal(commitment, seeds, salt)
+    assert tf.reveal(commitment, seeds[::-1], salt)
+    assert not tf.reveal(commitment, seeds, b"other")
 
 
 def test_sealed_battery_assigns_revealed_seeds_in_cell_order():
