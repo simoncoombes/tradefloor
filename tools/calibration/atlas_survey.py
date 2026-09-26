@@ -379,6 +379,16 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # The market's cycle nowcast: the probability a session's report names
+    # the true phase. 0.0 prices the true phase, the shipped vector; 1.0 is
+    # a report that is always right. The engine refuses (0, 0.2], where a
+    # report carries nothing or points away from the truth, and the survey
+    # records a draw there as the model's refusal: the price of a box that
+    # has to contain the shipped 0.0, as market_vol_level_persistence pays.
+    "cycle_nowcast_accuracy": (0.0, 1.0),
+    # The share of the spread's cycle multiplier replaced by its occupancy
+    # mean: its whole meaning, from the table as it stood to none of it.
+    "corporate_spread_cycle": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

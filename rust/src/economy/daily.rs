@@ -322,6 +322,12 @@ pub struct YieldDials {
     /// level then holds through the close, as it does on every preset
     /// without `corporate_yield_daily`: the daily move is not applied.
     pub corporate_pinned: bool,
+    /// The spread's cycle multiplier at the session's start and at its close,
+    /// under `cycle_nowcast_accuracy` or `corporate_spread_cycle`: the daily
+    /// move then carries the meeting formula's whole change,
+    /// `S(VIX', m') - S(VIX, m)`, so the level stays on the formula and a
+    /// meeting has nothing to re-anchor. `None` is the move that stood.
+    pub spread_multiplier: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -345,6 +351,7 @@ impl Default for YieldDials {
             corporate_yield_daily: 0.0,
             vix_pinned: false,
             corporate_pinned: false,
+            spread_multiplier: None,
         }
     }
 }
@@ -1648,14 +1655,19 @@ pub fn update_economy_daily(
     // the close moved it by the 10-year's change and the next morning's pin
     // put it back, so it was never the pinned value overnight.
     if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
-        let cycle_spread_multiplier = match economy.cycle_phase {
-            CyclePhase::Contraction => 2.8,
-            CyclePhase::Trough => 3.5,
-            CyclePhase::Recovery => 1.4,
-            CyclePhase::Peak => 1.1,
-            CyclePhase::Expansion => 1.0,
-        };
-        let vix_term = if inputs.yields.vix_pinned {
+        let cycle_spread_multiplier =
+            crate::economy::central_bank::spread_multiplier_of(economy.cycle_phase);
+        // THE PRICED MULTIPLIER (`cycle_nowcast_accuracy`,
+        // `corporate_spread_cycle`): the move is the meeting formula's whole
+        // change over the session, the VIX's and the multiplier's, so the
+        // level stays on the formula and the next meeting finds it there.
+        // A pinned VIX still takes no VIX term; the multiplier's change
+        // passes through at the VIX written.
+        let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
+            let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
+            crate::economy::central_bank::spread_formula(vix_close, m1)
+                - crate::economy::central_bank::spread_formula(economy.vix, m0)
+        } else if inputs.yields.vix_pinned {
             0.0
         } else {
             0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)

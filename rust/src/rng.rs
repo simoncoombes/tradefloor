@@ -214,6 +214,9 @@ pub enum Site {
     /// draw per episode, not per session, and none at all when the scenario
     /// has pinned the epicentre.
     CrisisEpicentreU = 22,
+    /// The market's cycle nowcast: one uniform per session at the close, on
+    /// [`stream::CYCLE_NOWCAST`], only while `cycle_nowcast_accuracy` is set.
+    CycleNowcastU = 23,
 }
 
 impl Site {
@@ -242,6 +245,7 @@ impl Site {
             Site::OvernightIdioZ => "overnight_idio_z",
             Site::MarketVolLevelZ => "market_vol_level_z",
             Site::CrisisEpicentreU => "crisis_epicentre_u",
+            Site::CycleNowcastU => "cycle_nowcast_u",
         }
     }
 }
@@ -505,6 +509,15 @@ pub mod stream {
     /// untouched at every setting, so every shipped preset reproduces bit
     /// for bit.
     pub const OPENING: u32 = 10;
+
+    /// The market's cycle nowcast: the one uniform a session that names the
+    /// phase the market's news reports (`cycle_nowcast_accuracy`). Outside
+    /// [`COUNT`] like [`OPENING`], so no array indexed by stream id grows and
+    /// every engine with the dial at 0.0 is the engine it was; its generator
+    /// is carried in the snapshot and the state hash only while the dial is
+    /// set. Conditional, for [`CRISIS_EPICENTRE`]'s reason: nothing else reads
+    /// this stream.
+    pub const CYCLE_NOWCAST: u32 = 11;
 
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
