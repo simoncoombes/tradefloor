@@ -1,24 +1,31 @@
-//! No library code calls the platform's maths library.
+//! No library code calls the platform's maths library, or a float `max`/`min`.
 //!
 //! The crate promises the same market on every platform, and it keeps that
 //! promise by doing its transcendental maths in `mathx`, in Rust, rather than
 //! through `f64::ln`, `f64::exp` and friends, which call whatever `libm` the
 //! target links. Two of those can differ in the last bit, and a last-bit
 //! difference compounds over a simulated year into a different market.
+//! `f64::max` and `f64::min` are refused on the same footing for a different
+//! reason: they treat NaN as missing and return the other operand, so a
+//! poisoned input comes out as a plausible number. `mathx::max` and
+//! `mathx::min` propagate it.
 //!
-//! A shipped preset never reaching a call is not enough. A user can override
-//! any dial with `ModelParams::with_override`, and a dial that switches a
-//! branch on can lead into a platform call that no known-answer digest covers.
-//! That is how `alpha_beta_at` in `market/factor_vol.rs` came to call
-//! `f64::ln` in 0.8.5: every preset sets `market_vol_alpha_excursion` to 0.0
-//! and returns before the line, so no digest could see it.
+//! This guard used to live in `tests/mathx_parity.rs`, which reads the parity
+//! corpus and so does not ship in the package. It also stopped reading a file
+//! at the file's first `#[cfg(test)]` line and treated everything after it as
+//! test code. `market/factor_vol.rs` has a `#[cfg(test)] use` at line 119 of
+//! 1,871, so the guard never saw `alpha_beta_at`, which called `f64::ln` in
+//! 0.8.5. No shipped preset reaches that line (every one sets
+//! `market_vol_alpha_excursion` to 0.0, and the function returns before the
+//! log), so no known-answer digest could see it either; a user who set the
+//! dial with `ModelParams::with_override` ran the platform log.
 //!
-//! So this reads the source. It walks every `.rs` file under `src/` except
-//! `mathx.rs`, drops comments, string literals and `#[cfg(test)]` items, and
-//! fails on any remaining call to a float method that goes to the platform.
+//! So this walks every `.rs` file under `src/` except `mathx.rs`, drops
+//! comments, string and char literals, and each `#[cfg(test)]` item on its
+//! own (a module, a function, a `use`), and fails on any remaining call.
 //! `sqrt` is allowed: IEEE 754 requires it to be correctly rounded, so every
-//! platform gives the same bits. `mul_add` is refused for the opposite reason:
-//! it is exact where the target has FMA and emulated where it does not.
+//! platform gives the same bits. `mul_add` is refused because it is a fused
+//! instruction on one target and a software emulation on another.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,8 +35,12 @@ use std::path::{Path, PathBuf};
 const PLATFORM_METHODS: &[&str] = &[
     "ln", "log", "log2", "log10", "ln_1p", "exp", "exp2", "exp_m1", "powf", "powi", "sin",
     "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh", "tanh", "asinh", "acosh",
-    "atanh", "cbrt", "hypot", "sin_cos", "mul_add",
+    "atanh", "cbrt", "hypot", "sin_cos", "mul_add", "max", "min",
 ];
+
+/// Integer `max`/`min` calls the text match cannot tell from float ones.
+/// Only floats swallow NaN, so these are allowed by spelling.
+const INTEGER_MIN_MAX: &[&str] = &["levels.max(", "len().max("];
 
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -184,12 +195,14 @@ fn platform_calls(code: &str) -> Vec<(usize, String)> {
                 while let Some(k) = line[at..].find(&spelling) {
                     let open = at + k + spelling.len();
                     at = open;
-                    // Method-call form only: `x.ln(` directly, not `x.lnx(`.
-                    // `rng.log()` is the draw log and takes no argument, where
-                    // `f64::log` always takes its base, so an empty argument
-                    // list is not a platform call.
+                    // `rng.log()` is the draw log and `iter.max()` an
+                    // iterator's; `f64::log`, `f64::max` and `f64::min` always
+                    // take an argument, so an empty argument list is not one.
                     let rest = line[open..].trim_start();
-                    if *method == "log" && rest.starts_with(')') {
+                    if matches!(*method, "log" | "max" | "min") && rest.starts_with(')') {
+                        continue;
+                    }
+                    if INTEGER_MIN_MAX.iter().any(|ok| line[..open].ends_with(ok)) {
                         continue;
                     }
                     found.push((n + 1, line.trim().to_string()));
@@ -203,7 +216,7 @@ fn platform_calls(code: &str) -> Vec<(usize, String)> {
 }
 
 #[test]
-fn no_library_code_calls_the_platform_maths_library() {
+fn no_std_transcendentals_outside_mathx() {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut files = Vec::new();
     rust_files(&src, &mut files);
@@ -223,7 +236,8 @@ fn no_library_code_calls_the_platform_maths_library() {
     }
     assert!(
         offences.is_empty(),
-        "library code calls the platform's maths library; use the mathx equivalent:\n  {}",
+        "library code calls the platform's maths library or a NaN-swallowing max/min; \
+         use the crate::mathx equivalent:\n  {}",
         offences.join("\n  ")
     );
 }
@@ -246,8 +260,11 @@ mod tests {
     fn t(x: f64) -> f64 { x.atan2(1.0) }
 }
 fn after(x: f64) -> f64 { x.mul_add(2.0, 1.0) }
+fn floats(a: f64) -> f64 { a.max(0.0) + f64::min(a, 1.0) }
+fn ints(levels: usize, v: &[f64]) -> usize { levels.max(1) + v.len().max(1) }
+fn iters(v: &[u32]) -> Option<u32> { v.iter().copied().max() }
 "##;
     let code = blank_test_items(&blank_comments_and_literals(sample));
     let lines: Vec<usize> = platform_calls(&code).into_iter().map(|(n, _)| n).collect();
-    assert_eq!(lines, vec![2, 10, 16], "{code}");
+    assert_eq!(lines, vec![2, 10, 16, 17], "{code}");
 }

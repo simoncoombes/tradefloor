@@ -2,9 +2,9 @@
 //!
 //! **Every transcendental in this crate goes through this module.** Nothing
 //! else may call `f64::exp`, `f64::ln`, `f64::powf`, `f64::sin` or `f64::cos`
-//! directly. That is enforced by `no_std_transcendentals` in
-//! `tests/mathx_parity.rs`, which greps the source rather than trusting anyone
-//! to remember.
+//! directly. That is enforced by `no_std_transcendentals_outside_mathx` in
+//! `tests/platform_maths.rs`, which reads the source rather than trusting
+//! anyone to remember.
 //!
 //! # Why the rule exists
 //!
