@@ -78,6 +78,7 @@ strategy is running inside them, so they hand no agent anything.
 
 from __future__ import annotations
 
+import inspect
 import json
 import struct
 import threading
@@ -135,6 +136,47 @@ def _day_cap() -> int:
 MAX_UNIVERSE = 120
 MAX_STRATEGIES = 8
 MAX_SEEDS = 12
+
+#: Steps per simulated day on `evaluate_strategies` and `rank_strategies`.
+#:
+#: Every step here is 65 ticks, a minute each (`evaluate`'s default), so six
+#: steps are the whole 390-minute session and each step past the sixth runs
+#: 65 minutes after the close. 22 steps is 1,430 minutes, the most that fits
+#: in a 24-hour day. A run costs time in proportion to days times steps, and
+#: until this cap only days were bounded: `steps_per_day=10**9` on a one-day
+#: call ran until the server was killed, and two such jobs held both job
+#: workers, so every later job was refused.
+MAX_STEPS_PER_DAY = 22
+
+#: The steps per day the day caps were measured at, and the tools' default.
+DEFAULT_STEPS_PER_DAY = 6
+
+
+def _steps_refusal(days: int, steps_per_day: int,
+                   day_cap: int) -> dict[str, Any] | None:
+    """A `_fail` for a steps_per_day the server will not run, else None.
+
+    Days times steps may not exceed `day_cap` days at the default six steps,
+    so a longer day buys fewer of them and a run costs at most what the day
+    cap already allowed.
+    """
+    if not 1 <= steps_per_day <= MAX_STEPS_PER_DAY:
+        return _fail(
+            f"steps_per_day must be 1..{MAX_STEPS_PER_DAY}, got "
+            f"{steps_per_day}. A step is 65 minutes, so "
+            f"{DEFAULT_STEPS_PER_DAY} steps are the whole trading session and "
+            f"{MAX_STEPS_PER_DAY} fill a 24-hour day.")
+    budget = day_cap * DEFAULT_STEPS_PER_DAY
+    if days * steps_per_day > budget:
+        return _fail(
+            f"days x steps_per_day must be at most {budget} "
+            f"({day_cap} days at {DEFAULT_STEPS_PER_DAY} steps), got {days} x "
+            f"{steps_per_day} = {days * steps_per_day}. Ask for fewer days or "
+            f"fewer steps"
+            + ("." if day_cap > MAX_DAYS else
+               f", or use `start_job`, which allows "
+               f"{MAX_DAYS_ASYNC * DEFAULT_STEPS_PER_DAY}."))
+    return None
 
 #: The three shipped scenario presets, reachable by name.
 #:
@@ -206,6 +248,26 @@ def _seed_refusal(**named: Any) -> dict[str, Any] | None:
             except tf.ValidationError as exc:
                 return _fail(str(exc))
     return None
+
+
+def _whole(name: str, value: Any) -> int:
+    """``value`` as an int, or ValueError naming the argument.
+
+    A direct tool call is type-checked against its signature before it gets
+    here. A job's arguments and a universe document are not: they arrive as
+    raw JSON, so ``"abc"``, ``2.5`` or a list would otherwise raise from
+    inside the tool, or run with a float where a count belongs.
+    """
+    try:
+        whole = int(value)
+        exact = whole == value or (isinstance(value, str)
+                                   and value.strip() == str(whole))
+    except (TypeError, ValueError, OverflowError):
+        exact = False
+    if not exact:
+        raise ValueError(f"{name} must be a whole number, got "
+                         f"{repr(value)[:80]}")
+    return whole
 
 
 def _provenance(**extra: Any) -> dict[str, Any]:
@@ -470,11 +532,20 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
 
     rows = doc.get("instruments")
     if rows:
+        # Checked by shape here because the rows reach `tf.Instrument`, whose
+        # binding raises TypeError on a wrong type, and a refusal is a
+        # result: an exception reaches the model as a bare transport error.
+        if not isinstance(rows, list):
+            raise ValueError(f"instruments must be a list of objects, got "
+                             f"{type(rows).__name__}")
         if not 2 <= len(rows) <= MAX_UNIVERSE:
             raise ValueError(
                 f"instruments must number 2..{MAX_UNIVERSE}, got {len(rows)}")
         built = []
         for i, row in enumerate(rows):
+            if not isinstance(row, dict):
+                raise ValueError(f"instrument {i} must be an object, got "
+                                 f"{type(row).__name__}")
             unknown = sorted(set(row) - set(_INSTRUMENT_FIELDS))
             if unknown:
                 raise ValueError(
@@ -493,6 +564,9 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
                 # SHARE COUNT, not a fraction -- so pass them through whole.
                 raise ValueError(f"instrument {i} ({row['ticker']}): "
                                  f"{exc}") from exc
+            except TypeError as exc:
+                # A field of the wrong type, such as a ticker sent as 5.
+                raise ValueError(f"instrument {i}: {exc}") from exc
         universe = tf.Universe(built)
         counts = {}
         for inst in universe:
@@ -503,9 +577,14 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
         concentrated = len(counts) < max(2, len(tf.sectors()) // 2)
         return universe, concentrated, {"instruments": rows}
 
-    size = int(doc.get("size", 40))
+    size = _whole("universe size", doc.get("size", 40))
     seed = check_seed(doc.get("seed", 111), "universe seed")
     sectors = doc.get("sectors")
+    if sectors is not None and not (
+            isinstance(sectors, list)
+            and all(isinstance(name, str) for name in sectors)):
+        raise ValueError(f"sectors must be a list of sector names, got "
+                         f"{repr(sectors)[:80]}")
     universe, concentrated = _build_universe(size, seed, sectors)
     return universe, concentrated, {"size": size, "seed": seed,
                                     "sectors": sectors}
@@ -875,6 +954,8 @@ def evaluate_strategies(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
+    if (refused := _steps_refusal(days, steps_per_day, cap)) is not None:
+        return refused
     try:
         specs, assumed = _specs_from(strategies)
         roster, concentrated, uni_doc = _resolve_universe(
@@ -981,6 +1062,8 @@ def rank_strategies(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
+    if (refused := _steps_refusal(days, steps_per_day, cap)) is not None:
+        return refused
     try:
         specs, assumed = _specs_from(strategies)
         roster, concentrated, uni_doc = _resolve_universe(
@@ -1806,15 +1889,29 @@ def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
 
     Anchored on three measurements at 40 names with the six reference
     entrants: 0.5s at 5 days, 20s at 60, 95s at 252 -- about 0.38 s/day.
-    Scaled by roster size and, for a ranking, by the number of seeds. It is
-    an estimate and the field says so; a model deciding whether to wait or
+    Scaled by roster size, by steps per day against the six those were
+    measured at, and, for a ranking, by the number of seeds. It is an
+    estimate and the field says so; a model deciding whether to wait or
     poll needs an order of magnitude, not a promise.
+
+    The arguments have passed `start_job`'s checks, but a universe document
+    is checked only when the job runs, so anything unreadable here counts
+    as the default rather than raising after the job has started.
     """
-    days = float(args.get("days", 5))
-    size = float((args.get("universe") or {}).get("size")
-                 or args.get("universe_size", 40) or 40)
-    per_day = 0.38 * (size / 40.0)
-    seeds = len(args.get("seeds") or []) or 1
+    def number(read: Any, default: float) -> float:
+        try:
+            value = float(read())
+        except Exception:                    # noqa: BLE001
+            return default
+        return value if value > 0 else default
+
+    days = number(lambda: args.get("days", 5), 5.0)
+    size = number(lambda: (args.get("universe") or {}).get("size")
+                  or args.get("universe_size", 40), 40.0)
+    steps = number(lambda: args.get("steps_per_day", DEFAULT_STEPS_PER_DAY),
+                   float(DEFAULT_STEPS_PER_DAY))
+    per_day = 0.38 * (size / 40.0) * (steps / DEFAULT_STEPS_PER_DAY)
+    seeds = number(lambda: len(args.get("seeds") or []), 1.0)
     if tool == "rank_strategies":
         return per_day * days * max(1, seeds)
     if tool == "run_stress_scenario":
@@ -1850,10 +1947,30 @@ def start_job(tool: str, arguments: dict[str, Any] | None = None
     if tool not in JOBBABLE:
         return _fail(f"{tool!r} cannot be run as a job. Jobbable: "
                      f"{list(JOBBABLE)}. Everything else answers inline.")
+    if not isinstance(arguments, (dict, type(None))):
+        return _fail(f"arguments must be an object of {tool}'s arguments, "
+                     f"got {type(arguments).__name__}")
     args = dict(arguments or {})
-    days = args.get("days")
-    if days is not None and not 1 <= int(days) <= MAX_DAYS_ASYNC:
+    # A job's arguments skip the type check a direct call gets, so the ones
+    # that size the work are checked here, before a worker is spent on them.
+    params = inspect.signature(globals()[tool]).parameters
+    unknown = sorted(set(args) - set(params))
+    if unknown:
+        return _fail(f"{tool} takes no argument(s) {unknown}. It takes "
+                     f"{list(params)}.")
+    try:
+        for name in ("days", "steps_per_day"):
+            if name in args:
+                args[name] = _whole(name, args[name])
+    except ValueError as exc:
+        return _fail(str(exc))
+    days = args.get("days", params["days"].default)
+    if not 1 <= days <= MAX_DAYS_ASYNC:
         return _fail(f"days must be 1..{MAX_DAYS_ASYNC} for a job, got {days}")
+    if "steps_per_day" in params:
+        steps = args.get("steps_per_day", params["steps_per_day"].default)
+        if (refused := _steps_refusal(days, steps, MAX_DAYS_ASYNC)) is not None:
+            return refused
 
     with _jobs_lock:
         running = sum(1 for j in _jobs.values() if j["status"] == "running")

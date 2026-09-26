@@ -762,3 +762,135 @@ def test_every_result_serialises(call):
     # transport error. `Ranking.separation` was a bound method on the first
     # draft of this server and would have done exactly that.
     json.dumps(call())
+
+
+# -- compute and argument limits -------------------------------------------
+#
+# A security review of the 0.8.5 release branch found that no run tool
+# bounded `steps_per_day`. A run costs time in proportion to days times
+# steps, so MAX_DAYS and the job cap bounded nothing: one direct call with
+# steps_per_day=10**9 was still running after 20 seconds, and two such jobs
+# took both job workers until the server restarted, so a third, ordinary
+# one-day job was refused. The same review found malformed arguments that
+# escaped as exceptions, where the module promises refusals as results.
+
+TINY = {"days": 1, "universe_size": 2, "include_baselines": False}
+
+
+@pytest.mark.parametrize("call,expect", [
+    (lambda: mcp.evaluate_strategies(
+        {"m": MOMENTUM}, steps_per_day=mcp.MAX_STEPS_PER_DAY + 1, **TINY),
+     "steps_per_day must be 1..22"),
+    (lambda: mcp.evaluate_strategies({"m": MOMENTUM}, steps_per_day=0, **TINY),
+     "steps_per_day must be 1..22"),
+    (lambda: mcp.rank_strategies(
+        {"m": MOMENTUM}, seeds=[1, 2], days=1, universe_size=2,
+        steps_per_day=mcp.MAX_STEPS_PER_DAY + 1),
+     "steps_per_day must be 1..22"),
+    # Within the per-day cap, but more steps in all than the day cap allows
+    # at six a day.
+    (lambda: mcp.evaluate_strategies(
+        {"m": MOMENTUM}, days=mcp.MAX_DAYS, steps_per_day=7,
+        universe_size=2, include_baselines=False),
+     "days x steps_per_day must be at most 360"),
+])
+def test_steps_per_day_is_bounded_like_days(call, expect):
+    r = call()
+    assert r["ok"] is False
+    assert expect in r["error"]
+
+
+def test_a_huge_steps_per_day_is_refused_at_once():
+    """The review's call, on a thread so that a regression fails here
+    rather than hanging the suite."""
+    import threading
+
+    out = {}
+    t = threading.Thread(
+        target=lambda: out.update(r=mcp.evaluate_strategies(
+            {"m": MOMENTUM}, steps_per_day=10**9, **TINY)),
+        daemon=True)
+    t.start()
+    t.join(10.0)
+    assert not t.is_alive(), "evaluate_strategies ran steps_per_day=10**9"
+    assert out["r"]["ok"] is False
+    assert "steps_per_day" in out["r"]["error"]
+
+
+def test_the_step_budget_still_admits_what_the_day_cap_admitted():
+    assert mcp._steps_refusal(mcp.MAX_DAYS, 6, mcp.MAX_DAYS) is None
+    assert mcp._steps_refusal(mcp.MAX_DAYS_ASYNC, 6,
+                              mcp.MAX_DAYS_ASYNC) is None
+    # The same budget, spent on longer days.
+    assert mcp._steps_refusal(mcp.MAX_DAYS // 2, 12, mcp.MAX_DAYS) is None
+    refused = mcp._steps_refusal(mcp.MAX_DAYS, 12, mcp.MAX_DAYS)
+    assert "start_job" in refused["error"]
+
+
+@pytest.mark.parametrize("tool,arguments,expect", [
+    ("rank_strategies",
+     {"strategies": {"m": MOMENTUM}, "days": 60, "steps_per_day": 10**9,
+      "universe_size": 120, "seeds": list(range(12))},
+     "steps_per_day must be 1..22"),
+    ("evaluate_strategies",
+     {"strategies": {"m": MOMENTUM}, "days": 60, "steps_per_day": 10**9,
+      "universe_size": 120},
+     "steps_per_day must be 1..22"),
+    ("evaluate_strategies",
+     {"strategies": {"m": MOMENTUM}, "days": mcp.MAX_DAYS_ASYNC,
+      "steps_per_day": 7},
+     "days x steps_per_day must be at most 1512"),
+    ("evaluate_strategies", {"days": "abc"}, "days must be a whole number"),
+    ("evaluate_strategies", {"days": 2.5}, "days must be a whole number"),
+    ("rank_strategies", {"steps_per_day": [6]},
+     "steps_per_day must be a whole number"),
+    ("run_stress_scenario", {"scenario": "rate_shock", "steps_per_day": 6},
+     "takes no argument(s) ['steps_per_day']"),
+    ("evaluate_strategies", ["days", 1], "arguments must be an object"),
+])
+def test_a_job_that_would_run_unbounded_is_refused_before_it_starts(
+        tool, arguments, expect):
+    before = len(mcp._jobs)
+    r = mcp.start_job(tool, arguments)
+    assert r["ok"] is False, r
+    assert expect in r["error"]
+    assert len(mcp._jobs) == before, "a refused job must not take a worker"
+
+
+def test_the_estimate_counts_steps_and_survives_odd_arguments():
+    base = mcp._estimate_seconds("evaluate_strategies", {"days": 10})
+    assert base == pytest.approx(0.38 * 10)
+    assert mcp._estimate_seconds(
+        "evaluate_strategies", {"days": 10, "steps_per_day": 12}) == \
+        pytest.approx(2 * base)
+    # A universe sent as a JSON string, or garbage, counts as the default
+    # roster rather than raising after the job has been submitted.
+    for universe in ('{"size": 40}', 7, ["x"]):
+        assert mcp._estimate_seconds(
+            "evaluate_strategies", {"days": 10, "universe": universe}) == \
+            pytest.approx(base)
+
+
+def _row(**over):
+    row = {"ticker": "ZZA", "sector": "technology", "initial_price": 50.0,
+           "shares_outstanding": 1e8}
+    row.update(over)
+    return row
+
+
+@pytest.mark.parametrize("universe,expect", [
+    ({"instruments": [_row(ticker=5), _row(ticker="ZZB")]}, "instrument 0"),
+    ({"instruments": [_row(initial_price="cheap"), _row(ticker="ZZB")]},
+     "instrument 0"),
+    ({"instruments": [7, _row(ticker="ZZB")]},
+     "instrument 0 must be an object"),
+    ({"instruments": 5}, "instruments must be a list"),
+    ({"size": [4]}, "universe size must be a whole number"),
+    ({"size": 4, "sectors": 5}, "sectors must be a list"),
+])
+def test_a_malformed_universe_is_refused_as_a_result(universe, expect):
+    for r in (mcp.evaluate_strategies({"m": MOMENTUM}, universe=universe,
+                                      **TINY),
+              mcp.explain_price_move(universe=universe, day=1)):
+        assert r["ok"] is False, r
+        assert expect in r["error"]
