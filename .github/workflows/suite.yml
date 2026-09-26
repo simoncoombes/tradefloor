@@ -79,6 +79,21 @@ jobs:
         working-directory: rust
         run: cargo test --release
 
+  msrv:
+    name: cargo check on the declared rust-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The toolchain here and `rust-version` in rust/Cargo.toml are one
+      # number, and tests/test_rust_crate.py fails if they drift apart.
+      # 1.83 is a real floor, not a guess: `f64::from_bits` in a const
+      # (S_PHI_TICK, MISPRICING_PHI) became stable in 1.83, and 1.82 stops
+      # there with "not yet stable as a const fn".
+      - uses: dtolnay/rust-toolchain@1.83
+      - name: Every target and feature builds on the oldest supported Rust
+        working-directory: rust
+        run: cargo check --locked --all-targets --all-features
+
   batch:
     name: tests ${{ matrix.batch }}
     needs: wheel
@@ -179,7 +194,7 @@ jobs:
 
   complete:
     name: the suite is green
-    needs: [batch, versions, rust]
+    needs: [batch, versions, rust, msrv]
     runs-on: ubuntu-latest
     steps:
       - name: Report

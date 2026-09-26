@@ -2,6 +2,7 @@
 name = "tradefloor"
 version = "0.8.5"
 edition = "2021"
+rust-version = "1.83"
 description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
 # user picks whichever term suits their own policy. Supersedes an earlier
