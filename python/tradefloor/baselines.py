@@ -480,12 +480,32 @@ class Oracle:
     :meth:`expected_returns` and :meth:`_act_on_expected_returns`): the
     market-wide transient mispricing and herding, the fair value's drift and
     the earnings cycle's pull, as a net position plus a residual
-    cross-sectional book, once a day. Measured on pt-v20 over 30 days
-    (rosters ``Universe.random(20, seed=3 / 42 / 11)``, sim seeds 0-3): positive
-    on 12 of 12 markets and ahead of every price-only reference agent on 11
-    of 12, the twelfth being buy-and-hold in a month the market rose. Its
-    edge is market-wide and a few basis points a day, so over five days it
-    is behind buy-and-hold as often as not.
+    cross-sectional book, once a day.
+
+    **On pt-v20 as graded it trades close to no edge.** The graded arm
+    moves every shock into fair value for good, the market's plain loading
+    included (``fair_value_market_share`` 1.0 with
+    ``fair_value_market_linear``), and opens the market-wide mispricing at
+    ``opening_market_sigma`` 0.001, so there is almost no transient
+    mispricing left for hidden state to know: the index's next-day return
+    correlates with the predicted common return at 0.11, and the
+    cross-sectional rank IC is 0.014. The rule is net long most days and
+    its P&L takes the sign of the market's month. Over 30 days
+    on rosters ``Universe.random(20, seed=3 / 42 / 11)`` it is positive on 10
+    of 14 markets (sim seeds 0-3, 0-3, 0-5) and on 30 of 48 over sim seeds
+    0-15. It lost on sim seed 3 on all three rosters, a month the index fell
+    about 11 per cent in log terms, 10 points of it in the names' permanent
+    fair-value offsets, and on seed 4 on the third; buy-and-hold lost more
+    in each. A fuller model does no better: the terms :meth:`expected_returns`
+    leaves out (the crowd's lean on ``s``, the anticipated earnings' drift
+    in place of the cycle's pull, the volatility discount's approach to its
+    target) were added and re-measured on the same 48 markets, and moved the
+    count to between 26 and 30 with the mean still near zero. With the
+    opening dispersion at the 0.10 the rule was first measured on, seed 3
+    on roster 3 pays it +152,102 against buy-and-hold's -175,280: that
+    dispersion was its edge. Measure the Oracle as a ceiling on pt-v19,
+    and do not quote a capture ratio on pt-v20, where :func:`capture_ratio`
+    declines to answer in every month the Oracle loses.
 
     The rest of this docstring describes the cross-sectional rule and was
     measured under pt-v19.
