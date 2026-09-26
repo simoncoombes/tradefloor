@@ -144,6 +144,35 @@ its mispricing implies on the new state, and `pin_macro` re-marks the same
 way. The mispricing itself is unchanged and no draw is taken. pt-v20 sets
 1.
 
+The re-mark moves a price between the day's last print and the next
+session, and the tools that read prices now account for it. `prints()` has a
+column, `repriced`: what was written to the price between the last print and
+the tick. `repriced + shock + absorbed` is the print's move from the last
+print. The column is zero through pt-v19, and NaN on the first print after
+`restore_state` on a model that can write a price between prints, since the
+snapshot does not carry it. `Engine.explain` has a fourteenth contribution,
+`repricing`: the change over the day in the gap from the last print to the
+price the close left. `book` is now measured to the last print, and
+`check()` compares last prints. `externalities` prices each fill against the
+prices its step opened on, which a World now records. It used the previous
+step's row, which on pt-v20 is the print before the re-mark, so a fill on a
+day's first step was priced against the wrong baseline (-24.48 against
+tca's 8.77 on one measured trade). `boundary.macro_field_of` compares true
+values, so it finds a field for `macro.cycle` and `macro.growth` under the
+publication lags. None of this moves a price, and every digest is unchanged.
+
+A one-day counterfactual on pt-v20 (`flow_impact`, `tca.analyse`,
+`externalities`) moves untraded names at the first close. The flow moves the
+index return, the close's macro step reads it, and the re-mark prices every
+name at the result. The sessions are identical on those names to the bit,
+and the moves are small (3.4e-5 bps against 0.80 on the traded name in one
+measured analysis). To compare on the same macro path, pin the VIX and the
+corporate yield in both worlds (`tca.analyse(scenario=...)`,
+`World(pins=...)`). `flow_impact` cannot pin; a model with
+`macro_publication_repricing` at 0 writes no price at the close. A World's
+last trace row marks the portfolio before the last close, while `summary()`
+and `evaluate` mark it after.
+
 For users, the change is in what an observer reads. On pt-v20,
 `macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
 values, and a turn of the cycle reaches `macro_fields`, `macro_state`, trace
