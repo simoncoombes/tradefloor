@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v10",
   "fingerprint": "pt-v10",
-  "coefficient_digest": "38664a7d6a56ac80b9da17e49e3644b9aea0fb2c0e4e759bd75e46135113602e",
+  "coefficient_digest": "9dab7d02d3364d564cc18cdf175e81ee5c9f12d50f7525c60e83694053c23ef3",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -11,6 +11,7 @@
     "book_refill_half_life": 0.0,
     "book_resting": 0.0,
     "book_shared": 0.0,
+    "buyback_accrual": 0.0,
     "buyback_payout_share": 0.0,
     "buyback_yield_cap": 0.0,
     "cascade_gain": 1.0,

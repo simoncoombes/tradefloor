@@ -459,9 +459,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # So are the rate instruments, only on an engine that holds them, and
     # the agent-facing book, only once an agent has used it.
     # From pt-v20 the fair-value levels and the unapplied opening draws are
-    # carried, together, on a model that can move a level.
+    # carried, together, on a model that can move a level. The accrued
+    # buyback share-count reductions are carried only with
+    # `buyback_accrual` and `buyback_payout_share` both set.
     expected = set(_SNAPSHOT_KEYS) | (
         {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z",
+         "buyback_log_shares",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -593,6 +596,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
     if "vix_feedback" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["vix_feedback"])
+    # The accrued buyback share-count reductions, only on a model with
+    # `buyback_accrual` and `buyback_payout_share` both set, one per name in
+    # roster order: `Engine::state_hash`'s order, before the levels.
+    if "buyback_log_shares" in snapshot:
+        raw = snapshot["buyback_log_shares"]
+        for value in _column(raw, n, "buyback_log_shares"):
+            _f64(buf, value)
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -1005,10 +1015,12 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "pending_jump", "pending_overnight")
 
 #: Byte buffers only some snapshots carry: the fair-value levels and the
-#: unapplied opening draws on a model that can move a level (pt-v20 on), and
-#: the agent-facing book's consumed depth once an agent has used it. Encoded
+#: unapplied opening draws on a model that can move a level (pt-v20 on), the
+#: agent-facing book's consumed depth once an agent has used it, and the
+#: accrued buyback share-count reductions under `buyback_accrual`. Encoded
 #: where present and left out where not.
-_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value")
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
+                            "buyback_log_shares")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

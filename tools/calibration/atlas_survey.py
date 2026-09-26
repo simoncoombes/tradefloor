@@ -379,6 +379,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # A switch: 0.0 is the term that stood, 1.0 accrues the share count.
+    "buyback_accrual": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

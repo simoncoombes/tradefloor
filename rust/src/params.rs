@@ -817,6 +817,32 @@ pub struct ModelParams {
     /// stays under one. Read only with `buyback_payout_share` non-zero.
     /// In [0, 1].
     pub buyback_yield_cap: f64,
+    /// The buyback term as accrued state. A switch: 0.0, which every preset
+    /// carries, is the term that stood, `exp(b(P_today) * elapsed / 252)`
+    /// with `b = min(buyback_payout_share * eps / P_today,
+    /// buyback_yield_cap)`.
+    ///
+    /// That term reads the yield at today's price and applies it to every
+    /// elapsed year, so `d ln FV / d ln P_today = -b t`: fair value moves
+    /// against the price it anchors, with a gain that grows linearly in the
+    /// elapsed years. On pt-v20 the measured slope is -0.29 by year 10 and
+    /// -0.49 by year 40; once `b t` passes one the close's re-mark stops
+    /// contracting and the price flips each session, and over 100-year runs
+    /// (30 seeds x 40 names) the median name vol goes from 0.23 to 1.70 by
+    /// years 40-50 with the worst name's tick autocorrelation at -1.000.
+    /// Because the elapsed days enter the level, relabelling the calendar
+    /// origin moves prices by up to 1.50 in logs on one seed.
+    ///
+    /// 1.0: each name carries a running log share-count reduction `L`
+    /// (`TickStock::buyback_log_shares`). The close adds
+    /// `min(buyback_payout_share * E * exp(L) / P_close, buyback_yield_cap)
+    /// / 252`, with `E` the earnings the valuation holds (nominal scale and
+    /// fair-value level included), and fair value reads `exp(L)`. `L` is
+    /// fixed within a session, so the elasticity is zero, and it does not
+    /// read the calendar. New listings start at 0; loss-makers and bankrupt
+    /// names do not accrue. The snapshot and the state hash carry `L` only
+    /// while this and `buyback_payout_share` are both set. In {0, 1}.
+    pub buyback_accrual: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5239,6 +5265,7 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             buyback_yield_cap: 0.0,
+            buyback_accrual: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7574,6 +7601,7 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
+            "buyback_accrual" => self.buyback_accrual,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7825,6 +7853,7 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
+            "buyback_accrual" => out.buyback_accrual = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8197,6 +8226,11 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.buyback_accrual == 0.0 || self.buyback_accrual == 1.0) {
+            return Err(format!(
+                "buyback_accrual is {}. It is a switch: 0.0 is the term that stood, 1.0 accrues the share count.",
+                self.buyback_accrual));
         }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
@@ -8723,6 +8757,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "buyback_yield_cap",
+        "buyback_accrual",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

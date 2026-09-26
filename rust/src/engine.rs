@@ -4497,6 +4497,69 @@ impl Engine {
         if !self.rates.is_empty() {
             self.rates.close();
         }
+        self.accrue_buybacks();
+    }
+
+    /// `buyback_accrual`'s close step, after the rates close. Each public,
+    /// solvent name with a mispricing state adds one session's buyback
+    /// yield, read at the close price on the earnings the valuation holds
+    /// (nominal scale and fair-value level included), to its log share-count
+    /// reduction. See `market::tick::buyback_accrual_step`.
+    fn accrue_buybacks(&mut self) {
+        if !self.carries_buyback_log_shares() {
+            return;
+        }
+        let p = &self.params;
+        let nominal = crate::market::tick::nominal_scale(p, &self.economy, self.nominal_output_base);
+        for c in self.companies.iter_mut() {
+            if !c.is_public || c.is_bankrupt || c.stock.mispricing_s.is_none() {
+                continue;
+            }
+            let Some(eps) = c.eps else { continue };
+            let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+            let earnings = match c.stock.fair_value_offset {
+                Some(v) if v != 0.0 => earnings * crate::mathx::exp(v),
+                _ => earnings,
+            };
+            let l = c.stock.buyback_log_shares.unwrap_or(0.0);
+            let dl = crate::market::tick::buyback_accrual_step(p, Some(earnings), c.stock.price, l);
+            if dl != 0.0 {
+                c.stock.buyback_log_shares = Some(l + dl);
+            }
+        }
+    }
+
+    /// Each name's accrued log share-count reduction under
+    /// `buyback_accrual`, in roster order, 0.0 where nothing has accrued.
+    /// For checkpoints and forks.
+    pub fn buyback_log_shares(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.buyback_log_shares.unwrap_or(0.0)).collect()
+    }
+
+    /// Put the accrued log share-count reductions back. A width mismatch is
+    /// refused, as the fair-value levels' is: they are positional against
+    /// the roster.
+    pub fn set_buyback_log_shares(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} buyback share-count reductions and the \
+                 roster holds {} companies. They are positional against the roster, \
+                 so this restore is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        for (c, &v) in self.companies.iter_mut().zip(values) {
+            c.stock.buyback_log_shares = if v == 0.0 { None } else { Some(v) };
+        }
+        Ok(())
+    }
+
+    /// Whether this engine's model accrues the buyback share count, which is
+    /// when the snapshot and the state hash carry it: `buyback_accrual` and
+    /// `buyback_payout_share` both set. Off on every preset as shipped.
+    pub fn carries_buyback_log_shares(&self) -> bool {
+        self.params.buyback_accrual != 0.0 && self.params.buyback_payout_share != 0.0
     }
 
     /// The stationary opening (`opening_mispricing_sigma`), applied once,
@@ -5515,8 +5578,9 @@ impl Engine {
                     // multiple read without it rises by the buyback yield
                     // every year. A branch, so 0.0 is the line that stood.
                     let earnings = if self.params.market_pe_buybacks != 0.0 {
-                        earnings * crate::market::tick::buyback_scale(
-                            &self.params, Some(earnings), c.stock.price, self.current_day)
+                        earnings * crate::market::tick::buyback_factor(
+                            &self.params, Some(earnings), c.stock.price, self.current_day,
+                            c.stock.buyback_log_shares)
                     } else {
                         earnings
                     };
@@ -5642,7 +5706,9 @@ impl Engine {
             // is a contraction (the term's elasticity is the buyback yield
             // times the years elapsed, well under one), so a few steps
             // settle it; the loop stops when a step moves nothing, or at
-            // sixteen, and takes no draw.
+            // sixteen, and takes no draw. Under `buyback_accrual` fair value
+            // does not read the price, so the first step is exact and the
+            // loop stops at its first comparison.
             let ratio = last / fv0;
             let clamp = |x: f64| crate::mathx::min(crate::mathx::max(x, 0.01), p.price_hard_cap);
             let mut price = clamp(ratio * fv1);
@@ -6502,6 +6568,12 @@ impl Engine {
         if self.carries_vix_feedback() {
             hash_f64(&mut buf, self.economy.vix_feedback);
         }
+        // The accrued buyback share-count reductions, on the same rule.
+        if self.carries_buyback_log_shares() {
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.buyback_log_shares.unwrap_or(0.0));
+            }
+        }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.
         if self.carries_fair_value_offsets() {
@@ -7347,6 +7419,7 @@ mod tests {
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
                 fair_value_offset: None,
+                buyback_log_shares: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,
                 garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],

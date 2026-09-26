@@ -3800,6 +3800,12 @@ impl PyEngine {
         // preset through pt-v18 actually held.
         out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
         out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The accrued buyback share-count reductions: their own key, and
+        // only while `buyback_accrual` and the payout share are both set, so
+        // every preset's snapshot is the one it was.
+        if self.inner.carries_buyback_log_shares() {
+            out.set_item("buyback_log_shares", f64_bytes(py, &self.inner.buyback_log_shares()))?;
+        }
         // The fair-value levels pt-v20 turned on. Their own key, and only
         // when the model can move them, so every earlier preset's snapshot
         // is the one it was.
@@ -4293,6 +4299,18 @@ impl PyEngine {
                 .collect();
             self.inner
                 .set_fair_value_offsets(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        // Absent means a snapshot from a model without the accrual, whose
+        // names all held 0.0, which is what a fresh engine holds.
+        if let Some(raw) = snapshot.get_item("buyback_log_shares")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_buyback_log_shares(&values)
                 .map_err(ValidationError::new_err)?;
         }
         if let Some(raw) = snapshot.get_item("opening_z")? {

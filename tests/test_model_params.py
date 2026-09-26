@@ -1010,6 +1010,10 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # LIVE: the default carries buyback_payout_share, and the accrued
+    # share count replaces the term that compounds today's yield over the
+    # elapsed days from the first session.
+    ("buyback_accrual", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
