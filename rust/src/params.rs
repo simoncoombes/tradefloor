@@ -696,6 +696,60 @@ pub struct ModelParams {
     /// 10-year's move plus the meeting formula's VIX slope on the session's
     /// VIX change; the next meeting re-anchors the level. A switch.
     pub corporate_yield_daily: f64,
+    /// THE MARKET'S CYCLE NOWCAST. 0.0, which every preset carries, prices
+    /// the TRUE phase: the earnings anticipation reads `g` of the phase the
+    /// economy is in and the corporate spread its multiplier, so every true
+    /// turn moves `A` by `g_next - g` at the close it happens on (about
+    /// -4.5, -3.3, +4.1 and +4.0 per cent on pt-v20, into peak, contraction,
+    /// trough and recovery) and the first meeting after it re-anchors the
+    /// spread by `base * dm` (111 bp on average, up to 304), while the daily
+    /// VIX term's ratio to 2 bp a point returns the true multiplier on any
+    /// unclamped session: a price-only agent reads the hidden phase off one
+    /// close (r13 audit, design repository scratchpad r13/phase-reanchor).
+    ///
+    /// Off zero the market holds a belief `pi` over the five phases, in
+    /// `phase_cycle` order, a forward filter on the engine's own chain
+    /// (exponential sojourns at the mean sojourns
+    /// `earnings_anticipation_terms` already uses, `lambda_j = 1 /
+    /// mean_sojourn_j`). At each close one report names a phase: the phase
+    /// the session ran in with this probability, otherwise one of the other
+    /// four uniformly, from one uniform on `stream::CYCLE_NOWCAST`. The
+    /// filter predicts (`pi'_j = pi_j (1 - lambda_j) + pi_(j-1)
+    /// lambda_(j-1)`), multiplies by `q` on the reported phase and by
+    /// `(1 - q) / 4` elsewhere, and normalises, so no session moves the
+    /// belief's log-odds by more than ln(4q / (1 - q)). The anticipation
+    /// reads `pi . g + c e` in place of `g` of the true phase, and the
+    /// corporate spread prices `pi . m` (see `corporate_spread_cycle`).
+    ///
+    /// The belief opens one-hot on the opening phase (and on a restore from
+    /// a snapshot that carries none), and a pinned phase is public news: the
+    /// pin puts it one-hot on the pinned phase and that session's close takes
+    /// no report, so a driven path that pins the phase prices exactly what it
+    /// priced at 0.0. The belief and its generator are carried in the
+    /// snapshot (`economy.cycle_nowcast`, `cycle_nowcast_rng`) and the state
+    /// hash only while the dial is set. Proposed for pt-v20 at 0.4 (the
+    /// thirteenth registration): the market is 50 per cent sure of a new
+    /// phase about 10 sessions after it starts and 90 per cent after about
+    /// 19. In {0} and (0.2, 1]; 0.2 would be a report that carries nothing.
+    pub cycle_nowcast_accuracy: f64,
+    /// The share of the corporate spread's cycle multiplier replaced by its
+    /// occupancy-weighted mean over the phases (about 1.22 on the US table):
+    /// the market prices `(1 - s) m + s m_bar`, where `m` is the belief's
+    /// `pi . m` under `cycle_nowcast_accuracy` and the true phase's
+    /// multiplier without it. 0.0, which every preset carries, is the
+    /// multiplier as it stood; 1.0 leaves the spread's widening to the VIX
+    /// alone.
+    ///
+    /// While either this or `cycle_nowcast_accuracy` is set, the meeting
+    /// re-anchors to the priced multiplier, and on a preset with
+    /// `corporate_yield_daily` the daily move carries the meeting formula's
+    /// whole change `S(VIX', m') - S(VIX, m)` (the 50 bp daily cap and the floor
+    /// still apply), so the level is on the formula every session and a
+    /// meeting has nothing to re-anchor. With the nowcast at 0.4, 0.0 here
+    /// leaves the spread's daily sd at 7.7 bp against FRED BAA10Y's 3.1
+    /// (belief moves times the full multiplier); 0.75 gives 3.8. Proposed
+    /// for pt-v20 at 0.75. In [0, 1].
+    pub corporate_spread_cycle: f64,
     /// The share of each IDIOSYNCRATIC shock that moves the name's fair
     /// value for good rather than its mispricing. 0.0, which every preset
     /// through pt-v19 carries, sends the whole shock to `s`, so every
@@ -5231,6 +5285,8 @@ impl ModelParams {
             flight_to_quality_gain: 0.02,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
+            cycle_nowcast_accuracy: 0.0,
+            corporate_spread_cycle: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
@@ -7566,6 +7622,8 @@ impl ModelParams {
             "flight_to_quality_gain" => self.flight_to_quality_gain,
             "flight_to_quality_day" => self.flight_to_quality_day,
             "corporate_yield_daily" => self.corporate_yield_daily,
+            "cycle_nowcast_accuracy" => self.cycle_nowcast_accuracy,
+            "corporate_spread_cycle" => self.corporate_spread_cycle,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
@@ -7817,6 +7875,8 @@ impl ModelParams {
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
             "flight_to_quality_day" => out.flight_to_quality_day = value,
             "corporate_yield_daily" => out.corporate_yield_daily = value,
+            "cycle_nowcast_accuracy" => out.cycle_nowcast_accuracy = value,
+            "corporate_spread_cycle" => out.corporate_spread_cycle = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
@@ -8152,6 +8212,19 @@ impl ModelParams {
                  macro year: 365.0 as shipped, 252.0 on the session calendar. Set a whole \
                  number inside [24, 365].",
                 self.macro_calendar_days_per_year));
+        }
+        if !(self.cycle_nowcast_accuracy == 0.0
+            || (self.cycle_nowcast_accuracy > 0.2 && self.cycle_nowcast_accuracy <= 1.0))
+        {
+            return Err(format!(
+                "cycle_nowcast_accuracy is {}. It is the probability a session's report names \
+                 the true phase: 0.0 prices the true phase, otherwise in (0.2, 1].",
+                self.cycle_nowcast_accuracy));
+        }
+        if !(self.corporate_spread_cycle >= 0.0 && self.corporate_spread_cycle <= 1.0) {
+            return Err(format!(
+                "corporate_spread_cycle is {}. It is a share, in [0, 1].",
+                self.corporate_spread_cycle));
         }
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
@@ -8715,6 +8788,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "flight_to_quality_gain",
         "flight_to_quality_day",
         "corporate_yield_daily",
+        "cycle_nowcast_accuracy",
+        "corporate_spread_cycle",
         "fair_value_news_share",
         "fair_value_market_share",
         "fair_value_market_linear",

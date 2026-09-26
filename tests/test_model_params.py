@@ -1010,6 +1010,16 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # The market's cycle nowcast (r13). LIVE: the anticipation reads the
+    # belief's pi . g, which the first session's report moves off the true
+    # phase's g, and the default reprices at the close
+    # (`macro_publication_repricing`) and moves the corporate yield daily.
+    ("cycle_nowcast_accuracy", 0.4, True),
+    # LIVE: the default moves the corporate yield daily, and the blend
+    # prices the multiplier toward its occupancy mean and carries the
+    # formula's change on the daily path, so the corporate yield and the
+    # rate term of every fair value move from the first meeting.
+    ("corporate_spread_cycle", 0.75, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

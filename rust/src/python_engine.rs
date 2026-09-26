@@ -3115,8 +3115,15 @@ impl PyEngine {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
         }
         // A pinned phase is news of a turn, which the anticipated earnings
-        // price at once (`earnings_anticipation_half_life`).
-        self.inner.refresh_earnings_anticipation();
+        // price at once (`earnings_anticipation_half_life`); under
+        // `cycle_nowcast_accuracy` the market's belief goes onto it and
+        // holds there through tonight's close, since a caller's write is
+        // public (`Engine::cycle_phase_pinned`, which refreshes as well).
+        if phase.is_some() {
+            self.inner.cycle_phase_pinned();
+        } else {
+            self.inner.refresh_earnings_anticipation();
+        }
         if corporate_bond_yield.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
         }
@@ -3773,6 +3780,18 @@ impl PyEngine {
         if self.inner.macro_pins_today() != 0 {
             out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
         }
+        // The market's cycle nowcast's generator (`cycle_nowcast_accuracy`),
+        // a key only while the dial is set: (state, increment, spare) as the
+        // `rng` array carries a stream, then its uniform and normal counts.
+        // The belief itself is `economy["cycle_nowcast"]`.
+        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
+            let s = self.inner.cycle_nowcast_rng_state();
+            out.set_item(
+                "cycle_nowcast_rng",
+                vec![f64::from_bits(s.state), f64::from_bits(s.increment),
+                     s.spare.unwrap_or(f64::NAN), s.uniforms as f64, s.normals as f64],
+            )?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3889,6 +3908,9 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
+            econ.set_item("cycle_nowcast", self.inner.cycle_nowcast().to_vec())?;
+        }
         // The published-phase history, oldest first, only while
         // `cycle_publication_lag` keeps one, so every other snapshot is the
         // dict it was. A restore without it re-seeds from the true phase.
@@ -4497,6 +4519,47 @@ impl PyEngine {
                 economy.cycle_phase = CyclePhase::from_name(&name).ok_or_else(|| {
                     ValidationError::new_err(format!("unknown cycle phase {name:?}"))
                 })?;
+            }
+            // The market's cycle nowcast (`cycle_nowcast_accuracy`), before
+            // the anticipation that reads it. Refused where the dial is off;
+            // re-seeded on the phase just restored where the snapshot carries
+            // none.
+            match d.get_item("cycle_nowcast")? {
+                Some(v) => {
+                    let belief: Vec<f64> = v.extract()?;
+                    if belief.len() != 5 {
+                        return Err(ValidationError::new_err(format!(
+                            "cycle_nowcast must be 5 numbers, got {}", belief.len())));
+                    }
+                    let rng = match snapshot.get_item("cycle_nowcast_rng")? {
+                        Some(r) => {
+                            let r: Vec<f64> = r.extract()?;
+                            if r.len() != 5 {
+                                return Err(ValidationError::new_err(format!(
+                                    "cycle_nowcast_rng must be 5 numbers, got {}", r.len())));
+                            }
+                            Some(crate::rng::RngState {
+                                state: r[0].to_bits(),
+                                increment: r[1].to_bits(),
+                                spare: if r[2].is_nan() { None } else { Some(r[2]) },
+                                uniforms: r[3] as u64,
+                                normals: r[4] as u64,
+                            })
+                        }
+                        None => None,
+                    };
+                    self.inner
+                        .set_cycle_nowcast([belief[0], belief[1], belief[2], belief[3], belief[4]], rng)
+                        .map_err(ValidationError::new_err)?;
+                }
+                None => {
+                    if snapshot.get_item("cycle_nowcast_rng")?.is_some() {
+                        return Err(ValidationError::new_err(
+                            "this snapshot carries cycle_nowcast_rng without the economy's \
+                             cycle_nowcast; the engine writes both or neither"));
+                    }
+                    self.inner.seed_cycle_nowcast();
+                }
             }
             // Derived from the phase and the level just restored.
             self.inner.refresh_earnings_anticipation();

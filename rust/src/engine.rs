@@ -84,6 +84,11 @@ pub const MAIN_STREAM: u32 = 99;
 pub const PIN_VIX: u8 = 1;
 /// `Engine::macro_pins_today`: the corporate yield was pinned today.
 pub const PIN_CORPORATE: u8 = 2;
+/// `Engine::macro_pins_today`: the cycle phase was pinned today, under
+/// `cycle_nowcast_accuracy`. The market's belief was put on the pinned phase
+/// (a pin is public news) and tonight's close takes no report, so the belief
+/// holds on the pin through the close. Kept only while the dial is set.
+pub const PIN_CYCLE: u8 = 4;
 
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
@@ -291,6 +296,8 @@ pub struct Engine {
     overnight_rng: GameRng,
     market_vol_level_rng: GameRng,
     crisis_epicentre_rng: GameRng,
+    /// `stream::CYCLE_NOWCAST`: drawn only while `cycle_nowcast_accuracy` is set.
+    cycle_nowcast_rng: GameRng,
     /// The opening mispricing draws, one standard normal per name of the
     /// roster the engine was built with and one more for the market's
     /// common level, from the one-shot [`stream::OPENING`]. Empty unless
@@ -623,6 +630,19 @@ pub struct Engine {
     /// through pt-v19 carries, so such an engine is the engine it was
     /// before this existed.
     cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
+
+    /// The market's belief over the five phases in `phase_cycle` order
+    /// (`cycle_nowcast_accuracy`). Zero, never touched, unsnapshotted and
+    /// unhashed while the dial is 0.0.
+    cycle_nowcast: [f64; 5],
+
+    /// The nowcast's and the spread blend's constants, fixed for the
+    /// engine's life because `params` is: each phase's exit rate `lambda_j =
+    /// min(1, 1 / mean_sojourn_j)` and the multiplier's occupancy mean
+    /// `m_bar`. Derived once at construction while `cycle_nowcast_accuracy`
+    /// or `corporate_spread_cycle` is set (zeros otherwise), since the
+    /// sojourn walk is too dear to run at every close.
+    cycle_nowcast_terms: ([f64; 5], f64),
 
     /// The GDP growth figure as published under `gdp_publication_lag`, and
     /// what it is computed from: the quarter being averaged and the
@@ -1111,6 +1131,7 @@ impl Engine {
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
             crisis_epicentre_rng: GameRng::substream(seed, stream::CRISIS_EPICENTRE),
+            cycle_nowcast_rng: GameRng::substream(seed, stream::CYCLE_NOWCAST),
             // One normal per name, then one for the market's common level,
             // whenever either opening dial is on.
             opening_z: if params.opening_mispricing_sigma != 0.0
@@ -1183,9 +1204,12 @@ impl Engine {
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
             cycle_history: std::collections::VecDeque::new(),
+            cycle_nowcast: [0.0; 5],
+            cycle_nowcast_terms: ([0.0; 5], 0.0),
             gdp_publication: GdpPublication::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
+        engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The opening meeting interval, 45 calendar days, onto the macro
         // calendar's steps. Only a fresh schedule is moved, and never on
         // the shipped calendar, where `scale_days` is the literal anyway.
@@ -1210,6 +1234,8 @@ impl Engine {
         if engine.params.earnings_cycle_depth != 0.0 {
             engine.economy.earnings_cycle = engine.earnings_cycle_target();
         }
+        // The market opens knowing the phase it opens in.
+        engine.seed_cycle_nowcast();
         engine.refresh_earnings_anticipation();
         // After the burn-in and the stationary opening, so the phase the
         // run opens in is the one published until the lag has elapsed.
@@ -1499,17 +1525,166 @@ impl Engine {
 
     /// Keep `economy.earnings_anticipation` current: `A - e`, or 0.0 with
     /// the anticipation off. Called wherever the phase or the level moves.
+    /// Under `cycle_nowcast_accuracy` the phase term is the belief's
+    /// `pi . g`, not the true phase's `g`.
     pub fn refresh_earnings_anticipation(&mut self) {
         self.economy.earnings_anticipation = match self.earnings_anticipation_terms() {
             None => 0.0,
             Some((g, c)) => {
-                let k = crate::economy::cycle::phase_cycle()
-                    .iter()
-                    .position(|ph| *ph == self.economy.cycle_phase)
-                    .unwrap_or(0);
-                g[k] + c * self.economy.earnings_cycle - self.economy.earnings_cycle
+                let gk = if self.params.cycle_nowcast_accuracy != 0.0 {
+                    let mut acc = 0.0;
+                    for j in 0..5 {
+                        acc += self.cycle_nowcast[j] * g[j];
+                    }
+                    acc
+                } else {
+                    let k = crate::economy::cycle::phase_cycle()
+                        .iter()
+                        .position(|ph| *ph == self.economy.cycle_phase)
+                        .unwrap_or(0);
+                    g[k]
+                };
+                gk + c * self.economy.earnings_cycle - self.economy.earnings_cycle
             }
         };
+    }
+
+    /// The market's belief over the phases, `phase_cycle` order; zeros with
+    /// `cycle_nowcast_accuracy` off.
+    pub fn cycle_nowcast(&self) -> [f64; 5] {
+        self.cycle_nowcast
+    }
+
+    /// Put the whole belief on the phase the economy is in: the opening, or
+    /// a restore from a snapshot that carried none. Nothing with the dial off.
+    pub fn seed_cycle_nowcast(&mut self) {
+        if self.params.cycle_nowcast_accuracy == 0.0 {
+            return;
+        }
+        let k = crate::economy::cycle::phase_cycle()
+            .iter()
+            .position(|ph| *ph == self.economy.cycle_phase)
+            .unwrap_or(0);
+        self.cycle_nowcast = [0.0; 5];
+        self.cycle_nowcast[k] = 1.0;
+    }
+
+    /// The nowcast generator's position, for the snapshot.
+    pub fn cycle_nowcast_rng_state(&self) -> crate::rng::RngState {
+        self.cycle_nowcast_rng.snapshot()
+    }
+
+    /// Put the belief and its generator back from a snapshot. Refused with
+    /// `cycle_nowcast_accuracy` at 0.0, which keeps neither, and for a
+    /// belief that is not five finite non-negative weights summing to one.
+    pub fn set_cycle_nowcast(
+        &mut self,
+        belief: [f64; 5],
+        rng: Option<crate::rng::RngState>,
+    ) -> Result<(), String> {
+        if self.params.cycle_nowcast_accuracy == 0.0 {
+            return Err("this snapshot carries a cycle nowcast, and this engine's \
+                        cycle_nowcast_accuracy is 0, so it keeps none"
+                .to_string());
+        }
+        let total: f64 = belief.iter().sum();
+        if belief.iter().any(|v| !v.is_finite() || *v < 0.0) || (total - 1.0).abs() > 1e-9 {
+            return Err(format!(
+                "a cycle nowcast is five finite non-negative weights summing to one, got {belief:?}"));
+        }
+        self.cycle_nowcast = belief;
+        if let Some(state) = rng {
+            self.cycle_nowcast_rng = GameRng::restore(state);
+        }
+        Ok(())
+    }
+
+    /// One session of the nowcast: the report, drawn from the phase the
+    /// session ran in, and the forward filter's predict and update.
+    fn update_cycle_nowcast(&mut self) {
+        // A pinned phase is public: the belief was put on it at the pin and
+        // holds there through the close, with no report drawn.
+        if self.macro_pins_today & PIN_CYCLE != 0 {
+            return;
+        }
+        let q = self.params.cycle_nowcast_accuracy;
+        let phases = crate::economy::cycle::phase_cycle();
+        let k = phases.iter().position(|ph| *ph == self.economy.cycle_phase).unwrap_or(0);
+        self.cycle_nowcast_rng.site(Site::CycleNowcastU, 0);
+        let u = self.cycle_nowcast_rng.next_f64();
+        let r = if u < q {
+            k
+        } else {
+            // One of the other four, uniformly; a uniform that rounds to
+            // the top edge takes the last.
+            let j = ((u - q) / (1.0 - q) * 4.0) as usize;
+            (k + 1 + if j > 3 { 3 } else { j }) % 5
+        };
+        let lambda = self.cycle_nowcast_terms.0;
+        let mut pred = [0.0; 5];
+        for j in 0..5 {
+            let lam = lambda[j];
+            pred[j] += self.cycle_nowcast[j] * (1.0 - lam);
+            pred[(j + 1) % 5] += self.cycle_nowcast[j] * lam;
+        }
+        let other = (1.0 - q) / 4.0;
+        let mut total = 0.0;
+        for j in 0..5 {
+            pred[j] *= if j == r { q } else { other };
+            total += pred[j];
+        }
+        if total > 0.0 && total.is_finite() {
+            for j in 0..5 {
+                pred[j] /= total;
+            }
+            self.cycle_nowcast = pred;
+        } else {
+            self.seed_cycle_nowcast();
+        }
+    }
+
+    /// The spread's cycle multiplier the market prices: the belief's `pi . m`
+    /// under the nowcast, the true phase's `m` otherwise, blended toward the
+    /// stationary mean by `corporate_spread_cycle`. `phase` is the true phase
+    /// to read with the nowcast off.
+    fn priced_spread_multiplier(&self, phase: crate::economy::CyclePhase) -> f64 {
+        let phases = crate::economy::cycle::phase_cycle();
+        let m = if self.params.cycle_nowcast_accuracy != 0.0 {
+            let mut acc = 0.0;
+            for j in 0..5 {
+                acc += self.cycle_nowcast[j] * crate::economy::central_bank::spread_multiplier_of(phases[j]);
+            }
+            acc
+        } else {
+            crate::economy::central_bank::spread_multiplier_of(phase)
+        };
+        let s = self.params.corporate_spread_cycle;
+        if s == 0.0 {
+            return m;
+        }
+        (1.0 - s) * m + s * self.cycle_nowcast_terms.1
+    }
+
+    /// `cycle_nowcast_terms`: each phase's exit rate for the nowcast's
+    /// predict step and the spread multiplier's occupancy mean for the
+    /// blend, from the cycle's own mean sojourns (the ones
+    /// `earnings_anticipation_terms` reads). Zeros with both dials off, so
+    /// nothing is walked.
+    fn derive_cycle_nowcast_terms(&self) -> ([f64; 5], f64) {
+        if self.params.cycle_nowcast_accuracy == 0.0 && self.params.corporate_spread_cycle == 0.0 {
+            return ([0.0; 5], 0.0);
+        }
+        let phases = crate::economy::cycle::phase_cycle();
+        let (mean, cycle) = crate::economy::cycle::stationary_phase_shares_for(&self.cycle_spec());
+        let mut lambda = [0.0; 5];
+        let mut mbar = 0.0;
+        for j in 0..5 {
+            lambda[j] = if mean[j] > 0.0 { crate::mathx::min(1.0, 1.0 / mean[j]) } else { 0.0 };
+            if cycle > 0.0 {
+                mbar += mean[j] / cycle * crate::economy::central_bank::spread_multiplier_of(phases[j]);
+            }
+        }
+        (lambda, mbar)
     }
 
     /// The level the earnings cycle is pulled toward in the current phase:
@@ -1990,6 +2165,10 @@ impl Engine {
         // default, where it returns without drawing and every line below
         // is the line that stood here.
         let drawn = self.draw_stationary_opening();
+        // The market's belief on the phase the burn-in opens in; the
+        // construction puts it back on the opening phase afterwards. Nothing
+        // with `cycle_nowcast_accuracy` at 0.0.
+        self.seed_cycle_nowcast();
         if self.params.macro_burn_in_days <= 0.0 {
             return;
         }
@@ -3850,12 +4029,30 @@ impl Engine {
         self.macro_pins_today
     }
 
-    /// Add today's pins (an OR; the close clears them). Kept only while
-    /// `corporate_yield_daily` is on, the one reader.
+    /// Add today's pins (an OR; the close clears them). The VIX and
+    /// corporate bits are kept only while `corporate_yield_daily` is on, their
+    /// one reader; the cycle bit only while `cycle_nowcast_accuracy` is set,
+    /// its one reader.
     pub fn mark_macro_pins_today(&mut self, bits: u8) {
         if self.params.corporate_yield_daily != 0.0 {
             self.macro_pins_today |= bits & (PIN_VIX | PIN_CORPORATE);
         }
+        if self.params.cycle_nowcast_accuracy != 0.0 {
+            self.macro_pins_today |= bits & PIN_CYCLE;
+        }
+    }
+
+    /// A caller pinned the cycle phase: the pin is public news, so the
+    /// market's belief goes onto the phase now standing and tonight's close
+    /// takes no report (`PIN_CYCLE`), and the anticipation is refreshed on
+    /// it. With `cycle_nowcast_accuracy` at 0.0 this is only the refresh the
+    /// pin path always made.
+    pub fn cycle_phase_pinned(&mut self) {
+        if self.params.cycle_nowcast_accuracy != 0.0 {
+            self.seed_cycle_nowcast();
+            self.mark_macro_pins_today(PIN_CYCLE);
+        }
+        self.refresh_earnings_anticipation();
     }
 
     /// Restore the marks from a snapshot, as they were.
@@ -4867,6 +5064,15 @@ impl Engine {
         rng: &mut impl Rng,
     ) -> DayAdvanceOutcome {
         let phase_before = self.economy.cycle_phase;
+        // THE MARKET'S NOWCAST, first: the report on the phase this session
+        // ran in, so a turn at tonight's close is reported from tomorrow's.
+        let nowcast_on = self.params.cycle_nowcast_accuracy != 0.0;
+        let spread_blend = nowcast_on || self.params.corporate_spread_cycle != 0.0;
+        let spread_before = if spread_blend { self.priced_spread_multiplier(phase_before) } else { 0.0 };
+        if nowcast_on {
+            self.update_cycle_nowcast();
+        }
+        let spread_after_report = if spread_blend { self.priced_spread_multiplier(phase_before) } else { 0.0 };
         // Today's pins and the corporate yield a pin wrote, for the end of
         // the step: a pinned corporate yield holds through tonight's close,
         // a meeting's re-anchoring included (`macro_pins_today`).
@@ -5061,6 +5267,11 @@ impl Engine {
                     corporate_yield_daily: self.params.corporate_yield_daily,
                     vix_pinned: self.macro_pins_today & PIN_VIX != 0,
                     corporate_pinned: self.macro_pins_today & PIN_CORPORATE != 0,
+                    spread_multiplier: if spread_blend {
+                        Some((spread_before, spread_after_report))
+                    } else {
+                        None
+                    },
                 },
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
@@ -5111,6 +5322,14 @@ impl Engine {
         let policy = crate::economy::PolicyOptions {
             calendar: self.macro_calendar(),
             liftoff: self.params.fed_liftoff_rule,
+            // The meeting reads the phase after tonight's transition, as it
+            // did; under the nowcast that is the belief, which the transition
+            // does not move.
+            spread_multiplier: if spread_blend {
+                Some(self.priced_spread_multiplier(self.economy.cycle_phase))
+            } else {
+                None
+            },
         };
         let meeting =
             {
@@ -6607,6 +6826,19 @@ impl Engine {
             hash_f64(&mut buf, value);
         }
         hash_str(&mut buf, e.cycle_phase.as_str());
+        // The market's nowcast and its generator's position, only while
+        // `cycle_nowcast_accuracy` is set.
+        if self.params.cycle_nowcast_accuracy != 0.0 {
+            for v in self.cycle_nowcast {
+                hash_f64(&mut buf, v);
+            }
+            let s = self.cycle_nowcast_rng.snapshot();
+            hash_u64(&mut buf, s.state);
+            hash_u64(&mut buf, s.increment);
+            hash_bits(&mut buf, s.spare.unwrap_or(f64::NAN));
+            hash_f64(&mut buf, s.uniforms as f64);
+            hash_f64(&mut buf, s.normals as f64);
+        }
         // The published-phase history, only while `cycle_publication_lag`
         // keeps one, so every other engine's hash is the one it was.
         if self.params.cycle_publication_lag != 0.0 {
@@ -7437,6 +7669,120 @@ mod tests {
         assert_ne!(other.state_hash(12, false), before);
         assert!(other.set_cycle_history(vec![opening; lag]).is_err());
         assert!(engine_v19(7).clone().set_cycle_history(vec![opening]).is_err());
+    }
+
+    /// The engine the nowcast tests read: the default, pt-v20, with
+    /// `cycle_nowcast_accuracy` and `corporate_spread_cycle` as given.
+    fn engine_nowcast(seed: u64, q: f64, s: f64) -> Engine {
+        let params = crate::params::ModelParams {
+            cycle_nowcast_accuracy: q,
+            corporate_spread_cycle: s,
+            ..Engine::default_model()
+        };
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        )
+    }
+
+    /// `cycle_nowcast_accuracy`: off, no belief is kept and the stream is
+    /// never drawn; on, the belief opens one-hot on the opening phase, a
+    /// true turn nobody announced moves neither the belief nor the
+    /// anticipation, each close leaves five non-negative weights summing to
+    /// one, a pin is public (one-hot, and held through that close), and the
+    /// state hash covers the belief.
+    #[test]
+    fn the_cycle_nowcast_prices_a_belief_not_the_true_phase_only_under_the_dial() {
+        let phases = crate::economy::cycle::phase_cycle();
+        let off = engine(7);
+        assert_eq!(off.cycle_nowcast(), [0.0; 5]);
+        assert_eq!(off.cycle_nowcast_terms, ([0.0; 5], 0.0));
+        assert!(off.clone().set_cycle_nowcast([1.0, 0.0, 0.0, 0.0, 0.0], None).is_err());
+
+        let mut e = engine_nowcast(7, 0.4, 0.75);
+        let k0 = phases.iter().position(|p| *p == e.economy().cycle_phase).unwrap();
+        let mut onehot = [0.0; 5];
+        onehot[k0] = 1.0;
+        assert_eq!(e.cycle_nowcast(), onehot);
+        // The blend's occupancy mean of the US table, about 1.22.
+        assert!((e.cycle_nowcast_terms.1 - 1.22).abs() < 0.05, "{:?}", e.cycle_nowcast_terms);
+
+        // A true turn nobody announced: what the market prices stays put.
+        let a0 = e.economy().earnings_anticipation;
+        e.economy_mut().cycle_phase = phases[(k0 + 1) % 5];
+        e.refresh_earnings_anticipation();
+        assert_eq!(e.economy().earnings_anticipation, a0);
+        assert_eq!(e.cycle_nowcast(), onehot);
+
+        let draws = e.cycle_nowcast_rng_state().uniforms;
+        for day in 1..=40i64 {
+            e.advance_macro_day(day);
+            let pi = e.cycle_nowcast();
+            assert!(pi.iter().all(|v| v.is_finite() && *v >= 0.0), "{pi:?}");
+            assert!((pi.iter().sum::<f64>() - 1.0).abs() < 1e-12, "{pi:?}");
+        }
+        assert_eq!(e.cycle_nowcast_rng_state().uniforms, draws + 40);
+        assert_ne!(e.cycle_nowcast(), onehot);
+
+        // A pin is public: one-hot on the pinned phase, and the close that
+        // follows takes no report, so the belief holds through it.
+        let pinned = phases[(k0 + 2) % 5];
+        e.economy_mut().cycle_phase = pinned;
+        e.cycle_phase_pinned();
+        let kp = phases.iter().position(|p| *p == pinned).unwrap();
+        let mut on_pin = [0.0; 5];
+        on_pin[kp] = 1.0;
+        assert_eq!(e.cycle_nowcast(), on_pin);
+        let draws = e.cycle_nowcast_rng_state().uniforms;
+        e.advance_macro_day(41);
+        assert_eq!(e.cycle_nowcast(), on_pin);
+        assert_eq!(e.cycle_nowcast_rng_state().uniforms, draws);
+
+        // Hashed while set.
+        let before = e.state_hash(41, false);
+        let mut other = e.clone();
+        other.set_cycle_nowcast([0.2; 5], None).unwrap();
+        assert_ne!(other.state_hash(41, false), before);
+        assert!(other.set_cycle_nowcast([0.5, 0.5, 0.5, 0.0, 0.0], None).is_err());
+        assert!(other.set_cycle_nowcast([f64::NAN, 1.0, 0.0, 0.0, 0.0], None).is_err());
+    }
+
+    /// Over a long macro path the belief's time-mean matches the true
+    /// phase's occupancy, and neither dial adds a draw to the economy
+    /// stream (the report is on its own stream).
+    #[test]
+    fn the_cycle_nowcast_tracks_the_occupancy_on_its_own_stream() {
+        let phases = crate::economy::cycle::phase_cycle();
+        let days = 5040i64;
+        let mut e = engine_nowcast(11, 0.4, 0.75);
+        let mut control = engine(11);
+        let mut mean = [0.0; 5];
+        let mut occupancy = [0.0; 5];
+        let mut turns = 0;
+        let mut phase = e.economy().cycle_phase;
+        for day in 1..=days {
+            e.advance_macro_day(day);
+            control.advance_macro_day(day);
+            let pi = e.cycle_nowcast();
+            for j in 0..5 {
+                mean[j] += pi[j] / days as f64;
+            }
+            let now = e.economy().cycle_phase;
+            if now != phase {
+                turns += 1;
+                phase = now;
+            }
+            occupancy[phases.iter().position(|p| *p == now).unwrap()] += 1.0 / days as f64;
+        }
+        assert!(turns >= 5, "only {turns} true turns in {days} sessions");
+        for j in 0..5 {
+            assert!((mean[j] - occupancy[j]).abs() < 0.05, "{mean:?} against {occupancy:?}");
+        }
+        assert_eq!(e.draws.economy, control.draws.economy);
     }
 
     /// `gdp_publication_lag`: off, the published growth is the true one and

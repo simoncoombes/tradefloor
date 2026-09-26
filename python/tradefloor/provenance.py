@@ -371,6 +371,29 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # The thirteenth registration's two dials (r13, the phase re-anchor),
+    # inert on every preset. When pt-v20 takes them they leave this table:
+    # the nowcast's 0.4 as fitted, the blend's 0.75 as fitted and
+    # undetermined (a guard on the spread's daily noise against the
+    # recession widening T4 reports short).
+    "cycle_nowcast_accuracy":
+        "inert at 0.0 as shipped: `Engine::refresh_earnings_anticipation` "
+        "reads the true phase's `g`, `update_cycle_nowcast` is never called, "
+        "stream::CYCLE_NOWCAST is never drawn, and the belief is neither "
+        "snapshotted nor hashed. Off zero the market prices a filtered "
+        "belief over the phase in place of the true phase (0.8.5, r13 "
+        "audit: the true phase re-marked the index by about 4 per cent at "
+        "every turn's close)",
+    "corporate_spread_cycle":
+        "inert at 0.0 while `cycle_nowcast_accuracy` is also 0.0, as every "
+        "preset ships them: the meeting and the daily VIX term read the "
+        "true phase's multiplier as they did "
+        "(`PolicyOptions::spread_multiplier` and "
+        "`YieldDials::spread_multiplier` are None). Off zero the spread "
+        "prices a blend toward the multiplier's occupancy mean and the "
+        "daily move carries the formula's whole change (0.8.5, r13 audit: "
+        "the first meeting after a turn re-anchored the spread by 111 bp "
+        "on average)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

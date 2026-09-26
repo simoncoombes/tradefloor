@@ -465,7 +465,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
-         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # The market's cycle nowcast's generator, only while
+         # `cycle_nowcast_accuracy` is set; the belief rides in the economy.
+         "cycle_nowcast_rng"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -668,9 +671,18 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `unemployment_adjustment_half_life` set; hashed before it.
     # `vix_feedback` only with the volatility feedback smoothed; hashed
     # after `earnings_cycle`.
+    # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
+    # together with the snapshot's `cycle_nowcast_rng`; hashed after the
+    # phase, before the history.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
-         "unemployment_impulse", "vix_feedback"} & set(economy))
+         "unemployment_impulse", "vix_feedback", "cycle_nowcast"}
+        & set(economy))
+    if ("cycle_nowcast" in economy) != ("cycle_nowcast_rng" in snapshot):
+        raise ValidationError(
+            "this snapshot carries one of the economy's cycle_nowcast and "
+            "cycle_nowcast_rng without the other. The engine writes both or "
+            "neither, so it was edited or assembled from two snapshots.")
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -694,6 +706,24 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     for value in trend:
         _f64(buf, value)
     _text(buf, economy["cycle_phase"])
+    # The market's cycle nowcast, only while `cycle_nowcast_accuracy` is set:
+    # the five weights, then its generator's state, increment and spare as
+    # bit patterns and its uniform and normal counts. `Engine::state_hash`'s
+    # order and rule.
+    if "cycle_nowcast" in economy:
+        belief = list(economy["cycle_nowcast"])
+        rng = list(snapshot["cycle_nowcast_rng"])
+        if len(belief) != 5 or len(rng) != 5:
+            raise ValidationError(
+                f"this snapshot's cycle nowcast carries {len(belief)} weights "
+                f"and {len(rng)} generator numbers; the state hash covers 5 "
+                "and 5.")
+        for value in belief:
+            _f64(buf, value)
+        for value in rng[:3]:
+            _bits(buf, value)
+        for value in rng[3:]:
+            _f64(buf, value)
     # The published-phase history, oldest first, LENGTH-PREFIXED, only while
     # `cycle_publication_lag` keeps one: `Engine::state_hash`'s order and rule.
     if "cycle_history" in economy:
@@ -1293,6 +1323,11 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
+    # Bit patterns wearing floats, as `rng` is, so NaN payloads survive.
+    if "cycle_nowcast_rng" in snapshot:
+        values = list(snapshot["cycle_nowcast_rng"])
+        out["cycle_nowcast_rng"] = base64.b64encode(
+            struct.pack("<%dd" % len(values), *values)).decode("ascii")
     return out
 
 
@@ -1312,6 +1347,10 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
         out["book"] = book
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
+    if "cycle_nowcast_rng" in payload:
+        raw = base64.b64decode(payload["cycle_nowcast_rng"])
+        out["cycle_nowcast_rng"] = list(
+            struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out
 
 

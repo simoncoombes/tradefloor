@@ -103,12 +103,36 @@ pub struct PolicyOptions {
     /// `fed_liftoff_rule`: 0.0 is the shipped ladder. See
     /// [`crate::params::ModelParams::fed_liftoff_rule`].
     pub liftoff: f64,
+    /// The corporate spread's cycle multiplier the meeting re-anchors with;
+    /// `None` is the true phase's, the table that stood. `Some` only while
+    /// `cycle_nowcast_accuracy` or `corporate_spread_cycle` is set, and then
+    /// it is the multiplier the market prices. See
+    /// [`crate::params::ModelParams::cycle_nowcast_accuracy`].
+    pub spread_multiplier: Option<f64>,
 }
 
 impl PolicyOptions {
     pub const fn shipped() -> Self {
-        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0 }
+        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0, spread_multiplier: None }
     }
+}
+
+/// The spread's cycle multiplier of one phase, the table the meeting and the
+/// daily VIX term read.
+pub fn spread_multiplier_of(phase: CyclePhase) -> f64 {
+    match phase {
+        CyclePhase::Contraction => 2.8,
+        CyclePhase::Trough => 3.5,
+        CyclePhase::Recovery => 1.4,
+        CyclePhase::Peak => 1.1,
+        CyclePhase::Expansion => 1.0,
+    }
+}
+
+/// The meeting formula's spread at a VIX and a multiplier, clamped as the
+/// meeting clamps it.
+pub fn spread_formula(vix: f64, multiplier: f64) -> f64 {
+    clamp((1.0 + (vix - 12.0) * 0.02) * multiplier, CORPORATE_SPREAD_FLOOR, 6.0)
 }
 
 /// Run a scheduled (or emergency) FOMC-style meeting.
@@ -334,12 +358,9 @@ pub fn update_central_bank_with(
 
     // ── Corporate spread ──────────────────────────────────────────────────
     let base_corporate_spread = 1.0 + (economy.vix - 12.0) * 0.02;
-    let cycle_spread_multiplier = match economy.cycle_phase {
-        CyclePhase::Contraction => 2.8,
-        CyclePhase::Trough => 3.5,
-        CyclePhase::Recovery => 1.4,
-        CyclePhase::Peak => 1.1,
-        CyclePhase::Expansion => 1.0,
+    let cycle_spread_multiplier = match options.spread_multiplier {
+        Some(m) => m,
+        None => spread_multiplier_of(economy.cycle_phase),
     };
     let corporate_spread = base_corporate_spread * cycle_spread_multiplier;
     let calculated_corp_yield = new_economy.treasury_yield_10y + clamp(corporate_spread, CORPORATE_SPREAD_FLOOR, 6.0);
