@@ -2,6 +2,7 @@
 
 import json
 import struct
+import sys
 
 import pytest
 
@@ -348,3 +349,100 @@ def test_opening_the_day_by_hand_is_the_same_as_letting_it_happen():
 
     assert arr(auto.prices()) == arr(explicit.prices())
     assert auto.order_log == explicit.order_log
+
+
+# -- a received log is bounded before it runs --------------------------------
+#
+# A log is data that may come from somebody else: a RunManifest or a
+# Checkpoint someone sent. Before 0.8.5 was tagged a security review found
+# that `apply_log` passed each session's `ticks` straight to `run_session`,
+# so a 150-byte log naming ticks=10**12 ran for days. `from_json` checks only
+# fingerprints computed from the document's own content, which whoever wrote
+# the file recomputes.
+
+SESSION = dict(op="run_session", hour=9, minute=30, day_of_week=3, ticks=65,
+               volatility=1.0, close_at_end=False)
+
+
+def _refused_at_once(log, match, **kwargs):
+    """Replay on a thread, so a regression fails here instead of hanging."""
+    import threading
+
+    out = {}
+
+    def go():
+        try:
+            tradefloor.replay(log, seed=1, universe=UNIVERSE, **kwargs)
+            out["result"] = "ran"
+        except Exception as exc:                    # noqa: BLE001
+            out["result"] = exc
+
+    t = threading.Thread(target=go, daemon=True)
+    t.start()
+    t.join(30.0)
+    assert not t.is_alive(), f"the replay ran {log!r:.120}"
+    assert isinstance(out["result"], tradefloor.ValidationError), out
+    assert match in str(out["result"])
+
+
+def test_a_session_of_a_trillion_ticks_is_refused_before_it_runs():
+    _refused_at_once([dict(SESSION, ticks=10**12)], "more than the 23,400")
+
+
+def test_many_sessions_in_one_day_add_up_to_the_same_bound():
+    day = [{"op": "open_market"}] + [dict(SESSION, ticks=2_340)] * 11
+    _refused_at_once(day, "log entry 11")
+
+
+def test_a_close_starts_a_new_day_count():
+    replay_module = sys.modules["tradefloor.replay"]
+    cap = replay_module.MAX_TICKS_PER_DAY
+    closed = dict(SESSION, ticks=cap, close_at_end=True)
+    # Two full days, each closed: at the bound and not over it. Checked
+    # without running them, which would take a while.
+    replay_module._check([closed, closed, dict(SESSION, ticks=cap),
+                          {"op": "close_market"}, dict(SESSION, ticks=cap)])
+    with pytest.raises(tradefloor.ValidationError, match="log entry 1"):
+        replay_module._check([dict(SESSION, ticks=cap), {"op": "tick"}])
+
+
+@pytest.mark.parametrize("ticks", [0, -1, 2.5, "65", True, None])
+def test_a_session_whose_ticks_are_not_a_count_is_refused(ticks):
+    _refused_at_once([dict(SESSION, ticks=ticks)], "whole number")
+
+
+def test_a_refused_log_leaves_the_engine_untouched():
+    from tradefloor.replay import apply_log
+
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    before = engine.state_hash(), len(engine.order_log)
+    # The good entries come first, and none of them runs.
+    with pytest.raises(tradefloor.ValidationError, match="unknown operation"):
+        apply_log(engine, [{"op": "open_market"}, SESSION, {"op": "rm -rf"}])
+    assert (engine.state_hash(), len(engine.order_log)) == before
+
+
+def test_a_trusted_long_day_replays_once_the_bound_is_raised():
+    engine = tradefloor.Engine(seed=4, universe=UNIVERSE)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 500)
+    log = engine.order_log
+    with pytest.raises(tradefloor.ValidationError, match="max_ticks_per_day"):
+        tradefloor.replay(log, seed=4, universe=UNIVERSE,
+                          max_ticks_per_day=400)
+    again = tradefloor.replay(log, seed=4, universe=UNIVERSE,
+                              max_ticks_per_day=500)
+    assert again.prices() == engine.prices()
+
+
+def test_a_received_checkpoint_naming_a_huge_session_is_refused():
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(1, record=False)
+    point = tradefloor.Checkpoint.of(engine, universe=UNIVERSE, seed=5)
+    payload = json.loads(point.to_json())
+    for entry in payload["log"]:
+        if entry["op"] == "run_session":
+            entry["ticks"] = 10**12
+    received = tradefloor.Checkpoint.from_json(json.dumps(payload))
+    with pytest.raises(tradefloor.ValidationError, match="23,400"):
+        received.resume()

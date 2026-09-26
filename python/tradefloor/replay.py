@@ -34,6 +34,16 @@ _OPS = frozenset({
 })
 
 
+#: The most ticks a replay runs between two closes: sixty 390-minute
+#: sessions. The harnesses here run 390 ticks a day by default and close
+#: every day, so a log they write at their defaults is far inside it. A log is
+#: data that may have come from somebody else (a `RunManifest`, a
+#: `Checkpoint`), and before this bound a 150-byte log naming
+#: ``ticks=10**12`` in one `run_session` entry ran for days. For a log you
+#: trust that runs longer days, pass ``max_ticks_per_day`` to :func:`replay`.
+MAX_TICKS_PER_DAY = 23_400
+
+
 def replay(
     log: Sequence[dict[str, Any]],
     *,
@@ -43,6 +53,7 @@ def replay(
     model: str | ModelParams | None = None,
     until: int | None = None,
     ledger: Any = None,
+    max_ticks_per_day: int = MAX_TICKS_PER_DAY,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
 
@@ -70,11 +81,15 @@ def replay(
     ``ledger`` is an optional :class:`tradefloor.DayLedger`, filled at every
     close boundary the log crosses, so a replayed run can be committed to the
     same way the original was.
+
+    ``max_ticks_per_day`` bounds the ticks between two closes, checked over
+    the whole log before anything runs; see :data:`MAX_TICKS_PER_DAY`.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     entries = list(log)[: until if until is not None else len(log)]
-    apply_log(engine, entries, ledger=ledger)
+    apply_log(engine, entries, ledger=ledger,
+              max_ticks_per_day=max_ticks_per_day)
     return engine
 
 
@@ -83,6 +98,7 @@ def apply_log(
     entries: Sequence[dict[str, Any]],
     *,
     ledger: Any = None,
+    max_ticks_per_day: int = MAX_TICKS_PER_DAY,
 ) -> Engine:
     """Execute recorded entries against an engine that already exists.
 
@@ -95,15 +111,16 @@ def apply_log(
     Appends to the engine's own order log, as every operation here does, so
     an engine that started from a snapshot ends holding the entries it was
     given rather than the history it was restored from.
-    """
-    for i, entry in enumerate(entries):
-        op = entry.get("op")
-        if op not in _OPS:
-            raise ValidationError(
-                f"log entry {i}: unknown operation {op!r}. A replay that "
-                "skipped it would produce a market the log does not describe."
-            )
 
+    The whole log is checked before anything runs: every operation must be
+    one the log can carry, every session's ``ticks`` a whole number of at
+    least one, and no day (the entries between two closes) may run more than
+    ``max_ticks_per_day`` ticks (:data:`MAX_TICKS_PER_DAY` unless given). A
+    log that fails leaves the engine as it was.
+    """
+    _check(entries, max_ticks_per_day)
+    for entry in entries:
+        op = entry["op"]
         if op == "open_market":
             engine.open_market()
         elif op == "close_market":
@@ -173,6 +190,38 @@ def apply_log(
             engine.take_impacts(entry.get("agent"))
 
     return engine
+
+
+def _check(entries: Sequence[dict[str, Any]],
+           max_ticks_per_day: int = MAX_TICKS_PER_DAY) -> None:
+    """Refuse a log that is malformed or runs too long, before running it."""
+    day_ticks = 0
+    for i, entry in enumerate(entries):
+        op = entry.get("op") if isinstance(entry, dict) else None
+        if op not in _OPS:
+            raise ValidationError(
+                f"log entry {i}: unknown operation {op!r}. A replay that "
+                "skipped it would produce a market the log does not describe."
+            )
+        if op == "tick":
+            day_ticks += 1
+        elif op == "run_session":
+            ticks = entry.get("ticks")
+            if (not isinstance(ticks, int) or isinstance(ticks, bool)
+                    or ticks < 1):
+                raise ValidationError(
+                    f"log entry {i}: a session's ticks must be a whole "
+                    f"number of at least 1, got {repr(ticks)[:40]}")
+            day_ticks += ticks
+        if day_ticks > max_ticks_per_day:
+            raise ValidationError(
+                f"log entry {i}: this day runs {day_ticks:,} ticks, more "
+                f"than the {max_ticks_per_day:,} a replay runs between two "
+                f"closes; the harnesses write 390 a day by default. If you "
+                f"trust the log, pass max_ticks_per_day to tradefloor.replay.")
+        if op == "close_market" or (op == "run_session"
+                                    and entry.get("close_at_end")):
+            day_ticks = 0
 
 
 def _news(entry: dict[str, Any]) -> list[News] | None:
