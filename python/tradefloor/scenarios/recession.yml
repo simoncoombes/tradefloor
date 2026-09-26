@@ -18,8 +18,8 @@
 # - Growth is held at -2 per cent through the contraction, then released.
 # - Earnings. The preset's own earnings cycle takes some of every company's
 #   earnings off in a contraction and gives it back in the recovery, at a
-#   60-session half-life: about 30 per cent at pt-v20's depth of 0.35, 18
-#   at a depth of 0.2. This file's own cut stacks on it, x0.65 by day 301.
+#   60-session half-life: about 18 per cent at pt-v20's depth of 0.2, and
+#   30 at the 0.35 it carried before its graded arm. This file's own cut stacks on it, x0.65 by day 301.
 #   Together they fall 47 to 54 per cent by day 365. S&P 500 operating
 #   earnings, four quarters trailing, fell from $91.47 in the second quarter
 #   of 2007 to $39.61 in the third of 2009, 57 per cent, and were about $84
@@ -67,8 +67,9 @@
 # macro_publication_repricing 1). "With the permanent market" adds audit
 # major 5's fix: fair_value_market_share 1, fair_value_market_linear 1,
 # fair_value_market_vol_cap 1.5, opening_market_sigma 0.001 and
-# earnings_cycle_depth 0.2. These values lead for the next preset and are
-# set in none yet. The paired index is lowest on day 324 on the mean path:
+# earnings_cycle_depth 0.2. pt-v20 sets all of these (its graded arm,
+# 2026-09-26), with a volatility-feedback discount, a buyback yield cap and
+# more 10-year noise that these runs did not carry. The paired index is lowest on day 324 on the mean path:
 # -81 log, -56 per cent, on the leading dials; -72 log, -51 per cent, with
 # the permanent market. The index's own drawdown is -60 and -56 per cent.
 # - Recession recovers. Against its twin, the index gains back 57 per cent
@@ -101,17 +102,18 @@
 # - Before audit major 4's fix the file held contraction, growth and credit
 #   for good. The index never recovered: it was -58 to -66 per cent (log)
 #   against its twin 550 sessions after the onset.
-# All of these figures get re-measured once the next preset's dials are
-# final.
+# The grade re-measures the recovery and the rise on pt-v20 as it ships
+# (rows S1a, S1b and S2 of the twelfth registration).
 #
-# WHAT IT CANNOT DO. On pt-v20 as shipped the model prices a company off its
-# current earnings and has no forward-looking valuation. So it falls as
-# earnings fall and not ahead of them, and it reaches 2008's depth over
-# months. It cannot fall as fast as March 2020, 29 per cent in 21 sessions,
-# and it cannot look through an earnings dip that a real market expects to
-# reverse. With earnings_anticipation_half_life set, a turn of the cycle
-# moves prices at once, so the index turns up with the trough on day 365
-# and again with the recovery on day 428.
+# WHAT IT CANNOT DO. Without earnings_anticipation_half_life, as on pt-v19,
+# the model prices a company off its current earnings and has no
+# forward-looking valuation. So it falls as earnings fall and not ahead of
+# them, and it reaches 2008's depth over months. It cannot fall as fast as
+# March 2020, 29 per cent in 21 sessions, and it cannot look through an
+# earnings dip that a real market expects to reverse. pt-v20 sets it (126
+# sessions), so a turn of the cycle moves prices at once, and the index
+# turns up with the trough on day 365 and again with the recovery on day
+# 428.
 #
 # Against the file before 0.8.5, which moved this index -5.8 per cent at 120
 # sessions on pt-v19 and -28.7 on pt-v20: growth is held at a level of -2 per

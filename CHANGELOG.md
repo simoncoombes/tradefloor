@@ -53,8 +53,12 @@ gives each value's derivation or measurement.
 - The curve. `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
   `corporate_yield_daily` and `treasury_10y_noise`.
 - The market's years. An aggregate earnings cycle (`earnings_cycle_depth`
-  0.35, `_upside` 0.09) with `market_factor_sigma` and
-  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.8.
+  0.2, `_upside` 0.09) with `market_factor_sigma` and
+  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.6.
+- The market's long horizon and looking ahead, below: the market's plain
+  shocks permanent up to a volatility ceiling, volatility feedback, the
+  earnings cycle's expected path in fair value, the rate sensitivity and the
+  buyback share.
 - The book. The seven book dials at depth 0.75, exponent 0.5, reach 1,
   shared, resting, refill 27 ticks and fill impact 0.314, so an agent's
   orders execute in the engine's own book on the default.
@@ -103,7 +107,7 @@ and the opening phase until the lag has passed. Prices, the earnings cycle,
 the cycle's hazards and the central bank read the true phase. A scenario
 that sets the phase sets the true one at once, so `recession.yml`'s
 contraction on day 50 acts on the model that day and is published that many
-sessions later. pt-v20 sets <PTV20-VALUE> sessions.
+sessions later. pt-v20 sets 252 sessions.
 
 `gdp_publication_lag` reports GDP growth as the BEA does, as the mean of the
 true daily growth over each quarter of the macro calendar (63 sessions on
@@ -112,7 +116,7 @@ pt-v20), released that many sessions after the quarter's last day.
 `macro.arrow`, carry that figure, and the opening growth before the first
 release. Output, earnings, unemployment and the central bank read the true
 daily growth, and a `macro.growth` intervention and the Oracle's drift now
-read it from `state_snapshot()`. pt-v20 sets <PTV20-VALUE> sessions.
+read it from `state_snapshot()`. pt-v20 sets 21 sessions.
 
 `unemployment_adjustment_half_life` makes unemployment respond to a turn
 over months. The monthly step moved the rate by the whole of what the
@@ -122,14 +126,14 @@ change otherwise, and announced the turn. Off zero, an impulse closes
 `1 - 0.5^(month / half_life)` of its gap to that drive at each monthly step,
 with a month of 21 sessions on pt-v20. At 84 sessions the first rise is
 about 0.16 points. It moves the true rate, and so inflation, the central
-bank and the cycle's hazards. pt-v20 sets <PTV20-VALUE> sessions.
+bank and the cycle's hazards. pt-v20 sets 84 sessions.
 
 `fear_greed_published_inputs` makes the fear and greed index read the
 published phase and growth. Its target carried a phase bonus (+15 in an
 expansion, -25 in a contraction) and three times the true daily growth, so
 it fell about 35 points in the five sessions after a contraction began. With
 the switch on it moves when the turn is published. Nothing on the price path
-reads the index, so the switch moves no price. pt-v20 sets <PTV20-VALUE>.
+reads the index, so the switch moves no price. pt-v20 sets 1.
 
 `macro_publication_repricing` prices the close's macro step at the moment it
 is published. The policy rate, the corporate yield and the cycle could be
@@ -138,7 +142,7 @@ tick, so an agent that read a hike sold at the price from before it. With
 the switch on, each traded name is re-marked as the step ends to the price
 its mispricing implies on the new state, and `pin_macro` re-marks the same
 way. The mispricing itself is unchanged and no draw is taken. pt-v20 sets
-<PTV20-VALUE>.
+1.
 
 For users, the change is in what an observer reads. On pt-v20,
 `macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
@@ -149,6 +153,57 @@ happens. A phase or a growth rate written with `pin_macro` reads back from
 still holds the true phase and growth. Sandboxed agents cannot read it. Code
 that needs the true state, such as an oracle or a regime label, reads it
 there. Nothing changes on pt-v19 or any earlier preset.
+
+### The market's long horizon
+
+The same audit found the index mean-reverting far faster than the S&P 500.
+Every market-wide shock sat in the mispricing, which reverts, so the ratio
+of the index's five-year variance to five times its one-year variance read
+0.42 against the S&P 500's 0.87 over 1871-2023. Three dials, 0 on every
+preset before pt-v20, change what is permanent.
+
+`fair_value_market_share` moves that share of each market-wide shock into
+the company's fair-value level, beside the stock-level share
+`fair_value_news_share` already moves. `fair_value_market_linear` makes only
+the plain loading on the market draw permanent, which has zero mean in every
+regime; the down-tick tilt, the lagged wire, the crisis injection and the
+crash amplifier stay in the mispricing and revert. `fair_value_market_vol_cap`
+cuts the share above a ceiling on the market's daily sigma, in multiples of
+`market_factor_sigma`, so the excess a fear regime adds reverts, as mean
+reversion in real index returns concentrates in turbulent periods. pt-v20
+sets 1, 1 and 1.5. The earnings cycle then carries less of the index's
+yearly spread, and `earnings_cycle_depth` goes from 0.35 to 0.2, where the
+aggregate fall in a contraction matches Shiller's median of 17 per cent.
+`opening_market_sigma` goes from 0.10 to 0.001.
+
+`fair_value_vix_discount` is a volatility-feedback discount: while the VIX
+is above `fair_value_vix_knee`, every company's fair value is scaled by
+`exp(-gain * beta * ln(vix / knee))`, read from a VIX exposure smoothed over
+`fair_value_vix_half_life` sessions. It has no permanent part, so it
+deepens a crash while fear is high and gives it back as the VIX falls. pt-v20
+sets 0.35, 40 and 5. The snapshot and the state hash carry the smoothed
+exposure only while the gain and the half-life are both set.
+
+`buyback_yield_cap` caps the buyback yield the fair-value term compounds.
+The term reads the yield at today's price, so a company near the 0.01 floor
+read a yield in the hundreds, and on one held-out history the index rose
+86-fold in one close. pt-v20 sets 0.15.
+
+Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
+the earnings cycle's expected path from the cycle's own hazards, so a turn
+of phase moves prices at once and a price trough leads the earnings trough;
+pt-v20 sets 126 sessions. `rate_pe_sensitivity`, the constant 1.5 until
+now, is the P/E compression per unit of yield; pt-v20 sets 3. Both cost the
+index about 1.5 points a year of drift, and pt-v20's `buyback_payout_share`
+goes from a third to 0.75 to restore it. That value is calibrated to the
+drift, not measured: it is a buyback yield of about 4.2 per cent against a
+real 1.5 to 2.0. `treasury_10y_noise` goes from 0.025 to 0.038.
+
+pt-v20's values are the twelfth registration's graded arm (design
+repository, `programme/ptv20-registration.md`), chosen on held-out seeds,
+where it passes all 40 registered rows. `python/tradefloor/provenance.py`
+gives each value's kind and source. Every preset before pt-v20 replays and
+hashes as it did.
 
 ### The flow fix and its measurement
 
