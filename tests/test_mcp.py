@@ -762,3 +762,37 @@ def test_every_result_serialises(call):
     # transport error. `Ranking.separation` was a bound method on the first
     # draft of this server and would have done exactly that.
     json.dumps(call())
+
+
+
+# -- installing it -----------------------------------------------------------
+
+
+def test_explain_without_pyarrow_is_a_refusal_naming_the_extra(monkeypatch):
+    """explain needs pyarrow, which is why the `mcp` extra carries it
+    (tests/test_packaging.py). Where it is missing anyway, the tool refuses
+    with the install line rather than raising.
+
+    Raising was worse than it looks: MCP wraps a tool's exception, so a
+    client saw "Error executing tool explain" and nothing of the message
+    naming pyarrow and the command that installs it.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "pyarrow", None)
+    out = mcp.explain(universe_size=8, day=1, depth=1)
+    assert out["ok"] is False
+    assert "pyarrow" in out["error"]
+    assert 'pip install "tradefloor[mcp]"' in out["error"]
+
+
+def test_the_console_script_hands_over_to_the_server(monkeypatch):
+    """`tradefloor-mcp` runs `tradefloor.__main__:mcp_main`, which checks
+    for the `mcp` package and then calls `tradefloor.mcp.main`. With the
+    package present it must reach the server."""
+    from tradefloor.__main__ import mcp_main
+
+    called = []
+    monkeypatch.setattr(mcp, "main", lambda: called.append(True))
+    mcp_main()
+    assert called == [True]

@@ -180,3 +180,57 @@ def test_every_test_file_is_in_exactly_one_ci_batch():
                 f"{name} is in both {seen[name]!r} and {batch!r}")
             seen[name] = batch
     assert seen, "the batches are empty"
+
+
+# --------------------------------------------------------------------------
+# What pyproject.toml promises an installer
+# --------------------------------------------------------------------------
+
+def _pyproject() -> dict:
+    import tomllib
+
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+
+def _names(requirements) -> set[str]:
+    return {re.split(r"[<>=!~;\[ ]", r, maxsplit=1)[0].lower()
+            for r in requirements}
+
+
+def test_the_mcp_extra_installs_pyarrow_for_the_explain_tool():
+    """The README's MCP install line is `pip install "tradefloor[mcp]"`.
+
+    The `explain` tool reads the truth table as an Arrow stream, and the
+    extra was only `mcp>=2.0`. So in 0.8.5 that install gave a server whose
+    explain tool failed on every call, and the client saw only "Error
+    executing tool explain", because MCP wraps the exception and the pip
+    line inside it was lost. CI never saw it, because CI installs pyarrow
+    for everything. `test_mcp.py` checks that explain does need it.
+    """
+    extra = _names(_pyproject()["project"]["optional-dependencies"]["mcp"])
+    assert {"mcp", "pyarrow"} <= extra, extra
+
+
+def test_tradefloor_mcp_without_the_extra_prints_one_line():
+    """Runs the console script's target, as pyproject names it, with `mcp`
+    made unimportable.
+
+    Pointed at `tradefloor.mcp:main`, it printed two chained tracebacks,
+    about fifteen lines, before the line naming the extra, and it prints
+    them into an MCP client's log, where the useful line is easy to miss.
+    """
+    import os
+    import sys
+
+    target = _pyproject()["project"]["scripts"]["tradefloor-mcp"]
+    module, _, function = target.partition(":")
+    code = ("import importlib, sys; sys.modules['mcp'] = None; "
+            f"getattr(importlib.import_module({module!r}), {function!r})()")
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                          text=True, timeout=300, env=dict(os.environ))
+    assert done.returncode == 1, done
+    assert "Traceback" not in done.stderr, done.stderr
+    lines = done.stderr.strip().splitlines()
+    assert len(lines) == 1, done.stderr
+    assert 'pip install "tradefloor[mcp]"' in lines[0]
+

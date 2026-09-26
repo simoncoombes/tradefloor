@@ -1666,6 +1666,14 @@ def explain(
         result = engine.explain(name, day)
     except tf.ValidationError as exc:
         return _fail(str(exc))
+    except ImportError as exc:
+        # pyarrow, which reads the truth table. The `mcp` extra installs
+        # it since 0.8.5; before that, `pip install "tradefloor[mcp]"`
+        # left it out, and the exception reached the client as a bare
+        # "Error executing tool explain" with the install line lost. A
+        # server whose mcp was installed some other way can still lack it.
+        return _fail(f"{exc}. The extra that installs the MCP server "
+                     "installs it too: pip install \"tradefloor[mcp]\"")
 
     misses = result.check()
     tree = json.loads(result.to_json())["root"]

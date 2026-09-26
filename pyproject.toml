@@ -53,7 +53,10 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 # The MCP server, which lets an LLM agent drive the simulator over tool calls.
 # Optional for the same reason as the rest: nothing in the library imports it,
 # and a user who only wants the simulator should not install a server stack.
-mcp = ["mcp>=2.0"]
+# pyarrow because the `explain` tool reads the truth table, which arrives as
+# an Arrow stream. Without it, `pip install "tradefloor[mcp]"` (the README's
+# install line) gave a server whose explain tool failed on every call.
+mcp = ["mcp>=2.0", "pyarrow>=14"]
 # One extra per framework adapter under python/tradefloor/integrations/,
 # named after the framework, as that subpackage's rules require. Floors only,
 # no ceilings: every adapter imports its framework lazily and validates
@@ -162,7 +165,10 @@ finrobot = [
 tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
 # arguments; see tradefloor-docs: docs/mcp.md for a client configuration block.
-tradefloor-mcp = "tradefloor.mcp:main"
+# Through a shim rather than `tradefloor.mcp:main`, so that without the `mcp`
+# extra the script prints one line naming the extra instead of two chained
+# tracebacks.
+tradefloor-mcp = "tradefloor.__main__:mcp_main"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"

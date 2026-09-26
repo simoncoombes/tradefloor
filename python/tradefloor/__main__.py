@@ -203,5 +203,30 @@ def _targets() -> int:
     return 0
 
 
+def mcp_main() -> None:
+    """Entry point for `tradefloor-mcp`: the MCP server, or one line on why not.
+
+    The script used to point at `tradefloor.mcp:main` directly, so without
+    the extra the module-level import failed and the user saw about fifteen
+    lines of chained ModuleNotFoundError and ImportError tracebacks before
+    the one line that mattered. Users start it through a client
+    (`claude mcp add tradefloor -- tradefloor-mcp`), so that noise lands in
+    a client log where the last line is easy to miss.
+
+    Only the `mcp` import is caught. Any other ImportError from
+    `tradefloor.mcp` is a defect in tradefloor and keeps its traceback.
+    """
+    try:
+        from mcp.server import MCPServer  # noqa: F401
+    except ImportError as exc:
+        print("tradefloor-mcp needs the mcp package, 2.0 or later, which "
+              f"tradefloor does not install by default ({exc}). Install it "
+              "with: pip install \"tradefloor[mcp]\"", file=sys.stderr)
+        raise SystemExit(1) from None
+    from .mcp import main as serve
+
+    serve()
+
+
 if __name__ == "__main__":
     sys.exit(main())
