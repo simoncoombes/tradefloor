@@ -980,6 +980,17 @@ def serialize_observation(obs: Any, *,
     hold. The binding one is usually the funding cap, and it used to be the
     one the payload hid -- see the comment at the portfolio block for what
     that cost.
+
+    The portfolio block mixes units, and one key name is wrong about its
+    unit. ``cash``, ``net_worth`` and ``buying_power`` are dollars.
+    ``portfolio.gross_exposure`` is a multiple of net worth, the value
+    :meth:`Portfolio.leverage` returns, so ``1.39`` means gross positions
+    worth 1.39 times equity. It is not :meth:`Portfolio.gross_exposure`,
+    which returns dollars. ``max_leverage`` is the cap on that same
+    multiple. The key keeps its name for now because it is inside every
+    recorded prompt, and renaming it would change the replay key of every
+    committed recording. The rename to ``leverage`` is queued for the next
+    version of this payload, which will re-record the fixtures anyway.
     """
     macro_state = obs.engine.macro_state
     macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
@@ -1030,6 +1041,9 @@ def serialize_observation(obs: Any, *,
         "portfolio": {
             "cash": portfolio.cash,
             "net_worth": equity,
+            # A multiple of net worth, despite the name. See the docstring:
+            # the key is inside every recorded digest, so it is renamed
+            # only when the fixtures are next re-recorded.
             "gross_exposure": portfolio.leverage(obs.engine),
             "max_leverage": limit,
             "buying_power": headroom,
@@ -1186,6 +1200,23 @@ class Transcript:
     preset does the same thing one step earlier -- every key misses, because
     every price the digest covers moved -- and the refusal a reader then
     meets names a step number rather than the cause.
+
+    An entry does not carry the market's seed, on purpose. The adapter is
+    never told the seed, so it has none to write, and passing it to agent
+    code so that it could be recorded would hand the agent what it needs to
+    rebuild the market and read the answers ahead of time. To audit a
+    multi-seed recording by seed, record each seed into its own transcript,
+    or put a seed-to-arm table in ``meta`` yourself.
+
+    :meth:`save` writes the entries sorted by arm, day, step and digest, so
+    recording the same run twice gives the same file even when
+    ``tf.rank(..., workers=4)`` appended the entries from four threads in
+    whatever order they finished. The order in memory, and in
+    :meth:`to_json`, stays the order the entries were recorded in. Replay
+    looks entries up by digest, so the sort cannot change what a replay
+    returns. The one case where order matters is a digest recorded twice,
+    where the later answer wins, and the sort keeps those entries in their
+    recorded order so the same answer still wins after a save and a load.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -1247,12 +1278,68 @@ class Transcript:
         floor, which market -- is :func:`stamp_artefact`'s, shared with
         ``finrobot.Transcript.save`` so the two cannot say different things
         about the same kind of file.
+
+        The bytes do not depend on thread timing either. Entries are
+        written in :func:`saved_order`, sorted by arm, day, step and
+        digest, so two recordings of one run through ``rank(workers=4)``
+        are the same file. Before 0.8.5 they were written in the order the
+        threads finished, and three recordings of one run gave three
+        different sha256s. The transcript in memory keeps its recorded
+        order.
         """
         import pathlib
         stamp_artefact(self.meta)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(self.to_json().encode("utf-8"))
+        text = json.dumps({"meta": self.meta,
+                           "entries": saved_order(self.entries)},
+                          indent=2) + "\n"
+        target.write_bytes(text.encode("utf-8"))
+
+
+def _position(value: Any) -> tuple[int, Any]:
+    """A sort key for a day or a step that tolerates a hand-built entry.
+
+    Numbers sort as numbers, a missing field sorts first, and anything else
+    sorts after every number by its text. A fixture written by hand can
+    hold any of these, and sorting it must not raise.
+    """
+    if value is None:
+        return (0, -1)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return (1, value)
+    return (2, str(value))
+
+
+def saved_order(entries: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """``entries`` in the order :meth:`Transcript.save` writes them.
+
+    Sorted by arm, day, step and digest, so the file does not depend on
+    the order threads appended to a shared recorder.
+
+    Lookup is by digest, so for a digest recorded once the order changes
+    nothing a replay can see. A digest recorded more than once is the
+    exception. :class:`Transcript` keeps the LAST of them, so a plain sort
+    could move a different answer into last place and change what the
+    replay returns. That happens when two forked arms, or two agents
+    sharing one recorder, are shown the same payload and answer it
+    differently. Entries that share a digest are therefore kept together
+    in the order they were recorded, placed where the first of them sorts,
+    and the answer that won before the save still wins after the load.
+    """
+    def key(entry: dict[str, Any]) -> tuple:
+        return (str(entry.get("arm", "")), _position(entry.get("day")),
+                _position(entry.get("step")), str(entry.get("digest", "")))
+
+    first: dict[Any, tuple] = {}
+    for entry in entries:
+        slot = key(entry)
+        name = entry.get("digest")
+        if name not in first or slot < first[name]:
+            first[name] = slot
+    ranked = sorted(range(len(entries)),
+                    key=lambda i: (first[entries[i].get("digest")], i))
+    return [entries[i] for i in ranked]
 
 
 def stamp_artefact(meta: dict[str, Any]) -> None:
@@ -1473,9 +1560,18 @@ def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
     so the value is the market of the FIRST recorded exchange. Both arms of
     a forked experiment share one recorder and one engine, so there is no
     second market to disagree with.
+
+    It also writes ``tradefloor_version``, the library version that made
+    the recording, under the key :class:`~tradefloor.Checkpoint` uses. A
+    preset name means a particular model only within one build, so a
+    reader placing a recording needs the build as well as the name. It is
+    stamped here, while the recording is made, and not at save time,
+    because a save can happen later, under another version.
     """
     if recorder is None:
         return
+    from .. import __version__
+    recorder.meta.setdefault("tradefloor_version", __version__)
     preset = preset_of(obs)
     if preset:
         recorder.meta.setdefault("model_preset", preset)
@@ -1828,8 +1924,9 @@ def stamp_resume_counts(recorder: "Transcript | None",
 
 
 def refuse_changed_instructions(prior: "Transcript | None",
-                                current: str) -> None:
-    """Refuse a resume whose instructions are not the recorded ones.
+                                current: str, *,
+                                replaying: bool = False) -> None:
+    """Refuse a resume or a replay whose instructions are not the recorded ones.
 
     The transcript key is a digest of the INPUT, and an adapter's
     instructions do not travel in that input -- they reach the framework as
@@ -1848,12 +1945,31 @@ def refuse_changed_instructions(prior: "Transcript | None",
     worse off than they were. An adapter that leaves
     ``instructions_digest`` empty is in the same position, and the fix
     there is to stamp one.
+
+    ``replaying=True`` applies the same rule to a replay transcript, with
+    the remedy a replay needs. :class:`ReplayMixin` calls it that way at
+    construction. Until 0.8.5 only ``prior=`` was checked, so a
+    :class:`~tradefloor.integrations.callable.CallableAgentAdapter` whose
+    ``AdapterInfo`` named a new prompt replayed a recording made under the
+    old one and produced the recorded scorecard exactly, with no error and
+    no warning.
     """
     if prior is None:
         return
     recorded = (prior.meta or {}).get("instructions_digest")
     if not recorded or not current or recorded == current:
         return
+    if replaying:
+        raise ValidationError(
+            f"this transcript was recorded under different instructions "
+            f"(recorded {recorded}, current {current}). The instructions "
+            "do not travel in the input the replay is keyed on, so every "
+            "recorded key would still match and the run would complete, "
+            "answering the instructions you have now with decisions taken "
+            "under the ones you had then. Restore the instructions the "
+            "recording was made with, or re-record the run live. To replay "
+            "the file as a plain recording, build the adapter with no "
+            "instructions_digest in its AdapterInfo.")
     raise ValidationError(
         f"this prior transcript was recorded under different instructions "
         f"(recorded {recorded}, current {current}). The instructions do not "
@@ -2009,6 +2125,18 @@ class AdapterInfo:
             out[slot] = copy.deepcopy(value) if isinstance(value, dict) \
                 else value
         return out
+
+    def _with(self, **changes: Any) -> "AdapterInfo":
+        """A copy with ``changes`` applied. ``self`` is left as it was.
+
+        A copy because one ``AdapterInfo`` is often handed to two adapters,
+        say a live one and a replaying one, and setting the mode on the
+        shared object would make the first report the second's mode.
+        """
+        fields = self.as_dict()
+        fields.pop("decision_schema_version")
+        fields.update(changes)
+        return AdapterInfo(**fields)
 
     def reference(self) -> str:
         """A one-line citation, for ``RunManifest.of(strategy=...)``."""
@@ -2199,7 +2327,26 @@ class FrameworkAdapter:
 
         The Observation is read, never written: the same object is what the
         harness executes against after this returns.
+
+        One adapter instance is one run. Its price memory is never cleared,
+        so an instance handed to a second ``evaluate`` or ``World`` shows
+        its agent up to five days of the first market's prices in the
+        second run's returns and volatility. The first step of a run (day
+        0, step 0) arriving while that memory is not empty is the sign of
+        it, and this warns when it sees one. It warns and does not clear
+        the memory, because the payload the agent is shown must not change.
+        Build a fresh adapter for each run, as :func:`tradefloor.rank` does
+        with the factory it is given.
         """
+        if self.history and obs.step == 0 and getattr(obs, "day", 0) == 0:
+            warnings.warn(
+                f"{type(self).__name__} is starting a new run (day 0, step "
+                f"0) but still holds {len(self.history)} steps of prices "
+                "from an earlier one. This run's returns and volatility "
+                "will be computed partly from the other market's prices. "
+                "A replay shows that as missed digests, and a live run "
+                "shows nothing at all. Build a fresh adapter for each "
+                "evaluate() or World, as rank() does.", stacklevel=2)
         self.history.append(list(obs.prices))
         if len(self.history) > HISTORY_STEPS:
             self.history.pop(0)
@@ -2241,10 +2388,19 @@ class FrameworkAdapter:
         # FinRobot record and the Transcript use, so the three join without
         # translation. The response is always in hand -- it is what ask()
         # returned -- normalised to the JSON-able form the record needs.
+        #
+        # The response is what the framework said. An adapter whose ask()
+        # turns that into a decision on the way out (ReplayMixin with an
+        # `interpret` hook) stages the raw response in the exchange, so the
+        # record joins to the transcript, which holds the raw response too.
+        # With nothing staged, what ask() returned is the response.
+        response = raw
         if self._exchange is not None:
             entry["digest"] = self._exchange["digest"]
             entry["prompt"] = self._exchange["prompt"]
-        entry["response"] = raw.as_dict() if isinstance(raw, Decision) else raw
+            response = self._exchange.get("response", raw)
+        entry["response"] = (response.as_dict()
+                             if isinstance(response, Decision) else response)
         entry["decision"] = decision.as_dict()
         entry["orders"] = dict(orders)
         entry["clipped"] = notes
@@ -2388,6 +2544,22 @@ class ReplayMixin:
     - :meth:`call` performs one live framework interaction and returns the
       raw response. Replay mode never reaches it, which is what makes a
       replayed run need no framework, no network and no API key.
+
+    One optional hook, for code that runs after the model answers:
+
+    - :meth:`interpret` turns the raw response into what ``ask`` returns.
+      The default returns it unchanged. The transcript always holds the raw
+      response, and ``interpret`` runs on it in both modes, so parsing a
+      tool call, a risk check or position sizing written here is exercised
+      by every replay. Code of that kind placed inside :meth:`call` is
+      recorded as its output and never runs again on replay.
+
+    The mixin also keeps the adapter's ``AdapterInfo.mode`` equal to the
+    mode it runs in, refuses a replay transcript whose recorded
+    ``instructions_digest`` differs from the adapter's own (see
+    :func:`refuse_changed_instructions`), and writes the adapter's
+    :meth:`~FrameworkAdapter.provenance` into a recorder whose ``meta`` does
+    not yet name its instructions, as the framework adapters do.
     """
 
     def __init__(self, *, mode: str = "replay",
@@ -2404,8 +2576,18 @@ class ReplayMixin:
                 "framework.")
         super().__init__(**kwargs)
         self.mode = mode
+        # The mode the adapter RUNS in, which is what AdapterInfo.mode is
+        # for. It was left as given, so a callable adapter's provenance
+        # said "" in both modes. Neither the replay key nor any prompt
+        # reads the info, so this changes what a recording says about
+        # itself and nothing it replays.
+        if self.info.mode != mode:
+            self.info = self.info._with(mode=mode)
         self.transcript = transcript
         self.recorder = recorder
+        if mode == "replay":
+            refuse_changed_instructions(
+                transcript, self.info.instructions_digest, replaying=True)
         self.prior = check_prior(
             prior, mode=mode, recorder=recorder,
             instructions_digest=self.info.instructions_digest)
@@ -2438,23 +2620,42 @@ class ReplayMixin:
             "return the raw response; replay mode never reaches this "
             "method.")
 
+    def interpret(self, response: Any, payload: dict[str, Any]) -> Any:
+        """What ``ask`` returns for ``response``. Optional; identity here.
+
+        ``response`` is the raw response, recorded or live, and ``payload``
+        is the serialized observation it answers. Return anything
+        :func:`parse_decision` accepts. Raise :class:`DecisionError` to
+        refuse the response, which charges the agent the step as any other
+        refusal does.
+
+        It runs in both modes, after the transcript has been read or
+        written, so the transcript and :attr:`~FrameworkAdapter.record`
+        both hold the raw response and a replay re-runs this code on it.
+        """
+        return response
+
     # -- the shared skeleton ----------------------------------------------
 
     def ask(self, obs: Any, payload: dict[str, Any]) -> Any:
         """One decision, replayed or live, recorded either way.
 
         The key is a digest of the INPUT, never of a position: change the
-        observation mapping or the instructions and the key goes missing
-        and the replay REFUSES, naming the step, instead of answering the
-        new question with a response given to the old one.
+        observation mapping, or anything else :meth:`prepare` puts in the
+        key material, and the key goes missing and the replay REFUSES,
+        naming the step, instead of answering the new question with a
+        response given to the old one. Instructions that do not travel in
+        the key material are checked separately, by ``instructions_digest``
+        at construction.
         """
         key_material, prompt = self.prepare(obs, payload)
         key = digest(key_material)
         self.record_exchange(prompt, key=key)
         if self.mode == "replay":
-            return replay_response(self.transcript, key,
-                                   step=obs.step, day=obs.day,
-                                   preset=preset_of(obs))
+            response = replay_response(self.transcript, key,
+                                       step=obs.step, day=obs.day,
+                                       preset=preset_of(obs))
+            return self._interpreted(response, payload)
         # A `prior` recording is consulted first. The market is
         # deterministic, so a resumed run reaches the same prompts and the
         # same digests, and a recorded answer is still an answer to the
@@ -2469,13 +2670,28 @@ class ReplayMixin:
             # replay must return the same shape -- a JSON string
             # json.dumps'd here would replay one parse level short, against
             # a recording that looked fine when it was written.
+            #
+            # The recorder describes itself on its first write, as every
+            # framework adapter's does: a replay can only refuse changed
+            # instructions if the recording says what it ran under, and a
+            # guard that needs somebody to remember `meta` is off in the
+            # runs nobody was careful about. Keys already in `meta` win.
+            if "instructions_digest" not in self.recorder.meta:
+                for field, value in self.provenance().items():
+                    self.recorder.meta.setdefault(field, value)
             stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,
             })
             stamp_resume_counts(self.recorder, self.prior)
-        return response
+        return self._interpreted(response, payload)
+
+    def _interpreted(self, response: Any, payload: dict[str, Any]) -> Any:
+        """Stage the raw response for the record, then :meth:`interpret` it."""
+        if self._exchange is not None:
+            self._exchange["response"] = response
+        return self.interpret(response, payload)
 
     def reask(self, entry: Any) -> Any:
         """One more answer, straight through :meth:`call`.
@@ -2486,7 +2702,11 @@ class ReplayMixin:
         the same answer N times and report a noise floor of zero.
         """
         refuse_replay_reask(self.mode, type(self).__name__)
-        return self.call(moment_of(entry), entry.get("prompt"))
+        # Through `interpret`, because `resample` parses what this returns,
+        # and a raw response ask() would have interpreted first is not
+        # always a decision.
+        return self.interpret(self.call(moment_of(entry), entry.get("prompt")),
+                              entry.get("payload"))
 
     def fork_kwargs(self) -> dict[str, Any]:
         kwargs = super().fork_kwargs()
