@@ -60,14 +60,16 @@ two adapters:
 
 | example | trades | return | impact |
 |---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 9 | -1.31% | +0.05 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 9 | -1.31% | +0.05 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 9 | -3.34% | +0.96 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 0 | +0.00% | +0.00 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 10 | -1.16% | +0.04 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 10 | -1.16% | +0.04 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 10 | -2.18% | +0.95 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.64% | +1.24 bps |
 
-Re-measured at 0.8.5 twice over. The default preset moved to pt-v20, and on
-its market the three offline examples trade nothing over ten days, so they
-now run twenty (below). And an agent's fills stopped being counted on every
+Re-measured at 0.8.5 three times over. The default preset moved to pt-v20,
+and on its market the three offline examples trade nothing over ten days, so
+they now run twenty (below). pt-v20 then took its graded arm, which moved
+every row: before it they read callable and openai_agents 9 trades -1.31%
++0.05 bps, pydantic_ai 9 trades -3.34% +0.96 bps, and langgraph no trades. And an agent's fills stopped being counted on every
 tick of a step and reach the market once. On pt-v19 with the fills applied
 once, over ten days, the rows read callable and openai_agents 3 trades
 +1.62% +0.00 bps and pydantic_ai 3 trades +6.24% -1.55 bps; before the fill
@@ -86,7 +88,8 @@ langgraph +0.62% +18.99 bps. The langgraph row reads no trades at all: it
 runs five days, not ten, and on pt-v19's market no name in its roster fell
 more than two per cent over five days on any of them -- the deepest, HELX,
 fell 1.83 per cent on day 1 -- so the rule bought nothing, had nothing to
-trim, and held every day. It still trades nothing on pt-v20. Nothing else
+trim, and held every day. It traded nothing on pt-v20 before its graded
+arm either, and trades once on the arm. Nothing else
 about these examples changed until 0.8.5: the rule, the rosters, the seed
 and the horizons were the ones 0.7.0 shipped, so every difference in the
 table above was the market and not the demonstration.
@@ -96,8 +99,9 @@ five to ten. They share one mean-reversion rule that acts on a five-day
 move past two per cent, and on a five-day run it gets a single usable
 reading -- which was enough on pt-v16's market and was not on pt-v18's,
 whose worst five-day fall over this roster is 1.85 per cent. On pt-v19 ten
-days traded three times. On pt-v20, the default from 0.8.5, no name falls
-two per cent over five days in the first fifteen: 5, 8, 10, 12 and 15 days
+days traded three times. On pt-v20, the default from 0.8.5, as it stood
+before its graded arm, no name falls two per cent over five days in the
+first fifteen: 5, 8, 10, 12 and 15 days
 trade nothing, 20 days nine times with nothing refused, and 25 days meet
 market refusals in two of the three. So twenty. The rule is
 untouched, because lowering its trigger until this market tripped it would
