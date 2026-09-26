@@ -75,11 +75,11 @@ reproduced every row pt-v19 publishes to four places
 drift is +1.14 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
 to 10.3 at its floor, and the three crisis rows are inside their bands.
 
-`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `b0ef10ef`,
-`sha256` from `c22d4a02` to `92c9cb7c` and `bondsSha256` from `522aeb76` to
-`3d5bdd8c`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
+`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `72485a9f`,
+`sha256` from `c22d4a02` to `ac004fea` and `bondsSha256` from `522aeb76` to
+`cac3ff44`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
 mispricing and crowd coefficients. No per-preset digest moves, and pt-v20's
-row is `149d72de`.
+row is `07ab6e0c`.
 
 ### Macro data as the agencies publish it
 
