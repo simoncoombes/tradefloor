@@ -450,8 +450,8 @@ pub fn stationary_opening_for(spec: &CycleSpec, u_phase: f64, u_age: f64) -> (Cy
 
     let mut cumulative = 0.0;
     let mut pick = phases.len() - 1;
-    for k in 0..phases.len() {
-        cumulative += mean[k];
+    for (k, share) in mean.iter().enumerate().take(phases.len()) {
+        cumulative += share;
         if cumulative / cycle >= u_phase {
             pick = k;
             break;

@@ -590,6 +590,7 @@ pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, below: f64, vix: f64, 
     mathx::max(0.0, 1.0 - one_minus)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn return_spike_at_level(
     current: f64,
     gain: f64,
@@ -629,6 +630,7 @@ pub fn return_spike_at_level(
 /// are the Gaussian ones `expected_return_spike` already carries, with the
 /// up side's own order. Same branch as the spike: at the three defaults it
 /// IS `expected_return_spike`, evaluated by that function.
+#[allow(clippy::too_many_arguments)]
 pub fn expected_return_spike_at_level(
     sigma_pct: f64,
     gain: f64,
@@ -679,7 +681,6 @@ pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f6
 /// the "reads `economy.x`, writes `newState.x`" distinction — which is
 /// load-bearing throughout, since many lines read the OLD value after a new
 /// one has been written — impossible to express faithfully.
-
 pub fn update_economy_daily(
     economy: &EconomyState,
     inputs: &DailyInputs,
@@ -2723,7 +2724,7 @@ mod fear_response_shape {
             let mut earliest: Option<(f64, f64)> = None;
             for &vix in LEVELS {
                 if let Some(at) = flattens_at(&p, vix) {
-                    if earliest.map_or(true, |(best, _)| at < best) {
+                    if earliest.is_none_or(|(best, _)| at < best) {
                         earliest = Some((at, vix));
                     }
                 }

@@ -4993,7 +4993,8 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 pub const DEFAULT_PRESET_NAME: &str = "pt-v20";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
-/// certificate recorded.
+/// certificate recorded. Read only by the tests.
+#[cfg(test)]
 const PT_V3_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FAE_77BA_B2AC_7C70u64),
     ("garch_beta", 0x3FE5_EE19_E4CB_5403u64),
@@ -5005,6 +5006,7 @@ const PT_V3_BITS: &[(&str, u64)] = &[
     ("momentum_theta", 0x3FB2_FF2E_48E8_A71Cu64),
 ];
 
+#[cfg(test)]
 const PT_V2_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FB0_319F_E8B2_672Eu64),
     ("garch_beta", 0x3FE7_0C76_769C_A23Fu64),
@@ -7979,7 +7981,7 @@ impl ModelParams {
     /// read by nothing without. Part of [`ModelParams::invariants`].
     fn book_invariants(&self) -> Result<(), String> {
         let y = self.book_depth_coefficient;
-        if !(y >= 0.0 && y <= 10.0) {
+        if !(0.0..=10.0).contains(&y) {
             return Err(format!(
                 "book_depth_coefficient is {y}. It is the latent depth's Y in \
                  Y sigma (Q/V)^delta, a non-negative number of order one; 0.0 \
@@ -7996,21 +7998,21 @@ impl ModelParams {
             }
         }
         let d = self.book_depth_exponent;
-        if !(d >= 0.0 && d <= 1.0) {
+        if !(0.0..=1.0).contains(&d) {
             return Err(format!(
                 "book_depth_exponent is {d}. It is the exponent of the \
                  price-for-size law, in [0, 1]: 0.5 is the square root, 1.0 is \
                  linear, and 0.0 reads as the square root."));
         }
         let r = self.book_depth_reach;
-        if !(r >= 0.0 && r <= 10.0) {
+        if !(0.0..=10.0).contains(&r) {
             return Err(format!(
                 "book_depth_reach is {r}. It is how far the latent depth reaches, \
                  in multiples of daily volume, inside [0, 10]; 0.0 reads as one \
                  day's volume."));
         }
         let h = self.book_refill_half_life;
-        if !(h >= 0.0 && h <= 390.0) {
+        if !(0.0..=390.0).contains(&h) {
             return Err(format!(
                 "book_refill_half_life is {h}. It is a half-life in ticks inside \
                  the 390-tick session, in [0, 390]; 0.0 refills at the next tick."));
@@ -8022,7 +8024,7 @@ impl ModelParams {
                  it is read by nothing without both."));
         }
         let g = self.fill_impact_coefficient;
-        if !(g >= 0.0 && g <= 5.0) {
+        if !(0.0..=5.0).contains(&g) {
             return Err(format!(
                 "fill_impact_coefficient is {g}. It is gamma in gamma sigma Q/V, \
                  non-negative and of order 0.1 to 1 (Almgren et al. 2005 measure \
@@ -8282,7 +8284,7 @@ impl ModelParams {
         for (name, v) in [("quote_model_weight", self.quote_model_weight),
                           ("fair_value_news_share", self.fair_value_news_share),
                           ("fair_value_market_share", self.fair_value_market_share)] {
-            if !(v >= 0.0 && v <= 1.0) {
+            if !(0.0..=1.0).contains(&v) {
                 return Err(format!(
                     "{name} is {v}. It is a weight in [0, 1]; 0.0 as shipped."));
             }
@@ -8302,7 +8304,7 @@ impl ModelParams {
         for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
                           ("news_absorption_drift_half_life",
                            self.news_absorption_drift_half_life)] {
-            if !(v >= 0.0 && v <= 390.0) {
+            if !(0.0..=390.0).contains(&v) {
                 return Err(format!(
                     "{name} is {v}. It is a half-life in ticks inside the 390-tick \
                      session, in [0, 390]; 0.0 is the straight-line spread."));
@@ -9729,7 +9731,7 @@ mod tests {
     }
 
     fn word_at(s: &str, i: usize, word: &str) -> Option<usize> {
-        if s.len() >= i + word.len() && s[i..].as_bytes()[..word.len()].eq_ignore_ascii_case(word.as_bytes()) {
+        if s.len() >= i + word.len() && s.as_bytes()[i..][..word.len()].eq_ignore_ascii_case(word.as_bytes()) {
             Some(i + word.len())
         } else {
             None
@@ -9839,7 +9841,7 @@ mod tests {
                         && rest[i + 3..]
                             .chars()
                             .next()
-                            .map_or(true, |c| !c.is_ascii_alphanumeric())
+                            .is_none_or(|c| !c.is_ascii_alphanumeric())
                 });
             match hit {
                 Some(i) => {
@@ -10059,16 +10061,15 @@ mod tests {
                 // "At `1.0` ... which is what <scope> does" -- indicative,
                 // unlike "at X every preset is bit-identical", which is a
                 // counterfactual about a value no preset need set.
-                if after_trim.starts_with("does")
+                if (after_trim.starts_with("does")
                     || after_trim.starts_with("do ")
-                    || after_trim.starts_with("did")
+                    || after_trim.starts_with("did"))
+                    && s[..i].trim_end().ends_with("what")
                 {
-                    if s[..i].trim_end().ends_with("what") {
-                        let opener = head.strip_prefix("At ").unwrap_or("");
-                        let opener = opener.strip_prefix('`').unwrap_or(opener);
-                        if let Some((v, t)) = number_at(opener, 0) {
-                            push(v, t, presets.clone(), &format!("At {t} ... what {}", &s[i..end]));
-                        }
+                    let opener = head.strip_prefix("At ").unwrap_or("");
+                    let opener = opener.strip_prefix('`').unwrap_or(opener);
+                    if let Some((v, t)) = number_at(opener, 0) {
+                        push(v, t, presets.clone(), &format!("At {t} ... what {}", &s[i..end]));
                     }
                 }
             }

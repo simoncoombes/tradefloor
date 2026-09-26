@@ -349,8 +349,11 @@ pub fn intraday_variance_factor() -> f64 {
 /// this module in the form `factors.rs` asserts `SQRT_TWO_PI`.
 const INV_SQRT_TWO_PI: f64 = 0.3989422804014327;
 
-/// `sqrt(2)`, the argument scale between `erfc` and the normal's tail.
-const SQRT_TWO: f64 = 1.4142135623730951;
+/// `sqrt(2)`, the argument scale between `erfc` and the normal's tail. The
+/// standard library's constant, which is the same double as the literal
+/// `1.4142135623730951` this used to spell out (bits `0x3FF6A09E667F3BCD`,
+/// asserted in the tests below).
+const SQRT_TWO: f64 = std::f64::consts::SQRT_2;
 
 /// The standard normal density at `c`.
 fn standard_normal_pdf(c: f64) -> f64 {
@@ -779,6 +782,7 @@ impl IndexVarianceTerms {
 /// `sector_count` bounds the sector accumulator; a name whose sector index
 /// is outside it contributes no sector term, which is
 /// `SharedFactors::sector`'s own "an absent sector is zero, not a panic".
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance(
     p: &ModelParams,
     names: &[NameVariance],
@@ -808,6 +812,7 @@ pub fn index_conditional_variance(
 ///
 /// Nothing here is computed that the summing form did not compute. This is
 /// a read-only instrument: it adds no draw, no state and no term.
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance_terms(
     p: &ModelParams,
     names: &[NameVariance],
@@ -840,6 +845,7 @@ pub fn index_conditional_variance_terms(
 /// 0.72, and a read-back that priced the stateless forms while the tick
 /// ran the stateful ones would be the same defect this module was written
 /// to close.
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance_terms_with_states(
     p: &ModelParams,
     names: &[NameVariance],
@@ -1195,6 +1201,18 @@ mod tests {
     use super::*;
     use crate::params::PT_V18;
 
+    /// `SQRT_TWO` scales every `erfc` argument in the tail probability, so
+    /// its bits are part of the simulation. It is the standard library's
+    /// `SQRT_2` now, and before that it was the literal `1.4142135623730951`
+    /// (which clippy's `approx_constant` refuses). Both are this double.
+    #[test]
+    fn sqrt_two_is_the_double_the_literal_was() {
+        assert_eq!(SQRT_TWO.to_bits(), 0x3FF6_A09E_667F_3BCD);
+        #[allow(clippy::approx_constant)]
+        let literal: f64 = 1.4142135623730951;
+        assert_eq!(SQRT_TWO.to_bits(), literal.to_bits());
+    }
+
     fn roster() -> Vec<NameVariance> {
         (0..8)
             .map(|i| NameVariance {
@@ -1541,7 +1559,7 @@ mod tests {
         let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
         assert_eq!(terms.factor_raw, beta_w * beta_w * v_f, "factor_raw");
 
-        let mut loaded = vec![0.0; 3];
+        let mut loaded = [0.0; 3];
         for n in names.iter() {
             if n.sector < 3 {
                 loaded[n.sector] +=

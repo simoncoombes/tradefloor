@@ -1277,7 +1277,7 @@ pub fn simulate_market_tick(
             // the change in `s`, and all but that one to the change in `s + v`.
             if dv != 0.0 {
                 let before = s_val;
-                s_val = s_val - dv;
+                s_val -= dv;
                 s_components[i][crate::market::factors::TICK_FAIR_VALUE] += s_val - before;
                 let step = dv - 0.5 * dv * dv;
                 companies[idx].stock.fair_value_offset = Some(v_level + step);

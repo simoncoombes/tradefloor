@@ -78,6 +78,14 @@ jobs:
       - name: The crate passes its own tests
         working-directory: rust
         run: cargo test --release
+      # Every target and every feature, warnings as errors. Plain
+      # `cargo clippy` failed outright on 0.8.5 (a spelled-out sqrt(2) trips
+      # `approx_constant`, which clippy denies by default) and `-D warnings`
+      # found 26 more on the library, because nothing ran it. The allows that
+      # remain in the source each say why at the site.
+      - name: Clippy is clean
+        working-directory: rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   msrv:
     name: cargo check on the declared rust-version

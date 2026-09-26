@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn qe_stock_channel_is_inert_off_and_concave_on() {
         let base = econ(Some(10.0), 3.5, Some(0.05));
-        let mut high = base.clone();
+        let mut high = base;
         high.qe_assets_ratio = Some(2.2);
         let c = co(Some(20.0), Some(4.0), None, Some(0.1));
 
@@ -427,7 +427,7 @@ mod tests {
         assert_eq!(off_base.qe_adjustment.to_bits(), off_high.qe_adjustment.to_bits());
 
         // neutral ratio: no contribution at any gain
-        let mut neutral = base.clone();
+        let mut neutral = base;
         neutral.qe_assets_ratio = Some(1.0);
         assert_eq!(
             compute_target_pe(&c, &neutral, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment.to_bits(),
@@ -438,7 +438,7 @@ mod tests {
         // equally per doubling; concavity in the LEVEL: equal increments of
         // ratio add less and less.
         let term = |r: f64| {
-            let mut e = base.clone();
+            let mut e = base;
             e.qe_assets_ratio = Some(r);
             compute_target_pe(&c, &e, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment
         };

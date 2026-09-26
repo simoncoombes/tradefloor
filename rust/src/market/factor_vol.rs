@@ -1168,7 +1168,7 @@ mod tests {
         // And the boundedness that replaces it: ordered bounds, and a
         // quiet-run fixed point ABOVE the floor, so the floor is a
         // worst-case guarantee rather than a regime.
-        assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE);
+        const { assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE) };
         let quiet_fixed_point = (1.0 - persistence) / (1.0 - MARKET_VOL_BETA);
         assert!(
             quiet_fixed_point > MARKET_VOL_FLOOR_MULTIPLE,

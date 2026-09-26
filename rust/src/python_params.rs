@@ -13,7 +13,7 @@
 //! Everything of substance lives in `crate::params`; this file is the
 //! boundary.
 
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, clippy::useless_conversion)]
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

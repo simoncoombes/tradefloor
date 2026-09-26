@@ -52,3 +52,24 @@ def test_the_crate_declares_the_rust_it_needs_and_ci_builds_on_it():
     assert "msrv" in re.search(r"^  complete:\n.*?needs: \[(.*?)\]",
                                suite(), re.M | re.S).group(1), (
         "`the suite is green` does not wait for the msrv job")
+
+
+def rust_job() -> str:
+    job = re.search(r"^  rust:\n(.*?)(?=^  \S)", suite(), re.M | re.S)
+    assert job, "suite.yml has no rust job"
+    return job.group(1)
+
+
+def test_ci_runs_clippy_on_everything_with_warnings_as_errors():
+    """Clippy runs, on every target and feature, and a warning fails it.
+
+    0.8.5 shipped with plain `cargo clippy --all-targets` exiting 101 on a
+    deny-by-default lint, and 26 more warnings under `-D warnings`, because
+    no workflow ran clippy at all.
+    """
+    runs = [line.strip() for line in rust_job().splitlines()
+            if line.strip().startswith("run: cargo clippy")]
+    assert runs, "the rust job does not run clippy"
+    run = runs[0]
+    for flag in ("--all-targets", "--all-features", "-D warnings"):
+        assert flag in run, f"clippy runs without {flag}: {run}"

@@ -33,8 +33,16 @@ use crate::economy::{create_initial_central_bank_state, create_initial_economy_s
 use crate::economy::{CyclePhase, ForwardGuidance, InitialEconomyOptions};
 use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
 use crate::engine::{TickOutcome};
-use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany};
 use crate::python::ValidationError;
+
+/// One recorded draw as `draw_log` returns it:
+/// `((stream, kind, index), value, day, site, tag)`.
+type DrawLogRow = ((String, String, u64), f64, i64, String, u32);
+
+/// One order as `submit_many` parses it:
+/// `(agent, position in the call, ticker, quantity, limit, id)`.
+type ParsedOrder = (String, usize, String, f64, Option<f64>, Option<String>);
 
 /// Serialise a column as little-endian f64 bytes.
 ///
@@ -314,6 +322,7 @@ impl PyMacro {
         inflation_rate = 0.02, qe_pe_boost = 0.0, qe_assets_ratio = 1.0, fear_greed_index = 50.0,
         cycle = "expansion"
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         vix: f64,
         federal_funds_rate: f64,
@@ -2560,7 +2569,7 @@ impl PyEngine {
     /// `((stream, kind, index), value, day, site, tag)` tuples in the order
     /// they were taken.
     fn draw_log(&self, stream: String, from_day: i64, to_day: i64)
-        -> PyResult<Vec<((String, String, u64), f64, i64, String, u32)>> {
+        -> PyResult<Vec<DrawLogRow>> {
         let id = stream_id(&stream)?;
         Ok(self
             .inner
@@ -4329,7 +4338,7 @@ impl PyEngine {
             for item in items.iter() {
                 let d = item.downcast::<PyDict>()?;
                 let get = |key: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
-                    Ok(d.get_item(key)?)
+                    d.get_item(key)
                 };
                 events.push(NewsEvent {
                     company_id: match get("ticker")? {
@@ -5295,7 +5304,7 @@ impl PyEngine {
     /// Returns one report per order, in the order they were processed. An
     /// order the engine refuses raises, and the orders before it stand.
     fn submit_many(&mut self, py: Python<'_>, orders: Vec<Bound<'_, PyDict>>) -> PyResult<Vec<PyObject>> {
-        let mut parsed: Vec<(String, usize, String, f64, Option<f64>, Option<String>)> = Vec::new();
+        let mut parsed: Vec<ParsedOrder> = Vec::new();
         for (i, d) in orders.iter().enumerate() {
             let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
                 d.get_item(k)?.ok_or_else(|| {
@@ -5680,23 +5689,6 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::OVERNIGHT_COMPONENT_KEY,
     crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
 ];
-
-/// Every field `column()` accepts, in one place.
-///
-/// Declared once so the error message cannot drift from the match arms above
-/// it -- a list of valid names that omits a name it accepts is worse than no
-/// list, because it sends the reader looking for a different mistake.
-/// Index of `random_noise` in the engine's component order.
-///
-/// Found in the engine's own key list rather than written as a literal. Every
-/// component is an f64, so a hard-coded index would keep compiling and start
-/// feeding GARCH the crowd lean the day a component is inserted.
-pub fn random_noise_index() -> usize {
-    FACTOR_NAMES
-        .iter()
-        .position(|name| *name == "random_noise")
-        .expect("random_noise is one of the components")
-}
 
 /// A rate instrument's state in a snapshot, in the order the state hash
 /// walks it (`Engine::state_hash_with_pending`, `manifest.state_hash`).
