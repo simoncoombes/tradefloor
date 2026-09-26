@@ -92,13 +92,18 @@ PRICE_ONLY_EDGE = ("C4a", "C4b")
 ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
            "C1", "C2", "C3", "D1")
 
-#: The twelve more rows pt-v20's long-run verdict grades (box ptv20g4b,
-#: commit 40f3f39, D2 the driven 2020-21 market added in the fifth
-#: registration; the record's `criteria` field names design repo
-#: `programme/ptv20-registration.md`). pt-v20's record carries all
-#: twenty-nine; pt-v19's carries the other seventeen.
+#: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
+#: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
+#: fifth registration) and eleven from the twelfth registration, graded on
+#: box ptv20g6 (the record's `criteria` field names design repo
+#: `programme/ptv20-registration.md`). pt-v20's record carries all forty;
+#: pt-v19's carries the other seventeen.
 REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
-                     "R4", "E1", "D2")
+                     "R4", "E1", "D2",
+                     # The twelfth registration's eleven more, graded on
+                     # pt-v20's arm (box ptv20g6, 40 of 40).
+                     "C10", "F1", "L1", "R5", "R6", "R7a", "R7b", "S1a",
+                     "S1b", "S2", "V1")
 
 
 def counted_rows(horizon_days: int = 252) -> list[str]:
@@ -1175,9 +1180,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     assert rec["mechanism_heldout_seeds"]["reversed"] == []
 
     # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
-    # record carries twenty-eight: the fifteen pt-v19 was adopted under on
+    # record carries forty: the fifteen pt-v19 was adopted under on
     # 2026-09-23, C4a and C4b (added 2026-09-24, design repo
-    # `programme/longrun/CRITERIA.md`, section C4), and the eleven more
+    # `programme/longrun/CRITERIA.md`, section C4), and the twenty-three more
     # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
     # became the default. pt-v19's record reads 15 of 17 with the verdict
     # "fail": it passes the fifteen and fails C4a and C4b, the tape's
@@ -1188,7 +1193,8 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
     assert all(r["pass"] for r in lr["rows"]), [
         r["id"] for r in lr["rows"] if not r["pass"]]
-    assert lr["of"] == 29 and lr["passed"] == 29 and lr["verdict"] == "pass"
+    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
+    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
     assert lr["measured"]["fingerprint"] == envelope.PRESET
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}

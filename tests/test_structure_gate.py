@@ -77,13 +77,18 @@ PRICE_ONLY_EDGE = ("C4a", "C4b")
 ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
            "C1", "C2", "C3", "D1")
 
-#: The twelve more rows pt-v20's long-run verdict grades (box ptv20g4b,
-#: commit 40f3f39, D2 the driven 2020-21 market added in the fifth
-#: registration; the record's `criteria` field names design repo
-#: `programme/ptv20-registration.md`). pt-v20's record carries all
-#: twenty-nine; pt-v19's carries the other seventeen.
+#: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
+#: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
+#: fifth registration) and eleven from the twelfth registration, graded on
+#: box ptv20g6 (the record's `criteria` field names design repo
+#: `programme/ptv20-registration.md`). pt-v20's record carries all forty;
+#: pt-v19's carries the other seventeen.
 REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
-                     "R4", "E1", "D2")
+                     "R4", "E1", "D2",
+                     # The twelfth registration's eleven more, graded on
+                     # pt-v20's arm (box ptv20g6, 40 of 40).
+                     "C10", "F1", "L1", "R5", "R6", "R7a", "R7b", "S1a",
+                     "S1b", "S2", "V1")
 
 
 def record(name: str) -> dict:
@@ -387,9 +392,10 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert "structure bar" in line and "PASS" in line
 
     # The reading the release carries, REPORTED, and asserted so it cannot
-    # change in silence. RE-PINNED at 0.8.5 on pt-v20 (box ptv20g3): PASS on
-    # both panels, k 15 at 252 and k 15 held out (cut 21), median 0.932337
-    # against the tape's 0.929939. pt-v19's fifth composition of 2026-09-23
+    # change in silence. RE-PINNED on pt-v20's graded arm (box ptv20g6):
+    # PASS on both panels, k 15 at 252 and k 15 held out (cut 21), median
+    # 0.930223 against the tape's 0.929939; the same k and 0.932337 before
+    # the arm (box ptv20g3). pt-v19's fifth composition of 2026-09-23
     # read PASS on both at k 18 and k 17, median 0.933726. The
     # fourth composition read PASS at 19 and REFUSED above at 23 held out;
     # the second 20 and 21 (at the cut), the 2026-09-20 record 25 and 22,
@@ -410,9 +416,9 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
             == envelope.CERTIFIED_STRUCTURE[VIX_AR1_ROW])
 
     # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
-    # record carries twenty-eight: the fifteen pt-v19 was adopted under on
+    # record carries forty: the fifteen pt-v19 was adopted under on
     # 2026-09-23, C4a and C4b (added 2026-09-24, design repo
-    # `programme/longrun/CRITERIA.md`, section C4), and the eleven more
+    # `programme/longrun/CRITERIA.md`, section C4), and the twenty-three more
     # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
     # became the default. pt-v19's record reads 15 of 17 with the verdict
     # "fail": it passes the fifteen and fails C4a and C4b, the tape's
@@ -423,7 +429,8 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
     assert all(r["pass"] for r in lr["rows"]), [
         r["id"] for r in lr["rows"] if not r["pass"]]
-    assert lr["of"] == 29 and lr["passed"] == 29 and lr["verdict"] == "pass"
+    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
+    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
     assert set(rec["misses"]) == {"252", "504", "heldout_universe",
@@ -524,8 +531,9 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         # tape's paired +0.0120, on the record box; +0.0071 on the fourth
         # composition and +0.0143 [+0.0064, +0.0280] on the fifth (2026-09-23),
         # reported and not gated by the owner's ruling of that day. pt-v20,
-        # the default since 0.8.5, reads +0.0156 [+0.0041, +0.0270] (box
-        # ptv20g3). (The
+        # the default since 0.8.5, reads +0.0146 [+0.0032, +0.0241] on its
+        # graded arm (box ptv20g6), +0.0156 [+0.0041, +0.0270] before it
+        # (box ptv20g3). (The
         # 2026-09-20 record read -0.0024 [-0.0058, +0.0065]: one pole. The
         # regime level on the VIX law is what makes calm years and a rise.)
         assert row["verdict"] == "matches", row
