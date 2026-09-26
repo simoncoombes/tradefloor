@@ -619,3 +619,58 @@ def test_a_forked_oracle_forgets_the_engine_it_was_reading():
     assert arm.agent._engine is None
     arm.run(days=1)
     assert arm.agent._engine is arm.engine
+
+
+# ---------------------------------------------------------------------------
+# P&L since the fork starts from the mark the arm starts from
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("preset", ("pt-v19", "pt-v20"))
+def test_pnl_since_the_fork_starts_from_the_mark_after_the_last_close(preset):
+    """An arm's `pnl_since` counts only what happened in the arm.
+
+    The last trace row before a fork marks the portfolio before that day's
+    close. On pt-v20 `macro_publication_repricing` re-marks every name at
+    the close, so a P&L measured from the row carried the shared re-mark
+    into each arm: measured here on pt-v20, a buy-and-hold arm read
+    +267.51 before it had run a step, and its first day's P&L -359.48
+    where the worth moved -627.00 from the fork. On pt-v19 the close
+    writes no price, the row and the fork agree, and nothing moves.
+    """
+    world = World(seed=7, universe=list(tf.Universe.random(20, seed=11)),
+                  agent=tf.baselines.BuyAndHold(), model=preset)
+    world.run(days=2)
+    at_fork = world.net_worth()
+    remark = at_fork - world.trace[-1]["net_worth"]
+    if preset == "pt-v20":
+        assert abs(remark) > 1.0, "no re-mark to keep out of the arm"
+    else:
+        assert remark == 0.0
+    (arm,) = world.fork("arm")
+    fresh = arm.summary()
+    assert fresh["value_at_start"] == at_fork
+    assert fresh["pnl_since"] == 0.0
+    arm.run(days=1)
+    after = arm.summary()
+    assert after["value_at_start"] == at_fork
+    assert after["pnl_since"] == after["final_net_worth"] - at_fork
+    # Asked from a step other than the fork's, the window still starts
+    # from the trace row before it, as it always has.
+    assert (arm.summary(since=1)["value_at_start"]
+            == world.trace[0]["net_worth"])
+
+
+def test_a_cohort_arms_pnl_since_starts_from_each_agents_mark_at_the_fork():
+    world = World(seed=7, universe=list(tf.Universe.random(20, seed=11)),
+                  agents={"hold": tf.baselines.BuyAndHold(),
+                          "trend": tf.baselines.Momentum()},
+                  model="pt-v20")
+    world.run(days=2)
+    at_fork = {label: world.net_worth(agent=label)
+               for label in ("hold", "trend")}
+    (arm,) = world.fork("arm")
+    arm.run(days=1)
+    for label, worth in at_fork.items():
+        summary = arm.summary(agent=label)
+        assert summary["value_at_start"] == worth
+        assert summary["pnl_since"] == summary["final_net_worth"] - worth

@@ -4,7 +4,7 @@
  "seed": 20260820,
  "sessions": 60,
  "ticks": 78,
- "note": "One digest per shipped preset, fixed when the preset first ships in a tagged release. Recorded 2026-09-24 on release/0.8.5 for pt-v1 to pt-v19. Before committing, the same harness without the two treasury yields (which 0.8.1 does not report) gave the same digest for all eighteen presets on the published 0.8.1 wheel and on this build, so every preset 0.8.1 shipped replays in 0.8.5 bit for bit. A new preset adds its row; an existing row never changes. pt-v20's row was added on 2026-09-24 when preset/pt-v20 (6059bfd) merged into release/0.8.5, with the other eighteen rows unchanged. pt-v20's row re-recorded 2026-09-24 on fix/ptv20-core when its volume response went from 0.8 to 0.6 (the volume-return correlation crossed its ceiling from 1,260 sessions) and its garch_beta from 0.7905 to 0.85 (the volatility memory); pt-v20 has not shipped in a tagged release, and the other eighteen rows are unchanged.",
+ "note": "One digest per shipped preset, fixed when the preset first ships in a tagged release. Recorded 2026-09-24 on release/0.8.5 for pt-v1 to pt-v19. Before committing, the same harness without the two treasury yields (which 0.8.1 does not report) gave the same digest for all eighteen presets on the published 0.8.1 wheel and on this build, so every preset 0.8.1 shipped replays in 0.8.5 bit for bit. A new preset adds its row; an existing row never changes. pt-v20's row was added on 2026-09-24 when preset/pt-v20 (6059bfd) merged into release/0.8.5, with the other eighteen rows unchanged. pt-v20's row re-recorded 2026-09-24 on fix/ptv20-core when its volume response went from 0.8 to 0.6 (the volume-return correlation crossed its ceiling from 1,260 sessions); pt-v20 has not shipped in a tagged release, and the other eighteen rows are unchanged. pt-v20's row re-recorded again 2026-09-26 on fix/ptv20-final when it took the eighteen dials of the twelfth registration's graded arm (box ptv20vr9): c430bcbb to 07ab6e0c, the digest the same harness gives for from_preset(\"pt-v20\", **arm) on the build before the values were set. The other eighteen rows are unchanged.",
  "presets": {
   "pt-v1": "2ea0e1d010e54e6dbd7f1a999ddac5109ce5c5d473d64613fa63abc8a38941b6",
   "pt-v2": "3eed75860aa8b2714309f238a9e36c1f50f020571dcbafa18b688a49f41b69b5",
@@ -24,7 +24,7 @@
   "pt-v16": "ca52930a131c51e363302114d4b4c0e2c6430eca9555e1265e49188eaf9d7a68",
   "pt-v18": "cc03d3a654b47a02b7ff8a1011b435f333a0e9084ecc7e4a6ad76a62a3978d84",
   "pt-v19": "816eafada02d85bdda5f51bbb4dd575aaad82a4dc5d3454429071d03dc7b4682",
-  "pt-v20": "9befa413f2d805d0d6537d9eea9b4cdfd403ce8b9ba2225d6868c2ee82838b3f"
+  "pt-v20": "07ab6e0c1cea8fe42eb5e801afa0c725f7c6e8e6e1e56ba622eaa1efa9577520"
  },
- "sha256": "f131be87dc5e5d6e621fb0af5805d0da20b07bc95e4534d5591fe789fd09bf3c"
+ "sha256": "87f0b185fb8a84a7038b38065c91034c94e26caaf7e820d1959f292b21c43cc0"
 }

@@ -433,6 +433,23 @@ pub struct EconomyState {
     /// 0.0 (every preset through pt-v19). See
     /// [`crate::params::ModelParams::earnings_cycle_depth`].
     pub earnings_cycle: f64,
+    /// The smoothed log excess of the VIX over `fair_value_vix_knee` that
+    /// the volatility-feedback discount reads when
+    /// `fair_value_vix_half_life` is set. 0.0, and never written, on every
+    /// preset through pt-v19, whose `fair_value_vix_discount` is 0.0.
+    pub vix_feedback: f64,
+    /// What the valuation reads beyond `earnings_cycle`: the anticipated
+    /// level of the earnings cycle over the valuation's horizon minus the
+    /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
+    /// from the phase and `earnings_cycle` and kept current by the engine
+    /// after every change to either, so neither hashed nor snapshotted.
+    pub earnings_anticipation: f64,
+    /// The monthly change the unemployment rate is making from its cyclical
+    /// drivers (the phase's trend and Okun's law), partially adjusted toward
+    /// what they ask for at `ModelParams::unemployment_adjustment_half_life`.
+    /// 0.0, and never read or written, while that dial is 0.0, which every
+    /// preset carries; snapshotted and hashed only while it is set.
+    pub unemployment_impulse: f64,
     /// `economy.marketPE ?? 18` at the cycle-transition sites. Kept optional
     /// because the reference implementation genuinely leaves it unset before the first market
     /// tick, and the `?? 18` there is a real fallback rather than a
@@ -581,6 +598,9 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         previous_day_market_return: 0.0,
         rolling_market_return_30d: 0.0,
         earnings_cycle: 0.0,
+        vix_feedback: 0.0,
+        earnings_anticipation: 0.0,
+        unemployment_impulse: 0.0,
         market_pe: Some(18.0),
 
         qe_pe_boost: 0.0,

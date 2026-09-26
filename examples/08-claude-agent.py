@@ -272,9 +272,18 @@ def main() -> None:
         acc = "     -" if s.explanation_accuracy is None else "%5.0f%%" % (s.explanation_accuracy * 100)
         print("%-16s %12.0f %9.1f %12s" % (s.name, s.pnl, s.impact_bps, acc))
 
-    print("\nCapture against the Oracle:")
-    for name, ratio in tf.capture_ratio(scores).items():
-        print("  %-16s %+.3f" % (name, ratio))
+    print("\nP&L over buy-and-hold:")
+    for name, excess in tf.versus_buy_and_hold(scores).items():
+        print("  %-16s %+12.0f" % (name, excess))
+    # Only where the Oracle is a ceiling: on pt-v20, the default, market
+    # moves mostly stick and no capture ratio is reported.
+    withheld = tf.capture_withheld(scores)
+    if withheld is None:
+        print("\nCapture against the Oracle:")
+        for name, ratio in tf.capture_ratio(scores).items():
+            print("  %-16s %+.3f" % (name, ratio))
+    else:
+        print("\n" + withheld)
 
     print("\nWhat Claude said, and whether the engine agreed:")
     for day, driver, why in claude._log[:5]:

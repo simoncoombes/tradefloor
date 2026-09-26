@@ -4,31 +4,123 @@
 # Calibrated in 0.8.5 to the depth of 2008 (tradefloor-design,
 # programme/ptv20-scenario-size.md). The S&P 500 fell 45 per cent over the
 # 120 sessions from Lehman to March 2009, with the VIX going from 26 to 81,
-# and 57 per cent from the 2007 peak to the March 2009 trough. S&P operating
-# earnings fell about 40 per cent in 2008-09.
+# and 57 per cent from the 2007 peak to the March 2009 trough.
 #
-# MEASURED on pt-v20, the certified roster `Universe.random(40, seed=111)`,
-# its index the cap-weighted closes, every figure paired against the same
-# seed with no scenario, seeds 301-330 (box ptv20g3): the index is -14.5 per
-# cent at 21 sessions after the onset, -30.4 at 63, -37.5 at 85 and -44.7 at
-# 120, and its worst drawdown within 120 sessions is -48.3 (-10.1 without
-# the scenario). The VIX peaks at 70.2 from 17.6, and the corporate yield
-# ends 140 basis points wider. On pt-v20 the preset's own earnings cycle
-# pulls earnings down in a contraction as well, and the two stack.
+# DATED ON 2007-09. Day 50 is December 2007, the NBER peak, and a month is
+# 21 sessions.
+# - The cycle is held in contraction for 315 sessions, to March 2009 and the
+#   S&P 500's low. On day 365 it is set to trough. On day 428, June 2009,
+#   the NBER's trough, it is set to recovery and left to the model's own
+#   cycle. Before this the model's own hazards took it out of the trough,
+#   on days 366 to 644 over seeds 301-330: with the permanent market (below)
+#   one seed in thirty sat in trough for thirteen months and was still
+#   there 24 months after the onset.
+# - Growth is held at -2 per cent through the contraction, then released.
+# - Earnings. The preset's own earnings cycle takes some of every company's
+#   earnings off in a contraction and gives it back in the recovery, at a
+#   60-session half-life: about 18 per cent at pt-v20's depth of 0.2, and
+#   30 at the 0.35 it carried before its graded arm. This file's own cut stacks on it, x0.65 by day 301.
+#   Together they fall 47 to 54 per cent by day 365. S&P 500 operating
+#   earnings, four quarters trailing, fell from $91.47 in the second quarter
+#   of 2007 to $39.61 in the third of 2009, 57 per cent, and were about $84
+#   over 2010 and $96 over 2011, 0.92 and 1.05 of the 2007 peak. The file
+#   holds its cut to day 490, September 2009, the quarter in which trailing
+#   earnings bottomed. It then takes them to x0.96 of their pre-shock level
+#   by day 680 (June 2010) and to x1 by day 932 (June 2011). With the
+#   cycle's own recovery, earnings average 0.92 of their pre-shock level
+#   over days 554 to 805 (calendar 2010) on every dial set below, and about
+#   1.02 over 2011. Until this change they recovered from day 428 and only
+#   to x0.78 after a year, about 0.80 of the peak over 2010.
+# - Credit is 150 basis points wider for the 18 months of the NBER
+#   contraction. It then comes back to its day-50 level over a year, and
+#   eases 110 basis points more over the next 18 months, then is released
+#   to the model's own chain on day 1058. Moody's Baa yield (FRED DBAA) was
+#   6.65 per cent in December 2007, peaked at 9.2 in November 2008, was
+#   back at 6.3 by September 2009, and was 5.25 by December 2011. The fall
+#   back is slower here than in 2009, when it took three months: a fall
+#   that fast put the rise over its band on the leading dials (below) in
+#   the grids this file was tuned on.
 #
-# WHAT IT CANNOT DO. The model prices a company off its current earnings and
-# has no forward-looking valuation, so it falls as earnings fall and not
-# ahead of them. It reaches 2008's depth over months. It cannot fall as fast
-# as March 2020, 29 per cent in 21 sessions, and it cannot look through an
-# earnings dip that a real market expects to reverse.
+# THE FIRST 120 SESSIONS ARE AS RECORDED IN 0.8.5. The earnings cut
+# follows the 0.8.5 path, x0.60 over 252 sessions, for its first 121
+# sessions (to within a rounding of the last bit) and then flattens to x0.65
+# by day 301. So these figures stand: MEASURED on pt-v20, the certified
+# roster `Universe.random(40, seed=111)`, its index the cap-weighted closes,
+# every figure paired against the same seed with no scenario, seeds 301-330
+# (box ptv20g3), the index is -14.5 per cent at 21 sessions after the onset,
+# -30.4 at 63, -37.5 at 85 and -44.7 at 120. Its worst drawdown within 120
+# sessions is -48.3 (-10.1 without the scenario). The VIX peaks at 70.2
+# from 17.6.
+#
+# THE WHOLE PATH, measured on AWS (box rec2grid2), seeds 301-330, 900
+# sessions, on the true phase. The log difference against the unshocked
+# twin, in per cent, mean over seeds:
+#
+#   day                        110   170   300   365   450   599   700   899
+#   leading dials              -40   -57   -80   -74   -63   -30   -12    -7
+#   with the permanent market  -32   -48   -71   -67   -61   -31   -13    -8
+#
+# "Leading dials" is pt-v20 with earnings_anticipation_half_life 126,
+# rate_pe_sensitivity 3, buyback_payout_share 0.75 and the five publication
+# dials (cycle_publication_lag 252, gdp_publication_lag 21,
+# unemployment_adjustment_half_life 84, fear_greed_published_inputs 1,
+# macro_publication_repricing 1). "With the permanent market" adds audit
+# major 5's fix: fair_value_market_share 1, fair_value_market_linear 1,
+# fair_value_market_vol_cap 1.5, opening_market_sigma 0.001 and
+# earnings_cycle_depth 0.2. pt-v20 sets all of these (its graded arm,
+# 2026-09-26), with a volatility-feedback discount, a buyback yield cap and
+# more 10-year noise that these runs did not carry. The paired index is lowest on day 324 on the mean path:
+# -81 log, -56 per cent, on the leading dials; -72 log, -51 per cent, with
+# the permanent market. The index's own drawdown is -60 and -56 per cent.
+# - Recession recovers. Against its twin, the index gains back 57 per cent
+#   (leading dials) and 54 (permanent market) of its log fall in the 252
+#   sessions after its lowest point. After the March 2009 low the S&P 500
+#   gained back 62 per cent (2002-03 43, 1990-91 114, 2020-21 135). The
+#   cycle is out of contraction and trough within 24 months on every seed.
+# - Rise from the low. The index itself rises 76 per cent (leading dials)
+#   and 64 (permanent market) in the 252 sessions after its own low.
+#   The S&P 500 rose 69 per cent from March 2009 (2020-21 75, 2002-03 34,
+#   1990-91 29).
+# - The bands are 45 to 100 per cent and 25 to 80. With the permanent
+#   market the file passes both with room: 9 points on the recovery, 16 on
+#   the rise, against standard errors of 3 and 6 over 30 seeds. On the
+#   leading dials the rise has 4 points. On the permanent market with
+#   anticipation at a 63-session half-life, rate_pe_sensitivity 4, a vol
+#   cap of 1.2 and a depth of 0.25 the two are 57 and 75. About 20 points
+#   of the rise is the twin's own rise over the same year: the index's own
+#   low tends to fall where the shared market noise is low, and the model
+#   reverts from there. The index's own low (median day 297) comes before
+#   the paired one (days 337 to 348), so the rise's year ends earlier than the
+#   recovery's: an earnings recovery that starts early lifts the rise more
+#   than the recovery, one that starts late the other way round.
+# - Why it changed. fair_value_market_share makes the market's own shocks
+#   permanent, so less of the fall reverts by itself and more of the
+#   recovery has to come from earnings and credit. With the earnings path
+#   before this change (x0.78 a year after day 428) the permanent market
+#   gained back 41 per cent of its fall, under the band, rose 55 per cent,
+#   and one seed in thirty stayed in trough past 24 months.
+# - Before audit major 4's fix the file held contraction, growth and credit
+#   for good. The index never recovered: it was -58 to -66 per cent (log)
+#   against its twin 550 sessions after the onset.
+# The grade re-measures the recovery and the rise on pt-v20 as it ships
+# (rows S1a, S1b and S2 of the twelfth registration).
+#
+# WHAT IT CANNOT DO. Without earnings_anticipation_half_life, as on pt-v19,
+# the model prices a company off its current earnings and has no
+# forward-looking valuation. So it falls as earnings fall and not ahead of
+# them, and it reaches 2008's depth over months. It cannot fall as fast as
+# March 2020, 29 per cent in 21 sessions, and it cannot look through an
+# earnings dip that a real market expects to reverse. pt-v20 sets it (126
+# sessions), so a turn of the cycle moves prices at once, and the index
+# turns up with the trough on day 365 and again with the recovery on day
+# 428.
 #
 # Against the file before 0.8.5, which moved this index -5.8 per cent at 120
 # sessions on pt-v19 and -28.7 on pt-v20: growth is held at a level of -2 per
 # cent rather than shifted three points, because a shift refused seeds whose
 # growth was already near the floor; the VIX goes x3.0 rather than x1.5
-# (2008-09 was x3.2); and every company's earnings fall 40 per cent over four
-# quarters, stay down two quarters and recover over four. The earnings path
-# is this file's assumption, set to the 2008-09 operating-earnings fall.
+# (2008-09 was x3.2); and every company's earnings are cut and restored as
+# above. The earnings path is this file's assumption.
 
 version: 1
 
@@ -36,47 +128,88 @@ scenario:
   name: recession
 
   description: >
-    A downturn with an earnings recession, calibrated to 2008's depth: the
-    cycle turns to contraction on day 50, growth is held at -2 per cent, the
-    VIX triples for sixty days, credit widens 150 basis points, and every
-    company's earnings fall 40 per cent over four quarters, stay there two,
-    and recover over four. Example experimental assumptions, not a forecast.
+    A downturn with an earnings recession, dated on 2007-09. The cycle
+    turns to contraction on day 50 and is held there fifteen months. On day
+    365 it is set to trough, and on day 428, the NBER's trough in June 2009,
+    to recovery, and left to the model's own cycle. Growth is held at -2
+    per cent through the contraction, and the VIX triples for sixty days.
+    Credit is 150 basis points wider for eighteen months, then eases back
+    over the next thirty. Every company's earnings fall 35 per cent over
+    four quarters, on top of the preset's own cycle, stay there to
+    September 2009, recover to 96 per cent by June 2010 and the rest by
+    June 2011. Example experimental assumptions, not a forecast.
 
   shocks:
 
+    # The cycle: contraction for 315 sessions, trough on day 365, recovery on
+    # day 428, then the model's own cycle. A `hold` on the phase writes it
+    # every day and stops; the cycle then runs from whatever phase was
+    # written last.
     - target: macro.cycle
       operation: set
       value: contraction
       at: 50
-      shape: permanent
+      shape: hold
+      duration: 315
+
+    - target: macro.cycle
+      operation: set
+      value: trough
+      at: 365
+      shape: impulse
+
+    # June 2009, the NBER's trough: recovery, then the model's own cycle.
+    - target: macro.cycle
+      operation: set
+      value: recovery
+      at: 428
+      shape: impulse
 
     - target: macro.growth
       operation: set
       value: -0.02
       at: 50
-      shape: permanent
+      shape: hold
+      duration: 315
 
-    # The earnings recession: down 40 per cent over four quarters, held two,
-    # back over four. The windows are contiguous, because a gap between them
+    # The earnings recession. Down to x0.65 by day 301: first along the
+    # 0.8.5 path (x0.60 over 252 sessions) for 121 sessions, then flatter.
+    # Held to day 490 (September 2009). Back to x0.96 by day 680, June 2010
+    # (x0.65 times 1.4769...), and to x1 over the next four quarters (times
+    # 1.0416...). The windows are contiguous, because a gap between them
     # restores the pre-shock earnings.
     - target: market.earnings
       operation: multiply
-      value: 0.60
+      value: 0.807936507936508
       at: 50
       shape: ramp
-      duration: 252
+      duration: 121
+
+    - target: market.earnings
+      operation: multiply
+      value: 0.8045186640471513
+      at: 171
+      shape: ramp
+      duration: 131
 
     - target: market.earnings
       operation: multiply
       value: 1.0
       at: 302
       shape: hold
-      duration: 126
+      duration: 189
 
     - target: market.earnings
       operation: multiply
-      value: 1.6666667
-      at: 428
+      value: 1.4769230769230768
+      at: 491
+      shape: ramp
+      duration: 189
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.0416666666666667
+      at: 680
       shape: ramp
       duration: 252
 
@@ -89,10 +222,27 @@ scenario:
       at: 50
       duration: 60
 
-    # Assumed credit response: 150 basis points wider, held. Nothing in the
-    # engine derives this number from the growth path.
+    # Assumed credit response: 150 basis points wider for the 18 months of
+    # the NBER contraction, back to the day-50 level over a year, 110 basis
+    # points under it over the next 18 months, then released. Nothing in the
+    # engine derives these numbers from the growth path.
     - target: macro.corporate_yield
       operation: add
       value: 0.015
       at: 50
-      shape: permanent
+      shape: hold
+      duration: 378
+
+    - target: macro.corporate_yield
+      operation: add
+      value: -0.015
+      at: 428
+      shape: ramp
+      duration: 252
+
+    - target: macro.corporate_yield
+      operation: add
+      value: -0.011
+      at: 680
+      shape: ramp
+      duration: 378

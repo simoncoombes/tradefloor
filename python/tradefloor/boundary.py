@@ -119,7 +119,8 @@ from ._core import Engine, ValidationError, random_instruments
 from .counterfactual import (Agreement, Resample, World, _net, _shape, agree,
                              resample)
 from .interventions import (CYCLES, OPERATIONS, TARGETS, Intervention,
-                            Target, apply_operation, resolve, summarise)
+                            Target, apply_operation, resolve, summarise,
+                            true_macro_fields)
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -202,11 +203,20 @@ def macro_field_of(target: Target) -> str | None:
     scratch engine, and the one key of ``Engine.macro_fields`` that moved
     is the field. ``market.liquidity`` moves none, and is driven through a
     scenario instead. The answer is cached per process.
+
+    The fields compared are the TRUE ones
+    (:func:`tradefloor.interventions.true_macro_fields`), which is what a
+    target reads and writes. Under `gdp_publication_lag` and
+    `cycle_publication_lag`, both set on pt-v20, the published
+    ``macro_fields["gdp_growth"]`` and ``macro_fields["cycle"]`` do not move
+    when the true value is written (the write is released a quarter or a
+    year later), so a comparison of the published fields found no field for
+    ``macro.growth`` or ``macro.cycle`` on the default model.
     """
     if target.name in _FIELD_OF:
         return _FIELD_OF[target.name]
     engine = Engine(seed=0, universe=random_instruments(2, seed=0))
-    before = dict(engine.macro_fields)
+    before = true_macro_fields(engine)
     current = target.read(engine)
     if isinstance(current, tuple):
         nudged = tuple(v * 1.01 for v in current)
@@ -215,7 +225,7 @@ def macro_field_of(target: Target) -> str | None:
     else:
         nudged = next(c for c in CYCLES if c != current)
     target.write(engine, nudged)
-    after = engine.macro_fields
+    after = true_macro_fields(engine)
     moved = sorted(k for k in after if after[k] != before.get(k))
     if len(moved) > 1:
         raise ValidationError(

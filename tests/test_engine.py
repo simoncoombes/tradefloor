@@ -654,4 +654,11 @@ def test_run_until_does_not_close_the_day():
     # fields the close rolls.
     assert not matches(halted, closed, "garch_variance")
     assert not matches(halted, closed, "mispricing_momentum")
-    assert matches(halted, closed, "price")
+    # On pt-v20, the default, the price is one of them: the close re-marks
+    # every traded name to the macro state it publishes
+    # (`macro_publication_repricing`), after the day's last print. What the
+    # halted run holds is that last print, the closed session's last row,
+    # to the bit; before the re-mark the closed engine's price was it too.
+    assert not matches(halted, closed, "price")
+    last_print = arr(closed.session_prices())[-len(universe):]
+    assert list(arr(halted.column("price"))) == list(last_print)

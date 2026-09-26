@@ -231,7 +231,8 @@ factor's variance was funded rather than added, and still above the
 band for a reason about how a universe is generated rather than about
 the price process: a generated roster is deliberately dispersed and
 skews small, which the mega-cap reference biases against, and the real
-crisis year read 45. Prefer ratios -- capture against the oracle,
+crisis year read 45. Prefer relative figures -- P&L over buy-and-hold's,
+capture against the Oracle where it is a ceiling (pt-v19 and before),
 shortfall in basis points -- over raw percentages.
 
 **Volume shocks do not persist, by construction.** Volume CHANGES

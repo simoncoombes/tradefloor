@@ -292,8 +292,21 @@ def test_a_mid_day_pin_reaches_the_index_on_the_next_tick_and_no_sooner():
 
 def test_no_price_reveals_tomorrows_yield():
     """Two engines identical until one's close is given a different 10-year:
-    every index price up to that close agrees to the bit."""
-    a = tf.Engine(seed=8, universe=universe())
+    every index price up to that close agrees to the bit.
+
+    On pt-v19, where the close's macro step reaches prices at the next open.
+    pt-v20 prices it the moment it is published since its graded arm
+    (`macro_publication_repricing`, 2026-09-26), so there the two differ
+    from the close on, by design; the first assertion is the one about
+    tomorrow's yield and holds on both (checked below). Was the default."""
+    b0 = tf.Engine(seed=8, universe=universe(), model="pt-v20")
+    day(b0)
+    b0.open_market()
+    b0.run_session(9, 30, 3, 390)
+    b1 = b0.fork(1)[0]
+    b1.pin_macro(treasury_yield_10y=b1.macro_fields["treasury_yield_10y"] + 0.01)
+    assert b0.prices() == b1.prices()
+    a = tf.Engine(seed=8, universe=universe(), model="pt-v19")
     day(a)
     a.open_market()
     a.run_session(9, 30, 3, 390)
@@ -382,19 +395,26 @@ def test_the_rate_shock_reaches_the_2_year_at_that_evenings_close():
 
 def test_the_rate_shock_reaches_pt_v20s_2_year_over_the_following_weeks():
     """pt-v20's 2-year (``treasury_2y_noise`` 0.022) closes 5 per cent of
-    its gap to the formula each session, so the shock reaches it over
-    weeks rather than that evening. Nothing on day 50; -0.11 per cent
-    below the unshocked world on day 51, where pt-v19 moves -3.45; then a
-    gap that widens every session, -1.30 per cent by day 60 and -2.14 by
-    day 70."""
+    its gap to the formula each session between meetings, so the shock
+    reaches it over the sessions to the next meeting rather than that
+    evening, and the meeting re-anchors it to the formula. Nothing on day
+    50; -0.16 per cent below the unshocked world on day 51, where pt-v19
+    moves -3.45; a gap that widens every session to -0.61 on day 54; then
+    the meeting at day 54's close takes it to -3.50 on day 55.
+
+    RE-MEASURED 2026-09-26 on pt-v20's graded arm. At seed 3 the first
+    meeting after the shock now falls at day 54's close (before, after day
+    70), so the widening runs four sessions, not twenty. Was: -0.11 on day
+    51, widening every session to -2.14 by day 70."""
     scenario = tf.Scenario.load("rate_shock")
     shocked = _scenario_run(scenario, 71, model="pt-v20")
     base = _scenario_run(None, 71, model="pt-v20")
     gap = [s["UST2Y"] / b["UST2Y"] - 1.0 for s, b in zip(shocked, base)]
     assert abs(gap[50]) < 1e-4
     assert -0.002 < gap[51] < -0.0005
-    assert all(gap[d + 1] < gap[d] for d in range(51, 70))
-    assert -0.025 < gap[70] < -0.018
+    assert all(gap[d + 1] < gap[d] for d in range(51, 54))
+    assert -0.008 < gap[54] < -0.004
+    assert -0.040 < gap[55] < -0.030
 
 
 def test_a_held_corporate_yield_holds_the_corporate_index():
@@ -447,12 +467,47 @@ def test_the_60_40_bond_sleeve_takes_the_duration_weighted_hit():
     assert sleeve == pytest.approx(expected, abs=0.004)
 
 
-def test_a_rebalancer_buys_bonds_after_a_shock_that_crosses_its_band():
-    scenario = tf.Scenario.load("curve_shock")
-    agent = Balanced(band=0.02)
+def _banded_through_the_curve_shock(band, model=None):
+    agent = Balanced(band=band)
     tf.evaluate({"banded": agent}, seed=4, universe=universe(16), days=53,
-                steps_per_day=1, ticks_per_step=390, scenario=scenario)
+                steps_per_day=1, ticks_per_step=390,
+                scenario=tf.Scenario.load("curve_shock"), model=model)
+    marks = {d: equity / (equity + bonds) for d, equity, bonds in agent.marks
+             if equity + bonds}
+    return agent, marks
+
+
+def test_a_rebalancer_buys_bonds_after_a_shock_that_crosses_its_band():
+    """The 200bp curve shock on day 50 takes the bond sleeve down 12 per
+    cent at the day's first mark, and a banded 60/40 trades back to target
+    there, buying bonds.
+
+    Where the price takes the rate at the next tick (pt-v20 with
+    `macro_publication_repricing` 0), the day-50 mark sees the bonds' fall
+    and not yet the equities', the equity share reads 0.629 and a 2-point
+    band is crossed. On pt-v20, the default, the scenario's pins re-mark
+    every equity to the higher discount rate the moment they are written,
+    before the open, so the equity sleeve takes its hit at the same mark
+    (604,460 to 567,314) and the share moves only to 0.6125: inside 2
+    points, outside 1. The rebalancer is tested at the band the shock
+    crosses on each; at 1 point it also trades on ordinary drift (days 19
+    and 42), so what is asserted is the day-50 trade and its direction.
+    """
+    agent, marks = _banded_through_the_curve_shock(
+        0.02, tf.ModelParams.from_preset(
+            "pt-v20", macro_publication_repricing=0.0))
     assert 50 in agent.rebalances
+    assert marks[51] < marks[50]
+
+    agent, marks = _banded_through_the_curve_shock(0.02)
+    assert 50 not in agent.rebalances
+    assert 0.01 < marks[50] - 0.6 < 0.02
+
+    agent, marks = _banded_through_the_curve_shock(0.01)
+    assert 50 in agent.rebalances
+    # It sold equity and bought bonds: the next mark is back near target.
+    assert marks[51] < marks[50]
+    assert abs(marks[51] - 0.6) < abs(marks[50] - 0.6)
 
 
 # -- shared machinery ---------------------------------------------------------------

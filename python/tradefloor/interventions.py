@@ -72,7 +72,10 @@ new: 115.00` rather than restating the recipe.
 That read and that write have to be in the same units, or a `multiply` by 1.4
 is a factor of a hundred out on a plausible-looking trajectory. Both go
 through `Engine.macro_fields`, which is the read side of `pin_macro` in
-`pin_macro`'s own denomination, for exactly this reason.
+`pin_macro`'s own denomination, for exactly this reason. One field reads
+elsewhere: under `gdp_publication_lag`, `macro_fields["gdp_growth"]` is the
+last quarter's published mean, so a `macro.growth` operation reads the true
+growth from `state_snapshot()["economy"]`, in the same units.
 """
 
 from __future__ import annotations
@@ -238,6 +241,42 @@ class Target:
         return f"Target({self.name!r}, units={self.units!r})"
 
 
+#: The `macro_fields` keys whose published value can lag the one `pin_macro`
+#: writes, each with the snapshot's economy key that holds the true value.
+#: Under `gdp_publication_lag` `macro_fields["gdp_growth"]` is the last
+#: quarter released, and under `cycle_publication_lag` `macro_fields["cycle"]`
+#: is the phase as published; the engine's own state carries the true ones.
+TRUE_MACRO_FIELDS: dict[str, str] = {"gdp_growth": "gdp_growth",
+                                     "cycle": "cycle_phase"}
+
+
+def true_macro_value(engine: Engine, field: str) -> Any:
+    """The TRUE value of one `macro_fields` key, in `pin_macro`'s units.
+
+    The value `pin_macro` writes. For the keys in :data:`TRUE_MACRO_FIELDS`
+    it is read from ``state_snapshot()["economy"]``, since `macro_fields`
+    reports the published one; for every other key the two are the same
+    field and it is read from `macro_fields`. With both publication lags at
+    0.0 the two reads agree to the bit: the growth is the core's percent
+    over 100 either way, and the phase is the same name.
+    """
+    if field not in TRUE_MACRO_FIELDS:
+        return engine.macro_fields[field]
+    value = engine.state_snapshot()["economy"][TRUE_MACRO_FIELDS[field]]
+    return value / 100.0 if field == "gdp_growth" else value
+
+
+def true_macro_fields(engine: Engine) -> dict[str, Any]:
+    """`Engine.macro_fields` with the true value in place of each published
+    one that can lag (:data:`TRUE_MACRO_FIELDS`): what the economy holds,
+    rather than what has been released of it."""
+    fields = dict(engine.macro_fields)
+    for field in TRUE_MACRO_FIELDS:
+        if field in fields:
+            fields[field] = true_macro_value(engine, field)
+    return fields
+
+
 def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any], None]]:
     """Read and write one pinnable macro field, in `pin_macro`'s own units.
 
@@ -246,9 +285,14 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit.
+    field for field and unit for unit, with two exceptions: `gdp_growth` and
+    `cycle` read the true values from the snapshot, because under
+    `gdp_publication_lag` and `cycle_publication_lag` `macro_fields` reports
+    the published ones.
     """
     def read(engine: Engine) -> Any:
+        if field in TRUE_MACRO_FIELDS:
+            return true_macro_value(engine, field)
         return engine.macro_fields[field]
 
     def write(engine: Engine, value: Any) -> None:
@@ -561,7 +605,9 @@ _register(_make_macro_target(
         "The business-cycle phase. Immediate through the universe's stress "
         "intensity, and it retargets GDP growth, unemployment and the "
         "recession probability at the next monthly step. `set` only: a "
-        "phase is a name. Measured, set to contraction: -3.61%."
+        "phase is a name. Measured, set to contraction: -3.61%. It sets "
+        "the true phase at once; under `cycle_publication_lag` "
+        "`macro_fields[\"cycle\"]` reports it that many sessions later."
     ),
     check=_cycle_check, format=str, numeric=False,
 ))

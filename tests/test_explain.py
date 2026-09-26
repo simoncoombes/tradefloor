@@ -73,7 +73,10 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     names = [child.name for child in result.root.children]
     assert names == list(ex.CONTRIBUTIONS)
     assert list(ex.CONTRIBUTIONS)[:11] == list(tf.Engine.FACTORS)
-    assert list(ex.CONTRIBUTIONS)[11:] == ["fair_value", "book"]
+    # pt-v20's close re-marks the price after the last print
+    # (`macro_publication_repricing`), and `repricing` is that re-mark's
+    # change over the day, so the fourteen reach the price the engine holds.
+    assert list(ex.CONTRIBUTIONS)[11:] == ["fair_value", "book", "repricing"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
 
@@ -94,6 +97,15 @@ def test_the_check_passes_exactly_on_every_preset(preset):
     carries = tf.ModelParams.from_preset(preset).to_dict()[
         "fair_value_news_share"] != 0.0
     assert (shift != 0.0) == carries, (preset, shift)
+    # The close's re-mark is a contribution of its own where the preset
+    # re-marks at publication (pt-v20) and exactly zero where the close
+    # writes no price. Before it joined, pt-v20's replayed close was the
+    # re-marked price and check() compared it with the tape's last print.
+    repricing = next(c.value for c in result.root.children
+                     if c.name == "repricing")
+    remarks = tf.ModelParams.from_preset(preset).to_dict()[
+        "macro_publication_repricing"] != 0.0
+    assert (repricing != 0.0) == remarks, (preset, repricing)
 
 
 def test_the_contributions_sum_to_the_move():
@@ -919,7 +931,11 @@ HAS_PRINTS = hasattr(tf.Engine, "prints")
 #: because the MCP test `importorskip`s an optional extra, so every local
 #: run and every measurement box SKIPPED it, and the pushes to `dev` ran no
 #: CI. The first pull request to run CI on this lineage found it.
-WALK_NODES = (55 + 8 + 3) if HAS_PRINTS else (53 + 8 + 3)
+#:
+#: The two threes are pt-v20's: the fair-value shift's factor, mechanism
+#: and state nodes, then the close's re-mark's (`repricing`), the same
+#: three. Neither takes a draw, so neither adds a replay overlay.
+WALK_NODES = (55 + 8 + 3 + 3) if HAS_PRINTS else (53 + 8 + 3 + 3)
 needs_prints = pytest.mark.skipif(
     not HAS_PRINTS, reason="Engine.prints() is not on this build")
 
@@ -1513,8 +1529,9 @@ def sources(mech) -> str:
 def test_the_table_covers_every_contribution_once():
     # Twelve since the overnight move joined the ten tape columns.
     # Thirteen since pt-v20's fair-value shift joined them.
-    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 13
-    assert len({m.factor for m in ex.MECHANISMS}) == 13
+    # Fourteen since pt-v20's close's re-mark joined them.
+    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 14
+    assert len({m.factor for m in ex.MECHANISMS}) == 14
 
 
 def test_every_mechanism_names_a_rust_function_that_exists():
@@ -1566,6 +1583,8 @@ EXPECTED = {
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
                     "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),
+    "repricing": (("macro_publication_repricing", "buyback_payout_share",
+                   "price_hard_cap"), ("price",)),
 }
 
 
@@ -1610,8 +1629,10 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # which is the point, so the number moving with a dial is correct
     # rather than maintenance.
     # 45 and eleven since the fair-value shift's two joined.
-    assert declared == 45
-    assert sum(1 for m in ex.MECHANISMS if m.dials) == 11
+    # 48 and twelve since the close's re-mark joined with its three: the
+    # switch, and the buyback share and hard cap its fixed point reads.
+    assert declared == 48
+    assert sum(1 for m in ex.MECHANISMS if m.dials) == 12
 
 
 def test_every_declared_state_field_is_a_column_that_its_rust_reads():
@@ -1625,8 +1646,9 @@ def test_every_declared_state_field_is_a_column_that_its_rust_reads():
             declared += 1
     # 18 since the overnight move's three state fields joined.
     # 19 and eleven since the fair-value shift's one joined.
-    assert declared == 19
-    assert sum(1 for m in ex.MECHANISMS if m.state) == 11
+    # 20 and twelve since the close's re-mark joined with the price.
+    assert declared == 20
+    assert sum(1 for m in ex.MECHANISMS if m.state) == 12
 
 
 def test_every_declared_macro_field_is_a_macro_field_that_its_rust_reads():

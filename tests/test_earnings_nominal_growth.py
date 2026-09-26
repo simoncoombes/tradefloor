@@ -157,7 +157,7 @@ UNDERIVABLE = {
 
 
 def _buyback_scale(share: float, grown_eps: float, price: float,
-                   day: int) -> float:
+                   day: int, cap: float = 0.0) -> float:
     """The payout term, in the engine's own spelling.
 
     `market::tick::buyback_scale`, which reads the ALREADY-grown earnings, so
@@ -172,7 +172,11 @@ def _buyback_scale(share: float, grown_eps: float, price: float,
         return 1.0
     if not (price > 0.0) or not math.isfinite(price) or day <= 0:
         return 1.0
-    return math.exp(share * grown_eps / price * day / 252.0)
+    yield_ = share * grown_eps / price
+    # `buyback_yield_cap`: a ceiling on the yield, a branch at 0.0.
+    if cap != 0.0:
+        yield_ = min(yield_, cap)
+    return math.exp(yield_ * day / 252.0)
 
 
 def _derived(instrument, economy, scale: float, model, *,
@@ -225,7 +229,8 @@ def _derived(instrument, economy, scale: float, model, *,
     qe_adjustment = 1.0 + p["qe_pe_gain"] * economy["qe_pe_boost"]
 
     buyback = 1.0 if price is None else _buyback_scale(
-        p["buyback_payout_share"], instrument.eps * scale, price, day)
+        p["buyback_payout_share"], instrument.eps * scale, price, day,
+        p["buyback_yield_cap"])
     total = scale * buyback
 
     eps = instrument.eps * total

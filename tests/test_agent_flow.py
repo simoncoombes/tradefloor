@@ -305,7 +305,24 @@ def test_a_counterfactual_world_applies_the_flow_once(trade, expected, preset):
     world = World(seed=92001, universe=ROSTER, model=preset,
                   agent=BuyOnceThenHold(ticker, shares))
     world.run(days=2)
-    assert world.trace[-1]["net_worth"] == expected[preset]
+    # The reference marks after the run's last close, as evaluate and tca
+    # do, so the World is read at the same point: its portfolio against
+    # its engine once `run` has closed the day.
+    assert world.portfolio.net_worth(world.engine) == expected[preset]
+    # A trace row is the step it records, marked at the prices that
+    # step's session left, before the close. Through pt-v19 the close
+    # writes no price and the two readings are one number. On pt-v20 the
+    # close re-marks every name to the macro state it publishes
+    # (`macro_publication_repricing`), so the last row reads 993,499.87
+    # against 988,202.12 after the close; it is asserted as the mark at its
+    # own prices rather than against the reference.
+    row = world.trace[-1]
+    held = world.portfolio.positions
+    at_row = world.portfolio.cash + sum(
+        position.quantity * row["prices"][world.engine.tickers.index(t)]
+        for t, position in held.items())
+    assert row["net_worth"] == at_row
+    assert (row["net_worth"] == expected[preset]) == (preset == "pt-v19")
     if world.engine.book_live:
         applied_once_in_the_book(world.engine, ticker, {
             world.portfolio.owner: world.portfolio.fills[0]["quantity"]})

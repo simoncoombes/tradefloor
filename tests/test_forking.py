@@ -1052,6 +1052,9 @@ def _nothing_dormant():
                    closing_auction=1.0,
                    flight_to_quality_day=1.0,
                    corporate_yield_daily=1.0,
+                   # The close's macro step priced as it is published, a
+                   # switch too.
+                   macro_publication_repricing=1.0,
                    news_absorption_half_life=0.6,
                    news_absorption_drift_share=0.12,
                    news_absorption_drift_half_life=42.0,
@@ -1066,7 +1069,19 @@ def _nothing_dormant():
                    book_depth_exponent=0.5,
                    book_depth_reach=1.0,
                    book_refill_half_life=27.0,
-                   fill_impact_coefficient=0.314)
+                   fill_impact_coefficient=0.314,
+                   # A whole number of sessions, and short enough that the
+                   # published-phase history turns over inside the run.
+                   cycle_publication_lag=5.0,
+                   # A whole number of sessions, as pt-v20 would carry it;
+                   # tests/test_gdp_publication_lag.py carries the figure
+                   # across a restore through its releases.
+                   gdp_publication_lag=21.0,
+                   # A few months, so the impulse is well short of its drive
+                   # and a restore that lost it would move the next release.
+                   unemployment_adjustment_half_life=84.0,
+                   # A switch.
+                   fear_greed_published_inputs=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

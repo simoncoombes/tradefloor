@@ -97,6 +97,17 @@ p-value computed as though they were would be a precise-looking number built
 on an assumption this library can measure to be false. Counting wins assumes
 almost nothing.
 
+## On pt-v20 there is no capture, and the table reads against buy-and-hold
+
+A capture divides by the Oracle's P&L, and on pt-v20 that is not a ceiling:
+market moves mostly stick, the Oracle made money in 10 of 14 test markets,
+and its P&L follows the market's month (``baselines.ORACLE_NOT_A_CEILING``).
+There `rank` reports no capture at all. :attr:`Ranking.capture_withheld`
+gives the reason, no seed is listed as unmeasurable, and the table sorts on
+each agent's mean P&L over buy-and-hold's in the same market, with the count
+of seeds it came out ahead. The sign test is unchanged, since it never read
+a capture. Every preset through pt-v19 ranks on pooled capture as before.
+
 ## Agents are stateful, so this takes a factory
 
 `Momentum` keeps a rolling window; `RandomTrader` advances a generator. Handing
@@ -123,15 +134,25 @@ class AgentRecord:
     """
 
     __slots__ = ("name", "seeds", "captures", "pnls", "wins",
-                 "reference_pnls")
+                 "reference_pnls", "benchmark_pnls", "capture_withheld")
 
     def __init__(self, name: str, seeds: list[int],
-                 reference_pnls: list[float]) -> None:
+                 reference_pnls: list[float],
+                 benchmark_pnls: list[float | None] | None = None,
+                 capture_withheld: str | None = None) -> None:
         self.name = name
         self.seeds = seeds
         #: The reference's P&L per seed, shared with the ranking. Held here so
         #: a record can pool without reaching back for its parent.
         self.reference_pnls = reference_pnls
+        #: Buy-and-hold's P&L per seed, shared with the ranking, ``None`` on
+        #: a seed where it did not run. The comparison to quote where the
+        #: Oracle is not a ceiling.
+        self.benchmark_pnls: list[float | None] = (
+            benchmark_pnls if benchmark_pnls is not None else [])
+        #: Why no capture is reported, on a preset where the Oracle is not a
+        #: ceiling (``baselines.ORACLE_NOT_A_CEILING``); None elsewhere.
+        self.capture_withheld = capture_withheld
         self.captures: list[float | None] = []
         self.pnls: list[float] = []
         self.wins = 0
@@ -163,7 +184,12 @@ class AgentRecord:
         Seeds where the reference lost money are excluded from both sums --
         see :attr:`Ranking.unmeasurable` -- because a negative denominator
         flips the sign of everything above it.
+
+        None on a preset where the Oracle is not a ceiling
+        (:attr:`capture_withheld`); read :attr:`mean_excess_pnl` there.
         """
+        if self.capture_withheld is not None:
+            return None
         numerator = 0.0
         denominator = 0.0
         for pnl, reference in zip(self.pnls, self.reference_pnls):
@@ -198,7 +224,45 @@ class AgentRecord:
         """Fraction of seeds this agent ranked first on, by P&L."""
         return self.wins / len(self.pnls) if self.pnls else 0.0
 
+    @property
+    def excess_pnls(self) -> list[float | None]:
+        """P&L less buy-and-hold's, per seed; None where it did not run."""
+        return [None if base is None else pnl - base
+                for pnl, base in zip(self.pnls, self.benchmark_pnls)]
+
+    @property
+    def mean_excess_pnl(self) -> float | None:
+        """Mean P&L over buy-and-hold's across the seeds where both ran.
+
+        The headline where the Oracle is not a ceiling. A difference in
+        currency needs no pooling: every agent starts each seed with the
+        same cash, so a seed where the market moved a lot weighs no more
+        here than its difference does. None when buy-and-hold never ran.
+        """
+        values = [v for v in self.excess_pnls if v is not None]
+        return statistics.fmean(values) if values else None
+
+    @property
+    def seeds_ahead(self) -> int | None:
+        """Seeds where this agent earned more than buy-and-hold did."""
+        values = [v for v in self.excess_pnls if v is not None]
+        return sum(1 for v in values if v > 0.0) if values else None
+
     def as_dict(self) -> dict[str, Any]:
+        if self.capture_withheld is not None:
+            # No capture keys at all, rather than None: a missing ratio
+            # cannot be read as a measured zero or sorted as one.
+            return {
+                "name": self.name,
+                "seeds": list(self.seeds),
+                "pnls": list(self.pnls),
+                "excess_pnls": self.excess_pnls,
+                "mean_excess_pnl": self.mean_excess_pnl,
+                "seeds_ahead": self.seeds_ahead,
+                "wins": self.wins,
+                "median_pnl": self.median_pnl,
+                "win_rate": self.win_rate,
+            }
         return {
             "name": self.name,
             "seeds": list(self.seeds),
@@ -212,6 +276,11 @@ class AgentRecord:
         }
 
     def __repr__(self) -> str:
+        if self.capture_withheld is not None:
+            excess = self.mean_excess_pnl
+            shown = f"{excess:+,.0f}" if excess is not None else "n/a"
+            return (f"AgentRecord({self.name!r}, mean_excess_pnl={shown}, "
+                    f"wins={self.wins}/{len(self.pnls)})")
         pooled = self.pooled_capture
         shown = f"{pooled:+.3f}" if pooled is not None else "n/a"
         return (f"AgentRecord({self.name!r}, pooled_capture={shown}, "
@@ -222,12 +291,14 @@ class Ranking:
     """Agent results over a set of seeds, and the comparisons worth making."""
 
     __slots__ = ("records", "seeds", "unmeasurable", "universe_fingerprint",
-                 "oracle", "reference_pnls", "model_fingerprint")
+                 "oracle", "reference_pnls", "model_fingerprint",
+                 "capture_withheld")
 
     def __init__(self, records: dict[str, AgentRecord], seeds: list[int],
                  unmeasurable: list[int], universe_fingerprint: str,
                  oracle: str, reference_pnls: list[float],
-                 model_fingerprint: str = "") -> None:
+                 model_fingerprint: str = "",
+                 capture_withheld: str | None = None) -> None:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
@@ -247,20 +318,32 @@ class Ranking:
         #: agents across different models would compare markets, not
         #: agents. A shipped preset's name or custom-XXXXXXXX.
         self.model_fingerprint = model_fingerprint
+        #: Why no capture is reported, where the model is a preset on which
+        #: the Oracle is not a ceiling (``baselines.ORACLE_NOT_A_CEILING``,
+        #: pt-v20); None elsewhere. When set, no seed is counted in
+        #: :attr:`unmeasurable`, every capture is None, and the table sorts
+        #: on :attr:`AgentRecord.mean_excess_pnl`, P&L over buy-and-hold's.
+        self.capture_withheld = capture_withheld
 
-    def table(self, by: str = "pooled_capture") -> list[AgentRecord]:
+    def table(self, by: str | None = None) -> list[AgentRecord]:
         """Records sorted best-first, ties broken on name.
 
-        Sorts on pooled capture rather than the median of per-seed ratios;
-        :attr:`AgentRecord.pooled_capture` explains why, with the measurement.
+        By default on pooled capture rather than the median of per-seed
+        ratios (:attr:`AgentRecord.pooled_capture` explains why, with the
+        measurement), and on :attr:`AgentRecord.mean_excess_pnl` where the
+        Oracle is not a ceiling (:attr:`capture_withheld`).
 
-        Falls back to median P&L when capture was never measurable, so a
+        Falls back to median P&L when the key was never measurable, so a
         ranking without a working reference still ranks rather than raising.
         """
+        if by is None:
+            by = ("mean_excess_pnl" if self.capture_withheld is not None
+                  else "pooled_capture")
         if by not in ("pooled_capture", "median_capture", "median_pnl",
-                      "win_rate"):
+                      "win_rate", "mean_excess_pnl"):
             raise ValidationError(f"cannot rank by {by!r}")
-        if by in ("pooled_capture", "median_capture") and not any(
+        if by in ("pooled_capture", "median_capture",
+                  "mean_excess_pnl") and not any(
             getattr(r, by) is not None for r in self.records.values()
         ):
             by = "median_pnl"
@@ -320,6 +403,16 @@ class Ranking:
         }
 
     def as_dict(self) -> dict[str, Any]:
+        if self.capture_withheld is not None:
+            return {
+                "seeds": list(self.seeds),
+                "capture_withheld": self.capture_withheld,
+                "universe_fingerprint": self.universe_fingerprint,
+                "model_fingerprint": self.model_fingerprint,
+                "oracle": self.oracle,
+                "reference_pnls": list(self.reference_pnls),
+                "agents": {n: r.as_dict() for n, r in self.records.items()},
+            }
         return {
             "seeds": list(self.seeds),
             "unmeasurable_seeds": list(self.unmeasurable),
@@ -341,6 +434,27 @@ class Ranking:
             + (f" under model {self.model_fingerprint}"
                if self.model_fingerprint else "")
         ]
+        if self.capture_withheld is not None:
+            for record in self.table():
+                excess, ahead = record.mean_excess_pnl, record.seeds_ahead
+                if record.name == "buy_and_hold":
+                    lines.append(f"  {record.name:16s}  the benchmark  "
+                                 f"median pnl {record.median_pnl:+12,.0f}  "
+                                 f"wins {record.wins}/{len(record.pnls)}")
+                    continue
+                if excess is None or ahead is None:
+                    lines.append(f"  {record.name:16s}  no buy-and-hold to "
+                                 f"compare  median pnl "
+                                 f"{record.median_pnl:+12,.0f}")
+                    continue
+                measured = sum(1 for v in record.excess_pnls if v is not None)
+                lines.append(
+                    f"  {record.name:16s}  vs buy-and-hold "
+                    f"{excess:+12,.0f} a seed  ahead {ahead}/{measured}  "
+                    f"wins {record.wins}/{len(record.pnls)}"
+                )
+            lines.append(f"  {self.capture_withheld}")
+            return "\n".join(lines)
         for record in self.table():
             pooled = record.pooled_capture
             span = record.capture_range
@@ -444,7 +558,7 @@ def rank(
     ranking.separation("momentum", "mean_reversion")
     ```
     """
-    from .baselines import capture_ratio
+    from .baselines import capture_ratio, capture_withheld
     from .harness import evaluate
     from .universe_util import as_universe, fingerprint_of
 
@@ -484,18 +598,26 @@ def rank(
     records: dict[str, AgentRecord] = {}
     unmeasurable: list[int] = []
     reference_pnls: list[float] = []
+    benchmark_pnls: list[float | None] = []
+    # One model for every seed, so the first seed's answer is every seed's.
+    withheld = capture_withheld(results[0][1], oracle=oracle)
     for seed, scores in results:
         ratios = capture_ratio(scores, oracle=oracle)
         reference = scores[oracle].pnl if oracle in scores else 0.0
         reference_pnls.append(reference)
-        if not ratios:
+        benchmark_pnls.append(scores["buy_and_hold"].pnl
+                              if "buy_and_hold" in scores else None)
+        # A withheld capture is not an unmeasurable one: the reference may
+        # well have made money. The reason is on the ranking instead.
+        if not ratios and withheld is None:
             unmeasurable.append(seed)
         contenders = {n: c for n, c in scores.items() if n != oracle}
         winner = (max(contenders, key=lambda n: (contenders[n].pnl, n))
                   if contenders else None)
         for name, card in contenders.items():
             record = records.setdefault(
-                name, AgentRecord(name, seed_list, reference_pnls))
+                name, AgentRecord(name, seed_list, reference_pnls,
+                                  benchmark_pnls, withheld))
             record.captures.append(ratios.get(name))
             record.pnls.append(card.pnl)
             if name == winner:
@@ -505,4 +627,4 @@ def rank(
     # name is the one the evaluations actually ran under.
     model_fingerprint = next(iter(results[0][1].values())).model_fingerprint
     return Ranking(records, seed_list, unmeasurable, fingerprint_of(roster),
-                   oracle, reference_pnls, model_fingerprint)
+                   oracle, reference_pnls, model_fingerprint, withheld)

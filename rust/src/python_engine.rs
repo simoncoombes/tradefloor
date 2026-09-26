@@ -278,6 +278,34 @@ pub struct PyMacro {
     pub cycle: String,
 }
 
+/// A snapshot's `economy["gdp_publication"]` block (`gdp_publication_lag`),
+/// every key required.
+fn gdp_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::GdpPublication> {
+    let d = v.downcast::<PyDict>().map_err(|_| {
+        ValidationError::new_err("snapshot economy.gdp_publication is not a dict")
+    })?;
+    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
+        d.get_item(key)?.ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "snapshot economy.gdp_publication has no {key:?} (gdp_publication_lag)"))
+        })
+    };
+    let days: Vec<i64> = need("pending_days")?.extract()?;
+    let values: Vec<f64> = need("pending_values")?.extract()?;
+    if days.len() != values.len() {
+        return Err(ValidationError::new_err(format!(
+            "snapshot economy.gdp_publication has {} pending release days and {} \
+             pending figures (gdp_publication_lag)", days.len(), values.len())));
+    }
+    Ok(crate::engine::GdpPublication {
+        published: need("published")?.extract()?,
+        quarter: need("quarter")?.extract()?,
+        count: need("count")?.extract()?,
+        sum: need("sum")?.extract()?,
+        pending: days.into_iter().zip(values).collect(),
+    })
+}
+
 #[pymethods]
 impl PyMacro {
     #[new]
@@ -581,6 +609,9 @@ impl PyEngine {
         self.day_buffer
             .clamp
             .extend_from_slice(&self.buffer.clamp[..n]);
+        self.day_buffer
+            .repriced
+            .extend_from_slice(&self.buffer.repriced[..n]);
         // Appended only when the session actually carried the arm, so a day
         // that ran without it holds an EMPTY pair rather than a padded one.
         if !self.buffer.unbounded_print.is_empty() {
@@ -900,6 +931,7 @@ struct DayBuffer {
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
+    repriced: Vec<f64>,
     /// Empty on a day whose sessions ran without the depth counterfactual.
     ///
     /// A session that ran with it appends; one that did not appends nothing.
@@ -922,6 +954,7 @@ impl DayBuffer {
         self.shock.clear();
         self.absorbed.clear();
         self.clamp.clear();
+        self.repriced.clear();
         self.unbounded_print.clear();
         self.liquidity_share.clear();
         for column in self.components.iter_mut() {
@@ -2778,6 +2811,11 @@ impl PyEngine {
     /// Rates come back FRACTIONAL, matching what the constructor takes, so a
     /// value read here can be written straight back without a conversion --
     /// which is the whole point of having one denomination at the boundary.
+    ///
+    /// `cycle` is the phase as PUBLISHED: under `cycle_publication_lag`, the
+    /// phase of that many sessions before, so a turn reaches it when it is
+    /// announced. `state_snapshot()["economy"]["cycle_phase"]` is the true
+    /// phase.
     #[getter]
     fn macro_state(&self) -> PyMacro {
         let e = self.inner.economy();
@@ -2789,7 +2827,12 @@ impl PyEngine {
             qe_pe_boost: e.qe_pe_boost,
             qe_assets_ratio: e.qe_assets_ratio,
             fear_greed_index: e.fear_greed_index,
-            cycle: cycle_name(e.cycle_phase).to_string(),
+            // The phase as PUBLISHED: under `cycle_publication_lag` the
+            // phase of that many sessions before, so this `Macro` written
+            // back into a constructor opens where an observer believed the
+            // economy was. `state_snapshot()["economy"]["cycle_phase"]` is
+            // the true phase, for a restore and for an oracle.
+            cycle: cycle_name(self.inner.published_cycle_phase()).to_string(),
         }
     }
 
@@ -2995,6 +3038,9 @@ impl PyEngine {
             vix_sets_variance,
         });
 
+        // What the market stands on before the write, for the re-mark
+        // below; `None` with `macro_publication_repricing` off.
+        let marks = self.inner.published_macro_marks();
         let e = self.inner.economy_mut();
         if let Some(v) = vix {
             e.vix = v;
@@ -3064,15 +3110,30 @@ impl PyEngine {
         if vix.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
         }
+        // A pinned phase is news of a turn, which the anticipated earnings
+        // price at once (`earnings_anticipation_half_life`).
+        self.inner.refresh_earnings_anticipation();
         if corporate_bond_yield.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
         }
+        // A pin is published the moment it is written, so with
+        // `macro_publication_repricing` on the price takes it now rather
+        // than at the next tick (`Engine::reprice_to_published_macro`).
+        self.inner.reprice_to_published_macro(marks);
         Ok(())
     }
 
     /// Whether tonight's close will SET the market factor's variance from
     /// the VIX, because a scenario forced the VIX today with
     /// `vix_sets_variance` on. Cleared by the close.
+    /// The anticipated earnings level's offset over the earnings cycle's
+    /// current level, which the valuation reads beside it
+    /// (`earnings_anticipation_half_life`); 0.0 with it off.
+    #[getter]
+    fn earnings_anticipation(&self) -> f64 {
+        self.inner.economy().earnings_anticipation
+    }
+
     #[getter]
     fn vix_sets_variance_pending(&self) -> bool {
         self.inner.vix_sets_variance_pending()
@@ -3108,6 +3169,13 @@ impl PyEngine {
     /// denomination `pin_macro` takes: fractional rates, VIX in points,
     /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
     /// write it back.
+    ///
+    /// Two exceptions to "read it back": under `cycle_publication_lag`,
+    /// `cycle` is the phase as PUBLISHED, that many sessions late, so a
+    /// phase pinned today reads back only once it is published; and under
+    /// `gdp_publication_lag`, `gdp_growth` is the last quarter's mean growth
+    /// as released, so a pinned growth reaches it only through its quarter.
+    /// `state_snapshot()["economy"]` holds the true values (in percent).
     #[getter]
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
@@ -3127,9 +3195,13 @@ impl PyEngine {
         )?;
         out.set_item("qe_pe_boost", e.qe_pe_boost)?;
         out.set_item("fear_greed_index", e.fear_greed_index)?;
+        // Growth as published (`gdp_publication_lag`): the last quarter
+        // released, its mean daily growth, the growth the economy runs at
+        // with the dial at 0.0. A pin writes the true growth, which reaches
+        // this only through the quarter it falls in.
         out.set_item(
             "gdp_growth",
-            crate::units::percent_to_fraction(e.gdp_growth),
+            crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
         )?;
         out.set_item(
             "unemployment_rate",
@@ -3140,7 +3212,10 @@ impl PyEngine {
             crate::units::percent_to_fraction(e.tariff_rate),
         )?;
         out.set_item("oil_price", e.oil_price)?;
-        out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        // The phase as published (`cycle_publication_lag`): the phase of that
+        // many sessions before, the phase the economy is in at 0.0. A pin
+        // writes the true phase, which this reports once it is published.
+        out.set_item("cycle", cycle_name(self.inner.published_cycle_phase()))?;
         out.set_item(
             "treasury_yield_2y",
             crate::units::percent_to_fraction(e.treasury_yield_2y),
@@ -3810,10 +3885,45 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        // The published-phase history, oldest first, only while
+        // `cycle_publication_lag` keeps one, so every other snapshot is the
+        // dict it was. A restore without it re-seeds from the true phase.
+        if self.inner.params().cycle_publication_lag != 0.0 {
+            let history: Vec<&str> =
+                self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
+            econ.set_item("cycle_history", history)?;
+        }
+        // Unemployment's impulse, in percentage points a month, only while
+        // `unemployment_adjustment_half_life` is set. A restore without it
+        // re-seeds from the economy restored.
+        if self.inner.params().unemployment_adjustment_half_life != 0.0 {
+            econ.set_item("unemployment_impulse", economy.unemployment_impulse)?;
+        }
+        // The published GDP growth figure's state, in the economy's percent,
+        // only while `gdp_publication_lag` is set, so every other snapshot is
+        // the dict it was. `gdp_growth` above is the TRUE daily growth. A
+        // restore without this block re-seeds from the growth restored.
+        if self.inner.params().gdp_publication_lag != 0.0 {
+            let p = self.inner.gdp_publication();
+            let block = PyDict::new_bound(py);
+            block.set_item("published", p.published)?;
+            block.set_item("quarter", p.quarter)?;
+            block.set_item("count", p.count)?;
+            block.set_item("sum", p.sum)?;
+            let days: Vec<i64> = p.pending.iter().map(|&(d, _)| d).collect();
+            let values: Vec<f64> = p.pending.iter().map(|&(_, v)| v).collect();
+            block.set_item("pending_days", days)?;
+            block.set_item("pending_values", values)?;
+            econ.set_item("gdp_publication", block)?;
+        }
         // The aggregate earnings cycle, only when the model moves it, so
         // every earlier preset's snapshot is the dict it was.
         if self.inner.params().earnings_cycle_depth != 0.0 {
             econ.set_item("earnings_cycle", economy.earnings_cycle)?;
+        }
+        // The volatility feedback's smoothed exposure, on the same rule.
+        if self.inner.carries_vix_feedback() {
+            econ.set_item("vix_feedback", economy.vix_feedback)?;
         }
         out.set_item("economy", econ)?;
 
@@ -3886,6 +3996,10 @@ impl PyEngine {
             .get_item("tickers")?
             .ok_or_else(|| ValidationError::new_err("snapshot has no 'tickers'"))?
             .extract()?;
+        // The economy block's published-GDP state, read with the economy and
+        // applied after `day_count`: `None` with no economy block, `Some(None)`
+        // for one without the state.
+        let mut gdp_publication: Option<Option<crate::engine::GdpPublication>> = None;
         if tickers != self.inner.ids() {
             return Err(ValidationError::new_err(
                 "snapshot roster does not match this engine. Columns are                  positional, so restoring across rosters would attach every                  value to the wrong instrument.",
@@ -4361,6 +4475,9 @@ impl PyEngine {
             if let Some(v) = d.get_item("earnings_cycle")? {
                 economy.earnings_cycle = v.extract()?;
             }
+            if let Some(v) = d.get_item("vix_feedback")? {
+                economy.vix_feedback = v.extract()?;
+            }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
                 if trend.len() != 4 {
@@ -4377,6 +4494,50 @@ impl PyEngine {
                     ValidationError::new_err(format!("unknown cycle phase {name:?}"))
                 })?;
             }
+            // Derived from the phase and the level just restored.
+            self.inner.refresh_earnings_anticipation();
+            // The published-phase history (`cycle_publication_lag`). A
+            // snapshot without it, under the dial, re-seeds from the phase
+            // just restored: the phase is then published as it stands.
+            match d.get_item("cycle_history")? {
+                Some(v) => {
+                    let names: Vec<String> = v.extract()?;
+                    let mut history = Vec::with_capacity(names.len());
+                    for name in &names {
+                        history.push(CyclePhase::from_name(name).ok_or_else(|| {
+                            ValidationError::new_err(format!("unknown cycle phase {name:?}"))
+                        })?);
+                    }
+                    self.inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
+                }
+                None => self.inner.seed_cycle_history(),
+            }
+            // Unemployment's impulse (`unemployment_adjustment_half_life`).
+            // Refused where the dial is off; re-seeded from the economy just
+            // restored where the snapshot carries none.
+            match d.get_item("unemployment_impulse")? {
+                Some(v) => {
+                    if self.inner.params().unemployment_adjustment_half_life == 0.0 {
+                        return Err(ValidationError::new_err(
+                            "this snapshot carries an unemployment impulse, and this \
+                             engine's unemployment_adjustment_half_life is 0, so it keeps none"));
+                    }
+                    let impulse: f64 = v.extract()?;
+                    if !impulse.is_finite() {
+                        return Err(ValidationError::new_err(
+                            "this snapshot's unemployment_impulse is not finite"));
+                    }
+                    self.inner.economy_mut().unemployment_impulse = impulse;
+                }
+                None => self.inner.seed_unemployment_impulse(),
+            }
+            // The published GDP growth figure (`gdp_publication_lag`), put
+            // back once `day_count` is: a snapshot without it re-seeds from
+            // the growth just restored, as of the day it was taken.
+            gdp_publication = Some(match d.get_item("gdp_publication")? {
+                Some(v) => Some(gdp_publication_from(&v)?),
+                None => None,
+            });
         }
         if let Some(raw) = snapshot.get_item("central_bank")? {
             let d = raw.downcast::<PyDict>()?;
@@ -4433,6 +4594,13 @@ impl PyEngine {
         // for: something the engine carries drove the market and was not
         // restored with it.
         self.inner.set_current_day(i64::from(self.day_count));
+        match gdp_publication {
+            Some(Some(state)) => {
+                self.inner.set_gdp_publication(state).map_err(ValidationError::new_err)?
+            }
+            Some(None) => self.inner.seed_gdp_publication(i64::from(self.day_count)),
+            None => {}
+        }
 
         // The rate instruments. Required exactly when this engine holds them,
         // and for the same tickers in the same order: a snapshot restored
@@ -4510,6 +4678,12 @@ impl PyEngine {
             None => crate::agent_book::BookState::default(),
         };
         self.inner.set_book_state(book).map_err(ValidationError::new_err)?;
+        // What was written to each price since its last print is tape, not
+        // state: the snapshot does not carry it, and the engine restored
+        // into must not keep its own. So the next print's `repriced` reads
+        // NaN, not known, on a model that can write a price between prints,
+        // and zero on one that cannot.
+        self.inner.forget_repriced();
         Ok(())
     }
 
@@ -4545,6 +4719,7 @@ impl PyEngine {
             shock: self.day_buffer.shock.clone(),
             absorbed: self.day_buffer.absorbed.clone(),
             clamp: self.day_buffer.clamp.clone(),
+            repriced: self.day_buffer.repriced.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
@@ -4559,7 +4734,9 @@ impl PyEngine {
             corporate_bond_yield: crate::units::percent_to_fraction(e.corporate_bond_yield),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
             unemployment_rate: crate::units::percent_to_fraction(e.unemployment_rate),
-            gdp_growth: crate::units::percent_to_fraction(e.gdp_growth),
+            // As published (`gdp_publication_lag`), as `macro_fields`
+            // reports it: the true daily growth with the dial at 0.0.
+            gdp_growth: crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
             qe_pe_boost: e.qe_pe_boost,
             fear_greed_index: e.fear_greed_index,
             universe_stress: self.inner.universe_stress(),
@@ -4626,6 +4803,7 @@ impl PyEngine {
                 shock: Vec::new(),
                 absorbed: Vec::new(),
                 clamp: Vec::new(),
+                repriced: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
             }]
@@ -4795,9 +4973,18 @@ impl PyEngine {
     /// The `prints` table: how each print was arrived at.
     ///
     /// `truth` says what moved fair value. This says what happened between
-    /// fair value and the tape: `shock` is the log distance from the last
-    /// print to the model price, `absorbed` is the log distance from the
-    /// model price to the print, and the two sum to the print's own log move.
+    /// fair value and the tape: `shock` is the log distance from the price
+    /// the tick started from to the model price, `absorbed` is the log
+    /// distance from the model price to the print, and `repriced` is the
+    /// log distance from the last print to the price the tick started from.
+    /// The three sum to the print's own log move. `repriced` is zero except
+    /// where something wrote the price between two prints: the close's
+    /// re-mark to the macro state it publishes and a `pin_macro`'s
+    /// (`macro_publication_repricing`, pt-v20), and the overnight opening
+    /// print (`overnight_variance_ratio`). It is NaN on the first print
+    /// after `restore_state` on
+    /// a model that can write a price between prints, because the snapshot
+    /// does not carry it.
     ///
     ///   `prints()`        every recorded day, one batch each
     ///   `prints(day=N)`   that day alone
@@ -4866,6 +5053,7 @@ impl PyEngine {
                     self.written(&self.buffer.shock),
                     self.written(&self.buffer.absorbed),
                     self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.repriced),
                     self.written(&self.buffer.unbounded_print),
                     self.written(&self.buffer.liquidity_share),
                     depth,
@@ -4910,6 +5098,7 @@ impl PyEngine {
                         &d.shock,
                         &d.absorbed,
                         &d.clamp,
+                        &d.repriced,
                         &d.unbounded_print,
                         &d.liquidity_share,
                         depth,

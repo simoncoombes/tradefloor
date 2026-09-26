@@ -41,8 +41,10 @@ a reader can check by re-deriving it, which :func:`_labels_table` is built
 to make easy.
 
 ``regime`` names the economy's cycle phase (``expansion``, ``peak``,
-``contraction``, ``trough`` or ``recovery``, read from
-:attr:`Engine.macro_state` before the day's close) with a ``-crisis``
+``contraction``, ``trough`` or ``recovery``, the true phase read from
+``Engine.state_snapshot()["economy"]`` before the day's close, not the
+published one ``Engine.macro_state`` reports under
+``cycle_publication_lag``) with a ``-crisis``
 suffix appended on a day whose recorded ``universe_stress`` is above zero.
 ``universe_stress`` is VIX points above the crisis threshold, already
 carried on ``macro.arrow`` and already documented there as the model's own
@@ -145,8 +147,8 @@ TICKS_PER_DAY = 390
 #: values; named here rather than re-typed so the two cannot drift apart.
 HOUR, MINUTE, DAY_OF_WEEK = 9, 30, 3
 
-#: The five names `Engine.macro_state.cycle` returns, per `_core.pyi`'s
-#: `CycleName`. Declared here so a name this build does not recognise
+#: The five names the true phase (`state_snapshot()["economy"]
+#: ["cycle_phase"]`) takes, per `_core.pyi`'s `CycleName`. Declared here so a name this build does not recognise
 #: fails `_regime` by name instead of writing a label nothing can parse.
 CYCLE_NAMES = ("expansion", "peak", "contraction", "trough", "recovery")
 
@@ -227,10 +229,10 @@ def _regime(cycle: str, crisis: bool) -> str:
     """
     if cycle not in CYCLE_NAMES:
         raise ValidationError(
-            f"macro_state.cycle returned {cycle!r}, which is not one of "
+            f"the cycle phase read {cycle!r}, which is not one of "
             f"{CYCLE_NAMES}. Either this build added a cycle phase this "
             "function does not know, or the value did not come from "
-            "Engine.macro_state."
+            "Engine.state_snapshot()['economy']['cycle_phase']."
         )
     return f"{cycle}-crisis" if crisis else cycle
 
@@ -365,7 +367,10 @@ def export(seed: int, *, universe: Sequence[Instrument], days: int,
         # tape and the regime for day `day` have to carry what day `day`
         # actually traded under.
         engine.record(day)
-        cycles.append(engine.macro_state.cycle)
+        # The TRUE phase: under `cycle_publication_lag` `macro_state.cycle`
+        # is the published one, months behind, and a label is the truth an
+        # agent is scored against. The same name at the dial's 0.0.
+        cycles.append(engine.state_snapshot()["economy"]["cycle_phase"])
         engine.close_market()
         # After the close: a leaf commits to the state the NEXT day starts
         # from, which is what makes day d checkable from day d - 1.

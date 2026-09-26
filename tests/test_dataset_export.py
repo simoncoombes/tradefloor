@@ -745,3 +745,26 @@ def test_the_cli_runs_a_small_batch_end_to_end(tmp_path):
     text = card_path.read_text(encoding="utf-8")
     assert "--roster-seed 5" in text
     assert "--seeds 1-2" in text
+
+
+def test_labels_regime_is_the_true_phase_under_the_publication_lag(tmp_path):
+    """A label is what an agent is scored against, so ``regime`` carries the
+    phase the economy traded under, not the one ``macro_state`` publishes
+    ``cycle_publication_lag`` sessions later. A scenario sets contraction on
+    day 2; with the lag at 252 no published phase has moved by day 6."""
+    universe = tf.Universe.random(4, seed=99)
+    model = tf.ModelParams.from_preset("pt-v20", cycle_publication_lag=252.0)
+    probe = tf.Engine(seed=7, universe=list(universe), model=model)
+    opening = probe.macro_fields["cycle"]
+    pinned = "trough" if opening != "trough" else "peak"
+    scenario = tf.Scenario(name="turn").shock(
+        "macro.cycle", operation="set", value=pinned, at=2, duration=100)
+    written = export.export(7, universe=universe, days=6, scenario=scenario,
+                            model=model, out=tmp_path)
+    labels = pa.ipc.open_file(written.files["labels"]).read_all()
+    by_day = {}
+    for day, regime in zip(labels.column("day").to_pylist(),
+                           labels.column("regime").to_pylist()):
+        by_day[day] = regime.removesuffix("-crisis")
+    assert by_day[0] == opening
+    assert all(by_day[d] == pinned for d in range(2, 6)), by_day

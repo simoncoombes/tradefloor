@@ -442,19 +442,47 @@ def test_a_cohort_summary_reads_the_agent_it_names():
 # The reconstruction the diagonal rests on
 # ---------------------------------------------------------------------------
 
-def test_closing_and_opening_a_day_moves_no_price():
-    """`_path` reads the price a step's session left as the next step's
-    opening cross-section, and a day boundary sits between those two reads.
+@pytest.mark.parametrize("preset", ("pt-v19", "pt-v20"))
+def test_each_step_is_priced_from_the_cross_section_it_opened_on(preset):
+    """`_path` reads the cross-section each step opened on, as recorded.
 
-    If a close or an open ever moves a price, that reconstruction is wrong
-    at every day boundary and the diagonal quietly stops being a shortfall.
+    It used to read the price a step's session left as the next step's
+    opening cross-section, with a day boundary between those two reads,
+    which is right only if a close and an open move no price. On pt-v20,
+    the default, the close re-marks every traded name to the macro state it
+    publishes (`macro_publication_repricing`), so the next day's first step
+    opens at the re-marked price, and the reconstruction priced a fill on
+    that step against the wrong baseline. This holds the recorded opening
+    to what the agents were shown, and shows the two reads part at a close
+    on pt-v20 and agree on pt-v19, where the close writes no price.
     """
-    world = World(seed=SEED, universe=roster(), agent=Idle())
+    world = World(seed=SEED, universe=roster(), agent=Idle(), model=preset)
     world.run(days=1)
-    assert world.trace[-1]["prices"] == _prices(world.engine)
-    world.engine.open_market()
-    assert world.trace[-1]["prices"] == _prices(world.engine)
-    world.engine.close_market()
+    last_print = world.trace[-1]["prices"]
+    after_close = _prices(world.engine)
+    assert (last_print == after_close) == (preset == "pt-v19")
+    world.run(days=1)
+    first_of_day = world.steps_per_day
+    assert world._step_opens[first_of_day] == after_close
+    within = world._step_opens[first_of_day + 1]
+    assert within == world.trace[first_of_day]["prices"]
+
+
+def test_a_fill_on_a_days_first_step_is_priced_as_tca_prices_it():
+    """The diagonal against `tca.analyse` where the reconstruction broke:
+    one 200-share buy at step 6, the first step of day 1, three days, on
+    the default. Before `_path` read the recorded openings the diagonal was
+    -24.48 against tca's 8.77, because the baseline row for step 6 was the
+    last print of day 0 and not the price the close re-marked it to."""
+    def agent():
+        return Buyer(0, at=6, shares=200.0)
+
+    reference = tf.tca.analyse(agent(), seed=SEED, universe=roster(), days=3)
+    world = World(seed=SEED, universe=roster(), agents={"alpha": agent()})
+    result = externalities(world, days=3)
+    assert reference.shortfall() != 0.0, "the fixture agent never traded"
+    assert result.diagonal["alpha"] == reference.shortfall()
+    assert result.diagonal_bps["alpha"] == reference.shortfall_bps()
 
 
 def _prices(engine):
@@ -744,7 +772,12 @@ def test_a_pinned_vix_moves_the_corporate_yield_by_nothing():
     change.
     """
     universe = list(tf.Universe.random(8, seed=99))
-    for days in (1, 5, 10, 20):
+    # Up to 16 sessions, the last before the first meeting. Since pt-v20's
+    # graded arm (2026-09-26) the run's first meeting at seed 42 falls on
+    # session 17 (it fell after session 20 before), and a meeting re-anchors
+    # the yield to the formula at the pinned VIX, +39 bp here: the meeting's
+    # rule, not the ratchet this test is about. Was (1, 5, 10, 20).
+    for days in (1, 5, 10, 16):
         e = tf.run_scenario(tf.Scenario().hold(vix=45.0), seed=42,
                             universe=universe, days=days, ticks_per_day=30,
                             model="pt-v20")
@@ -821,17 +854,41 @@ def test_the_cross_name_caveat_reads_exposure_and_not_fills():
     assert pinned.matrix["mover"]["holder"] != 0.0
 
 
-def test_one_day_leaks_nothing_across_disjoint_names():
-    """The reaction has to cross two closes, so one day cannot carry it.
+def test_one_day_leaks_nothing_across_disjoint_names_but_the_close():
+    """The fear gauge's reaction has to cross two closes, so one day cannot
+    carry it; on pt-v20 the close's re-mark carries the macro step at once.
 
-    `tca.py` says a one-day analysis is structurally immune because its
-    final prices predate the first repriced variance target. The same
-    holds here, and it is why the zero matrix at one day is not evidence
-    that the channel is absent.
+    `tca.py` says a one-day analysis is immune to the variance channel
+    because its final prices predate the first repriced variance target.
+    That still holds, and is why the zero matrix at one day is not evidence
+    that the channel is absent: pt-v20 with `macro_publication_repricing`
+    at 0 reads exactly zero here, as pt-v19 does.
+
+    What one day does carry on pt-v20, the default, is the close's re-mark.
+    The agents' flow moves the session's index return, the close's macro
+    step reads it (the VIX, the 10-year's flight to quality and the
+    corporate yield that follows it), and the re-mark prices every name at
+    that step before the day's P&L is marked, so each agent's holdings move
+    with the other's flow at the first close: 0.0120 and 0.0586 here,
+    against -1,523.87 and -400.00 over four days. Isolation at one day
+    therefore means the same macro path: pinning the VIX and the corporate
+    yield in both worlds, the control `test_a_pinned_fear_gauge_removes_
+    the_whole_cross_effect` runs at four and ten days, takes both entries to
+    exactly zero at one.
     """
-    result = _disjoint(days=1)
-    assert result.matrix["low"]["high"] == 0.0
-    assert result.matrix["high"]["low"] == 0.0
+    quiet = _disjoint(days=1, model=tf.ModelParams.from_preset(
+        "pt-v20", macro_publication_repricing=0.0))
+    assert quiet.matrix["low"]["high"] == 0.0
+    assert quiet.matrix["high"]["low"] == 0.0
+
+    remarked = _disjoint(days=1)
+    assert remarked.matrix["low"]["high"] != 0.0
+    assert remarked.matrix["high"]["low"] != 0.0
+
+    same_path = _disjoint(days=1, pins={"vix": 15.0,
+                                        "corporate_bond_yield": 0.055})
+    assert same_path.matrix["low"]["high"] == 0.0
+    assert same_path.matrix["high"]["low"] == 0.0
 
 
 def test_the_matrix_is_the_pnl_the_removal_changed():

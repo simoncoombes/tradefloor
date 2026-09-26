@@ -328,10 +328,16 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
         )
 
     if "oracle" in signals:
+        # Every tool here runs the default preset, so whether the Oracle is
+        # a ceiling is the default's answer.
         out.append(
             "The `oracle` signal is PRIVILEGED: it reads the simulator's own "
-            "fair value, which no real trader can observe. It is a ceiling "
-            "for measuring capture, never a strategy."
+            "fair value, which no real trader can observe. "
+            + ("It is a ceiling for measuring capture, never a strategy."
+               if baselines.oracle_is_ceiling() else
+               "It is a reference agent, never a strategy, and on this preset "
+               "not a ceiling either: market moves mostly stick, so knowing "
+               "fair value leaves little edge.")
         )
 
     if max_leverage is None:
@@ -863,7 +869,21 @@ def evaluate_strategies(
         "scores": rows,
         "ranking_note": "Sorted by return on this ONE market draw.",
     }
-    if include_baselines and "oracle" in scores:
+    withheld = baselines.capture_withheld(scores)
+    if include_baselines and withheld is not None:
+        # The preset's Oracle is no ceiling, so no ratio is sent, not even
+        # an empty one: the headline is buy-and-hold, and the reason is
+        # sent in place of the ratio.
+        result["versus_buy_and_hold"] = {
+            k: round(v, 2)
+            for k, v in baselines.versus_buy_and_hold(scores).items()
+        }
+        result["versus_buy_and_hold_note"] = (
+            "Each entrant's P&L less buy-and-hold's on the same market, in "
+            "currency: above zero, it earned more than owning the market."
+        )
+        result["capture_ratio_withheld"] = withheld
+    elif include_baselines and "oracle" in scores:
         result["capture_ratio"] = {
             k: round(v, 4) for k, v in tf.capture_ratio(scores).items()
         }
@@ -945,6 +965,10 @@ def rank_strategies(
 
     # `table()` is the RANKED order; `records` is a dict, and iterating it
     # would present insertion order as if it were a ranking.
+    if ranking.capture_withheld is not None:
+        return _ranking_against_buy_and_hold(ranking, specs, days, seeds,
+                                             steps_per_day, max_leverage,
+                                             roster, concentrated, uni_doc)
     records = [
         {
             "name": r.name,
@@ -994,6 +1018,73 @@ def rank_strategies(
             "is true only when one won on every paired seed. `unmeasurable` "
             "names entrants the test could not separate -- a real answer, "
             "not a gap."
+        ),
+        "caveats": _caveats(
+            days=days, n_seeds=len(seeds), signals=_signals_in(specs),
+            max_leverage=max_leverage, universe_size=len(roster),
+            sector_concentrated=concentrated,
+        ),
+        "provenance": _provenance(
+            seeds=list(seeds), days=days, steps_per_day=steps_per_day,
+            universe=uni_doc,
+            universe_fingerprint=ranking.universe_fingerprint,
+        ),
+    }
+
+
+def _ranking_against_buy_and_hold(ranking: Any, specs: dict[str, Any],
+                                  days: int, seeds: list[int],
+                                  steps_per_day: int,
+                                  max_leverage: float | None, roster: Any,
+                                  concentrated: bool,
+                                  uni_doc: Any) -> dict[str, Any]:
+    """`rank_strategies`' result on a preset where the Oracle is no ceiling.
+
+    The same shape as the capture version, with every capture field left
+    out rather than sent as None, the buy-and-hold comparison in their
+    place, and the reason in `capture_withheld`.
+    """
+    records = [
+        {
+            "name": r.name,
+            "mean_excess_over_buy_and_hold": (
+                round(r.mean_excess_pnl, 2)
+                if r.mean_excess_pnl is not None else None),
+            "seeds_ahead_of_buy_and_hold": r.seeds_ahead,
+            "median_pnl": round(r.median_pnl, 2),
+            "seeds_first": r.wins,
+        }
+        for r in ranking.table()
+    ]
+    order = [r["name"] for r in records]
+    tests = []
+    for name in specs:
+        for other in order:
+            if other == name:
+                continue
+            try:
+                tests.append(ranking.separation(name, other))
+            except Exception:  # a pair the test cannot form is not an error
+                continue
+    return {
+        "ok": True,
+        "records": records,
+        "seeds": list(ranking.seeds),
+        "paired_sign_tests": tests,
+        "capture_withheld": ranking.capture_withheld,
+        "report": ranking.report(),
+        "reading_note": (
+            "QUOTE `mean_excess_over_buy_and_hold`: the entrant's P&L less "
+            "buy-and-hold's on the same market, averaged over the seeds, "
+            "with `seeds_ahead_of_buy_and_hold` beside it. No capture ratio "
+            "is reported on this preset; `capture_withheld` says why. "
+            "`seeds_first` counts seeds where this entrant ranked FIRST "
+            "among ALL entrants, baselines included -- so it is not a "
+            "head-to-head record, and two entrants that behave identically "
+            "will split it arbitrarily on a tie. For 'is A better than B', "
+            "read `paired_sign_tests`: both traded the SAME market on each "
+            "seed, so the pairing removes the market from the question. "
+            "`decisive` is true only when one won on every paired seed."
         ),
         "caveats": _caveats(
             days=days, n_seeds=len(seeds), signals=_signals_in(specs),

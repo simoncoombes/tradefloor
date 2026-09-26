@@ -472,8 +472,9 @@ class StrategySpec:
         disclosure into the uncitable escape hatch. Its ``top_k`` moves the
         denominator of every capture ratio the library quotes, so a ratio
         published without the oracle's spec fingerprint beside it is not a
-        number anyone can compare. See :class:`tradefloor.baselines.Oracle` for
-        the measurements.
+        number anyone can compare. On pt-v20 the library quotes none
+        (``baselines.ORACLE_NOT_A_CEILING``). See
+        :class:`tradefloor.baselines.Oracle` for the measurements.
         """
         return cls({"kind": "oracle"},
                    portfolio={"top_k": top_k, "gross": gross},

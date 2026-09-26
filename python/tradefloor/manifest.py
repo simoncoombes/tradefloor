@@ -588,6 +588,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # model that can move a level: `Engine::state_hash`'s order and rule.
     if "earnings_cycle" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["earnings_cycle"])
+    # The volatility feedback's smoothed exposure, only on a model with both
+    # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
+    if "vix_feedback" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["vix_feedback"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -656,8 +660,16 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     economy = snapshot["economy"]
     # `earnings_cycle` only on a model with the cycle on; hashed above, beside
-    # the other states a dial turns on.
-    economy_expected = set(_ECONOMY_KEYS) | ({"earnings_cycle"} & set(economy))
+    # the other states a dial turns on. `cycle_history` only on a model with
+    # `cycle_publication_lag` set; hashed after the phase, below.
+    # `gdp_publication` only on a model with `gdp_publication_lag` set;
+    # hashed after the history. `unemployment_impulse` only on a model with
+    # `unemployment_adjustment_half_life` set; hashed before it.
+    # `vix_feedback` only with the volatility feedback smoothed; hashed
+    # after `earnings_cycle`.
+    economy_expected = set(_ECONOMY_KEYS) | (
+        {"earnings_cycle", "cycle_history", "gdp_publication",
+         "unemployment_impulse", "vix_feedback"} & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -681,6 +693,42 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     for value in trend:
         _f64(buf, value)
     _text(buf, economy["cycle_phase"])
+    # The published-phase history, oldest first, LENGTH-PREFIXED, only while
+    # `cycle_publication_lag` keeps one: `Engine::state_hash`'s order and rule.
+    if "cycle_history" in economy:
+        history = list(economy["cycle_history"])
+        _u32(buf, len(history))
+        for phase in history:
+            _text(buf, phase)
+    # Unemployment's impulse, only while `unemployment_adjustment_half_life`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "unemployment_impulse" in economy:
+        _f64(buf, economy["unemployment_impulse"])
+    # The published GDP growth figure's state, only while
+    # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
+    # the pending releases LENGTH-PREFIXED, each its day then its figure.
+    if "gdp_publication" in economy:
+        gdp = economy["gdp_publication"]
+        keys = {"published", "quarter", "count", "sum",
+                "pending_days", "pending_values"}
+        if set(gdp) != keys:
+            raise ValidationError(
+                "this snapshot's gdp_publication is not the one the state "
+                f"hash covers: missing {sorted(keys - set(gdp))}, "
+                f"unexpected {sorted(set(gdp) - keys)}.")
+        days, values = list(gdp["pending_days"]), list(gdp["pending_values"])
+        if len(days) != len(values):
+            raise ValidationError(
+                f"this snapshot's gdp_publication has {len(days)} pending "
+                f"release days and {len(values)} pending figures.")
+        _f64(buf, gdp["published"])
+        _i64(buf, gdp["quarter"])
+        _u32(buf, gdp["count"])
+        _f64(buf, gdp["sum"])
+        _u32(buf, len(days))
+        for day, value in zip(days, values):
+            _i64(buf, day)
+            _f64(buf, value)
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):

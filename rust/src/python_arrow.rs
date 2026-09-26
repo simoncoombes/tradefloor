@@ -319,6 +319,7 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
         Field::new("shock", DataType::Float64, false),
         Field::new("absorbed", DataType::Float64, false),
         Field::new("clamp", DataType::Float64, false),
+        Field::new("repriced", DataType::Float64, false),
     ];
     if depth == DepthColumns::Present {
         fields.push(Field::new("unbounded_print", DataType::Float64, false));
@@ -332,7 +333,14 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
                     breaker's own part and book = absorbed - clamp is the \
                     book's. Read them apart: on a halted print the two pull \
                     opposite ways and often cancel exactly, so absorbed alone \
-                    reads zero on a name the breaker had just moved. ";
+                    reads zero on a name the breaker had just moved. \
+                    repriced is what was written to the price between the \
+                    last print and the tick: the close's re-mark to a \
+                    published macro figure, a pin_macro's re-mark and the \
+                    overnight opening print. repriced + shock + absorbed is \
+                    the print's log move from the last print; it is NaN \
+                    where not known, on the first print after a restore on a \
+                    model that can write a price between prints. ";
     let caveat = match depth {
         DepthColumns::Present => format!(
             "{absorbed}unbounded_print is the same tick settled against every \
@@ -379,6 +387,7 @@ pub fn prints_batch(
     shock: &[f64],
     absorbed: &[f64],
     clamp: &[f64],
+    repriced: &[f64],
     unbounded_print: &[f64],
     liquidity_share: &[f64],
     depth: DepthColumns,
@@ -390,6 +399,7 @@ pub fn prints_batch(
         ("shock", shock.len()),
         ("absorbed", absorbed.len()),
         ("clamp", clamp.len()),
+        ("repriced", repriced.len()),
     ] {
         if len < rows {
             return Err(format!(
@@ -428,6 +438,7 @@ pub fn prints_batch(
         Arc::new(Float64Array::from(shock[..rows].to_vec())),
         Arc::new(Float64Array::from(absorbed[..rows].to_vec())),
         Arc::new(Float64Array::from(clamp[..rows].to_vec())),
+        Arc::new(Float64Array::from(repriced[..rows].to_vec())),
     ];
     if depth == DepthColumns::Present {
         columns.push(Arc::new(Float64Array::from(unbounded_print[..rows].to_vec())));
@@ -721,6 +732,7 @@ pub struct RecordedDay {
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
     pub clamp: Vec<f64>,
+    pub repriced: Vec<f64>,
     /// The depth counterfactual, EMPTY on a day that ran without it. A day
     /// carries its own answer because the arm can be switched between days,
     /// and a table that reported one day's setting for all of them would be

@@ -53,8 +53,12 @@ gives each value's derivation or measurement.
 - The curve. `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
   `corporate_yield_daily` and `treasury_10y_noise`.
 - The market's years. An aggregate earnings cycle (`earnings_cycle_depth`
-  0.35, `_upside` 0.09) with `market_factor_sigma` and
-  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.8.
+  0.2, `_upside` 0.09) with `market_factor_sigma` and
+  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.6.
+- The market's long horizon and looking ahead, below: the market's plain
+  shocks permanent up to a volatility ceiling, volatility feedback, the
+  earnings cycle's expected path in fair value, the rate sensitivity and the
+  buyback share.
 - The book. The seven book dials at depth 0.75, exponent 0.5, reach 1,
   shared, resting, refill 27 ticks and fill impact 0.314, so an agent's
   orders execute in the engine's own book on the default.
@@ -75,11 +79,195 @@ reproduced every row pt-v19 publishes to four places
 drift is +1.14 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
 to 10.3 at its floor, and the three crisis rows are inside their bands.
 
-`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `b0ef10ef`,
-`sha256` from `c22d4a02` to `92c9cb7c` and `bondsSha256` from `522aeb76` to
-`3d5bdd8c`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
+`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `72485a9f`,
+`sha256` from `c22d4a02` to `ac004fea` and `bondsSha256` from `522aeb76` to
+`cac3ff44`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
 mispricing and crowd coefficients. No per-preset digest moves, and pt-v20's
-row is `149d72de`.
+row is `07ab6e0c`.
+
+### Macro data as the agencies publish it
+
+An independent audit of pt-v20 found that timing rules on the reported macro
+data beat buy-and-hold. Holding the roster and going to cash while
+`macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
+over holding, in 30 of 30 21-year histories. The owner decided that macro
+data is published the way the real agencies publish it. The true state
+drives prices, and observers read the published state. Five dials do this,
+each 0 on every preset before pt-v20, and `docs/MODEL.md` gives their rules
+under "True and published state". The snapshot and the state hash carry the
+state a dial adds (`cycle_history`, `gdp_publication`,
+`unemployment_impulse`) only while that dial is set, so every preset before
+pt-v20 replays and hashes as it did.
+
+`cycle_publication_lag` publishes the business-cycle phase that many
+sessions late, as the NBER dates a turn about a year after it happens.
+`macro_fields["cycle"]`, `macro_state.cycle`, a World's trace rows and the
+LLM adapters' observations report the phase of that many sessions before,
+and the opening phase until the lag has passed. Prices, the earnings cycle,
+the cycle's hazards and the central bank read the true phase. A scenario
+that sets the phase sets the true one at once, so `recession.yml`'s
+contraction on day 50 acts on the model that day and is published that many
+sessions later. pt-v20 sets 252 sessions.
+
+`gdp_publication_lag` reports GDP growth as the BEA does, as the mean of the
+true daily growth over each quarter of the macro calendar (63 sessions on
+pt-v20), released that many sessions after the quarter's last day.
+`macro_fields["gdp_growth"]` and `macro_table()`, and so a dataset export's
+`macro.arrow`, carry that figure, and the opening growth before the first
+release. Output, earnings, unemployment and the central bank read the true
+daily growth, and a `macro.growth` intervention and the Oracle's drift now
+read it from `state_snapshot()`. pt-v20 sets 21 sessions.
+
+`unemployment_adjustment_half_life` makes unemployment respond to a turn
+over months. The monthly step moved the rate by the whole of what the
+phase's trend and Okun's law asked for, so the first step after a
+contraction began rose about 1.2 points, four times the spread of a monthly
+change otherwise, and announced the turn. Off zero, an impulse closes
+`1 - 0.5^(month / half_life)` of its gap to that drive at each monthly step,
+with a month of 21 sessions on pt-v20. At 84 sessions the first rise is
+about 0.16 points. It moves the true rate, and so inflation, the central
+bank and the cycle's hazards. pt-v20 sets 84 sessions.
+
+`fear_greed_published_inputs` makes the fear and greed index read the
+published phase and growth. Its target carried a phase bonus (+15 in an
+expansion, -25 in a contraction) and three times the true daily growth, so
+it fell about 35 points in the five sessions after a contraction began. With
+the switch on it moves when the turn is published. Nothing on the price path
+reads the index, so the switch moves no price. pt-v20 sets 1.
+
+`macro_publication_repricing` prices the close's macro step at the moment it
+is published. The policy rate, the corporate yield and the cycle could be
+read after the close, but prices took them only at the next session's first
+tick, so an agent that read a hike sold at the price from before it. With
+the switch on, each traded name is re-marked as the step ends to the price
+its mispricing implies on the new state, and `pin_macro` re-marks the same
+way. The mispricing itself is unchanged and no draw is taken. pt-v20 sets
+1.
+
+The re-mark moves a price between the day's last print and the next
+session, and the tools that read prices now account for it. `prints()` has a
+column, `repriced`: what was written to the price between the last print and
+the tick. `repriced + shock + absorbed` is the print's move from the last
+print. The column is zero through pt-v19, and NaN on the first print after
+`restore_state` on a model that can write a price between prints, since the
+snapshot does not carry it. `Engine.explain` has a fourteenth contribution,
+`repricing`: the change over the day in the gap from the last print to the
+price the close left. `book` is now measured to the last print, and
+`check()` compares last prints. `externalities` prices each fill against the
+prices its step opened on, which a World now records. It used the previous
+step's row, which on pt-v20 is the print before the re-mark, so a fill on a
+day's first step was priced against the wrong baseline (-24.48 against
+tca's 8.77 on one measured trade). `boundary.macro_field_of` compares true
+values, so it finds a field for `macro.cycle` and `macro.growth` under the
+publication lags. None of this moves a price, and every digest is unchanged.
+
+A one-day counterfactual on pt-v20 (`flow_impact`, `tca.analyse`,
+`externalities`) moves untraded names at the first close. The flow moves the
+index return, the close's macro step reads it, and the re-mark prices every
+name at the result. The sessions are identical on those names to the bit,
+and the moves are small (3.4e-5 bps against 0.80 on the traded name in one
+measured analysis). To compare on the same macro path, pin the VIX and the
+corporate yield in both worlds (`tca.analyse(scenario=...)`,
+`World(pins=...)`). `flow_impact` cannot pin; a model with
+`macro_publication_repricing` at 0 writes no price at the close. A World's
+last trace row marks the portfolio before the last close, while `summary()`
+and `evaluate` mark it after. A forked arm's `summary()["pnl_since"]` and
+`value_at_start` start from the net worth marked at the fork, after the last
+shared close. They started from the last trace row, so on pt-v20 each arm's
+P&L carried the shared re-mark: +267.51 on a buy-and-hold arm that had not
+run a step (`tests/test_counterfactual.py`). A difference between two arms
+is unchanged, since both carried it.
+
+For users, the change is in what an observer reads. On pt-v20,
+`macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
+values, and a turn of the cycle reaches `macro_fields`, `macro_state`, trace
+rows and a hosted market log's cycle events that many sessions after it
+happens. A phase or a growth rate written with `pin_macro` reads back from
+`macro_fields` only once it is published. `state_snapshot()["economy"]`
+still holds the true phase and growth. Sandboxed agents cannot read it. Code
+that needs the true state, such as an oracle or a regime label, reads it
+there. Nothing changes on pt-v19 or any earlier preset.
+
+### The market's long horizon
+
+The same audit found the index mean-reverting far faster than the S&P 500.
+Every market-wide shock sat in the mispricing, which reverts, so the ratio
+of the index's five-year variance to five times its one-year variance read
+0.42 against the S&P 500's 0.87 over 1871-2023. Three dials, 0 on every
+preset before pt-v20, change what is permanent.
+
+`fair_value_market_share` moves that share of each market-wide shock into
+the company's fair-value level, beside the stock-level share
+`fair_value_news_share` already moves. `fair_value_market_linear` makes only
+the plain loading on the market draw permanent, which has zero mean in every
+regime; the down-tick tilt, the lagged wire, the crisis injection and the
+crash amplifier stay in the mispricing and revert. `fair_value_market_vol_cap`
+cuts the share above a ceiling on the market's daily sigma, in multiples of
+`market_factor_sigma`, so the excess a fear regime adds reverts, as mean
+reversion in real index returns concentrates in turbulent periods. pt-v20
+sets 1, 1 and 1.5. The earnings cycle then carries less of the index's
+yearly spread, and `earnings_cycle_depth` goes from 0.35 to 0.2, where the
+aggregate fall in a contraction matches Shiller's median of 17 per cent.
+`opening_market_sigma` goes from 0.10 to 0.001.
+
+`fair_value_vix_discount` is a volatility-feedback discount: while the VIX
+is above `fair_value_vix_knee`, every company's fair value is scaled by
+`exp(-gain * beta * ln(vix / knee))`, read from a VIX exposure smoothed over
+`fair_value_vix_half_life` sessions. It has no permanent part, so it
+deepens a crash while fear is high and gives it back as the VIX falls. pt-v20
+sets 0.35, 40 and 5. The snapshot and the state hash carry the smoothed
+exposure only while the gain and the half-life are both set.
+
+`buyback_yield_cap` caps the buyback yield the fair-value term compounds.
+The term reads the yield at today's price, so a company near the 0.01 floor
+read a yield in the hundreds, and on one held-out history the index rose
+86-fold in one close. pt-v20 sets 0.15.
+
+Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
+the earnings cycle's expected path from the cycle's own hazards, so a turn
+of phase moves prices at once and a price trough leads the earnings trough;
+pt-v20 sets 126 sessions. `rate_pe_sensitivity`, the constant 1.5 until
+now, is the P/E compression per unit of yield; pt-v20 sets 3. Both cost the
+index about 1.5 points a year of drift, and pt-v20's `buyback_payout_share`
+goes from a third to 0.75 to restore it. That value is calibrated to the
+drift, not measured: it is a buyback yield of about 4.2 per cent against a
+real 1.5 to 2.0. `treasury_10y_noise` goes from 0.025 to 0.038.
+
+pt-v20's values are the twelfth registration's graded arm (design
+repository, `programme/ptv20-registration.md`), chosen on held-out seeds,
+where it passes all 40 registered rows. `python/tradefloor/provenance.py`
+gives each value's kind and source. Every preset before pt-v20 replays and
+hashes as it did.
+
+### No capture ratio on pt-v20
+
+On pt-v20 market moves mostly stick: each shock moves fair value for good,
+so even perfect knowledge of the model's fair value leaves little edge. The
+Oracle made money in 10 of 14 test markets over 30 days (rosters
+`Universe.random(20, seed=3, 42, 11)`), and its P&L follows the market's
+month. A capture ratio there would measure the month. The Oracle stays in
+`reference_agents` as a reference agent, and the library reports no capture
+ratio on pt-v20. Scores are read against buy-and-hold instead.
+
+`baselines.ORACLE_NOT_A_CEILING` names the presets without a ceiling, each
+with the reason a result gives, and holds pt-v20 alone. The check reads a
+scorecard's `model_fingerprint`, so a custom model keeps the ratio whatever
+preset it was built from. On pt-v20:
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned.
+  `capture_withheld` returns the reason, and the new `versus_buy_and_hold`
+  gives each agent's P&L less buy-and-hold's.
+- `rank` sets `Ranking.capture_withheld`, lists no seed as unmeasurable and
+  leaves the capture keys out of `as_dict()`. The table sorts on
+  `AgentRecord.mean_excess_pnl`, the mean P&L over buy-and-hold's, with
+  `seeds_ahead` beside it, and `report()` prints both and the reason.
+- The MCP tools `evaluate_strategies` and `rank_strategies` send no capture
+  field. They send the buy-and-hold comparison and the reason
+  (`capture_ratio_withheld`, `capture_withheld`), and the Oracle caveat
+  calls it a reference agent.
+
+On pt-v19 and every earlier preset each of these reports the capture ratio
+as before. `oracle_is_ceiling(model)` answers for a preset name, a
+`ModelParams` or the default.
 
 ### The flow fix and its measurement
 
@@ -344,13 +532,32 @@ four quarters, holds them two and restores them over four. The index is
 -44.7 per cent at 120 sessions, the depth of 2008 (-45 from Lehman to March
 2009), where the old file read -5.8 on pt-v19 and -28.7 on pt-v20.
 
+The recession also ends. As first recalibrated it held the cycle in
+contraction for good, so the index was still about 60 per cent (log) under
+its unshocked twin two years on. It now holds contraction for 15 months,
+sets the cycle to trough on day 365 and to recovery on day 428, the NBER's
+trough in June 2009, then lets the model's own cycle run. Growth is
+released at the trough. Credit comes back over the following 30 months
+along Moody's Baa yield of 2009-11. The file's earnings cut stacked on
+pt-v20's own earnings cycle, so it now flattens to x0.65 after its first
+121 sessions. It holds there to September 2009, the quarter in which S&P
+500 trailing operating earnings bottomed ($39.61 against $91.47 in 2007),
+and recovers to x0.96 by June 2010 and x1 by June 2011, so earnings
+average 0.92 of their pre-shock level over 2010, as the S&P's did ($84).
+The first 120 sessions, and every figure above, are unchanged. On the
+leading dials with the permanent market of audit major 5, the index gains
+back 54 per cent of its fall against its twin within a year of its lowest
+point (the S&P 500 gained back 62 per cent after March 2009) and rises 64
+per cent from its own low (the S&P 69), on seeds 301-330; 51 and 70 on
+seeds 201-230. The file records the whole path.
+
 `liquidity_crisis.yml` takes the VIX x3.5 where it went x2.0 and cuts
 earnings 15 per cent over two months, back over four, with depth and credit
 as before. The index is -10.0 per cent at 21 sessions and -33.9 at worst,
 against March 2020's -28.8 and -33.9, where the old file read -1.5 at 21
 sessions. The model prices a company off its current earnings with no
 forward-looking valuation, so it cannot fall as fast as March 2020 did, and
-each file says so. The fingerprints are `sha256:ba41a923...` and
+each file says so. The fingerprints are `sha256:c0cbfcb7...` and
 `sha256:7d8c8cc8...`. `rate_shock.yml` keeps its shocks and its fingerprint.
 
 The earnings shocks write through `Engine.set_fundamentals`, which the order

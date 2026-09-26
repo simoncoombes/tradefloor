@@ -158,6 +158,13 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "fair_value_market_linear": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "fair_value_market_vol_cap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 32.0)},
+    "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
+    "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down
@@ -658,6 +665,17 @@ PARAM_SPECS: dict[str, dict] = {
     "earnings_cycle_upside": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "earnings_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (1.0, 2520.0)},
     "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
+    "earnings_anticipation_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 5040.0)},
+    "rate_pe_sensitivity": {"kind": "rel", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": False},
+    # A switch whose identity is the value: 1.0 prices a macro decision the
+    # moment it is readable (pt-v20 audit finding 3).
+    "macro_publication_repricing": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": True},
     "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
     # on an agent's path, so no untraded statistic moves with any of them.

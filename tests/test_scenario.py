@@ -826,3 +826,37 @@ def test_an_undefined_percentage_move_is_refused_rather_than_sorted():
     assert sorted(values)[0] != min(values) or max(values) != 3.0, (
         "a NaN no longer breaks sort/min/max; the guard in compare() can go"
     )
+
+
+def test_the_packaged_recession_ends():
+    """The recession holds contraction for fifteen months, writes a trough,
+    then a recovery on the NBER's trough date, and lets the cycle go on
+    (audit major 4: it used to pin contraction, growth and credit for good,
+    so the index never recovered). Nothing in it is permanent, its last word
+    on the cycle is a recovery written once on day 428 (June 2009), and the
+    model's own cycle then carries the economy on. The recovery is written
+    rather than left to the trough's hazards, which on one seed in thirty
+    held the economy in trough for thirteen months."""
+    scenario = Scenario.load("recession")
+    assert all(item.shape != "permanent" for item in scenario.interventions)
+    cycle = sorted((item for item in scenario.interventions
+                    if item.target == "macro.cycle"), key=lambda item: item.at)
+    assert [(item.value, item.shape) for item in cycle] == [
+        ("contraction", "hold"), ("trough", "impulse"),
+        ("recovery", "impulse")]
+    assert cycle[1].at == cycle[0].last_day + 1
+    assert cycle[2].at == 428
+
+    engine = tradefloor.Engine(
+        seed=2, universe=list(tradefloor.Universe.random(8, seed=1)))
+    phases = []
+    for day in range(460):
+        scenario.apply(engine, day)
+        engine.run_days(1)
+        # The TRUE phase: pt-v20, the default, publishes the phase 252
+        # sessions late since its graded arm (2026-09-26), and the scenario
+        # sets the phase the economy is in. Was macro_fields["cycle"].
+        phases.append(engine.state_snapshot()["economy"]["cycle_phase"])
+    assert phases[cycle[1].at] == "trough"
+    assert phases[cycle[2].at] == "recovery"
+    assert phases[-1] in ("recovery", "expansion")

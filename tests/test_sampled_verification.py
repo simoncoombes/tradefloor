@@ -199,6 +199,28 @@ def _mutations(label, value):
         # only empty list this walk met before draw addressing added a
         # second one, and it is not this field's shape.
         yield label, [(0, 0, 0, 0.5)]
+    elif isinstance(value, dict) and "ticker" not in value:
+        # A nested block, walked field by field: the economy's
+        # `gdp_publication` (the published figure, the quarter, its count
+        # and sum, the pending releases), which pt-v20 carries since its
+        # graded arm (2026-09-26) set `gdp_publication_lag`. Before that no
+        # snapshot the walk met nested a dict below the economy.
+        for key, inner in value.items():
+            if key in ("pending_days", "pending_values") and not inner:
+                continue
+            for sub, moved in _mutations(f"{label}.{key}", inner):
+                yield sub, {**value, key: moved}
+        if not value.get("pending_days") and "pending_days" in value:
+            # No release pending: the two lists move together, as one
+            # release, since a day without a figure is not a state.
+            yield (f"{label}.pending_days[]",
+                   {**value, "pending_days": [1], "pending_values": [1.0]})
+    elif isinstance(value, list) and value and all(
+            isinstance(v, (int, float)) and not isinstance(v, bool)
+            for v in value) and label.startswith("economy.gdp_publication."):
+        for i, element in enumerate(value):
+            yield (f"{label}[{i}]",
+                   value[:i] + [_moved(element)] + value[i + 1:])
     elif isinstance(value, list) and value:
         for i, element in enumerate(value):
             yield (f"{label}[{i}]",
@@ -240,7 +262,14 @@ def _walk(snapshot):
 CONDITIONAL_KEYS = {"pt-v20": {"vix_anchor_slow", "fair_value_offset",
                                "opening_z"},
                     "pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
-CONDITIONAL_ECONOMY_KEYS = {"pt-v20": {"earnings_cycle"}}
+#: Since its graded arm (2026-09-26) pt-v20's economy also carries the
+#: state its publication dials and the volatility feedback add: the phase
+#: history, the published GDP figure, the unemployment impulse and the
+#: smoothed VIX exposure. Was {"earnings_cycle"}.
+CONDITIONAL_ECONOMY_KEYS = {"pt-v20": {"earnings_cycle", "cycle_history",
+                                       "gdp_publication",
+                                       "unemployment_impulse",
+                                       "vix_feedback"}}
 
 
 @pytest.mark.parametrize("preset", sorted(CONDITIONAL_KEYS))
@@ -280,7 +309,8 @@ def test_the_hash_moves_when_any_snapshot_field_moves(preset):
         set(mf._SNAPSHOT_KEYS) | CONDITIONAL_KEYS[preset])
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("columns.")} == set(mf._STATE_HASH_COLUMNS)
-    assert {name.split(".", 1)[1] for name in named
+    # The economy key, not a nested block's field under it.
+    assert {name.split(".")[1] for name in named
             if name.startswith("economy.")} == (
                 set(mf._ECONOMY_KEYS)
                 | CONDITIONAL_ECONOMY_KEYS.get(preset, set()))

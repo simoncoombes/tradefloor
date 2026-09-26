@@ -555,6 +555,260 @@ safe-haven bid (`usd_crisis_vix_threshold`, chosen).
 Gold, copper, housing, confidence, the fear and greed index and the trade
 balance are computed each day and read by nothing on the price path.
 
+### True and published state
+
+The economy's true state drives prices. An observer reads the state as
+published, which can follow the true state the way the real agencies
+publish it. The NBER dates a turn of the business cycle months after it
+happens: it announced the December 2007 peak on 1 December 2008 and the June
+2009 trough on 20 September 2010. The BEA's first estimate of a quarter's GDP
+growth comes about a month after the quarter ends.
+
+Five dials, added in 0.8.5 and 0 on every preset through pt-v19, act on
+this. Two publish the phase and GDP growth late. One makes the true
+unemployment rate turn over months instead of in one monthly step. One
+points the fear and greed index at the published figures, and one prices a
+macro step at the moment it is published. They answer an independent audit
+of pt-v20, which found that timing rules on the reported macro data beat
+buy-and-hold. Holding the roster and going to cash while
+`macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
+over holding, in 30 of 30 21-year histories (design repository,
+`programme/handover-2026-09-25/audit/pt-v20-audit.md`, finding 1).
+
+| Figure | The true value is read by | The published value is read by |
+|---|---|---|
+| business-cycle phase | the phase hazards and phase terms of the macro step, the central bank, the spread multiplier, the earnings cycle and its anticipation, the stress intensity; a pin writes it; `state_snapshot()["economy"]["cycle_phase"]` | `macro_fields["cycle"]`, `macro_state.cycle`, a World's trace rows, the LLM adapters' observations, the fear and greed index under its switch |
+| GDP growth | output, earnings, unemployment, the phase hazards, the central bank; a pin writes it; `state_snapshot()["economy"]["gdp_growth"]`, the `macro.growth` intervention's read, the Oracle's drift | `macro_fields["gdp_growth"]`, `macro_table()` and so a dataset export's `macro.arrow`, the fear and greed index under its switch |
+
+Every other field of `macro_fields` reports the value the engine holds. The
+policy rate is known from the meeting that sets it, and yields, the VIX and
+oil are market prices, known as they print. Inflation and unemployment change
+only at the monthly step and are reported on the close that computes them,
+where the BLS publishes both a week or two after the month. A sandboxed
+agent's market view serves `macro_fields` through an allowlist of published
+fields and refuses `state_snapshot()`, which carries the true state.
+
+With every dial at 0 the published value is the true one, the snapshot and
+the state hash are the ones they were before 0.8.5, and every known-answer
+digest is unchanged.
+
+### The published phase
+
+**Timescale:** at every close. **State:** the phases of the last $L_c + 1$
+closes, oldest first.
+
+With `cycle_publication_lag` $L_c$ in sessions, the phase published after
+close $d$ is the true phase $L_c$ closes before:
+
+```math
+\hat{\mathcal{P}}_d = \mathcal{P}_{\max(d - L_c,\ 0)}
+```
+
+$\mathcal{P}_0$ is the opening phase, the one the run opens in after the
+burn-in and the stationary opening draw, so it stays published until $L_c$
+sessions have closed (`engine.rs:1340-1345`). At the end of each close's
+macro step, after the cycle and the central bank, the engine appends the
+phase to the history and drops the oldest (`engine.rs:1392-1401`,
+`engine.rs:5047`). The burn-in runs the same step, and the construction then
+refills the history with the opening phase (`engine.rs:1185`).
+
+A scenario or a `pin_macro` that sets the phase sets the true phase at once,
+so prices, the earnings cycle and the hazards react as they did before. The
+new phase is published $L_c$ closes after the first close it holds for, and
+a pinned phase reads back from `macro_fields["cycle"]` only then. The
+packaged `recession.yml`, for example, sets contraction on day 50 and trough
+on day 365, and an observer reads them about $L_c$ sessions later. A
+turn announced in a World's trace rows or a hosted market log's cycle events
+arrives on the same schedule.
+
+`state_snapshot()["economy"]["cycle_phase"]` stays the true phase. While
+$L_c > 0$ the economy block also carries `cycle_history`, the $L_c + 1$ phase
+names oldest first, and the state hash takes the history after the phase, as
+a `u32` length then each name (`engine.rs:6501-6506`,
+`manifest.state_hash`). A restore refuses a history of the wrong length, or
+any history on an engine whose lag is 0. A snapshot without one, restored
+under the dial, refills the history with the restored phase, so that phase is
+published at once.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `cycle_publication_lag` $L_c$ | 0, off; a whole number of sessions up to 2520. pt-v20 sets 252 | chosen | the NBER's announcement delay, about a year for the 2007-09 recession; the owner's ruling of 2026-09-25 |
+
+### Published GDP growth
+
+**Timescale:** a quarterly figure, released at a close. **State:** the
+figure published, the quarter being averaged (its index, the closes in it
+and their sum), and the averaged quarters waiting for release.
+
+With `gdp_publication_lag` $L_g$ in sessions, growth is reported as a
+quarterly figure. Quarter $k$ is the days $kq$ to $(k+1)q - 1$ of the macro
+calendar, with $q = 63$ on pt-v19 and pt-v20 (90 on the 365-day calendar
+of the presets before pt-v19), and day 0, the opening, is the first day of quarter 0.
+$g_d$ is the true growth after close $d$, and $g_0$ the opening growth. A
+quarter's figure is its mean, released on the close $L_g$ sessions after its
+last day:
+
+```math
+\bar g_k = \frac{1}{q} \sum_{d = kq}^{(k+1)q - 1} g_d,
+\qquad
+\hat g_d = \begin{cases} g_0 & d < q - 1 + L_g \\ \bar g_{k^{\ast}},\quad k^{\ast} = \max\lbrace k : (k+1)q - 1 + L_g \le d \rbrace & \text{otherwise} \end{cases}
+```
+
+(`engine.rs:1229-1234`, `engine.rs:1298-1325`). The step runs at the end of
+each close's macro step, after the phase is recorded (`engine.rs:5051`):
+the close's growth joins its quarter, the first close of a new quarter queues
+the last one's mean, and every figure due by that close is released. The
+construction seeds the figure with the opening growth after the burn-in
+(`engine.rs:1187`). A pin on growth writes the true growth, which reaches the
+published figure only through the mean of the quarter it falls in.
+
+The daily growth steps at every change of phase: the growth shock on entering
+a contraction is $-(2 + 2U)$ points (see
+[Growth and output](#growth-and-output)), so a daily figure gave the turn
+away on the day it happened. A quarterly mean released late dilutes and
+delays that step as the real figure does.
+
+`state_snapshot()["economy"]["gdp_growth"]` stays the true daily growth.
+While $L_g > 0$ the economy block also carries `gdp_publication`, with the
+keys `published`, `quarter`, `count`, `sum`, `pending_days` and
+`pending_values`, in the economy's percent. The state hash takes it after the
+unemployment impulse below: the published figure, the quarter, the count, the
+sum, then a `u32` count of pending releases and each one's day and figure
+(`engine.rs:6515-6526`). A restore refuses the block on an engine whose lag
+is 0, a quarter with no close in it, a non-finite figure and releases out of
+order. A snapshot without it, restored under the dial, publishes the
+restored growth and averages its quarter from the restore day on.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `gdp_publication_lag` $L_g$ | 0, off (growth reported daily); a whole number of sessions up to 2520. pt-v20 sets 21 | chosen | the BEA's advance estimate, about a month after the quarter; the owner's ruling of 2026-09-25 |
+
+### Unemployment's adjustment
+
+**Timescale:** monthly. **State:** the impulse $m$, the monthly change the
+rate is making from its cyclical drivers, in points a month.
+
+[Unemployment](#unemployment) moves at each monthly step by the NAIRU pull,
+the noise and its cyclical drive in full,
+
+```math
+D = 0.3\,\theta^{u}_{\mathcal{P}} + 0.2\,(2 - g) - 0.08\,g\,\mathbf{1}[\mathcal{P} \in \lbrace E, R\rbrace,\ g > 1]
+```
+
+(`economy/daily.rs:662-672`), where $g$ is the month's growth after its
+monthly step. So the first monthly step of a contraction carried a rise of
+about 1.2 points, four times the spread of a monthly change otherwise, and
+announced the turn within a month (desk seeds 201 to 212, 2026-09-25). With
+`unemployment_adjustment_half_life` $H_u$ in sessions, the drive reaches the
+rate through a partial adjustment (`economy/daily.rs:833-857`):
+
+```math
+m_d = m + a\,(D - m),
+\qquad
+a = 1 - 0.5^{M / H_u},
+\qquad
+u_d = \mathrm{clip}\big(u + m_d + 0.06\,(u^{\ast} - u) + 0.06\,Z;\ 2.5,\ 15\big)
+```
+
+$M$ is the macro month in sessions, 21 on pt-v19 and pt-v20. The NAIRU pull
+and the noise are as before, and the noise draw is taken in the same place. The impulse opens at the drive of the starting economy,
+before the burn-in, which then runs it (`engine.rs:1170`,
+`engine.rs:1204-1213`). At $H_u = 84$ sessions, $a = 0.159$, and the first
+monthly rise of a contraction is about 0.16 points on the same seeds. US
+unemployment rose from 4.3% to 5.5% over the 2001 recession and from 5.0% to
+9.5% from December 2007 to June 2009, by 0.1 to 0.3 points in each first
+month.
+
+This dial moves the true unemployment rate, not a published copy of it, and
+so moves everything that reads the rate: inflation, confidence, the central
+bank and the phase hazards. While $H_u > 0$ the snapshot's economy block
+carries `unemployment_impulse`, and the state hash takes it after the phase
+history and before the GDP figure (`engine.rs:6509-6511`). A restore refuses
+it on an engine whose half-life is 0, and re-seeds it from the restored
+economy when a snapshot has none.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `unemployment_adjustment_half_life` $H_u$ | 0, off; up to 2520 sessions. pt-v20 sets 84 | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
+
+### The fear and greed index
+
+**Timescale:** daily. **State:** the index $F \in [0, 100]$.
+
+```math
+F_d = \mathrm{clip}\big(F + 0.25\,(B - F) + 2\,Z;\ 0,\ 100\big),
+\qquad
+B = 50 + 3\,g' - 0.8\,(X - 15) + b(\mathcal{P}') + 5\,r_d
+```
+
+(`economy/daily.rs:1674-1699`). $r_d$ is the day's index return in percent,
+and the phase bonus $b$ is E +15, P +5, C -25, T -20, R +10. The index feeds
+consumer confidence and gold (`economy/daily.rs:952`,
+`economy/daily.rs:1252`), and through confidence the housing figures and
+copper. Nothing a price, the central bank, the cycle or a draw reads is
+downstream of it. It is reported as `macro_fields["fear_greed_index"]` and
+`macro_state.fear_greed_index`.
+
+With `fear_greed_published_inputs` off, $\mathcal{P}'$ and $g'$ are the true
+phase and growth, so the index fell about 35 points in the five sessions
+after a contraction began and announced the turn to anyone reading it. With
+the switch on they are the published phase and growth as of the previous
+close, read before the step (`engine.rs:4973-4977`), so the index steps when
+the turn is published. The switch adds no state, and with both publication
+lags at 0 it changes nothing. On desk seeds 201 to 212, with the cycle lag at
+252, the GDP lag at 21 and the unemployment half-life at 84, a rule that trades a five-session
+fall in the index beat holding in 1 of 12 histories with the switch on,
+against 9 of 12 with it off.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `fear_greed_published_inputs` | 0, off; a switch, 0 or 1. pt-v20 sets 1 | derived | the real index is built from market data and dates no recession |
+
+### Repricing at publication
+
+**Timescale:** at the end of each close's macro step, and at each
+`pin_macro`.
+
+The macro step runs after the close, and its results are readable from then
+on: the meeting's policy rate, the corporate yield it re-anchors, output and
+the cycle. Fair value reaches the price only at the next session's first
+tick, so an agent acting before that tick trades at the price from before the
+decision. On pt-v20 with the leading dials (anticipation 126 sessions, rate
+sensitivity 3, buyback share 0.75), the index fell 76 bp (se 5) in the first
+65 minutes after a published hike and rose 171 bp (se 36) after a cut
+(pt-v20 audit, finding 3). Event studies place the S&P 500's whole response to
+an FOMC statement inside a 30-minute window (Gurkaynak, Sack and Swanson
+2005; Bernanke and Kuttner 2005).
+
+With `macro_publication_repricing` on, each public, solvent name that has
+traded is re-marked as the step ends (`engine.rs:5458-5466`,
+`engine.rs:5476-5573`). With $P$ its last print, $V_0$ its fair value before
+the step and $V_1$ after it, both computed as the tick computes them on the
+same day (`market/tick.rs:1696-1728`), the new price solves
+
+```math
+P' = \mathrm{clip}\Big(\frac{P}{V_0}\,V_1(P');\ 0.01,\ P_{\max}\Big)
+```
+
+$P_{\max}$ is the 50,000 price cap (`price_hard_cap`). $V_1$ reads the price
+through the buyback term, so the engine iterates from
+$P' = P V_1(P) / V_0$ until a step moves nothing, at most 16 times; with the
+buyback share at 0 the first step is exact. The mispricing $s$ is left as it
+was, so the next tick starts on the model price the new state implies. The
+day's high, low and market cap follow the new price. A `pin_macro` re-marks
+the same way, around its write (`python_engine.rs:3030`,
+`python_engine.rs:3108-3109`).
+
+The re-mark reads the true state the step leaves, as the next tick would.
+The policy rate and the corporate yield are published as they are set, so
+for them the two agree. For the phase it prices only what the next tick
+would, and publishes nothing. It takes no draw and adds no state: the price
+it writes is already in the snapshot and the state hash.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `macro_publication_repricing` | 0, off; a switch, 0 or 1. pt-v20 sets 1 | derived | pt-v20 audit, finding 3; FOMC event studies |
+
 ### The economy's outputs
 
 1. **The corporate bond yield** $y^{c}$, as the discount rate in fair value (`fair_value.rs:143-148`). The engine always supplies it, so the fallback to the policy rate never runs.
@@ -622,15 +876,16 @@ What follows from this:
 
 - **Rates.** $\partial \ln V / \partial r = -1.5 D_i / R$. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 1.5% to 2.7%, depending on its growth. Loss-makers do not move.
 - **Earnings growth** comes only from nominal output and buybacks. Revenue growth sets duration and nothing else. There are no dividends.
-- **Buybacks** add about $\kappa E/P$ a year, about 1.9% at a typical earnings yield. They retire no shares.
+- **Buybacks** add about $\kappa E/P$ a year, about 1.9% at a typical earnings yield. They retire no shares. The yield is read at the current price and applied over every elapsed session, so a company whose price falls toward the 0.01 floor reads a yield in the hundreds. Under `buyback_yield_cap` $\bar b$ the yield in $B$ is $\min(\kappa E_i n_d / P_{i,t-1},\ \bar b)$ (`market/tick.rs:270-277`). pt-v20's $\kappa$ of 0.75 is about 4.2% a year at the same earnings yield, and its cap of 0.15 binds only on a company priced under five times earnings.
 - Nominal output grows 4.8% a year over a long run, against 4.8% in the US 1990 to 2025 (design note results/macro-cycle §0). On pt-v20 the index returns 5.7% a year over 21 years against a target of 6.25% (row B8), and its annual returns have a standard deviation of 16.8% against the S&P 500's 17.4% (row B9).
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
 | $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2652-2694`); see [Known gaps](#known-gaps) |
 | $\eta$ | `earnings_nominal_growth` | 1.0 | derived | holds the earnings share of nominal output constant |
-| $\kappa$ | `buyback_payout_share` | 0.3333 | chosen | US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs:2840-2862`); no error bar |
-| | rate sensitivity | 1.5 | chosen | reference implementation |
+| $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
+| $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | guard | keeps the buyback term finite for a company near the price floor |
+| $\lambda$ | `rate_pe_sensitivity` | 3 (1.5) | fitted (chosen) | pt-v20's 3 was picked on a grid; pt-v19's 1.5 is the reference implementation's. The S&P 500's P/E fell 4.9% to 5.5% per 100 bp of Baa in 2022 |
 | | rate-term floor | 0.5 | guard | |
 | | duration scale | 2.0 | chosen | reference implementation |
 | | loss-maker price to book | 1.2 | chosen | reference implementation |
@@ -638,6 +893,122 @@ What follows from this:
 
 The sector anchors $\Pi_k$ are in [The sectors](#the-sectors). They are
 chosen: carried from the reference implementation, with no market data named.
+
+### The market's permanent share
+
+**Timescale:** every tick, and the close's jumps. **State:** a fair-value
+level $v_i$ per company, 0 on every preset through pt-v19.
+
+pt-v20 moves part of each tick's shocks out of the mispricing and into a
+permanent fair-value level, so that part does not revert. The level scales a
+company's restated earnings and book value by $e^{v_i}$ before the buyback
+term and the valuation above (`market/tick.rs:1778-1785`). After the tick's
+update of $s$ (see [Mispricing](#mispricing)), with $\psi$ =
+`fair_value_news_share`:
+
+```math
+\Delta v_{i,t} = \psi\,\big(u\,(\varepsilon^{I}_{i,t} + \varepsilon^{S}_{i,t}) + N^{own}_{i,t}\big)
+ + \psi_m(\sigma_t)\,\big(u\,m_{i,t} + N^{mkt}_{i,t}\big),
+\qquad
+s_{i,t+1} \leftarrow s_{i,t+1} - \Delta v_{i,t},
+\qquad
+v_i \leftarrow v_i + \Delta v_{i,t} - \tfrac{1}{2}\Delta v_{i,t}^{2}
+```
+
+(`market/tick.rs:1246-1286`). $\varepsilon^{I}$ and $\varepsilon^{S}$ are the
+tick's idiosyncratic and sector noise, $N^{own}$ the news naming the company,
+its peers or its sector, $N^{mkt}$ the market-wide news, and $u$ the intraday
+curve (0.15 while the market is closed). The price moves by the whole shock
+either way; what changes is how much of it later reverts. The
+$-\tfrac{1}{2}\Delta v^{2}$ term keeps $e^{v}$ a martingale. The close's jumps
+are split the same way: a company's own jump on $\psi$, the market jump on
+$\psi_m$ (`engine.rs:4638-4678`).
+
+The market's share $\psi_m$ = `fair_value_market_share` is cut above a
+ceiling on the market factor's current daily sigma $\sigma_t$, with $c$ =
+`fair_value_market_vol_cap` and $\sigma_F$ = `market_factor_sigma`
+(`market/tick.rs:806-821`):
+
+```math
+\psi_m(\sigma) = \begin{cases} \psi_m & c = 0 \ \text{or}\ \sigma \le c\,\sigma_F \\ \psi_m\,c\,\sigma_F / \sigma & \text{otherwise} \end{cases}
+```
+
+$m_{i,t}$ is the company's market input. With `fair_value_market_linear` at
+0 it is the whole input: the loading on the market draw, the down-tick tilt,
+the lagged down-day wire, the crisis injection, the crash amplifier and the
+recentring. At 1 it is the plain loading $\beta_i F_t$ alone
+(`market/factors.rs:1226`), which has zero mean in every regime. The other
+terms are not zero-mean once the VIX is high, because the amplifier fires on
+a threshold in baseline sigmas; left in $s$ they are a discount that reverts
+as the VIX falls, and made permanent they were a drift that ran as long as
+the VIX stayed high.
+
+Why pt-v20 takes it. With every market shock in $s$, the index reverted on
+the mispricing's half-life. The ratio of its five-year variance to five
+times its one-year variance read 0.42 on the leading dials, against 0.87 for
+the S&P 500 over 1871-2023 (pt-v20 audit, major 5; design repository,
+`programme/ptv20-registration.md`, twelfth registration, row V1). With the
+plain market draw permanent up to 1.5 times the base sigma, ordinary market
+news is permanent and the excess a fear regime adds reverts, the form the
+evidence takes: mean reversion in index returns concentrates in turbulent
+periods (Poterba and Summers 1988; Kim, Nelson and Startz 1991; Spierdijk,
+Bikker and van den Hoek 2012). On held-out seeds the two-year and five-year
+ratios over one year read 0.80 and 0.66, against bands of 0.75 to 1.15 and
+0.55 to 1.20 (box ptv20vr9). The earnings cycle then carries less of the
+index's yearly spread, and pt-v20's depth goes from 0.35 to 0.2, where the
+aggregate fall in a contraction reads -0.173 against Shiller's median -0.17.
+`opening_market_sigma`, the spread of the market's opening mispricing, goes
+from 0.10 to 0.001, since little of the market's variance stays in $s$.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $\psi_m$ | `fair_value_market_share` | 0, off; pt-v20 1 | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
+| | `fair_value_market_linear` | 0, off; a switch. pt-v20 1 | derived | the plain loading is the zero-mean part |
+| $c$ | `fair_value_market_vol_cap` | 0, no ceiling; pt-v20 1.5 | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
+
+### Volatility feedback
+
+**Timescale:** wherever fair value is read, and once a session for the
+smoothed exposure. **State:** the exposure $x$, while both the gain and the
+half-life are set.
+
+Higher expected volatility raises the return investors require and lowers
+the price (French, Schwert and Stambaugh 1987; Campbell and Hentschel 1992).
+With `fair_value_vix_discount` $g$ and `fair_value_vix_knee` $K$, every
+company's fair value is scaled by
+
+```math
+V_{i,t} \leftarrow V_{i,t}\,e^{-g\,\beta_i\,x},
+\qquad
+x = \begin{cases} \max\big(0,\ \ln(X/K)\big) & H_x = 0 \\ x_d & H_x > 0 \end{cases},
+\qquad
+x_{d} = x_{d-1} + \big(1 - 0.5^{1/H_x}\big)\big(\max(0, \ln(X_d/K)) - x_{d-1}\big)
+```
+
+(`market/tick.rs:1690-1723`, `engine.rs:5033-5043`). $X$ is the VIX and
+$H_x$ = `fair_value_vix_half_life` in sessions; the smoothed exposure steps
+once at each close, after the VIX has moved, and takes no draw. The discount
+is applied in the tick (`market/tick.rs:1128`), the overnight opening print
+(`engine.rs:4124`), the re-mark at publication and the stationary opening
+(`market/tick.rs:1755`, `market/tick.rs:1796`). It has no permanent part: it
+deepens a fall while fear is high and is given back as the VIX comes down.
+While $g > 0$ and $H_x > 0$ the snapshot's economy block carries
+`vix_feedback`, and the state hash takes it (`engine.rs:6418-6421`).
+
+Why pt-v20 takes it. With the market's plain shocks permanent, the driven
+2020 path fell 0.192 in 41 sessions against the S&P 500's 0.339 in 23 (long-run
+row F1). Read unsmoothed, the discount's whole daily change landed with the
+VIX's move and took the sessions under -5% from 10.6 to 18 to 25 a decade.
+With a knee of 40 and a 5-session half-life the fall reads 0.266 in 35.5
+sessions and the sessions under -5% 11.5 a decade, against the tape's 6.2 and
+a band up to twice it (box ptv20vr9). At knees of 30 and 35 every smoothed
+arm tried ran past twice the tape.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $g$ | `fair_value_vix_discount` | 0, off; pt-v20 0.35 | fitted | held-out grids ptv20vr6 to vr9 |
+| $K$ | `fair_value_vix_knee` | 30, unread at $g = 0$; pt-v20 40 | fitted | held-out grids ptv20vr8 and vr9 |
+| $H_x$ | `fair_value_vix_half_life` | 0, the VIX as it stands; pt-v20 5 | fitted | held-out grids ptv20vr6 to vr9 |
 
 ### The sectors
 
@@ -1566,15 +1937,54 @@ as the cross-sectional rule trades $s$. The common part is a net position
 spread over every equity, long or short by its sign. The gross splits
 between the two in proportion to what each earns per unit of gross.
 
-Measured on pt-v20, over 30 days on rosters `Universe.random(20, seed=3, 42,
-11)` at sim seeds 0-3:
+Before pt-v20's graded arm, over 30 days on rosters `Universe.random(20,
+seed=3, 42, 11)` at sim seeds 0-3, the Oracle was positive on 12 of 12
+markets and ahead of every price-only reference agent on 11 of 12. Its edge
+then was the market's opening mispricing (`opening_market_sigma` 0.10),
+which reverts.
 
-- the Oracle is positive on 12 of 12 markets;
-- it is ahead of every price-only reference agent on 11 of 12;
-- the exception is buy-and-hold, in a month the market rose 2.2 per cent against the Oracle's 1.4.
+On the graded arm it trades close to no edge. The market's plain shocks move fair
+value for good (`fair_value_market_share` 1.0, `fair_value_market_linear` 1)
+and the opening mispricing is 0.001, so little that hidden state knows
+predicts a return. The index's next-day return correlates with the rule's
+predicted common return at 0.11, and the cross-sectional rank IC is 0.014.
+The rule is net long most days and its P&L takes the sign of the market's
+month:
+- positive on 10 of 14 markets on those rosters (sim seeds 0-3, 0-3 and
+  0-5), and on 30 of 48 over sim seeds 0-15;
+- every loss is a month buy-and-hold lost more; on sim seed 3 the index
+  fell about 11 per cent in log terms, 10 points of it in the names'
+  permanent fair-value offsets, with the VIX below the discount's knee and
+  the earnings cycle unmoved;
+- adding the terms the rule leaves out (the crowd's lean on $s$, the
+  anticipated earnings' drift, the volatility discount's approach to its
+  target) moves the count to 26-30 of 48, with the mean P&L still near zero;
+- at `opening_market_sigma` 0.10 the same seed 3 pays it +152,102 against
+  buy-and-hold's -175,280.
 
-Its edge is market-wide and a few basis points a day, so over five days it is
-behind buy-and-hold as often as not. Quote a capture ratio with its horizon.
+So the Oracle is measured as a ceiling on pt-v19 (`tests/test_baselines.py`,
+`CEILING_PRESET`). On pt-v20 it stays in the reference set as a reference
+agent, not a ceiling, and the library reports no capture ratio there. A
+fraction of the Oracle's P&L would measure the market's month, not the
+agent.
+
+`baselines.ORACLE_NOT_A_CEILING` names the presets this applies to, each
+with the reason a result gives. It holds pt-v20 alone. The check reads a
+scorecard's `model_fingerprint`, so a custom model (`custom-XXXXXXXX`) keeps
+the ratio whatever preset it was built from. Where a preset is named:
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned, and
+  `capture_withheld` returns the reason;
+- `versus_buy_and_hold` gives each agent's P&L less buy-and-hold's in the
+  same market, the comparison to quote;
+- `rank` sets `Ranking.capture_withheld`, counts no seed as unmeasurable,
+  leaves every capture `None` and out of `as_dict()`, and sorts the table
+  on each agent's mean P&L over buy-and-hold's (`mean_excess_pnl`, with
+  `seeds_ahead`);
+- the MCP tools `evaluate_strategies` and `rank_strategies` send no capture
+  field. They send the buy-and-hold comparison and the reason in its place.
+
+On pt-v19 and every earlier preset each of these reports the capture ratio
+as before.
 
 ## Volume
 
@@ -1671,6 +2081,30 @@ states it, and the model carries it to prices.
 
 **Timescale:** once a session, before the open. Scenario day $d$ counts
 sessions from the start of the run, or from the fork.
+
+### The packaged recession
+
+`recession.yml` is dated on September 2007: day 50 is December 2007, the
+NBER peak, and a month is 21 sessions. From 0.8.5 the recession ends and
+hands back to the model's own cycle
+(`python/tradefloor/scenarios/recession.yml`):
+
+- The cycle is set to contraction on day 50 and held 315 sessions, to March 2009. On day 365 it is set to trough, and on day 428, June 2009, the NBER's trough, to recovery, and then left to the model's own cycle. Left to its own hazards from day 365, the model's cycle kept one seed in 30 in trough for more than 24 months after the onset.
+- Growth is held at -2% from day 50 to day 364, then released.
+- The VIX is multiplied by 3 for 60 sessions from day 50.
+- The corporate yield is 150 bp wider for 378 sessions from day 50, comes back to its day-50 level over the next 252, eases 110 bp more over the 378 after that, and is released to the model's own chain on day 1058. Moody's Baa yield (FRED DBAA) was 6.65% in December 2007, 9.2% at its peak in November 2008, 6.3% in September 2009 and 5.25% in December 2011.
+- Every company's earnings are multiplied down to 0.65 of their level by day 301, in two ramps (0.808 over 121 sessions from day 50, 0.805 over 131 from day 171), held there to day 490, September 2009, and restored in two ramps: to 0.96 of their pre-shock level by day 680, June 2010 (1.477 over 189 sessions from day 491), and to 1 by day 932 (1.042 over 252 from day 680). The cut stacks on pt-v20's earnings cycle, which takes about 18% off in a contraction at its depth of 0.2. Together they fall about 47% by day 365. S&P 500 four-quarter operating earnings fell 57%, from $91.47 in Q2 2007 to $39.61 in Q3 2009, and were about 0.92 of the 2007 peak over 2010 and 1.05 over 2011.
+
+The first 120 sessions are the 0.8.5 recalibration's, to within the last
+bit, and it measured -44.7% at 120 sessions, paired against the same seed
+with no scenario, on the certified roster over seeds 301 to 330. That was
+pt-v20 before its graded arm (box ptv20g3). The scenario sets the true phase
+and growth. Under [the publication dials](#true-and-published-state) an
+observer reads contraction about $L_c$ sessions after day 50 and growth as
+quarterly means. The recovery was tuned on the arm's permanent market share
+without the volatility feedback (the file's header gives the path), and the
+grade measures it on pt-v20 as it ships (rows S1a, S1b and S2 of the
+twelfth registration).
 
 ### Scenario operations
 
