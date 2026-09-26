@@ -58,15 +58,23 @@ moved no digest.
       the control pt-v19 reproducing its four constants), its long-run
       block from `verdict-pt-v20-g6.json`, `envelope_tables.py --write`,
       and the known answers as re-based on `fix/ptv20-final`.
-- [ ] Re-run the envelope gap measurements on the final vector
+- [x] Re-run the envelope gap measurements on the final vector
       (`tools/calibration/aws/user-data-envgaps.sh`, one box, about $0.15)
       and fold them into `envelope.py` and `loss.py`. The runs on branches
       `envgaps/pt-v20` (folded) and `envgaps/pt-v20-final` (6fa7462, not
       folded, measured at `garch_beta` 0.85) are superseded by that run.
+      Done on `integration/0.8.5-envgaps` (2026-09-26): run `envgaps-085` at
+      ba3f020, about $0.15, artefacts in
+      `tools/calibration/results/envgaps-085-2026-09-26/`, folded in 0d2b7a9.
+      The scenario gap's summary now reads "a quarter to a half of the real
+      size", and a local re-run on notebook 09's Baa path (`driven-path/`)
+      shows that response arrives through the credit leg (239970a).
 - [ ] The CHANGELOG's release note (it quotes the ptv20g3 figures), the
       README's realism section, notebooks 00 to 06 and 09 and the pt-v19
       figures left in the docs glossary and core-concepts pages follow the
       final vector. MODEL.md's values follow it on `integration/0.8.5`.
+      The glossary's and core concepts' pt-v19 figures are re-measured on
+      pt-v20 on `docs/0.8.5-final` (9b57dc6 there).
 
 ## 2. The docs branch against the final engine
 
@@ -75,10 +83,18 @@ venv that holds a build of the final engine commit:
 
 - [ ] `python tools/docs/learn/regenerate.py --source <engine checkout> --ref origin/release/0.8.5`
       (mirrors, library pages, inventories, experiments, build, commits).
-- [ ] Merge the figures branch (`figures/pt-v20`) once its gate is clean.
-- [ ] `python tools/docs/check.py` passes all fifteen steps.
-- [ ] `python tools/remeasure/resync.py --lines` from the engine checkout
-      with `TRADEFLOOR_DOCS` set, and commit the register.
+      Done against `--ref origin/integration/0.8.5-envgaps` on the docs
+      branch `docs/0.8.5-final` (off `release/0.8.5`, pushed, not merged);
+      to be run once more against `origin/release/0.8.5` after this branch
+      is merged into it, which should change only `mirrors.json`'s ref.
+- [x] Merge the figures branch (`figures/pt-v20`) once its gate is clean
+      (4f16d54 on `release/0.8.5`).
+- [ ] `python tools/docs/check.py` passes all fifteen steps. Passes on
+      `docs/0.8.5-final` (15 of 15, 2026-09-26), with `TRADEFLOOR_PYTHON`
+      a Python 3.11 venv and `node` on the PATH.
+- [x] `python tools/remeasure/resync.py --lines` from the engine checkout
+      with `TRADEFLOOR_DOCS` set, and commit the register (94 ok, 0 moved,
+      on `docs/0.8.5-final`).
 - [ ] The docs repo's CI installs `tradefloor==0.8.5` from PyPI, so it stays
       red until the tag.
 
@@ -93,7 +109,12 @@ venv that holds a build of the final engine commit:
       About $0.45 at the spot floor, $1.37 at most.
 - [ ] Read "Doc edits needed", fix each MOVED row in the docs repo, rebuild,
       and repeat until clean, then commit `tools/remeasure/out-0.8.5/` on
-      the engine branch.
+      the engine branch. Run on `integration/0.8.5-envgaps` instead of
+      `release/0.8.5`: `remeasure-085env` (6152466, 9 MOVED, fixed on
+      `docs/0.8.5-final`) and `remeasure-085env2` (e35ce06: 41 reproduced,
+      0 MOVED, 0 structural_fail), about $0.31 each; the clean run is
+      committed as `tools/remeasure/out-0.8.5/`. Re-run on `release/0.8.5`
+      only if something moves a figure before the PR.
 
 ## 4. The determinism gate (RELEASING step 7)
 
@@ -101,6 +122,11 @@ venv that holds a build of the final engine commit:
 - [ ] Read the run you started and check its `headSha` is the branch head.
       This is the second architecture for KAT 28's digests, which were
       produced on macOS arm64.
+      Dispatched on `integration/0.8.5-envgaps` at 6152466 (run
+      36240292877): all five targets and `all targets agree` green, and
+      the envgaps box reproduced sim 72485a9f on linux-aarch64. Both boxes
+      (remeasure) passed the known answer there too. The required check
+      still has to run on `release/0.8.5` (or its PR) once merged.
 
 ## 5. The pull request to main
 

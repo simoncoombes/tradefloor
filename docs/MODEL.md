@@ -915,7 +915,7 @@ What follows from this:
 The sector anchors $\Pi_k$ are in [The sectors](#the-sectors). They are
 chosen: carried from the reference implementation, with no market data named.
 
-### The market's permanent share
+### The permanent share of market moves
 
 **Timescale:** every tick, and the close's jumps. **State:** a fair-value
 level $v_i$ per company, 0 on every preset through pt-v19.
@@ -1226,7 +1226,7 @@ $e^{v}$ a martingale. The price takes the whole shock on the tick either
 way; what changes is that the company's part no longer reverts on the
 mispricing's half-life. At the close the company's own jump goes to $v$ the
 same way (`engine.rs:4696-4744`). The market's share of both, which
-pt-v20 also sets, is in [The market's permanent share](#the-markets-permanent-share):
+pt-v20 also sets, is in [The permanent share of market moves](#the-permanent-share-of-market-moves):
 
 ```math
 \Delta_{i}^{v,J} = \psi\,J_{i}^{I},
@@ -1247,7 +1247,7 @@ to the volatility ceiling.
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $\psi$ | `fair_value_news_share` | 1.0 (0, off) | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
-| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The market's permanent share](#the-markets-permanent-share) |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
 
 ### The factor structure
 
@@ -1951,17 +1951,9 @@ An agent sees the market through a read-only view (`sandbox.py`). The
 harness loops in `harness.py`, `counterfactual.py` and `tca.py` hand
 `act(obs)` the following:
 
-- `obs.prices`, `obs.tickers`, `obs.avg_volume(t)` and `obs.book(t)`, the
-  last prints, the roster, $\bar A_i$ and a copy of the book at the step's
-  start;
-- `obs.engine`, a `MarketView`: the columns price, previous close, previous
-  tick price, open, high, low, volume, $\bar A_i$, market cap, last daily
-  return, $\beta_i$, short interest and float; `bars`; the published macro
-  fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as
-  published); the curve; and which names and sectors have news today,
-  without its size;
-- `obs.portfolio`, a read-only view of the agent's own cash, positions and
-  fills.
+- `obs.prices`, `obs.tickers`, `obs.avg_volume(t)` and `obs.book(t)`, the last prints, the roster, $\bar A_i$ and a copy of the book at the step's start;
+- `obs.engine`, a `MarketView`: the columns price, previous close, previous tick price, open, high, low, volume, $\bar A_i$, market cap, last daily return, $\beta_i$, short interest and float; `bars`; the published macro fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as published); the curve; and which names and sectors have news today, without its size;
+- `obs.portfolio`, a read-only view of the agent's own cash, positions and fills.
 
 Nothing in the observation carries $s_i$, its momentum $\mu_i$, the maker's
 inventory, the GARCH variance $h_{i,d}$, the fundamentals, the attribution,
@@ -2011,17 +2003,10 @@ predicts a return. The index's next-day return correlates with the rule's
 predicted common return at 0.11, and the cross-sectional rank IC is 0.014.
 The rule is net long most days and its P&L takes the sign of the market's
 month:
-- positive on 10 of 14 markets on those rosters (sim seeds 0-3, 0-3 and
-  0-5), and on 30 of 48 over sim seeds 0-15;
-- every loss is a month buy-and-hold lost more; on sim seed 3 the index
-  fell about 11 per cent in log terms, 10 points of it in the names'
-  permanent fair-value offsets, with the VIX below the discount's knee and
-  the earnings cycle unmoved;
-- adding the terms the rule leaves out (the crowd's lean on $s$, the
-  anticipated earnings' drift, the volatility discount's approach to its
-  target) moves the count to 26-30 of 48, with the mean P&L still near zero;
-- at `opening_market_sigma` 0.10 the same seed 3 pays it +152,102 against
-  buy-and-hold's -175,280.
+- positive on 10 of 14 markets on those rosters (sim seeds 0-3, 0-3 and 0-5), and on 30 of 48 over sim seeds 0-15;
+- every loss is a month buy-and-hold lost more; on sim seed 3 the index fell about 11 per cent in log terms, 10 points of it in the names' permanent fair-value offsets, with the VIX below the discount's knee and the earnings cycle unmoved;
+- adding the terms the rule leaves out (the crowd's lean on $s$, the anticipated earnings' drift, the volatility discount's approach to its target) moves the count to 26-30 of 48, with the mean P&L still near zero;
+- at `opening_market_sigma` 0.10 the same seed 3 pays it +152,102 against buy-and-hold's -175,280.
 
 So the Oracle is measured as a ceiling on pt-v19 (`tests/test_baselines.py`,
 `CEILING_PRESET`). On pt-v20 it stays in the reference set as a reference
@@ -2033,16 +2018,10 @@ agent.
 with the reason a result gives. It holds pt-v20 alone. The check reads a
 scorecard's `model_fingerprint`, so a custom model (`custom-XXXXXXXX`) keeps
 the ratio whatever preset it was built from. Where a preset is named:
-- `capture_ratio` returns an empty mapping, whatever the Oracle earned, and
-  `capture_withheld` returns the reason;
-- `versus_buy_and_hold` gives each agent's P&L less buy-and-hold's in the
-  same market, the comparison to quote;
-- `rank` sets `Ranking.capture_withheld`, counts no seed as unmeasurable,
-  leaves every capture `None` and out of `as_dict()`, and sorts the table
-  on each agent's mean P&L over buy-and-hold's (`mean_excess_pnl`, with
-  `seeds_ahead`);
-- the MCP tools `evaluate_strategies` and `rank_strategies` send no capture
-  field. They send the buy-and-hold comparison and the reason in its place.
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned, and `capture_withheld` returns the reason;
+- `versus_buy_and_hold` gives each agent's P&L less buy-and-hold's in the same market, the comparison to quote;
+- `rank` sets `Ranking.capture_withheld`, counts no seed as unmeasurable, leaves every capture `None` and out of `as_dict()`, and sorts the table on each agent's mean P&L over buy-and-hold's (`mean_excess_pnl`, with `seeds_ahead`);
+- the MCP tools `evaluate_strategies` and `rank_strategies` send no capture field. They send the buy-and-hold comparison and the reason in its place.
 
 On pt-v19 and every earlier preset each of these reports the capture ratio
 as before.
@@ -2154,7 +2133,7 @@ hands back to the model's own cycle
 - Growth is held at -2% from day 50 to day 364, then released.
 - The VIX is multiplied by 3 for 60 sessions from day 50.
 - The corporate yield is 150 bp wider for 378 sessions from day 50, comes back to its day-50 level over the next 252, eases 110 bp more over the 378 after that, and is released to the model's own chain on day 1058. Moody's Baa yield (FRED DBAA) was 6.65% in December 2007, 9.2% at its peak in November 2008, 6.3% in September 2009 and 5.25% in December 2011.
-- Every company's earnings are multiplied down to 0.65 of their level by day 301, in two ramps (0.808 over 121 sessions from day 50, 0.805 over 131 from day 171), held there to day 490, September 2009, and restored in two ramps: to 0.96 of their pre-shock level by day 680, June 2010 (1.477 over 189 sessions from day 491), and to 1 by day 932 (1.042 over 252 from day 680). The cut stacks on pt-v20's earnings cycle, which takes about 18% off in a contraction at its depth of 0.2. Together they fall about 47% by day 365. S&P 500 four-quarter operating earnings fell 57%, from $91.47 in Q2 2007 to $39.61 in Q3 2009, and were about 0.92 of the 2007 peak over 2010 and 1.05 over 2011.
+- Every company's earnings are multiplied down to 0.65 of their level by day 301, in two ramps (0.808 over 121 sessions from day 50, 0.805 over 131 from day 171), held there to day 490, September 2009, and restored in two ramps: to 0.96 of their pre-shock level by day 680, June 2010 (1.477 over 189 sessions from day 491), and to 1 by day 932 (1.042 over 252 from day 680). The cut stacks on pt-v20's earnings cycle, which takes about 18% off in a contraction at its depth of 0.2. Together they fall about 47% by day 365. S&P 500 four-quarter operating earnings fell 57%, from 91.47 dollars in Q2 2007 to 39.61 in Q3 2009, and were about 0.92 of the 2007 peak over 2010 and 1.05 over 2011.
 
 The first 120 sessions are the 0.8.5 recalibration's, to within the last
 bit, and it measured -44.7% at 120 sessions, paired against the same seed
