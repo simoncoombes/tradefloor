@@ -34,7 +34,9 @@ from pathlib import Path
 
 import tradefloor as pt
 import pyarrow as pa
-from tradefloor.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
+from tradefloor.baselines import (BuyAndHold, Momentum, Oracle, capture_ratio,
+                                  capture_withheld, reference_agents,
+                                  versus_buy_and_hold)
 from tradefloor.scenario import Scenario, compare, run_scenario
 
 
@@ -370,14 +372,28 @@ def g_horizon(ctx: Ctx) -> dict:
     The agent is mean_reversion because that is the agent the page's
     sentence is about. This measured momentum, left over from an era when
     the bullet was written about momentum, and reported the horizon captures
-    as MOVED ever since against prose that was correct."""
+    as MOVED ever since against prose that was correct.
+
+    On pt-v20 `capture_ratio` reports nothing, because the Oracle is not a
+    ceiling there (`baselines.ORACLE_NOT_A_CEILING`), so `capture_{days}d`
+    read None on the default from 0.8.5 and this group measured nothing. The
+    capture is kept for a preset where the Oracle is a ceiling, and beside
+    it the comparison the library quotes on pt-v20: mean reversion's P&L
+    less buy-and-hold's over the same horizon (`versus_buy_and_hold`), with
+    `capture_withheld` saying which reading applies. The bullet itself is
+    retired from the register (no page states it since 0.8.1); a page that
+    restates it on pt-v20 quotes `excess_{days}d`.
+    """
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
         out[f"capture_{days}d"] = capture_ratio(scores).get("mean_reversion")
+        out[f"excess_{days}d"] = versus_buy_and_hold(scores).get(
+            "mean_reversion")
         out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
+        out["capture_withheld"] = capture_withheld(scores) is not None
     return out
 
 
@@ -482,10 +498,26 @@ def g_ranking(ctx: Ctx) -> dict:
         # Over the seeds where a capture exists (`AgentRecord.measured`).
         "mr3_mean_of_ratios": (sum(mr3.measured) / len(mr3.measured)
                                if mr3.measured else float("nan")),
+        # None on pt-v20, where the ranking withholds every capture
+        # (`Ranking.capture_withheld`); `capture_range` is None there too,
+        # and indexing it took the whole group down on the default.
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
-        "momentum_capture_lo": mom.capture_range[0],
-        "momentum_capture_hi": mom.capture_range[1],
+        "momentum_capture_lo": (mom.capture_range[0]
+                                if mom.capture_range else None),
+        "momentum_capture_hi": (mom.capture_range[1]
+                                if mom.capture_range else None),
+        # The comparison the pages quote where the capture is withheld:
+        # P&L less buy-and-hold's, averaged over the twelve markets, and
+        # momentum's per-market range of it. Read from the same records the
+        # docs' experiments.py writes into experiments.json.
+        "capture_withheld": rk.capture_withheld is not None,
+        "excess_momentum": mom.mean_excess_pnl,
+        "excess_mean_reversion": mr.mean_excess_pnl,
+        "momentum_excess_lo": min(v for v in mom.excess_pnls if v is not None),
+        "momentum_excess_hi": max(v for v in mom.excess_pnls if v is not None),
+        "momentum_seeds_ahead": mom.seeds_ahead,
+        "mr_seeds_ahead": mr.seeds_ahead,
         "momentum_wins": mom.wins,
         "mr_wins": mr.wins,
         "seeds": len(rk.seeds) if hasattr(rk, "seeds") else 12,
