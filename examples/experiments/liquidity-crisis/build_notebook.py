@@ -52,7 +52,7 @@ M("""
 > the study is a listed follow-up.
 
 This runs [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
-inside [Tradefloor](https://tradefloor.dev), copies the market it is
+inside [Tradefloor](https://docs.tradefloor.dev), copies the market it is
 trading, and drops a liquidity crisis on one copy.
 
 Twenty-four real companies loaded from SEC filings, fifty million dollars,

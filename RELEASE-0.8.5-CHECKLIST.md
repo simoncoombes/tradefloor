@@ -136,7 +136,8 @@ venv that holds a build of the final engine commit:
       wheel (`params.py --check --python /tmp/rel/bin/python`),
       `build.py --target live` (it refuses any `[PLACEHOLDER` or
       `[REMEASURE` marker left), `check.py`, a PR into `main`, merged by the
-      owner, then `curl -sI https://tradefloor.dev/` and `indexnow.py`.
+      owner, then `curl -sI https://tradefloor.dev/`,
+      `curl -sI https://docs.tradefloor.dev/` and `indexnow.py`.
 - [ ] Merge `main` into `dev`.
 - [ ] Delete the working branches and worktrees: `integration/0.8.5`,
       `archive/integration-0.8.5-677ca51` (the earlier local integration

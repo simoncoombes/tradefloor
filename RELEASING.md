@@ -686,7 +686,9 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   `build_site.py` left this repository at 0.5.0. There is no Pages workflow
   here and no committed `docs/` tree; `.github/workflows/` holds
   `determinism.yml`, `release.yml` and `suite.yml`. Step 5 is the whole of
-  what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
+  what the site needs. Check that both hosts serve, with
+  `curl -sI https://tradefloor.dev/` and
+  `curl -sI https://docs.tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 

@@ -35,7 +35,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://tradefloor.dev"
 Repository = "https://github.com/simoncoombes/tradefloor"
-Documentation = "https://tradefloor.dev"
+Documentation = "https://docs.tradefloor.dev"
 # PyPI has no changelog field, so a project page can only point at one.
 # Without this a visitor has no route from the package to its release notes.
 Changelog = "https://github.com/simoncoombes/tradefloor/releases"

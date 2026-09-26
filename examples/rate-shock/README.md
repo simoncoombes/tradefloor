@@ -255,5 +255,6 @@ subject being measured.
 Ground truth about this market, not about any real one. The prices come from a
 known model, so a strategy shaped like that model looks excellent and teaches
 you nothing. There is one venue, no latency, and no counterparty that adapts
-to you. See [the realism envelope](https://tradefloor.dev) for the five limits
-that are measured and written down.
+to you. See
+[the realism envelope](https://docs.tradefloor.dev/realism-envelope.html#limits)
+for the five limits that are measured and written down.

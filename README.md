@@ -19,10 +19,10 @@ price.
 
 ## Documentation
 
-Documentation is at https://tradefloor.dev. It covers install, core
+Documentation is at https://docs.tradefloor.dev. It covers install, core
 concepts, the realism envelope, presets, the API and the notebooks.
 
-Three documents in this repository are for anyone publishing with it:
+Four documents in this repository are for anyone publishing with it:
 
 - [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
   the model as equations, with every coefficient's value on the default
@@ -32,6 +32,9 @@ Three documents in this repository are for anyone publishing with it:
   matched to a count on another
 - [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
   which release lines get fixes, and for how long
+- [docs/PRINCIPLES.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/PRINCIPLES.md):
+  the rules the project is built under, and the failures two of them came
+  from
 
 ## Install
 
@@ -137,7 +140,7 @@ claude mcp add tradefloor -- tradefloor-mcp
 
 Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
-[the MCP page](https://tradefloor.dev/mcp.html).
+[the MCP page](https://docs.tradefloor.dev/mcp.html).
 
 ## Controlled scenarios
 
@@ -268,7 +271,7 @@ Five limits are measured and written down:
 | roster | certification used a sector-balanced roster. Four concentrated sector mixes are also measured, on the shape rows only and for up to two years |
 
 `tf.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://tradefloor.dev/realism-envelope.html) says
+[the realism envelope](https://docs.tradefloor.dev/realism-envelope.html) says
 what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
