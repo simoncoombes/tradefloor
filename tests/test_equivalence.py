@@ -179,5 +179,11 @@ def test_the_comparator_can_actually_fail():
     unclosed = tradefloor.Engine(seed=5, universe=UNIVERSE)
     unclosed.open_market()
     unclosed.run_session(9, 30, 3, 100)
-    assert identical(closed, unclosed, "price")
+    # A column the close leaves alone compares equal. That was `price`
+    # until pt-v20, the default, whose close re-marks every traded name to
+    # the macro state it publishes (`macro_publication_repricing`), so the
+    # price is now one of the columns a close rolls. `previous_close` is set
+    # at the open, never at the close, so it still reads the same on both.
+    assert identical(closed, unclosed, "previous_close")
+    assert not identical(closed, unclosed, "price")
     assert not identical(closed, unclosed, "garch_variance")
