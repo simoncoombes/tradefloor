@@ -26,8 +26,9 @@ libm.
   modified coefficient set fingerprints as `custom-XXXXXXXX` and can never
   present as a shipped one.
 - **A published realism envelope.** A one-year realism table of 19 statistics
-  graded against real-market bands, and a long-run check of 17 criteria, with
-  the misses named as gaps rather than omitted.
+  graded against real-market bands, and a long-run check of 17 criteria (40
+  rows registered for `pt-v20`, all met), with the misses named as gaps
+  rather than omitted.
   See <https://tradefloor.dev/realism-envelope.html>.
 
 ## Using it

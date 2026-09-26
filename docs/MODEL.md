@@ -69,7 +69,7 @@ data series used most often:
 | Unit | Length | Code |
 |---|---|---|
 | tick | one minute of the 09:30 to 16:00 session | `market/hours.rs:22` |
-| session (day) | 390 ticks | `python_engine.rs:1863` |
+| session (day) | 390 ticks | `python_engine.rs:1923` |
 | macro month | 21 sessions | `economy/state.rs:65` |
 | macro quarter | 63 sessions | `economy/state.rs:83` |
 | year | 252 sessions | `market/tick.rs:217`, `economy/state.rs:62` |
@@ -144,10 +144,10 @@ process in the market reads it back.
 
 ### The order of a session
 
-1. **Open** (`engine.rs:3450-3562`). The crisis episode is stepped (start, end, epicentre), the day's company news is drawn, and each company's opening price $P^{o}$ is set to its last print. On the first session only, the stationary opening splits each company's day-zero premium between $s$ and $v$ (`engine.rs:4031-4070`).
-2. **390 ticks** (`market/tick.rs:797-1679`). Each tick: apply the agents' fills from the last step, once, on the first tick (`engine.rs:2114-2138`); draw the market factor and the sector factors; for each company, draw its own noise, update $s$ and $v$, compute $V$ and $P^{\ast}$, draw tick volume, and settle the print through the book. The last tick is the closing cross (`market/tick.rs:1501-1513`).
-3. **Close** (`engine.rs:3730-4070`). Each company's GJR variance is updated from the day's noise, the momentum term rolls, jumps are drawn and applied to $s$, the market-factor and sector variances are updated, and the volume state steps.
-4. **Macro step** (`engine.rs:4926-5007`, `engine.rs:4363-4605`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:4555-4586`).
+1. **Open** (`engine.rs:3920-4037`). The crisis episode is stepped (start, end, epicentre), the day's company news is drawn, and each company's opening price $P^{o}$ is set to its last print. On the first session only, the stationary opening splits each company's day-zero premium between $s$ and $v$ (`engine.rs:4520-4559`).
+2. **390 ticks** (`market/tick.rs:823-1678`). Each tick: apply the agents' fills from the last step, once, on the first tick (`engine.rs:2513-2537`); draw the market factor and the sector factors; for each company, draw its own noise, update $s$ and $v$, compute $V$ and $P^{\ast}$, draw tick volume, and settle the print through the book. The last tick is the closing cross (`market/tick.rs:1542-1554`).
+3. **Close** (`engine.rs:4219-4500`). Each company's GJR variance is updated from the day's noise, the momentum term rolls, jumps are drawn and applied to $s$, the market-factor and sector variances are updated, and the volume state steps.
+4. **Macro step** (`engine.rs:5472-5559`, `engine.rs:4864-5150`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:5072-5115`).
 
 The next session reads the new VIX, rates and output.
 
@@ -179,8 +179,8 @@ sealed seed from all 64 bits.
 
 **The opening.** Before session 1 the economy runs 755 macro steps on its
 own, with the market frozen and the day's return set to zero
-(`engine.rs:1588-1657`). The business cycle's opening phase and its age are
-drawn from the cycle's stationary law first (`engine.rs:1501-1525`). Because
+(`engine.rs:1987-2056`). The business cycle's opening phase and its age are
+drawn from the cycle's stationary law first (`engine.rs:1900-1924`). Because
 the market is frozen during this burn-in, the VIX settles near a fixed level
 that depends on the roster and hardly on the seed: on
 `Universe.random(40, seed=111)` it opens at 17.66 on 27 of seeds 101 to 130,
@@ -189,12 +189,12 @@ depends on where the cycle opens, 2.5% to 6.7% across the same seeds.
 
 ## The macro economy
 
-The economy steps once per session, after the close (`engine.rs:4894-4904`).
+The economy steps once per session, after the close (`engine.rs:5440-5450`).
 Its day counter $d$ starts at 1 on the first close. Within one step the order
 is: the market P/E and the day's index return are read from prices, the VIX
 and the economy are updated, the business cycle may change phase, and then
-the central bank meets if a meeting is due (`engine.rs:4948-5007`,
-`engine.rs:4437-4596`). All macro draws come from the economy stream.
+the central bank meets if a meeting is due (`engine.rs:5494-5559`,
+`engine.rs:4943-5125`). All macro draws come from the economy stream.
 
 The price path reads four things from the economy: the **corporate bond
 yield**, as the discount rate in fair value; **nominal output** and the
@@ -210,7 +210,7 @@ They are **chosen**. The dials that pt-v19 and pt-v20 moved carry their own entr
 ### The calendar
 
 The macro clock runs on trading sessions. A month starts when
-$d \bmod 21 = 0$ and a quarter when $d \bmod 63 = 0$ (`economy/daily.rs:643-644`).
+$d \bmod 21 = 0$ and a quarter when $d \bmod 63 = 0$ (`economy/daily.rs:694-695`).
 Levels compound over 252 sessions a year.
 
 | Dial | Value | Kind | Source |
@@ -227,7 +227,7 @@ month. **State:** the phase $\mathcal{P} \in \lbrace E, P, C, T, R \rbrace$
 age $a$ in months.
 
 The age advances by $1/21$ each session and resets to zero on a transition
-(`economy/daily.rs:1614`, `economy/cycle.rs:258-260`). Below a minimum age
+(`economy/daily.rs:1723`, `economy/cycle.rs:258-260`). Below a minimum age
 $a_{\min}(\mathcal{P})$ no transition is possible. Above it, the phase
 ends with a Weibull hazard plus a state-dependent adjustment:
 
@@ -254,7 +254,7 @@ growth and $\mathrm{PE}$ the market's trailing P/E:
 
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
-earnings of [Fair value](#fair-value) (`engine.rs:4948-4994`).
+earnings of [Fair value](#fair-value) (`engine.rs:5494-5540`).
 
 | Phase | Min age (months) | Weibull shape $k$ | Weibull scale $\lambda$ | Mean length (months) |
 |---|---|---|---|---|
@@ -287,7 +287,7 @@ real output $Y$.
 Each phase has a growth midpoint $\bar g$: E 3.0, P 1.25, C -1.5, T -0.25,
 R 2.25 (`economy/state.rs:263-302`). On entering a phase, growth takes a
 shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
-(`economy/daily.rs:668-690`), and then growth is updated in three steps:
+(`economy/daily.rs:719-741`), and then growth is updated in three steps:
 
 ```math
 \text{quarterly: } g \leftarrow \mathrm{clip}\big(g + 0.25\,(\bar g - g) + 0.3\,Z;\ -10,\ 6\big)
@@ -302,7 +302,7 @@ shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
 \text{daily: } Y_d = Y_{d-1}\Big(1 + \frac{g_d}{100 \cdot 252}\Big)
 ```
 
-(`economy/daily.rs:710-763`, `economy/daily.rs:726`). "Wrong sign" means
+(`economy/daily.rs:761-814`, `economy/daily.rs:777`). "Wrong sign" means
 $g > 0$ in C or T, or $g < 0$ in R or E. Fiscal stimulus adds to $g$ at the
 end of the monthly step, below.
 
@@ -316,9 +316,9 @@ u_d = \mathrm{clip}\Big(u + 0.3\,\theta^{u}_{\mathcal{P}} + 0.2\,(2 - g) + 0.06\
  - 0.08\,g\,\mathbf{1}[\mathcal{P} \in \lbrace E, R\rbrace,\ g > 1] + 0.06\,Z;\ 2.5,\ 15\Big)
 ```
 
-(`economy/daily.rs:766-785`). The phase trends $\theta^{u}$ are E -0.05,
+(`economy/daily.rs:817-843`). The phase trends $\theta^{u}$ are E -0.05,
 P 0, C 0.30, T 0.04, R -0.10. The $0.2 (2 - g)$ term is Okun's law. The
-structural rate carries hysteresis (`economy/daily.rs:953-965`):
+structural rate carries hysteresis (`economy/daily.rs:1026-1038`):
 
 ```math
 \ell \leftarrow \begin{cases} \ell + 0.05\,(0.4\,u - \ell) & \mathcal{P} \in \lbrace C, T \rbrace \\ \max(0.5,\ 0.97\,\ell) & \text{otherwise} \end{cases}
@@ -344,19 +344,19 @@ w^{\ast} = \begin{cases} \max\big(0.7\,\pi + 0.5\,(u^{\ast} - u),\ 0.8\,\pi\big)
  - 0.2\,(u_d - u^{\ast}) + W + R^{r} + \Omega - 0.0003\,(e - 100) + 0.0003\,(\tau - 5) + 0.04\,Z;\ \pi_{\min},\ \pi_{\max}\Big)
 ```
 
-(`economy/daily.rs:827-836`, `economy/daily.rs:796-862`). Most terms read last
+(`economy/daily.rs:900-909`, `economy/daily.rs:869-935`). Most terms read last
 month's values; the Phillips term reads this month's unemployment $u_d$,
 and the terms are these:
 
 - $-0.2 (u_d - u^{\ast})$ is the Phillips curve.
-- $W = 0.08\max(0, w - 2) + 0.02 (w - 4)(\pi - 3) \cdot \mathbf{1}[w > 4, \pi > 3]$ is wage pressure (`economy/daily.rs:838-846`).
-- $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:800-806`).
-- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:808-814`).
+- $W = 0.08\max(0, w - 2) + 0.02 (w - 4)(\pi - 3) \cdot \mathbf{1}[w > 4, \pi > 3]$ is wage pressure (`economy/daily.rs:911-919`).
+- $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:873-879`).
+- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:881-887`).
 - $e$ is the dollar index and $\tau$ the tariff rate. The tariff rate stays at 5, so its term is 0, unless a scenario changes it.
 - The phase trends $\theta^{\pi}$ are E 0.015, P 0.015, C -0.02, T -0.01, R 0.01.
 
 The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
-(`economy/daily.rs:1009`).
+(`economy/daily.rs:1082`).
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
@@ -368,7 +368,7 @@ The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
 
 ### Fiscal policy
 
-**Timescale:** monthly (`economy/daily.rs:981-1005`). In contraction and
+**Timescale:** monthly (`economy/daily.rs:1054-1078`). In contraction and
 trough the government runs a stimulus $F$ (percent of GDP a year) and debt
 $b$ rises; otherwise the stimulus decays and debt falls slowly in good times:
 
@@ -450,19 +450,19 @@ y^{10} \leftarrow \mathrm{clip}\big(y^{10} + 0.05\,(r^{p} + \mathrm{TP} - y^{10}
 ```
 
 The 2-year is its own process, pulled toward the formula it used to equal,
-with its own noise (`economy/daily.rs:1492-1510`):
+with its own noise (`economy/daily.rs:1565-1583`):
 
 ```math
 y^{2}_{d+1} = \mathrm{clip}\Big(y^{2}_d + 0.05\,\big(0.85\,r^{p} + 0.15\,y^{10} - y^{2}_d\big) + \sigma_{2}\,Z;\ 0,\ 12\Big)
 ```
 
-Here $y^{10}$ is the value just stepped (`economy/daily.rs:1475-1492`). At a
+Here $y^{10}$ is the value just stepped (`economy/daily.rs:1548-1565`). At a
 meeting the 2-year is reset to $0.85\,r^{p} + 0.15\,y^{10}$
 (`economy/central_bank.rs:315-316`).
 
 **Flight to quality.** The session's cap-weighted index return $R_d$, in
 percent, open to close, moves both Treasury yields the same day
-(`economy/daily.rs:1512-1546`):
+(`economy/daily.rs:1585-1619`):
 
 ```math
 \Delta^{Q}_d = \begin{cases} +g_Q\,R_d & \pi < 3 \\ -g_Q\,R_d & \pi > 4 \\ 0 & \text{otherwise} \end{cases},
@@ -475,7 +475,7 @@ points off both yields, and Treasuries rally when stocks fall.
 
 **The corporate yield** moves every session by the change in the 10-year
 and by the meeting formula's own VIX term, and the meeting re-sets its level
-(`economy/daily.rs:1548-1570`):
+(`economy/daily.rs:1621-1672`):
 
 ```math
 y^{c}_{d+1} = \max\Big(y^{c}_d + \big(y^{10}_{d+1} - y^{10}_d\big) + 0.02\,m_{\mathcal{P}}\,\big(X_{d+1} - X_d\big),\ \ y^{10}_{d+1} + 0.8\Big)
@@ -491,7 +491,7 @@ y^{c} = y^{10} + \mathrm{clip}\Big(\big(1 + 0.02\,(X - 12)\big)\,m_{\mathcal{P}}
 ```
 
 A daily floor, $y^{c} \ge y^{10} + 0.8$, also applies
-(`economy/daily.rs:1655-1665`). So the discount rate that fair value reads
+(`economy/daily.rs:1764-1774`). So the discount rate that fair value reads
 moves every session with the 10-year and the VIX, and is re-anchored at
 meetings.
 
@@ -502,23 +502,23 @@ meetings.
 | $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
 | | `flight_to_quality_day` | 1 (0) | derived | a switch: the step reads the session's own return |
 | | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
-| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4611-4626`) |
+| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4846-4861`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
 the 0.8 floor are chosen. One limit: the model's inflation almost never
 leaves the under-3% regime, so stocks and Treasuries are nearly always in
 flight to quality. They match the pooled 2015-24 correlation, not the
-positive one of a 2022-style inflation regime (`params.rs:6902-6905`).
+positive one of a 2022-style inflation regime (`params.rs:7180-7183`).
 
 ### The aggregate earnings cycle
 
 **Timescale:** one step a session, in the macro step, after the phase
-check and before the central bank (`engine.rs:4555-4580`). **State:**
+check and before the central bank (`engine.rs:5072-5097`). **State:**
 $\chi_d$, a log level on every company's earnings beyond what nominal
 output gives them (`economy/state.rs:430-435`).
 
 The level is pulled toward a target set by the business cycle
-(`engine.rs:1116-1126`, `engine.rs:4559-4580`):
+(`engine.rs:1515-1525`, `engine.rs:5076-5097`):
 
 ```math
 \chi^{\ast}(\mathcal{P}) = \begin{cases} -\delta_E & \mathcal{P} \in \lbrace C, T \rbrace \\ \delta_E\,u_E & \mathcal{P} \in \lbrace E, P, R \rbrace \end{cases},
@@ -530,7 +530,7 @@ The level is pulled toward a target set by the business cycle
 Earnings therefore fall toward $e^{-0.2} - 1 = -18.1\%$ in a contraction
 and trough and recover toward $+1.8\%$ otherwise; the upside is set so the
 level averages to zero over a cycle. The run opens at the target of the
-phase it opens in (`engine.rs:1105-1112`). $\chi$ multiplies every
+phase it opens in (`engine.rs:1205-1212`). $\chi$ multiplies every
 company's restated earnings and book value through $n_d$ in
 [Fair value](#fair-value), so a move written at the close reaches prices on
 the next session.
@@ -558,19 +558,19 @@ reaches them through inflation and oil.
 o \leftarrow \mathrm{clip}\Big(o + 0.03\,\big[(75 + 3g)(1 + a_d) - o\big] + p^{I} - 0.08\,(e - 100) + \mathrm{opec} + 2Z;\ 35,\ 150\Big)
 ```
 
-(`economy/daily.rs:1109-1142`). $a_d = 0.03 \sin(2\pi (d' - 62)/252)$ is a
+(`economy/daily.rs:1182-1215`). $a_d = 0.03 \sin(2\pi (d' - 62)/252)$ is a
 seasonal term on the target, with $d'$ the day of the macro year. $p^{I}$ is
 an inventory pressure that is zero while inventory is between 40 and 60
 (inventory is a driftless random walk at `oil_supply_response` = 1,
 derived). Every 63 sessions an OPEC decision adds $\pm(2.5 + 3U)$ with
 probability 0.55 when the price is more than USD 10 from 80, or
-$3(U - 0.5)$ with probability 0.2 otherwise (`economy/daily.rs:1069-1107`).
+$3(U - 0.5)$ with probability 0.2 otherwise (`economy/daily.rs:1142-1180`).
 
 ```math
 e \leftarrow \mathrm{clip}\Big(e + 0.02\,\big(100 + 3\,(r^{p} - 2.5) - e\big) + 0.05\,(X - 25.5)^{+} + 0.3\,Z;\ 80,\ 130\Big)
 ```
 
-(`economy/daily.rs:1198-1215`). Above a VIX of 25.5 the dollar gets a
+(`economy/daily.rs:1271-1288`). Above a VIX of 25.5 the dollar gets a
 safe-haven bid (`usd_crisis_vix_threshold`, chosen).
 
 Gold, copper, housing, confidence, the fear and greed index and the trade
@@ -627,11 +627,11 @@ close $d$ is the true phase $L_c$ closes before:
 
 $\mathcal{P}_0$ is the opening phase, the one the run opens in after the
 burn-in and the stationary opening draw, so it stays published until $L_c$
-sessions have closed (`engine.rs:1340-1345`). At the end of each close's
+sessions have closed (`engine.rs:1371-1376`). At the end of each close's
 macro step, after the cycle and the central bank, the engine appends the
-phase to the history and drops the oldest (`engine.rs:1392-1401`,
-`engine.rs:5047`). The burn-in runs the same step, and the construction then
-refills the history with the opening phase (`engine.rs:1185`).
+phase to the history and drops the oldest (`engine.rs:1423-1432`,
+`engine.rs:5137`). The burn-in runs the same step, and the construction then
+refills the history with the opening phase (`engine.rs:1216`).
 
 A scenario or a `pin_macro` that sets the phase sets the true phase at once,
 so prices, the earnings cycle and the hazards react as they did before. The
@@ -645,7 +645,7 @@ arrives on the same schedule.
 `state_snapshot()["economy"]["cycle_phase"]` stays the true phase. While
 $L_c > 0$ the economy block also carries `cycle_history`, the $L_c + 1$ phase
 names oldest first, and the state hash takes the history after the phase, as
-a `u32` length then each name (`engine.rs:6501-6506`,
+a `u32` length then each name (`engine.rs:6612-6617`,
 `manifest.state_hash`). A restore refuses a history of the wrong length, or
 any history on an engine whose lag is 0. A snapshot without one, restored
 under the dial, refills the history with the restored phase, so that phase is
@@ -675,12 +675,12 @@ last day:
 \hat g_d = \begin{cases} g_0 & d < q - 1 + L_g \\ \bar g_{k^{\ast}},\quad k^{\ast} = \max\lbrace k : (k+1)q - 1 + L_g \le d \rbrace & \text{otherwise} \end{cases}
 ```
 
-(`engine.rs:1229-1234`, `engine.rs:1298-1325`). The step runs at the end of
-each close's macro step, after the phase is recorded (`engine.rs:5051`):
+(`engine.rs:1260-1265`, `engine.rs:1329-1356`). The step runs at the end of
+each close's macro step, after the phase is recorded (`engine.rs:5141`):
 the close's growth joins its quarter, the first close of a new quarter queues
 the last one's mean, and every figure due by that close is released. The
 construction seeds the figure with the opening growth after the burn-in
-(`engine.rs:1187`). A pin on growth writes the true growth, which reaches the
+(`engine.rs:1218`). A pin on growth writes the true growth, which reaches the
 published figure only through the mean of the quarter it falls in.
 
 The daily growth steps at every change of phase: the growth shock on entering
@@ -695,7 +695,7 @@ keys `published`, `quarter`, `count`, `sum`, `pending_days` and
 `pending_values`, in the economy's percent. The state hash takes it after the
 unemployment impulse below: the published figure, the quarter, the count, the
 sum, then a `u32` count of pending releases and each one's day and figure
-(`engine.rs:6515-6526`). A restore refuses the block on an engine whose lag
+(`engine.rs:6626-6637`). A restore refuses the block on an engine whose lag
 is 0, a quarter with no close in it, a non-finite figure and releases out of
 order. A snapshot without it, restored under the dial, publishes the
 restored growth and averages its quarter from the restore day on.
@@ -733,8 +733,8 @@ u_d = \mathrm{clip}\big(u + m_d + 0.06\,(u^{\ast} - u) + 0.06\,Z;\ 2.5,\ 15\big)
 
 $M$ is the macro month in sessions, 21 on pt-v19 and pt-v20. The NAIRU pull
 and the noise are as before, and the noise draw is taken in the same place. The impulse opens at the drive of the starting economy,
-before the burn-in, which then runs it (`engine.rs:1170`,
-`engine.rs:1204-1213`). At $H_u = 84$ sessions, $a = 0.159$, and the first
+before the burn-in, which then runs it (`engine.rs:1201`,
+`engine.rs:1235-1244`). At $H_u = 84$ sessions, $a = 0.159$, and the first
 monthly rise of a contraction is about 0.16 points on the same seeds. US
 unemployment rose from 4.3% to 5.5% over the 2001 recession and from 5.0% to
 9.5% from December 2007 to June 2009, by 0.1 to 0.3 points in each first
@@ -744,7 +744,7 @@ This dial moves the true unemployment rate, not a published copy of it, and
 so moves everything that reads the rate: inflation, confidence, the central
 bank and the phase hazards. While $H_u > 0$ the snapshot's economy block
 carries `unemployment_impulse`, and the state hash takes it after the phase
-history and before the GDP figure (`engine.rs:6509-6511`). A restore refuses
+history and before the GDP figure (`engine.rs:6620-6622`). A restore refuses
 it on an engine whose half-life is 0, and re-seeds it from the restored
 economy when a snapshot has none.
 
@@ -774,7 +774,7 @@ With `fear_greed_published_inputs` off, $\mathcal{P}'$ and $g'$ are the true
 phase and growth, so the index fell about 35 points in the five sessions
 after a contraction began and announced the turn to anyone reading it. With
 the switch on they are the published phase and growth as of the previous
-close, read before the step (`engine.rs:4973-4977`), so the index steps when
+close, read before the step (`engine.rs:5051-5055`), so the index steps when
 the turn is published. The switch adds no state, and with both publication
 lags at 0 it changes nothing. On desk seeds 201 to 212, with the cycle lag at
 252, the GDP lag at 21 and the unemployment half-life at 84, a rule that trades a five-session
@@ -802,10 +802,10 @@ an FOMC statement inside a 30-minute window (Gurkaynak, Sack and Swanson
 2005; Bernanke and Kuttner 2005).
 
 With `macro_publication_repricing` on, each public, solvent name that has
-traded is re-marked as the step ends (`engine.rs:5458-5466`,
-`engine.rs:5476-5573`). With $P$ its last print, $V_0$ its fair value before
+traded is re-marked as the step ends (`engine.rs:5549-5557`,
+`engine.rs:5567-5671`). With $P$ its last print, $V_0$ its fair value before
 the step and $V_1$ after it, both computed as the tick computes them on the
-same day (`market/tick.rs:1696-1728`), the new price solves
+same day (`market/tick.rs:1764-1797`), the new price solves
 
 ```math
 P' = \mathrm{clip}\Big(\frac{P}{V_0}\,V_1(P');\ 0.01,\ P_{\max}\Big)
@@ -817,8 +817,8 @@ $P' = P V_1(P) / V_0$ until a step moves nothing, at most 16 times; with the
 buyback share at 0 the first step is exact. The mispricing $s$ is left as it
 was, so the next tick starts on the model price the new state implies. The
 day's high, low and market cap follow the new price. A `pin_macro` re-marks
-the same way, around its write (`python_engine.rs:3030`,
-`python_engine.rs:3108-3109`).
+the same way, around its write (`python_engine.rs:3047`,
+`python_engine.rs:3125-3126`).
 
 The re-mark reads the true state the step leaves, as the next tick would.
 The policy rate and the corporate yield are published as they are set, so
@@ -833,7 +833,7 @@ it writes is already in the snapshot and the state hash.
 ### The economy's outputs
 
 1. **The corporate bond yield** $y^{c}$, as the discount rate in fair value (`fair_value.rs:143-148`). The engine always supplies it, so the fallback to the policy rate never runs.
-2. **Nominal output** $N_d = Y_d Q_d$ and **the earnings cycle** $\chi_d$, which scale every company's earnings and book value (`market/tick.rs:369-393`).
+2. **Nominal output** $N_d = Y_d Q_d$ and **the earnings cycle** $\chi_d$, which scale every company's earnings and book value (`market/tick.rs:375-402`).
 3. **The VIX** $X_d$, which every variance process, the jump rate, the crisis gates and the market maker's spread read.
 
 The business cycle reaches prices through these: through growth and
@@ -844,7 +844,7 @@ earnings cycle toward its new target at the next close.
 ## Fair value
 
 **Timescale:** recomputed from scratch every tick for every company
-(`market/tick.rs:1067-1101`). Its inputs move at three speeds: the
+(`market/tick.rs:1094-1128`). Its inputs move at three speeds: the
 corporate yield, nominal output and the earnings cycle change once a
 session, after the close; the company's fair-value level $v_i$ and the last
 print change every tick; a company's published earnings, book value,
@@ -865,7 +865,7 @@ B_{i,t} = \exp\!\Big(\kappa\,\frac{E_i\,n_d\,e^{v_{i,t}}}{P_{i,t-1}}\cdot\frac{d
 \hat E_{i,t} = E_i\,n_d\,e^{v_{i,t}}\,B_{i,t},\quad \hat K_{i,t} = K_i\,n_d\,e^{v_{i,t}}\,B_{i,t}
 ```
 
-(`market/tick.rs:259-272`, `market/tick.rs:369-418`, `market/tick.rs:1081-1092`).
+(`market/tick.rs:259-278`, `market/tick.rs:375-427`, `market/tick.rs:1108-1119`).
 $N_0$ is nominal output at the end of the burn-in, so the nominal factor is
 1 on the first session. $\chi_d$ is the earnings cycle
 ([above](#the-aggregate-earnings-cycle)) and $v_{i,t}$ the company's
@@ -881,7 +881,7 @@ D_i = 1 + 2\max(0,\ \gamma_i),
 R_{i,d} = \max\!\Big(0.5,\ 1 - \lambda\,D_i\Big(\frac{y^{c}_d}{100} - r^{\ast}\Big)\Big)
 ```
 
-(`fair_value.rs:143-148`, `fair_value.rs:184-190`), and fair value is:
+(`fair_value.rs:143-148`, `fair_value.rs:197-203`), and fair value is:
 
 ```math
 V_{i,t} = \begin{cases}
@@ -890,7 +890,7 @@ V_{i,t} = \begin{cases}
 \end{cases}
 ```
 
-(`fair_value.rs:200`, `fair_value.rs:271-300`). A loss-making company is
+(`fair_value.rs:213`, `fair_value.rs:299-329`). A loss-making company is
 valued at 1.2 times book, with no rate term.
 
 What follows from this:
@@ -902,7 +902,7 @@ What follows from this:
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
-| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2652-2694`); see [Known gaps](#known-gaps) |
+| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2874-2916`); see [Known gaps](#known-gaps) |
 | $\eta$ | `earnings_nominal_growth` | 1.0 | derived | holds the earnings share of nominal output constant |
 | $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
 | $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | guard | keeps the buyback term finite for a company near the price floor |
@@ -943,7 +943,7 @@ curve (0.15 while the market is closed). The price moves by the whole shock
 either way; what changes is how much of it later reverts. The
 $-\tfrac{1}{2}\Delta v^{2}$ term keeps $e^{v}$ a martingale. The close's jumps
 are split the same way: a company's own jump on $\psi$, the market jump on
-$\psi_m$ (`engine.rs:4638-4678`).
+$\psi_m$ (`engine.rs:4704-4744`).
 
 The market's share $\psi_m$ = `fair_value_market_share` is cut above a
 ceiling on the market factor's current daily sigma $\sigma_t$, with $c$ =
@@ -1006,15 +1006,15 @@ x = \begin{cases} \max\big(0,\ \ln(X/K)\big) & H_x = 0 \\ x_d & H_x > 0 \end{cas
 x_{d} = x_{d-1} + \big(1 - 0.5^{1/H_x}\big)\big(\max(0, \ln(X_d/K)) - x_{d-1}\big)
 ```
 
-(`market/tick.rs:1690-1723`, `engine.rs:5033-5043`). $X$ is the VIX and
+(`market/tick.rs:1690-1723`, `engine.rs:5099-5109`). $X$ is the VIX and
 $H_x$ = `fair_value_vix_half_life` in sessions; the smoothed exposure steps
 once at each close, after the VIX has moved, and takes no draw. The discount
 is applied in the tick (`market/tick.rs:1128`), the overnight opening print
-(`engine.rs:4124`), the re-mark at publication and the stationary opening
+(`engine.rs:4185`), the re-mark at publication and the stationary opening
 (`market/tick.rs:1755`, `market/tick.rs:1796`). It has no permanent part: it
 deepens a fall while fear is high and is given back as the VIX comes down.
 While $g > 0$ and $H_x > 0$ the snapshot's economy block carries
-`vix_feedback`, and the state hash takes it (`engine.rs:6418-6421`).
+`vix_feedback`, and the state hash takes it (`engine.rs:6501-6504`).
 
 Why pt-v20 takes it. With the market's plain shocks permanent, the driven
 2020 path fell 0.192 in 41 sessions against the S&P 500's 0.339 in 23 (long-run
@@ -1062,7 +1062,7 @@ global and scale with each company's own beta.
 ### The universe and the opening
 
 `Universe.random(n, seed)` draws a roster from its own random stream,
-independent of the market's (`universe.rs:36`, `universe.rs:197-275`).
+independent of the market's (`universe.rs:36`, `universe.rs:204-282`).
 Company $i$ is in sector $k = i \bmod 12$, and:
 
 ```math
@@ -1092,14 +1092,14 @@ $S_i \mathrm{LogU}(0.004, 0.30)$, and all these ranges are chosen.
 
 **The stationary opening.** A roster opens with a day-zero premium
 $g_i = \ln(\max(0.01, P_{i,0})/V_{i,0})$ that has a cross-sectional
-standard deviation of about 0.33 (`market/tick.rs:1654-1679`), for a
+standard deviation of about 0.33 (`market/tick.rs:1730-1756`), for a
 profitable company $\ln u_i^{PE} - \ln R_{i,0}$ and for a loss-maker
 $-\ln u_i^{K}$. The model's own stationary spread of $s$ is about 0.016, so
 putting the whole premium into $s$ would open every run with a months-long
 drift back to fair value. Instead, at the first open tick, the premium is
-split between $s$ and the fair-value level $v$ (`engine.rs:4031-4070`), using
+split between $s$ and the fair-value level $v$ (`engine.rs:4520-4559`), using
 $n + 1$ normals drawn once from the opening stream when the engine is built
-(`engine.rs:1024-1033`):
+(`engine.rs:1114-1123`):
 
 ```math
 s_{i,0} = \mathrm{clip}\big(\sigma_c\,z_{n+1} + \sigma_o\,(z_i - \bar z);\ -0.9,\ 0.9\big),
@@ -1114,7 +1114,7 @@ draw from its stationary spread, the market's common level at a draw from
 its own, and the rest of the premium becomes fair value, so no price moves
 at the open: $V_{i,0} e^{v_{i,0}} e^{s_{i,0}} = P_{i,0}$. A company listed
 later opens with $s_0 = \mathrm{clip}(g_i;\ -0.9,\ 0.9)$
-(`market/tick.rs:1103-1111`).
+(`market/tick.rs:1130-1138`).
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
@@ -1135,7 +1135,7 @@ year-on-year revenue growth. By default each opens at its fair value.
 
 **Timescale:** every tick. The model price is fair value, including the
 company's fair-value level, times the exponential of the mispricing
-(`market/tick.rs:1250`):
+(`market/tick.rs:1291`):
 
 ```math
 P^{\ast}_{i,t} = \max\big(0.01,\ V_{i,t}\,e^{s_{i,t+1}}\big)
@@ -1143,7 +1143,7 @@ P^{\ast}_{i,t} = \max\big(0.01,\ V_{i,t}\,e^{s_{i,t+1}}\big)
 
 If $P^{\ast}$ leaves the session band $[0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o}]$
 it is clamped to the band and $s$ is re-derived from the clamped price
-(`market/tick.rs:1256-1265`). The printed price is $P^{\ast}$ traded through
+(`market/tick.rs:1297-1306`). The printed price is $P^{\ast}$ traded through
 the book; see [The market maker and the book](#the-market-maker-and-the-book).
 
 ### Mispricing
@@ -1160,7 +1160,7 @@ s_{i,t+1} = \mathrm{clip}\Big(\phi_\tau\,s_{i,t}
  + u(\tau_t)\,\varepsilon_{i,t};\ -\bar s,\ \bar s\Big)
 ```
 
-(`market/tick.rs:1193-1246`), with these terms in order:
+(`market/tick.rs:1223-1287`), with these terms in order:
 
 - **Mean reversion.** $\phi_\tau = 0.5^{1/(390 H)}$, so $s$ decays by half in $H$ sessions if nothing else acts.
 - **Herding.** $\theta \mu$: a share of yesterday's re-rating continues today.
@@ -1175,7 +1175,7 @@ The momentum term rolls at the close, before the jumps
 (`market/daily.rs:240-244`): $\mu_{i,d+1} = s_i^{\mathrm{close}} - s_i^{\mathrm{ref}}$,
 then $s_i^{\mathrm{ref}} \leftarrow s_i^{\mathrm{close}}$. Jumps are excluded
 from the next day's momentum (`jump_momentum_share` = 0,
-`engine.rs:4170-4175`).
+`engine.rs:4661-4666`).
 
 **As a daily AR(2).** Summed over a session, with the crowd term in its
 linear range and no clamp binding, the close-to-close mispricing follows
@@ -1209,7 +1209,7 @@ a log level on each company's fair value, persistent across sessions
 
 A company's own shocks are permanent. On each tick the share $\psi$ of its
 sector and own noise, and of the news that names it, its peers or its
-sector, leaves $s$ for $v$ (`market/tick.rs:1209-1245`):
+sector, leaves $s$ for $v$ (`market/tick.rs:1239-1286`):
 
 ```math
 \Delta_{i,t}^{v} = \psi\Big[u(\tau_t)\big(\xi_i\,\ell_i\,G_{k(i),t} + \xi_i\,I_{i,t}\big) + \frac{N_{i,t} - N_{i,t}^{M}}{390}\Big]
@@ -1225,7 +1225,7 @@ $N^{M}$ is market-wide news, which stays in $s$. The Ito term keeps
 $e^{v}$ a martingale. The price takes the whole shock on the tick either
 way; what changes is that the company's part no longer reverts on the
 mispricing's half-life. At the close the company's own jump goes to $v$ the
-same way (`engine.rs:4205-4245`). The market's share of both, which
+same way (`engine.rs:4696-4744`). The market's share of both, which
 pt-v20 also sets, is in [The market's permanent share](#the-markets-permanent-share):
 
 ```math
@@ -1255,8 +1255,8 @@ to the volatility ceiling.
 $\zeta_{k,t}$ per sector, one normal $\eta_{i,t}$ per company, all on the
 market stream, in that order.
 
-The market factor and the sector factors (`market/tick.rs:850-896`,
-`market/tick.rs:290-298`):
+The market factor and the sector factors (`market/tick.rs:876-922`,
+`market/tick.rs:296-304`):
 
 ```math
 f_t = \sqrt{v_d}\,\frac{z_t}{\sqrt{390}},
@@ -1269,7 +1269,7 @@ state, both set at the previous close; see [Volatility](#volatility). The
 sector sigma scales with the VIX ratio $\rho_d$ because
 `sector_vix_coupling` = 1.
 
-A company's tick shock (`market/factors.rs:820-1072`):
+A company's tick shock (`market/factors.rs:850-1115`):
 
 ```math
 \varepsilon_{i,t} = \Gamma_t\,M_{i,t} + \upsilon_{i,d} + \xi_i\,\ell_i\,G_{k(i),t} + \xi_i\,I_{i,t}
@@ -1299,7 +1299,7 @@ What each term does:
 - $\Gamma$ is the crash amplifier: a market draw beyond $T_A$ standard deviations loads extra. It fires on 4.6% of ticks.
 - $\upsilon$ gives back the mean the down-tick tilt adds, so the tilt changes shape and not drift.
 - $\ell_i G$ is the sector leg. The loading rises with beta.
-- $I$ is the company's own noise. Its scale is the company's GJR variance $h_{i,d}$, floored, times a size step $c_i$: 0.8 above USD 50bn of market cap, 1.0 above 10bn, 1.3 above 1bn, 1.6 below (`market/factors.rs:692-703`).
+- $I$ is the company's own noise. Its scale is the company's GJR variance $h_{i,d}$, floored, times a size step $c_i$: 0.8 above USD 50bn of market cap, 1.0 above 10bn, 1.3 above 1bn, 1.6 below (`market/factors.rs:722-733`).
 - $\xi_i$ is 1 except during a crisis episode with an epicentre, when it is 2.04 for companies in the epicentre sector and 0.80 for the rest; see [Crisis regimes](#crisis-regimes).
 
 Betas are fixed per company when the universe is built.
@@ -1324,7 +1324,7 @@ Betas are fixed per company when the universe is built.
 
 **Timescale:** a daily-equivalent drift, set by the previous session's
 return $r$ and short interest over float $\mathrm{SIR}$
-(`market/factors.rs:1097-1164`):
+(`market/factors.rs:1140-1207`):
 
 ```math
 Q_{i,d} = \min(0.02,\ 0.5\,\mathrm{SIR}\,r) \cdot \mathbf{1}[\mathrm{SIR} > 0.2,\ r > 0.03]
@@ -1334,7 +1334,7 @@ Q_{i,d} = \min(0.02,\ 0.5\,\mathrm{SIR}\,r) \cdot \mathbf{1}[\mathrm{SIR} > 0.2,
 
 The cascade $C(x)$ is 0.007 above a 7% move, 0.0045 above 5%, 0.0025 above
 3%, else 0.0005. The whole term is scaled by `cascade_gain`, 0.1 on pt-v20
-and 1 on pt-v19 (`market/factors.rs:1166-1174`): with the tape tracking the
+and 1 on pt-v19 (`market/factors.rs:1209-1217`): with the tape tracking the
 model price, the ladders were the largest daily momentum left, and 0.1
 brings the one-day Lo-MacKinlay contrarian profit to the reference roster's
 -1.74 basis points a day (measured; estimate 0.12, s.e. 0.11; row C8 reads
@@ -1347,7 +1347,7 @@ and down ladders mirror images, and it and the ladder constants are chosen.
 
 At each open every company draws a uniform and a normal on the news stream.
 With probability $\lambda_N$ it has a news event of log size
-$\nu_e = \sigma_N Z$ (`engine.rs:3522-3539`). An event reaches company $i$
+$\nu_e = \sigma_N Z$ (`engine.rs:3997-4014`). An event reaches company $i$
 with weight
 
 ```math
@@ -1357,7 +1357,7 @@ w_p\,(1 + c_p\,\chi_d) & \text{the event is about another company in the same se
 \end{cases}
 ```
 
-(`market/factors.rs:734-791`), where $\chi_d$ is the crisis spike (below).
+(`market/factors.rs:764-821`), where $\chi_d$ is the crisis spike (below).
 An event is priced mostly within minutes. The share absorbed by minute $m$
 of the session is
 
@@ -1373,11 +1373,11 @@ and the news term in the mispricing equation is
 N_{i,t} = 390 \sum_{e} w_{e,i}\,\nu_e\,\big(\mathcal{A}(t + 1) - \mathcal{A}(t)\big)
 ```
 
-(`engine.rs:2044-2054`, `market/factors.rs:512-565`). Over the session an
+(`engine.rs:2443-2453`, `market/factors.rs:536-589`). Over the session an
 event moves $s$ by $w \nu_e$: 61% of that in the first minute, 89% by the
 fifth and 99% by the 150th. The market
 maker re-quotes by the tick's news term before any trade, so the traded price
-carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1446-1464`).
+carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1487-1505`).
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
@@ -1393,7 +1393,7 @@ carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1446-1464`)
 ### Jumps
 
 **Timescale:** once a day, at the close, on the jumps stream
-(`engine.rs:4112-4178`). A market jump hits every company with unit loading;
+(`engine.rs:4601-4745`). A market jump hits every company with unit loading;
 an idiosyncratic jump hits one company. Both rates rise with the VIX, and the
 expected market jump is subtracted so jumps add no drift:
 
@@ -1427,7 +1427,7 @@ idiosyncratic jumps a year, of standard deviation 7.5%.
 
 Every change in the model price at a fixed published valuation is booked to
 one of ten factors, which `engine.truth()` reports
-(`market/factors.rs:61-63`, `market/tick.rs:1144-1161`). An eleventh column,
+(`market/factors.rs:61-64`, `market/tick.rs:1171-1190`). An eleventh column,
 the fair-value shift, books what left $s$ for the fair-value level. It is
 new in 0.8.5 (`market/factors.rs`, `python_arrow.rs`), and each tick books
 as follows:
@@ -1546,7 +1546,7 @@ e_{i,d} = \sum_{t} u(\tau_t)\,\varepsilon_{i,t}
 ```
 
 The innovation $e_{i,d}$ is the day's whole noise term for the company:
-market, sector and own parts together (`engine.rs:3214-3217`). The
+market, sector and own parts together (`engine.rs:3664-3667`). The
 persistence $\alpha + \beta + \gamma/2 = 0.9416$ is a half-life of 11.5
 sessions. The recursion's own unconditional level,
 $\omega / (1 - 0.9416) = 3.4 \times 10^{-5}$, sits below the floor
@@ -1566,7 +1566,7 @@ not $\omega$, holds the resting level.
 ### Sector variance
 
 **Timescale:** daily, at the close. **State:** $h_{k,d}^{S}$, a variance ratio
-whose fixed point is 1 (`engine.rs:1262-1290`). $D_{k,d} = \sum_t G_{k,t}$ is
+whose fixed point is 1 (`engine.rs:1661-1689`). $D_{k,d} = \sum_t G_{k,t}$ is
 the day's summed sector factor.
 
 ```math
@@ -1611,7 +1611,7 @@ structure; $\Lambda_d = (1 + a_L)^{2}$ if today's summed market factor
 was negative, else 1; and $J_d^{V}$ is the variance the jumps and news add.
 
 The VIX it implies, and the anchor $A$ (`market/index_var.rs:1189-1191`,
-`engine.rs:1176-1199`):
+`engine.rs:1575-1598`):
 
 ```math
 I_d = (1 + \varpi)\cdot 100\,\sqrt{252\,V_d},
@@ -1635,9 +1635,9 @@ or two uniforms on the economy stream, and one normal on the VIX level
 stream at the close. **State:** $X_d$, a slow log level $q_d$, and the
 anchor's slow memory $M_d$.
 
-A slow level wanders around the anchor (`engine.rs:3850-3863`,
-`engine.rs:4844-4867`), and a slow memory tracks the read-back
-(`engine.rs:4418-4434`):
+A slow level wanders around the anchor (`engine.rs:4339-4352`,
+`engine.rs:5390-5413`), and a slow memory tracks the read-back
+(`engine.rs:4924-4941`):
 
 ```math
 q_d = \phi_q\,q_{d-1} + \frac{\sigma_\ell}{G_\ell}\,Z,
@@ -1647,7 +1647,7 @@ q_d = \phi_q\,q_{d-1} + \frac{\sigma_\ell}{G_\ell}\,Z,
 M_d = (1 - h_M)\,M_{d-1} + h_M \ln\frac{I_d}{A\,e^{-c_A}}
 ```
 
-The target (`economy/daily.rs:1263-1358`):
+The target (`economy/daily.rs:1336-1431`):
 
 ```math
 T_d = \Xi_d\,I_d\,e^{-a(X_d)\,M_d}
@@ -1667,12 +1667,12 @@ G_{\downarrow}\,\lvert r \rvert^{e_\downarrow}\,X^{-(e_\downarrow - 1)} & r < 0 
 A fall raises the VIX, by less when the VIX is already high; a rise lowers
 it. $\bar\Phi_d$ is the mean of $\Phi$ under a normal return with the index's
 own variance, subtracted so the fear response adds no drift
-(`economy/daily.rs:599-623`). The weight on the slow memory falls as the VIX
+(`economy/daily.rs:632-654`). The weight on the slow memory falls as the VIX
 rises: $a(X) = 1 - (1 - a_0) X_d^{\ast} / \mathrm{clip}(X;\ X_d^{\ast},\ 2.216 X_d^{\ast})$ with
 $X_d^{\ast} = A \Xi_d e^{-0.3888}$, so $a$ runs from 0.375 to 0.718
-(`economy/daily.rs:550-558`).
+(`economy/daily.rs:583-591`).
 
-The step (`economy/daily.rs:1400-1472`):
+The step (`economy/daily.rs:1473-1545`):
 
 ```math
 X_{d+1} = \mathrm{clip}\Big(X_d + \kappa_X\,(T_d - X_d) + \sigma^{X}_d\,Z + J_d;\ 10,\ X_{\max}\Big),
@@ -1714,7 +1714,7 @@ A crisis is a state of the VIX. There is no separate regime switch: every
 variance process scales with the VIX, so a high VIX is a violent market.
 Three things change above a threshold $X_c$.
 
-**The crisis spike** (`market/tick.rs:324-342`):
+**The crisis spike** (`market/tick.rs:330-348`):
 
 ```math
 \chi_d = \min\big(0.98,\ (X_d - X_c)^{+} / 1.4\big)
@@ -1726,13 +1726,13 @@ that once raised every company's market loading in a crisis is switched off
 (`crisis_blend_gain` = 0): the data showed no crisis correlation beyond
 what the higher common volatility already gives.
 
-**The crisis episode and its epicentre** (`engine.rs:3258-3332`). An episode
+**The crisis episode and its epicentre** (`engine.rs:3708-3780`). An episode
 starts at the open of the first session with $X_d > X_c$. One uniform on the
 epicentre stream picks the sector it starts in: financial services with
 probability 0.6, no epicentre with 0.4. The episode ends after 21
 consecutive sessions at or below $X_c$. While it runs, and if a company in
 the epicentre sector is listed, the sector and own-noise legs of each
-company's shock are scaled by $\xi_i$ (`market/factors.rs:333-351`):
+company's shock are scaled by $\xi_i$ (`market/factors.rs:334-352`):
 
 ```math
 \xi_\uparrow^{2} = \frac{m\,(e^{2} - 1)}{1 - m} + e^{2}\,\xi_\downarrow^{2},
@@ -1767,7 +1767,7 @@ inventory $I_i$ in shares (`microstructure.rs:325-380`).
 ### The quote
 
 The maker quotes around a blend of the last print and the tick's model
-price (`market/tick.rs:1446-1464`):
+price (`market/tick.rs:1487-1505`):
 
 ```math
 \hat P_{i,t} = P_{i,t-1}^{\,1 - w_Q}\,\big(P_{i,t}^{\ast}\big)^{w_Q}
@@ -1835,12 +1835,12 @@ The maker's inventory takes the other side of every fill and never decays
 
 The print is then clamped to the same ±25% session band as the model price:
 $P_{i,t} = \mathrm{clip}(P_{i,t}^{\mathrm{set}};\ 0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o})$
-(`market/tick.rs:1404-1412`). The overnight gap is not clamped, and there is
+(`market/tick.rs:1445-1453`). The overnight gap is not clamped, and there is
 no overnight move: each session opens at the last print.
 
 **The closing cross.** On the last tick of the session the print is the
 model price, clamped to the same band, and the maker's inventory change
-from that tick is dropped (`market/tick.rs:1501-1513`, `market/tick.rs:1570`):
+from that tick is dropped (`market/tick.rs:1542-1554`, `market/tick.rs:1611`):
 
 ```math
 P_{i,389} = \mathrm{clip}\big(P_{i,389}^{\ast};\ 0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o}\big)
@@ -1899,9 +1899,9 @@ D_{t+1} = D_t\,2^{-1/H_B}
 ```
 
 and a fill against the maker moves the maker's inventory at the next
-re-quote (`engine.rs:2368-2386`), and at the open everything resets.
+re-quote (`engine.rs:2779-2798`), and at the open everything resets.
 
-A limit order's remainder rests (`engine.rs:2826-2843`). Each tick it is
+A limit order's remainder rests (`engine.rs:3240-3256`). Each tick it is
 also posted into the settlement book, where the background flow can fill it
 at its limit, as a maker fill (`microstructure.rs:674-716`,
 `microstructure.rs:740-755`).
@@ -1909,8 +1909,8 @@ at its limit, as a maker fill (`microstructure.rs:674-716`,
 ### The path of a fill to the price
 
 All agents' taker fills since the last tick are applied once, on the next
-open tick (`engine.rs:2114-2138`). Each agent's net fill leaves a linear
-permanent impact on $s$, Almgren's law (`engine.rs:2390-2395`):
+open tick (`engine.rs:2513-2537`). Each agent's net fill leaves a linear
+permanent impact on $s$, Almgren's law (`engine.rs:2801-2806`):
 
 ```math
 \Delta s_i = \sum_{a} \gamma\,\sigma_i\,\frac{b_{a,i} - x_{a,i}}{\bar A_i}
@@ -1931,7 +1931,7 @@ which now carries only flow a caller supplies directly:
 O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac{x^{+} + x^{-}}{\max(\bar A_i/390,\ 100)},\ 10\Big)\Big)\cdot\frac{c_{OF}\,f_I}{\max\big(\max(\bar A_i,\ 0.005\,S_i)/390,\ 100\big)}
 ```
 
-(`market/factors.rs:797-803`, `market/factors.rs:1219-1232`).
+(`market/factors.rs:827-833`, `market/factors.rs:1263-1276`).
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
@@ -2052,7 +2052,7 @@ as before.
 **Timescale:** tick volume every tick; two persistent states once a day.
 
 Tick volume is a product of multipliers on a minute's share of average
-daily volume (`market/tick.rs:1272-1370`):
+daily volume (`market/tick.rs:1313-1411`):
 
 ```math
 V^{\mathrm{vol}}_{i,t} = \Big\lfloor \frac{\bar A_i}{390}\,M^{\mathrm{var}}_d\,M^{\mathrm{pers}}_d\,M^{h}_{i,d}\,\Psi_{i,t}\,c^{\mathrm{vol}}(\tau_t) \Big\rfloor
@@ -2076,7 +2076,7 @@ $c^{\mathrm{vol}}(\tau)$ is the intraday U-shape: 2.9 at the open, 1.07 at its l
 around 12:50, 2.4 at the close. Two more multipliers, one for closed-market
 ticks and one for news a caller supplies, are 1 in a normal run.
 $\Psi$ raises volume with the day's move so far, measured on the model price. The persistent volume state is an AR(1)
-stepped at each close (`engine.rs:4291-4303`):
+stepped at each close (`engine.rs:4792-4804`):
 
 ```math
 \vartheta_{d+1} = \rho_V\,\vartheta_d + \sigma_V\,Z
@@ -2099,17 +2099,17 @@ the size of the settlement slices, so a volume dial is also a price dial.
 ## Bonds
 
 A roster can include three bond indices: `UST2Y`, `UST10Y` and `IGCORP`
-(`rates.rs:208-242`), with `Universe.random(..., bonds=True)`. They are
+(`rates.rs:216-250`), with `Universe.random(..., bonds=True)`. They are
 simulated constant-maturity indices, priced off the model's curve; they
 read the curve and write nothing back to it.
 
 **Timescale:** each index reprices at the first open after its yield
-changes (`rates.rs:504-549`). UST2Y reads $y^{2}$, UST10Y reads $y^{10}$, and
+changes (`rates.rs:512-557`). UST2Y reads $y^{2}$, UST10Y reads $y^{10}$, and
 IGCORP reads $y^{10}$ plus a spread re-marked to $y^{c} - y^{10}$ whenever
 the corporate yield changes, which on pt-v20 is almost every session
-(`rates.rs:258-273`, `rates.rs:495-509`). With the yield change $\Delta y$
+(`rates.rs:266-281`, `rates.rs:503-517`). With the yield change $\Delta y$
 as a fraction, the level moves by carry, duration and convexity
-(`rates.rs:287-305`):
+(`rates.rs:295-314`):
 
 ```math
 L \leftarrow L\,\Big(1 + \frac{y^{\mathrm{prev}}}{252} - D\,\Delta y' + \tfrac12\,C\,(\Delta y')^{2}\Big),
@@ -2128,8 +2128,8 @@ pricing a large rise as a gain.
 Each index has its own ten-level maker ladder around its level, widened by
 the VIX. An agent trades it with market orders, whose fills apply once on
 the next tick; they move the maker's inventory, which decays with a
-15-tick half-life, and never the level (`rates.rs:385-423`,
-`rates.rs:556-607`). The agent book, limit orders and news do not apply to
+15-tick half-life, and never the level (`rates.rs:393-431`,
+`rates.rs:564-615`). The agent book, limit orders and news do not apply to
 the indices. Graded: rows R1 to R4 read the curve the indices price off.
 
 ## Scenarios
@@ -2182,7 +2182,7 @@ A **pin** gives a field an exogenous path $x_d = P(d)$
 
 An **intervention** changes a field relative to its value $\tilde x_a$ on the
 day $a$ it fires, by $\mathrm{op} \in \lbrace$ set, add, multiply $\rbrace$
-(`python/tradefloor/interventions.py:1247-1255`,
+(`python/tradefloor/interventions.py:1298-1306`,
 `python/tradefloor/scenario.py:1272-1302`). With
 $x^{\dagger} = \mathrm{op}(\tilde x_a, v)$:
 
@@ -2202,7 +2202,7 @@ a moving value.
 **What a pin does to the economy underneath.** A pin writes the value each
 morning. The macro step still runs at every close, starting from the pinned
 value, and every other field follows from it; the next morning the pin
-overwrites the pinned field again (`python_engine.rs:2970-3018`). When the
+overwrites the pinned field again (`python_engine.rs:3048-3096`). When the
 pin ends, the economy carries on from the last value. Two fixes on
 `fix/ptv20-core` for this release (commits `cd15126` and `fe8bcef`) close
 a leak the daily corporate yield opened on pt-v20: a pinned corporate yield
@@ -2213,7 +2213,7 @@ sessions.
 
 ### Target channels
 
-On pt-v20 (`python/tradefloor/interventions.py:476-790`):
+On pt-v20 (`python/tradefloor/interventions.py:520-841`):
 
 | Target | Reaches prices through | Delay |
 |---|---|---|
@@ -2246,7 +2246,7 @@ variance.
 
 **`market.earnings`** multiplies each company's published earnings, and
 scales its book value by the same factor, through `set_fundamentals`
-(`python/tradefloor/interventions.py:634-691`). Only `multiply` is
+(`python/tradefloor/interventions.py:685-742`). Only `multiply` is
 accepted. It stacks on the earnings cycle and moves fair value from the
 next tick; when its last window closes the scenario writes the earlier
 level back. On pt-v20 a multiply by 0.6 over 60 sessions took the index
@@ -2373,7 +2373,7 @@ equation. They are listed so a reader can judge them.
 
 **Macro.**
 
-- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs:665-690`). Whether that is intended is not recorded.
+- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs:716-741`). Whether that is intended is not recorded.
 - Unemployment sits on its 2.5% floor for much of an expansion. Its long-run mean is 3.6% against 5.7% in the US.
 - The cycle's monthly hazard is turned into a daily probability as $h/21$, an approximation to $1 - (1 - h)^{1/21}$ that runs 4% to 15% high. The opening draw uses the hazard alone, without the ladder, so it is close to stationary but not exactly so.
 - Row 6 of the central bank's ladder can never fire, because inflation is capped at 6%. While the emergency condition holds, a meeting is held at every close.
