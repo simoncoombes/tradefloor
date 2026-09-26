@@ -39,9 +39,12 @@ library itself still imports nothing.
 
 The root is the move, ``log(close / previous close)``, with the close
 read from the replayed day and the previous close from the copy taken
-before the open.
+before the open. Both are the price the engine holds after a close, which
+is the day's last print on every preset through pt-v19; under
+``macro_publication_repricing`` (pt-v20) the close re-marks every traded
+name to the macro state it publishes, after that print.
 
-Its children are thirteen contributions, of kind ``factor``. Eleven are
+Its children are fourteen contributions, of kind ``factor``. Eleven are
 the ``truth()`` columns for the name on that day, in ``Engine.FACTORS``
 order, and they sum to the day's change in ``mispricing_s``. The last of
 them, ``fair_value_shift``, is minus the part of the day's shocks that
@@ -50,12 +53,18 @@ permanent share; zero on every earlier preset). Two more close the
 arithmetic: ``fair_value`` is the day's change in log fundamental value,
 which carries that same permanent part with the opposite sign, and
 ``book`` is the change in the log distance from the model price to the
-print. All thirteen are measured, so their sum against
-the move is an identity the engine can fail;
-:meth:`Explanation.check` states the residual rather than asserting it.
-Where the day before is not on the tape its closing levels are unknown,
-``fair_value`` reads zero and ``book`` is what the mispricing leaves
-over, which the caveats say.
+day's last print. The fourteenth, ``repricing``, is the change in the log
+distance from that print to the price the close left: the close's re-mark
+tonight less the one the day opened on. The tape's fundamental value is
+the one the last tick read, before the close's macro step, so a published
+decision reaches ``fair_value`` on the next day's tape while the price
+took it the evening before, and ``repricing`` carries it between the two.
+It is exactly zero on every preset through pt-v19. All fourteen are
+measured, so their sum against the move is an identity the engine can
+fail; :meth:`Explanation.check` states the residual rather than
+asserting it. Where the day before is not on the tape its closing levels
+are unknown, ``fair_value`` and ``repricing`` read zero and ``book`` is
+what the mispricing leaves over, which the caveats say.
 
 ``fair_value`` is zero on a day the valuation holds still, which is most
 days of most presets: earnings and the sector anchor are fixed for a run,
@@ -92,10 +101,12 @@ What a call does is fixed and what it takes in wall time is not, so the
 counts come first. A ``check()`` runs the day once per DISTINCT overlay
 rather than once per node, since a replay is a function of its patch set:
 19 runs, whatever the roster, the 15 before the overnight contribution
-and its three sites plus their union. The tree is 63 nodes where
-``Engine.prints()`` splits the book contribution and 61 where the build
-has no print table, the 55 and 53 before plus the overnight
-contribution's eight, and the addressed draws under one name are 2,739 at
+and its three sites plus their union. The tree is 69 nodes where
+``Engine.prints()`` splits the book contribution and 67 where the build
+has no print table: the 55 and 53 before plus the overnight
+contribution's eight, then three each (factor, mechanism, one state node)
+for ``fair_value_shift`` and ``repricing``, which take no draw and so add
+no run. The addressed draws under one name are 2,739 at
 every roster size, the 2,736 before plus one per overnight site. What
 grows is the log the call reads, because the market stream's log is the
 size of the tape at 613 of that stream's draws a tick.
@@ -335,10 +346,27 @@ MECHANISMS: tuple[Mechanism, ...] = (
         # orders in the same book (`agent_book.rs`).
         via=("microstructure::settle_inner",),
     ),
+    Mechanism(
+        # What the close wrote to the price after the day's last print:
+        # under `macro_publication_repricing` every traded name is re-marked
+        # to the published macro state at the close (pt-v20), so the price
+        # the engine holds at a close is not the last print. The day's move
+        # is between those prices, and this is the change over the day in
+        # the log distance from the last print to it. Zero on every preset
+        # before pt-v20.
+        factor="repricing",
+        function="engine::Engine::reprice_to_published_macro",
+        state=("price",),
+        dials=("macro_publication_repricing", "buyback_payout_share",
+               "price_hard_cap"),
+        via=("engine::Engine::published_macro_marks",
+             "market::tick::tick_fair_value"),
+    ),
 )
 
 #: The contributions the root carries, in order: the eleven ``truth()``
-#: columns and the two that close the arithmetic to the printed move.
+#: columns, the two that close the arithmetic to the day's last print, and
+#: the close's re-mark from that print to the price the engine holds.
 #:
 #: Named for what they are rather than ``FACTORS``, which is what
 #: ``Engine.FACTORS`` calls the eleven. Two names for two different lists
@@ -352,16 +380,20 @@ CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 #: change in a level, so they are not a re-split of it in any obvious
 #: sense; that they add up to it is arithmetic worth stating. Writing A
 #: for the anchor's move, which is the other twelve contributions, the
-#: identity is that summed shock plus summed absorbed telescopes to the
-#: printed move, so summed absorbed plus (summed shock minus A) is the
-#: move minus A, which is the book contribution. Each is measured on its
-#: own rather than one being taken as what the others leave over.
+#: identity is that summed shock plus summed absorbed plus summed
+#: repriced telescopes to the move between the two days' last prints, so
+#: summed absorbed plus (summed shock and repriced minus A) is that move
+#: minus A, which is the book contribution. Each is measured on its own
+#: rather than one being taken as what the others leave over.
 #:
 #: The third has a closed form: summed shock minus A works out to minus
 #: the sum of the log distances from the anchor to the print, taken at
 #: the tick BEFORE each settlement. Each tick measures its shock from the
-#: last print, so wherever the tape sits away from the model that gap
-#: enters the shock and leaves again through absorbed.
+#: price it starts from, which is the last print unless something wrote
+#: the price between (``repriced``: the close's re-mark under
+#: ``macro_publication_repricing``), so the shock plus ``repriced`` is the
+#: shock measured from the last print; wherever the tape sits away from
+#: the model that gap enters it and leaves again through absorbed.
 DEPTH: tuple[tuple[str, str], ...] = (
     ("order_book", "microstructure::settle_price_through_book"),
     ("circuit_breaker_two", "market::tick::simulate_market_tick"),
@@ -371,11 +403,11 @@ DEPTH: tuple[tuple[str, str], ...] = (
 #: The kinds a node can be.
 KINDS = ("move", "factor", "mechanism", "state", "draw")
 
-#: How close the thirteen contributions have to come to the move before
+#: How close the fourteen contributions have to come to the move before
 #: :meth:`Explanation.check` calls it a miss, and how close a replayed
 #: value has to come to the recorded one. The truth test holds the
 #: decomposition to 1e-15 over one day's rows; this is the same order,
-#: loosened for the thirteen-term sum and the two logs the move is taken
+#: loosened for the fourteen-term sum and the two logs the move is taken
 #: through.
 TOLERANCE = 1e-12
 
@@ -480,7 +512,8 @@ def _the_slot_names_the_name(roster: Sequence[str], slot: int,
 
 
 def _levels(engine: Engine, day: int, index: int) -> dict[str, float] | None:
-    """The day's closing fundamental value and anchor price for one name.
+    """The day's closing fundamental value, anchor price and last print for
+    one name.
 
     ``None`` when the day is not on this engine's tape. Both are read at
     the name's last row of the day, which is its close.
@@ -506,8 +539,15 @@ def _levels(engine: Engine, day: int, index: int) -> dict[str, float] | None:
     if not rows:
         return None
     last = rows[-1]
+    # The day's last print, which the book's distance and the close's
+    # re-mark are both measured from. A day on the truth tape is on the
+    # bars tape too, since `record` writes both.
+    printed = _recorded_close(engine, day, index)
+    if printed is None:  # pragma: no cover - record writes both tapes
+        return None
     return {"fundamental_value": float(table["fundamental_value"][last]),
-            "anchor_price": float(table["anchor_price"][last])}
+            "anchor_price": float(table["anchor_price"][last]),
+            "printed_close": printed}
 
 
 def _table(stream: Any) -> dict[str, list]:
@@ -845,38 +885,61 @@ class Explanation:
         factors = {name: math.fsum(table[name][k] for k in rows)
                    for name in Engine.FACTORS}
         mispricing = math.fsum(factors.values())
+        # The day's last print, off the fork's own tape. Under
+        # `macro_publication_repricing` the close re-marks the price after
+        # it, so `close`, the price the engine holds, is not the print.
+        printed = _recorded_close(fork, self._label, i)
         levels = {"close": close, "previous_close": previous_close,
+                  "printed_close": close if printed is None else printed,
                   "fundamental_value": table["fundamental_value"][rows[-1]],
                   "anchor_price": table["anchor_price"][rows[-1]]}
         # log(close) is log(fundamental value) + mispricing_s + the log
-        # distance from the anchor to the print, so the day's move is the
-        # change in each of the three. Both of the two here are MEASURED
-        # against the day before's closing levels rather than taken as
-        # what the mispricing leaves over: a remainder would make the
-        # thirteen sum to the move whatever the engine had done, and the
-        # sum is the claim.
+        # distance from the anchor to the day's last print + the log
+        # distance from that print to the price the close left, so the
+        # day's move is the change in each of the four. All three of the
+        # ones here are MEASURED against the day before's closing levels
+        # rather than taken as what the mispricing leaves over: a
+        # remainder would make the fourteen sum to the move whatever the
+        # engine had done, and the sum is the claim.
+        #
+        # The last is the close's re-mark (`macro_publication_repricing`,
+        # pt-v20): the macro step published at the close re-values every
+        # traded name at once, so the price the engine holds at the close
+        # is not the last print. The tape's fundamental value is the one
+        # the last tick read, before the step, so the step's move reaches
+        # `fair_value` on the NEXT day while the price took it tonight;
+        # this contribution carries it in between, as tonight's re-mark
+        # less the one the day opened on. Exactly zero on every preset
+        # before pt-v20, where the close writes no price.
         #
         # Those levels are on the tape of the day before. Without it the
-        # valuation and the book are one number, `fair_value` reads zero
-        # and `book` is the remainder, which the caveats say and
-        # `check()` cannot then contradict.
+        # valuation, the book and the re-mark are one number, `fair_value`
+        # and `repricing` read zero and `book` is the remainder, which the
+        # caveats say and `check()` cannot then contradict.
         if self._previous is None:
             factors["fair_value"] = 0.0
+            factors["repricing"] = 0.0
             factors["book"] = move - mispricing
         else:
             factors["fair_value"] = math.log(
                 levels["fundamental_value"]
                 / self._previous["fundamental_value"])
             factors["book"] = (
-                math.log(levels["close"] / levels["anchor_price"])
-                - math.log(levels["previous_close"]
+                math.log(levels["printed_close"] / levels["anchor_price"])
+                - math.log(self._previous["printed_close"]
                            / self._previous["anchor_price"]))
+            factors["repricing"] = (
+                math.log(levels["close"] / levels["printed_close"])
+                - math.log(levels["previous_close"]
+                           / self._previous["printed_close"]))
         state = {name: value for name, value
                  in self._opened.macro_fields.items()
                  if isinstance(value, (int, float))}
         for name in _STATE_FIELDS:
             state[name] = _column(self._opened, name)[i]
-        depth = _depth(fork, self._label, i, anchor=move - factors["book"])
+        depth = _depth(fork, self._label, i,
+                       anchor=(move - factors["book"]
+                               - factors["repricing"]))
         return _Day(move=move, factors=factors, state=state, levels=levels,
                     depth=depth)
 
@@ -916,7 +979,7 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        Four claims, each stated as a line per miss. The thirteen
+        Four claims, each stated as a line per miss. The fourteen
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
         the replay reproduces both the nine columns the run recorded and
@@ -944,7 +1007,11 @@ class Explanation:
                     f"{name} replayed to {got!r} against {recorded!r} on "
                     "the tape the run itself recorded")
         if self._recorded_close is not None:
-            got = self._base.levels["close"]
+            # The replay's last PRINT against the run's: the tape holds
+            # prints, and under `macro_publication_repricing` the price the
+            # engine holds after the close is the re-mark, not the print
+            # (the `repricing` contribution carries the difference).
+            got = self._base.levels["printed_close"]
             if got != self._recorded_close:
                 misses.append(
                     f"the replayed close is {got!r} against "
@@ -1090,9 +1157,11 @@ class Explanation:
         if self._previous is None:
             out.append(
                 f"day {self.day - 1} is not on this engine's tape, so the "
-                "fundamental value at the previous close is unknown and the "
-                "valuation's own move is not separated from the book's. The "
-                "book contribution carries both and fair_value reads zero.")
+                "fundamental value and last print at the previous close are "
+                "unknown, and neither the valuation's own move nor the "
+                "close's re-mark is separated from the book's. The book "
+                "contribution carries all three, and fair_value and "
+                "repricing read zero.")
         else:
             out.append(
                 "The valuation's move is measured against the fundamental "
@@ -1293,7 +1362,13 @@ def _depth(engine: Engine, day: int, index: int,
         return {}
     absorbed = math.fsum(table["absorbed"][k] for k in rows)
     clamp = math.fsum(table["clamp"][k] for k in rows)
-    shock = math.fsum(table["shock"][k] for k in rows)
+    # The shock measured from the LAST PRINT: the tick's own shock is from
+    # the price it started from, and `repriced` is what was written to the
+    # price between the two (the close's re-mark). A table from before the
+    # column has none, and nothing wrote a price between prints then.
+    repriced = table.get("repriced", [0.0] * len(ids))
+    shock = math.fsum([table["shock"][k] for k in rows]
+                      + [repriced[k] for k in rows])
     return {"order_book": absorbed - clamp,
             "circuit_breaker_two": clamp,
             "anchor_pull": shock - anchor,
