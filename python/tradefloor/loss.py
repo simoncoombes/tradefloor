@@ -140,9 +140,11 @@ LIVE_TARGETS = (
 #: `decay_curve.py` over thirty seeds, where aggregation kills exactly the
 #: noise that defeats the panel: real markets fit a log-log slope of
 #: -0.436 there and pt-v3, the default at 0.1.0, fit -0.956, which was
-#: unambiguous. pt-v20, the default from 0.8.5, fits -0.615 +/- 0.129,
-#: about 1.4 errors steeper than real (pt-v19: -0.515 +/- 0.109, inside one
-#: error), while reading below real at every lag (`envelope.DECAY_252`), so
+#: unambiguous. pt-v20, the default from 0.8.5, fits -0.676 +/- 0.188 on
+#: the vector that ships (fleet run `envgaps-085`, 2026-09-26), about 1.3
+#: errors steeper than real (pt-v19: -0.515 +/- 0.109, inside one error;
+#: pt-v20's first composition -0.615 +/- 0.129), while reading below real at
+#: every lag, about a quarter of real at lag one (`envelope.DECAY_252`), so
 #: on this default the slope does not clearly separate the two and the level
 #: does.
 CONSTRAINTS = (
