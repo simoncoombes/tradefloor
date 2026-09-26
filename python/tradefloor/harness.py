@@ -451,6 +451,10 @@ def evaluate(
         raise ValidationError("no agents given")
     if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
         raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
+    # The portfolio's own checks on cash and max_leverage, run before the
+    # untraded market rather than after it: that run costs as much as one
+    # agent's, and a bad argument should not wait for it.
+    Portfolio(cash=cash, max_leverage=max_leverage, cash_interest=cash_interest)
 
     hour, minute, day_of_week = start
     results: dict[str, Scorecard] = {}

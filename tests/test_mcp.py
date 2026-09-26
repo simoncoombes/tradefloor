@@ -894,3 +894,12 @@ def test_a_malformed_universe_is_refused_as_a_result(universe, expect):
               mcp.explain_price_move(universe=universe, day=1)):
         assert r["ok"] is False, r
         assert expect in r["error"]
+
+
+def test_infinite_cash_is_refused_like_nan_cash():
+    """cash=nan was refused and cash=inf returned ok: True, because the
+    portfolio's check was `x != x or x <= 0`."""
+    for cash in (float("inf"), float("nan")):
+        r = mcp.evaluate_strategies({"m": MOMENTUM}, cash=cash, **TINY)
+        assert r["ok"] is False
+        assert "cash must be finite and positive" in r["error"]
