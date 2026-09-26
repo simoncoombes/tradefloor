@@ -915,7 +915,7 @@ What follows from this:
 The sector anchors $\Pi_k$ are in [The sectors](#the-sectors). They are
 chosen: carried from the reference implementation, with no market data named.
 
-### The market's permanent share
+### The permanent share of market moves
 
 **Timescale:** every tick, and the close's jumps. **State:** a fair-value
 level $v_i$ per company, 0 on every preset through pt-v19.
@@ -1226,7 +1226,7 @@ $e^{v}$ a martingale. The price takes the whole shock on the tick either
 way; what changes is that the company's part no longer reverts on the
 mispricing's half-life. At the close the company's own jump goes to $v$ the
 same way (`engine.rs:4205-4245`). The market's share of both, which
-pt-v20 also sets, is in [The market's permanent share](#the-markets-permanent-share):
+pt-v20 also sets, is in [The permanent share of market moves](#the-permanent-share-of-market-moves):
 
 ```math
 \Delta_{i}^{v,J} = \psi\,J_{i}^{I},
@@ -1247,7 +1247,7 @@ to the volatility ceiling.
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $\psi$ | `fair_value_news_share` | 1.0 (0, off) | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
-| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The market's permanent share](#the-markets-permanent-share) |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
 
 ### The factor structure
 
