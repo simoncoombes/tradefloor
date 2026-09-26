@@ -47,7 +47,19 @@ bar contains it.
 Days are labelled ``-N`` to ``-1``. Under the harness the history then
 grows by one bar after each scored close, labelled ``0, 1, ...`` like
 ``obs.day``, so on scored day ``d`` it ends at ``d - 1`` and never shows the
-day being traded.
+day being traded. Each agent holds its own copy, grown from its own market:
+the pre-history is common to all of them, but from day zero an agent's
+trading moves its market, and the bars it is shown are the ones it printed.
+Handing every agent the untraded baseline's bars instead would show it the
+market its own impact was measured against.
+
+Scorecards record ``history_days``. With N days of pre-history, scored day
+zero is the session an evaluation without one scores as day N, so
+:func:`tradefloor.leaderboard` and :func:`tradefloor.rank` refuse to rank
+cards run with different settings together.
+
+The scenario clock starts at scored day zero and the pre-history runs no
+scenario, so nothing about a coming scenario is in the bars.
 
 ``history_days=252`` is the recommended setting for lookback agents, and
 273 for a rule that skips the most recent month (12-1 momentum). The cap is
@@ -132,6 +144,22 @@ class History:
         self._macro.append({k: v for k, v in macro.items()
                             if k in PUBLISHED_MACRO})
         self._steps.append(steps)
+
+    def copy(self) -> "History":
+        """An independent history with the same days, to grow separately.
+
+        The harness hands each agent its own, because after day zero each
+        agent's market is its own: the bars it is shown are the ones its
+        trading printed, never another agent's or the untraded baseline's.
+        The days already held are shared, which is safe because nothing
+        edits a day once it is appended.
+        """
+        out = History(self._tickers, self._steps_per_day, self._first)
+        out._labels = list(self._labels)
+        out._bars = {f: list(rows) for f, rows in self._bars.items()}
+        out._macro = list(self._macro)
+        out._steps = list(self._steps)
+        return out
 
     # -- shape ------------------------------------------------------------
 
@@ -267,24 +295,22 @@ class History:
                 f"{self._labels[-1]}, {len(self._tickers)} instruments)")
 
 
-def _read_day_bars(engine: Engine) -> dict[str, array]:
-    """The session's open, high, low and volume, read before the close."""
+def read_day_bars(engine: Engine) -> dict[str, Any]:
+    """The session's open, high, low, volume and published macro, read
+    before the close. Reading changes nothing in the engine."""
     return {"open_": _f64(engine.column("open")),
             "high": _f64(engine.column("high")),
             "low": _f64(engine.column("low")),
-            "volume": _f64(engine.column("volume"))}
-
-
-def _published_macro(engine: Engine) -> dict[str, Any]:
-    return {k: v for k, v in engine.macro_fields.items()
-            if k in PUBLISHED_MACRO}
+            "volume": _f64(engine.column("volume")),
+            "macro": {k: v for k, v in engine.macro_fields.items()
+                      if k in PUBLISHED_MACRO}}
 
 
 def record_day(history: History, engine: Engine, before_close: dict[str, Any],
                steps: array) -> None:
     """Append the day ``engine`` just closed. ``before_close`` is what
-    :func:`_read_day_bars` and :func:`_published_macro` read before
-    ``close_market``; the close is read now."""
+    :func:`read_day_bars` read before ``close_market``; the close is read
+    now. ``steps`` holds each step's opening prices, row after row."""
     history._append(close=_f64(engine.prices()), steps=steps, **before_close)
 
 
@@ -324,7 +350,6 @@ def run_untraded_day(engine: Engine, history: History, steps_per_day: int,
         steps.extend(_f64(engine.prices()))
         engine.run_session(*session_clock(start, step, ticks_per_step),
                            ticks_per_step)
-    before = _read_day_bars(engine)
-    before["macro"] = _published_macro(engine)
+    before = read_day_bars(engine)
     engine.close_market()
     record_day(history, engine, before, steps)

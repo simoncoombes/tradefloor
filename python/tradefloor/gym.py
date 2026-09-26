@@ -52,12 +52,15 @@ maker inventory, the Box-Muller spare, the GARCH state.
 
 from __future__ import annotations
 
+from array import array
+
 from typing import Any, Sequence
 
 from ._core import check_seed
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import session_clock
+from .history import read_day_bars, record_day
 from .portfolio import Portfolio
 from .sandbox import MarketView, PortfolioView
 from .universe_util import as_universe
@@ -178,6 +181,10 @@ class TradingEnv(_Base):
         self._step = 0
         self._prev_prices = None
         self._prev_worth = 0.0
+        # The episode's pre-history, and the current day's step prices for
+        # the bar it will append at the close; None without one.
+        self._history = None
+        self._day_steps = None
 
     @property
     def engine(self) -> Any:
@@ -193,6 +200,13 @@ class TradingEnv(_Base):
         under ``trusted_agents=True``. None before :meth:`reset`."""
         return self._portfolio if self.trusted_agents else self._shown[1]
 
+    @property
+    def history(self) -> Any:
+        """The episode's past as a :class:`~tradefloor.history.History`,
+        when :meth:`reset` was passed ``options={"history_days": N}``; None
+        otherwise. It grows by one bar after each close."""
+        return self._history
+
     # -- gym API ----------------------------------------------------------
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
@@ -203,8 +217,17 @@ class TradingEnv(_Base):
         another is being tested rather than recalled. Any integer from 0 to
         ``2**64 - 1``, checked before Gymnasium's own generator sees it, so a
         refusal names the engine's range rather than numpy's.
+
+        ``options={"history_days": N}`` runs N untraded sessions first, as
+        :func:`tradefloor.evaluate` does, and serves their daily bars as
+        :attr:`history`, so a policy with a lookback starts with its window
+        full. The episode is then the N+1-th session onward of the seed's
+        market. The observation vector is unchanged.
         """
+        from .history import check_history_days, prehistory
         episode_seed = self.base_seed if seed is None else check_seed(seed)
+        history_days = check_history_days(
+            (options or {}).get("history_days", 0))
         if _gym is not None:
             # Gymnasium keeps its own generator on the base class and its API
             # checker enforces that reset seeds it. This environment does not
@@ -219,6 +242,12 @@ class TradingEnv(_Base):
                         macro_state=self.macro, model=self.model)
         portfolio = Portfolio(cash=self.starting_cash,
                               max_leverage=self.max_leverage)
+        self._history = self._day_steps = None
+        if history_days:
+            self._history = prehistory(
+                engine, history_days, steps_per_day=self.steps_per_day,
+                ticks_per_step=self.ticks_per_step, start=self.start)
+            self._day_steps = array("d")
         self._engine, self._portfolio = engine, portfolio
         # Built once per episode, so `env.engine` is one object for the
         # episode and a new one after the next reset, as it always was.
@@ -234,6 +263,8 @@ class TradingEnv(_Base):
         if self.trusted_agents:
             # Only when set, so every sandboxed info dict is the one it was.
             info["trusted"] = True
+        if history_days:
+            info["history_days"] = history_days
         return self._observe(), info
 
     def step(self, action):
@@ -253,6 +284,10 @@ class TradingEnv(_Base):
         # teach optimiser hygiene instead of trading.
         action = _np.clip(action, -1.0, 1.0)
 
+        if self._day_steps is not None:
+            # The prices this step opened at, before the trade: the step row
+            # the day's bar will carry, as the harness records it.
+            self._day_steps.extend(self._prices().tolist())
         rejected = self._rebalance(action)
 
         # The clock advances within the day, so an episode traverses trading
@@ -267,7 +302,13 @@ class TradingEnv(_Base):
 
         self._step += 1
         if self._step % self.steps_per_day == 0:
-            engine.close_market()
+            if self._history is None:
+                engine.close_market()
+            else:
+                before = read_day_bars(engine)
+                engine.close_market()
+                record_day(self._history, engine, before, self._day_steps)
+                self._day_steps = array("d")
             if self._step < self.max_steps:
                 engine.open_market()
 

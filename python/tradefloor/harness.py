@@ -51,6 +51,7 @@ scorecard records all three. See :mod:`tradefloor.sandbox`.
 from __future__ import annotations
 
 import struct
+from array import array
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
@@ -59,6 +60,7 @@ from .portfolio import Portfolio
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .universe_util import fingerprint_of
+from .history import read_day_bars, record_day
 
 if TYPE_CHECKING:
     # Runtime import happens inside evaluate(): spec builds agents from
@@ -137,10 +139,10 @@ class Observation:
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
-                 "_adv", "steps_per_day", "hidden")
+                 "_adv", "steps_per_day", "hidden", "history")
 
     def __init__(self, step, day, tickers, prices, portfolio, engine, adv,
-                 steps_per_day=1, hidden=None):
+                 steps_per_day=1, hidden=None, history=None):
         # Run-wide, NOT within-day. See the class docstring: `step_of_day` is
         # the one that resets, and is what a per-day guard wants.
         self.step = step
@@ -163,6 +165,11 @@ class Observation:
         #: Read-only hidden state, for an agent that declared
         #: ``privileged = True``; None for every other agent.
         self.hidden = hidden
+        #: The market's past as daily bars, a
+        #: :class:`~tradefloor.history.History`, when the run was given
+        #: ``history_days``; None otherwise. It ends at the day before this
+        #: one, so it never shows the day being traded.
+        self.history = history
 
     @property
     def step_of_day(self) -> int:
@@ -260,7 +267,7 @@ class Scorecard:
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
                  "strategy_fingerprint", "model_fingerprint", "trusted",
-                 "uses_hidden_state", "tampered")
+                 "uses_hidden_state", "tampered", "history_days")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -270,6 +277,7 @@ class Scorecard:
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
         model_fingerprint: str = "", trusted: bool = False,
         uses_hidden_state: bool = False, tampered: bool = False,
+        history_days: int = 0,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -314,9 +322,18 @@ class Scorecard:
         #: order path. ``errors`` names the step. The score is of a market
         #: the agent rewrote and ranks nothing.
         self.tampered = tampered
+        #: Sessions of pre-history the agent was shown before day zero
+        #: (``evaluate(history_days=...)``). The scored window then starts
+        #: that many sessions later in the seed's market, so a card with
+        #: history is not a peer of one without: :func:`leaderboard` and
+        #: :func:`tradefloor.rank` refuse to mix them.
+        self.history_days = history_days
 
     def as_dict(self) -> dict[str, Any]:
-        return {slot: getattr(self, slot) for slot in self.__slots__}
+        # history_days only when set, so a card from a run without a
+        # pre-history serialises to the bytes it always did.
+        return {slot: getattr(self, slot) for slot in self.__slots__
+                if slot != "history_days" or self.history_days}
 
     def __repr__(self) -> str:
         flags = "".join(
@@ -324,6 +341,8 @@ class Scorecard:
                                          ("trusted", self.trusted),
                                          ("hidden-state",
                                           self.uses_hidden_state)) if on)
+        if self.history_days:
+            flags += f", history={self.history_days}d"
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
@@ -397,6 +416,7 @@ def evaluate(
     model: str | ModelParams | None = None,
     cash_interest: bool = False,
     trusted_agents: bool = False,
+    history_days: int = 0,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -443,14 +463,34 @@ def evaluate(
     ``tampered=True`` with an error line naming the step. See
     :mod:`tradefloor.sandbox`.
 
+    ``history_days`` gives every agent the market's past. By default an agent
+    starts on the seed's first session with one price per name, so a rule
+    with a lookback (a 200-day average, a 12-month trend) sits in cash until
+    its window fills, and a comparison with buy-and-hold charges it for the
+    wait: 2 to 8 points a year for a lookback of 60 days or more, measured on
+    the S&P 500 and on pt-v20 alike. With ``history_days=N`` the harness runs
+    N untraded sessions first, on the same loop as the baseline and with no
+    scenario, then forks that engine once per agent and once for the
+    baseline. ``obs.history`` holds the N sessions' daily bars and grows by
+    one after each scored close, from the agent's own market; the scenario
+    clock and ``obs.day`` still start at zero. The market is the one an
+    untraded run of N sessions reaches, state hash for state hash: the
+    scored window starts N sessions later in the same seed's life, with no
+    warm-up regime added. 252 covers a year's lookback and 273 a 12-1 rule;
+    the cap is ten years. The shipped lookback agents fill their windows
+    from it. Each card records ``history_days``, and 0, the default, runs
+    exactly what it always did. See :mod:`tradefloor.history`.
+
     Returns a scorecard per agent, keyed by name.
     """
+    from .history import check_history_days, prehistory
     from .spec import StrategySpec
     seed = check_seed(seed)
     if not agents:
         raise ValidationError("no agents given")
     if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
         raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
+    history_days = check_history_days(history_days)
 
     hour, minute, day_of_week = start
     results: dict[str, Scorecard] = {}
@@ -463,11 +503,26 @@ def evaluate(
     # market, so a per-agent hash would be the same value hashed N times.
     fingerprint = fingerprint_of(universe)
 
-    baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
-                             ticks_per_step, hour, minute, day_of_week,
-                             scenario, model)
+    engines: list[Engine | None] = [None] * len(agents)
+    history = None
+    if history_days:
+        # One pre-history, run once and forked: every agent and the
+        # baseline start from the same market, bit for bit, and the
+        # untraded sessions are paid for once rather than once per agent.
+        root = Engine(seed=seed, universe=universe, macro_state=macro,
+                      model=model)
+        history = prehistory(root, history_days, steps_per_day=steps_per_day,
+                             ticks_per_step=ticks_per_step, start=start)
+        base_engine, *engines = root.fork(len(agents) + 1)
+        baseline = _advance_untraded(base_engine, days, steps_per_day,
+                                     ticks_per_step, hour, minute,
+                                     day_of_week, scenario)
+    else:
+        baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
+                                 ticks_per_step, hour, minute, day_of_week,
+                                 scenario, model)
 
-    for name, entry in agents.items():
+    for (name, entry), engine in zip(agents.items(), engines):
         agent = entry.build() if isinstance(entry, StrategySpec) else entry
         # Built agents carry their spec (build() attaches it), so the
         # fingerprint flows whether the caller passed the spec or the agent
@@ -479,7 +534,9 @@ def evaluate(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
-            cash_interest, bool(trusted_agents),
+            cash_interest, bool(trusted_agents), engine=engine,
+            history=None if history is None else history.copy(),
+            history_days=history_days,
         )
     return results
 
@@ -489,6 +546,12 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
                   model=None) -> list[float]:
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
+    return _advance_untraded(engine, days, steps_per_day, ticks_per_step,
+                             hour, minute, day_of_week, scenario)
+
+
+def _advance_untraded(engine, days, steps_per_day, ticks_per_step, hour,
+                      minute, day_of_week, scenario=None) -> list[float]:
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
@@ -509,9 +572,13 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
-                  trusted=False) -> Scorecard:
-    engine = Engine(seed=seed, universe=universe, macro_state=macro,
-                    model=model)
+                  trusted=False, engine=None, history=None,
+                  history_days=0) -> Scorecard:
+    # `engine` is this agent's fork of the pre-history when the run has one,
+    # and `history` the agent's own copy of its bars; both None otherwise.
+    if engine is None:
+        engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                        model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
                           cash_interest=cash_interest)
     tickers = engine.tickers
@@ -534,6 +601,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
 
     step = 0
     for day in range(days):
+        if history is not None:
+            shown_steps = array("d")
         # Applied before the day opens, so day zero already runs under the
         # path rather than under whatever the engine was constructed with.
         if scenario is not None:
@@ -550,10 +619,13 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
             # this loop indexes by.
-            obs = Observation(step, day, list(tickers), _f64(engine.prices()),
+            prices = _f64(engine.prices())
+            if history is not None:
+                shown_steps.extend(prices)
+            obs = Observation(step, day, list(tickers), prices,
                               shown_portfolio, shown_engine,
                               adv if trusted else tuple(adv), steps_per_day,
-                              hidden=hidden)
+                              hidden=hidden, history=history)
             # The within-day tick the fill lands on: agents act at the START of
             # a step, so `ticks_per_step` ticks per completed step have
             # run this day. This is what makes the fills table joinable
@@ -623,7 +695,14 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # A day's interest on cash at the rate the day traded under, before
         # the close's macro step can move it. Nothing with the option off.
         portfolio.accrue(engine)
-        engine.close_market()
+        if history is None:
+            engine.close_market()
+        else:
+            # The day's bar joins the history after its close, so tomorrow's
+            # observations see it and today's did not.
+            before = read_day_bars(engine)
+            engine.close_market()
+            record_day(history, engine, before, shown_steps)
 
     final = portfolio.net_worth(engine)
     actual_prices = _f64(engine.prices())
@@ -660,6 +739,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         trusted=trusted,
         uses_hidden_state=privileged,
         tampered=tampered,
+        history_days=history_days,
     )
 
 
@@ -689,6 +769,23 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     return weighted
 
 
+def one_history_setting(cards) -> int:
+    """The ``history_days`` every card shares, or a ValidationError.
+
+    Cards with different pre-histories were scored on different windows of
+    the seed's market: with 252 days of history, day zero is the session an
+    evaluation without it scores as day 252. Ranking them together would
+    compare windows, not agents.
+    """
+    settings = sorted({getattr(card, "history_days", 0) for card in cards})
+    if len(settings) > 1:
+        raise ValidationError(
+            f"these scorecards were run with different history_days "
+            f"({settings}), so they scored different windows of the market "
+            f"and cannot be ranked together. Re-run them with one setting.")
+    return settings[0] if settings else 0
+
+
 def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard]:
     """Scorecards sorted best-first, for ONE market.
 
@@ -713,6 +810,7 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
     """
     if by not in ("pnl", "return_pct", "impact_bps", "turnover"):
         raise ValidationError(f"cannot rank by {by!r}")
+    one_history_setting(scores.values())
     # Impact is a cost, so less is better; everything else is more-is-better.
     #
     # The direction is applied by NEGATING the metric rather than by

@@ -30,6 +30,25 @@ lever is 5.1x against a real 6.2x.
 
 <!-- release-note-ends -->
 
+### Pre-history
+
+`evaluate`, `rank` and the gym env (`reset(options={"history_days": N})`)
+take `history_days`. The harness runs N untraded sessions on the loop its
+baseline uses, with no scenario, forks that engine once per agent and once
+for the baseline, and hands each agent the N sessions' daily bars as
+`obs.history` (`tradefloor.history.History`), growing by one bar after each
+scored close from the agent's own market. The scored window then starts N
+sessions later in the same seed's market: an N-day pre-history followed by T
+scored untraded days has the state hash of an untraded run of N+T. Without
+it, a lookback rule waits in cash for its window to fill, and on the S&P 500
+1990-2025 that wait cost a 200-day filter 5.1 points a year and a 12-month
+trend rule 7.7 (pt-v20: 2.5 and 2.8). The shipped `Momentum`,
+`MeanReversion` and spec blends fill their windows from it. Cards and
+rankings record `history_days`, only when it is set, and cards with
+different settings are refused by `leaderboard` and `rank`. The default is
+0 and runs exactly what it did; 252 is recommended for a lookback of up to a
+year and 273 for a 12-1 rule.
+
 ### pt-v20
 
 pt-v20 is pt-v19 with the market-behaviour faults found by the

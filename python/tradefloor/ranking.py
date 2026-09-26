@@ -320,14 +320,15 @@ class Ranking:
 
     __slots__ = ("records", "seeds", "unmeasurable", "universe_fingerprint",
                  "oracle", "reference_pnls", "model_fingerprint",
-                 "capture_withheld", "tampered")
+                 "capture_withheld", "tampered", "history_days")
 
     def __init__(self, records: dict[str, AgentRecord], seeds: list[int],
                  unmeasurable: list[int], universe_fingerprint: str,
                  oracle: str, reference_pnls: list[float],
                  model_fingerprint: str = "",
                  capture_withheld: str | None = None,
-                 tampered: dict[str, list[int]] | None = None) -> None:
+                 tampered: dict[str, list[int]] | None = None,
+                 history_days: int = 0) -> None:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
@@ -357,6 +358,9 @@ class Ranking:
         #: the seeds it did so on. Not in :attr:`records`: nothing they
         #: scored is a score.
         self.tampered: dict[str, list[int]] = dict(tampered or {})
+        #: Sessions of pre-history every evaluation gave its agents; 0 for
+        #: none. See :func:`tradefloor.evaluate`.
+        self.history_days = history_days
 
     def table(self, by: str | None = None) -> list[AgentRecord]:
         """Records sorted best-first, ties broken on name.
@@ -447,6 +451,8 @@ class Ranking:
                 "agents": {n: r.as_dict() for n, r in self.records.items()},
                 **({"tampered": {n: list(s) for n, s in self.tampered.items()}}
                    if self.tampered else {}),
+                **({"history_days": self.history_days}
+                   if self.history_days else {}),
             }
         return {
             "seeds": list(self.seeds),
@@ -458,6 +464,8 @@ class Ranking:
             "agents": {n: r.as_dict() for n, r in self.records.items()},
             **({"tampered": {n: list(s) for n, s in self.tampered.items()}}
                if self.tampered else {}),
+            **({"history_days": self.history_days}
+               if self.history_days else {}),
         }
 
     def report(self) -> str:
@@ -470,6 +478,8 @@ class Ranking:
             # reading as a benchmark table.
             + (f" under model {self.model_fingerprint}"
                if self.model_fingerprint else "")
+            + (f", {self.history_days} days of pre-history"
+               if self.history_days else "")
         ]
         if self.capture_withheld is not None:
             for record in self.table():
@@ -587,6 +597,7 @@ def rank(
     workers: int = 1,
     model: str | ModelParams | None = None,
     trusted_agents: bool = False,
+    history_days: int = 0,
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
@@ -608,6 +619,12 @@ def rank(
     had the live engine. An agent whose code changed the market on any seed
     is left out of the table and named in :attr:`Ranking.tampered`.
 
+    ``history_days`` is passed to every :func:`tradefloor.evaluate` and
+    recorded on the :class:`Ranking`: each seed's agents are shown that many
+    sessions of the market's past before day zero. One setting for the whole
+    ranking, because scores with and without a pre-history cover different
+    windows of each seed's market.
+
     ```python
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(12),
                       universe=u, days=10)
@@ -616,7 +633,8 @@ def rank(
     ```
     """
     from .baselines import capture_ratio, capture_withheld
-    from .harness import evaluate
+    from .harness import evaluate, one_history_setting
+    from .history import check_history_days
     from .universe_util import as_universe, fingerprint_of
 
     factory = _factory_or_refuse(make_agents)
@@ -630,6 +648,7 @@ def rank(
                               "weight that market twice in every median")
     if workers < 1:
         raise ValidationError(f"workers must be at least 1, got {workers}")
+    history_days = check_history_days(history_days)
 
     roster = as_universe(universe)
     kwargs: dict[str, Any] = dict(
@@ -638,6 +657,10 @@ def rank(
         start=start, scenario=scenario, model=model,
         trusted_agents=trusted_agents,
     )
+    if history_days:
+        # Only when set, so a ranking without one calls evaluate exactly
+        # as it always did.
+        kwargs["history_days"] = history_days
 
     def one(seed: int):
         return seed, evaluate(factory(), seed=seed, **kwargs)
@@ -701,6 +724,8 @@ def rank(
     # Read off a scorecard rather than recomputed here, so the recorded
     # name is the one the evaluations actually ran under.
     model_fingerprint = next(iter(results[0][1].values())).model_fingerprint
+    recorded_history = one_history_setting(
+        card for _, scores in results for card in scores.values())
     return Ranking(records, seed_list, unmeasurable, fingerprint_of(roster),
                    oracle, reference_pnls, model_fingerprint, withheld,
-                   tampered)
+                   tampered, recorded_history)
