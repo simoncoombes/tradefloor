@@ -165,6 +165,7 @@ from typing import Any, NamedTuple, Sequence
 from . import noise
 from ._core import Engine, ValidationError
 from .noise import DrawAddress, Patch
+from .replay import _recorded_clock
 
 
 class Mechanism(NamedTuple):
@@ -728,7 +729,7 @@ class Explanation:
         self._recorded = _recorded_factors(engine, self._label,
                                            self._index)
         #: The close the run itself printed on this day, where its tape
-        #: holds one. The nine columns agreeing says the mispricing path
+        #: holds one. The eleven columns agreeing says the mispricing path
         #: was rebuilt; the print is settled through the book after that,
         #: so it is compared on its own.
         self._recorded_close = _recorded_close(engine, self._label,
@@ -982,7 +983,7 @@ class Explanation:
         Four claims, each stated as a line per miss. The fourteen
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
-        the replay reproduces both the nine columns the run recorded and
+        the replay reproduces both the eleven columns the run recorded and
         the close it printed.
         """
         misses: list[str] = []
@@ -1428,14 +1429,16 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             # per-tick flow under the name each log was written with.
             per_tick = (entry["flow_per_tick"] if "flow_per_tick" in entry
                         else entry.get("order_flow"))
-            engine.run_session(
-                int(entry["hour"]), int(entry["minute"]),
-                int(entry["day_of_week"]), int(entry["ticks"]),
-                volatility=float(entry["volatility"]),
-                close_at_end=bool(entry["close_at_end"]),
-                news=_news(entry["news"]),
-                fills=_flow(entry.get("fills")),
-                flow_per_tick=_flow(per_tick))
+            # The start the run recorded, which may repeat the day's clock.
+            with _recorded_clock():
+                engine.run_session(
+                    int(entry["hour"]), int(entry["minute"]),
+                    int(entry["day_of_week"]), int(entry["ticks"]),
+                    volatility=float(entry["volatility"]),
+                    close_at_end=bool(entry["close_at_end"]),
+                    news=_news(entry["news"]),
+                    fills=_flow(entry.get("fills")),
+                    flow_per_tick=_flow(per_tick))
         elif op == "tick":
             engine.tick(int(entry["hour"]), int(entry["minute"]),
                         int(entry["day_of_week"]),

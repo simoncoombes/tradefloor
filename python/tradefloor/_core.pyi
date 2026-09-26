@@ -32,9 +32,11 @@ ColumnField = Literal[
     "maker_inventory", "garch_variance", "beta", "short_interest",
     "float_shares",
 ]
+# The eleven names `Engine.attribution` accepts, in `Engine.FACTORS` order.
 FactorName = Literal[
     "reversion", "momentum", "crowd_lean",
     "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise",
+    "circuit_breaker", "jump", "overnight", "fair_value_shift",
 ]
 
 class ValidationError(ValueError):
@@ -288,6 +290,12 @@ class Engine:
         news_impacts: Sequence[NewsImpact] | None = ...,
         order_flow: dict[str, tuple[float, float]] | None = ...,
     ) -> TickResult: ...
+    # Start each session of a day where the previous one ended. The time of
+    # day sets the activity profile, so an earlier start (9:30 every time,
+    # say) replays those minutes and raises a RuntimeWarning.
+    # `harness.session_clock(start, step, ticks_per_step)` returns each
+    # step's start, or pass (9 + m // 60, m % 60) with m = 30 plus the ticks
+    # already run today.
     def run_session(
         self, hour: int, minute: int, day_of_week: int, ticks: int, *,
         volatility: float = ..., close_at_end: bool = ...,
@@ -318,6 +326,8 @@ class Engine:
     # core does not have.
     def prices(self) -> bytes: ...
     def column(self, field: ColumnField) -> bytes: ...
+    # The eleven sum to the day's change in `mispricing_s`. On pt-v20 most
+    # of a price's move is fair value moving, which they do not split up.
     def attribution(self, factor: FactorName) -> bytes: ...
     # The rate indices' own decomposition; zero in every equity's slot.
     RATE_COMPONENTS: list[str]
@@ -338,6 +348,7 @@ class Engine:
 
     # `day=None` is every recorded day; `day=N` is that day alone, and a
     # day that was never recorded raises rather than returning nothing.
+    # At tick grain `volume` is the running total since the day's open.
     def bars(
         self, *, day: int | None = ..., minutes: int | None = ...,
         grain: Grain | None = ...,
@@ -354,6 +365,9 @@ class Engine:
     # shape came back and why.
     def prints(self, *, day: int | None = ...) -> ArrowStream: ...
     def settle_depth_counterfactual(self, on: bool = ...) -> None: ...
+    # Row d holds the values day d traded under, recorded before its close.
+    # Compare row d + 1 with row d for the move day d caused; the last
+    # close's values are on `macro_state`.
     def macro_table(self) -> ArrowStream: ...
     def book_table(self) -> ArrowStream: ...
     def fork(self, count: int = ...) -> list["Engine"]: ...

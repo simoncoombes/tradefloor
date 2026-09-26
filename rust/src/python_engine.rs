@@ -1148,6 +1148,56 @@ pub struct PyEngine {
     /// What `explain` reaches a day through. Recording only: nothing here is
     /// read by the tick, the snapshot or the hash.
     explanations: Explanations,
+    /// Where this day's last `run_session` left the clock, so a later
+    /// session that starts before it can warn. Read by nothing else: the
+    /// tick, the snapshot and the hash leave it out, so it cannot change a
+    /// run. `None` until the day's first session, which never warns.
+    session_clock: Option<SessionClock>,
+}
+
+/// Minutes in a day, the modulus `harness.session_clock` wraps the clock at.
+const MINUTES_PER_DAY: i64 = 24 * 60;
+
+/// The clock one day's sessions have reached.
+///
+/// `end` counts minutes from the midnight before the day's first session,
+/// and it keeps counting past 1,440 instead of wrapping. `harness.
+/// session_clock` wraps a long day's later steps back to 00:00 and keeps the
+/// day of week, so a session at 00:05 straight after one that ran to 00:05
+/// continues the day. The unwrapped count is what tells that apart from a
+/// session that went back to 09:30.
+#[derive(Clone, Copy, Debug)]
+struct SessionClock {
+    day_of_week: i64,
+    end: i64,
+}
+
+impl SessionClock {
+    /// Where a session starting at `start` (minutes after midnight) sits on
+    /// this day's unwrapped clock: in the same 24 hours as `end`.
+    fn place(&self, start: i64) -> i64 {
+        start + self.end.div_euclid(MINUTES_PER_DAY) * MINUTES_PER_DAY
+    }
+}
+
+/// The warning `run_session` raises when a session starts before the day's
+/// previous one ended.
+fn repeated_clock_warning(start: i64, end: i64) -> String {
+    let at = |m: i64| {
+        let m = m.rem_euclid(MINUTES_PER_DAY);
+        format!("{:02}:{:02}", m / 60, m % 60)
+    };
+    format!(
+        "run_session started at {} but this day's previous session ran to {}. \
+         The time of day sets the intraday activity profile, so those minutes \
+         run a second time and the day becomes a different market from one \
+         continuous session. Start each session where the last one ended. \
+         tradefloor.harness.session_clock(start, step, ticks_per_step) returns \
+         that start, or pass (9 + m // 60, m % 60) as hour and minute, where m \
+         is 30 plus the ticks already run today.",
+        at(start),
+        at(end),
+    )
 }
 
 /// The day stamp, kept off the Python surface.
@@ -1209,6 +1259,8 @@ impl PyEngine {
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
         self.day_buffer.clear();
+        // And a new day's clock, so its first session never warns.
+        self.session_clock = None;
         self.market_open = true;
         // The day a draw carries in the draw log is the day whose open it
         // follows, so the jumps, volume and macro draws taken at a close
@@ -1608,6 +1660,7 @@ impl PyEngine {
             recorded_book: Vec::new(),
             log: Vec::new(),
             explanations: Explanations::default(),
+            session_clock: None,
         };
         // After construction, so a settled opening has run its burn-in and
         // the indices are marked at the curve the run actually starts from.
@@ -1730,6 +1783,31 @@ impl PyEngine {
     /// package passed an agent's fills through it, so one order was counted
     /// on each of a step's 65 ticks and landed after the fill it came from.
     /// `tick(order_flow=...)` is unchanged, since a tick is one minute.
+    ///
+    /// # Advance the clock between sessions of one day
+    ///
+    /// `hour` and `minute` are where the session starts, and each tick is
+    /// one minute after the last. The time of day sets the intraday activity
+    /// profile, so a day split into several sessions has to start each one
+    /// where the previous one ended. Passing 9:30 to every session replays
+    /// the opening minutes each time. Measured on 40 names with the day split
+    /// into 78 sessions of 5 ticks, one name returned -25.0% for the day
+    /// where `run_days(1)` gave it +0.6%, and the largest gap in log price
+    /// was 0.29. With the clock advanced, the stepped day's prices match
+    /// `run_days(1)` to the bit.
+    ///
+    /// `tradefloor.harness.session_clock(start, step, ticks_per_step)`
+    /// returns each step's start. By hand, pass `(9 + m // 60, m % 60)` with
+    /// `m = 30 + ticks already run today`.
+    ///
+    /// A session that starts before the day's previous session ended raises
+    /// a `RuntimeWarning` and then runs as asked. The warning writes nothing
+    /// to the log and changes no state. It never fires on a day's first
+    /// session, on a clock that moves forward, or on a day that runs past
+    /// midnight and wraps to 00:00 as `session_clock` does. A change of
+    /// `day_of_week` starts the comparison again. Only `run_session` calls
+    /// are compared, so `tick` and `run_until` neither warn nor move the
+    /// clock it compares against.
     #[pyo3(signature = (
         hour, minute, day_of_week, ticks, *, volatility = 1.0,
         close_at_end = false, news = None, news_impacts = None, fills = None,
@@ -1778,6 +1856,30 @@ impl PyEngine {
         let session_impacts = self.build_impacts(news_impacts)?;
         let session_flow = self.build_flow(flow_per_tick)?;
         let session_fills = self.build_flow(fills)?;
+        // A session that starts before the day's previous one ended replays
+        // minutes the day has already run. Warned rather than refused, since
+        // a caller may mean it. After every check that can refuse the call
+        // and before anything is opened or logged, so a warning filter set
+        // to "error" leaves the engine exactly as it was.
+        let start = hour
+            .wrapping_mul(60)
+            .wrapping_add(minute)
+            .rem_euclid(MINUTES_PER_DAY);
+        let placed = match self.session_clock {
+            Some(clock) if self.market_open && clock.day_of_week == day_of_week => {
+                let placed = clock.place(start);
+                if placed < clock.end {
+                    PyErr::warn_bound(
+                        py,
+                        &py.get_type_bound::<pyo3::exceptions::PyRuntimeWarning>(),
+                        &repeated_clock_warning(start, clock.end),
+                        1,
+                    )?;
+                }
+                placed
+            }
+            _ => start,
+        };
         // Open the day here if the caller has not, and exactly once however
         // many sessions the day is made of. Letting `run_session` re-open made
         // attribution and the daily anchor per-STEP; see
@@ -1895,6 +1997,16 @@ impl PyEngine {
             // hashed apart, which is how this surfaced.
             self.record_day_jump();
         }
+        // Where the next session of this day should start. A close ends the
+        // day, and the session after it is the next day's first.
+        self.session_clock = if close_at_end {
+            None
+        } else {
+            Some(SessionClock {
+                day_of_week,
+                end: placed.saturating_add(i64::try_from(ticks).unwrap_or(i64::MAX)),
+            })
+        };
         Ok(self.buffer.ticks_written)
     }
 
@@ -2150,6 +2262,7 @@ impl PyEngine {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
         // The day is over, so the next session opens a new one.
         self.market_open = false;
+        self.session_clock = None;
         // The settle-and-advance is `Engine::close_day` in the core, so the
         // WebAssembly binding runs the same day loop rather than a second
         // implementation of it. This surface keeps only the day COUNTER,
@@ -3349,22 +3462,48 @@ impl PyEngine {
 
     /// One attribution column across every instrument, as f64 bytes.
     ///
-    /// # Why the simulator can tell you this at all
+    /// # What it labels
     ///
-    /// It knows WHY each price moved, because it computed the reasons. No
-    /// historical dataset carries those labels -- you can observe that a stock
-    /// fell, never that 60% of the fall was order-flow pressure and the rest
-    /// was noise. This is the labelled-dataset output.
+    /// The simulator computed every driver of `mispricing_s`, the log gap
+    /// between the model price and fair value, so it can report how much
+    /// each one moved it. No historical dataset carries these labels. They
+    /// decompose the change in `s` and nothing else: when fair value itself
+    /// moves, on rates, earnings or the VIX, that move is not split up here,
+    /// and on pt-v20 it is most of a price's daily move. For a breakdown that
+    /// sums to the log price move, call `keep_explanations` before the run
+    /// and `explain(ticker, day)` after it, which adds fair value, the book
+    /// and the close's re-mark.
     ///
     /// Accumulated per DAY and reset at `open_market`, so a read after
     /// `close_market` still returns the day just finished.
     ///
-    /// # Nine components, and the same nine the `truth` table carries
+    /// # Eleven components, the same eleven the `truth` table carries
     ///
-    /// Four shocks -- `company_news`, `order_flow_impact`,
-    /// `short_squeeze_effect`, `random_noise` -- and the three pieces of the
-    /// model's own dynamics: `reversion`, `momentum`, `crowd_lean`. Together
-    /// they account for the day's change in `s`.
+    /// In `FACTORS` order. `reversion`, `momentum` and `crowd_lean` are the
+    /// model's own dynamics. `company_news`, `order_flow_impact`,
+    /// `short_squeeze_effect` and `random_noise` are the shocks.
+    /// `circuit_breaker` is the correction when the session breaker clamps a
+    /// price. `jump` is the daily jump and `overnight` the move applied at
+    /// the open. `fair_value_shift` is minus the part of the shocks that
+    /// moved the name's fair value for good instead of `s`.
+    ///
+    /// All eleven sum to the day's change in `mispricing_s`. What that
+    /// change covers depends on the preset. Measured over the first 40 days
+    /// of `Universe.random(40, seed=111)` with seed 101, where the sum matched
+    /// the change in `s` to within 1e-13 on both presets, and "explained" is
+    /// the squared correlation with the day's log price change:
+    ///
+    /// - Through pt-v19, `fair_value_shift` is zero and fair value moves
+    ///   little in a day. The eleven summed to a daily standard deviation of
+    ///   0.0133 against 0.0143 for the log price change, and explained 69% of
+    ///   it.
+    /// - On pt-v20, the default, most of each shock moves fair value
+    ///   instead, so `random_noise` and `fair_value_shift` are both large and
+    ///   mostly cancel (45.3% and 45.6% of the summed absolute
+    ///   contributions). The eleven summed to a standard deviation of 0.0019
+    ///   against 0.0127 and explained 28%. Without `fair_value_shift`, the
+    ///   other ten count each shock at full size, as if fair value had not
+    ///   moved, and they explained 75%.
     ///
     /// This is the DAY grain of exactly what `truth` reports per tick, so
     /// summing a `truth` column over a day reproduces the value here. Two
@@ -4218,6 +4357,9 @@ impl PyEngine {
             // so it prices differently from the parent it forked from.
             self.market_open = flag.extract()?;
         }
+        // The snapshot carries no clock, so the restored engine's next
+        // session is treated as the day's first and does not warn.
+        self.session_clock = None;
         if let Some(raw) = snapshot.get_item("volume_state")? {
             self.inner.set_volume_state(raw.extract::<f64>()?);
         }
@@ -4775,6 +4917,11 @@ impl PyEngine {
     /// they carry real information, so the coarse schema is genuinely wider
     /// rather than the same columns rearranged.
     ///
+    /// At tick grain `volume` is the running total since the day's open, and
+    /// it keeps counting across the sessions a day is split into. The last
+    /// tick of a day holds the day's volume. Take the difference between
+    /// consecutive ticks for each minute's own volume.
+    ///
     /// Every recorded day is a separate batch, so a year streams rather than
     /// materialising. With nothing recorded it falls back to the last session.
     ///
@@ -5121,9 +5268,24 @@ impl PyEngine {
 
     /// The `macro` table: one row per recorded day.
     ///
-    /// Keyed by the same `day` as `bars` and `truth`, so aligning a macro
-    /// signal with prices is a join rather than a hand-rolled accumulation
-    /// loop. Rates are fractional, as everywhere else.
+    /// Row `d` holds the values day `d` traded under. `run_days`, and every
+    /// day loop in the package, records a day before closing it, and the
+    /// close is where the macro chain steps. So row `d` is what day `d - 1`'s
+    /// close produced, plus any pin made before the record, and what day
+    /// `d`'s own close produced is in row `d + 1`. If you call `record`
+    /// yourself after `close_market`, row `d` holds day `d`'s close instead.
+    ///
+    /// A join on `day` with `bars` therefore pairs each day's return with the
+    /// macro move that came before it. To pair a return with the move it
+    /// caused, compare row `d + 1` with row `d`. Measured on 40 names over 5
+    /// days (seed 101), `macro_state.vix` after each close read 17.005,
+    /// 15.853, 17.849, 19.312 and 23.060, and rows 0 to 4 read 17.660,
+    /// 17.005, 15.853, 17.849 and 19.312.
+    ///
+    /// The values after the last recorded close are not in the table. Read
+    /// them from `macro_state` or `macro_fields`.
+    ///
+    /// Rates are fractional, as everywhere else.
     fn macro_table(&self) -> PyResult<crate::python_arrow::PyArrowStream> {
         let batch = crate::python_arrow::macro_batch(&self.recorded_macro)
             .map_err(crate::python_arrow::arrow_err)?;

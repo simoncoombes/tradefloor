@@ -87,3 +87,41 @@ def test_a_tick_driven_day_gets_the_endogenous_news_a_session_gets(preset):
         f"{preset}: turning endogenous news off changed nothing on a "
         "tick-driven day, so the tick path is not seeing it"
     )
+
+
+@pytest.mark.parametrize("preset", ["pt-v19", "pt-v20"])
+@pytest.mark.parametrize("split", [(2, 195), (6, 65), (78, 5)])
+def test_a_day_of_sessions_on_an_advancing_clock_is_one_session(preset, split):
+    """A third spelling of a day: several `run_session` calls, each starting
+    where the last ended. It is the same day to the bit, and it raises no
+    clock warning, which is what a harness stepping an agent needs.
+
+    Starting every session at 9:30 is not the same day. It replays the
+    opening minutes, and `run_session` warns.
+    """
+    import warnings
+
+    from tradefloor.harness import session_clock
+
+    model = tradefloor.ModelParams.from_preset(preset)
+    steps, ticks = split
+
+    whole = tradefloor.Engine(seed=5, universe=UNIVERSE, model=model)
+    whole.open_market()
+    whole.run_session(9, 30, 3, 390)
+
+    stepped = tradefloor.Engine(seed=5, universe=UNIVERSE, model=model)
+    stepped.open_market()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        for step in range(steps):
+            stepped.run_session(*session_clock((9, 30, 3), step, ticks), ticks)
+    assert whole.prices() == stepped.prices()
+    assert whole.draws_consumed == stepped.draws_consumed
+
+    repeated = tradefloor.Engine(seed=5, universe=UNIVERSE, model=model)
+    repeated.open_market()
+    with pytest.warns(RuntimeWarning, match="harness.session_clock"):
+        for _ in range(steps):
+            repeated.run_session(9, 30, 3, ticks)
+    assert whole.prices() != repeated.prices()

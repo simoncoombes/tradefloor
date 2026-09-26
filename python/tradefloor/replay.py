@@ -18,7 +18,9 @@ Three things this makes possible that a seed alone cannot:
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+import contextlib
+import warnings
+from typing import Any, Iterator, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 
@@ -32,6 +34,26 @@ _OPS = frozenset({
     # produced.
     "submit", "cancel", "take_fills", "take_impacts",
 })
+
+
+@contextlib.contextmanager
+def _recorded_clock() -> Iterator[None]:
+    """Silence ``run_session``'s repeated-clock warning for one replayed call.
+
+    Since 0.8.5 ``run_session`` warns when a session starts before the day's
+    previous one ended. A replay runs the start the log recorded, and a log
+    written before 0.8.5, when nothing warned, can hold one. Nobody can act
+    on the warning at replay time, and under ``-W error`` it would stop the
+    replay of a run that is correct as recorded.
+
+    Only that warning, and only around the one call. ``catch_warnings``
+    changes the process's filters, so a thread calling ``run_session`` at
+    the same moment would not see the warning either.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="run_session started at",
+                                category=RuntimeWarning)
+        yield
 
 
 def replay(
@@ -147,15 +169,16 @@ def apply_log(
                 order_flow=_flow(entry),
             )
         elif op == "run_session":
-            engine.run_session(
-                entry["hour"], entry["minute"], entry["day_of_week"],
-                entry["ticks"],
-                volatility=entry["volatility"],
-                close_at_end=entry["close_at_end"],
-                news=_news(entry),
-                fills=_flow(entry, "fills"),
-                flow_per_tick=_session_flow(entry),
-            )
+            with _recorded_clock():
+                engine.run_session(
+                    entry["hour"], entry["minute"], entry["day_of_week"],
+                    entry["ticks"],
+                    volatility=entry["volatility"],
+                    close_at_end=entry["close_at_end"],
+                    news=_news(entry),
+                    fills=_flow(entry, "fills"),
+                    flow_per_tick=_session_flow(entry),
+                )
             # The second spelling of a close. A ledger that knew only
             # `close_market` would leave a session-closed run with no leaves
             # and read as one long day.

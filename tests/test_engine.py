@@ -173,7 +173,7 @@ def test_session_buffer_does_not_leak_a_previous_session():
     e = engine(n=3)
     e.open_market()
     e.run_session(9, 30, 3, 100)
-    e.run_session(9, 30, 3, 10)
+    e.run_session(11, 10, 3, 10)
     assert len(arr(e.session_prices())) == 10 * 3
 
 
@@ -662,3 +662,265 @@ def test_run_until_does_not_close_the_day():
     assert not matches(halted, closed, "price")
     last_print = arr(closed.session_prices())[-len(universe):]
     assert list(arr(halted.column("price"))) == list(last_print)
+
+
+# --------------------------------------------------------------------------
+# What the docs promise about the clock, the macro table and attribution
+# --------------------------------------------------------------------------
+
+def _clock_warnings(record):
+    return [w for w in record if issubclass(w.category, RuntimeWarning)
+            and "run_session started at" in str(w.message)]
+
+
+def test_a_session_that_starts_before_the_last_one_ended_warns():
+    """Passing 9:30 to every session of a day replays the opening minutes.
+
+    The time of day sets the activity profile, so the repeated start is a
+    different market. Measured on 40 names and 78 five-tick sessions, one
+    name returned -25.0% where `run_days(1)` gave it +0.6%. It used to run
+    without a word; it now warns, and the warning names the fix.
+    """
+    import warnings
+
+    e = tradefloor.Engine(seed=404, universe=tradefloor.Universe.random(
+        8, seed=111))
+    e.open_market()
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        e.run_session(9, 30, 3, 5)
+        assert _clock_warnings(record) == [], "a day's first session"
+        e.run_session(9, 30, 3, 5)
+    [w] = _clock_warnings(record)
+    message = str(w.message)
+    assert "09:30" in message and "09:35" in message
+    assert "harness.session_clock" in message
+    assert "(9 + m // 60, m % 60)" in message
+    # Pointed at the caller's line, not at the extension.
+    assert w.filename == __file__
+
+    # An overlap warns too, not only an exact repeat.
+    with pytest.warns(RuntimeWarning, match="started at 09:33"):
+        e.run_session(9, 33, 3, 5)
+
+
+def test_the_clock_warning_writes_nothing_and_changes_nothing():
+    """A warning filter set to "error" leaves the engine as it was.
+
+    The check runs after every argument check and before the day is opened
+    or the call logged, so the raised warning leaves no log entry, and a run
+    that only warns is the same market it was before the warning existed.
+    """
+    import warnings
+
+    u = tradefloor.Universe.random(6, seed=3)
+    e = tradefloor.Engine(seed=9, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 20)
+    log, state = len(e.order_log), e.state_hash()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with pytest.raises(RuntimeWarning, match="session_clock"):
+            e.run_session(9, 30, 3, 20)
+    assert len(e.order_log) == log
+    assert e.state_hash() == state
+
+    # Warned or not, the call runs as asked: same prices either way.
+    quiet, loud = e.fork(2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        quiet.run_session(9, 30, 3, 20)
+    with pytest.warns(RuntimeWarning):
+        loud.run_session(9, 30, 3, 20)
+    assert quiet.prices() == loud.prices()
+    assert quiet.order_log == loud.order_log
+
+
+def test_the_clock_warning_stays_silent_on_a_clock_that_moves_forward():
+    """No warning on a day's first session, an advancing clock, a gap, a
+    change of day of week, or a long day that wraps past midnight the way
+    `harness.session_clock` wraps it."""
+    import warnings
+
+    from tradefloor.harness import session_clock
+
+    u = tradefloor.Universe.random(6, seed=3)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+
+        e = tradefloor.Engine(seed=9, universe=u)
+        for _ in range(2):
+            e.open_market()
+            for step in range(6):
+                e.run_session(*session_clock((9, 30, 3), step, 65), 65)
+            e.close_market()
+        # The next day's first session, however the last one was closed.
+        e.run_session(9, 30, 3, 30, close_at_end=True)
+        e.run_session(9, 30, 3, 30)
+        # A gap forward, then an exact continuation.
+        e.run_session(11, 0, 3, 30)
+        e.run_session(11, 30, 3, 30)
+        # A new day of week starts the comparison again.
+        e.run_session(9, 30, 4, 30)
+        e.close_market()
+
+        # 22:00 in 65-tick steps reaches 00:10 on the third step. The day of
+        # week stays put, as `session_clock` leaves it.
+        late = tradefloor.Engine(seed=9, universe=u)
+        late.open_market()
+        starts = [session_clock((22, 0, 3), step, 65) for step in range(4)]
+        assert starts[2][:2] == (0, 10)
+        for start in starts:
+            late.run_session(*start, 65)
+        late.close_market()
+
+        # A restored engine has no clock to compare against.
+        mid = tradefloor.Engine(seed=9, universe=u)
+        mid.open_market()
+        mid.run_session(9, 30, 3, 60)
+        again = tradefloor.Engine(seed=9, universe=u)
+        again.restore_state(mid.state_snapshot())
+        again.run_session(9, 30, 3, 10)
+
+    # The wrapped day ran to 02:20, so a session at 01:00 goes back.
+    late.open_market()
+    for start in starts:
+        late.run_session(*start, 65)
+    with pytest.warns(RuntimeWarning, match="started at 01:00 .* ran to 02:20"):
+        late.run_session(1, 0, 3, 65)
+
+
+def test_a_replay_runs_a_recorded_repeated_clock_without_warning():
+    """A log from before 0.8.5 can hold a repeated start, and nobody can act
+    on the warning at replay time. `replay` runs it as recorded and stays
+    quiet, even under warnings-as-errors."""
+    import warnings
+
+    u = tradefloor.Universe.random(6, seed=3)
+    run = tradefloor.Engine(seed=9, universe=u)
+    run.open_market()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for _ in range(3):
+            run.run_session(9, 30, 3, 20)
+    run.close_market()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        again = tradefloor.replay(run.order_log, seed=9, universe=u)
+    assert again.prices() == run.prices()
+    assert again.state_hash() == run.state_hash()
+
+
+def test_run_session_docs_say_how_to_advance_the_clock():
+    doc = tradefloor.Engine.run_session.__doc__
+    assert "harness.session_clock" in doc
+    assert "(9 + m // 60, m % 60)" in doc
+    assert "RuntimeWarning" in doc
+
+
+def test_macro_table_row_d_holds_what_day_d_traded_under():
+    """Row d is recorded before day d's close, so it holds the values the
+    day traded under, and what day d's close produced is row d + 1.
+
+    The docstring used to say the table was keyed like `bars`, "so aligning
+    a macro signal with prices is a join". A join pairs each return with the
+    macro move BEFORE it: on the reviewer's run it put the correlation of the
+    VIX change with the index return at -0.08 against -0.78 aligned.
+    """
+    import pyarrow as pa
+
+    e = tradefloor.Engine(seed=101, universe=tradefloor.Universe.random(
+        8, seed=111))
+    before = e.macro_state.vix
+    after = []
+    for _ in range(4):
+        e.run_days(1, record=True)
+        after.append(e.macro_state.vix)
+    vix = pa.table(e.macro_table()).column("vix").to_pylist()
+    assert vix[0] == before
+    assert vix[1:] == after[:-1]
+    assert after[-1] not in vix, "the last close's values are on macro_state"
+
+    doc = tradefloor.Engine.macro_table.__doc__
+    assert "aligning a macro signal with prices is a join" not in doc
+    assert "row `d + 1`" in doc and "macro_state" in doc
+
+
+def _factor_names_in_the_stub():
+    import ast
+    import pathlib
+
+    stub = pathlib.Path(tradefloor.__file__).with_name("_core.pyi")
+    for node in ast.parse(stub.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and node.targets[0].id == "FactorName":
+            return [elt.value for elt in node.value.slice.elts]
+    raise AssertionError("no FactorName in the stub")
+
+
+def test_the_attribution_docs_count_what_factors_holds():
+    """The docstring said "Nine components" and listed seven; FACTORS has
+    eleven. And the stub's `FactorName` listed seven, so a type checker
+    refused `attribution("jump")`."""
+    words = {9: "Nine", 10: "Ten", 11: "Eleven", 12: "Twelve"}
+    doc = tradefloor.Engine.attribution.__doc__
+    factors = tradefloor.Engine.FACTORS
+    assert f"# {words[len(factors)]} components" in doc
+    assert "Nine components" not in doc
+    for name in factors:
+        assert f"`{name}`" in doc, name
+    # It decomposes the mispricing, and it says so.
+    assert "WHY each price moved" not in doc
+    assert "change in `mispricing_s`" in doc
+    assert _factor_names_in_the_stub() == factors
+
+
+@pytest.mark.parametrize("preset", ["pt-v19", "pt-v20"])
+def test_attribution_sums_to_the_change_in_mispricing(preset):
+    """What the docstring says the eleven add up to, on both sides of
+    pt-v20: the day's change in `mispricing_s`, with `fair_value_shift`
+    zero through pt-v19 and large on pt-v20, where it mostly cancels
+    `random_noise`."""
+    u = tradefloor.Universe.random(12, seed=111)
+    e = tradefloor.Engine(seed=101, universe=u, model=preset)
+    e.run_days(2)
+    n = len(u)
+    fair_value, noise = 0.0, 0.0
+    for _ in range(5):
+        s0 = arr(e.column("mispricing_s"))[:n]
+        e.run_days(1)
+        s1 = arr(e.column("mispricing_s"))[:n]
+        parts = {f: arr(e.attribution(f))[:n]
+                 for f in tradefloor.Engine.FACTORS}
+        for i in range(n):
+            total = math.fsum(parts[f][i] for f in parts)
+            assert total == pytest.approx(s1[i] - s0[i], abs=1e-12)
+        fair_value += sum(abs(x) for x in parts["fair_value_shift"])
+        noise += sum(abs(x) for x in parts["random_noise"])
+    if preset == "pt-v19":
+        assert fair_value == 0.0
+    else:
+        assert fair_value > 0.5 * noise
+
+
+def test_tick_grain_volume_is_the_running_total_since_the_open():
+    """What the `bars` docstring says about tick volume: a running total
+    that keeps counting across the sessions a day is split into, whose last
+    tick is the day's volume."""
+    import pyarrow as pa
+
+    from tradefloor.harness import session_clock
+
+    e = tradefloor.Engine(seed=5, universe=tradefloor.Universe.random(
+        3, seed=1))
+    e.open_market()
+    for step in range(3):
+        e.run_session(*session_clock((9, 30, 3), step, 130), 130)
+    e.record(0)
+    rows = pa.table(e.bars()).to_pylist()
+    volume = [r["volume"] for r in rows if r["instrument_id"] == 0]
+    assert len(volume) == 390
+    assert all(a <= b for a, b in zip(volume, volume[1:]))
+    assert volume[130] > volume[129] > 0
+    assert volume[-1] == arr(e.column("volume"))[0]
+    assert "running total since the day's open" in \
+        tradefloor.Engine.bars.__doc__
