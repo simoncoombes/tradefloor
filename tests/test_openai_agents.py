@@ -1380,32 +1380,30 @@ def test_the_committed_recording_replays_end_to_end():
     # And RE-RECORDED once more for 0.8.5, when pt-v20 became the default.
     # The values the pt-v20 recording replaced (pt-v19, fills applied
     # once): trades 10, pnl 18930.0, turnover 2257400.0.
-    assert card.trades == 1, card.trades
-    assert card.pnl == pytest.approx(7042.0, abs=0.5), card.pnl
-    assert card.turnover == pytest.approx(934500.0), card.turnover
-
-    # AND THE REFUSALS ARE BACK, which is a fact about this run and not a
-    # bug. gpt-5.2 sized inside the limits on pt-v18's market and the
-    # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
-    # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
-    # that leg; on the fourth and fifth compositions, and on 0.8.5's pt-v19
-    # run, it stayed inside the cap every day. On pt-v20 it sat in cash for
-    # four days and then asked for three names at once on day 4, 3.26x
-    # equity against the 2.00x cap: the first order filled and the market
-    # refused the other two, at 2.11x and 2.08x. Each of those is the
-    # environment doing its job on a decision the agent made, not a replay
-    # failure.
     #
-    # Pinned exactly rather than bounded, and the reason both lines exist:
-    # a replay failure lands in this same list, so counting the refusals is
-    # not enough -- the second assertion says every entry is one of the two
-    # leverage refusals, which a missing-digest error would not be.
-    # Previously: rejected 0, no errors.
-    assert card.rejected == 2, card.errors
-    assert card.errors == [
-        "step 24: trade would take leverage to 2.11x, above the 2.00x limit",
-        "step 24: trade would take leverage to 2.08x, above the 2.00x limit",
-    ], card.errors
+    # And RE-RECORDED once more for 0.8.5, when pt-v20 took the vector its
+    # grade passed on (ptv20g6). The values that recording replaced (pt-v20
+    # before its graded arm): trades 1, pnl 7042.0, turnover 934500.0,
+    # rejected 2.
+    assert card.trades == 3, card.trades
+    assert card.pnl == pytest.approx(57576.0, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(2825350.0), card.turnover
+
+    # NO REFUSALS on this recording, which is a fact about this run and not
+    # a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
+    # pt-v19 as first composed it asked for 2.06x against a 2.00x cap on day
+    # 4 and the MARKET refused that leg; on the fourth and fifth
+    # compositions, and on 0.8.5's pt-v19 run, it stayed inside the cap
+    # every day. On pt-v20 before its graded arm it asked for 3.26x equity
+    # on day 4 and the market refused two of three orders, at 2.11x and
+    # 2.08x. On the graded arm it bought TECH_B on days 1 and 4 and trimmed
+    # it on day 2, peaking at 1.86x, and nothing was refused.
+    #
+    # Pinned exactly rather than bounded: a replay failure lands in the
+    # errors list, so an empty list is what says every decision replayed.
+    # Previously: rejected 2, the two leverage refusals above.
+    assert card.rejected == 0, card.errors
+    assert card.errors == [], card.errors
 
 
 @needs_fixture

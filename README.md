@@ -208,12 +208,11 @@ set of companies, and that fixed-roster panel is repeated on held-out seeds
 and on a held-out set of companies.
 
 Four of the 19 describe the index as a whole. An equal-weight index of the
-stocks gains 1.1 percent a year over one year, at the floor of a real range
-of 1.1 to 10.3 (pt-v19 gained 7.6). On a day the index falls 1 percent or
-more, the VIX rises a median 1.7 points, inside a real range of 0.39 to
-3.03. On a 3 percent fall it rises 5.1, inside 2.6 to 9.58. The index falls
-3 percent or more on 0.82 percent of days, against 1.21 percent in real
-markets.
+stocks gains 7.7 percent a year over one year, inside a real range of 1.1 to
+10.3 (pt-v19 gains 7.6). On a day the index falls 1 percent or more, the VIX
+rises a median 1.7 points, inside a real range of 0.39 to 3.03. On a 3
+percent fall it rises 4.3, inside 2.6 to 9.58. The index falls 3 percent or
+more on 0.89 percent of days, against 1.21 percent in real markets.
 
 **The two-year panel** is the fixed-roster panel run for 504 days. Fourteen
 of its 15 statistics have a two-year range, and pt-v20 has all 14 inside.
@@ -226,20 +225,27 @@ lasts, how often the VIX is above 30 or below 15, how many bear markets and
 corrections a decade brings, the long-run return, and whether a headline
 read late still pays. The other two, C4a and C4b, ask whether a rule that
 reads only prices can find an edge real markets do not have. pt-v20 meets
-all 17, and the eleven more registered for it, among them the rate indices against real
-treasury and corporate bonds, the earnings cycle, value and momentum
-signals, and the cost of size in the book. pt-v19, the previous default,
-meets 15 of the 17 and fails C4a and C4b. On pt-v20 the 2008 replay falls 47
-percent against the real 57, the VIX is above 30 on 5.8 percent of days
-against a real 8.2, and the index returns 5.7 percent a year over 21 years
-against a real 6.25. The verdicts ship with the package as
-`tf.preset_record()["long_run"]`.
+all 17, and the 23 more registered for it: among them the rate indices
+against real treasury and corporate bonds, the earnings cycle, value and
+momentum signals, timing rules on the published macro data, the cost of size
+in the book, the real 2020-21 and 2022 macro paths, and the packaged
+recession. pt-v19, the previous default, meets 15 of the 17 and fails C4a
+and C4b. On pt-v20 the 2008 replay falls 45 percent against the real 57, the
+VIX is above 30 on 5.9 percent of days against a real 8.2, and the index
+returns 6.4 percent a year over 21 years against a real 6.25. The verdicts
+ship with the package as `tf.preset_record()["long_run"]`.
 
-Three things are still off. The worst month of the 2020 replay is about 20
-percent milder than the real one. The index has 2.1 bear markets a decade
-against a real 1.1, inside the criterion's range of half to twice real but
-near its edge. With the VIX held at 65 the market is 3.6 times as volatile
-as with it held at 5, against 6.2 times in real markets (pt-v19 5.2).
+Some rows pass near their edges. A timing rule on the published macro data
+uses 92 percent of its tolerance. The price trough leads the earnings trough
+in the driven 2020 market by 10 sessions against a real 68. The two-year
+yield moves 3.87 basis points a day against a real 5.23. A recession wins
+back 49 percent of its fall in a year against 62 percent in 2009. The index
+has 2.0 bear markets a decade against a real 1.1.
+
+Two things are still off. The worst month of the 2020 replay is about 19
+percent milder than the real one. With the VIX held at 65 the market is 5.1
+times as volatile as with it held at 5, against 6.2 times in real markets
+(pt-v19 5.2).
 
 Each crisis starts in one sector, picked at random. A scenario can pick it for
 you with `Scenario().hold(epicentre="financial_services")`.

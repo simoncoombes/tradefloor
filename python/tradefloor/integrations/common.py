@@ -39,7 +39,7 @@ believing in a property nobody enforces.
 
 :class:`~tradefloor.harness.Observation` carries ``.engine``. By default
 that is a read-only market view, but under ``trusted_agents=True`` it is the
-live engine, and the engine knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
+live engine, and the engine knows the answer key: :func:`tradefloor.fair_value`, the factor
 attribution of every price move, each company's ``mispricing_s``, and --
 through a :class:`~tradefloor.Scenario` -- the macro path the run has not
 reached yet. An agent reading any of those inverts the simulator, and the

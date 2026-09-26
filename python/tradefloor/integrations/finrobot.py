@@ -32,7 +32,7 @@ response to the engine runs through :func:`parse` and :func:`orders_from`.
 
 :class:`~tradefloor.harness.Observation` carries ``.engine``: a read-only
 market view by default (:mod:`tradefloor.sandbox`), and under
-``trusted_agents=True`` the live engine, which knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
+``trusted_agents=True`` the live engine, which knows the answer key: :func:`tradefloor.fair_value`, the factor
 :meth:`~tradefloor.Engine.attribution` of every price move, each company's
 ``mispricing_s``, and -- through a :class:`~tradefloor.Scenario` -- the macro
 path the run has not reached yet. An agent reading any of those inverts the

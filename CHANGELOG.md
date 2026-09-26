@@ -2,32 +2,31 @@
 
 0.8.5 is the first long-term support release. The 0.8 line gets fixes that
 leave every known-answer digest unchanged for 24 months from this tag
-(`docs/SUPPORT.md`). `pt-v20` is the default: its tape follows the model
-price, a stock's own news moves its fair value, and agents trade in a book
-with depth through `Engine.submit`, `cancel`, `open_orders` and
-`take_fills`. It holds all 19 one-year rows, 14 of 14 at two years and all 28
-long-run criteria registered for it. A run that took the default will not
-replay against 0.8.1; `model="pt-v19"` keeps that market, and every preset
-replays as it did.
+(`docs/SUPPORT.md`). `pt-v20` is the default. Its tape follows the model
+price, a stock's own news and the market's plain shocks move fair value for
+good, fear discounts fair value while the VIX is high, and agents trade in a
+book with depth. It passes all 40 rows registered for it. Runs on the
+default will not replay against 0.8.1; `model="pt-v19"` keeps that market,
+and every preset replays as it did.
 
-An agent's orders now reach the market once. Harnesses applied an agent's
-fills on every tick of the session, so one order counted 65 times and agents
-were marked to their own impact.
+On pt-v20 the cycle phase and GDP growth are published late, as the agencies
+publish them, and prices read the true state. Agents see a read-only
+`MarketView`, and tampering is flagged. pt-v20 reports no capture ratio;
+read scores against buy-and-hold (`versus_buy_and_hold`). Seeds take any 64-bit integer. An agent's orders
+reach the market once, not on every tick.
 
-`Universe.random(n, bonds=True)` adds three simulated rate indices priced off
-the engine's curve (`UST2Y`, `UST10Y` and `IGCORP`). The packaged
-`recession` and `liquidity_crisis` are recalibrated to 2008 and March 2020.
-`docs/MODEL.md` states
-the model as equations, and `docs/STATISTICS.md` names the statistic sets
-behind every count the site quotes.
+`Universe.random(n, bonds=True)` adds three rate indices, and
+`docs/MODEL.md` states the model as equations.
 
-**What breaks.** `run_session(order_flow=...)` raises. Pass trades as
-`fills=` or a standing rate as `flow_per_tick=`. Every traded result moves:
-scorecards, rankings, TCA and the recorded agent fixtures.
+**What breaks.** `run_session(order_flow=...)` raises, so pass `fills=` or
+`flow_per_tick=`, and every traded result moves. Agent code that needs the
+live engine takes `trusted_agents=True`.
 
-**Still off.** On pt-v20 the crisis lever is 3.6x against a real 6.2x
-(pt-v19 5.2x), an equal-weight index gains 1.1 per cent over one year at the
-floor of its band, and it has 2.1 bear markets a decade against a real 1.1.
+**Nearest the edge.** A macro timing rule at 92 per cent of its tolerance;
+the price trough leading the earnings trough by 10 sessions against a real
+68; the two-year yield's daily move at 3.87 bp against 5.23; a recession
+winning back 49 per cent of its fall in a year against 2009's 62. The crisis
+lever is 5.1x against a real 6.2x.
 
 <!-- release-note-ends -->
 
@@ -65,19 +64,22 @@ gives each value's derivation or measurement.
 - `cascade_gain` scales the stop and squeeze ladders to the certified
   forty's daily Lo-MacKinlay reading.
 
-Measured on the final grade box (ptv20g3, 90 pooled 21-year histories) and
+Measured on the final grade box (ptv20g6, 90 pooled 21-year histories) and
 recorded in `python/tradefloor/presets/pt-v20.json`: 15 of 15 on the
 fixed-roster panel at 252 days, 14 of 14 at 504, 15 of 15 on held-out seeds
-and on a held-out roster, 10 of 10 mechanisms, and all 28 long-run criteria
-registered for it, the 17 of `CRITERIA.md` and eleven more (the rate
-indices against FRED and SPY, IEF and LQD, the earnings cycle against
-Shiller, value and momentum signals, the one-day reversal book and the cost
-of size). The level and crisis block comes from a paired level-protocol run
-on one build, pt-v20 against pt-v19 on seeds 101 to 130, whose control
-reproduced every row pt-v19 publishes to four places
-(`tools/presets/results/level-rows-pt-v20-2026-09-24.json`). On it the index
-drift is +1.14 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
-to 10.3 at its floor, and the three crisis rows are inside their bands.
+and on a held-out roster, 10 of 10 mechanisms on the panel (9 of 10 on
+held-out seeds, where `corr_asymmetry_lagged` is not shown), and all 40
+long-run rows registered for it: the 17 of `CRITERIA.md` and 23 more (the
+rate indices against FRED and SPY, IEF and LQD, the earnings cycle against
+Shiller, value and momentum signals, the one-day reversal book, the cost of
+size, the driven 2020-21 and 2022 markets, the packaged recession, timing
+rules on published macro data, the rate-news agent and the long-horizon
+variance ratio). The level and crisis block comes from a paired
+level-protocol run on one build, pt-v20 against pt-v19 on seeds 101 to 130,
+whose control reproduced every row pt-v19 publishes to four places
+(`tools/presets/results/level-rows-pt-v20-2026-09-26.json`). On it the index
+drift is +7.70 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
+to 10.3, and the three crisis rows are inside their bands.
 
 `KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `72485a9f`,
 `sha256` from `c22d4a02` to `ac004fea` and `bondsSha256` from `522aeb76` to
@@ -579,7 +581,7 @@ equation and value where the earlier default differs.
 the documentation quotes, with every member: the one-year table (19, of
 which `facts.measure()` reads 18), the two-year panel (15 rows, 14 graded)
 and the long-run criteria (17 from this release, 15 in 0.8.x records), with
-the 28 rows registered for pt-v20.
+the 40 rows registered for pt-v20.
 
 `docs/SUPPORT.md` takes effect with this tag. The LTS line covers 0.8.5 and
 the patch releases after it, with fixes that leave every known-answer digest

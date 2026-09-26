@@ -93,7 +93,7 @@ sides, refuses anything it cannot execute, and hands share deltas to the same
 execution path every other agent uses.
 
 **FinRobot is never shown the answer key.** The observation is an allowlist,
-written out field by field. Fair value, the ten-way factor attribution of
+written out field by field. Fair value, the factor attribution of
 every price move, each company's mispricing and the macro path the run has
 not reached yet all stay on the Tradefloor side of the line.
 `tests/test_finrobot.py` proves it twice: once by running the mapping against
