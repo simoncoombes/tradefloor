@@ -24,19 +24,22 @@ rationale. Tradefloor owns the market, the macro path, execution, the order
 book, fills, accounting, checkpoints, forks, interventions and the
 comparison. A framework MUST NOT mutate engine state, and every path from a
 framework RESPONSE to the engine runs through :func:`parse_decision` and
-:func:`orders_from` -- but that is validation, not confinement. ``act`` and
-``ask`` hold the Observation, the Observation carries the live engine, and
-the seam is not sandboxed: the adapter boundary is exactly an ordinary
-agent's, no tighter. The serializer's allowlist and the contract checks
-catch the accident of a cooperating author reading or writing what they
-should not; nothing in this package restrains an adapter that reaches for
-``obs.engine`` deliberately, and claiming otherwise would leave an author
+:func:`orders_from`. ``act`` and ``ask`` hold the Observation, and the
+adapter boundary is exactly an ordinary agent's, no tighter: since 0.8.5
+``obs.engine`` is a read-only :class:`~tradefloor.sandbox.MarketView` and
+the harness flags any change to the engine made inside ``act``, unless the
+run passed ``trusted_agents=True``, which hands over the live engine. The
+serializer's allowlist and the contract checks catch the accident of a
+cooperating author reading what they should not; neither restrains code
+that walks the interpreter to the engine deliberately (see
+:mod:`tradefloor.sandbox`), and claiming otherwise would leave an author
 believing in a property nobody enforces.
 
 ## The observation allowlist
 
-:class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
-knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
+:class:`~tradefloor.harness.Observation` carries ``.engine``. By default
+that is a read-only market view, but under ``trusted_agents=True`` it is the
+live engine, and the engine knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
 attribution of every price move, each company's ``mispricing_s``, and --
 through a :class:`~tradefloor.Scenario` -- the macro path the run has not
 reached yet. An agent reading any of those inverts the simulator, and the

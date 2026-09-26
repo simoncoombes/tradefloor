@@ -272,7 +272,10 @@ def test_the_gym_environment_applies_the_flow_once(trade, preset):
     np = pytest.importorskip("numpy")
     from tradefloor.gym import TradingEnv
     ticker, _ = trade
-    env = TradingEnv(universe=ROSTER, seed=92001, days=1, model=preset)
+    # Trusted: the test reads the engine's order log, which training code
+    # holding the env sees only through the opt-in.
+    env = TradingEnv(universe=ROSTER, seed=92001, days=1, model=preset,
+                     trusted_agents=True)
     env.reset()
     action = np.zeros(len(ROSTER))
     action[ROSTER.tickers().index(ticker)] = 0.001

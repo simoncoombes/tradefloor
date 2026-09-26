@@ -1338,7 +1338,8 @@ class RunManifest:
            strategy: StrategySpec | str | None = None,
            universe_source: Any = None, label: str = "",
            derived_from: Any = None,
-           ledger: "DayLedger | None" = None) -> "RunManifest":
+           ledger: "DayLedger | None" = None,
+           agent_access: dict[str, Any] | None = None) -> "RunManifest":
         """Capture a finished run.
 
         ``universe`` and ``seed`` are passed rather than read off the engine
@@ -1375,6 +1376,15 @@ class RunManifest:
         alone; the leaves and the states stay in the ledger, because a year
         of snapshots at forty names is several megabytes and a manifest is
         meant to be read. :func:`verify` is what the block is for.
+
+        ``agent_access`` records how the run's agents were given the market,
+        when that was not the default read-only view: ``trusted_agents``
+        (handed the live engine), ``hidden_state`` (the labels that declared
+        the capability) and ``tampered`` (label to the steps on which agent
+        code changed the market). :meth:`World.manifest` fills it. Absent,
+        the key is not written, so every other document is the one it was.
+        It sits outside ``fingerprints``: it describes the agents, and the
+        market's replay does not depend on it.
         """
         from . import Universe
 
@@ -1550,6 +1560,13 @@ class RunManifest:
                 "label": derived_from.label,
                 "entries": entries,
             }
+        if agent_access:
+            try:
+                doc["agent_access"] = json.loads(_canonical(agent_access))
+            except TypeError:
+                raise ValidationError(
+                    "agent_access must be JSON-serialisable: it travels "
+                    "inside the manifest.") from None
         return cls(doc)
 
     def to_json(self) -> str:
@@ -1973,6 +1990,14 @@ class RunManifest:
                 f"first {entries} log entries do not, so one of the two was "
                 "edited after it was written."
             )
+
+    @property
+    def agent_access(self) -> dict[str, Any] | None:
+        """How the run's agents were given the market, or ``None`` for the
+        default read-only view with no privileged agent and no tampering.
+        See :meth:`of`."""
+        recorded = self._doc.get("agent_access")
+        return json.loads(_canonical(recorded)) if recorded else None
 
     @property
     def day_ledger(self) -> dict[str, Any] | None:

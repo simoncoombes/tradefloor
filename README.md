@@ -92,6 +92,25 @@ gives each P&L as a fraction of the Oracle's. On pt-v20, the default, it
 gives nothing: market moves there mostly stick, so even perfect knowledge of
 fair value leaves little edge, and buy-and-hold is the comparison to quote.
 
+## The agent's view
+
+A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
+read-only market view: prices, the public columns, each book, bars, the
+published macro fields, the curve and which names have news today.
+`obs.portfolio` reads the agent's own positions and cannot trade. Forking the
+engine, writing to it and reading the hidden state all raise
+`tf.SandboxError`. The hidden state includes the true business-cycle phase;
+the macro fields carry the phase as published. The gym environment's `env.engine` and
+`env.portfolio` are the same views.
+
+The Oracle reads hidden state by declaring `privileged = True`, which gives
+it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for
+research that needs the live engine, and every scorecard says so. Either way
+the harness compares the engine's state hash around each call, and an agent
+that changed the market is scored `tampered` and left out of `tf.rank`.
+[`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
+lists what the view serves and what the check cannot catch.
+
 ## Contents
 
 | | |

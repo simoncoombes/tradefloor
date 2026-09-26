@@ -19,10 +19,11 @@ measuring two validators.
 
 ``fn`` is called with the :func:`~tradefloor.integrations.common.serialize_observation`
 output -- a JSON-able dict -- and never with the Observation itself. The
-Observation carries ``.engine``, and the engine knows the answer key. A
-function handed the Observation could read
-``obs.engine.macro_state`` today and ``obs.engine.attribution`` tomorrow,
-and nothing in the allowlist test would see it. Handed the payload, the
+Observation carries ``.engine``: a read-only market view by default, the
+live engine, which knows the answer key, under ``trusted_agents=True``. A
+function handed the Observation could read ``obs.engine.macro_state`` today
+and, in a trusted run, ``obs.engine.attribution`` tomorrow, and nothing in
+the allowlist test would see it. Handed the payload, the
 function can only decide from what a framework would be shown, which is
 what makes it an honest baseline for one. A policy that genuinely needs the
 Observation is not an integration; it is a native agent, and it implements

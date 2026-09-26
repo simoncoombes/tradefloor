@@ -115,6 +115,17 @@ the same instances to twelve seeds would carry seed 0's history into seed 1 and
 score something that is not the agent. That failure is silent, because the
 numbers look fine, so `rank` refuses a plain mapping rather than accepting one and
 quietly measuring the wrong thing.
+
+## A tampered agent is not ranked
+
+`evaluate` compares the engine's state hash around every call into agent
+code (see :mod:`tradefloor.sandbox`). An agent that changed the market on any
+seed is left out of the table, the win counts and the comparisons, and
+:attr:`Ranking.tampered` and :meth:`Ranking.report` say which and where. Its
+score is of a market it rewrote. An agent handed the live engine
+(``trusted_agents=True``) or hidden state (``privileged = True``) is ranked,
+and marked in the report, because nothing on its card can say it did not
+use what it was given.
 """
 
 from __future__ import annotations
@@ -135,7 +146,8 @@ class AgentRecord:
     """
 
     __slots__ = ("name", "seeds", "captures", "pnls", "wins",
-                 "reference_pnls", "benchmark_pnls", "capture_withheld")
+                 "reference_pnls", "benchmark_pnls", "capture_withheld",
+                 "trusted", "uses_hidden_state")
 
     def __init__(self, name: str, seeds: list[int],
                  reference_pnls: list[float],
@@ -157,6 +169,18 @@ class AgentRecord:
         self.captures: list[float | None] = []
         self.pnls: list[float] = []
         self.wins = 0
+        #: Handed the live engine on these runs (``trusted_agents=True``).
+        self.trusted = False
+        #: Declared ``privileged = True`` and was handed hidden state.
+        self.uses_hidden_state = False
+
+    @property
+    def marks(self) -> str:
+        """The report's label for how this agent saw the market, if not as
+        every other agent did."""
+        return "".join(tag for tag, on in (
+            ("  [trusted: live engine]", self.trusted),
+            ("  [hidden state]", self.uses_hidden_state)) if on)
 
     @property
     def measured(self) -> list[float]:
@@ -274,6 +298,9 @@ class AgentRecord:
             "median_capture": self.median_capture,
             "median_pnl": self.median_pnl,
             "win_rate": self.win_rate,
+            **({"trusted": True} if self.trusted else {}),
+            **({"uses_hidden_state": True} if self.uses_hidden_state
+               else {}),
         }
 
     def __repr__(self) -> str:
@@ -293,13 +320,14 @@ class Ranking:
 
     __slots__ = ("records", "seeds", "unmeasurable", "universe_fingerprint",
                  "oracle", "reference_pnls", "model_fingerprint",
-                 "capture_withheld")
+                 "capture_withheld", "tampered")
 
     def __init__(self, records: dict[str, AgentRecord], seeds: list[int],
                  unmeasurable: list[int], universe_fingerprint: str,
                  oracle: str, reference_pnls: list[float],
                  model_fingerprint: str = "",
-                 capture_withheld: str | None = None) -> None:
+                 capture_withheld: str | None = None,
+                 tampered: dict[str, list[int]] | None = None) -> None:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
@@ -325,6 +353,10 @@ class Ranking:
         #: :attr:`unmeasurable`, every capture is None, and the table sorts
         #: on :attr:`AgentRecord.mean_excess_pnl`, P&L over buy-and-hold's.
         self.capture_withheld = capture_withheld
+        #: Agents left out because their code changed the market, each with
+        #: the seeds it did so on. Not in :attr:`records`: nothing they
+        #: scored is a score.
+        self.tampered: dict[str, list[int]] = dict(tampered or {})
 
     def table(self, by: str | None = None) -> list[AgentRecord]:
         """Records sorted best-first, ties broken on name.
@@ -422,6 +454,8 @@ class Ranking:
             "oracle": self.oracle,
             "reference_pnls": list(self.reference_pnls),
             "agents": {n: r.as_dict() for n, r in self.records.items()},
+            **({"tampered": {n: list(s) for n, s in self.tampered.items()}}
+               if self.tampered else {}),
         }
 
     def report(self) -> str:
@@ -461,7 +495,8 @@ class Ranking:
             span = record.capture_range
             if pooled is None or span is None:
                 lines.append(f"  {record.name:16s}  capture unmeasurable  "
-                             f"median pnl {record.median_pnl:+12,.0f}")
+                             f"median pnl {record.median_pnl:+12,.0f}"
+                             f"{record.marks}")
                 continue
             # The pooled figure is the verdict; the per-seed span is shown
             # beside it because a wide one is the warning that a single seed
@@ -469,8 +504,13 @@ class Ranking:
             lines.append(
                 f"  {record.name:16s}  capture {pooled:+.3f}  "
                 f"per-seed [{span[0]:+.3f}, {span[1]:+.3f}]  "
-                f"wins {record.wins}/{len(record.pnls)}"
+                f"wins {record.wins}/{len(record.pnls)}{record.marks}"
             )
+        for name, seeds in sorted(self.tampered.items()):
+            lines.append(
+                f"  EXCLUDED {name}: its code changed the market during "
+                f"act() on seed(s) {', '.join(str(s) for s in seeds)}, so "
+                "its score is not a score. See Scorecard.errors.")
         if self.unmeasurable:
             shown = ", ".join(str(s) for s in self.unmeasurable[:8])
             more = ", ..." if len(self.unmeasurable) > 8 else ""
@@ -536,6 +576,7 @@ def rank(
     oracle: str = "oracle",
     workers: int = 1,
     model: str | ModelParams | None = None,
+    trusted_agents: bool = False,
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
@@ -551,6 +592,11 @@ def rank(
     ranking, agents and seeds alike, because a verdict taken across models
     would rank markets rather than agents. The :class:`Ranking` records
     ``model_fingerprint``, as does every scorecard under it.
+
+    ``trusted_agents`` is passed to every :func:`tradefloor.evaluate`; see
+    there and :mod:`tradefloor.sandbox`. Every row is then marked as having
+    had the live engine. An agent whose code changed the market on any seed
+    is left out of the table and named in :attr:`Ranking.tampered`.
 
     ```python
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(12),
@@ -580,6 +626,7 @@ def rank(
         universe=roster, macro=macro, days=days, steps_per_day=steps_per_day,
         ticks_per_step=ticks_per_step, cash=cash, max_leverage=max_leverage,
         start=start, scenario=scenario, model=model,
+        trusted_agents=trusted_agents,
     )
 
     def one(seed: int):
@@ -595,6 +642,19 @@ def rank(
             # Collected in SEED order, never completion order, so a median
             # over an even count picks the same element on every run.
             results = [f.result() for f in futures]
+
+    # Found across every seed first: an agent that tampered on one seed is
+    # out of every seed, so its other seeds cannot take a win from anybody.
+    tampered: dict[str, list[int]] = {}
+    for seed, scores in results:
+        for name, card in scores.items():
+            if card.tampered:
+                tampered.setdefault(name, []).append(seed)
+    if oracle in tampered:
+        raise ValidationError(
+            f"the reference {oracle!r} changed the market during act() on "
+            f"seed(s) {tampered[oracle]}, so no capture here means "
+            "anything. See Scorecard.errors.")
 
     records: dict[str, AgentRecord] = {}
     unmeasurable: list[int] = []
@@ -612,7 +672,8 @@ def rank(
         # well have made money. The reason is on the ranking instead.
         if not ratios and withheld is None:
             unmeasurable.append(seed)
-        contenders = {n: c for n, c in scores.items() if n != oracle}
+        contenders = {n: c for n, c in scores.items()
+                      if n != oracle and n not in tampered}
         winner = (max(contenders, key=lambda n: (contenders[n].pnl, n))
                   if contenders else None)
         for name, card in contenders.items():
@@ -621,6 +682,9 @@ def rank(
                                   benchmark_pnls, withheld))
             record.captures.append(ratios.get(name))
             record.pnls.append(card.pnl)
+            record.trusted = record.trusted or card.trusted
+            record.uses_hidden_state = (record.uses_hidden_state
+                                        or card.uses_hidden_state)
             if name == winner:
                 record.wins += 1
 
@@ -628,4 +692,5 @@ def rank(
     # name is the one the evaluations actually ran under.
     model_fingerprint = next(iter(results[0][1].values())).model_fingerprint
     return Ranking(records, seed_list, unmeasurable, fingerprint_of(roster),
-                   oracle, reference_pnls, model_fingerprint, withheld)
+                   oracle, reference_pnls, model_fingerprint, withheld,
+                   tampered)
