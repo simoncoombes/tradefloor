@@ -8712,6 +8712,27 @@ mod tests {
     }
 
     #[test]
+    fn a_pt_v20_engine_walks_the_cycle_shares_once() {
+        // `refresh_earnings_anticipation` asks for the cycle's stationary
+        // shares on every close, burn-in included, and pt-v20 is the first
+        // preset that turns anticipation on. Each answer is a survival walk
+        // of about a thousand `pow` calls a phase. Before the memo, building
+        // this engine took 756 walks, 96 per cent of its construction time.
+        let start = crate::economy::cycle::share_walks();
+        let mut e = engine(7);
+        assert_ne!(e.params().earnings_anticipation_half_life, 0.0);
+        for day in 1..=3i64 {
+            e.open_market();
+            for m in 0..10 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            e.close_day(day);
+        }
+        let walks = crate::economy::cycle::share_walks() - start;
+        assert!(walks <= 1, "{walks} survival walks for one fixed cycle spec");
+    }
+
+    #[test]
     fn a_clone_hashes_the_same_and_a_tick_moves_the_hash() {
         let mut e = engine(77);
         e.open_market();

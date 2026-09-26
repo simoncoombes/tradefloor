@@ -424,6 +424,8 @@ pub fn stationary_phase_shares_for(spec: &CycleSpec) -> ([f64; 5], f64) {
 
 /// The walk behind [`stationary_phase_shares_for`], uncached.
 fn stationary_phase_shares_walk(spec: &CycleSpec) -> ([f64; 5], f64) {
+    #[cfg(test)]
+    SHARE_WALKS.with(|n| n.set(n.get() + 1));
     let mut mean = [0.0; 5];
     let mut cycle = 0.0;
     for (k, &phase) in phase_cycle().iter().enumerate() {
@@ -431,6 +433,20 @@ fn stationary_phase_shares_walk(spec: &CycleSpec) -> ([f64; 5], f64) {
         cycle += mean[k];
     }
     (mean, cycle)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many survival walks [`stationary_phase_shares_walk`] has run on
+    /// this thread. Tests read it to hold callers to the memo.
+    static SHARE_WALKS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Survival walks for the stationary shares run so far on this thread.
+/// Test-only.
+#[cfg(test)]
+pub(crate) fn share_walks() -> u64 {
+    SHARE_WALKS.with(|n| n.get())
 }
 
 /// The day-zero `(phase, months_in_current_phase)` drawn from the cycle's
@@ -496,6 +512,28 @@ pub fn stationary_opening_for(spec: &CycleSpec, u_phase: f64, u_age: f64) -> (Cy
 #[cfg(test)]
 mod stationary_law {
     use super::*;
+
+    /// The memo in [`stationary_phase_shares_for`] hands back the walk's
+    /// own answer, to the bit, and walks again only when the spec changes.
+    #[test]
+    fn the_memo_returns_the_walk_and_walks_once_per_spec() {
+        fn bits(v: ([f64; 5], f64)) -> ([u64; 5], u64) {
+            (v.0.map(f64::to_bits), v.1.to_bits())
+        }
+        let a = CycleSpec::shipped(1.0);
+        let b = CycleSpec { per_month: 1.0, month_days: 30.0, us: true };
+        let start = share_walks();
+        let first = stationary_phase_shares_for(&a);
+        for _ in 0..10 {
+            assert_eq!(bits(stationary_phase_shares_for(&a)), bits(first));
+        }
+        assert_eq!(share_walks() - start, 1, "one spec, one walk");
+        let other = stationary_phase_shares_for(&b);
+        assert_eq!(share_walks() - start, 2, "a new spec walks again");
+        assert_eq!(bits(stationary_phase_shares_for(&a)), bits(first));
+        assert_eq!(bits(first), bits(stationary_phase_shares_walk(&a)));
+        assert_eq!(bits(other), bits(stationary_phase_shares_walk(&b)));
+    }
 
     /// The order is walked, so the guard is that it CLOSES: five distinct
     /// phases and the fifth's successor is the first. A `next_phase` that
