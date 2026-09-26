@@ -2,9 +2,11 @@
 
 This document states the tradefloor market model as equations. It describes
 **tradefloor 0.8.5** running the default preset **pt-v20**. Every equation
-was read off the code on the `release/0.8.5` branch at commit `8b7ed44`, and
-each one names the source line it comes from, as `file:line` under
-`rust/src/`. Parameter values are pt-v20's, as
+was read off the code on the `release/0.8.5` branch at commit `8b7ed44`,
+and the sections on what pt-v20's graded arm added (published macro data,
+the market's permanent share, volatility feedback, the packaged recession)
+on `fix/ptv20-final`; each one names the source line it comes from, as
+`file:line` under `rust/src/`, on the tree it was read from. Parameter values are pt-v20's, as
 `tf.ModelParams.from_preset("pt-v20").to_dict()` returns them, rounded here
 to four significant figures. Where a table gives two values, the second is
 pt-v19's.
@@ -14,15 +16,15 @@ preset, but many terms are switched on or off by a preset's dials, and this
 document describes the terms pt-v20 runs. Terms that pt-v20 switches off are
 listed once, in [Off in pt-v20](#off-in-pt-v20), and not written out.
 
-pt-v20 is pt-v19 with 22 dials moved. Work published on pt-v19, the default
+pt-v20 is pt-v19 with 38 dials moved. Work published on pt-v19, the default
 in 0.8.0 and 0.8.1, still replays exactly when it names its preset.
 [pt-v19: reproducing earlier work](#pt-v19-reproducing-earlier-work) gives
 every equation and value where pt-v19 differs.
 
-pt-v20 was graded before it shipped on 28 registered long-run rows and the
-one-year table, and passes all of them (design repository,
-`programme/ptv20-registration.md` and `programme/results/ptv20/`, final
-grade box `ptv20g3`). [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
+pt-v20 was graded before it shipped on the 40 rows of its twelfth
+registration, the long-run rows and the one-year table, and passes all 40
+on the grade seeds (design repository, `programme/ptv20-registration.md`
+and `programme/results/ptv20/`, grade box `ptv20g6`). [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
 lists the rows.
 
 The realism statistics the model is checked against are defined in
@@ -127,9 +129,10 @@ volatility (daily, at the close)     = per-name GJR-GARCH, market-factor
 **Fair value** moves with the corporate bond yield, which moves every
 session; with nominal output and an aggregate earnings cycle, which move
 with the business cycle; and with each company's own fair-value level $v$,
-which takes the company's and its sector's shocks for good. **Mispricing**
-carries what is transient: the common market factor, market-wide news,
-market jumps and order flow. It reverts to zero with a half-life of about
+which takes the company's and its sector's shocks for good, and the
+market's plain shocks up to a volatility ceiling. **Mispricing** carries
+what is transient: the market factor's excess over that ceiling and the
+terms that are not zero-mean, order flow and the crowd. It reverts to zero with a half-life of about
 40 sessions. **The printed price** is the model price after it has gone
 through a limit order book that the market maker quotes around the model
 price, so trades move it and a large order pays for depth. The close is a
@@ -494,11 +497,11 @@ meetings.
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
-| $\sigma_{10}$ | `treasury_10y_noise` | 0.025 (0.03) pp a session | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; graded row R2 reads 4.72 bp against a band of 4.54 to 6.27 |
-| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | measured | FRED DGS2, 5.23 bp; row R1 reads 4.48 against 3.65 to 6.80 |
-| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.154 |
+| $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
+| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | measured | FRED DGS2, 5.23 bp; row R1 reads 3.87 against 3.65 to 6.80 (box ptv20g6) |
+| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
 | | `flight_to_quality_day` | 1 (0) | derived | a switch: the step reads the session's own return |
-| | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.231 |
+| | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
 | | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4611-4626`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
@@ -524,8 +527,8 @@ The level is pulled toward a target set by the business cycle
 \qquad \alpha_E = 1 - 2^{-1/H_E}
 ```
 
-Earnings therefore fall toward $e^{-0.35} - 1 = -29.5\%$ in a contraction
-and trough and recover toward $+3.2\%$ otherwise; the upside is set so the
+Earnings therefore fall toward $e^{-0.2} - 1 = -18.1\%$ in a contraction
+and trough and recover toward $+1.8\%$ otherwise; the upside is set so the
 level averages to zero over a cycle. The run opens at the target of the
 phase it opens in (`engine.rs:1105-1112`). $\chi$ multiplies every
 company's restated earnings and book value through $n_d$ in
@@ -534,12 +537,13 @@ the next session.
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
-| $\delta_E$ | `earnings_cycle_depth` | 0.35 (0, off) | measured | picked on row B9, the spread of annual index returns (S&P 500 1990-2024, 17.4%), on 90 pooled histories (box ptv20e4); s.e. 0.14. Shiller's reported earnings fell a median 17% around NBER recessions; row E1 reads -28% against a band of -40% to -4.6% |
+| $\delta_E$ | `earnings_cycle_depth` | 0.2 (0, off) | measured | the depth at which row E1, the median fall of aggregate earnings in a contraction, meets Shiller's reported earnings around NBER recessions (median -17%) once the market's plain shocks are permanent: -0.280 at 0.35, -0.173 at 0.2, -0.132 at 0.15 (box ptv20vr4); graded, E1 reads -0.172 (box ptv20g6). pt-v20 before its graded arm had 0.35, picked on row B9 when the cycle carried the index's yearly spread; no error bar |
 | $u_E$ | `earnings_cycle_upside` | 0.09 (0) | derived | $q/(1-q)$ with $q$ = 9/108, the share of months in contraction and trough in the US phase table |
 | $H_E$ | `earnings_cycle_half_life` | 60 sessions | chosen | not searched |
 
 With the cycle carrying part of the index's year-to-year variance, pt-v20
-takes transient variance out by as much: the market factor's daily sigma is
+took transient variance out by as much before its graded arm, and keeps it
+out: the market factor's daily sigma is
 0.85 of pt-v19's and market jumps come at half the rate (see the tables in
 [The factor structure](#the-factor-structure) and [Jumps](#jumps)). Both
 were picked on the same grid, which held the bear-market count (row B3)
@@ -649,7 +653,7 @@ published at once.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
-| `cycle_publication_lag` $L_c$ | 0, off; a whole number of sessions up to 2520. pt-v20 sets 252 | chosen | the NBER's announcement delay, about a year for the 2007-09 recession; the owner's ruling of 2026-09-25 |
+| `cycle_publication_lag` $L_c$ | 252 (0, off); a whole number of sessions up to 2520 | chosen | the NBER's announcement delay, about a year for the 2007-09 recession; the owner's ruling of 2026-09-25 |
 
 ### Published GDP growth
 
@@ -746,7 +750,7 @@ economy when a snapshot has none.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
-| `unemployment_adjustment_half_life` $H_u$ | 0, off; up to 2520 sessions. pt-v20 sets 84 | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
+| `unemployment_adjustment_half_life` $H_u$ | 84 (0, off); up to 2520 sessions | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
 
 ### The fear and greed index
 
@@ -779,7 +783,7 @@ against 9 of 12 with it off.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
-| `fear_greed_published_inputs` | 0, off; a switch, 0 or 1. pt-v20 sets 1 | derived | the real index is built from market data and dates no recession |
+| `fear_greed_published_inputs` | 1 (0, off); a switch, 0 or 1 | derived | the real index is built from market data and dates no recession |
 
 ### Repricing at publication
 
@@ -824,7 +828,7 @@ it writes is already in the snapshot and the state hash.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
-| `macro_publication_repricing` | 0, off; a switch, 0 or 1. pt-v20 sets 1 | derived | pt-v20 audit, finding 3; FOMC event studies |
+| `macro_publication_repricing` | 1 (0, off); a switch, 0 or 1 | derived | pt-v20 audit, finding 3; FOMC event studies |
 
 ### The economy's outputs
 
@@ -874,7 +878,7 @@ neutral level, more for fast-growing companies:
 ```math
 D_i = 1 + 2\max(0,\ \gamma_i),
 \qquad
-R_{i,d} = \max\!\Big(0.5,\ 1 - 1.5\,D_i\Big(\frac{y^{c}_d}{100} - r^{\ast}\Big)\Big)
+R_{i,d} = \max\!\Big(0.5,\ 1 - \lambda\,D_i\Big(\frac{y^{c}_d}{100} - r^{\ast}\Big)\Big)
 ```
 
 (`fair_value.rs:143-148`, `fair_value.rs:184-190`), and fair value is:
@@ -891,10 +895,10 @@ valued at 1.2 times book, with no rate term.
 
 What follows from this:
 
-- **Rates.** $\partial \ln V / \partial r = -1.5 D_i / R$. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 1.5% to 2.7%, depending on its growth. Loss-makers do not move.
+- **Rates.** $\partial \ln V / \partial r = -\lambda D_i / R$, with $\lambda$ = `rate_pe_sensitivity`. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 3% to 5.4% on pt-v20 ($\lambda$ = 3), depending on its growth, and by 1.5% to 2.7% on pt-v19 ($\lambda$ = 1.5). On the driven 2022 path the market P/E falls 4.26% per 100 bp against the S&P 500's 5.2% (row R6, box ptv20g6). Loss-makers do not move.
 - **Earnings growth** comes only from nominal output and buybacks. Revenue growth sets duration and nothing else. There are no dividends.
 - **Buybacks** add about $\kappa E/P$ a year, about 1.9% at a typical earnings yield. They retire no shares. The yield is read at the current price and applied over every elapsed session, so a company whose price falls toward the 0.01 floor reads a yield in the hundreds. Under `buyback_yield_cap` $\bar b$ the yield in $B$ is $\min(\kappa E_i n_d / P_{i,t-1},\ \bar b)$ (`market/tick.rs:270-277`). pt-v20's $\kappa$ of 0.75 is about 4.2% a year at the same earnings yield, and its cap of 0.15 binds only on a company priced under five times earnings.
-- Nominal output grows 4.8% a year over a long run, against 4.8% in the US 1990 to 2025 (design note results/macro-cycle §0). On pt-v20 the index returns 5.7% a year over 21 years against a target of 6.25% (row B8), and its annual returns have a standard deviation of 16.8% against the S&P 500's 17.4% (row B9).
+- Nominal output grows 4.8% a year over a long run, against 4.8% in the US 1990 to 2025 (design note results/macro-cycle §0). On pt-v20 the index returns 6.4% a year over 21 years against a target of 6.25% (row B8), and its annual returns have a standard deviation of 16.3% against the S&P 500's 17.4% (row B9), on 90 histories (box ptv20g6).
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
@@ -979,9 +983,9 @@ from 0.10 to 0.001, since little of the market's variance stays in $s$.
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
-| $\psi_m$ | `fair_value_market_share` | 0, off; pt-v20 1 | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
-| | `fair_value_market_linear` | 0, off; a switch. pt-v20 1 | derived | the plain loading is the zero-mean part |
-| $c$ | `fair_value_market_vol_cap` | 0, no ceiling; pt-v20 1.5 | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
+| | `fair_value_market_linear` | 1 (0, off); a switch | derived | the plain loading is the zero-mean part |
+| $c$ | `fair_value_market_vol_cap` | 1.5 (0, no ceiling) | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
 
 ### Volatility feedback
 
@@ -1023,9 +1027,9 @@ arm tried ran past twice the tape.
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
-| $g$ | `fair_value_vix_discount` | 0, off; pt-v20 0.35 | fitted | held-out grids ptv20vr6 to vr9 |
-| $K$ | `fair_value_vix_knee` | 30, unread at $g = 0$; pt-v20 40 | fitted | held-out grids ptv20vr8 and vr9 |
-| $H_x$ | `fair_value_vix_half_life` | 0, the VIX as it stands; pt-v20 5 | fitted | held-out grids ptv20vr6 to vr9 |
+| $g$ | `fair_value_vix_discount` | 0.35 (0, off) | fitted | held-out grids ptv20vr6 to vr9 |
+| $K$ | `fair_value_vix_knee` | 40 (30, unread at $g = 0$) | fitted | held-out grids ptv20vr8 and vr9 |
+| $H_x$ | `fair_value_vix_half_life` | 5 (0, the VIX as it stands) | fitted | held-out grids ptv20vr6 to vr9 |
 
 ### The sectors
 
@@ -1115,11 +1119,11 @@ later opens with $s_0 = \mathrm{clip}(g_i;\ -0.9,\ 0.9)$
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $\sigma_o$ | `opening_mispricing_sigma` | 0.016 (0, off) | measured | the cross-sectional sd of $s$ over sessions 250 to 2,660 on seeds 201 to 212; 0.0155 to 0.0165 |
-| $\sigma_c$ | `opening_market_sigma` | 0.10 (0, off) | measured | the time-series sd of the cap-weighted $s$ on seeds 201 to 203: 0.148, 0.105, 0.042 |
+| $\sigma_c$ | `opening_market_sigma` | 0.001 (0, off) | chosen | with the market's plain shocks permanent, little of the market's variance stays in $s$, and 0.001 is the smallest opening that keeps the stationary form (0 would take the roster's day-zero premium). Not measured on the graded arm; pt-v20 before it had 0.10, the time-series sd of the cap-weighted $s$ on seeds 201 to 203 (0.148, 0.105, 0.042) |
 
 Graded: the start-up ratio in row B9, the index's volatility over the first
-60 sessions against sessions 250 to 490, reads 1.19 against a band of two
-thirds to 1.5.
+60 sessions against sessions 250 to 490, reads 0.80 against a band of two
+thirds to 1.5 (box ptv20g6).
 
 Companies can also be built from SEC EDGAR filings (`python/tradefloor/edgar.py`):
 diluted EPS, shares outstanding, equity over shares as book value, and
@@ -1221,7 +1225,8 @@ $N^{M}$ is market-wide news, which stays in $s$. The Ito term keeps
 $e^{v}$ a martingale. The price takes the whole shock on the tick either
 way; what changes is that the company's part no longer reverts on the
 mispricing's half-life. At the close the company's own jump goes to $v$ the
-same way, and the market jump stays in $s$ (`engine.rs:4205-4245`):
+same way (`engine.rs:4205-4245`). The market's share of both, which
+pt-v20 also sets, is in [The market's permanent share](#the-markets-permanent-share):
 
 ```math
 \Delta_{i}^{v,J} = \psi\,J_{i}^{I},
@@ -1231,15 +1236,18 @@ s_i \leftarrow s_i - \Delta_{i}^{v,J},
 v_i \leftarrow v_i + \Delta_{i}^{v,J} - \tfrac12\big(\Delta_{i}^{v,J}\big)^{2}
 ```
 
-and the jump is kept out of the next day's momentum. What stays in $s$: the
+and the jump is kept out of the next day's momentum. With the market's
+share at 0, as on every preset through pt-v19, what stays in $s$ is the
 market leg of the factor structure, market-wide news, the market jump and
 its compensator, order flow and agents' impact, the squeeze and cascade
-term, reversion, herding, the crowd and the breaker.
+term, reversion, herding, the crowd and the breaker. On pt-v20 the plain
+market loading, market-wide news and the market jump move to $v$ too, up
+to the volatility ceiling.
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $\psi$ | `fair_value_news_share` | 1.0 (0, off) | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
-| | `fair_value_market_share` | 0 | chosen | undetermined; nothing market-wide reaches $v$ |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The market's permanent share](#the-markets-permanent-share) |
 
 ### The factor structure
 
@@ -2084,7 +2092,7 @@ the size of the settlement slices, so a volume dial is also a price dial.
 | $\sigma_V$ | `volume_innovation_sigma` | 0.21 | fitted | same sweep |
 | $g_h$ | `volume_idio_variance_gain` | 0.2 | measured | 120-seed paired measurement on `volume_change_acf1`; flat from 0.2 to 0.3 |
 | $f_0$ | `volume_move_floor` | 0.6 | chosen | reference implementation |
-| $r_V$ | `volume_move_response` | 0.8 (1.0) | fitted | with less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2) |
+| $r_V$ | `volume_move_response` | 0.6 (1.0) | chosen | pt-v1's value. With less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2); pt-v20 takes pt-v1's 0.6, where the graded arm reads 0.508 at one year and 0.561 at two (`presets/pt-v20.json`) |
 | $c_V$ | `volume_move_cap` | 12 | fitted | a sweep found 8, 12 and 20 alike |
 | $n_V$ | `volume_move_noise` | 0.2 | chosen | reference implementation |
 
@@ -2252,11 +2260,12 @@ macro step's own clip was already -10.
 Seven scenarios ship: `curve_shock`, `geopolitical_conflict`,
 `liquidity_crisis`, `oil_price_spike`, `policy_regime_shift`, `rate_shock`
 and `recession`. Two were recalibrated on pt-v20, on the certified roster
-over seeds 301 to 330 (box ptv20g3):
+over seeds 301 to 330, and are measured again on the graded arm, paired
+against the same seed with no scenario (box ptv20g6):
 
-- `recession`, to 2008's depth: contraction, growth set to -2%, the VIX times 3 for 60 sessions, credit +150 bp, and earnings times 0.6 over a year. The index falls 30.4% by session 63 and 44.7% by session 120.
-- `liquidity_crisis`, to March 2020's speed: book depth times 0.4 and the VIX times 3.5 for 25 sessions, credit +50 bp, earnings times 0.85. The index falls 10.0% in 21 sessions and 14.8% by 63, then recovers.
-- `curve_shock` is new: the policy rate, both Treasury yields and the corporate yield up 200 bp on day 50. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 3.9% by day 120.
+- `recession`, to 2008's path, as [The packaged recession](#the-packaged-recession) sets it out: contraction on day 50 held to March 2009, then trough, recovery on the NBER trough date and the model's own cycle; growth held at -2% to day 364; the VIX times 3 for 60 sessions; credit 150 bp wider, then easing along Baa to 2011; earnings cut to 0.65 by day 301, held to day 490 and restored by day 932. The index falls 28.1% by session 63 and 39.3% by session 120 (30.4% and 44.7% on pt-v20 before its graded arm, box ptv20g3). It wins back 49% of its fall within 252 sessions of the low (row S1a, 2009: 62%) and rises 54.6% in those sessions (row S2, 2009: 69%), and every seed is out of contraction within 24 months (S1b).
+- `liquidity_crisis`, to March 2020's speed: book depth times 0.4 and the VIX times 3.5 for 25 sessions, credit +50 bp, earnings times 0.85. The index falls 19.8% in 21 sessions and 14.0% by 63, then recovers (10.0% and 14.8% before the graded arm).
+- `curve_shock` is new: the policy rate, both Treasury yields and the corporate yield up 200 bp on day 50. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 3.9% by day 120, measured before the graded arm.
 
 The other four files record effect sizes measured before pt-v20.
 
@@ -2265,7 +2274,6 @@ The other four files record effect sizes measured before pt-v20.
 These mechanisms exist in the code and are switched off, or cannot act, on
 pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 
-- **Market shocks in fair value** (`fair_value_market_share`): only a company's own and its sector's shocks reach the fair-value level.
 - **Noise in the earnings cycle** (`earnings_cycle_sigma`): the cycle follows the phase path alone.
 - **Overnight move** (`overnight_variance_ratio`): the draws are taken and nothing is applied, so each session opens at the last print.
 - **Crisis correlation blend** (`crisis_blend_gain`, `crisis_blend_variance_damp`): no extra market loading in a crisis.
@@ -2287,8 +2295,9 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 pt-v19 was the default in 0.8.0 and 0.8.1. It still runs, and replays
 exactly, with `model="pt-v19"`. Every equation above holds for it with the
 values below, except where this section gives pt-v19's own form. pt-v19
-fails 10 of the 28 rows pt-v20 was graded on: B9, C4a, C4b, C5, C6, C7,
-C8, R1, R4 and E1 (design repository, `programme/results/ptv20/criteria-g3.txt`).
+fails 16 of the 40 rows pt-v20 was graded on, and two are not scored on it
+(C9 and D1): B9, C4a, C4b, C5, C6, C7, C8, R1, R4, E1, F1, L1, C10, R7a,
+R7b and V1 (design repository, `programme/results/ptv20/criteria-g6.txt`).
 
 | Dial | pt-v19 | pt-v20 |
 |---|---|---|
@@ -2296,9 +2305,9 @@ C8, R1, R4 and E1 (design repository, `programme/results/ptv20/criteria-g3.txt`)
 | `closing_auction` | 0 | 1 |
 | `fair_value_news_share` | 0 | 1 |
 | `opening_mispricing_sigma` | 0 | 0.016 |
-| `opening_market_sigma` | 0 | 0.10 |
+| `opening_market_sigma` | 0 | 0.001 |
 | `cascade_gain` | 1 | 0.1 |
-| `treasury_10y_noise` | 0.03 | 0.025 |
+| `treasury_10y_noise` | 0.03 | 0.038 |
 | `treasury_2y_noise` | 0 | 0.022 |
 | `flight_to_quality_gain` | 0.02 | 0.008 |
 | `flight_to_quality_day` | 0 | 1 |
@@ -2310,11 +2319,26 @@ C8, R1, R4 and E1 (design repository, `programme/results/ptv20/criteria-g3.txt`)
 | `book_refill_half_life` | 0 | 27 |
 | `book_resting` | 0 | 1 |
 | `fill_impact_coefficient` | 0 | 0.314 |
-| `earnings_cycle_depth` | 0 | 0.35 |
+| `earnings_cycle_depth` | 0 | 0.2 |
 | `earnings_cycle_upside` | 0 | 0.09 |
 | `market_factor_sigma` | 0.007593 | 0.006454 |
 | `jump_intensity_market` | 0.05658 | 0.02829 |
-| `volume_move_response` | 1.0 | 0.8 |
+| `volume_move_response` | 1.0 | 0.6 |
+| `buyback_payout_share` | 0.3333 | 0.75 |
+| `buyback_yield_cap` | 0 | 0.15 |
+| `cycle_publication_lag` | 0 | 252 |
+| `earnings_anticipation_half_life` | 0 | 126 |
+| `fair_value_market_linear` | 0 | 1 |
+| `fair_value_market_share` | 0 | 1 |
+| `fair_value_market_vol_cap` | 0 | 1.5 |
+| `fair_value_vix_discount` | 0 | 0.35 |
+| `fair_value_vix_half_life` | 0 | 5 |
+| `fair_value_vix_knee` | 30 | 40 |
+| `fear_greed_published_inputs` | 0 | 1 |
+| `gdp_publication_lag` | 0 | 21 |
+| `macro_publication_repricing` | 0 | 1 |
+| `rate_pe_sensitivity` | 1.5 | 3 |
+| `unemployment_adjustment_half_life` | 0 | 84 |
 
 Where the equations differ on pt-v19:
 
@@ -2327,6 +2351,9 @@ Where the equations differ on pt-v19:
 - **The corporate yield** is set only at meetings; between them only the one-way floor $y^{c} \ge y^{10} + 0.8$ moves it, so the discount rate moves in steps.
 - **Agents' orders.** An agent's book is the maker's ten levels and nothing else; an order beyond them is cut off, and a fill takes no depth and does not move the maker's inventory. In 0.8.5 its fills reach the market once, on the next tick, through the order-flow law $O$ above. In 0.8.1 the harness held them as order flow for every tick of the next step, 65 times at six steps a day, after the agent had filled at the pre-trade book, so an agent collected its own impact.
 - **The squeeze and cascade term** is not scaled, and volume responds 1.0 per 1% a company has moved.
+- **Macro data as it happens.** Every publication dial is 0: the phase, GDP growth and unemployment are reported as they are, the fear and greed index reads the true phase and growth, and a rate decision is not re-marked at publication.
+- **No market share in fair value.** $\psi_m$ = 0: the market's plain loading, market-wide news and the market jump stay in $s$ and revert. There is no volatility feedback, and fair value reads the earnings cycle's level, not its expected path.
+- **The valuation.** $\lambda$ = 1.5, $\kappa$ = 1/3 with no cap on the buyback yield, and the 10-year's noise is 0.03.
 
 pt-v19's values for every other dial are the ones in the tables above.
 
@@ -2367,7 +2394,7 @@ equation. They are listed so a reader can judge them.
 
 **The VIX.**
 
-- With the VIX held at 65 the market is 3.6 times as volatile as with it held at 5, against 6.2 times in real markets (pt-v19: 5.2). The lower market sigma and jump rate take the lever down with them. It is reported beside the grade and does not gate it.
+- With the VIX held at 65 the market is 5.1 times as volatile as with it held at 5, against 6.2 times in real markets (pt-v19: 5.2; pt-v20 before its graded arm: 3.6). The lower market sigma and jump rate take the lever down with them. It is reported beside the grade and does not gate it.
 - The index variance $V_d$ leaves out the crisis epicentre's scaling, so during an episode the VIX's read-back is not quite the variance the market realises. It also reads the lagged down-beta's condition once a session, where the market samples it every tick.
 
 **Agents and the book.**
@@ -2389,9 +2416,10 @@ equation. They are listed so a reader can judge them.
 **Records.** The provenance ledger labels `crisis_epicentre_end_sessions` as
 out of scope, but it is read; and it labels `market_beta_down_asym_lag`
 as measured, while its own entry says 0.46 is fitted. It has no entry for
-three dials pt-v20 moved, `market_factor_sigma`, `jump_intensity_market` and
-`volume_move_response`, which this document calls fitted from the grading
-notes. It calls `book_refill_half_life` measured where the code derives it.
+two dials pt-v20 moved, `market_factor_sigma` and `jump_intensity_market`,
+which this document calls fitted from the grading notes;
+`volume_move_response` is back at pt-v1's 0.6 and leaves the ledger, which
+asks only about a dial away from pt-v1. It calls `book_refill_half_life` measured where the code derives it.
 This document uses the corrected kinds.
 
 ## Reproducing a result
