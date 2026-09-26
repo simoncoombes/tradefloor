@@ -4160,6 +4160,57 @@ pub struct ModelParams {
     /// The per-sector variance state's persistence term, **0.837** by the
     /// same measurement. See [`ModelParams::sector_vol_alpha`].
     pub sector_vol_beta: f64,
+    /// The per-NAME idiosyncratic variance state's shock share. A RATIO of
+    /// unconditional mean one, the same form as the sector state
+    /// (`sector_vol_alpha`): the variance of the name's own idiosyncratic
+    /// draw is its GJR variance times `s`, with
+    /// `s' = (1 - a - b) + a u^2 + b s` at the close, clamped to
+    /// [`garch_floor_multiple`, `garch_ceiling_multiple`]. `u` is the
+    /// session's OWN shock -- the own noise the ticks drew plus the name's
+    /// own jump the session realised (the one applied at the previous
+    /// close) -- over its expected sd, `kappa^2 max(h, idio_sigma_floor)`
+    /// (kappa^2 already carrying `s`) plus the idiosyncratic jump rate drawn
+    /// times `jump_sigma_idio^2`. The tick scales the own draw by `sqrt(s)`
+    /// through the per-company volatility multiplier; the overnight own
+    /// draw and the VIX identity's idiosyncratic term read the same `s`.
+    /// The per-name GJR, the market factor and the VIX process are
+    /// untouched.
+    ///
+    /// Why: the per-name GJR is fed the day's NOISE (market, sector and own
+    /// together), never the name's own jumps or news, so a name's large
+    /// idiosyncratic move has no aftershock. On the forty-name reference
+    /// panel (2015-2025, ten 252-return windows, residual on the
+    /// leave-one-out equal-weight roster) the idiosyncratic `|e|` lag-1
+    /// ACF reads a median 0.088 (se 0.010, every window at least 0.068)
+    /// and the mean `|e|` the day after a top-2.5% day is 1.29x the mean
+    /// (se 0.062, every window at least 1.18); pt-v20 reads 0.029 and 1.05
+    /// on held-out seeds. The panel's own excitation measurement (see
+    /// `jump_idio_excitation`) gives the fast response a half-life of about
+    /// two sessions, which is what this state carries; the per-name long
+    /// lags are already above the tape's, so the missing memory is short.
+    ///
+    /// Either dial non-zero switches the state on. At (0.0, 0.0), which
+    /// every preset carries, no state is read or written, the tick receives
+    /// an empty ratio slice and nothing is multiplied: every trajectory and
+    /// digest is the one it was. The snapshot and the state hash carry the
+    /// state (the ratio, the own jump pending for tomorrow's shock and its
+    /// expected variance) only while it runs. `a >= 0`, `b >= 0`,
+    /// `a + b < 1`.
+    pub idio_vol_alpha: f64,
+    /// The per-name idiosyncratic variance state's persistence term. See
+    /// [`ModelParams::idio_vol_alpha`].
+    pub idio_vol_beta: f64,
+    /// The per-name idiosyncratic variance state's jump channel: the
+    /// session after the name's own jump is realised, the ratio moves by
+    /// `c (1 - lambda)`, and by `-c lambda` on every other session, `lambda`
+    /// the own-jump probability the name was drawn at. Re-centred on the
+    /// rate, so the ratio's mean stays one. The diffusive shock `u^2` above
+    /// reads the own noise only: fed the jump itself, `u^2` runs to tens on
+    /// a jump session and the ceiling clamp (`garch_ceiling_multiple`) takes
+    /// the excess, which put the ratio's mean at 0.86 on pt-v20 (40 names,
+    /// 110 sessions; 1.00 with the idiosyncratic jumps off). 0.0 is no jump
+    /// channel; `0 <= c <= 4`. Off zero alone it switches the state on.
+    pub idio_vol_jump_bump: f64,
     /// Self-excitation of a name's idiosyncratic jumps: after a jump the
     /// name's arrival rate is `lambda (1 + h)` with `h' = decay h + this`.
     /// 0.0, which every preset up to pt-v19 carries, is a branch: the rate
@@ -5170,6 +5221,9 @@ impl ModelParams {
             // and the idiosyncratic-rate switch, all branches at 0.0.
             sector_vol_alpha: 0.0,
             sector_vol_beta: 0.0,
+            idio_vol_alpha: 0.0,
+            idio_vol_beta: 0.0,
+            idio_vol_jump_bump: 0.0,
             jump_idio_excitation: 0.0,
             jump_idio_excitation_decay: 0.0,
             jump_idio_vix_decoupled: 0.0,
@@ -7516,6 +7570,9 @@ impl ModelParams {
             "vix_jump_return_intensity" => self.vix_jump_return_intensity,
             "sector_vol_alpha" => self.sector_vol_alpha,
             "sector_vol_beta" => self.sector_vol_beta,
+            "idio_vol_alpha" => self.idio_vol_alpha,
+            "idio_vol_beta" => self.idio_vol_beta,
+            "idio_vol_jump_bump" => self.idio_vol_jump_bump,
             "jump_idio_excitation" => self.jump_idio_excitation,
             "jump_idio_excitation_decay" => self.jump_idio_excitation_decay,
             "jump_idio_vix_decoupled" => self.jump_idio_vix_decoupled,
@@ -7767,6 +7824,9 @@ impl ModelParams {
             "vix_jump_return_intensity" => out.vix_jump_return_intensity = value,
             "sector_vol_alpha" => out.sector_vol_alpha = value,
             "sector_vol_beta" => out.sector_vol_beta = value,
+            "idio_vol_alpha" => out.idio_vol_alpha = value,
+            "idio_vol_beta" => out.idio_vol_beta = value,
+            "idio_vol_jump_bump" => out.idio_vol_jump_bump = value,
             "jump_idio_excitation" => out.jump_idio_excitation = value,
             "jump_idio_excitation_decay" => out.jump_idio_excitation_decay = value,
             "jump_idio_vix_decoupled" => out.jump_idio_vix_decoupled = value,
@@ -8207,6 +8267,22 @@ impl ModelParams {
             return Err(format!(
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
                 self.fair_value_vix_discount));
+        }
+        if !(self.idio_vol_alpha >= 0.0 && self.idio_vol_beta >= 0.0
+            && self.idio_vol_alpha + self.idio_vol_beta < 1.0)
+        {
+            return Err(format!(
+                "idio_vol_alpha is {} and idio_vol_beta is {}. They are the per-name \
+                 idiosyncratic variance state's shock share and persistence: each at \
+                 least 0 and their sum under 1, or the state has no mean of one to \
+                 revert to.",
+                self.idio_vol_alpha, self.idio_vol_beta));
+        }
+        if !(self.idio_vol_jump_bump >= 0.0 && self.idio_vol_jump_bump <= 4.0) {
+            return Err(format!(
+                "idio_vol_jump_bump is {}. It is the idiosyncratic variance ratio's move \
+                 the session after an own jump, in [0, 4]; 0 is none.",
+                self.idio_vol_jump_bump));
         }
         if !(self.fair_value_vix_half_life >= 0.0 && self.fair_value_vix_half_life <= 252.0) {
             return Err(format!(
@@ -8769,6 +8845,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_jump_return_intensity",
         "sector_vol_alpha",
         "sector_vol_beta",
+        "idio_vol_alpha",
+        "idio_vol_beta",
+        "idio_vol_jump_bump",
         "jump_idio_excitation",
         "jump_idio_excitation_decay",
         "jump_idio_vix_decoupled",

@@ -539,6 +539,12 @@ pub struct TickInputs<'a> {
     /// draw at `sector_sigma_at` every preset up to pt-v19 runs. See
     /// `programme/results/vix-dynamics.md` section 19.
     pub sector_sigmas: &'a [f64],
+    /// The per-name idiosyncratic variance state
+    /// (`ModelParams::idio_vol_alpha`): one RATIO per company slot,
+    /// multiplying the variance of the name's own draw, or EMPTY when
+    /// `idio_vol_alpha` and `_beta` are both 0.0, which is the draw every
+    /// preset runs and multiplies nothing.
+    pub idio_vol_ratios: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
     /// Read only by the lagged transmission wire
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
@@ -998,11 +1004,18 @@ pub fn simulate_market_tick(
 
         // DRAW SITE: one normal, inside the factor computation.
         rng.site(crate::rng::Site::FactorIdioZ, idx as u32);
+        // The idiosyncratic variance state scales the name's own draw
+        // through the one multiplier that reaches only that draw (and its
+        // unit, so `noise_own_scale2` carries it). EMPTY is a branch.
+        let volatility_multiplier = match inputs.idio_vol_ratios.get(idx) {
+            Some(&r) => inputs.volatility_multiplier * mathx::sqrt(r),
+            None => inputs.volatility_multiplier,
+        };
         let factors = calculate_live_factors(
             &company.factor_view(),
             inputs.news,
             imbalance,
-            inputs.volatility_multiplier,
+            volatility_multiplier,
             &shared,
             p,
             rng,
