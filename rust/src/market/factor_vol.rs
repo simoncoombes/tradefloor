@@ -107,6 +107,12 @@
 //! transcendentals, no RNG — the same discipline as `garch.rs`, and the
 //! reason GARCH was chosen over an EGARCH/log-variance form, which would
 //! have dragged `exp`/`log` into the daily state chain.
+//!
+//! That is the path every shipped preset takes. Two dials add a
+//! transcendental when a custom vector switches them on: the VIX response
+//! goes through `mathx::pow`, and `market_vol_alpha_excursion` through
+//! `mathx::log`. Both are `mathx`, never the platform's libm, and
+//! `tests/platform_maths.rs` fails on any call that is not.
 
 use crate::mathx;
 
@@ -414,7 +420,10 @@ fn alpha_beta_at(
     if k == 0.0 || target_variance <= 0.0 || current_variance <= 0.0 {
         return (alpha, beta);
     }
-    let delta = k * (current_variance / target_variance).ln();
+    // `mathx::log`, not `f64::ln`: a dial a user sets with `with_override`
+    // must not reach the platform's libm, or their custom market stops being
+    // the same market on every platform. No shipped preset reaches this line.
+    let delta = k * mathx::log(current_variance / target_variance);
     // The largest rotation the fourth moment allows, from
     // `3a^2 + a(3g + 2b') + (1.5g^2 + b'g + b'^2) = 0.999` with the rotation
     // b' = beta - d and a = alpha + d substituted; solved numerically by
