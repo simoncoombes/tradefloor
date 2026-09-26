@@ -995,14 +995,16 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. Measured on pt-v20 at 0.8.5: the agent trades 58 names, both
-    untouched names move by under 3e-6 bps, and the median direct impact
-    is 0.0018 bps (pt-v19: 57 names, none of 3 untouched moves, 10.10 bps).
+    days. Measured on pt-v20's graded arm at 0.8.5 (2026-09-26): the agent
+    trades 57 names, all three untouched names move by under 3e-5 bps, and
+    the median direct impact is 0.0020 bps (pt-v20 as first composed: 58
+    names, both untouched under 3e-6 bps, 0.0018; pt-v19: 57 names, none of
+    3 untouched moves, 10.10 bps).
     Before 0.8.5 the agent's fills were counted on every tick of the step,
     and that flow was large enough to reach the untouched names through
     the VIX. On pt-v20 the flight to quality carries the session's return
     into the corporate yield too, so the control pins both, as
-    `Execution.moved` says: hold(vix=15.0) alone leaves one name moved, and
+    `Execution.moved` says: hold(vix=15.0) alone leaves two names moved, and
     hold(vix=15.0, corporate_bond_yield=0.055) returns untouched_moved() to
     empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
