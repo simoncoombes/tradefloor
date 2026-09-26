@@ -398,6 +398,32 @@ pub fn stationary_phase_shares(per_month: f64) -> ([f64; 5], f64) {
 
 /// [`stationary_phase_shares`] on a given clock and table.
 pub fn stationary_phase_shares_for(spec: &CycleSpec) -> ([f64; 5], f64) {
+    // A pure function of the spec's three fields, and the engine asks for
+    // it on every close through `earnings_anticipation_terms`: 755 times
+    // during pt-v20's macro burn-in alone, each a survival walk of about a
+    // thousand `pow` calls per phase. It was 96 per cent of pt-v20's
+    // construction time. The memo holds the last spec and its answer,
+    // keyed on the fields' BITS, so a hit returns the very value the walk
+    // would have produced and no result can move.
+    type Key = (u64, u64, bool);
+    type Shares = ([f64; 5], f64);
+    thread_local! {
+        static LAST: std::cell::Cell<Option<(Key, Shares)>> =
+            const { std::cell::Cell::new(None) };
+    }
+    let key: Key = (spec.per_month.to_bits(), spec.month_days.to_bits(), spec.us);
+    if let Some((k, v)) = LAST.with(|c| c.get()) {
+        if k == key {
+            return v;
+        }
+    }
+    let v = stationary_phase_shares_walk(spec);
+    LAST.with(|c| c.set(Some((key, v))));
+    v
+}
+
+/// The walk behind [`stationary_phase_shares_for`], uncached.
+fn stationary_phase_shares_walk(spec: &CycleSpec) -> ([f64; 5], f64) {
     let mut mean = [0.0; 5];
     let mut cycle = 0.0;
     for (k, &phase) in phase_cycle().iter().enumerate() {
