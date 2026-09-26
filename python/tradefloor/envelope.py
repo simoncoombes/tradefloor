@@ -961,6 +961,12 @@ def _sector_reading() -> str:
             f"({say[1]})")
 
 
+#: `abs_return_acf1`'s band on the default basis, for the decay-shape gap
+#: below. That gap typed the 2015-2025 decade band, 0.02 to 0.22, until
+#: 0.8.5, while `score` and `certified` graded the row on 0.02 to 0.17.
+_ACF1_BAND = RULERS_BY_BASIS[DEFAULT_BAND_BASIS][CERTIFIED_HORIZON_DAYS][0][
+    "abs_return_acf1"]
+
 GAPS: tuple[Gap, ...] = (
     # RETIRED 2026-08-26: the "volume-change" gap. It read that
     # volume_change_acf1 sat about 2.2 seed-sd outside its tighter 504-day
@@ -1130,8 +1136,9 @@ GAPS: tuple[Gap, ...] = (
             f"LOWERING lag-1 autocorrelation from 0.1107 to 0.0693, while "
             f"lag 20 does not move at all. A flatter line through a lower "
             f"point is a better slope and a worse market -- real markets "
-            f"have BOTH short-lag clustering, `abs_return_acf1` between 0.02 "
-            f"and 0.22, and weakly positive autocorrelation out to lag 60. "
+            f"have BOTH short-lag clustering, `abs_return_acf1` inside "
+            f"{_ACF1_BAND[0]} to {_ACF1_BAND[1]} on the {DEFAULT_BAND_BASIS} "
+            f"bands, and weakly positive autocorrelation out to lag 60. "
             f"The slope is a ratio of shape to level and can be improved by "
             f"destroying the level. pt-v19 was that case: its slope sat "
             f"inside real's error and its lag-1 reading was less than half of "
@@ -1509,22 +1516,52 @@ class Verdict:
         return "\n".join(lines)
 
 
+def _ruler(basis: str, horizon_days: int) -> tuple[
+        dict[str, tuple[float, float]], dict[str, float], str]:
+    """The band table, noise scale and table name for one basis and horizon.
+
+    The one lookup `check`, `score` and `intervals` read their bands
+    through, so the three cannot grade the same question on two tables.
+    Until 0.8.5 `check` and `intervals` read `facts.REAL_MARKETS`, the
+    2015-2025 decade table, while `score` and `certified` read the default
+    basis, and `abs_return_acf1` printed as (0.02, 0.22) from one and
+    (0.02, 0.17) from the other.
+    """
+    if basis not in RULERS_BY_BASIS:
+        raise ValidationError(
+            f"{basis!r} is not a band basis; the bases are "
+            f"{sorted(RULERS_BY_BASIS)}. A basis is an era, a window count "
+            f"and a rule, and `facts.band_basis` states each one")
+    if horizon_days not in RULERS_BY_BASIS[basis]:
+        raise ValidationError(
+            f"no band set has been derived at {horizon_days} days; the "
+            f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
+            f"nearer band set is not an approximation -- the 252-day and "
+            f"504-day tables differ on twelve of fourteen rows and their "
+            f"noise scales differ by factors from 0.80 to 3.23 -- so this "
+            f"refuses rather than picking one.")
+    return RULERS_BY_BASIS[basis][horizon_days]
+
+
 def intervals(
     panels: Sequence[Mapping[str, Any]],
     *,
     seed_sd: Mapping[str, float] | None = None,
+    basis: str = DEFAULT_BAND_BASIS,
 ) -> dict[str, dict[str, Any]]:
     """Per-statistic spread across seeds, beside the median and the band.
 
     `panels` is a sequence of `facts.measure` results, one per seed -- the
-    same input `loss.band_distance_loss` takes. Returns, for each statistic:
+    same input `loss.band_distance_loss` takes. The bands are the 252-day
+    table of `basis`, the one `score` and `check` use by default. Returns,
+    for each statistic:
 
         median      the point estimate a single panel would report
         low, high   the actual min and max ACROSS SEEDS
         p10, p90    the 10th and 90th percentile, for a less brittle range
         sd          across-seed standard deviation, measured here
         shipped_sd  `facts.SEED_SD`, measured at the shipped baseline
-        band        the real-market band
+        band        the real-market band on `basis`
         distance    band distance of the median, zero inside
         sd_out      that distance in units of `shipped_sd`
         extremes_straddle  True when min or max crosses a band edge
@@ -1547,9 +1584,10 @@ def intervals(
             "intervals needs at least two per-seed panels; a spread over one "
             "observation is not a spread"
         )
+    bands, _, _ = _ruler(basis, CERTIFIED_HORIZON_DAYS)
     scales = SEED_SD if seed_sd is None else seed_sd
     out: dict[str, dict[str, Any]] = {}
-    for key, (low, high) in REAL_MARKETS.items():
+    for key, (low, high) in bands.items():
         values = [p.get(key) for p in panels]
         present = [v for v in values if v is not None]
         if len(present) < 2:
@@ -1735,6 +1773,132 @@ def _roster_refusal(shape: str | None, horizon_days: int,
             + ". ".join(why))
 
 
+#: The lowest value a row can read at all, for the rows where a band's floor
+#: can sit below it. A floor under this value cannot reject any reading, so
+#: the row is tested on its ceiling alone, and `score` and `check` say so in
+#: the row's note so that a two-sided band is not read as a two-sided test.
+#: The comparison is made against the band in use each time. The 2015-2025
+#: kurtosis floor (1.6) and the ruled 504-day dispersion floor (1.03) sit
+#: above these values and do bind.
+#:
+#: KNOWN LIMITATION, kept for pt-v20 and marked for the next preset. The
+#: ruled `excess_kurtosis` band, -13 to 24 at 252 days and -9.3 to 24 at 504,
+#: comes from the fixed rule (the median of the real windows plus or minus
+#: 2.11 trimmed standard deviations), and that rule is symmetric while the
+#: statistic is bounded below and skewed to the right. So the floor lands far
+#: under -2 and only the ceiling tests anything. pt-v20 was graded 40 of 40
+#: on these bands, so they stay as they are for 0.8.5. A one-sided or
+#: log-scale rule for this row belongs with the next preset's bands.
+#: `facts.BAND_EDGE_LIVENESS` records the same finding under the blocker
+#: excess-kurtosis-floor-cannot-reject.
+_ARITHMETIC_FLOOR: dict[str, tuple[float, str]] = {
+    "excess_kurtosis": (
+        -2.0, "the lowest excess kurtosis any distribution can have"),
+    _facts.CRISIS_DISPERSION_ROW: (
+        1.0, "the lowest this row can read, since it divides the largest "
+             "sector ratio by the median one"),
+}
+
+
+def _dead_floor(name: str, band: tuple[float, float]) -> str | None:
+    """A sentence saying the band's floor cannot bind, or None when it can."""
+    floor = _ARITHMETIC_FLOOR.get(name)
+    if floor is None or band[0] >= floor[0]:
+        return None
+    return (f"Its floor, {band[0]:g}, is below {floor[0]:g}, {floor[1]}, so "
+            f"the floor cannot reject any reading and only the ceiling, "
+            f"{band[1]:g}, tests this row.")
+
+
+def _fmt(x: float) -> str:
+    return f"{x:.4g}"
+
+
+def _real_context(name: str, value: float, *,
+                  horizon_days: int) -> dict[str, Any] | None:
+    """Where `value` falls among the real windows for `name`, or None.
+
+    The shape rows only, read from the per-window tables in `facts`
+    (`REAL_MARKETS_WINDOWS` at 252 days, `REAL_MARKETS_WINDOWS_504` and
+    `REAL_PERSISTENCE_WINDOWS_504` at 504) through `facts.real_windows`, so
+    the crisis window is left out here exactly as the band rule and
+    `facts.real_centre` leave it out. The median is `facts.real_centre`,
+    the same centre `certify`'s `centre` block and the scoring rule use.
+
+    These are the 2015-2025 reference windows, the only real record kept
+    window by window for every shape row at both horizons. The ruled bands
+    come from a longer record (1987-2025, 32 names), so a value can sit
+    below every window here and still be inside its ruled band. The band
+    says whether a real year could read the value, and this says how
+    typical the value is of the recent decade.
+
+    The level and crisis rows get None. Their real side is a different
+    corpus with its own estimator (an index over decades, a pooled rate),
+    and `facts.rule_row` states each one.
+    """
+    if name not in _facts.SHAPE:
+        return None
+    windows = _facts.real_windows(name, horizon_days=horizon_days)
+    if not windows:
+        return None
+    source = _facts.rule_row(name, horizon_days=horizon_days,
+                             require=False)["source"]
+    table = getattr(_facts, source.split(".", 1)[1])
+    labels = [w for i, w in enumerate(table["windows"])
+              if i != table["crisis_index"]]
+    n = len(windows)
+    under = sum(1 for w in windows if w < value)
+    over = sum(1 for w in windows if w > value)
+    if over == n:
+        position = f"below all {n}"
+    elif under == n:
+        position = f"above all {n}"
+    elif under == 0:
+        position = f"level with the lowest of {n}"
+    elif over == 0:
+        position = f"level with the highest of {n}"
+    else:
+        position = f"above {under} of {n}"
+    return {
+        "source": source,
+        "span": (labels[0].split("..")[0], labels[-1].split("..")[1]),
+        "left_out": table["windows"][table["crisis_index"]],
+        "windows": n,
+        "median": _facts.real_centre(name, horizon_days=horizon_days),
+        "lowest": min(windows),
+        "highest": max(windows),
+        "windows_below": under,
+        "position": position,
+    }
+
+
+def _row_note(name: str, value: float, band: tuple[float, float] | None,
+              real: Mapping[str, Any] | None, *,
+              horizon_days: int) -> str | None:
+    """The row's plain-language note: where the value sits, and dead edges."""
+    parts: list[str] = []
+    if real is not None:
+        length = {252: "one-year", 504: "two-year"}.get(
+            horizon_days, f"{horizon_days}-day")
+        parts.append(
+            f"{_fmt(value)} is {real['position']} non-crisis real {length} "
+            f"windows from {real['span'][0]} to {real['span'][1]} (median "
+            f"{_fmt(real['median'])}, lowest {_fmt(real['lowest'])}, highest "
+            f"{_fmt(real['highest'])}; {real['source']}).")
+        inside = band is not None and band_distance(value, *band) == 0
+        if inside and value < real["lowest"]:
+            parts.append("The band admits it, but none of those windows read "
+                         "this low.")
+        elif inside and value > real["highest"]:
+            parts.append("The band admits it, but none of those windows read "
+                         "this high.")
+    if band is not None:
+        dead = _dead_floor(name, band)
+        if dead:
+            parts.append(dead)
+    return " ".join(parts) or None
+
+
 def check(
     *,
     horizon_days: int,
@@ -1743,6 +1907,7 @@ def check(
     scenario_magnitude: bool = False,
     macro_regime: bool = False,
     preset: str | None = None,
+    basis: str = DEFAULT_BAND_BASIS,
 ) -> Verdict:
     """Does this question fall inside the envelope?
 
@@ -1752,6 +1917,16 @@ def check(
     keys of `facts.REAL_MARKETS`; unknown names are refused rather than
     ignored, because a silently dropped statistic is a silently granted
     certification.
+
+    `basis` picks the band table, and defaults to `DEFAULT_BAND_BASIS`, the
+    one `score` and `certified` use. Each named statistic is reported
+    against that table with the ruler named, and each shape row says where
+    the certified value falls among the real 2015-2025 windows. A value can
+    be inside its band and still sit below every one of those windows, as
+    `abs_return_acf1` does on pt-v20. Before 0.8.5 this function read the
+    decade table `facts.REAL_MARKETS` whatever `score` used, so the two
+    could print different bands for the same row. Pass `basis="shipped"`
+    for the decade table.
 
     `macro_regime` says the result depends on the ECONOMY reaching a
     particular state -- an inflation regime, a policy crisis -- rather than on
@@ -1808,6 +1983,7 @@ def check(
             f"are {sorted(ROSTER_SHAPES)}, and `True` says the roster is "
             f"concentrated without naming one"
         )
+    bands, _, ruler_name = _ruler(basis, CERTIFIED_HORIZON_DAYS)
 
     reasons: list[str] = []
     warnings: list[str] = []
@@ -1841,18 +2017,22 @@ def check(
         # horizon gap's own detail quoted the ruled count. It reports the
         # shape rows on the default basis, names the rows that basis cannot
         # read, and then gives the decade table's count beside it.
+        #
+        # ON THE CALLER'S `basis` since 0.8.5, which defaults to the same
+        # thing. The decade sentence is left out when the caller asked for
+        # the decade basis, since it would repeat the first.
         ruled = score({k: v for k, v in MEASURED_504.items()
                        if v is not None and k in _facts.SHAPE},
-                      horizon_days=504)
+                      horizon_days=504, basis=basis)
         rows = ruled["statistics"]
         graded = [k for k in rows if rows[k]["in_band"] is not None]
         missed = [k for k in graded if not rows[k]["in_band"]]
         held_ruled = (
-            f"holds all {len(graded)} shape rows the {DEFAULT_BAND_BASIS} "
+            f"holds all {len(graded)} shape rows the {basis} "
             f"bands can grade ({ruled['ruler']})"
             if not missed else
             f"holds {len(graded) - len(missed)} of {len(graded)} shape rows "
-            f"on the {DEFAULT_BAND_BASIS} bands ({ruled['ruler']}), out on "
+            f"on the {basis} bands ({ruled['ruler']}), out on "
             + ", ".join(f"{k} at {rows[k]['measured']:.4f} against "
                         f"{rows[k]['band']}" for k in missed))
         if ruled["unreadable"]:
@@ -1868,18 +2048,23 @@ def check(
                 f"missing "
                 + ", ".join(f"{k} at {MEASURED_504[k]:.4f} against "
                             f"{BANDS_504[k]}" for k in out))
-        roomy = [k for k in graded if rows[k]["room_sd"] is not None]
+        decade = ("" if RULERS_BY_BASIS[basis][504][0] is BANDS_504 else
+                  f" On the 2015-2025 decade bands (BANDS_504) it {held}.")
+        # In-band rows only: a row already out is named above, and calling
+        # it "inside" at a negative room would contradict that.
+        roomy = [k for k in graded
+                 if rows[k]["in_band"] and rows[k]["room_sd"] is not None]
         near = min(roomy, key=lambda k: rows[k]["room_sd"]) if roomy else None
         nearest = ("" if near is None else
-                   f" The row nearest an edge of its {DEFAULT_BAND_BASIS} "
+                   f" The row nearest an edge of its {basis} "
                    f"band is {near} at {rows[near]['measured']:.4f} against "
                    f"{rows[near]['band']}, {rows[near]['room_sd']:.2f} "
                    f"seed-sd inside.")
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
             f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model "
-            f"{held_ruled}. On the 2015-2025 decade bands (BANDS_504) it "
-            f"{held}.{nearest} Beyond 504 days the panel is measured but "
+            f"{held_ruled}.{decade}{nearest} Beyond 504 days the panel is "
+            f"measured but "
             f"has no ruler of its own: at 2520 days pt-v20 holds all 13 "
             f"shape rows the ruled 504-day bands can grade and 12 of 14 on "
             f"the decade bands (tools/calibration/long_horizon.py, run "
@@ -1905,17 +2090,26 @@ def check(
             # was still printed at pt-v19's 6.34. The decade band is the
             # one quoted because the ruled band's floor, -9.3, is below the
             # statistic's theoretical minimum of -2 and grades nothing.
+            # Since 0.8.5 the warning says that too, when the caller's basis
+            # has such a floor, so the switch of table is not silent.
             room_sd = ((MEASURED_504["excess_kurtosis"]
                         - BANDS_504["excess_kurtosis"][0])
                        / SEED_SD_504["excess_kurtosis"])
             edge = ("so a tail study at this horizon is reading the low "
                     "edge of the band" if room_sd < 2.0 else
                     "which is well clear of it")
+            own = RULERS_BY_BASIS[basis][504][0].get("excess_kurtosis")
+            why = ("" if own is None
+                   or _dead_floor("excess_kurtosis", own) is None else
+                   f". The {basis} band at 504 days is {own}, and its floor, "
+                   f"{own[0]:g}, is below -2, the lowest excess kurtosis any "
+                   f"distribution can have, so it cannot bind and the "
+                   f"2015-2025 floor is the one quoted here")
             warnings.append(
                 f"excess_kurtosis reads {MEASURED_504['excess_kurtosis']:.2f} "
                 f"at 504 days against the 2015-2025 band "
                 f"{BANDS_504['excess_kurtosis']}: inside it, "
-                f"{room_sd:.2f} seed-sd above the floor, {edge}"
+                f"{room_sd:.2f} seed-sd above the floor, {edge}{why}"
             )
 
     for name in wanted:
@@ -1956,32 +2150,60 @@ def check(
                 warnings.append(
                     f"{name} is graded and its certified value has not been "
                     f"measured on the pinned protocol yet")
+            elif bands.get(name) is None:
+                warnings.append(
+                    f"{name} has no band in {ruler_name}, so the {basis} "
+                    f"basis gives it no verdict at the certified horizon")
             else:
-                lo, hi = REAL_MARKETS[name]
+                lo, hi = bands[name]
                 if band_distance(value, lo, hi) == 0:
                     warnings.append(
                         f"{name} is in band at the certified horizon "
-                        f"({value:.4f} in {(lo, hi)}, at band position "
-                        f"{(value - lo) / (hi - lo):.2f}) -- it is reported "
-                        f"apart from the shape rows because it is certified "
-                        f"on facts.LEVEL_PROTOCOL, where the roster varies "
-                        f"with the seed, and a pass close to an edge is a "
-                        f"pass and not a demonstration that the row is right")
+                        f"({value:.4f} in {(lo, hi)} on {ruler_name}, at band "
+                        f"position {(value - lo) / (hi - lo):.2f}) -- it is "
+                        f"reported apart from the shape rows because it is "
+                        f"certified on facts.LEVEL_PROTOCOL, where the roster "
+                        f"varies with the seed, and a pass close to an edge "
+                        f"is a pass and not a demonstration that the row is "
+                        f"right")
                 else:
                     warnings.append(
                         f"{name} is held red at the certified horizon "
-                        f"({value:.4f} against {(lo, hi)}); a result leaning "
-                        f"on it leans on a row the shipped preset does not "
-                        f"hold")
+                        f"({value:.4f} against {(lo, hi)} on {ruler_name}); "
+                        f"a result leaning on it leans on a row the shipped "
+                        f"preset does not hold")
         elif horizon_days <= CERTIFIED_HORIZON_DAYS:
-            lo, hi = REAL_MARKETS[name]
-            if band_distance(CERTIFIED[name], lo, hi) == 0:
+            # ON THE CALLER'S BASIS, and with the real windows beside the
+            # band, since 0.8.5. This read `REAL_MARKETS[name]` while
+            # `score` read the default basis, and it said nothing at all
+            # about a row outside its band. A row in band now also says
+            # where the certified value falls among the real 2015-2025
+            # windows: `abs_return_acf1` is inside its ruled band at 0.0282
+            # and below every one of those windows.
+            value = CERTIFIED[name]
+            band = bands.get(name)
+            note = _row_note(name, value, band,
+                             _real_context(name, value,
+                                           horizon_days=CERTIFIED_HORIZON_DAYS),
+                             horizon_days=CERTIFIED_HORIZON_DAYS)
+            tail = f" {note}" if note else ""
+            if band is None:
+                warnings.append(
+                    f"{name} has no band in {ruler_name}, so the {basis} "
+                    f"basis gives it no verdict at the certified "
+                    f"horizon.{tail}")
+            elif band_distance(value, *band) == 0:
                 warnings.append(
                     f"{name} is in band at the certified horizon "
-                    f"({CERTIFIED[name]:.4f} in {(lo, hi)}) -- but that is a "
-                    f"median across 30 seeds; check `intervals` for the "
-                    f"spread before relying on one seed"
-                )
+                    f"({value:.4f} in {band} on {ruler_name}).{tail} That is "
+                    f"a median across 30 seeds, so check `intervals` for the "
+                    f"spread before relying on one seed")
+            else:
+                warnings.append(
+                    f"{name} is OUT of band at the certified horizon "
+                    f"({value:.4f} against {band} on {ruler_name}), so a "
+                    f"result leaning on it leans on a row the shipped preset "
+                    f"does not hold.{tail}")
 
     if sector_concentrated:
         # NARROWED 2026-09-24. This arm fired on every concentrated roster,
@@ -2074,13 +2296,66 @@ def check(
     )
 
 
-def score(panel: Mapping[str, float], *,
-          horizon_days: int = CERTIFIED_HORIZON_DAYS,
+#: The keys `facts.measure()` returns beside its statistics, which `score`
+#: sets aside by name: which run it was, how much data each row stands on,
+#: and why a row is absent. They are listed one by one, with no pattern
+#: match, so a new statistic added to `measure` is still refused as unknown
+#: until someone decides whether it is graded.
+MEASURE_RECORD_KEYS: frozenset[str] = frozenset({
+    "seed", "days", "burn", "universe_fingerprint", "model_fingerprint",
+    "instruments", "observations",
+    "dependence_instruments", "dependence_observations",
+    "fear_sessions_scored",
+    "fear_gauge_dn1_sessions", "fear_gauge_dn3_sessions",
+    "fear_gauge_dn5_sessions", "fear_gauge_up1_sessions",
+    "fear_gauge_dn3_samples", "fear_gauge_dn5_samples",
+    "index_tail_dn3_hits", "index_tail_dn3_sessions",
+    "index_tail_up3_hits", "index_tail_up3_sessions",
+    _facts.VIX_AR1_ROW + "_blind", _facts.CRISIS_DISPERSION_ROW + "_blind",
+})
+
+#: The statistics `facts.measure()` reports and no band grades: `skew`, and
+#: the rows `facts.REPORTING_ONLY` gives a reason for. `score` sets them
+#: aside by name as well.
+MEASURE_UNGRADED: frozenset[str] = frozenset(
+    {"skew", *_facts.REPORTING_ONLY})
+
+
+def score(panel: Mapping[str, Any], *,
+          horizon_days: int | None = None,
           basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     """How a measured panel sits against the bands for its own horizon.
 
-    `panel` maps statistic names to measured values -- what
-    `facts.measure()` returns, or a median across seeds.
+    `panel` maps statistic names to measured values: what `facts.measure()`
+    returns for one seed, or a median across seeds. A `measure()` result can
+    be passed as it is. Its other keys (the seed, the fingerprints, the
+    session counts, the `_blind` reasons) are in `MEASURE_RECORD_KEYS`, its
+    ungraded statistics such as `skew` are in `MEASURE_UNGRADED`, and both
+    are set aside and listed under `set_aside`. Any other name is still
+    refused. Until 0.8.5 every one of those keys was refused too, so a
+    `measure()` result had to be filtered by hand before it could be scored.
+
+    A row the panel carries as None, or reports absent through a `_blind`
+    key, is listed under `unmeasured` with the reason and is in no count.
+    `measure()` returns None for a row the run could not read, such as the
+    3 per cent fear row on a seed with no 3 per cent fall.
+
+    `horizon_days` defaults to the panel's own `days` when it has one, so a
+    504-day `measure()` result is graded on the 504-day bands, and to the
+    certified 252 otherwise. A `days` that disagrees with an explicit
+    `horizon_days` is refused.
+
+    Each graded row carries `real` and `note` beside its band. `real` says
+    where the value falls among the real 2015-2025 windows for a shape row
+    (`facts.REAL_MARKETS_WINDOWS` at 252 days, the 504-day tables at 504):
+    their median, lowest and highest, how many read below the value, and a
+    `position` such as "below all 9". It is None for the level and crisis
+    rows, whose real side is a different record. `note` says the same in a
+    sentence, and says when the band's floor sits below the lowest value
+    the statistic can take and so cannot reject anything, as the ruled
+    `excess_kurtosis` floor of -13 does. The band says whether a real year
+    could read the value, and `real` says how typical the value is of the
+    real years on record.
 
     The horizon chooses the ruler. That is why this exists as a function
     rather than a comparison anyone can write inline: a
@@ -2128,28 +2403,26 @@ def score(panel: Mapping[str, float], *,
     at one window is not an approximate ruler for another window: it is a
     ruler for a different quantity.
     """
+    panel_days = _facts.horizon_of_panels([panel], what="this panel")
+    if horizon_days is None:
+        horizon_days = (CERTIFIED_HORIZON_DAYS if panel_days is None
+                        else panel_days)
+    elif panel_days is not None and panel_days != horizon_days:
+        raise ValidationError(
+            f"the panel was measured over {panel_days} days (its `days` key) "
+            f"and horizon_days asks for the {horizon_days}-day bands. A band "
+            f"built for one window length does not grade a reading taken "
+            f"over another. Pass horizon_days={panel_days}, or leave it out "
+            f"and the panel's own `days` is used")
     if horizon_days < 1:
         raise ValidationError(
             f"horizon_days must be positive, got {horizon_days}")
-    if basis not in RULERS_BY_BASIS:
-        raise ValidationError(
-            f"{basis!r} is not a band basis; the bases are "
-            f"{sorted(RULERS_BY_BASIS)}. A basis is an era, a window count "
-            f"and a rule, and `facts.band_basis` states each one")
-    if horizon_days not in RULERS_BY_BASIS[basis]:
-        raise ValidationError(
-            f"no band set has been derived at {horizon_days} days; the "
-            f"horizons with a ruler are {sorted(RULERS_BY_HORIZON)}. A "
-            f"nearer band set is not an approximation -- the 252-day and "
-            f"504-day tables differ on twelve of fourteen rows and their "
-            f"noise scales differ by factors from 0.80 to 3.23 -- so this "
-            f"refuses rather than picking one.")
     # `loss.STRUCTURAL` names the statistics excluded from the objective by
     # design; imported here rather than at module scope because `loss`
     # imports this module's facts and a top-level import would cycle.
     from .loss import STRUCTURAL
 
-    bands, noise, ruler_name = RULERS_BY_BASIS[basis][horizon_days]
+    bands, noise, ruler_name = _ruler(basis, horizon_days)
 
     from .facts import SHAPE, LEVEL, CRISIS, PERSISTENCE, DISPERSION
 
@@ -2188,17 +2461,44 @@ def score(panel: Mapping[str, float], *,
     # horizons. So it is graded here, it is the twentieth row, and the
     # ruled basis reads 40 cells where it read 38.
     graded_rows = frozenset(SHAPE + LEVEL + CRISIS + PERSISTENCE + DISPERSION)
-    unknown = sorted(set(panel) - graded_rows)
+    #
+    # AND `facts.measure()`'s OTHER KEYS ARE SET ASIDE BY NAME, since 0.8.5.
+    # The docstring said the panel could be what `measure()` returns, and
+    # every such panel was refused here for its `seed`, `days` and session
+    # counts. The two sets are explicit lists, so a name outside them and
+    # outside the graded rows is still refused as unknown.
+    set_aside = sorted(k for k in panel
+                       if k in MEASURE_RECORD_KEYS or k in MEASURE_UNGRADED)
+    unknown = sorted(set(panel) - graded_rows - set(set_aside))
     if unknown:
         raise ValidationError(
             f"unknown statistics {unknown}; the rows this library grades "
             f"are facts.SHAPE + LEVEL + CRISIS + PERSISTENCE + DISPERSION: "
-            f"{sorted(graded_rows)}")
+            f"{sorted(graded_rows)}. The other keys facts.measure() returns "
+            f"are set aside by name (envelope.MEASURE_RECORD_KEYS and "
+            f"envelope.MEASURE_UNGRADED), and these are in neither")
+
+    # A row with no reading has no verdict, so it is named with its reason
+    # and kept out of every count, the same way `certified` keeps a row
+    # with no certified value out of its table. `band_distance(None, ...)`
+    # raises, which is what a `measure()` result carrying None did here.
+    unmeasured: dict[str, str] = {}
+    for key in set_aside:
+        if key.endswith("_blind") and key[:-len("_blind")] not in panel:
+            unmeasured[key[:-len("_blind")]] = str(panel[key])
+    for name, measured in panel.items():
+        if name in graded_rows and measured is None:
+            unmeasured[name] = (
+                "the panel carries None for this row, which is how "
+                "facts.measure reports a statistic the run could not read")
 
     unreadable_reasons = _facts.RULED_UNREADABLE.get(horizon_days, {})
     rows: dict[str, Any] = {}
     for name, measured in panel.items():
+        if name not in graded_rows or measured is None:
+            continue
         band = bands.get(name)
+        real = _real_context(name, measured, horizon_days=horizon_days)
         if band is None:
             # A row this basis has no band for. UNREADABLE, by name and with
             # the reason, rather than dropped or filled from another basis:
@@ -2212,6 +2512,9 @@ def score(panel: Mapping[str, float], *,
                 "structural": name in STRUCTURAL,
                 "unreadable": unreadable_reasons.get(
                     name, f"{ruler_name} carries no band for this row"),
+                "real": real,
+                "note": _row_note(name, measured, None, real,
+                                  horizon_days=horizon_days),
             }
             continue
         low, high = band
@@ -2225,6 +2528,12 @@ def score(panel: Mapping[str, float], *,
                         else min(measured - low, high - measured) / sd),
             "structural": name in STRUCTURAL,
             "edges": _facts.edge_liveness(name),
+            # Where the value sits among the real windows, and a sentence
+            # saying so and naming any band edge that cannot bind. Added in
+            # 0.8.5; the counts below do not read either.
+            "real": real,
+            "note": _row_note(name, measured, band, real,
+                              horizon_days=horizon_days),
         }
     def count(group):
         names = [n for n in rows if n in group and rows[n]["in_band"] is not None]
@@ -2282,6 +2591,11 @@ def score(panel: Mapping[str, float], *,
         "edge_form_rows": (sum(_facts.edge_liveness_counts(
             horizon_days).values()) if basis == BAR_BAND_BASIS else None),
         "panel_rows": len(rows),
+        # What the panel carried that is not graded, by name, and the
+        # graded rows it carried no reading for, with the reason. Neither
+        # enters a count.
+        "set_aside": set_aside,
+        "unmeasured": unmeasured,
         # The split. A gate reads `shape_in_band` against `shape_of`; the
         # level and crisis counts are reported beside it and never added
         # to it.
