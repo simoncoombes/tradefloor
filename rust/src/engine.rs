@@ -554,6 +554,17 @@ pub struct Engine {
     /// built with [`Engine::with_params`]; immutable for the engine's life,
     /// which is what lets its fingerprint be quoted for the whole run.
     params: ModelParams,
+    /// `params.fingerprint()`, taken the first time anything asks and kept.
+    ///
+    /// The fingerprint hashes the whole preset surface and then every
+    /// shipped preset to find a match, about a millisecond, and
+    /// [`Engine::state_hash`] folds it in. The sandbox's tamper guard hashes
+    /// the state twice around every call into agent code, so re-deriving it
+    /// each time was about 90 per cent of the guard's cost and a tenth of an
+    /// `evaluate`. `params` is fixed for the engine's life, so the first
+    /// answer is the only answer; a clone carries it with the params it
+    /// describes.
+    model_fingerprint: std::sync::OnceLock<String>,
     /// The VIX at which every variance coupling reads ONE — the factor's
     /// forward map, the sector draw's sigma, the per-name GARCH clamp
     /// reference and the jump arrival rate.
@@ -1173,6 +1184,7 @@ impl Engine {
             current_day: 0,
             day_marks: Vec::new(),
             params,
+            model_fingerprint: std::sync::OnceLock::new(),
             // Replaced immediately below. Zero rather than the dial's own
             // value so that a path which somehow skipped the derivation
             // would divide by zero rather than run on a plausible number.
@@ -2060,6 +2072,13 @@ impl Engine {
     /// whole run rather than the moment someone asked.
     pub fn params(&self) -> &ModelParams {
         &self.params
+    }
+
+    /// `self.params().fingerprint()`, worked out once per engine. A shipped
+    /// preset's name, or `custom-XXXXXXXX`. See the field for why it is
+    /// kept.
+    pub fn model_fingerprint(&self) -> &str {
+        self.model_fingerprint.get_or_init(|| self.params.fingerprint())
     }
 
     /// The macro calendar `macro_calendar_days_per_year` selects.
@@ -6391,7 +6410,7 @@ impl Engine {
         for id in self.ids() {
             hash_str(&mut buf, &id);
         }
-        hash_str(&mut buf, &self.params.fingerprint());
+        hash_str(&mut buf, self.model_fingerprint());
 
         // The day accumulators, in snapshot order. The fair-value shift's
         // slot, the last in both, follows the rest and only on an engine that
@@ -8730,6 +8749,26 @@ mod tests {
         }
         let walks = crate::economy::cycle::share_walks() - start;
         assert!(walks <= 1, "{walks} survival walks for one fixed cycle spec");
+    }
+
+    #[test]
+    fn the_state_hash_works_out_the_model_fingerprint_once() {
+        // The sandbox's tamper guard hashes the state before and after every
+        // call into agent code. The hash folds in the model's fingerprint,
+        // which was twenty digests of the preset surface each time and about
+        // 90 per cent of the hash's cost.
+        let e = engine(7);
+        let first = e.state_hash(0, false);
+        let taken = crate::params::digests_taken();
+        for _ in 0..5 {
+            assert_eq!(e.state_hash(0, false), first);
+        }
+        let copy = e.clone();
+        assert_eq!(copy.state_hash(0, false), first);
+        assert_eq!(crate::params::digests_taken(), taken, "the fingerprint was worked out again");
+        assert_eq!(e.model_fingerprint(), e.params().fingerprint());
+        assert_eq!(e.model_fingerprint(), "pt-v20");
+        assert_eq!(engine_v19(7).model_fingerprint(), "pt-v19");
     }
 
     #[test]

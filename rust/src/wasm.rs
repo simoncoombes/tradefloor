@@ -206,7 +206,7 @@ impl Sim {
     /// serialisation, so a page can cite exactly what it ran.
     #[wasm_bindgen(getter, js_name = modelFingerprint)]
     pub fn model_fingerprint(&self) -> String {
-        self.inner.params().fingerprint()
+        self.inner.model_fingerprint().to_string()
     }
 
     /// The macro state's VIX, the one number a trading page always wants.

@@ -2313,7 +2313,7 @@ impl PyEngine {
     /// model can never present as a standard one.
     #[getter]
     fn model_fingerprint(&self) -> String {
-        self.inner.params().fingerprint()
+        self.inner.model_fingerprint().to_string()
     }
 
     /// The VIX at which this engine's variance couplings read ONE.
@@ -3585,11 +3585,7 @@ impl PyEngine {
         let bytes = self.inner.state_hash_with_pending(
             self.day_count, self.market_open,
             &self.pending_jump, &self.pending_overnight, &self.pending_fair_value);
-        let mut hex = String::with_capacity(64);
-        for byte in bytes {
-            hex.push_str(&format!("{byte:02x}"));
-        }
-        hex
+        crate::params::lower_hex(&bytes)
     }
 
     /// Every column plus the generator position, as one dict.
@@ -3671,7 +3667,7 @@ impl PyEngine {
         // refuses a mismatch: a snapshot restored onto an engine running
         // other coefficients would continue plausibly and wrongly -- the
         // same failure class as the roster check above, for the model.
-        out.set_item("model_fingerprint", self.inner.params().fingerprint())?;
+        out.set_item("model_fingerprint", self.inner.model_fingerprint())?;
         // The per-DAY accumulators. The columns above are per-company state;
         // these live beside them and were missing, which made a mid-day fork
         // diverge in PRICE -- `attribution` is the day's GARCH innovation at
@@ -4017,7 +4013,7 @@ impl PyEngine {
         // the caller vouches for the context, as with the universe.
         if let Some(recorded) = snapshot.get_item("model_fingerprint")? {
             let recorded: String = recorded.extract()?;
-            let ours = self.inner.params().fingerprint();
+            let ours = self.inner.model_fingerprint();
             if recorded != ours {
                 return Err(ValidationError::new_err(format!(
                     "this snapshot was taken under model {recorded:?} and \

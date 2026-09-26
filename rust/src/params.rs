@@ -7903,6 +7903,8 @@ impl ModelParams {
     /// convention, so decimal formatting can never differ for reasons that
     /// are not the model.
     pub fn digest(&self) -> String {
+        #[cfg(test)]
+        DIGESTS_TAKEN.with(|n| n.set(n.get() + 1));
         let mut hasher = Sha256::new();
         for (name, value) in self.to_pairs() {
             hasher.update(name.as_bytes());
@@ -7910,24 +7912,21 @@ impl ModelParams {
             hasher.update(value.to_bits().to_be_bytes());
             hasher.update(b"\n");
         }
-        let out = hasher.finalize();
-        let mut hex = String::with_capacity(64);
-        for byte in out {
-            hex.push_str(&format!("{byte:02x}"));
-        }
-        hex
+        lower_hex(&hasher.finalize())
     }
 
     /// The honest name: a shipped preset's name when bit-identical to it,
     /// `custom-XXXXXXXX` (first 8 hex of the digest) otherwise. A run under
     /// a non-shipped preset can never present as a standard one.
+    ///
+    /// The shipped presets' own digests are constants of the build, so they
+    /// are worked out once per process ([`shipped_digests`]) rather than on
+    /// every call. The comparison is the one it was, in the same order.
     pub fn fingerprint(&self) -> String {
         let digest = self.digest();
-        for name in Self::preset_names() {
-            if let Some(preset) = Self::preset(name) {
-                if preset.digest() == digest {
-                    return (*name).to_string();
-                }
+        for (name, shipped) in shipped_digests() {
+            if *shipped == digest {
+                return (*name).to_string();
             }
         }
         format!("custom-{}", &digest[..8])
@@ -8583,6 +8582,50 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 
 /// The settable names, sorted. A function rather than the const above so
 /// the list is derived from `to_pairs`' actual coverage in tests.
+/// Bytes as lowercase hex, two digits each: what `format!("{byte:02x}")`
+/// per byte wrote, into one string allocated at its final length.
+pub(crate) fn lower_hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        hex.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        hex.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    hex
+}
+
+/// Every shipped preset's [`ModelParams::digest`], in
+/// [`ModelParams::preset_names`] order, worked out on first use and kept for
+/// the process.
+///
+/// A preset is a `const` and the carried read-only surface its digest
+/// includes is made of constants, so the digests cannot change while the
+/// process runs. Recomputing them was nineteen digests of the full preset
+/// surface on every [`ModelParams::fingerprint`] call, about a millisecond.
+fn shipped_digests() -> &'static [(&'static str, String)] {
+    static DIGESTS: std::sync::OnceLock<Vec<(&'static str, String)>> =
+        std::sync::OnceLock::new();
+    DIGESTS.get_or_init(|| {
+        ModelParams::preset_names()
+            .iter()
+            .filter_map(|name| ModelParams::preset(name).map(|p| (*name, p.digest())))
+            .collect()
+    })
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many times [`ModelParams::digest`] has run on this thread. Tests
+    /// read it to hold the fingerprint's callers to working it out once.
+    static DIGESTS_TAKEN: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// [`ModelParams::digest`] calls made so far on this thread. Test-only.
+#[cfg(test)]
+pub(crate) fn digests_taken() -> u64 {
+    DIGESTS_TAKEN.with(|n| n.get())
+}
+
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
@@ -9226,6 +9269,41 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn lower_hex_writes_what_format_wrote() {
+        let every: Vec<u8> = (0..=255u8).collect();
+        let by_format: String = every.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(lower_hex(&every), by_format);
+        assert_eq!(lower_hex(&[]), "");
+    }
+
+    #[test]
+    fn the_kept_preset_digests_are_the_live_ones() {
+        // The table `fingerprint` compares against is worked out once. It
+        // must hold every shipped preset, in `preset_names` order, at the
+        // digest the preset has now.
+        let kept = shipped_digests();
+        assert_eq!(kept.len(), ModelParams::preset_names().len());
+        for ((name, digest), listed) in kept.iter().zip(ModelParams::preset_names()) {
+            assert_eq!(name, listed);
+            assert_eq!(*digest, ModelParams::preset(name).unwrap().digest(), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_fingerprint_takes_one_digest_once_the_presets_are_kept() {
+        // Before the presets' digests were kept, every fingerprint took
+        // twenty: its own and one per shipped preset. The engine's state
+        // hash folds the fingerprint in, and the sandbox hashes the state
+        // around every call into agent code.
+        let _ = PT_V20.fingerprint();
+        let before = digests_taken();
+        assert_eq!(PT_V19.fingerprint(), "pt-v19");
+        let custom = PT_V1.with_override("garch_alpha", 0.12).unwrap();
+        assert!(custom.fingerprint().starts_with("custom-"));
+        assert_eq!(digests_taken() - before, 2);
     }
 
     #[test]

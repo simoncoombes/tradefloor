@@ -299,7 +299,7 @@ impl PyEngineBatch {
     /// constructor builds every engine from the same coefficient set.
     #[getter]
     fn model_fingerprint(&self) -> String {
-        self.engines[0].params().fingerprint()
+        self.engines[0].model_fingerprint().to_string()
     }
 
     /// The model every member runs, as a `ModelParams`.
