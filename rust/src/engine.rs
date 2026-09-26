@@ -929,6 +929,13 @@ impl Engine {
     /// Whether this engine's model can move a fair-value level, which is
     /// when the snapshot and the state hash carry them. Off on every preset
     /// through pt-v19, so their snapshots and hashes are the ones they were.
+    /// Whether this engine's model carries the volatility feedback's
+    /// smoothed exposure, which is when the snapshot and the state hash
+    /// carry it. Off on every preset.
+    pub fn carries_vix_feedback(&self) -> bool {
+        self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0
+    }
+
     pub fn carries_fair_value_offsets(&self) -> bool {
         self.params.fair_value_news_share != 0.0
             || self.params.fair_value_market_share != 0.0
@@ -4048,6 +4055,7 @@ impl Engine {
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let night_vix = crate::market::tick::vix_feedback_exposure(&self.params, &self.economy);
         let econ_view = crate::fair_value::EconomyValuationInputs {
             corporate_bond_yield: Some(self.economy.corporate_bond_yield),
             federal_funds_rate: self.economy.federal_funds_rate,
@@ -4111,6 +4119,7 @@ impl Engine {
                 p.rate_pe_sensitivity,
             )
             .fair_value;
+            let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
             let price = crate::mathx::min(
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
@@ -4626,7 +4635,8 @@ impl Engine {
         // keeps the whole jump: it reports what moved the price.
         if !s_before.is_empty() {
             let psi = self.params.fair_value_news_share;
-            let psim = self.params.fair_value_market_share;
+            let psim = crate::market::tick::market_permanent_share(
+                &self.params, self.market_vol.sigma_daily());
             let common = market - compensator;
             for (index, company) in self.companies.iter_mut().enumerate() {
                 let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
@@ -5016,6 +5026,17 @@ impl Engine {
                 level += p.earnings_cycle_sigma * rng.next_normal();
             }
             self.economy.earnings_cycle = level;
+        }
+
+        // THE VOLATILITY FEEDBACK'S SMOOTHED EXPOSURE, one step a session
+        // after the VIX has moved: the log excess of the VIX over the knee,
+        // pulled at a half-life of `fair_value_vix_half_life` sessions.
+        // Nothing runs unless both the gain and the half-life are set, so
+        // every preset leaves the field at 0.0 and takes no draw.
+        if self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0 {
+            let target = crate::market::tick::vix_excess(&self.params, self.economy.vix);
+            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_vix_half_life);
+            self.economy.vix_feedback += pull * (target - self.economy.vix_feedback);
         }
 
         let policy = crate::economy::PolicyOptions {
@@ -6390,6 +6411,10 @@ impl Engine {
         // The aggregate earnings cycle, on the same rule.
         if self.params.earnings_cycle_depth != 0.0 {
             hash_f64(&mut buf, self.economy.earnings_cycle);
+        }
+        // The volatility feedback's smoothed exposure, on the same rule.
+        if self.carries_vix_feedback() {
+            hash_f64(&mut buf, self.economy.vix_feedback);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

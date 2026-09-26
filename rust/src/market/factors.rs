@@ -631,6 +631,12 @@ pub struct LiveFactors {
     /// [`crate::params::ModelParams::garch_innovation_commensurate`] is
     /// non-zero.
     pub noise_market: f64,
+    /// The name's plain loading on the tick's market draw, `beta * F`: the
+    /// part of `noise_market` before the down-tick tilt, the lagged wire,
+    /// the crisis injection, the crash amplifier and the recentring. Zero
+    /// mean by construction. Read only under
+    /// [`crate::params::ModelParams::fair_value_market_linear`].
+    pub noise_market_linear: f64,
     pub noise_sector: f64,
     pub noise_idio: f64,
     /// The scale the idiosyncratic draw above was taken at, with the name's
@@ -1092,6 +1098,19 @@ pub fn calculate_live_factors(
             * shared.market_sigma_tick
             / SQRT_TWO_PI
     };
+    // The lagged wire multiplied the tilt by `1 + lag` on this session, so
+    // its mean is `1 + lag` times what the line above gives back
+    // (`market_beta_down_asym_lag_recentre`). The same condition the wire
+    // itself reads, and a branch, so 0.0 is the arithmetic that stood.
+    let tilt_recentre = if params.market_beta_down_asym_lag_recentre == 0.0
+        || params.market_beta_down_asym_lag == 0.0
+        || !shared.prev_day_down
+    {
+        tilt_recentre
+    } else {
+        tilt_recentre
+            * (1.0 + params.market_beta_down_asym_lag_recentre * params.market_beta_down_asym_lag)
+    };
     let random_noise =
         market_component * crash_amplifier + tilt_recentre + sector_component + idiosyncratic_noise;
     // The same three terms kept apart, written AFTER the sum so the sum
@@ -1204,6 +1223,7 @@ pub fn calculate_live_factors(
         short_squeeze_effect,
         random_noise,
         noise_market,
+        noise_market_linear: beta * shared.market_factor,
         noise_sector,
         noise_idio,
         noise_idio_unit,

@@ -933,6 +933,30 @@ PERTURBATIONS = [
     # named preset breaks the assertion below for a reason that has
     # nothing to do with the parameter.
     ("market_beta_down_asym_recentre", 0.5, True),
+    # Gives back the part of the tilt's mean the lagged wire multiplies in,
+    # on a session after a down day. Gated on the tilt, the wire and the
+    # recentring all being on, which the default carries, so the probe's
+    # market moves once a lagged session comes.
+    ("market_beta_down_asym_lag_recentre", 1.0, True),
+    # INERT on this probe by construction: it chooses which part of a
+    # market shock `fair_value_market_share` makes permanent, and the
+    # default carries no market share. tests/test_market_linear.py holds it.
+    ("fair_value_market_linear", 1.0, False),
+    # INERT on this probe for the same reason: a ceiling on the volatility
+    # whose market shocks the market share makes permanent, and the default
+    # carries no market share. tests/test_market_linear.py holds it.
+    ("fair_value_market_vol_cap", 1.5, False),
+    # INERT on this probe: the discount applies only while the VIX is above
+    # its knee (30), and the probe's three calm days sit below it.
+    # tests/test_vix_discount.py holds the mechanism.
+    ("fair_value_vix_discount", 0.2, False),
+    # INERT: read only with fair_value_vix_discount non-zero.
+    ("fair_value_vix_knee", 25.0, False),
+    # INERT: read only with fair_value_vix_discount non-zero.
+    ("fair_value_vix_half_life", 10.0, False),
+    # LIVE: the default carries buyback_payout_share, and a cap of a tenth
+    # of a per cent binds on every profitable name from the first session.
+    ("buyback_yield_cap", 0.001, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

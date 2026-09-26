@@ -3913,6 +3913,10 @@ impl PyEngine {
         if self.inner.params().earnings_cycle_depth != 0.0 {
             econ.set_item("earnings_cycle", economy.earnings_cycle)?;
         }
+        // The volatility feedback's smoothed exposure, on the same rule.
+        if self.inner.carries_vix_feedback() {
+            econ.set_item("vix_feedback", economy.vix_feedback)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -4462,6 +4466,9 @@ impl PyEngine {
             );
             if let Some(v) = d.get_item("earnings_cycle")? {
                 economy.earnings_cycle = v.extract()?;
+            }
+            if let Some(v) = d.get_item("vix_feedback")? {
+                economy.vix_feedback = v.extract()?;
             }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;

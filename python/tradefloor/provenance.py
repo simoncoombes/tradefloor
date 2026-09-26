@@ -418,6 +418,40 @@ OUT_OF_SCOPE = {
         "None, so `reprice_to_published_macro` writes nothing and the close's "
         "macro step reaches prices at the next session's first tick "
         "(0.8.5, pt-v20 audit finding 3)",
+    "buyback_yield_cap":
+        "inert at 0.0 as shipped: `market::tick::buyback_scale` compounds "
+        "the uncapped yield. Keeps the term's elasticity under one for a "
+        "name whose price collapses toward the floor (0.8.5, pt-v20 work: "
+        "the close's re-mark diverged on a 0.10 name, grid ptv20vr6)",
+    "fair_value_vix_discount":
+        "inert at 0.0 as shipped: `market::tick::with_vix_discount` returns "
+        "fair value unscaled without reading the VIX. A transient discount "
+        "on fair value while the VIX is above `fair_value_vix_knee` (0.8.5, "
+        "pt-v20 work: audit major 5 and minor 13, the 2020 fall's depth "
+        "and timing under a permanent market share)",
+    "fair_value_vix_half_life":
+        "unread at 0.0 while `fair_value_vix_discount` is 0.0; off zero the "
+        "close carries a smoothed exposure, snapshotted and hashed only while "
+        "both are set (0.8.5, pt-v20 work, grids ptv20vr6-7)",
+    "fair_value_vix_knee":
+        "unread at its 30.0 while `fair_value_vix_discount` is 0.0 (0.8.5, "
+        "pt-v20 work)",
+    "fair_value_market_vol_cap":
+        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
+        "the only reader. A ceiling on the volatility whose market shocks "
+        "are permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
+    "fair_value_market_linear":
+        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
+        "the only reader. Chooses the plain loading on the market draw as the "
+        "permanent part (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
+    "market_beta_down_asym_lag_recentre":
+        "inert at 0.0 as shipped: the recentring offset is not scaled on a "
+        "lagged session, and the lagged tilt's mean (about -8 per cent a "
+        "year of the market input on pt-v20) sits in `s` as a constant "
+        "discount while `fair_value_market_share` is 0.0 (0.8.5, pt-v20 "
+        "work: audit major 5, the long-horizon reversion)",
     "earnings_anticipation_half_life":
         "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
         "returns None and the valuation reads the earnings cycle's level "

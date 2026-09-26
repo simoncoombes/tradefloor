@@ -268,6 +268,12 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
         return 1.0;
     }
     let b = p.buyback_payout_share * eps / price;
+    // The yield is read at TODAY's price and applied over every elapsed
+    // year, so a name whose price collapses toward the 0.01 floor reads a
+    // yield of hundreds and a fair value of exp(hundreds): the re-mark's
+    // fixed point then diverges and the price jumps by orders of magnitude
+    // (`buyback_yield_cap`). A branch at 0.0, the arithmetic that stood.
+    let b = if p.buyback_yield_cap == 0.0 { b } else { mathx::min(b, p.buyback_yield_cap) };
     mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
 }
 
@@ -797,6 +803,23 @@ fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
     mathx::max(mathx::min(raw, 4.0), 0.25)
 }
 
+/// The share of a market shock that moves fair value for good at the
+/// market's current daily sigma: `fair_value_market_share`, scaled down by
+/// `fair_value_market_vol_cap` once the sigma is above that multiple of
+/// `market_factor_sigma`. The share itself at a cap of 0.0, bit for bit.
+pub fn market_permanent_share(p: &crate::params::ModelParams, market_sigma_daily: f64) -> f64 {
+    let share = p.fair_value_market_share;
+    if p.fair_value_market_vol_cap == 0.0 {
+        return share;
+    }
+    let ceiling = p.fair_value_market_vol_cap * p.market_factor_sigma;
+    if market_sigma_daily > ceiling {
+        share * (ceiling / market_sigma_daily)
+    } else {
+        share
+    }
+}
+
 pub fn simulate_market_tick(
     companies: &mut [TickCompany],
     inputs: &TickInputs,
@@ -1056,6 +1079,7 @@ pub fn simulate_market_tick(
 
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
+    let vix_exposure = vix_feedback_exposure(p, economy);
     let mut s_components = vec![[0.0f64; crate::market::factors::TICK_COMPONENT_COUNT]; active_count];
     let mut noise_parts = vec![[0.0f64; 3]; active_count];
     let mut noise_own_scale2 = vec![0.0f64; active_count];
@@ -1101,7 +1125,7 @@ pub fn simulate_market_tick(
         let breakdown = crate::fair_value::compute_fair_value_at(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
-        let fv = breakdown.fair_value;
+        let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
         // so enabling the model — or loading an old save — causes no level
@@ -1231,9 +1255,17 @@ pub fn simulate_market_tick(
             let dv = if p.fair_value_market_share == 0.0 {
                 own_noise + own_news
             } else {
-                let psim = p.fair_value_market_share;
+                let psim = market_permanent_share(p, inputs.market_sigma_daily);
+                // Under `fair_value_market_linear` only the plain loading on
+                // the draw is permanent; the tilt, the lagged wire, the
+                // crisis injection and the amplifier stay in `s`.
+                let market_draw = if p.fair_value_market_linear == 0.0 {
+                    raw.noise_market
+                } else {
+                    raw.noise_market_linear
+                };
                 own_noise + own_news
-                    + psim * (raw.noise_market * noise_scale)
+                    + psim * (market_draw * noise_scale)
                     + psim * (raw.company_news_market * scale)
             };
             // The component slots keep the WHOLE shock, deliberately: they
@@ -1655,6 +1687,41 @@ fn with_fill_impact(slot: f64, fill: Option<&f64>) -> f64 {
     }
 }
 
+/// The log excess of the VIX over `fair_value_vix_knee`, floored at zero.
+pub fn vix_excess(p: &ModelParams, vix: f64) -> f64 {
+    if !(p.fair_value_vix_knee > 0.0) || !(vix > p.fair_value_vix_knee) {
+        return 0.0;
+    }
+    mathx::log(vix / p.fair_value_vix_knee)
+}
+
+/// What the volatility-feedback discount reads (`fair_value_vix_discount`):
+/// the VIX's log excess over the knee as it stands, or, with
+/// `fair_value_vix_half_life` set, its smoothed level the close carries
+/// (`EconomyState::vix_feedback`). 0.0 at a gain of 0.0, reading nothing.
+pub fn vix_feedback_exposure(p: &ModelParams, economy: &EconomyState) -> f64 {
+    if p.fair_value_vix_discount == 0.0 {
+        return 0.0;
+    }
+    if p.fair_value_vix_half_life == 0.0 {
+        vix_excess(p, economy.vix)
+    } else {
+        economy.vix_feedback
+    }
+}
+
+/// A fair value scaled by the volatility-feedback discount,
+/// `exp(-gain * beta * exposure)`: the value itself, bit for bit, at a gain
+/// of 0.0 or an exposure of zero. A function of the VIX (or its smoothed
+/// level) alone, so the discount goes as fear does.
+pub fn with_vix_discount(p: &ModelParams, fv: f64, exposure: f64, beta: Option<f64>) -> f64 {
+    if p.fair_value_vix_discount == 0.0 || !(exposure > 0.0) {
+        fv
+    } else {
+        fv * mathx::exp(-p.fair_value_vix_discount * beta.unwrap_or(1.0) * exposure)
+    }
+}
+
 /// A name's fair value on its PUBLISHED fundamentals, as the tick's phase 2
 /// computes it for a name whose fair-value level is zero: the nominal
 /// restatement, the buyback term at the current price, then the valuation.
@@ -1681,10 +1748,11 @@ pub fn published_fair_value(
         qe_pe_boost: Some(economy.qe_pe_boost),
         qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
-    crate::fair_value::compute_fair_value_at(
+    let fv = crate::fair_value::compute_fair_value_at(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
-    .fair_value
+    .fair_value;
+    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
 }
 
 /// A name's fair value as the tick's phase 2 computes it: the nominal
@@ -1721,10 +1789,11 @@ pub fn tick_fair_value(
         qe_pe_boost: Some(economy.qe_pe_boost),
         qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
-    crate::fair_value::compute_fair_value_at(
+    let fv = crate::fair_value::compute_fair_value_at(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
-    .fair_value
+    .fair_value;
+    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {

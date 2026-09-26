@@ -728,6 +728,87 @@ pub struct ModelParams {
     /// repository, programme/results/ptv20/). Off zero, that share joins the
     /// name's fair-value level, as the stock-level share does. In [0, 1].
     pub fair_value_market_share: f64,
+    /// Which part of a market shock `fair_value_market_share` makes
+    /// permanent. 0.0, which every preset through pt-v20 carries, is the
+    /// whole of the name's market input. 1.0 is its plain loading on the
+    /// draw, `beta * F`, which has zero mean in every regime; the down-tick
+    /// tilt, the lagged down-day wire, the crisis injection, the crash
+    /// amplifier and the recentring stay in `s` and revert.
+    ///
+    /// Those terms are not zero-mean once the market is volatile: the
+    /// amplifier fires on a threshold in BASELINE sigmas, so at a high VIX it
+    /// multiplies the tilted down side on most ticks, and the recentring
+    /// gives back only the unamplified, unlagged form. In `s` that is a
+    /// discount that grows with the VIX and reverts as it falls, which is
+    /// how a replayed crash reaches its depth. Made permanent, it is a drift
+    /// that runs as long as the VIX is high: on the driven 2020 path at a
+    /// share of 1.0 the cap-weighted fair-value level falls about 0.45 in the
+    /// hundred sessions after the VIX peak (desk, seed 101). A switch. Read
+    /// only with `fair_value_market_share` non-zero. In [0, 1].
+    pub fair_value_market_linear: f64,
+    /// A ceiling, in multiples of `market_factor_sigma`, on the market
+    /// volatility whose shocks `fair_value_market_share` makes permanent.
+    /// 0.0, which every preset through pt-v20 carries, is no ceiling: the
+    /// share applies to every market shock whatever the regime.
+    ///
+    /// Off zero, a market shock drawn at a daily sigma above `this *
+    /// market_factor_sigma` moves fair value by the share times `this *
+    /// market_factor_sigma / sigma` of it, and the rest stays in `s` and
+    /// reverts on the mispricing's half-life: ordinary news is permanent,
+    /// and the excess a fear regime adds is transient. Reversion
+    /// concentrates in turbulent periods in the data (Poterba and Summers
+    /// 1988 on 1926-40; Kim, Nelson and Startz 1991; Spierdijk, Bikker and
+    /// van den Hoek 2012). The same ceiling applies to the market jump's
+    /// permanent share. Read only with `fair_value_market_share` non-zero.
+    /// In [0, 32].
+    pub fair_value_market_vol_cap: f64,
+    /// Volatility feedback: a discount on every name's fair value while the
+    /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
+    /// knee))`. 0.0, which every preset through pt-v20 carries, is none.
+    ///
+    /// A function of the VIX alone and no state, so it is transient by
+    /// construction: it deepens a fall while fear is high and is given back
+    /// as the VIX comes down, at the VIX's own pace, and it moves nothing
+    /// that a permanent share or the mispricing's pull carries. Higher
+    /// expected volatility raises the required return and lowers the price
+    /// (French, Schwert and Stambaugh 1987; Campbell and Hentschel 1992).
+    /// Under `macro_publication_repricing` the close's VIX reaches prices at
+    /// the close, with the day's move; without it, at the next tick. Read
+    /// wherever fair value is: the tick, the overnight opening print, the
+    /// re-mark and the stationary opening. In [0, 1].
+    pub fair_value_vix_discount: f64,
+    /// The VIX level above which `fair_value_vix_discount` applies. 30.0,
+    /// which every preset carries, is unread while the discount is 0.0.
+    /// In (0, 200].
+    pub fair_value_vix_knee: f64,
+    /// Half-life, in sessions, of the VIX exposure the volatility-feedback
+    /// discount reads. 0.0, which every preset carries, reads the VIX as it
+    /// stands, so the discount's whole daily change lands with the VIX's
+    /// move: on a held-out grid (ptv20vr6-7) that doubled the sessions under
+    /// -5 per cent and took the 2008 replay's worst month to 122 per cent
+    /// against 84. Off zero, the close pulls a smoothed exposure
+    /// (`EconomyState::vix_feedback`) toward the VIX's log excess over the
+    /// knee at this half-life, so the discount builds over a fearful month
+    /// and goes as the fear does, without a session of its own. The
+    /// snapshot and the state hash carry the exposure only while this and
+    /// the gain are both set. In [0, 252].
+    pub fair_value_vix_half_life: f64,
+    /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
+    /// price` that the buyback term compounds over the elapsed years. 0.0,
+    /// which every preset carries, is none.
+    ///
+    /// The term reads the yield at today's price and applies it over the
+    /// whole elapsed time, so a name whose price collapses toward the 0.01
+    /// floor reads a yield of hundreds, its fair value runs to exp(hundreds)
+    /// and the close's re-mark (whose fixed point assumes the term's
+    /// elasticity is well under one) diverges: on the leading pt-v20 arm
+    /// with the market permanent share, a name went from 0.10 to 38,220 in
+    /// one close and the index rose 86-fold (seed 821, session 4851), and
+    /// the W100k15d20 control shows the same on 1 of 90 held-out histories.
+    /// Off zero, the yield is capped at this, so the term's elasticity
+    /// stays under one. Read only with `buyback_payout_share` non-zero.
+    /// In [0, 1].
+    pub buyback_yield_cap: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -2323,6 +2404,32 @@ pub struct ModelParams {
     /// offset added before it would itself be amplified, delivering the
     /// form times `E[A]` rather than the form.
     pub market_beta_down_asym_recentre: f64,
+    /// How much of the first moment the down-day wire adds to the tilt is
+    /// given back. 0.0, which every preset through pt-v20 carries, is
+    /// bit-identical. 1.0 returns the whole of it.
+    ///
+    /// `market_beta_down_asym_recentre` gives back the tilt's mean at a
+    /// lag multiplier of one. On a session after a down day
+    /// (`market_beta_down_asym_lag`) the whole transmission, the tilt
+    /// included, is multiplied by `1 + lag`, so the tilt's mean is
+    /// `(1 + lag)` times the form and `lag * a * beta * s / sqrt(2 pi)` of
+    /// it is left in every name every tick of that session. At pt-v20's
+    /// 0.025 and 0.46 that is about -8 per cent a year of the cap-weighted
+    /// market input (desk: -11.3 per cent a year with the wire, -3.5 with
+    /// it off, se 3 to 4, seeds 101-104, 756 sessions). While every market
+    /// shock sits in `s` the pull turns it into a constant discount of
+    /// about 2 per cent and it costs no drift; under
+    /// `fair_value_market_share` it accumulates in the fair-value level and
+    /// is a drift (grid ptv20g1: the index's long-run return 5.6, 1.3 and
+    /// -3.1 per cent at shares 0, 0.5 and 1).
+    ///
+    /// Off zero, on a lagged session the recentring offset is multiplied by
+    /// `1 + this * lag`, so at 1.0 it gives back the lagged tilt's mean
+    /// exactly as `market_beta_down_asym_recentre` gives back the unlagged
+    /// one, after the amplifier and with the same one per cent left. Read
+    /// only with `market_beta_down_asym_recentre`, `market_beta_down_asym`
+    /// and `market_beta_down_asym_lag` all non-zero. In [0, 1].
+    pub market_beta_down_asym_lag_recentre: f64,
 
     /// Suppression of a name's idiosyncratic shock on a down tick of the
     /// market factor, with the up tick inflated to hold the unconditional
@@ -4968,6 +5075,7 @@ impl ModelParams {
             market_beta_down_asym_lag: 0.0,
             market_beta_down_asym_lag_live: 0.0,
             market_beta_down_asym_recentre: 0.0,
+            market_beta_down_asym_lag_recentre: 0.0,
             market_idio_down_suppress: 0.0,
             oil_supply_response: 0.0,
             oil_opec_symmetry: 0.0,
@@ -5104,6 +5212,12 @@ impl ModelParams {
             corporate_yield_daily: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
+            fair_value_market_linear: 0.0,
+            fair_value_market_vol_cap: 0.0,
+            fair_value_vix_discount: 0.0,
+            fair_value_vix_knee: 30.0,
+            fair_value_vix_half_life: 0.0,
+            buyback_yield_cap: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7213,6 +7327,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_beta_down_asym_lag_live" => self.market_beta_down_asym_lag_live,
             "market_beta_down_asym_recentre" => self.market_beta_down_asym_recentre,
+            "market_beta_down_asym_lag_recentre" => self.market_beta_down_asym_lag_recentre,
             "market_idio_down_suppress" => self.market_idio_down_suppress,
             "oil_supply_response" => self.oil_supply_response,
             "oil_opec_symmetry" => self.oil_opec_symmetry,
@@ -7329,6 +7444,12 @@ impl ModelParams {
             "corporate_yield_daily" => self.corporate_yield_daily,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
+            "fair_value_market_linear" => self.fair_value_market_linear,
+            "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
+            "fair_value_vix_discount" => self.fair_value_vix_discount,
+            "fair_value_vix_knee" => self.fair_value_vix_knee,
+            "fair_value_vix_half_life" => self.fair_value_vix_half_life,
+            "buyback_yield_cap" => self.buyback_yield_cap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7457,6 +7578,7 @@ impl ModelParams {
             "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_beta_down_asym_lag_live" => out.market_beta_down_asym_lag_live = value,
             "market_beta_down_asym_recentre" => out.market_beta_down_asym_recentre = value,
+            "market_beta_down_asym_lag_recentre" => out.market_beta_down_asym_lag_recentre = value,
             "market_idio_down_suppress" => out.market_idio_down_suppress = value,
             "oil_supply_response" => out.oil_supply_response = value,
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
@@ -7573,6 +7695,12 @@ impl ModelParams {
             "corporate_yield_daily" => out.corporate_yield_daily = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
+            "fair_value_market_linear" => out.fair_value_market_linear = value,
+            "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
+            "fair_value_vix_discount" => out.fair_value_vix_discount = value,
+            "fair_value_vix_knee" => out.fair_value_vix_knee = value,
+            "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
+            "buyback_yield_cap" => out.buyback_yield_cap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -7945,6 +8073,43 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
+            return Err(format!(
+                "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
+                self.buyback_yield_cap));
+        }
+        if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
+            return Err(format!(
+                "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
+                self.fair_value_vix_discount));
+        }
+        if !(self.fair_value_vix_half_life >= 0.0 && self.fair_value_vix_half_life <= 252.0) {
+            return Err(format!(
+                "fair_value_vix_half_life is {}. It is a half-life in sessions, in [0, 252]; 0 reads the VIX as it stands.",
+                self.fair_value_vix_half_life));
+        }
+        if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
+            return Err(format!(
+                "fair_value_vix_knee is {}. It is a VIX level, in (0, 200].",
+                self.fair_value_vix_knee));
+        }
+        if !(self.fair_value_market_vol_cap >= 0.0 && self.fair_value_market_vol_cap <= 32.0) {
+            return Err(format!(
+                "fair_value_market_vol_cap is {}. It is a multiple of market_factor_sigma, in [0, 32]; 0 is no ceiling.",
+                self.fair_value_market_vol_cap));
+        }
+        if !(self.fair_value_market_linear >= 0.0 && self.fair_value_market_linear <= 1.0) {
+            return Err(format!(
+                "fair_value_market_linear is {}. It is a switch, in [0, 1].",
+                self.fair_value_market_linear));
+        }
+        if !(self.market_beta_down_asym_lag_recentre >= 0.0
+            && self.market_beta_down_asym_lag_recentre <= 1.0)
+        {
+            return Err(format!(
+                "market_beta_down_asym_lag_recentre is {}. It is the share of the lagged tilt's mean given back, in [0, 1].",
+                self.market_beta_down_asym_lag_recentre));
         }
         if !(self.rate_pe_sensitivity >= 0.0 && self.rate_pe_sensitivity <= 10.0) {
             return Err(format!(
@@ -8387,6 +8552,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_beta_down_asym_lag",
         "market_beta_down_asym_lag_live",
         "market_beta_down_asym_recentre",
+        "market_beta_down_asym_lag_recentre",
         "market_idio_down_suppress",
         "oil_opec_symmetry",
         "oil_seasonality_target",
@@ -8427,6 +8593,12 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_yield_daily",
         "fair_value_news_share",
         "fair_value_market_share",
+        "fair_value_market_linear",
+        "fair_value_market_vol_cap",
+        "fair_value_vix_discount",
+        "fair_value_vix_knee",
+        "fair_value_vix_half_life",
+        "buyback_yield_cap",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",
