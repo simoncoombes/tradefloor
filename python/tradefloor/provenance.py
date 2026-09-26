@@ -429,6 +429,10 @@ OUT_OF_SCOPE = {
         "on fair value while the VIX is above `fair_value_vix_knee` (0.8.5, "
         "pt-v20 work: audit major 5 and minor 13, the 2020 fall's depth "
         "and timing under a permanent market share)",
+    "fair_value_vix_half_life":
+        "unread at 0.0 while `fair_value_vix_discount` is 0.0; off zero the "
+        "close carries a smoothed exposure, snapshotted and hashed only while "
+        "both are set (0.8.5, pt-v20 work, grids ptv20vr6-7)",
     "fair_value_vix_knee":
         "unread at its 30.0 while `fair_value_vix_discount` is 0.0 (0.8.5, "
         "pt-v20 work)",

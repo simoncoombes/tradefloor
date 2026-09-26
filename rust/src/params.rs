@@ -781,6 +781,18 @@ pub struct ModelParams {
     /// which every preset carries, is unread while the discount is 0.0.
     /// In (0, 200].
     pub fair_value_vix_knee: f64,
+    /// Half-life, in sessions, of the VIX exposure the volatility-feedback
+    /// discount reads. 0.0, which every preset carries, reads the VIX as it
+    /// stands, so the discount's whole daily change lands with the VIX's
+    /// move: on a held-out grid (ptv20vr6-7) that doubled the sessions under
+    /// -5 per cent and took the 2008 replay's worst month to 122 per cent
+    /// against 84. Off zero, the close pulls a smoothed exposure
+    /// (`EconomyState::vix_feedback`) toward the VIX's log excess over the
+    /// knee at this half-life, so the discount builds over a fearful month
+    /// and goes as the fear does, without a session of its own. The
+    /// snapshot and the state hash carry the exposure only while this and
+    /// the gain are both set. In [0, 252].
+    pub fair_value_vix_half_life: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
     /// which every preset carries, is none.
@@ -5204,6 +5216,7 @@ impl ModelParams {
             fair_value_market_vol_cap: 0.0,
             fair_value_vix_discount: 0.0,
             fair_value_vix_knee: 30.0,
+            fair_value_vix_half_life: 0.0,
             buyback_yield_cap: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
@@ -7435,6 +7448,7 @@ impl ModelParams {
             "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
             "fair_value_vix_discount" => self.fair_value_vix_discount,
             "fair_value_vix_knee" => self.fair_value_vix_knee,
+            "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
@@ -7685,6 +7699,7 @@ impl ModelParams {
             "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
             "fair_value_vix_discount" => out.fair_value_vix_discount = value,
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
+            "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
@@ -8068,6 +8083,11 @@ impl ModelParams {
             return Err(format!(
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
                 self.fair_value_vix_discount));
+        }
+        if !(self.fair_value_vix_half_life >= 0.0 && self.fair_value_vix_half_life <= 252.0) {
+            return Err(format!(
+                "fair_value_vix_half_life is {}. It is a half-life in sessions, in [0, 252]; 0 reads the VIX as it stands.",
+                self.fair_value_vix_half_life));
         }
         if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
             return Err(format!(
@@ -8577,6 +8597,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_market_vol_cap",
         "fair_value_vix_discount",
         "fair_value_vix_knee",
+        "fair_value_vix_half_life",
         "buyback_yield_cap",
         "opening_mispricing_sigma",
         "opening_market_sigma",

@@ -1079,6 +1079,7 @@ pub fn simulate_market_tick(
 
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
+    let vix_exposure = vix_feedback_exposure(p, economy);
     let mut s_components = vec![[0.0f64; crate::market::factors::TICK_COMPONENT_COUNT]; active_count];
     let mut noise_parts = vec![[0.0f64; 3]; active_count];
     let mut noise_own_scale2 = vec![0.0f64; active_count];
@@ -1124,7 +1125,7 @@ pub fn simulate_market_tick(
         let breakdown = crate::fair_value::compute_fair_value_at(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
-        let fv = with_vix_discount(p, breakdown.fair_value, economy.vix, companies[idx].stock.beta);
+        let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
         // so enabling the model — or loading an old save — causes no level
@@ -1686,29 +1687,38 @@ fn with_fill_impact(slot: f64, fill: Option<&f64>) -> f64 {
     }
 }
 
-/// The volatility-feedback scale on a name's fair value
-/// (`fair_value_vix_discount`): `exp(-gain * beta * ln(vix / knee))` above
-/// the knee, 1.0 at or below it, and exactly 1.0 at a gain of 0.0 without
-/// reading anything. A function of the VIX alone, so it carries no state:
-/// the discount is there while the VIX is high and goes as it falls.
-pub fn vix_fair_value_scale(p: &ModelParams, vix: f64, beta: Option<f64>) -> f64 {
-    if p.fair_value_vix_discount == 0.0 {
-        return 1.0;
+/// The log excess of the VIX over `fair_value_vix_knee`, floored at zero.
+pub fn vix_excess(p: &ModelParams, vix: f64) -> f64 {
+    if !(p.fair_value_vix_knee > 0.0) || !(vix > p.fair_value_vix_knee) {
+        return 0.0;
     }
-    if !(vix > p.fair_value_vix_knee) || !(p.fair_value_vix_knee > 0.0) {
-        return 1.0;
-    }
-    let x = mathx::log(vix / p.fair_value_vix_knee);
-    mathx::exp(-p.fair_value_vix_discount * beta.unwrap_or(1.0) * x)
+    mathx::log(vix / p.fair_value_vix_knee)
 }
 
-/// A fair value scaled by [`vix_fair_value_scale`]; the value itself, bit
-/// for bit, at a gain of 0.0.
-pub fn with_vix_discount(p: &ModelParams, fv: f64, vix: f64, beta: Option<f64>) -> f64 {
+/// What the volatility-feedback discount reads (`fair_value_vix_discount`):
+/// the VIX's log excess over the knee as it stands, or, with
+/// `fair_value_vix_half_life` set, its smoothed level the close carries
+/// (`EconomyState::vix_feedback`). 0.0 at a gain of 0.0, reading nothing.
+pub fn vix_feedback_exposure(p: &ModelParams, economy: &EconomyState) -> f64 {
     if p.fair_value_vix_discount == 0.0 {
+        return 0.0;
+    }
+    if p.fair_value_vix_half_life == 0.0 {
+        vix_excess(p, economy.vix)
+    } else {
+        economy.vix_feedback
+    }
+}
+
+/// A fair value scaled by the volatility-feedback discount,
+/// `exp(-gain * beta * exposure)`: the value itself, bit for bit, at a gain
+/// of 0.0 or an exposure of zero. A function of the VIX (or its smoothed
+/// level) alone, so the discount goes as fear does.
+pub fn with_vix_discount(p: &ModelParams, fv: f64, exposure: f64, beta: Option<f64>) -> f64 {
+    if p.fair_value_vix_discount == 0.0 || !(exposure > 0.0) {
         fv
     } else {
-        fv * vix_fair_value_scale(p, vix, beta)
+        fv * mathx::exp(-p.fair_value_vix_discount * beta.unwrap_or(1.0) * exposure)
     }
 }
 
@@ -1742,7 +1752,7 @@ pub fn published_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, economy.vix, company.stock.beta)
+    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
 }
 
 /// A name's fair value as the tick's phase 2 computes it: the nominal
@@ -1783,7 +1793,7 @@ pub fn tick_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, economy.vix, company.stock.beta)
+    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {

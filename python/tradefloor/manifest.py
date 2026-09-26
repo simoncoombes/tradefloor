@@ -588,6 +588,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # model that can move a level: `Engine::state_hash`'s order and rule.
     if "earnings_cycle" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["earnings_cycle"])
+    # The volatility feedback's smoothed exposure, only on a model with both
+    # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
+    if "vix_feedback" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["vix_feedback"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -661,9 +665,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `gdp_publication` only on a model with `gdp_publication_lag` set;
     # hashed after the history. `unemployment_impulse` only on a model with
     # `unemployment_adjustment_half_life` set; hashed before it.
+    # `vix_feedback` only with the volatility feedback smoothed; hashed
+    # after `earnings_cycle`.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
-         "unemployment_impulse"} & set(economy))
+         "unemployment_impulse", "vix_feedback"} & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "

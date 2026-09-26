@@ -952,6 +952,8 @@ PERTURBATIONS = [
     ("fair_value_vix_discount", 0.2, False),
     # INERT: read only with fair_value_vix_discount non-zero.
     ("fair_value_vix_knee", 25.0, False),
+    # INERT: read only with fair_value_vix_discount non-zero.
+    ("fair_value_vix_half_life", 10.0, False),
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),

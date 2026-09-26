@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v5",
   "fingerprint": "pt-v5",
-  "coefficient_digest": "373f4ccd9c3552faa95d7e54150bd4a0a94ae546b7ec1e9c25e9125cbd0da1d2",
+  "coefficient_digest": "00f5b68fed20f241b0c76e0ca3d5dee4efd6e98a8557b99dc988c9b934e8b7eb",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -53,6 +53,7 @@
     "fair_value_market_vol_cap": 0.0,
     "fair_value_news_share": 0.0,
     "fair_value_vix_discount": 0.0,
+    "fair_value_vix_half_life": 0.0,
     "fair_value_vix_knee": 30.0,
     "fear_greed_published_inputs": 0.0,
     "fed_liftoff_rule": 0.0,

@@ -374,6 +374,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
     # about a quarter off fair value, past any measured feedback.
     "fair_value_vix_discount": (0.0, 0.3),
+    # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
+    "fair_value_vix_half_life": (0.0, 63.0),
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),

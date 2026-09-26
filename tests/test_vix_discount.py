@@ -82,3 +82,48 @@ def test_a_high_vix_discounts_by_the_formula_and_gives_it_back():
 def test_the_ranges(name, value):
     with pytest.raises(Exception):
         tf.ModelParams.from_preset("pt-v20", **{name: value})
+
+
+def test_the_smoothed_exposure_builds_and_decays_and_is_carried_only_while_set():
+    # With a half-life the discount reads a level the close pulls toward the
+    # VIX's log excess: after one held session it is a fraction of the
+    # excess, it keeps building while the VIX stays high, and the snapshot
+    # carries it (and only then); a restore reproduces the market.
+    gain, knee, vix, h = 0.2, 30.0, 60.0, 5.0
+    e = engine(gain, fair_value_vix_half_life=h)
+    assert "vix_feedback" in e.state_snapshot()["economy"]
+    assert "vix_feedback" not in engine(gain).state_snapshot()["economy"]
+    assert "vix_feedback" not in engine(0.0, fair_value_vix_half_life=h).state_snapshot()["economy"]
+    e.run_days(2, record=False)
+    levels = []
+    for day in range(2, 8):
+        e.pin_macro(vix=vix)
+        e.run_days(1, record=False, first_day=day)
+        levels.append(e.state_snapshot()["economy"]["vix_feedback"])
+    excess = math.log(vix / knee)
+    assert 0.0 < levels[0] < 0.5 * excess
+    assert all(b > a for a, b in zip(levels, levels[1:]))
+    assert levels[-1] < excess
+    snap = e.state_snapshot()
+    twin = engine(gain, fair_value_vix_half_life=h)
+    twin.restore_state(snap)
+    assert twin.state_hash() == e.state_hash()
+    for x in (e, twin):
+        x.run_days(3, record=False, first_day=8)
+    assert floats(e.prices()) == floats(twin.prices())
+
+
+def test_the_smoothed_discount_moves_prices_less_on_the_day_than_the_direct_one():
+    # The same VIX spike: the direct form takes the whole discount at the
+    # close, the smoothed one a fraction of it.
+    gaps = {}
+    for h in (0.0, 10.0):
+        pair = [engine(0.0, macro_publication_repricing=1.0),
+                engine(0.2, macro_publication_repricing=1.0, fair_value_vix_half_life=h)]
+        for x in pair:
+            x.run_days(3, record=False)
+            x.pin_macro(vix=60.0)
+            x.run_days(1, record=False, first_day=3)
+        a, b = (floats(x.prices()) for x in pair)
+        gaps[h] = max(abs(math.log(y / x)) for x, y in zip(a, b))
+    assert gaps[10.0] < 0.25 * gaps[0.0]
