@@ -311,7 +311,7 @@ class World:
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
-                 "_adv", "_ran", "_step_mids", "_step_opens")
+                 "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth")
 
     def __init__(
         self,
@@ -392,6 +392,13 @@ class World:
         # history, so counting it into both inflates every level in both
         # columns and buries the difference between them.
         self.fork_step: int | None = None
+        #: Each portfolio's net worth at the fork, marked at the prices the
+        #: arm starts from, or None for a root. `summary` measures
+        #: `pnl_since` from it. The last trace row before the fork marks
+        #: before that day's close, and on pt-v20
+        #: `macro_publication_repricing` re-marks every name at the close,
+        #: so a P&L from the row would carry the shared re-mark into the arm.
+        self._fork_worth: dict[str, float] | None = None
         self._day = 0
         self._step = 0
         #: The depth the agent is shown and the participation cap is sized
@@ -1071,6 +1078,10 @@ class World:
                 f"fork labels must be distinct, got {list(labels)}. A "
                 "comparison between two arms with one name is unreadable.")
 
+        # Marked here, on the engine every arm is a copy of, after the
+        # day's close and so after any re-mark the close wrote.
+        worth_at_fork = {key: book.net_worth(self.engine)
+                         for key, book in self._portfolios.items()}
         engines = branch(self.engine, len(labels), universe=self.universe,
                          seed=self.seed, macro=self.macro)
         out: list[World] = []
@@ -1112,6 +1123,7 @@ class World:
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
+            child._fork_worth = dict(worth_at_fork)
             out.append(child)
         return out
 
@@ -1562,6 +1574,14 @@ class World:
         quantity. ``pnl_since`` is the windowed one, and for a forked arm it
         is the number the experiment is actually about.
 
+        ``pnl_since`` and ``value_at_start`` start from the net worth the
+        window opens on. Measured from the fork step, that is the worth
+        marked at the fork, after the last shared close. From any other
+        step it is the net worth of the trace row before it, which for a
+        step that opens a day marks before the previous close: on pt-v20,
+        where the close re-marks every name, that value misses the
+        re-mark.
+
         ``agent`` names which agent on a cohort, where every number here
         belongs to one of them, and is left out on a single-agent world. A
         cohort summary carries the label back under ``agent``.
@@ -1575,8 +1595,13 @@ class World:
         turnover = sum(abs(f["notional"]) for f in fills)
         cost = _execution_cost(fills)
 
-        base = (_fields_of(self.trace[start - 1], label)["net_worth"]
-                if start > 0 else self.cash)
+        if (self._fork_worth is not None and start == self.fork_step
+                and label in self._fork_worth):
+            base = self._fork_worth[label]
+        elif start > 0:
+            base = _fields_of(self.trace[start - 1], label)["net_worth"]
+        else:
+            base = self.cash
         peak, drawdown = base, 0.0
         for row in window:
             peak = max(peak, row["net_worth"])

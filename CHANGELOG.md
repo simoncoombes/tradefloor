@@ -171,7 +171,12 @@ corporate yield in both worlds (`tca.analyse(scenario=...)`,
 `World(pins=...)`). `flow_impact` cannot pin; a model with
 `macro_publication_repricing` at 0 writes no price at the close. A World's
 last trace row marks the portfolio before the last close, while `summary()`
-and `evaluate` mark it after.
+and `evaluate` mark it after. A forked arm's `summary()["pnl_since"]` and
+`value_at_start` start from the net worth marked at the fork, after the last
+shared close. They started from the last trace row, so on pt-v20 each arm's
+P&L carried the shared re-mark: +267.51 on a buy-and-hold arm that had not
+run a step (`tests/test_counterfactual.py`). A difference between two arms
+is unchanged, since both carried it.
 
 For users, the change is in what an observer reads. On pt-v20,
 `macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
