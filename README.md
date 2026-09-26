@@ -52,7 +52,12 @@ month.
 
 ## The demo
 
+The examples are in this repository and not in the package, so clone it
+first:
+
 ```
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 python examples/rate-shock/counterfactual.py
 ```
 
@@ -358,13 +363,26 @@ same agent responds. It is the rate-shock demo above with the agent swapped and
 nothing else changed.
 
 ```bash
-pip install "tradefloor[finrobot]"
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 python examples/integrations/finrobot/rate_shock.py            # replays a real recorded run
-python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot
 ```
 
 By default it replays a recorded FinRobot run, which needs no API key, no
-network and no FinRobot install.
+network and no FinRobot install. A plain `pip install tradefloor` runs it on
+any supported Python.
+
+Calling FinRobot itself needs the `finrobot` extra, which installs only on
+Python 3.11. FinRobot declares Python 3.10 and 3.11, and tradefloor needs
+3.11 or later. On 3.12 or 3.13, pip stops with "Could not find a version
+that satisfies the requirement finrobot>=0.1.5". uv installs it anyway,
+outside FinRobot's declared range, and `uv pip check` then reports the
+conflict.
+
+```bash
+pip install "tradefloor[finrobot]"                             # Python 3.11 only
+python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot
+```
 
 - [`examples/integrations/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.py)
 - [`examples/integrations/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.ipynb)
