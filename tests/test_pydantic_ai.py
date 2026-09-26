@@ -619,6 +619,21 @@ def test_a_provider_failure_keeps_its_chain_through_the_real_framework():
     assert "provider unreachable" in str(excinfo.value)
 
 
+def _needs_the_openai_sdk() -> None:
+    """Skip unless the OpenAI SDK is importable.
+
+    Two tests below build a real `openai:` model to check what happens
+    before a request. `pip install "tradefloor[pydantic-ai]"` installs
+    `pydantic-ai-slim` without the SDK, and in that environment both
+    failed: `Agent("openai:...")` raised ImportError ("Please install the
+    `openai` package") where they expect a RuntimeError or a missing-key
+    message.
+    """
+    pytest.importorskip(
+        "openai", reason="a real OpenAI model needs the openai package, "
+                         "which pydantic-ai-slim does not install")
+
+
 def test_a_real_provider_under_the_flag_raises_a_plain_runtime_error(
         monkeypatch):
     """The rail this module runs on, pinned. `ALLOW_MODEL_REQUESTS = False`
@@ -629,7 +644,13 @@ def test_a_real_provider_under_the_flag_raises_a_plain_runtime_error(
     A dummy key is set because the flag is checked when the request is MADE:
     without one, model construction fails first and the flag is never
     reached, which would make this test pass for the wrong reason.
+
+    Skips without the `openai` package. The extra installs
+    `pydantic-ai-slim`, which has no OpenAI SDK, and there the model fails
+    to build with an ImportError before any rail is reached. CI has the SDK
+    through `openai-agents`, so the test runs there.
     """
+    _needs_the_openai_sdk()
     from pydantic_ai import AgentRunError
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-not-a-real-key")
@@ -650,7 +671,9 @@ def test_a_missing_api_key_is_refused_before_any_request(monkeypatch):
     """The other half of the pair above: with no key at all the framework
     refuses during model construction, as a `UserError`, and the adapter
     turns that into one actionable FrameworkError rather than letting it
-    arrive double-wrapped."""
+    arrive double-wrapped. Skips without the `openai` package, for the
+    reason the test above gives."""
+    _needs_the_openai_sdk()
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     adapter = PydanticAIAdapter(Agent("openai:gpt-5.2",
                                       defer_model_check=True))

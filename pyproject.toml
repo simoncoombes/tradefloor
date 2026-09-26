@@ -77,8 +77,10 @@ mcp = ["mcp>=2.0"]
 # `pydantic_ai` module, and the umbrella adds openai, anthropic, google-genai,
 # groq, mistral, cohere and boto3 that no adapter imports. Whoever hands us a
 # PydanticAI agent already installed the provider they built it against.
-# `TestModel` and `FunctionModel` are both in slim, so the test suite needs
-# nothing further.
+# `TestModel` and `FunctionModel` are both in slim, and every test of the
+# adapter runs on them except two in tests/test_pydantic_ai.py. Those build a
+# real `openai:` model to check the rails before a request, so they need the
+# `openai` package too and skip without it. CI has it through openai-agents.
 openai-agents = ["openai-agents>=0.22"]
 pydantic-ai = ["pydantic-ai-slim>=2.36"]
 langgraph = ["langgraph>=1.2"]

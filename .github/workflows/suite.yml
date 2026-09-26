@@ -129,7 +129,10 @@ jobs:
           # and turn a test off.
           python -m pip install pyarrow numpy gymnasium mcp anthropic pydantic \
                                 openai-agents pydantic-ai-slim langgraph
-          python -c "import pyarrow, numpy, gymnasium, mcp, agents, pydantic_ai, langgraph; print('optional surfaces present')"
+          # `openai` by name as well: two PydanticAI tests build a real
+          # OpenAI model and skip without the SDK, which pydantic-ai-slim
+          # does not install. openai-agents brings it.
+          python -c "import pyarrow, numpy, gymnasium, mcp, agents, openai, pydantic_ai, langgraph; print('optional surfaces present')"
       - name: Run
         shell: bash
         run: |
