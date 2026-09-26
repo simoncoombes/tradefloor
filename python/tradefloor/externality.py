@@ -55,9 +55,16 @@ the nudge reaches every name's volatility two closes later.
 says plainly that it is not a rounding error. It reaches b through names a
 never touched, so ``matrix[a][b]`` is non-zero even when nothing a traded
 is anything b traded or held, and it grows with the horizon because the
-reaction has to cross two closes. :meth:`Externality.caveats` names those
-entries when a result carries them, and hands over the control `tca.py`
-gives, which is to pin the gauge in both worlds.
+reaction has to cross two closes. On pt-v20, the default, part of it
+arrives at the first close: the close's macro step reads the session's
+index return (the VIX, the 10-year's flight to quality, the corporate
+yield that follows it) and ``macro_publication_repricing`` re-marks every
+name to that step before b's holdings are marked, so one day is enough
+(``tests/test_externality.py``: 0.0120 and 0.0586 on its disjoint pair at
+one day). :meth:`Externality.caveats` names those entries when a result
+carries them, and hands over the control `tca.py` gives, which is to pin
+the gauge in both worlds, and on pt-v20 the corporate yield too; that
+holds them at zero at one day as at ten.
 
 The comparison is ``traded`` against ``exposure`` and not ``traded``
 against ``traded``. A removed agent reaches the market through the names
@@ -219,7 +226,11 @@ class Externality:
                 f"fear gauge reacts same-day to the cap-weighted market "
                 f"return, VIX sets the shared factor's variance target, and "
                 f"the nudge reaches every name's volatility two closes "
-                f"later. tradefloor.Execution.moved documents and measures "
+                f"later; on a model that re-marks prices to the published "
+                f"macro step at the close (macro_publication_repricing, "
+                f"pt-v20) the step that return moved reaches every price "
+                f"at that close. tradefloor.Execution.moved documents and "
+                f"measures "
                 f"that channel. To hold those entries at zero, pin the "
                 f"gauge in both worlds by building the cohort with "
                 f"pins={{'vix': 15.0}} and running this again, and on "
@@ -562,13 +573,27 @@ def _path(world: World, fork_step: int,
     """The cross-section every measured step opened on, then the final one.
 
     The shape :func:`tradefloor.tca.analyse` builds: one row per step, read
-    before that step's orders, and the end-of-run row appended. A trace row
-    records the prices its own session left, so row k-1 carries step k's
-    opening cross-section and the fork state carries step zero's.
+    before that step's orders, and the end-of-run row, read after the last
+    close, appended.
 
-    Crossing a day boundary costs nothing here because ``close_market`` and
-    ``open_market`` move no price, which ``tests/test_externality.py`` pins
-    directly rather than leaving to this comment.
+    Each step's row is the cross-section the world showed its agents when
+    that step opened (``World._step_opens``). Reconstructing it from the
+    trace instead, as the row the previous step's session left, is right
+    within a day and wrong across a close on pt-v20, the default: its close
+    re-marks every traded name to the macro state it publishes
+    (``macro_publication_repricing``), so the next day's first step opens
+    at the re-marked price, not the last print. A fill on a day's first
+    step was priced against the wrong baseline: -24.48 against tca's 8.77
+    on ``Universe.random(8, seed=99)``, seed 42, a 200-share buy at step 6
+    (tests/test_externality.py). ``at_fork`` stands in for a step the world
+    never recorded, which only a world restored from outside can lack.
     """
-    return [at_fork] + [list(row["prices"])
-                        for row in world.trace[fork_step:]]
+    opens = world._step_opens
+    rows = []
+    previous = at_fork
+    for k, row in enumerate(world.trace[fork_step:]):
+        step = fork_step + k
+        rows.append(list(opens[step]) if step in opens else previous)
+        previous = list(row["prices"])
+    rows.append(_f64(world.engine.prices()))
+    return rows
