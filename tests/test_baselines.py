@@ -16,10 +16,14 @@ from tradefloor.baselines import (
     MeanReversion,
     Momentum,
     Oracle,
+    ORACLE_NOT_A_CEILING,
     RandomTrader,
     capture_ratio,
+    capture_withheld,
+    oracle_is_ceiling,
     rebalance,
     reference_agents,
+    versus_buy_and_hold,
 )
 from tradefloor.harness import Observation
 
@@ -980,6 +984,79 @@ def test_on_pt_v20_the_oracle_loses_where_the_market_falls_for_good():
     dispersed = month(3, tradefloor.ModelParams.from_preset(
         "pt-v20", opening_market_sigma=0.10))
     assert dispersed["oracle"].pnl > 0 > dispersed["buy_and_hold"].pnl
+
+
+# --------------------------------------------------------------------------
+# Where the Oracle is not a ceiling: pt-v20
+# --------------------------------------------------------------------------
+
+
+def test_pt_v20_is_the_one_shipped_preset_without_a_ceiling():
+    """The condition is a list naming presets, read against a scorecard's
+    `model_fingerprint`. Every shipped preset but pt-v20 keeps the capture
+    ratio; `None` is the default, pt-v20 on this build; a custom model
+    keeps it whatever it was built from, since its card names no base."""
+    assert set(ORACLE_NOT_A_CEILING) == {"pt-v20"}
+    for name in tradefloor.preset_names():
+        assert oracle_is_ceiling(name) is (name != "pt-v20"), name
+        assert oracle_is_ceiling(
+            tradefloor.ModelParams.from_preset(name)) is (name != "pt-v20")
+    assert oracle_is_ceiling(None) is False
+    custom = tradefloor.ModelParams.from_preset(
+        "pt-v20", opening_market_sigma=0.10)
+    assert custom.fingerprint.startswith("custom-")
+    assert oracle_is_ceiling(custom) is True
+
+
+def test_on_pt_v20_no_capture_ratio_is_reported(scores):
+    """The default's five-day fixture. No ratio at all, not zeros and not
+    NaN, whatever the Oracle earned; the reason from `capture_withheld`;
+    and buy-and-hold's difference as the comparison instead."""
+    assert scores["oracle"].model_fingerprint == "pt-v20"
+    assert capture_ratio(scores) == {}
+    assert capture_withheld(scores) == ORACLE_NOT_A_CEILING["pt-v20"]
+    assert "buy-and-hold" in capture_withheld(scores)
+    versus = versus_buy_and_hold(scores)
+    assert set(versus) == set(scores) - {"buy_and_hold"}
+    for name, value in versus.items():
+        assert value == pytest.approx(
+            scores[name].pnl - scores["buy_and_hold"].pnl)
+
+
+def test_on_pt_v20_the_ratio_is_withheld_even_when_the_oracle_made_money():
+    # Withheld by the preset, not by the sign of the denominator: the
+    # Oracle's P&L there follows the market's month, so a positive one is
+    # no more a ceiling than a negative one.
+    class Card:
+        def __init__(self, pnl, model):
+            self.pnl = pnl
+            self.model_fingerprint = model
+
+    won = {"oracle": Card(100.0, "pt-v20"), "a": Card(50.0, "pt-v20"),
+           "buy_and_hold": Card(80.0, "pt-v20")}
+    assert capture_ratio(won) == {}
+    assert versus_buy_and_hold(won) == {"oracle": 20.0, "a": -30.0}
+    # The same cards on pt-v19, or on a custom model, divide as before.
+    for model in ("pt-v19", "custom-2acc9f9a"):
+        before = {k: Card(c.pnl, model) for k, c in won.items()}
+        assert capture_withheld(before) is None
+        assert capture_ratio(before) == {"a": 0.5, "buy_and_hold": 0.8}
+    # Without the Oracle the reason is read off any card.
+    assert capture_withheld({"a": Card(1.0, "pt-v20")}) is not None
+    # And with no buy-and-hold there is nothing to compare against.
+    assert versus_buy_and_hold({"oracle": Card(1.0, "pt-v20")}) == {}
+
+
+def test_on_pt_v19_the_capture_ratio_is_as_before(long_scores):
+    # The ceiling fixture: the ratio divides by the Oracle's P&L exactly as
+    # it did, and nothing is withheld.
+    assert long_scores["oracle"].model_fingerprint == CEILING_PRESET
+    assert capture_withheld(long_scores) is None
+    ratios = capture_ratio(long_scores)
+    ceiling = long_scores["oracle"].pnl
+    assert ratios == {name: card.pnl / ceiling
+                      for name, card in long_scores.items()
+                      if name != "oracle"}
 
 
 def test_capture_ratio_reports_above_one_rather_than_clamping():

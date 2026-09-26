@@ -347,9 +347,27 @@ def test_a_stress_test_always_carries_its_control():
     assert any("MAGNITUDE" in c for c in r["caveats"])
 
 
-def test_the_ranking_is_ordered_and_points_at_the_number_to_quote():
+def _on_ceiling_preset(monkeypatch):
+    """Run the tools' evaluations on pt-v19, where the Oracle is a ceiling.
+
+    No tool takes a preset, so the library calls they make are pinned
+    instead. What is checked is the capture path the server keeps for a
+    default whose Oracle is a ceiling."""
+    import functools
+
+    monkeypatch.setattr(pt, "evaluate",
+                        functools.partial(pt.evaluate, model="pt-v19"))
+    monkeypatch.setattr(pt, "rank", functools.partial(pt.rank, model="pt-v19"))
+    monkeypatch.setattr(pt.baselines, "oracle_is_ceiling",
+                        lambda model=None: True)
+
+
+def test_the_ranking_is_ordered_and_points_at_the_number_to_quote(
+        monkeypatch):
+    _on_ceiling_preset(monkeypatch)
     r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
     assert r["ok"]
+    assert "capture_withheld" not in r
     caps = [x["pooled_capture"] for x in r["records"]
             if x["pooled_capture"] is not None]
     assert caps == sorted(caps, reverse=True), "table() order must survive"
@@ -357,6 +375,61 @@ def test_the_ranking_is_ordered_and_points_at_the_number_to_quote():
     # `seeds_first` is a league position, not a head-to-head record, and
     # saying so is the difference between a number and a misreading.
     assert "not a head-to-head" in r["reading_note"]
+
+
+def test_on_pt_v20_the_ranking_quotes_buy_and_hold_and_no_capture():
+    """The default's Oracle is not a ceiling. The records carry no capture
+    field at all, the headline is the mean P&L over buy-and-hold's, the
+    table is ordered on it, and the reason is sent."""
+    r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
+    assert r["ok"]
+    assert r["provenance"]["model_preset"] == "pt-v20"
+    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"]
+    assert "unmeasurable" not in r
+    for record in r["records"]:
+        assert not {"pooled_capture", "median_capture",
+                    "seeds_measured"} & set(record)
+    excess = [x["mean_excess_over_buy_and_hold"] for x in r["records"]]
+    assert excess == sorted(excess, reverse=True)
+    assert "mean_excess_over_buy_and_hold" in r["reading_note"]
+    assert "not a head-to-head" in r["reading_note"]
+
+
+def test_on_pt_v20_an_evaluation_quotes_buy_and_hold_and_no_capture():
+    r = mcp.evaluate_strategies({"mine": MOMENTUM}, days=1)
+    assert r["ok"]
+    assert "capture_ratio" not in r and "capture_note" not in r
+    assert r["capture_ratio_withheld"] == (
+        pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"])
+    pnl = {row["name"]: row["pnl"] for row in r["scores"]}
+    assert set(r["versus_buy_and_hold"]) == set(pnl) - {"buy_and_hold"}
+    for name, value in r["versus_buy_and_hold"].items():
+        assert value == pytest.approx(pnl[name] - pnl["buy_and_hold"],
+                                      abs=0.02)
+
+
+def test_where_the_oracle_is_a_ceiling_an_evaluation_quotes_capture(
+        monkeypatch):
+    _on_ceiling_preset(monkeypatch)
+    r = mcp.evaluate_strategies({"mine": MOMENTUM}, days=1)
+    assert r["ok"]
+    assert "capture_ratio_withheld" not in r
+    assert "versus_buy_and_hold" not in r
+    assert "capture_note" in r and isinstance(r["capture_ratio"], dict)
+
+
+def test_the_oracle_caveat_says_whether_it_is_a_ceiling(monkeypatch):
+    blend = {"signal": {"kind": "oracle"}, "portfolio": {"top_k": 3}}
+    specs, _ = mcp._specs_from({"o": blend})
+    kwargs = dict(days=5, n_seeds=1, signals=mcp._signals_in(specs),
+                  max_leverage=2.0, universe_size=40,
+                  sector_concentrated=False)
+    line = next(c for c in mcp._caveats(**kwargs) if "PRIVILEGED" in c)
+    assert "not a ceiling" in line
+    monkeypatch.setattr(pt.baselines, "oracle_is_ceiling",
+                        lambda model=None: True)
+    line = next(c for c in mcp._caveats(**kwargs) if "PRIVILEGED" in c)
+    assert "ceiling for measuring capture" in line
 
 
 def test_the_paired_sign_test_reports_an_identical_strategy_as_all_ties():

@@ -59,7 +59,8 @@ from .interventions import (
 )
 from . import yaml_subset
 from .tca import Execution
-from .baselines import capture_ratio, reference_agents
+from .baselines import (capture_ratio, capture_withheld, oracle_is_ceiling,
+                        reference_agents, versus_buy_and_hold)
 from .ranking import AgentRecord, Ranking, rank
 from . import fingerprint
 from .fingerprint import (
@@ -115,7 +116,8 @@ __all__ = [
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
     "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
-    "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
+    "baselines", "reference_agents", "capture_ratio", "capture_withheld",
+    "oracle_is_ceiling", "versus_buy_and_hold", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",

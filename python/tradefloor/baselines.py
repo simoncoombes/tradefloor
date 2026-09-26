@@ -16,6 +16,19 @@ These are the reference points that make a score readable, from the bottom up:
   anyone would try first?
 - **Oracle**: how much was available *at all*?
 
+## On pt-v20 the headline is buy-and-hold
+
+The Oracle answers that last question only where hidden state predicts
+returns, which is every preset through pt-v19. On pt-v20 market moves
+mostly stick: each shock moves fair value for good, so even perfect
+knowledge of the model's fair value leaves little edge. The Oracle made
+money in 10 of 14 test markets there, and its P&L follows the
+market's month. It stays in the reference set, but :func:`capture_ratio`
+reports nothing on pt-v20 (:data:`ORACLE_NOT_A_CEILING` names it, with the
+reason), and a score is read against buy-and-hold with
+:func:`versus_buy_and_hold`. The rest of this docstring describes the
+Oracle where it is a ceiling.
+
 ## The Oracle is a reference strategy, NOT an upper bound
 
 This needs saying first because the name invites the opposite reading, and I
@@ -503,9 +516,11 @@ class Oracle:
     count to between 26 and 30 with the mean still near zero. With the
     opening dispersion at the 0.10 the rule was first measured on, seed 3
     on roster 3 pays it +152,102 against buy-and-hold's -175,280: that
-    dispersion was its edge. Measure the Oracle as a ceiling on pt-v19,
-    and do not quote a capture ratio on pt-v20, where :func:`capture_ratio`
-    declines to answer in every month the Oracle loses.
+    dispersion was its edge. So the Oracle stays a reference agent on
+    pt-v20 but is not a ceiling there: :func:`capture_ratio` reports
+    nothing on it (:data:`ORACLE_NOT_A_CEILING`), and a score is read
+    against buy-and-hold (:func:`versus_buy_and_hold`). Measure the Oracle
+    as a ceiling on pt-v19.
 
     The rest of this docstring describes the cross-sectional rule and was
     measured under pt-v19.
@@ -762,6 +777,94 @@ def reference_agents(*, seed: int = 0) -> dict[str, Any]:
     }
 
 
+#: Shipped presets on which the Oracle stays a reference agent but is not a
+#: ceiling, each with the reason a result gives for reporting no capture
+#: ratio. A capture ratio reads the Oracle's P&L as what was there to earn,
+#: and that holds only where hidden state predicts returns: on every preset
+#: through pt-v19 each shock is mispricing that reverts, and the Oracle
+#: trades it. pt-v20 moves each shock into fair value for good, so the
+#: Oracle's P&L follows the market's month (see :class:`Oracle`).
+#:
+#: Keyed by the name a scorecard records in ``model_fingerprint``. A custom
+#: model (``custom-XXXXXXXX``) is not in it, whatever preset it was built
+#: from: a card carries its model's name and not its dials, so the ratio is
+#: reported there as before, and a study on a modified pt-v20 should read
+#: :func:`versus_buy_and_hold` instead.
+ORACLE_NOT_A_CEILING: dict[str, str] = {
+    "pt-v20": (
+        "No capture ratio on pt-v20. Market moves there mostly stick: each "
+        "shock moves fair value for good, so even perfect knowledge of the "
+        "model's fair value leaves little edge. The Oracle made money in "
+        "10 of 14 test markets and its P&L follows the market's "
+        "month, so a fraction of it would measure the month, not the "
+        "agent. Compare against buy-and-hold instead."
+    ),
+}
+
+
+def _model_name(model: Any) -> str:
+    """The preset name or custom fingerprint a model runs under.
+
+    ``None`` is the shipped default, a string is taken as a preset name, and
+    anything else is read for its ``fingerprint``: a
+    :class:`tradefloor.ModelParams`.
+    """
+    if model is None:
+        from ._core import ModelParams
+        return ModelParams.from_preset().fingerprint
+    if isinstance(model, str):
+        return model
+    return str(getattr(model, "fingerprint", ""))
+
+
+def oracle_is_ceiling(model: Any = None) -> bool:
+    """Whether a capture ratio is reported under ``model``.
+
+    ``model`` is what :func:`tradefloor.evaluate` takes (a preset name, a
+    :class:`tradefloor.ModelParams`, or ``None`` for the default), or a
+    scorecard's ``model_fingerprint``. False only for the presets named in
+    :data:`ORACLE_NOT_A_CEILING`.
+    """
+    return _model_name(model) not in ORACLE_NOT_A_CEILING
+
+
+def capture_withheld(scores: dict[str, Any], *,
+                     oracle: str = "oracle") -> str | None:
+    """Why no capture ratio is reported for ``scores``, or None if one is.
+
+    Read from the scorecards' ``model_fingerprint``: the Oracle's card, or
+    any card when the Oracle did not run. A card without the field (a
+    stand-in built by hand) reads as a ceiling, as it did before.
+    """
+    card = scores.get(oracle)
+    if card is None and scores:
+        card = next(iter(scores.values()))
+    name = getattr(card, "model_fingerprint", "") if card is not None else ""
+    return ORACLE_NOT_A_CEILING.get(name)
+
+
+def versus_buy_and_hold(scores: dict[str, Any], *,
+                        reference: str = "buy_and_hold") -> dict[str, float]:
+    """Each agent's P&L less buy-and-hold's in the same market.
+
+    The comparison to quote where the Oracle is not a ceiling
+    (:data:`ORACLE_NOT_A_CEILING`), and a useful one everywhere: did the
+    strategy earn more than owning the market did? In currency, because
+    every agent in one evaluation starts with the same cash. The Oracle is
+    included; it is a reference agent like the others.
+
+    Returns an empty mapping when buy-and-hold did not run.
+    """
+    if reference not in scores:
+        return {}
+    base = scores[reference].pnl
+    return {
+        name: card.pnl - base
+        for name, card in scores.items()
+        if name != reference
+    }
+
+
 def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str, float]:
     """Each agent's P&L as a fraction of the Oracle's.
 
@@ -789,7 +892,14 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     against a negative denominator flips sign and would rank the worst agent
     first. An empty result says "not measurable here", which is true and is
     better than a confidently wrong table.
+
+    Returns an empty mapping, too, on a preset where the Oracle is not a
+    ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20), whatever
+    the Oracle earned. :func:`capture_withheld` gives the reason, and
+    :func:`versus_buy_and_hold` the comparison to quote there.
     """
+    if capture_withheld(scores, oracle=oracle) is not None:
+        return {}
     if oracle not in scores:
         return {}
     ceiling = scores[oracle].pnl

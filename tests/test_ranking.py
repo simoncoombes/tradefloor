@@ -36,6 +36,21 @@ def ranking():
                         workers=4)
 
 
+#: The preset the capture tests run on. pt-v20, the default, reports no
+#: capture (`baselines.ORACLE_NOT_A_CEILING`), so what a capture table does
+#: is checked where the Oracle is a ceiling: pt-v19, the last such preset.
+CEILING_PRESET = "pt-v19"
+
+
+@pytest.fixture(scope="module")
+def ceiling_ranking():
+    # Smaller than `ranking`: these tests read the table's mechanics, not
+    # a separation, and six seeds of five days is enough to order four
+    # agents on distinct captures.
+    return tradefloor.rank(make, seeds=range(6), universe=UNIVERSE, days=5,
+                           workers=4, model=CEILING_PRESET)
+
+
 # --------------------------------------------------------------------------
 # The trap the API exists to close
 # --------------------------------------------------------------------------
@@ -211,6 +226,15 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     does not confirm. Two of the twelve seeds are unmeasurable, where the
     Oracle lost money over the ten days.
 
+    Re-measured on pt-v20's graded arm, where the Oracle is no ceiling and
+    the table reads each agent's mean P&L over buy-and-hold's in place of
+    a capture. The strong pair holds, buy-and-hold against random 11 to 1
+    at p = 0.0063. The weak pair is still mean reversion against momentum:
+    mean reversion trails buy-and-hold by less (-31,797 a seed against
+    -35,129) and wins 7 of 12 paired seeds, p = 0.77. No seed is
+    unmeasurable, since nothing divides by the Oracle. On pt-v19 the same
+    grid reads the pooled captures in this module's docstring.
+
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
@@ -227,7 +251,7 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     )
     # And the ordering the aggregate suggests is the one the sign test
     # refuses to confirm, and reporting both exists for that.
-    table = {r.name: r.pooled_capture for r in ranking.table()}
+    table = {r.name: r.mean_excess_pnl for r in ranking.table()}
     assert table["buy_and_hold"] > table["random"]
     assert table["mean_reversion"] > table["momentum"]
 
@@ -257,13 +281,81 @@ def test_separation_refuses_an_unknown_agent(ranking):
 # --------------------------------------------------------------------------
 
 
-def test_the_table_is_ordered_by_pooled_capture(ranking):
-    pooled = [r.pooled_capture for r in ranking.table()]
+def test_the_table_is_ordered_by_pooled_capture(ceiling_ranking):
+    assert ceiling_ranking.capture_withheld is None
+    pooled = [r.pooled_capture for r in ceiling_ranking.table()]
+    assert None not in pooled
     assert pooled == sorted(pooled, reverse=True)
 
 
-def test_the_table_can_still_be_asked_for_the_median(ranking):
-    medians = [r.median_capture for r in ranking.table(by="median_capture")]
+def test_the_table_can_still_be_asked_for_the_median(ceiling_ranking):
+    medians = [r.median_capture
+               for r in ceiling_ranking.table(by="median_capture")]
+    assert None not in medians
+    assert medians == sorted(medians, reverse=True)
+
+
+def test_the_capture_ranking_is_unchanged_where_the_oracle_is_a_ceiling(
+        ceiling_ranking):
+    """On pt-v19 a ranking reads exactly as it did before pt-v20 withheld
+    the capture: the same keys, the pooled capture in the report, and no
+    buy-and-hold field in its place."""
+    payload = ceiling_ranking.as_dict()
+    assert "capture_withheld" not in payload
+    assert "unmeasurable_seeds" in payload
+    for record in payload["agents"].values():
+        assert set(record) == {"name", "seeds", "captures", "pnls", "wins",
+                               "pooled_capture", "median_capture",
+                               "median_pnl", "win_rate"}
+    assert "capture " in ceiling_ranking.report()
+    assert "buy-and-hold" not in ceiling_ranking.report()
+
+
+# --------------------------------------------------------------------------
+# pt-v20: no capture, and the table reads against buy-and-hold
+# --------------------------------------------------------------------------
+
+
+def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
+    """The default's Oracle is not a ceiling, so the ranking carries no
+    capture at all: every one None, none in `as_dict`, no seed counted as
+    unmeasurable (the Oracle may well have made money), and the reason in
+    `capture_withheld` and the report."""
+    from tradefloor.baselines import ORACLE_NOT_A_CEILING
+
+    assert ranking.model_fingerprint == "pt-v20"
+    assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v20"]
+    assert ranking.unmeasurable == []
+    for record in ranking.records.values():
+        assert record.captures == [None] * len(ranking.seeds)
+        assert record.pooled_capture is None
+        assert record.median_capture is None
+    payload = ranking.as_dict()
+    assert payload["capture_withheld"] == ranking.capture_withheld
+    assert "unmeasurable_seeds" not in payload
+    for record in payload["agents"].values():
+        assert not {"captures", "pooled_capture",
+                    "median_capture"} & set(record)
+    assert "No capture ratio on pt-v20" in ranking.report()
+    assert "capture +" not in ranking.report()
+
+
+def test_on_pt_v20_the_table_is_ordered_against_buy_and_hold(ranking):
+    """The headline is each agent's P&L less buy-and-hold's, per seed and
+    averaged, checked here by arithmetic on the recorded P&Ls."""
+    benchmark = ranking.records["buy_and_hold"].pnls
+    for record in ranking.records.values():
+        excess = [p - b for p, b in zip(record.pnls, benchmark)]
+        assert record.excess_pnls == pytest.approx(excess)
+        assert record.mean_excess_pnl == pytest.approx(
+            sum(excess) / len(excess))
+        assert record.seeds_ahead == sum(1 for e in excess if e > 0)
+    assert ranking.records["buy_and_hold"].mean_excess_pnl == 0.0
+    ordered = [r.mean_excess_pnl for r in ranking.table()]
+    assert ordered == sorted(ordered, reverse=True)
+    # Asking for the capture falls back to median P&L, as with no
+    # reference at all, rather than sorting on None.
+    medians = [r.median_pnl for r in ranking.table(by="pooled_capture")]
     assert medians == sorted(medians, reverse=True)
 
 
@@ -285,8 +377,10 @@ def test_an_absent_reference_leaves_capture_unmeasurable_and_says_so():
     reads None rather than 0.0 -- which would have sorted a lossmaking agent
     above one that lost more.
     """
+    # On `CEILING_PRESET`: on pt-v20 no capture is reported with or
+    # without the Oracle, and the reason is the preset's, not a lost seed.
     ranking = tradefloor.rank(make, seeds=range(4), universe=UNIVERSE, days=2,
-                           oracle="not_present")
+                           oracle="not_present", model=CEILING_PRESET)
     assert ranking.unmeasurable == [0, 1, 2, 3]
     assert all(r.median_capture is None for r in ranking.records.values())
     assert all(r.pooled_capture is None for r in ranking.records.values())
