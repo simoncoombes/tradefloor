@@ -549,9 +549,15 @@ def attribute(world: Any, window: Any, target: Any,
             + "; day aggregate covers the market stream.")
     # An event lands at its day's close and is first seen at the next open,
     # so a horizon that stops on the window's last day gives every event row
-    # nothing to move and every one of them measures exactly zero. The
-    # default therefore reaches one day past the window whenever an event
-    # stream is attributed. A caller who passes a horizon gets it as given,
+    # nothing to move and every one of them measures exactly zero. Under
+    # `macro_publication_repricing` (pt-v20) the close re-marks every price
+    # to the macro state it publishes, so the close's economy draws reach
+    # that close's prices at once, and a jump's permanent share reaches
+    # them in the second order (through the buyback yield the re-mark's
+    # fair values read; tests/test_noise_attribution.py measures it at
+    # under a millionth of what the next day reads). The default therefore
+    # reaches one day past the window whenever an event stream is
+    # attributed. A caller who passes a horizon gets it as given,
     # and the caveats say what a column of zeros means under it.
     if horizon is None:
         horizon = last + 1 if event_streams else last
