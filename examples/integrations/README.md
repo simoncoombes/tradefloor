@@ -133,13 +133,15 @@ scores = tf.evaluate({"mine": agent}, seed=4242, universe=roster, days=5)
 
 Fuller example: [`callable/five_days.py`](callable/five_days.py).
 
-`rule` is handed the serialized payload and never the `Observation`. The
-Observation carries `.engine`, which holds the answer key: fair value, the
-ten-way attribution of every price move, each company's mispricing, and the
-macro path the run has not reached yet. A function given that would step
-around the allowlist where no test could see it. A policy that genuinely
-needs the Observation is a native Tradefloor agent and implements `act`
-directly.
+`rule` is handed the serialized payload and never the `Observation`. Since
+0.8.5 the Observation's `.engine` is a read-only market view: it serves
+prices, the public columns, the book, the bars already run and the published
+macro fields, and it refuses fair value, the factor attribution of every
+price move, each company's mispricing and the macro path the run has not
+reached yet. The view still serves more than the payload, and a function
+given the Observation would read past the payload's allowlist where no test
+of the payload could see it. A policy that genuinely needs the Observation
+is a native Tradefloor agent and implements `act` directly.
 
 An async function works too, driven through `common.run_sync`.
 
