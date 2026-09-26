@@ -241,6 +241,42 @@ class Target:
         return f"Target({self.name!r}, units={self.units!r})"
 
 
+#: The `macro_fields` keys whose published value can lag the one `pin_macro`
+#: writes, each with the snapshot's economy key that holds the true value.
+#: Under `gdp_publication_lag` `macro_fields["gdp_growth"]` is the last
+#: quarter released, and under `cycle_publication_lag` `macro_fields["cycle"]`
+#: is the phase as published; the engine's own state carries the true ones.
+TRUE_MACRO_FIELDS: dict[str, str] = {"gdp_growth": "gdp_growth",
+                                     "cycle": "cycle_phase"}
+
+
+def true_macro_value(engine: Engine, field: str) -> Any:
+    """The TRUE value of one `macro_fields` key, in `pin_macro`'s units.
+
+    The value `pin_macro` writes. For the keys in :data:`TRUE_MACRO_FIELDS`
+    it is read from ``state_snapshot()["economy"]``, since `macro_fields`
+    reports the published one; for every other key the two are the same
+    field and it is read from `macro_fields`. With both publication lags at
+    0.0 the two reads agree to the bit: the growth is the core's percent
+    over 100 either way, and the phase is the same name.
+    """
+    if field not in TRUE_MACRO_FIELDS:
+        return engine.macro_fields[field]
+    value = engine.state_snapshot()["economy"][TRUE_MACRO_FIELDS[field]]
+    return value / 100.0 if field == "gdp_growth" else value
+
+
+def true_macro_fields(engine: Engine) -> dict[str, Any]:
+    """`Engine.macro_fields` with the true value in place of each published
+    one that can lag (:data:`TRUE_MACRO_FIELDS`): what the economy holds,
+    rather than what has been released of it."""
+    fields = dict(engine.macro_fields)
+    for field in TRUE_MACRO_FIELDS:
+        if field in fields:
+            fields[field] = true_macro_value(engine, field)
+    return fields
+
+
 def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any], None]]:
     """Read and write one pinnable macro field, in `pin_macro`'s own units.
 
@@ -255,19 +291,8 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     the published ones.
     """
     def read(engine: Engine) -> Any:
-        if field == "gdp_growth":
-            # The TRUE growth, the value `pin_macro` writes, in its units.
-            # Under `gdp_publication_lag` `macro_fields` reports the last
-            # quarter released, and an operation anchored there would write
-            # a figure months stale into the economy. Equal to
-            # `macro_fields["gdp_growth"]` to the bit with the dial at 0.0:
-            # both are the core's percent over 100.
-            return engine.state_snapshot()["economy"]["gdp_growth"] / 100.0
-        if field == "cycle":
-            # The TRUE phase, the one `pin_macro` writes: the published phase
-            # lags it by `cycle_publication_lag` sessions. The same name as
-            # `macro_fields["cycle"]` with the dial at 0.0.
-            return engine.state_snapshot()["economy"]["cycle_phase"]
+        if field in TRUE_MACRO_FIELDS:
+            return true_macro_value(engine, field)
         return engine.macro_fields[field]
 
     def write(engine: Engine, value: Any) -> None:

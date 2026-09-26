@@ -28,6 +28,7 @@ from tradefloor.boundary import (COLUMNS, FLOOR_CALLS, STATUSES, BoundaryMap,
 from tradefloor.counterfactual import World, resample
 from tradefloor.integrations.callable import CallableAgentAdapter
 from tradefloor.integrations.common import Transcript, refuse_replay_reask
+from tradefloor.interventions import true_macro_fields
 from tradefloor.manifest import market_digest
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -683,7 +684,13 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
     target.write(engine, value)
     # The engine carries rates in percent and hands them back as
     # fractions, so a written level comes back to the last bit or so.
-    assert engine.macro_fields[field] == pytest.approx(value)
+    # Read as the TRUE field: on pt-v20, the default, `gdp_publication_lag`
+    # and `cycle_publication_lag` hold `macro_fields["gdp_growth"]` and
+    # `macro_fields["cycle"]` at the figure last released, so the published
+    # value does not show a write until it is published. The field is the
+    # same name either way; what moves at once is the value the economy
+    # holds, which is the one the target writes.
+    assert true_macro_fields(engine)[field] == pytest.approx(value)
     assert target.read(engine) == pytest.approx(value)
 
 
