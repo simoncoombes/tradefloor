@@ -152,6 +152,47 @@ def test_the_portfolio_cannot_be_written_or_traded_directly():
     assert not card.tampered and card.final_net_worth == 1_000_000.0
 
 
+def test_position_reads_one_holding_and_copies_none(monkeypatch):
+    # `obs.position(t)` read `obs.portfolio.positions`, and the view builds
+    # a copy of every holding on each read of that. A strategy asking about
+    # each ticker made N squared copies a step: 863,455 of them in
+    # `evaluate` of five momentum strategies on 40 names over 20 days.
+    from tradefloor.harness import Observation
+    from tradefloor.portfolio import Position
+
+    engine = tf.Engine(seed=1, universe=U)
+    tickers = list(engine.tickers)
+    live = tf.Portfolio(1_000_000.0)
+    for i, t in enumerate(tickers[:5]):
+        held = Position(t)
+        held.quantity = [120.0, -35.0, 0.0, -0.0, 7.5][i]
+        live.positions[t] = held
+    want = [live.positions[t].quantity if t in live.positions else 0.0
+            for t in tickers]
+
+    class Plain:
+        # A portfolio built by hand, with `positions` and nothing else.
+        positions = live.positions
+
+    made = []
+    init = Position.__init__
+
+    def counting(self, ticker):
+        made.append(ticker)
+        init(self, ticker)
+
+    monkeypatch.setattr(Position, "__init__", counting)
+    for portfolio in (PortfolioView(live, engine), live, Plain()):
+        obs = Observation(0, 0, tickers, [1.0] * len(tickers), portfolio,
+                          MarketView(engine), [1.0] * len(tickers))
+        got = [obs.position(t) for t in tickers]
+        assert [repr(q) for q in got] == [repr(q) for q in want]
+    assert made == []
+    # The copies are still what `positions` hands out.
+    assert PortfolioView(live, engine).positions[tickers[0]].quantity == 120.0
+    assert made == tickers[:5]
+
+
 def test_a_portfolio_write_under_the_opt_in_is_flagged():
     class Rich:
         def act(self, obs):

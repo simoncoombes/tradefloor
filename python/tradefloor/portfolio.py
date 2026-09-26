@@ -488,6 +488,16 @@ class Portfolio:
 
     # -- valuation --------------------------------------------------------
 
+    def quantity_of(self, ticker: str) -> float:
+        """Shares held in ``ticker``, signed, or 0.0 with no position.
+
+        :meth:`Observation.position <tradefloor.harness.Observation.position>`
+        reads this, and so does the sandbox's
+        :class:`~tradefloor.sandbox.PortfolioView`.
+        """
+        held = self.positions.get(ticker)
+        return held.quantity if held else 0.0
+
     def marks(self, engine: Engine) -> dict[str, float]:
         """Current price per ticker, from the engine."""
         values = struct.unpack("<%dd" % len(engine.tickers), engine.prices())

@@ -219,6 +219,16 @@ class Observation:
         return abs(shares) / adv if adv > 0 else float("inf")
 
     def position(self, ticker: str) -> float:
+        """Shares held in ``ticker``, signed, or 0.0 with no position.
+
+        Asks the portfolio's ``quantity_of`` when it has one, as
+        :class:`~tradefloor.Portfolio` and the sandbox's read-only view
+        both do, so no holding is copied. A portfolio built by hand without
+        it is read through ``positions`` as before.
+        """
+        quantity_of = getattr(self.portfolio, "quantity_of", None)
+        if quantity_of is not None:
+            return quantity_of(ticker)
         held = self.portfolio.positions.get(ticker)
         return held.quantity if held else 0.0
 
