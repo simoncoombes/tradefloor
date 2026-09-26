@@ -293,9 +293,19 @@ class Execution:
         (``rust/src/economy/daily.rs``), which no ordinary close comes
         near, and the +/-0.03% clamp that once made the channel
         intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
-        structurally immune, its final prices predating the first repriced
-        variance target, so ``test_tca.py`` can still assert
-        emptiness there. When the untouched names must be byte-exact, pin
+        immune to that channel, its final prices predating the first
+        repriced variance target. On pt-v20, the default from 0.8.5, a
+        faster form of it arrives at the first close: the close's macro
+        step reads the session's index return (the VIX, the 10-year's
+        flight to quality, the corporate yield that follows it), and
+        ``macro_publication_repricing`` re-marks every name to that step
+        before the final prices are read. On ``test_tca.py``'s one-day
+        buy of 1 per cent of ADV it moves 18 of 19 untouched names by at
+        most 3.4e-5 bps, against +0.80 on the traded name; every
+        cross-section before the close is identical on them, and the
+        pins below take the final one back to identical, which is what
+        ``test_tca.py`` asserts. When the untouched names must be
+        byte-exact, pin
         VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
         on pt-v20, the default from 0.8.5, the corporate bond yield too:
         its flight to quality moves the 10-year with the session's index
@@ -316,10 +326,14 @@ class Execution:
     def untouched_moved(self) -> list[str]:
         """Names the trader never touched whose final price still differs.
 
-        Empty on a one-day analysis and under a pinned VIX (and, on pt-v20,
-        a pinned corporate bond yield); on a multi-day
-        run a small remainder is the fear-gauge channel, not a leak. See
-        :meth:`moved` for the measurement and the bounds.
+        Empty under a pinned VIX and, on pt-v20, a pinned corporate bond
+        yield, over any horizon. Without the pins, empty on a one-day
+        analysis only where the close writes no price (every preset
+        through pt-v19): pt-v20's close re-marks every name to the macro
+        step the trade moved, so a one-day analysis carries that close's
+        share of the fear-gauge and credit channel, and a multi-day one the
+        rest. Either way a small remainder is that channel, not a leak.
+        See :meth:`moved` for the measurement and the bounds.
         """
         traded = {f["ticker"] for f in self.fills}
         return sorted(t for t in self.moved() if t not in traded)

@@ -63,9 +63,18 @@ def test_a_real_counterfactual_moves_the_traded_name():
     # The positive counterpart to "nothing else moved". If the flow were
     # silently dropped, nothing at all would move, and the no-leak assertion
     # would pass while comparing two identical worlds.
+    #
+    # With the close's re-mark off (`macro_publication_repricing` 0). On
+    # pt-v20, the default, the close re-marks every name to the macro step
+    # the flow moved through the index return, so untraded names end a
+    # one-day run apart by that and `untouched_moved()` is not empty for a
+    # reason that is not a leak; tests/test_flow_impact.py measures it and
+    # holds the session's prints identical.
     cf = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE,
         order_flow={UNIVERSE[0].ticker: (6e6, 0.0)}, ticks=390,
+        model=tradefloor.ModelParams.from_preset(
+            "pt-v20", macro_publication_repricing=0.0),
     )
     assert cf.untouched_moved() == []
     assert cf.impact_bps[0] != 0.0

@@ -67,6 +67,11 @@ def test_a_seller_moves_the_price_down_and_also_pays():
     assert cost > 0, "which is still a cost to the seller"
 
 
+#: pt-v20 with the close's re-mark off: the close writes no price.
+NO_REMARK = tradefloor.ModelParams.from_preset(
+    "pt-v20", macro_publication_repricing=0.0)
+
+
 def test_impact_is_isolated_to_the_names_actually_traded():
     """The property that makes the measurement exact rather than a signal.
 
@@ -74,11 +79,43 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     byte-identical and untraded names follow exactly the path they would have
     followed. If that ever stopped being true, impact would be buried in a
     shifted market and this whole measurement would become an estimate.
+
+    Through the session, that is exact on every preset: the untraded names'
+    prints are the same to the bit, asserted below on the two worlds
+    `flow_impact` runs. `flow_impact` reads its prices after the close,
+    though, and on pt-v20, the default, the close re-marks every name to the
+    macro state it publishes (`macro_publication_repricing`). The close's
+    macro step reads the session's index return, which the flow moved (the
+    VIX, the 10-year's flight to quality and the corporate yield that
+    follows it), so the untraded names end the day apart by the difference
+    in their re-marks: +0.03 to +0.04 bps here, against +2.3 on the traded
+    name. That is the market-wide channel arriving at the first close, not a
+    leak in the subtraction, and `flow_impact` has no way to pin the macro
+    path. With the re-mark off, the close writes no price and
+    `untouched_moved()` is empty again, which is what it asserts.
     """
+    flow = {TRADED: (6e6, 0.0)}
+
+    def last_prints(flow_per_tick):
+        engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390, flow_per_tick=flow_per_tick)
+        return list(struct.unpack("<%dd" % len(engine.tickers),
+                                  engine.prices()))
+
+    traded = [t.ticker for t in UNIVERSE].index(TRADED)
+    with_flow, without = last_prints(flow), last_prints(None)
+    assert [p for i, p in enumerate(with_flow) if i != traded] == [
+        p for i, p in enumerate(without) if i != traded]
+
+    isolated = tradefloor.flow_impact(
+        seed=3, universe=UNIVERSE, order_flow=flow, ticks=390,
+        model=NO_REMARK)
+    assert isolated.untouched_moved() == []
+
     cf = tradefloor.flow_impact(
-        seed=3, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
+        seed=3, universe=UNIVERSE, order_flow=flow, ticks=390
     )
-    assert cf.untouched_moved() == []
     # Seed 3 since 2026-09-20. TRADED opens at $5.00, where one cent is 20
     # bps, so a few bps of impact register only when the path crosses a
     # cent riser: on the recomposed pt-v19 seeds 1, 2 and 8 read exactly

@@ -76,20 +76,47 @@ def test_the_untraded_world_is_unmoved_where_the_trader_did_not_go():
     it would have seen. If that were not true, impact would be a signal
     buried in a shifted market and the subtraction would be meaningless.
 
-    This is a ONE-DAY analysis, which makes emptiness assertable
-    exactly: the final prices predate the first close-repriced variance
-    target, so the 2026-08 fear-gauge channel — trading moves the same-day
-    VIX, VIX reaches other names' volatility two closes later — cannot
-    arrive in time. On a multi-day run that channel can move untraded names
-    a little unless VIX is pinned; the measurement and the bounds are in
-    ``Execution.moved``'s docstring.
+    This is a ONE-DAY analysis. Its final prices predate the first
+    close-repriced variance target, so the 2026-08 fear-gauge channel --
+    trading moves the same-day VIX, VIX reaches other names' volatility two
+    closes later -- cannot arrive in time. On a multi-day run that channel
+    can move untraded names a little unless VIX is pinned; the measurement
+    and the bounds are in ``Execution.moved``'s docstring.
 
-    Asserted rather than assumed: a non-empty result here means something
-    leaked between the two worlds.
+    What one day does carry on pt-v20, the default, is the close's re-mark
+    (`macro_publication_repricing`): the close's macro step reads the
+    session's index return, which the trade moved (the VIX, the 10-year's
+    flight to quality, the corporate yield that follows it), and the close
+    re-marks every name to it. The final row is read after that close, so
+    18 of the 19 untouched names end apart, by at most 3.4e-5 bps here
+    against +0.80 on the traded name. So isolation is asserted where it is
+    exact: every cross-section the session produced, before the close, is
+    identical on the untouched names; and the final one is too under the
+    same macro path, the VIX and the corporate yield pinned in both worlds
+    (the control ``Execution.moved`` gives), or with the re-mark off.
+
+    Asserted rather than assumed: a non-empty result under the same macro
+    path means something leaked between the two worlds.
     """
+    traded = UNIVERSE[0].ticker
     execution = analyse(BuyOnce(0.01))
-    assert execution.untouched_moved() == []
-    assert set(execution.moved()) == {UNIVERSE[0].ticker}
+    untouched = [i for i, t in enumerate(execution.tickers) if t != traded]
+    before_close = zip(execution.actual_path[:-1],
+                       execution.baseline_path[:-1])
+    for step, (actual, baseline) in enumerate(before_close):
+        assert [actual[i] for i in untouched] == [
+            baseline[i] for i in untouched], step
+    assert traded in execution.moved()
+
+    same_path = analyse(BuyOnce(0.01), scenario=tradefloor.Scenario().hold(
+        vix=15.0, corporate_bond_yield=0.055))
+    assert same_path.untouched_moved() == []
+    assert set(same_path.moved()) == {traded}
+
+    no_remark = analyse(BuyOnce(0.01), model=tradefloor.ModelParams.from_preset(
+        "pt-v20", macro_publication_repricing=0.0))
+    assert no_remark.untouched_moved() == []
+    assert set(no_remark.moved()) == {traded}
 
 
 def test_an_agent_that_does_nothing_has_no_cost_and_no_impact():
