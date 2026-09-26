@@ -609,6 +609,9 @@ impl PyEngine {
         self.day_buffer
             .clamp
             .extend_from_slice(&self.buffer.clamp[..n]);
+        self.day_buffer
+            .repriced
+            .extend_from_slice(&self.buffer.repriced[..n]);
         // Appended only when the session actually carried the arm, so a day
         // that ran without it holds an EMPTY pair rather than a padded one.
         if !self.buffer.unbounded_print.is_empty() {
@@ -928,6 +931,7 @@ struct DayBuffer {
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
+    repriced: Vec<f64>,
     /// Empty on a day whose sessions ran without the depth counterfactual.
     ///
     /// A session that ran with it appends; one that did not appends nothing.
@@ -950,6 +954,7 @@ impl DayBuffer {
         self.shock.clear();
         self.absorbed.clear();
         self.clamp.clear();
+        self.repriced.clear();
         self.unbounded_print.clear();
         self.liquidity_share.clear();
         for column in self.components.iter_mut() {
@@ -4670,6 +4675,12 @@ impl PyEngine {
             None => crate::agent_book::BookState::default(),
         };
         self.inner.set_book_state(book).map_err(ValidationError::new_err)?;
+        // What was written to each price since its last print is tape, not
+        // state: the snapshot does not carry it, and the engine restored
+        // into must not keep its own. So the next print's `repriced` reads
+        // NaN, not known, on a model that can write a price between prints,
+        // and zero on one that cannot.
+        self.inner.forget_repriced();
         Ok(())
     }
 
@@ -4705,6 +4716,7 @@ impl PyEngine {
             shock: self.day_buffer.shock.clone(),
             absorbed: self.day_buffer.absorbed.clone(),
             clamp: self.day_buffer.clamp.clone(),
+            repriced: self.day_buffer.repriced.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
@@ -4788,6 +4800,7 @@ impl PyEngine {
                 shock: Vec::new(),
                 absorbed: Vec::new(),
                 clamp: Vec::new(),
+                repriced: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
             }]
@@ -4957,9 +4970,18 @@ impl PyEngine {
     /// The `prints` table: how each print was arrived at.
     ///
     /// `truth` says what moved fair value. This says what happened between
-    /// fair value and the tape: `shock` is the log distance from the last
-    /// print to the model price, `absorbed` is the log distance from the
-    /// model price to the print, and the two sum to the print's own log move.
+    /// fair value and the tape: `shock` is the log distance from the price
+    /// the tick started from to the model price, `absorbed` is the log
+    /// distance from the model price to the print, and `repriced` is the
+    /// log distance from the last print to the price the tick started from.
+    /// The three sum to the print's own log move. `repriced` is zero except
+    /// where something wrote the price between two prints: the close's
+    /// re-mark to the macro state it publishes and a `pin_macro`'s
+    /// (`macro_publication_repricing`, pt-v20), and the overnight opening
+    /// print (`overnight_variance_ratio`). It is NaN on the first print
+    /// after `restore_state` on
+    /// a model that can write a price between prints, because the snapshot
+    /// does not carry it.
     ///
     ///   `prints()`        every recorded day, one batch each
     ///   `prints(day=N)`   that day alone
@@ -5028,6 +5050,7 @@ impl PyEngine {
                     self.written(&self.buffer.shock),
                     self.written(&self.buffer.absorbed),
                     self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.repriced),
                     self.written(&self.buffer.unbounded_print),
                     self.written(&self.buffer.liquidity_share),
                     depth,
@@ -5072,6 +5095,7 @@ impl PyEngine {
                         &d.shock,
                         &d.absorbed,
                         &d.clamp,
+                        &d.repriced,
                         &d.unbounded_print,
                         &d.liquidity_share,
                         depth,

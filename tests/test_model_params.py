@@ -2458,8 +2458,16 @@ def test_flow_impact_runs_the_model_in_both_worlds():
     default = tradefloor.flow_impact(**kwargs)
     custom = tradefloor.flow_impact(**kwargs, model=CUSTOM)
     assert custom.baseline != default.baseline
-    # One day, both worlds under the one model: nothing untraded moves.
-    assert custom.untouched_moved() == []
+    # One day, both worlds under the one model: nothing untraded moves,
+    # where the close writes no price. CUSTOM is pt-v20, whose close
+    # re-marks every name to the macro step the flow moved through the
+    # index return (`macro_publication_repricing`), so the untraded names
+    # end the day apart by their re-marks; with the re-mark off they do not.
+    # tests/test_flow_impact.py measures the channel.
+    quiet = tradefloor.ModelParams.from_preset(
+        market_factor_sigma=0.03, macro_publication_repricing=0.0)
+    assert tradefloor.flow_impact(
+        **kwargs, model=quiet).untouched_moved() == []
 
 
 def test_the_gym_env_runs_the_model_and_reports_it_at_reset():

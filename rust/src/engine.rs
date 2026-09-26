@@ -392,6 +392,25 @@ pub struct Engine {
     /// How far the print breaker moved this tick's print, per slot. The
     /// book's own share is `tick_absorbed - tick_clamp`.
     tick_clamp: Vec<f64>,
+    /// How far each price was moved between its last print and this tick,
+    /// per slot, in log units: `log(the price the tick started from / the
+    /// last print)`. Zero on every tick nothing wrote the price between
+    /// prints. `repriced + shock + absorbed` is the print's log move from
+    /// the previous print, where `shock + absorbed` alone is its move from
+    /// the price the tick started from.
+    tick_repriced: Vec<f64>,
+    /// The log move written to each name's price since its last print and
+    /// not yet booked onto a tape row, per slot: the close's re-mark and a
+    /// `pin_macro`'s (`macro_publication_repricing`) and the opening print
+    /// (`overnight_variance_ratio`). The next tick moves it into
+    /// `tick_repriced` and zeroes it. NaN where it is not known, which is
+    /// after a `restore_state` on a model that can write a price between
+    /// prints: the snapshot does not carry it.
+    ///
+    /// RECORDING state, like the `tick_*` columns: it moves no price and no
+    /// draw, it is outside the snapshot and the state hash, and a fork
+    /// (`Clone`) carries it.
+    repriced_pending: Vec<f64>,
     /// The depth counterfactual, per company slot. Empty unless
     /// [`Engine::set_settle_depth_counterfactual`] turned it on, which is
     /// how the reporting surface knows whether it has an arm to report.
@@ -1121,6 +1140,9 @@ impl Engine {
             tick_shock: vec![0.0; companies_len],
             tick_absorbed: vec![0.0; companies_len],
             tick_clamp: vec![0.0; companies_len],
+            tick_repriced: vec![0.0; companies_len],
+            // Nothing has been written to a price before the first print.
+            repriced_pending: vec![0.0; companies_len],
             // Empty until the counterfactual is switched on, so emptiness is
             // the one signal that says whether an arm ran.
             tick_unbounded_print: Vec::new(),
@@ -2641,6 +2663,18 @@ impl Engine {
         for slot in self.tick_clamp.iter_mut() {
             *slot = 0.0;
         }
+        // Every slot's row prints, active or not, so every slot books what
+        // was written to its price since the last print, and the pending
+        // value is spent. A name that did not tick prints the price it
+        // carries, so its row's move is exactly this.
+        self.tick_repriced.clear();
+        self.tick_repriced.resize(self.companies.len(), 0.0);
+        for (slot, pending) in self.repriced_pending.iter_mut().enumerate() {
+            if let Some(v) = self.tick_repriced.get_mut(slot) {
+                *v = *pending;
+            }
+            *pending = 0.0;
+        }
         // The counterfactual columns are prices, so their zero is the price
         // the company is carrying: unbounded depth does not move a name that
         // did not settle. Written before the copy below so an inactive slot
@@ -3358,6 +3392,28 @@ impl Engine {
         &self.tick_clamp
     }
 
+    /// This tick's repricing per company slot: `log(the price the tick
+    /// started from / the last print)`, what the close's re-mark, a pin's
+    /// re-mark or the opening print wrote to the price between the two.
+    /// Zero where nothing did; NaN where it is not known (after a restore;
+    /// see `repriced_pending`).
+    pub fn tick_repriced(&self) -> &[f64] {
+        &self.tick_repriced
+    }
+
+    /// Forget what was written to each price since its last print, as not
+    /// known: NaN on a model that can write a price between prints
+    /// (`macro_publication_repricing` or `overnight_variance_ratio` set),
+    /// zero on one that cannot. For a restore, whose snapshot does not
+    /// carry it, so the engine restored into does not keep its own.
+    pub fn forget_repriced(&mut self) {
+        let unknown = self.params.macro_publication_repricing != 0.0
+            || self.params.overnight_variance_ratio != 0.0;
+        let value = if unknown { f64::NAN } else { 0.0 };
+        self.repriced_pending.clear();
+        self.repriced_pending.resize(self.companies.len(), value);
+    }
+
     /// What each company would have printed this tick against unbounded
     /// depth. Empty while the counterfactual is off.
     pub fn tick_unbounded_print(&self) -> &[f64] {
@@ -3888,6 +3944,11 @@ impl Engine {
         self.tick_absorbed.resize(self.companies.len(), 0.0);
         self.tick_clamp.clear();
         self.tick_clamp.resize(self.companies.len(), 0.0);
+        self.tick_repriced.clear();
+        self.tick_repriced.resize(self.companies.len(), 0.0);
+        // Not the pending repricing: it carries the close's re-mark across
+        // the open to the first print. Only its width follows the roster.
+        self.repriced_pending.resize(self.companies.len(), 0.0);
         // Resized only while the arm is on, so a roster that changed between
         // days does not leave a short column behind -- and emptiness keeps
         // meaning "no arm ran" rather than "no companies".
@@ -4126,6 +4187,11 @@ impl Engine {
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
             );
+            // For the tape, as at the re-mark: the first print's `repriced`
+            // books the opening print's move from the last close.
+            if let Some(v) = self.repriced_pending.get_mut(index) {
+                *v += crate::mathx::log(price / company.stock.price);
+            }
             company.stock.price = price;
             company.stock.market_cap = price * company.stock.shares_outstanding;
         }
@@ -5192,6 +5258,7 @@ impl Engine {
                     shock: &self.tick_shock,
                     absorbed: &self.tick_absorbed,
                     clamp: &self.tick_clamp,
+                    repriced: &self.tick_repriced,
                     unbounded_print: &self.tick_unbounded_print,
                     liquidity_share: &self.tick_liquidity_share,
                 },
@@ -5553,7 +5620,8 @@ impl Engine {
         let economy = &self.economy;
         let base = self.nominal_output_base;
         let day = self.current_day;
-        for (c, &fv0) in self.companies.iter_mut().zip(before.iter()) {
+        let pending = &mut self.repriced_pending;
+        for (slot, (c, &fv0)) in self.companies.iter_mut().zip(before.iter()).enumerate() {
             if !(fv0 > 0.0) || c.is_bankrupt || !c.is_public {
                 continue;
             }
@@ -5593,6 +5661,12 @@ impl Engine {
             stock.high = crate::mathx::max(stock.high, price);
             stock.low = crate::mathx::min(stock.low, price);
             stock.market_cap = price * stock.shares_outstanding;
+            // For the tape: the next print's `repriced` books this move, so
+            // the print decomposition still sums to the move from the last
+            // print. Recording only; the price above is the whole effect.
+            if let Some(v) = pending.get_mut(slot) {
+                *v += crate::mathx::log(price / last);
+            }
         }
     }
 
@@ -5783,6 +5857,9 @@ impl Engine {
         self.tick_shock.push(0.0);
         self.tick_absorbed.push(0.0);
         self.tick_clamp.push(0.0);
+        self.tick_repriced.push(0.0);
+        // A name that joins has had nothing written to its price.
+        self.repriced_pending.push(0.0);
         // Only where the arm is running. Empty means no arm, and pushing
         // into an empty pair would turn that into a one-row column.
         if !self.tick_unbounded_print.is_empty() {
@@ -5865,6 +5942,12 @@ impl Engine {
         }
         if index < self.tick_clamp.len() {
             self.tick_clamp.remove(index);
+        }
+        if index < self.tick_repriced.len() {
+            self.tick_repriced.remove(index);
+        }
+        if index < self.repriced_pending.len() {
+            self.repriced_pending.remove(index);
         }
         if index < self.tick_unbounded_print.len() {
             self.tick_unbounded_print.remove(index);
@@ -7077,6 +7160,10 @@ pub struct SessionBuffer {
     /// How far the print breaker moved each print. `absorbed - clamp` is the
     /// book's own share of the distance from the model price to the tape.
     pub clamp: Vec<f64>,
+    /// What was written to each price between its last print and the
+    /// tick, in log units. `repriced + shock + absorbed` is the print's log
+    /// move from the previous print.
+    pub repriced: Vec<f64>,
     /// The depth counterfactual, each `ticks * companies` when it ran and
     /// EMPTY when it did not. Emptiness is the signal, which is why these
     /// two are not resized alongside the columns above.
@@ -7097,6 +7184,9 @@ pub struct TickTruth<'a> {
     pub shock: &'a [f64],
     pub absorbed: &'a [f64],
     pub clamp: &'a [f64],
+    /// What was written to each price between its last print and this
+    /// tick (`Engine::tick_repriced`).
+    pub repriced: &'a [f64],
     pub unbounded_print: &'a [f64],
     pub liquidity_share: &'a [f64],
 }
@@ -7117,6 +7207,7 @@ impl SessionBuffer {
             self.shock.resize(needed, 0.0);
             self.absorbed.resize(needed, 0.0);
             self.clamp.resize(needed, 0.0);
+            self.repriced.resize(needed, 0.0);
             for column in self.components.iter_mut() {
                 column.resize(needed, 0.0);
             }
@@ -7156,6 +7247,7 @@ impl SessionBuffer {
             self.shock[base + i] = truth.shock.get(i).copied().unwrap_or(0.0);
             self.absorbed[base + i] = truth.absorbed.get(i).copied().unwrap_or(0.0);
             self.clamp[base + i] = truth.clamp.get(i).copied().unwrap_or(0.0);
+            self.repriced[base + i] = truth.repriced.get(i).copied().unwrap_or(0.0);
             // Guarded on the buffer rather than on the source: a session that
             // sized these columns and then met an engine with the arm off
             // would otherwise write NaN into a column it had promised.
@@ -7194,6 +7286,8 @@ impl SessionBuffer {
             self.shock[at] = inst.tick_shock;
             self.absorbed[at] = inst.tick_absorbed;
             self.clamp[at] = 0.0;
+            // No re-mark or opening print writes a rate index's price.
+            self.repriced[at] = 0.0;
             if !self.unbounded_print.is_empty() {
                 self.unbounded_print[at] = inst.price;
                 self.liquidity_share[at] = 0.0;

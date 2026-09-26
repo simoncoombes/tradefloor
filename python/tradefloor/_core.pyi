@@ -344,10 +344,14 @@ class Engine:
     ) -> ArrowStream: ...
     def truth(self, *, day: int | None = ...) -> ArrowStream: ...
     # day, tick, instrument_id, print, model_price, shock, absorbed, clamp,
-    # and -- only when `settle_depth_counterfactual(True)` ran before the
-    # session -- unbounded_print and liquidity_share. `clamp` is the print
-    # breaker's part of `absorbed`; the book's is `absorbed - clamp`. The
-    # schema's one metadata key says which shape came back and why.
+    # repriced, and -- only when `settle_depth_counterfactual(True)` ran
+    # before the session -- unbounded_print and liquidity_share. `clamp` is
+    # the print breaker's part of `absorbed`; the book's is `absorbed -
+    # clamp`. `repriced` is what was written to the price between the last
+    # print and the tick (the close's re-mark under
+    # `macro_publication_repricing`), so `repriced + shock + absorbed` is the
+    # move from the last print. The schema's one metadata key says which
+    # shape came back and why.
     def prints(self, *, day: int | None = ...) -> ArrowStream: ...
     def settle_depth_counterfactual(self, on: bool = ...) -> None: ...
     def macro_table(self) -> ArrowStream: ...

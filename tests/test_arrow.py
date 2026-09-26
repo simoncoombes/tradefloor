@@ -7,6 +7,7 @@ the reference implementation of the protocol, and skip cleanly without it
 rather than pretending the surface is untested.
 """
 
+import math
 import struct
 
 import pytest
@@ -373,11 +374,15 @@ def test_the_day_bar_opens_at_the_session_open_not_the_first_print():
     """Issue #179. `prices` holds the print AFTER each tick, so a bar whose
     open is its first element opens one tick into the session. The day bar
     now carries the engine's own `open` mark, taken at `open_market` before
-    any tick. On the engine as it stands that mark IS the previous close on
-    every name-night, because nothing moves a price between sessions, so an
-    overnight return read off these bars is exactly zero, which is the
-    correct reading of a model with no overnight process; the first print
-    differs from it on most name-days and was being read as a gap."""
+    any tick. Through pt-v19 that mark IS the previous close on every
+    name-night, because nothing moves a price between sessions, so an
+    overnight return read off those bars is exactly zero. On pt-v20, the
+    default, one thing does: the close re-marks every traded name to the
+    macro state it publishes (`macro_publication_repricing`), after the
+    day's last print, so the overnight return read off these bars is
+    exactly that re-mark, which `prints()` books as the next day's first
+    `repriced`. Either way the first print differs from the open on most
+    name-days and was being read as a gap."""
     u = tradefloor.Universe.random(4, seed=5)
     e = tradefloor.Engine(seed=2026, universe=u)
     opens = []
@@ -396,11 +401,20 @@ def test_the_day_bar_opens_at_the_session_open_not_the_first_print():
     first_print = {(d, i): c for d, t, i, c in
                    zip(tick["day"], tick["tick"], tick["instrument_id"], tick["close"])
                    if t == 0}
+    repriced = {(d, i): r for d, t, i, r in
+                zip(*(pa.table(e.prints()).to_pydict()[k]
+                      for k in ("day", "tick", "instrument_id", "repriced")))
+                if t == 0}
     for d in range(3):
         for i in range(4):
             assert bar_open[(d, i)] == opens[d][i], (d, i)
             if d > 0:
-                assert bar_open[(d, i)] == bar_close[(d - 1, i)], (d, i)
+                # The night's return is the close's re-mark and nothing
+                # else: nonzero, and the same log move the tape books.
+                night = math.log(bar_open[(d, i)] / bar_close[(d - 1, i)])
+                assert night != 0.0, (d, i)
+                assert night == pytest.approx(repriced[(d, i)],
+                                              abs=1e-15), (d, i)
     assert sum(1 for k in bar_open if bar_open[k] != first_print[k]) > 0
     # The first intraday bar of a day opens at the session open too; a
     # later bar opens at its first print, the exchange convention.

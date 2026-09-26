@@ -311,7 +311,7 @@ class World:
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
-                 "_adv", "_ran", "_step_mids")
+                 "_adv", "_ran", "_step_mids", "_step_opens")
 
     def __init__(
         self,
@@ -407,6 +407,15 @@ class World:
         # The mid each name's book showed when the current step opened,
         # before any agent's order. See `_execute`.
         self._step_mids: dict[str, float | None] = {}
+        #: The cross-section each step opened on, keyed by step: the prices
+        #: every agent was shown before it acted. A trace row records the
+        #: prices its session LEFT, which is the next step's opening
+        #: cross-section within a day but not across a close: on pt-v20
+        #: `macro_publication_repricing` re-marks every traded name at the
+        #: close, and a scenario's pins before the open re-mark it again.
+        #: Bookkeeping, not state: no row, digest or snapshot carries it.
+        #: `tradefloor.externality` prices fills against it.
+        self._step_opens: dict[int, list[float]] = {}
 
     # -- who is in this world ---------------------------------------------
 
@@ -605,6 +614,7 @@ class World:
 
             for _ in range(self.steps_per_day):
                 prices = _f64(self.engine.prices())
+                self._step_opens[self._step] = prices
                 tick = ((self._step % self.steps_per_day)
                         * self.ticks_per_step)
                 # Every agent is shown the same cross-section and the same
@@ -1087,6 +1097,8 @@ class World:
                                  for key, book in self._portfolios.items()}
             child._frozen = self._frozen
             child.trace = copy.deepcopy(self.trace)
+            child._step_opens = {step: list(row) for step, row
+                                 in self._step_opens.items()}
             child.rejected = list(self.rejected)
             child.interventions = copy.deepcopy(self.interventions)
             # Interventions are immutable value objects, so the list is

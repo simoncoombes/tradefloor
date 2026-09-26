@@ -694,11 +694,27 @@ class FlowImpact:
     def untouched_moved(self) -> list[str]:
         """Instruments the trader did not touch, whose price still moved.
 
-        EMPTY on a one-day run, and the reason is what makes this
-        measurement clean: order flow consumes no draws. It is an input to
-        the factor calculation, not a call on the generator, so adding flow
-        to one name leaves the shared draw schedule byte-identical and
-        every other name sees exactly the noise it would have seen.
+        EMPTY on a one-day run where the close writes no price, and the
+        reason is what makes this measurement clean: order flow consumes no
+        draws. It is an input to the factor calculation, not a call on the
+        generator, so adding flow to one name leaves the shared draw
+        schedule byte-identical and every other name sees exactly the noise
+        it would have seen: its prints through the session are the same to
+        the bit on every preset.
+
+        The prices compared here are read after the close, and on pt-v20,
+        the default, the close re-marks every name to the macro state it
+        publishes (``macro_publication_repricing``). The close's macro step
+        reads the session's index return, which the flow moved (the VIX,
+        the 10-year's flight to quality, the corporate yield that follows
+        it), so on a one-day run the untouched names end apart by the
+        difference in their re-marks: +0.03 to +0.04 bps against +2.3 on
+        the traded name in ``tests/test_flow_impact.py``. That is the
+        market-wide channel below arriving at the first close, not a leak.
+        This function cannot pin the macro path; ``tradefloor.tca.analyse``
+        with ``scenario=Scenario().hold(vix=..., corporate_bond_yield=...)``
+        can, and a model with ``macro_publication_repricing`` 0 writes no
+        price at the close.
 
         Measured, not assumed: a 390-tick session consumes 19,110 draws with
         or without flow. (Adding an INSTRUMENT is a different matter and does
@@ -720,8 +736,9 @@ class FlowImpact:
         measurement of the channel.
 
         So on a one-day run impact is exactly attributable to the names
-        traded, and on a longer one it is attributable up to the fear
-        gauge. This accessor exists to prove that rather than to explain
+        traded up to the close's re-mark on pt-v20 (exactly, where the
+        close writes no price), and on a longer one it is attributable up
+        to the fear gauge. This accessor exists to prove that rather than to explain
         it away: a result a pinned VIX does not empty means something
         leaked, and is worth investigating.
         """

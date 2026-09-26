@@ -859,8 +859,10 @@ def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
 MISPRICING_TOLERANCE = 0.05
 
 
-def _public_inversion_error(model: str, days: int = 4) -> float:
-    """|log(price / public fair value) - mispricing_s| for TECH_A."""
+def _public_inversion_errors(model: str, days: int = 4) -> list[float]:
+    """|log(price / public fair value) - mispricing_s| for every name on the
+    roster, in roster order, from the fundamentals each was built with and
+    the two rates the world pins."""
     import math
     import struct
 
@@ -869,31 +871,61 @@ def _public_inversion_error(model: str, days: int = 4) -> float:
     n = len(engine.tickers)
     prices = list(struct.unpack("<%dd" % n, engine.prices()))
     truth = list(struct.unpack("<%dd" % n, engine.column("mispricing_s")))
-    facts = {"TECH_A": {"sector": "technology", "eps": 3.0,
-                        "book_value_per_share": 15.0, "revenue_growth": 0.30}}
-    macro = fr.observe(_observation(world), history=[],
-                       fundamentals=facts)["macro"]
-    f = facts["TECH_A"]
-    value = tf.fair_value(
-        eps=f["eps"], sector=f["sector"], revenue_growth=f["revenue_growth"],
-        book_value_per_share=f["book_value_per_share"],
-        federal_funds_rate=macro["federal_funds_rate"],
-        corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
-    return abs(math.log(prices[0] / value) - truth[0])
+    payload = fr.observe(_observation(world), history=[], fundamentals={
+        i.ticker: {"sector": i.sector, "eps": i.eps,
+                   "book_value_per_share": i.book_value_per_share,
+                   "revenue_growth": i.revenue_growth}
+        for i in world.universe})
+    macro = payload["macro"]
+    out = []
+    for k, instrument in enumerate(world.universe):
+        value = tf.fair_value(
+            eps=instrument.eps, sector=instrument.sector,
+            revenue_growth=instrument.revenue_growth,
+            book_value_per_share=instrument.book_value_per_share,
+            federal_funds_rate=macro["federal_funds_rate"],
+            corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+        out.append(abs(math.log(prices[k] / value) - truth[k]))
+    return out
+
+
+def _rms(values: list[float]) -> float:
+    import math
+    return math.sqrt(sum(v * v for v in values) / len(values))
 
 
 def test_from_pt_v20_the_anchor_is_not_the_public_valuation():
     """pt-v20, the default from 0.8.5, gives fair value a level of its own:
     the part of each name's opening premium the published fundamentals do
-    not explain (`opening_mispricing_sigma`), news that moves it for good
-    (`fair_value_news_share`) and an earnings cycle. So the public
-    `fair_value` is no longer the engine's anchor, and inverting it misses
-    `mispricing_s` by more than the pt-v19 tolerance: 0.087, 0.091 and
-    0.065 after 2, 4 and 10 days on this roster. That is the change pt-v20
-    was built to make, since a value screen that reconstructs the anchor
-    is an edge real markets do not offer."""
+    not explain (`opening_mispricing_sigma`), news and market moves that
+    move it for good (`fair_value_news_share`, `fair_value_market_share`)
+    and the valuation terms the public function does not carry (the
+    buyback yield, the rate sensitivity, the earnings cycle and its
+    anticipation). So the public `fair_value` is no longer the engine's
+    anchor, and inverting it misses `mispricing_s` by more than the pt-v19
+    tolerance. That is the change pt-v20 was built to make, since a value
+    screen that reconstructs the anchor is an edge real markets do not
+    offer.
+
+    Measured over the roster rather than on one name, and why. The miss on
+    a name is its fair-value level, and that level is a random walk: the
+    permanent share of every shock the name takes. TECH_A's offset reads
+    0.089, 0.090 and 0.064 after 2, 4 and 10 days on this build, beside a
+    near-constant -0.026 from the valuation terms, so its own miss reads
+    0.061, 0.062 and 0.039, and on day 10 the walk had drifted under the
+    bar. That is a draw of the walk and not a defect: the inversion reads
+    the two rates the world pins (published and true are one value there,
+    and no lagged field enters `fair_value`), and the close's re-mark moves
+    it by 0.0002. The bar is unchanged; the statistic is the root mean
+    square miss over the roster's names, 0.116, 0.123 and 0.094 on pt-v20
+    against 0.016, 0.019 and 0.017 on pt-v19, which is the property the
+    preset changed rather than one name's path.
+    """
     for days in (2, 4, 10):
-        assert _public_inversion_error("pt-v20", days) > MISPRICING_TOLERANCE
+        v20 = _rms(_public_inversion_errors("pt-v20", days))
+        v19 = _rms(_public_inversion_errors("pt-v19", days))
+        assert v20 > MISPRICING_TOLERANCE, (days, v20)
+        assert v19 < MISPRICING_TOLERANCE, (days, v19)
 
 
 def test_the_state_variable_is_approximable_but_not_recoverable():

@@ -19,6 +19,7 @@ is stated where it was measured rather than asserted here: see
 import hashlib
 import io
 import math
+import struct
 import subprocess
 import sys
 
@@ -67,6 +68,7 @@ def test_the_table_has_a_row_per_instrument_per_tick():
         "shock",
         "absorbed",
         "clamp",
+        "repriced",
     ]
 
 
@@ -290,29 +292,92 @@ def test_the_shock_and_the_absorption_sum_to_the_print_move():
 
     Roster `Universe.random(12, seed=111)`, seed 42, three days, the shipped
     preset. Asserted as a derivation rather than a pinned tolerance-free
-    number: `shock` and `absorbed` are two logs and the move is a third, so
-    they agree to rounding rather than to the bit.
+    number: `repriced`, `shock` and `absorbed` are three logs and the move
+    is a fourth, so they agree to rounding rather than to the bit.
     """
     table = pa.table(run(counterfactual=False).prints()).to_pydict()
     prints = table["print"]
     shock = table["shock"]
     absorbed = table["absorbed"]
+    repriced = table["repriced"]
     rows = len(prints)
     checked = 0
     # Every row but the twelve the run opens on. The table is tick-major
     # over concatenated days, so `row - NAMES` is the same instrument's
-    # previous print INCLUDING across a day boundary: the close does not
-    # move a price, so the first tick of day 1 differences against the last
-    # print of day 0 and the identity holds there too.
+    # previous print INCLUDING across a day boundary. On pt-v20, the
+    # default, the close moves a price: `macro_publication_repricing`
+    # re-marks every traded name to the macro state the close publishes,
+    # after the day's last print. `shock` is measured from the price the
+    # tick starts from, so on the first tick of the next day the re-mark
+    # is the third term, `repriced`, and the identity holds across the
+    # boundary with it.
     for row in range(NAMES, rows):
         previous = prints[row - NAMES]
         moved = math.log(prints[row] / previous)
-        assert abs(shock[row] + absorbed[row] - moved) < 1e-12, (
-            f"row {row}: shock {shock[row]} + absorbed {absorbed[row]} "
-            f"is not the move {moved}"
+        total = repriced[row] + shock[row] + absorbed[row]
+        assert abs(total - moved) < 1e-12, (
+            f"row {row}: repriced {repriced[row]} + shock {shock[row]} + "
+            f"absorbed {absorbed[row]} is not the move {moved}"
         )
         checked += 1
     assert checked == TICKS * NAMES * DAYS - NAMES
+    # And the third term is the close's alone: zero inside a day, and
+    # nonzero on the first tick after a close for the names it re-marked
+    # (every name had traded by then). Without it the identity above misses
+    # by the re-mark on exactly those rows.
+    for row in range(rows):
+        tick = table["tick"][row]
+        if table["day"][row] == 0 or tick != 0:
+            assert repriced[row] == 0.0, row
+    after_close = [row for row in range(rows)
+                   if table["day"][row] > 0 and table["tick"][row] == 0]
+    assert len(after_close) == NAMES * (DAYS - 1)
+    assert all(repriced[row] != 0.0 for row in after_close)
+
+
+def test_the_repricing_term_is_zero_where_the_close_writes_no_price():
+    """`repriced` is the close's re-mark and nothing else: on a preset
+    without `macro_publication_repricing` (pt-v19) the close leaves the
+    price at the last print, the column is zero on every row, and shock
+    plus absorbed is the move on its own, as it was before the column."""
+    universe = tradefloor.Universe.random(NAMES, seed=ROSTER_SEED)
+    engine = tradefloor.Engine(seed=RUN_SEED, universe=universe,
+                               model="pt-v19")
+    for day in range(DAYS):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 60)
+        engine.close_market()
+        engine.record(day)
+    table = pa.table(engine.prints()).to_pydict()
+    assert set(table["repriced"]) == {0.0}
+    prints = table["print"]
+    for row in range(NAMES, len(prints)):
+        moved = math.log(prints[row] / prints[row - NAMES])
+        assert abs(table["shock"][row] + table["absorbed"][row] - moved) < 1e-12
+
+
+def test_the_repricing_term_is_what_the_close_wrote_to_the_price():
+    """Measured against the engine, not against the tape: the price the
+    engine holds after `close_market` over the day's last print is the
+    next day's first `repriced`, name by name."""
+    universe = tradefloor.Universe.random(NAMES, seed=ROSTER_SEED)
+    engine = tradefloor.Engine(seed=RUN_SEED, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 60)
+    last = pa.table(engine.prints()).to_pydict()["print"][-NAMES:]
+    engine.close_market()
+    held = struct.unpack("<%dd" % NAMES, engine.prices())
+    engine.record(0)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 5)
+    engine.close_market()
+    engine.record(1)
+    table = pa.table(engine.prints(day=1)).to_pydict()
+    first = table["repriced"][:NAMES]
+    for i in range(NAMES):
+        assert first[i] == pytest.approx(math.log(held[i] / last[i]),
+                                         abs=1e-15), i
+        assert held[i] != last[i], i
 
 
 def test_the_model_price_is_where_the_shock_lands():
@@ -427,8 +492,11 @@ def test_the_clamp_is_reported_apart_from_the_book():
         book = absorbed - clamp
         previous = prints[row - names]
         moved = math.log(prints[row] / previous)
-        assert abs(table["shock"][row] + book + clamp - moved) < 1e-12, (
-            f"row {row}: shock + book + clamp is not the move"
+        # `repriced` is the close's re-mark on pt-v20, the default (see
+        # the identity test above): zero except on a day's first tick.
+        assert abs(table["repriced"][row] + table["shock"][row] + book
+                   + clamp - moved) < 1e-12, (
+            f"row {row}: repriced + shock + book + clamp is not the move"
         )
         if clamp == 0.0:
             continue
@@ -662,3 +730,33 @@ def test_the_arm_reports_something_on_this_roster():
         "every print differing would mean the bound binds on every tick, "
         "which the book is built not to do"
     )
+
+
+def test_a_restore_does_not_claim_to_know_what_the_close_wrote():
+    """`repriced` is tape, not state: the snapshot does not carry it (the
+    state hash covers every field the snapshot carries, and this moves no
+    price). So the first print after a restore reads NaN, not known, on a
+    model that re-marks at the close, rather than a zero that would say
+    the close wrote nothing; and zero on one whose close writes no price."""
+    universe = tradefloor.Universe.random(NAMES, seed=ROSTER_SEED)
+    for model, unknown in (("pt-v20", True), ("pt-v19", False)):
+        source = tradefloor.Engine(seed=RUN_SEED, universe=universe,
+                                   model=model)
+        source.open_market()
+        source.run_session(9, 30, 3, 20)
+        source.close_market()
+        resumed = tradefloor.Engine(seed=RUN_SEED, universe=universe,
+                                    model=model)
+        resumed.restore_state(source.state_snapshot())
+        resumed.open_market()
+        resumed.run_session(9, 30, 3, 2)
+        resumed.close_market()
+        resumed.record(1)
+        first = pa.table(resumed.prints()).to_pydict()["repriced"][:NAMES]
+        if unknown:
+            assert all(math.isnan(v) for v in first), model
+        else:
+            assert first == [0.0] * NAMES, model
+        # Known again from the next print on.
+        second = pa.table(resumed.prints()).to_pydict()["repriced"][NAMES:]
+        assert second == [0.0] * NAMES, model

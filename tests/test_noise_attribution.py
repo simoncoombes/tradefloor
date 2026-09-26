@@ -307,16 +307,43 @@ def test_a_column_target_before_the_window_is_refused():
 
 # -- the horizon an event needs ----------------------------------------------
 
+#: pt-v20 with the close's re-mark off, where a jump reaches no price
+#: before the next open.
+NO_REMARK = tf.ModelParams.from_preset("pt-v20",
+                                       macro_publication_repricing=0.0)
+
+#: How much of a jump the close's re-mark carries into that close's price,
+#: as a share of what the next day reads. The re-mark scales each price by
+#: its fair value after the close's macro step over its fair value before
+#: it; a jump's permanent share (`fair_value_market_share`,
+#: `fair_value_news_share`) moves the name's fair-value level at that same
+#: close, and the ratio reads the level only through the buyback term's
+#: yield (`buyback_payout_share`), so the jump reaches the price in the
+#: second order. Measured on `world()` at seed 42: 6.4e-8 of the largest
+#: effect a day later for the price, 3.0e-8 for the P&L; with the buyback
+#: share at 0 it is 1.4e-14, and with both permanent shares at 0 it is 0.
+REMARK_SHARE = 1e-6
+
+
 def test_the_default_horizon_reaches_the_open_after_an_event():
     """A jump lands at its day's close and is first seen at the next open,
     so a horizon stopping on the window's last day measures every event row
-    as exactly zero."""
+    as exactly zero where the close writes no price (pt-v20 with
+    `macro_publication_repricing` at 0 here). On pt-v20 itself the close's
+    re-mark carries a second-order sliver of the jump into that close's
+    price (`REMARK_SHARE`), so the short horizon measures almost nothing
+    rather than nothing, and the default still reaches the open."""
     root = world()
     reached = noise.attribute(root, (1, 1), noise.column("price", 2),
                               "event", streams=["jumps"])
     assert reached.horizon == 2
     assert any(r["effect"] != 0.0 for r in reached.rows)
+    largest = max(abs(r["effect"]) for r in reached.rows)
+    sliver = noise.attribute(root, (1, 1), noise.column("price", 1),
+                             "event", streams=["jumps"], horizon=1)
+    assert max(abs(r["effect"]) for r in sliver.rows) < REMARK_SHARE * largest
 
+    root = world(model=NO_REMARK)
     short = noise.attribute(root, (1, 1), noise.column("price", 1), "event",
                             streams=["jumps"], horizon=1)
     assert short.horizon == 1
@@ -595,11 +622,23 @@ def test_the_default_horizon_holds_for_a_target_that_names_no_day():
     passes whether or not the default reaches past the window. A target
     that names no day takes the default and nothing else, which is what
     states the rule: at the window's last day every event row is exactly
-    zero, and one day past it they are not.
+    zero, and one day past it they are not. Exactly zero where the close
+    writes no price; on pt-v20 the close's re-mark carries the second-order
+    sliver `REMARK_SHARE` describes, measured here as a bound.
     """
-    root = world()
+    remarked = world()
+    root = world(model=NO_REMARK)
     for target in (noise.pnl(),
                    lambda arm: float(arm.summary()["pnl_since"])):
+        full = noise.attribute(remarked, (1, 1), target, "event",
+                               streams=["jumps"])
+        sliver = noise.attribute(remarked, (1, 1), target, "event",
+                                 streams=["jumps"], horizon=1)
+        largest = max(abs(r["effect"]) for r in full.rows)
+        assert largest > 0.0
+        assert (max(abs(r["effect"]) for r in sliver.rows)
+                < REMARK_SHARE * largest)
+
         reached = noise.attribute(root, (1, 1), target, "event",
                                   streams=["jumps"])
         assert reached.horizon == 2

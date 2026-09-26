@@ -467,12 +467,47 @@ def test_the_60_40_bond_sleeve_takes_the_duration_weighted_hit():
     assert sleeve == pytest.approx(expected, abs=0.004)
 
 
-def test_a_rebalancer_buys_bonds_after_a_shock_that_crosses_its_band():
-    scenario = tf.Scenario.load("curve_shock")
-    agent = Balanced(band=0.02)
+def _banded_through_the_curve_shock(band, model=None):
+    agent = Balanced(band=band)
     tf.evaluate({"banded": agent}, seed=4, universe=universe(16), days=53,
-                steps_per_day=1, ticks_per_step=390, scenario=scenario)
+                steps_per_day=1, ticks_per_step=390,
+                scenario=tf.Scenario.load("curve_shock"), model=model)
+    marks = {d: equity / (equity + bonds) for d, equity, bonds in agent.marks
+             if equity + bonds}
+    return agent, marks
+
+
+def test_a_rebalancer_buys_bonds_after_a_shock_that_crosses_its_band():
+    """The 200bp curve shock on day 50 takes the bond sleeve down 12 per
+    cent at the day's first mark, and a banded 60/40 trades back to target
+    there, buying bonds.
+
+    Where the price takes the rate at the next tick (pt-v20 with
+    `macro_publication_repricing` 0), the day-50 mark sees the bonds' fall
+    and not yet the equities', the equity share reads 0.629 and a 2-point
+    band is crossed. On pt-v20, the default, the scenario's pins re-mark
+    every equity to the higher discount rate the moment they are written,
+    before the open, so the equity sleeve takes its hit at the same mark
+    (604,460 to 567,314) and the share moves only to 0.6125: inside 2
+    points, outside 1. The rebalancer is tested at the band the shock
+    crosses on each; at 1 point it also trades on ordinary drift (days 19
+    and 42), so what is asserted is the day-50 trade and its direction.
+    """
+    agent, marks = _banded_through_the_curve_shock(
+        0.02, tf.ModelParams.from_preset(
+            "pt-v20", macro_publication_repricing=0.0))
     assert 50 in agent.rebalances
+    assert marks[51] < marks[50]
+
+    agent, marks = _banded_through_the_curve_shock(0.02)
+    assert 50 not in agent.rebalances
+    assert 0.01 < marks[50] - 0.6 < 0.02
+
+    agent, marks = _banded_through_the_curve_shock(0.01)
+    assert 50 in agent.rebalances
+    # It sold equity and bought bonds: the next mark is back near target.
+    assert marks[51] < marks[50]
+    assert abs(marks[51] - 0.6) < abs(marks[50] - 0.6)
 
 
 # -- shared machinery ---------------------------------------------------------------
