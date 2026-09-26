@@ -168,14 +168,16 @@ pub fn build_company(c: &Json) -> TickCompany {
 /// differ in how they draw, never in where they start.
 struct Setup {
     engine: Engine,
-    seed: u32,
+    seed: u64,
     ticks: usize,
     volatility: f64,
 }
 
 fn setup(doc: &Json) -> Setup {
     let spec = &doc["spec"];
-    let seed = spec["tickSeed"].as_u64().unwrap() as u32;
+    // The reference's seeds are 32-bit (`>>> 0`), so the recorded seed is
+    // read at that width and widened for the engine, which takes a u64.
+    let seed = u64::from(spec["tickSeed"].as_u64().unwrap() as u32);
     let ticks = spec["ticks"].as_i64().unwrap() as usize;
     let volatility = bits(spec["volatility"].as_str().unwrap());
 

@@ -1311,7 +1311,7 @@ mod tests {
         // would pass or fail on which seed happened to be typed.
         let mean_delta = |fair_value: f64, flow_lean: f64| {
             let mut total = 0.0;
-            for seed in 0..300u32 {
+            for seed in 0..300u64 {
                 let mut rng = GameRng::from_seed(seed);
                 total += settle_price_through_book(
                     &company(),

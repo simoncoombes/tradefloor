@@ -295,12 +295,12 @@ pub struct DrawLog {
 ///
 /// This is a CONTRACT, not an implementation detail: it is the thing a
 /// reader reproduces, and changing it is an era boundary in its own right.
-/// For a root seed `s` (a `u32`) and a stream id `k` (one of the constants
-/// below):
+/// For a root seed `s` below `2^32` and a stream id `k` (one of the
+/// constants below):
 ///
 /// ```text
 /// mixed    = splitmix64_mix((s as u64) << 32 | k as u64)
-/// seed_k   = (mixed >> 32) as u32          // top 32 bits of the mix
+/// seed_k   = mixed >> 32                   // top 32 bits of the mix
 /// seq_k    = STREAM_SEQUENCE_BASE + k      // = 256 + k
 /// stream_k = GameRng::new(seed_k, seq_k)
 /// ```
@@ -314,6 +314,40 @@ pub struct DrawLog {
 /// z ^= z >> 27;  z *= 0x94D049BB133111EB
 /// z ^= z >> 31
 /// ```
+///
+/// # Root seeds from `2^32` to `2^64 - 1`
+///
+/// Until 0.8.5 the root seed was a `u32`, which left 2^32 markets per
+/// roster and preset: few enough that a sealed seed could be found by
+/// trying them all against a market's first prices. The root is now a
+/// `u64`, and the high 32 bits enter the derivation only when they are
+/// non-zero. A root below `2^32` takes the formula above, unchanged, so
+/// every such seed gives the market it always gave and every known-answer
+/// digest stands. A root at or above `2^32` takes a second formula:
+///
+/// ```text
+/// key_k    = splitmix64_mix(SEED64_TAG << 32 | k)   // SEED64_TAG = "SD64"
+/// seed_k   = splitmix64_mix(s ^ key_k)              // all 64 bits
+/// seq_k    = SEED64_SEQUENCE_BASE + k               // = 768 + k
+/// stream_k = GameRng::new(seed_k, seq_k)
+/// ```
+///
+/// Three properties follow, each by construction rather than by sampling:
+///
+/// - **No truncation.** Every bit of `s` reaches `seed_k`, and all 64 bits
+///   of `seed_k` reach the PCG state ([`GameRng::new`] adds the seed to the
+///   state whole). Recovering a wide root from its prices means searching
+///   2^64 roots, not 2^32.
+/// - **No collisions.** For one `k`, `s -> seed_k` is XOR with a constant
+///   followed by `splitmix64_mix`, and both are bijections on `u64`. Two
+///   wide roots never start one stream from the same state.
+/// - **No sharing with 32-bit roots.** `768 + k` is no sequence a 32-bit
+///   root's stream or surgery uses, so a wide root's streams traverse
+///   orbits that no 32-bit root's stream ever does.
+///
+/// The two independence properties below hold for the wide formula for
+/// the same reasons: a distinct sequence per stream, and a per-stream key
+/// through the finalizer so one root's streams start from unrelated states.
 ///
 /// # Why this derivation gives independent streams
 ///
@@ -491,6 +525,17 @@ pub mod stream {
     /// of a surgery of stream `k` under surgery seed `g` is never the
     /// input of a stream.
     pub const SURGERY_TAG: u32 = 0x5355_5247;
+    /// The sequence base for streams derived from a root seed at or above
+    /// `2^32`. Clear of `256 + k` and `512 + k`, so a stream of a wide root
+    /// traverses an orbit that no stream of a 32-bit root, and no surgery
+    /// of one, ever does: the two seed ranges cannot share a generator,
+    /// whatever the mixed states happen to be.
+    pub const SEED64_SEQUENCE_BASE: u32 = 768;
+    /// The sequence base for a surgery generator when the root seed or the
+    /// surgery seed is at or above `2^32`, for the same reason.
+    pub const SEED64_SURGERY_SEQUENCE_BASE: u32 = 1024;
+    /// The tag in a wide root's per-stream key, ASCII "SD64".
+    pub const SEED64_TAG: u32 = 0x5344_3634;
 }
 
 /// The SplitMix64 output finalizer. Integer-only, exact on every platform.
@@ -503,6 +548,24 @@ fn splitmix64_mix(input: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     z ^ (z >> 31)
+}
+
+/// The input the stream derivation mixes, for a root seed of either width.
+///
+/// Below `2^32` it is `s << 32 | k`, the 32-bit contract's input, bit for
+/// bit. At or above `2^32` the root no longer fits beside the id, so the
+/// whole root is XORed with a per-stream key instead:
+/// `s ^ splitmix64_mix(SEED64_TAG << 32 | k)`. For one stream id that is a
+/// bijection on `u64` (XOR with a constant), so two different wide roots
+/// never give one stream the same input, and the key differs per stream,
+/// so one root's streams start from unrelated states. The high 32 bits of
+/// the root therefore enter the derivation only when they are non-zero.
+fn stream_mix(root_seed: u64, stream_id: u32) -> u64 {
+    if root_seed >> 32 == 0 {
+        (root_seed << 32) | stream_id as u64
+    } else {
+        root_seed ^ splitmix64_mix(((stream::SEED64_TAG as u64) << 32) | stream_id as u64)
+    }
 }
 
 /// The draw interface the engine modules consume.
@@ -601,13 +664,24 @@ impl Pcg32 {
     /// pushes out of 32 bits. Verified rather than assumed, because getting
     /// this wrong produces a plausible-looking stream that is simply a
     /// different one.
-    pub fn new(seed: u32, sequence: u32) -> Self {
+    ///
+    /// # A 64-bit seed
+    ///
+    /// The seed is a `u64` and is added to the 64-bit state whole, which is
+    /// PCG's own `pcg32_srandom_r(initstate, initseq)`. The reference
+    /// implementation took a 32-bit seed, and every seed below `2^32` enters
+    /// exactly as it did: `seed as u64` was the widening it always applied,
+    /// so for those seeds this is the same arithmetic on the same values.
+    /// Above `2^32` the high bits land in the high half of the state instead
+    /// of being refused. Adding a constant is a bijection on `u64`, so two
+    /// different seeds on one sequence always start from different states.
+    pub fn new(seed: u64, sequence: u32) -> Self {
         let mut rng = Self {
             state: 0,
             inc: ((sequence as u64) << 1) | 1,
         };
         rng.step();
-        rng.state = rng.state.wrapping_add(seed as u64);
+        rng.state = rng.state.wrapping_add(seed);
         rng.step();
         rng
     }
@@ -684,7 +758,10 @@ impl PartialEq for GameRng {
 }
 
 impl GameRng {
-    pub fn new(seed: u32, sequence: u32) -> Self {
+    /// A raw generator on `(seed, sequence)`. `seed` is any `u64`; see
+    /// [`Pcg32::new`] for why every seed below `2^32` gives the stream it
+    /// always gave.
+    pub fn new(seed: u64, sequence: u32) -> Self {
         Self {
             pcg: Pcg32::new(seed, sequence),
             spare: None,
@@ -801,7 +878,7 @@ impl GameRng {
     /// while the `GameRng` constructor defaults to **1**. That asymmetry is in
     /// the original and is load-bearing: the two entry points produce
     /// different streams from the same seed.
-    pub fn from_seed(seed: u32) -> Self {
+    pub fn from_seed(seed: u64) -> Self {
         Self::new(seed, 0)
     }
 
@@ -813,12 +890,20 @@ impl GameRng {
     /// one domain draws cannot shift any other domain's sequence. The
     /// derivation is integer-only and documented as a formula a reader can
     /// reproduce; it is pinned by a golden test rather than trusted.
-    pub fn substream(root_seed: u32, stream_id: u32) -> Self {
-        let mixed = splitmix64_mix(((root_seed as u64) << 32) | stream_id as u64);
-        Self::new(
-            (mixed >> 32) as u32,
-            stream::STREAM_SEQUENCE_BASE + stream_id,
-        )
+    ///
+    /// A root seed below `2^32` takes the 32-bit derivation unchanged; one
+    /// at or above it takes the 64-bit one. [`stream`]'s module docs state
+    /// both and why the first is untouched.
+    pub fn substream(root_seed: u64, stream_id: u32) -> Self {
+        if root_seed >> 32 == 0 {
+            let mixed = splitmix64_mix(stream_mix(root_seed, stream_id));
+            Self::new(mixed >> 32, stream::STREAM_SEQUENCE_BASE + stream_id)
+        } else {
+            Self::new(
+                splitmix64_mix(stream_mix(root_seed, stream_id)),
+                stream::SEED64_SEQUENCE_BASE + stream_id,
+            )
+        }
     }
 
     /// A surgery generator: the source of a re-randomised window of one
@@ -829,12 +914,12 @@ impl GameRng {
     /// A contract in the sense of the stream derivation in [`stream`]: a
     /// formula a reader reproduces, pinned by a golden test, and an era
     /// boundary if it changes. For a root seed `s`, a stream id `k` and a
-    /// surgery seed `g` (all `u32`):
+    /// surgery seed `g`, both below `2^32`:
     ///
     /// ```text
     /// inner    = splitmix64_mix((s as u64) << 32 | k as u64)        // the stream's own mix
     /// mixed    = splitmix64_mix(inner ^ ((g as u64) << 32 | SURGERY_TAG as u64))
-    /// seed_g   = (mixed >> 32) as u32                               // top 32 bits
+    /// seed_g   = mixed >> 32                                        // top 32 bits
     /// seq_g    = SURGERY_SEQUENCE_BASE + k                          // = 512 + k
     /// surgery  = GameRng::new(seed_g, seq_g)
     /// ```
@@ -854,15 +939,34 @@ impl GameRng {
     /// uniforms and normals from it in the order of the addresses it
     /// replaces. `Engine.surgery_draws` on the Python side is that
     /// caller, and `World.window` is what asks.
-    pub fn surgery(root_seed: u32, stream_id: u32, surgery_seed: u32) -> Self {
-        let inner = splitmix64_mix(((root_seed as u64) << 32) | stream_id as u64);
-        let mixed = splitmix64_mix(
-            inner ^ (((surgery_seed as u64) << 32) | stream::SURGERY_TAG as u64),
-        );
-        Self::new(
-            (mixed >> 32) as u32,
-            stream::SURGERY_SEQUENCE_BASE + stream_id,
-        )
+    ///
+    /// # Above `2^32`
+    ///
+    /// When the root seed and the surgery seed are both below `2^32` the
+    /// formula above is the whole derivation, unchanged. When either is at
+    /// or above it:
+    ///
+    /// ```text
+    /// inner    = splitmix64_mix(stream_mix(s, k))    // the stream's own mix, either width
+    /// mixed    = splitmix64_mix(inner ^ splitmix64_mix(g ^ (SURGERY_TAG << 32 | SEED64_TAG)))
+    /// seed_g   = mixed                               // all 64 bits
+    /// seq_g    = SEED64_SURGERY_SEQUENCE_BASE + k    // = 1024 + k
+    /// ```
+    ///
+    /// For one root and stream, `g -> seed_g` is a composition of
+    /// bijections on `u64`, so two surgery seeds never share a generator.
+    pub fn surgery(root_seed: u64, stream_id: u32, surgery_seed: u64) -> Self {
+        let inner = splitmix64_mix(stream_mix(root_seed, stream_id));
+        if (root_seed | surgery_seed) >> 32 == 0 {
+            let mixed = splitmix64_mix(
+                inner ^ ((surgery_seed << 32) | stream::SURGERY_TAG as u64),
+            );
+            Self::new(mixed >> 32, stream::SURGERY_SEQUENCE_BASE + stream_id)
+        } else {
+            let key = ((stream::SURGERY_TAG as u64) << 32) | stream::SEED64_TAG as u64;
+            let mixed = splitmix64_mix(inner ^ splitmix64_mix(surgery_seed ^ key));
+            Self::new(mixed, stream::SEED64_SURGERY_SEQUENCE_BASE + stream_id)
+        }
     }
 
     pub fn next_f64(&mut self) -> f64 {
@@ -1169,7 +1273,7 @@ mod substream_tests {
     fn substream_derivation_is_the_documented_formula() {
         // splitmix64_mix(42 << 32 | k), top 32 bits, computed independently.
         for (id, seed) in [
-            (stream::MARKET, 0xEA67_E2F1_u32),
+            (stream::MARKET, 0xEA67_E2F1_u64),
             (stream::ECONOMY, 0x6997_3300),
             (stream::EXTERNAL, 0x4B07_4493),
         ] {
@@ -1193,7 +1297,7 @@ mod substream_tests {
         // splitmix64_mix(splitmix64_mix(s << 32 | k) ^ (g << 32 | 0x53555247)),
         // top 32 bits, computed independently.
         for (root, id, surgery, seed) in [
-            (42_u32, stream::JUMPS, 7_u32, 0x493A_2503_u32),
+            (42_u64, stream::JUMPS, 7_u64, 0x493A_2503_u64),
             (42, stream::MARKET, 1, 0xF382_1A83),
             (7, stream::VOLUME_IDIO, 0, 0x3D21_372F),
         ] {
@@ -1385,5 +1489,150 @@ mod snapshot_tests {
         let first = rng.snapshot();
         rng.next_f64();
         assert_ne!(first, rng.snapshot());
+    }
+}
+
+#[cfg(test)]
+mod seed64_tests {
+    use super::*;
+
+    const WIDE: u64 = (1 << 63) + 12345;
+
+    fn same_prefix(a: &mut GameRng, b: &mut GameRng) -> bool {
+        (0..64).all(|_| a.next_f64().to_bits() == b.next_f64().to_bits())
+    }
+
+    /// The wide derivation, pinned to hand-computed values of the formula
+    /// in [`stream`]'s docs, for the reason the 32-bit one is pinned: a
+    /// silent re-derivation would move every recorded wide-seed market.
+    #[test]
+    fn wide_substream_derivation_is_the_documented_formula() {
+        // splitmix64_mix(s ^ splitmix64_mix(0x53443634 << 32 | k)), all 64
+        // bits, computed independently.
+        for (root, id, seed) in [
+            (1_u64 << 32, stream::MARKET, 0x7547_BEE2_B588_1CEC_u64),
+            (WIDE, stream::ECONOMY, 0xF98D_6EE9_28B9_562B),
+            (u64::MAX, stream::EXTERNAL, 0x58C7_9E4C_21E1_08AB),
+            (0xDEAD_BEEF_0000_0001, stream::NEWS, 0x85B0_9E41_94B4_8998),
+        ] {
+            let mut derived = GameRng::substream(root, id);
+            let mut expected = GameRng::new(seed, stream::SEED64_SEQUENCE_BASE + id);
+            assert!(same_prefix(&mut derived, &mut expected),
+                    "wide root {root:#x}, stream {id} does not match the documented formula");
+        }
+    }
+
+    #[test]
+    fn wide_surgery_derivation_is_the_documented_formula() {
+        for (root, id, surgery, seed) in [
+            (42_u64, stream::JUMPS, 1_u64 << 32, 0x619E_7212_72AA_47E0_u64),
+            (WIDE, stream::JUMPS, 7, 0xE96A_D364_3F0A_0013),
+            (u64::MAX, stream::MARKET, u64::MAX, 0xA2CB_0D15_ABB5_23B0),
+        ] {
+            let mut derived = GameRng::surgery(root, id, surgery);
+            let mut expected =
+                GameRng::new(seed, stream::SEED64_SURGERY_SEQUENCE_BASE + id);
+            assert!(same_prefix(&mut derived, &mut expected),
+                    "surgery ({root:#x}, {id}, {surgery:#x}) does not match the documented formula");
+        }
+    }
+
+    /// The last 32-bit root and the first wide one sit either side of the
+    /// switch. The first must still be the old formula, and the second
+    /// must not be root 0 with its high bit dropped, which is what a
+    /// truncating derivation would give.
+    #[test]
+    fn the_boundary_is_at_two_to_the_thirty_two() {
+        let top = (1_u64 << 32) - 1;
+        let old = splitmix64_mix((top << 32) | stream::MARKET as u64) >> 32;
+        let mut a = GameRng::substream(top, stream::MARKET);
+        let mut b = GameRng::new(old, stream::STREAM_SEQUENCE_BASE + stream::MARKET);
+        assert!(same_prefix(&mut a, &mut b));
+        assert_eq!(a.snapshot().increment, b.snapshot().increment);
+
+        let mut wide = GameRng::substream(1 << 32, stream::MARKET);
+        let mut zero = GameRng::substream(0, stream::MARKET);
+        assert!(!same_prefix(&mut wide, &mut zero));
+        assert_ne!(GameRng::substream(1 << 32, stream::MARKET).snapshot().increment,
+                   GameRng::substream(0, stream::MARKET).snapshot().increment);
+    }
+
+    #[test]
+    fn roots_differing_only_in_the_high_bits_are_different_markets() {
+        for low in [0_u64, 5, 0xFFFF_FFFF] {
+            for high in [1_u64, 2, 0x8000_0000, 0xFFFF_FFFF] {
+                for id in 0..stream::COUNT as u32 {
+                    let mut a = GameRng::substream(low, id);
+                    let mut b = GameRng::substream(low | (high << 32), id);
+                    assert!(!same_prefix(&mut a, &mut b),
+                            "root {low:#x} and {:#x} share stream {id}", low | (high << 32));
+                }
+                let mut a = GameRng::surgery(low, stream::JUMPS, 3);
+                let mut b = GameRng::surgery(low | (high << 32), stream::JUMPS, 3);
+                assert!(!same_prefix(&mut a, &mut b));
+                let mut a = GameRng::surgery(7, stream::JUMPS, low);
+                let mut b = GameRng::surgery(7, stream::JUMPS, low | (high << 32));
+                assert!(!same_prefix(&mut a, &mut b));
+            }
+        }
+    }
+
+    /// No two wide roots start a stream from the same state. A bijection
+    /// by construction; this is the tripwire on a sample that includes
+    /// roots differing only in their high half and only in their low half.
+    #[test]
+    fn no_two_wide_roots_on_a_sample_share_a_starting_state() {
+        use std::collections::HashSet;
+        for id in [stream::MARKET, stream::ECONOMY, stream::NEWS] {
+            let mut states = HashSet::new();
+            let mut roots = 0;
+            for high in 1_u64..=128 {
+                for low in 0_u64..128 {
+                    let root = (high << 32) | low;
+                    assert!(states.insert(GameRng::substream(root, id).snapshot().state),
+                            "root {root:#x} repeats a starting state on stream {id}");
+                    roots += 1;
+                }
+            }
+            // And the far end of the range.
+            for offset in 0_u64..1024 {
+                assert!(states.insert(GameRng::substream(u64::MAX - offset, id).snapshot().state));
+                roots += 1;
+            }
+            assert_eq!(states.len(), roots);
+        }
+    }
+
+    /// Every stream of a wide root is on a sequence no 32-bit root uses,
+    /// stream or surgery, so the two ranges never share an orbit.
+    #[test]
+    fn wide_roots_use_sequences_no_narrow_root_does() {
+        let narrow: std::collections::HashSet<u64> = (0..=stream::OPENING)
+            .flat_map(|id| {
+                [GameRng::substream(42, id).snapshot().increment,
+                 GameRng::surgery(42, id, 1).snapshot().increment]
+            })
+            .collect();
+        for id in 0..=stream::OPENING {
+            assert!(!narrow.contains(&GameRng::substream(WIDE, id).snapshot().increment));
+            assert!(!narrow.contains(&GameRng::surgery(WIDE, id, 1).snapshot().increment));
+            assert!(!narrow.contains(&GameRng::surgery(42, id, 1 << 40).snapshot().increment));
+        }
+    }
+
+    /// The raw generator takes the seed whole: below `2^32` it is the
+    /// arithmetic it always was, and above it the high half reaches the
+    /// state rather than being dropped.
+    #[test]
+    fn the_raw_generator_takes_all_sixty_four_bits() {
+        let mut a = GameRng::new(0xFFFF_FFFF, 21);
+        let mut b = GameRng::new(u32::MAX as u64, 21);
+        assert!(same_prefix(&mut a, &mut b));
+        let mut wide = GameRng::new(1 << 32, 21);
+        let mut zero = GameRng::new(0, 21);
+        assert!(!same_prefix(&mut wide, &mut zero));
+        let mut top = GameRng::new(u64::MAX, 21);
+        let mut other = GameRng::new(u64::MAX - (1 << 32), 21);
+        assert!(!same_prefix(&mut top, &mut other));
     }
 }

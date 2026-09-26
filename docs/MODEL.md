@@ -149,13 +149,30 @@ process in the market reads it back.
 The next session reads the new VIX, rates and output.
 
 **Randomness.** Each process draws from its own stream, derived from the
-run's seed (`rng.rs:363-480`): market, economy, news, jumps, overnight,
+run's seed (`rng.rs:397-514`): market, economy, news, jumps, overnight,
 volume, crisis epicentre and others. The market stream's schedule depends
 only on the roster and the sectors, never on a price or a preset, so two
 presets run on the same seed see the same market shocks (`params.rs:30-35`,
 `market/mod.rs:15-32`). Some streams, such as the economy's, take a number
 of draws that depends on the state, and that dependence stays inside the
 stream.
+
+**Seeds.** A seed is any integer from 0 to $2^{64}-1$, for the market, the
+universe and a surgery alike (`rng.rs:294-350`). Each stream is a PCG32
+generator, set by a 64-bit starting value and a sequence number. For a
+root seed $s$ below $2^{32}$, stream $k$ starts from the top 32 bits of
+$\mathrm{mix}(s \cdot 2^{32} + k)$ on sequence $256 + k$, where mix is the
+SplitMix64 finalizer. That is the rule every release before 0.8.5 used, so
+every such seed gives the market it always gave. The high 32 bits of a seed
+enter only when they are non-zero: then stream $k$ starts from all 64 bits
+of $\mathrm{mix}(s \oplus \mathrm{mix}(	exttt{SD64} \cdot 2^{32} + k))$, on
+sequence $768 + k$. For one stream that map is a bijection, so no two wide
+seeds share a stream, and $768 + k$ is a sequence no 32-bit seed uses, so a
+wide seed shares no stream with a narrow one. The universe seed goes into
+its generator's state whole, so the same holds for rosters. The reason for
+the width is a sealed evaluation: with $2^{32}$ seeds, a hidden seed can be
+found by simulating every one against a market's first prices. Draw a
+sealed seed from all 64 bits.
 
 **The opening.** Before session 1 the economy runs 755 macro steps on its
 own, with the market frozen and the day's return set to zero

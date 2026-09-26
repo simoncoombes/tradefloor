@@ -193,7 +193,14 @@ fn ticker_for(index: usize) -> String {
 /// is worth more than a centred forty-name sample. A generator that
 /// silently re-centred every roster would also be reporting a cross-section
 /// tighter than the one it drew.
-pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
+///
+/// # The seed
+///
+/// Any `u64`. The generator is the raw `GameRng::new(seed, 21)`, which adds
+/// the seed to the PCG state whole, so every universe seed below `2^32`
+/// draws the roster it always drew and one above it draws its own: two
+/// seeds never share a starting state (see `Pcg32::new`).
+pub fn random_universe(n: usize, seed: u64) -> Vec<GeneratedInstrument> {
     let mut rng = GameRng::new(seed, UNIVERSE_STREAM);
     let mut out = Vec::with_capacity(n);
 

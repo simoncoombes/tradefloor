@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+from ._core import check_seed
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import session_clock
@@ -105,7 +106,7 @@ class TradingEnv(_Base):
         _require(_np, "numpy", "numpy")
 
         self.universe = as_universe(universe)
-        self.base_seed = int(seed)
+        self.base_seed = check_seed(seed)
         self.macro = macro
         # The coefficient set every episode runs -- a preset name or a
         # ModelParams, fixed at construction like the universe. Per-episode
@@ -163,8 +164,11 @@ class TradingEnv(_Base):
 
         ``seed`` selects the market. Passing a different one gives a different
         market, deliberately: an agent trained on one seed and evaluated on
-        another is being tested rather than recalled.
+        another is being tested rather than recalled. Any integer from 0 to
+        ``2**64 - 1``, checked before Gymnasium's own generator sees it, so a
+        refusal names the engine's range rather than numpy's.
         """
+        episode_seed = self.base_seed if seed is None else check_seed(seed)
         if _gym is not None:
             # Gymnasium keeps its own generator on the base class and its API
             # checker enforces that reset seeds it. This environment does not
@@ -175,7 +179,6 @@ class TradingEnv(_Base):
             # for it.
             super().reset(seed=seed)
 
-        episode_seed = self.base_seed if seed is None else int(seed)
         self.engine = Engine(seed=episode_seed, universe=self.universe,
                              macro_state=self.macro, model=self.model)
         self.portfolio = Portfolio(cash=self.starting_cash,

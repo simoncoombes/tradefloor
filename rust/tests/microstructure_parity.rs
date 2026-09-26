@@ -322,7 +322,7 @@ fn settlement_matches_the_reference_in_output_and_in_draws_consumed() {
         // `initRng(seed)` in the reference implementation is `new GameRng(seed, MAIN_STREAM)`
         // — sequence 99, NOT the sequence-0 stream `from_seed` produces.
         // Getting this wrong yields a plausible but entirely different stream.
-        let mut rng = GameRng::new(inputs.seed, MAIN_STREAM);
+        let mut rng = GameRng::new(inputs.seed.into(), MAIN_STREAM);
         let before = rng.clone();
 
         let result = settle_price_through_book(

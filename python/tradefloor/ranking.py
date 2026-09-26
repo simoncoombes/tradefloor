@@ -123,6 +123,7 @@ import statistics
 from typing import Any, Callable, Iterable, Sequence
 
 from ._core import Instrument, Macro, ModelParams, ValidationError
+from ._core import check_seed
 
 
 class AgentRecord:
@@ -563,7 +564,7 @@ def rank(
     from .universe_util import as_universe, fingerprint_of
 
     factory = _factory_or_refuse(make_agents)
-    seed_list = [int(s) for s in seeds]
+    seed_list = [check_seed(s) for s in seeds]
     if not seed_list:
         raise ValidationError("no seeds given")
     if len(set(seed_list)) != len(seed_list):

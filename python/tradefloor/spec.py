@@ -87,7 +87,7 @@ import json
 import math
 from typing import Any, Mapping, Sequence
 
-from ._core import GameRng, ValidationError
+from ._core import GameRng, ValidationError, check_seed
 
 #: Bumped when the MEANING of a spec changes, never for additive growth. A new
 #: signal kind or cadence value extends the grammar and old specs keep meaning
@@ -362,13 +362,11 @@ class StrategySpec:
                     "without one the strategy is not reproducible, which is "
                     "the one property a spec exists to provide"
                 )
-            seed = _integer("seed", seed, minimum=0)
-            if seed > 0xFFFF_FFFF:
-                # The RNG's seed is 32-bit. Caught here, where the spec is
-                # written, rather than at build time inside an evaluation.
-                raise ValidationError(
-                    f"seed must fit in 32 bits (0..4294967295), got {seed}"
-                )
+            # The RNG's seed is 64-bit from 0.8.5. Its range is checked here,
+            # where the spec is written, rather than at build time inside an
+            # evaluation. An integral float is the integer it holds, as for
+            # every other integer field of a spec.
+            seed = check_seed(_integer("seed", seed, minimum=0))
         elif seed is not None:
             raise ValidationError(
                 "seed applies only to specs containing the 'random' signal. "
@@ -425,7 +423,8 @@ class StrategySpec:
         ``seed`` seeds the strategy's own draws, on its own stream, exactly
         as :class:`tradefloor.baselines.RandomTrader` does. It is deliberately
         separate from the market seed and it is recorded in the spec, because
-        a noise floor that cannot be reproduced is not a floor.
+        a noise floor that cannot be reproduced is not a floor. Any integer
+        from 0 to ``2**64 - 1``.
         """
         return cls({"kind": "random"}, portfolio={"gross": gross},
                    execution={"max_participation": max_participation,
@@ -711,7 +710,7 @@ class _BlendAgent:
         self.max_participation = float(max_participation)
         self._history: list[list[float]] = []
         self._lookbacks: list[int | None] | None = None
-        self._rng = (GameRng(int(seed), RANDOM_AGENT_STREAM)
+        self._rng = (GameRng(check_seed(seed), RANDOM_AGENT_STREAM)
                      if any(c["kind"] == "random" for c in self._components)
                      else None)
         if any(c["kind"] == "oracle" for c in self._components):

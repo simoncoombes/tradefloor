@@ -48,7 +48,7 @@ import math
 import struct
 from typing import Any, Callable, NamedTuple, Sequence
 
-from ._core import Engine
+from ._core import Engine, check_seed
 
 STREAMS = ("market", "economy", "external", "jumps", "volume", "news",
            "volume_idio", "overnight", "market_vol_level", "crisis_epicentre")
@@ -250,7 +250,8 @@ def surgery_patches(seed: int, stream: str, surgery_seed: int,
             raise ValueError(
                 f"a surgery of {stream} cannot patch {a.stream}; one "
                 f"stream per surgery, so the record says what moved")
-    values = Engine.surgery_draws(int(seed), stream, int(surgery_seed),
+    values = Engine.surgery_draws(check_seed(seed), stream,
+                                  check_seed(surgery_seed, "surgery_seed"),
                                   [a.kind for a in checked])
     return [Patch(a, v) for a, v in zip(checked, values)]
 

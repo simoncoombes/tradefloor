@@ -90,6 +90,7 @@ from ._core import (  # noqa: F401
     apply_mispricing,
     characteristic_root_moduli,
     check_rate,
+    check_seed as _check_seed,
     crisis_epicentre_solve,
     crowd_adjusted_root_moduli,
     fair_value,
@@ -194,7 +195,9 @@ class Universe(list):
         ``seed`` is the UNIVERSE seed and is independent of the simulation
         seed. That separation is what makes "same universe, different market
         draws" expressible, which is the standard design for variance
-        estimation.
+        estimation. It is any integer from 0 to ``2**64 - 1``, like the
+        simulation seed, and every seed below ``2**32`` draws the roster it
+        drew when seeds were 32-bit.
 
         The generated cross-section is plausible rather than uniform: market
         caps are log-distributed across all four spread tiers, P/E ratios
@@ -533,8 +536,11 @@ def run_many(
     would be a poor default dressed as a good one.
 
     A single seed always runs in-process, whatever ``workers`` says.
+
+    Each seed is any integer from 0 to ``2**64 - 1``, checked here before any
+    worker starts.
     """
-    seeds = list(seeds)
+    seeds = [_check_seed(s) for s in seeds]
     if not seeds:
         raise ValidationError("no seeds given")
     if days < 1 or ticks < 1:

@@ -1544,7 +1544,9 @@ impl PyEngine {
     ///
     /// `seed` is required, never defaulted. A simulator that seeds itself from
     /// the clock when you forget produces a run nobody can reproduce, and the
-    /// failure is invisible until someone tries.
+    /// failure is invisible until someone tries. It is any integer from 0 to
+    /// `2**64 - 1`; every seed below `2**32` is the market it was when seeds
+    /// were 32-bit, and `rust/src/rng.rs` states how a wider one is derived.
     ///
     /// `model` selects the coefficient set: a shipped preset's name
     /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
@@ -1553,7 +1555,7 @@ impl PyEngine {
     #[new]
     #[pyo3(signature = (*, seed, universe, macro_state = None, model = None))]
     fn new(
-        seed: u32,
+        seed: crate::python::Seed,
         universe: Vec<PyInstrument>,
         macro_state: Option<PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
@@ -1585,7 +1587,7 @@ impl PyEngine {
 
         let mut engine = Self {
             inner: Engine::with_params_from_opening(
-                seed,
+                seed.0,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
@@ -2459,16 +2461,18 @@ impl PyEngine {
     /// replace, and the result is the value for each. Nothing on any
     /// engine is read or moved; the root seed is an argument because the
     /// derivation is a function of it, the stream and the surgery seed,
-    /// and of nothing else.
+    /// and of nothing else. Both seeds are any integer from 0 to
+    /// `2**64 - 1`.
     #[staticmethod]
     fn surgery_draws(
-        seed: u32,
+        seed: crate::python::Seed,
         stream: &str,
-        surgery_seed: u32,
+        surgery_seed: &Bound<'_, PyAny>,
         kinds: Vec<String>,
     ) -> PyResult<Vec<f64>> {
+        let surgery_seed = crate::python::seed_from(surgery_seed, "surgery_seed")?;
         let id = stream_id(stream)?;
-        let mut rng = crate::rng::GameRng::surgery(seed, id, surgery_seed);
+        let mut rng = crate::rng::GameRng::surgery(seed.0, id, surgery_seed);
         let mut out = Vec::with_capacity(kinds.len());
         for kind in &kinds {
             out.push(match draw_kind(kind)? {
@@ -5452,10 +5456,11 @@ pub fn market_status(hour: i64, minute: i64, day_of_week: i64) -> PyResult<Strin
 /// `seed` is the UNIVERSE seed and is independent of any simulation seed, so
 /// "same universe, different market draws", the standard design for variance
 /// estimation, is expressible. Generation draws from its own stream and
-/// consumes nothing from an engine's.
+/// consumes nothing from an engine's. Any integer from 0 to `2**64 - 1`.
 #[pyfunction]
-#[pyo3(signature = (n = 108, *, seed = 0))]
-pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
+#[pyo3(signature = (n = 108, *, seed = crate::python::Seed(0)),
+       text_signature = "(n=108, *, seed=0)")]
+pub fn random_instruments(n: usize, seed: crate::python::Seed) -> PyResult<Vec<PyInstrument>> {
     if n == 0 {
         return Err(ValidationError::new_err("n must be greater than zero"));
     }
@@ -5464,7 +5469,7 @@ pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
             "n must be at most {} - tickers are three letters", 26 * 26 * 26
         )));
     }
-    Ok(crate::universe::random_universe(n, seed)
+    Ok(crate::universe::random_universe(n, seed.0)
         .into_iter()
         .map(|g| PyInstrument {
             ticker: g.ticker,

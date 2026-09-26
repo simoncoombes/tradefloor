@@ -179,7 +179,7 @@ from collections import Counter
 from typing import Any, Sequence
 
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
-                    ValidationError)
+                    ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
 from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
@@ -340,7 +340,7 @@ class World:
         self._single, self._agents = _cohort(agent, agents)
         self._frozen: frozenset[str] = frozenset()
         self.label = label
-        self.seed = int(seed)
+        self.seed = check_seed(seed)
         self.universe = list(universe)
         self.macro = macro
         self.model = model
@@ -1345,7 +1345,8 @@ class World:
         ``rust/src/rng.rs`` (``GameRng::surgery``), which a golden test
         pins. The same ``surgery_seed`` on the same world reproduces the
         window; a different one is a different window; every other stream
-        delivers exactly what it did.
+        delivers exactly what it did. ``surgery_seed``, like the world's
+        own seed, is any integer from 0 to ``2**64 - 1``.
 
         # How the addresses are found
 
@@ -1363,6 +1364,7 @@ class World:
         stream, a log the size of the tape over the window.
         """
         self._refuse_open_market("window")
+        surgery_seed = check_seed(surgery_seed, "surgery_seed")
         first, last = _days(days)
         self._refuse_past(first, "window")
         stream = _noise.DrawAddress(stream, "uniform", 0).check().stream
@@ -1387,7 +1389,7 @@ class World:
         self.surgeries.append({
             "kind": "window", "day": first,
             "step": first * self.steps_per_day, "stream": stream,
-            "days": (first, last), "surgery_seed": int(surgery_seed),
+            "days": (first, last), "surgery_seed": surgery_seed,
             "draws": len(patches)})
         return self
 
