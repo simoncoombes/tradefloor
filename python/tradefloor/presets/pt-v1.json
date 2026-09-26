@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v1",
   "fingerprint": "pt-v1",
-  "coefficient_digest": "2f7533418c3e7db33c798d8e301c2f9727e508ed29aa8496ba342ee902f7b5e8",
+  "coefficient_digest": "3ba6432beb687cf41ed0c99faedee00a97c43a9aaf7cac124d143cb8b8b8b312",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -233,6 +233,9 @@
     "vix_return_level_exponent": 0.0,
     "vix_return_level_exponent_up": 0.0,
     "vix_return_source": 0.0,
+    "vix_stress_premium": 0.0,
+    "vix_stress_premium_cap": 0.0,
+    "vix_stress_premium_knee": 0.0,
     "vix_target_offset": 0.0,
     "vix_target_shock_cap": 12.0,
     "vix_variance_premium": 0.252,

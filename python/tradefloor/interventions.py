@@ -246,8 +246,13 @@ class Target:
 #: Under `gdp_publication_lag` `macro_fields["gdp_growth"]` is the last
 #: quarter released, and under `cycle_publication_lag` `macro_fields["cycle"]`
 #: is the phase as published; the engine's own state carries the true ones.
+#: Under `vix_stress_premium` `macro_fields["vix"]` is the published quote,
+#: which carries a stress premium over the VIX state that `pin_macro` writes;
+#: a `multiply` that read the quote would pin the state at the quote's level.
+#: With the dial at 0.0, which every preset carries, the two are one number.
 TRUE_MACRO_FIELDS: dict[str, str] = {"gdp_growth": "gdp_growth",
-                                     "cycle": "cycle_phase"}
+                                     "cycle": "cycle_phase",
+                                     "vix": "vix"}
 
 
 def true_macro_value(engine: Engine, field: str) -> Any:
@@ -256,9 +261,10 @@ def true_macro_value(engine: Engine, field: str) -> Any:
     The value `pin_macro` writes. For the keys in :data:`TRUE_MACRO_FIELDS`
     it is read from ``state_snapshot()["economy"]``, since `macro_fields`
     reports the published one; for every other key the two are the same
-    field and it is read from `macro_fields`. With both publication lags at
-    0.0 the two reads agree to the bit: the growth is the core's percent
-    over 100 either way, and the phase is the same name.
+    field and it is read from `macro_fields`. With both publication lags and
+    `vix_stress_premium` at 0.0 the two reads agree to the bit: the growth is
+    the core's percent over 100 either way, the phase is the same name, and
+    the VIX is the state's own number.
     """
     if field not in TRUE_MACRO_FIELDS:
         return engine.macro_fields[field]
@@ -285,10 +291,10 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit, with two exceptions: `gdp_growth` and
-    `cycle` read the true values from the snapshot, because under
-    `gdp_publication_lag` and `cycle_publication_lag` `macro_fields` reports
-    the published ones.
+    field for field and unit for unit, with three exceptions: `gdp_growth`,
+    `cycle` and `vix` read the true values from the snapshot, because under
+    `gdp_publication_lag`, `cycle_publication_lag` and `vix_stress_premium`
+    `macro_fields` reports the published ones.
     """
     def read(engine: Engine) -> Any:
         if field in TRUE_MACRO_FIELDS:

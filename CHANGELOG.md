@@ -225,6 +225,16 @@ The term reads the yield at today's price, so a company near the 0.01 floor
 read a yield in the hundreds, and on one held-out history the index rose
 86-fold in one close. pt-v20 sets 0.15.
 
+`vix_stress_premium`, `vix_stress_premium_knee` and `vix_stress_premium_cap`
+lift the published VIX in stress, where the damped VIX state reads too low
+against realised volatility. The quote is the state times
+`exp(cap * (1 - exp(-gain * max(0, m - knee) / cap)))`, with `m` the anchor's
+slow memory of the variance read-back, and never above `vix_ceiling`. Only
+`macro_fields["vix"]`, `macro_state.vix`, the macro table and the wasm getter
+move; every price, every other macro series and
+`state_snapshot()["economy"]["vix"]` stay as they are. All three are 0 on
+every preset.
+
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
 the earnings cycle's expected path from the cycle's own hazards, so a turn
 of phase moves prices at once and a price trough leads the earnings trough;

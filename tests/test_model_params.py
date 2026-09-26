@@ -1010,6 +1010,17 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # INERT on every column this probe reads, at any value: the premium
+    # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
+    # inside the engine reads the quote, and on this probe's three calm days
+    # the memory sits below the knee as well. Carries its cap as a companion,
+    # without which it is refused. tests/test_vix_stress_premium.py holds
+    # the mechanism, including prices bit-identical with it on.
+    ("vix_stress_premium", 1.0, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_knee", 0.5, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_cap", 0.25, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1677,6 +1688,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The fixed opening the row's decomposition was measured on, where the
     # probe's first two days are phase-change days (see the row).
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
+    # The published VIX's premium approaches its cap, so the gain is refused
+    # without one; the cap alone is unread, so both arms are the default's.
+    "vix_stress_premium": {"vix_stress_premium_cap": 0.25},
 }
 
 

@@ -817,6 +817,44 @@ pub struct ModelParams {
     /// stays under one. Read only with `buyback_payout_share` non-zero.
     /// In [0, 1].
     pub buyback_yield_cap: f64,
+    /// The published VIX's stress premium: the gain `g` of a premium the
+    /// QUOTE carries over the engine's VIX state while the variance
+    /// read-back's memory is high. 0.0, which every preset carries, is
+    /// none: `Engine::published_vix` is the state bit for bit and no state
+    /// is written.
+    ///
+    /// The VIX loop damps its state against the anchor's slow memory
+    /// (`vix_anchor_memory`, `vix_anchor_weight`), which the loop needs for
+    /// stability and which costs the quote its stress level: on pt-v20's
+    /// held-out histories the median VIX over trailing 21-session realised
+    /// volatility, on sessions whose realised volatility is 40 or more,
+    /// reads 0.668 against the S&P 500 and ^VIX tape's 0.831 (1990-2025,
+    /// calendar-year bootstrap SE 0.045), and the time above 50 is 0.41 per
+    /// cent against 0.84. Off zero, the close keeps a memory `m` of the
+    /// read-back's log deviation from the anchor's centre at
+    /// `vix_anchor_memory`'s rate (in a free run it equals the anchor's own
+    /// memory; a session whose VIX is pinned sets it to 0.0), and the
+    /// published quote is `min(vix * exp(pi), vix_ceiling)` with
+    /// `pi = cap * (1 - exp(-g * max(0, m - knee) / cap))`.
+    ///
+    /// The quote feeds nothing back: every internal reader of the VIX (the
+    /// variance couplings, the fair-value discount, the book, rates, the
+    /// central bank, fear and greed, the crisis thresholds, the anchor
+    /// memory) reads the state, so with the premium on every price and
+    /// every other macro series is the one the premium-off run gives.
+    /// `state_snapshot()["economy"]["vix"]` is the state. Requires
+    /// `vix_level_identity` and `vix_anchor_memory`. In [0, 10].
+    pub vix_stress_premium: f64,
+    /// Where the stress premium starts, on the anchor memory's log scale
+    /// (0.0 is the anchor's centre). Read only with `vix_stress_premium`
+    /// non-zero. In [0, 3]: at or above zero, so a pinned session, whose
+    /// memory is 0.0, publishes the pin.
+    pub vix_stress_premium_knee: f64,
+    /// The most the published quote can exceed the state, in log units:
+    /// the premium approaches this and never passes it. Must be positive
+    /// with `vix_stress_premium` non-zero, and is read by nothing
+    /// otherwise. In [0, 1].
+    pub vix_stress_premium_cap: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5239,6 +5277,9 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             buyback_yield_cap: 0.0,
+            vix_stress_premium: 0.0,
+            vix_stress_premium_knee: 0.0,
+            vix_stress_premium_cap: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7574,6 +7615,9 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
+            "vix_stress_premium" => self.vix_stress_premium,
+            "vix_stress_premium_knee" => self.vix_stress_premium_knee,
+            "vix_stress_premium_cap" => self.vix_stress_premium_cap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7825,6 +7869,9 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
+            "vix_stress_premium" => out.vix_stress_premium = value,
+            "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
+            "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8202,6 +8249,42 @@ impl ModelParams {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
                 self.buyback_yield_cap));
+        }
+        if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
+            return Err(format!(
+                "vix_stress_premium is {}. It is the published VIX premium's gain per \
+                 unit of the anchor memory above the knee, in [0, 10]; 0 is none.",
+                self.vix_stress_premium));
+        }
+        if !(self.vix_stress_premium_knee >= 0.0 && self.vix_stress_premium_knee <= 3.0) {
+            return Err(format!(
+                "vix_stress_premium_knee is {}. It is a log deviation of the anchor \
+                 memory, in [0, 3]; at or above 0 so a pinned session, whose memory \
+                 is 0, publishes the pin.",
+                self.vix_stress_premium_knee));
+        }
+        if !(self.vix_stress_premium_cap >= 0.0 && self.vix_stress_premium_cap <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_cap is {}. It is the largest log premium of the \
+                 published VIX over the state, in [0, 1].",
+                self.vix_stress_premium_cap));
+        }
+        if self.vix_stress_premium != 0.0 {
+            if self.vix_stress_premium_cap == 0.0 {
+                return Err(format!(
+                    "vix_stress_premium is {} but vix_stress_premium_cap is 0. The \
+                     premium approaches the cap, so it needs one above 0.",
+                    self.vix_stress_premium));
+            }
+            if self.vix_level_identity == 0.0 || self.vix_anchor_memory == 0.0 {
+                return Err(format!(
+                    "vix_stress_premium is {} but vix_level_identity is {} and \
+                     vix_anchor_memory is {}. The premium reads the identity's \
+                     variance read-back at the anchor memory's rate, so it needs \
+                     both. Set them, or vix_stress_premium to 0.0.",
+                    self.vix_stress_premium, self.vix_level_identity,
+                    self.vix_anchor_memory));
+            }
         }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
@@ -8723,6 +8806,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "buyback_yield_cap",
+        "vix_stress_premium",
+        "vix_stress_premium_knee",
+        "vix_stress_premium_cap",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",
