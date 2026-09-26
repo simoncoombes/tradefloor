@@ -135,7 +135,7 @@ if TYPE_CHECKING:
     # for everyone who is not a type checker.
     from ._core import FactorName
 
-from ._core import Engine, GameRng, check_seed
+from ._core import Engine, GameRng, ValidationError, check_seed
 from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
 from .sandbox import economy_of, hidden_state
@@ -860,18 +860,33 @@ def versus_buy_and_hold(scores: dict[str, Any], *,
     (:data:`ORACLE_NOT_A_CEILING`), and a useful one everywhere: did the
     strategy earn more than owning the market did? In currency, because
     every agent in one evaluation starts with the same cash. The Oracle is
-    included; it is a reference agent like the others.
+    included; it is a reference agent like the others, and its card says
+    ``uses_hidden_state``.
+
+    A tampered agent (``Scorecard.tampered``) is left out, since its P&L
+    is of a market it rewrote. A tampered reference raises
+    :class:`ValidationError`, since every excess would be measured against
+    it. :func:`tradefloor.rank` leaves tampered agents out the same way.
 
     Returns an empty mapping when buy-and-hold did not run.
     """
     if reference not in scores:
         return {}
+    _refuse_tampered(scores[reference], reference, "buy-and-hold reference")
     base = scores[reference].pnl
     return {
         name: card.pnl - base
         for name, card in scores.items()
-        if name != reference
+        if name != reference and not getattr(card, "tampered", False)
     }
+
+
+def _refuse_tampered(card: Any, name: str, role: str) -> None:
+    if getattr(card, "tampered", False):
+        raise ValidationError(
+            f"the {role} {name!r} tampered with its market (see its "
+            "Scorecard.errors), so no comparison against it means anything. "
+            "Run the evaluation again with an honest reference.")
 
 
 def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str, float]:
@@ -906,16 +921,20 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20), whatever
     the Oracle earned. :func:`capture_withheld` gives the reason, and
     :func:`versus_buy_and_hold` the comparison to quote there.
+
+    A tampered agent is left out and a tampered Oracle is refused with a
+    :class:`ValidationError`, as :func:`versus_buy_and_hold` does.
     """
     if capture_withheld(scores, oracle=oracle) is not None:
         return {}
     if oracle not in scores:
         return {}
+    _refuse_tampered(scores[oracle], oracle, "Oracle")
     ceiling = scores[oracle].pnl
     if ceiling <= 0:
         return {}
     return {
         name: card.pnl / ceiling
         for name, card in scores.items()
-        if name != oracle
+        if name != oracle and not getattr(card, "tampered", False)
     }

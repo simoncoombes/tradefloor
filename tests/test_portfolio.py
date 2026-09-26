@@ -337,3 +337,125 @@ def test_pnl_decomposes_into_realised_and_unrealised():
         portfolio.cash + portfolio.market_value(engine), abs=1e-9)
     # And it is not trivially zero, which would satisfy both identities.
     assert portfolio.realised() != 0.0
+
+
+# --------------------------------------------------------------------------
+# What counts as a quantity, and what an agent's act() may return
+# --------------------------------------------------------------------------
+
+def test_a_string_a_bool_or_an_infinity_is_not_a_quantity():
+    """ "100" traded 100 shares and True traded one, where the framework
+    adapters refuse "100" as not a number of shares, and -inf was refused
+    as "got inf" (0.8.5 review: Jordan Okafor, Marcus Bell)."""
+    e = market(model="pt-v19")
+    p = tradefloor.Portfolio(cash=1e9)
+    for bad, said in (("100", "got '100' (str)"), (True, "got True (bool)"),
+                      (1 + 1j, "got (1+1j) (complex)"),
+                      (float("inf"), "must be finite, got inf"),
+                      (float("-inf"), "must be finite, got -inf")):
+        with pytest.raises(tradefloor.ValidationError, match=said.replace(
+                "(", r"\(").replace(")", r"\)").replace("+", r"\+")):
+            p.execute(e, TICKER, bad)
+    assert p.positions == {} and p.fills == []
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.Limit("100", 10.0)
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.Limit(float("inf"), 10.0)
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.Limit(10, True)
+
+
+def test_a_leverage_refusal_is_an_order_error_of_its_own_kind():
+    from tradefloor.portfolio import LeverageError
+
+    e = market()
+    p = tradefloor.Portfolio(cash=5e6, max_leverage=2.0)
+    with pytest.raises(LeverageError, match="above the 2.00x limit"):
+        p.execute(e, TICKER, 200_000)
+    assert issubclass(LeverageError, tradefloor.OrderError)
+
+
+def test_order_items_takes_a_mapping_and_refuses_anything_else():
+    from tradefloor.portfolio import order_items
+
+    assert order_items(None) == []
+    assert order_items({}) == []
+    assert order_items({"AAA": 10}) == [("AAA", 10)]
+    for bad, kind in (([("AAA", 10)], "list"), ("buy AAA", "str"),
+                      (10, "int"), ((("AAA", 10),), "tuple")):
+        with pytest.raises(tradefloor.ValidationError,
+                           match=f"It returned a {kind}"):
+            order_items(bad)
+
+
+def test_check_order_says_what_each_entry_is():
+    from tradefloor.portfolio import check_order
+
+    limit, cancel = tradefloor.Limit(10, 5.0), tradefloor.Cancel()
+    assert check_order("AAA", limit) is limit
+    assert check_order("AAA", cancel) is cancel
+    assert check_order("AAA", None) is None
+    assert check_order("AAA", 0) is None
+    assert check_order("AAA", -0.0) is None
+    assert check_order("AAA", 7) == 7.0 and type(check_order("AAA", 7)) is float
+    for ticker, value in ((0, 100), ("AAA", "100"), ("AAA", True),
+                          ("AAA", float("nan")), ("AAA", [1])):
+        with pytest.raises(tradefloor.ValidationError):
+            check_order(ticker, value)
+
+
+def test_the_part_of_a_limit_order_that_fills_at_once_is_in_fills():
+    """A marketable limit order moved the position and the cash and was
+    left out of Portfolio.fills, so obs.portfolio.fills, fills_table and
+    the scorecard's impact missed it (0.8.5 review: Tomas Herrera)."""
+    e = market()                      # pt-v20: the book is the engine's
+    assert e.book_live
+    p = tradefloor.Portfolio(cash=1e9)
+    ask = e.book(TICKER).best_ask
+    report = p.submit_limit(e, TICKER, 100, round(ask + 0.05, 2))
+    assert report["filled"] > 0
+    assert len(p.fills) == 1
+    fill = p.fills[0]
+    assert fill["quantity"] == report["filled"]
+    assert fill["price"] == report["average_price"]
+    assert fill["order_id"] == report["order_id"]
+    assert fill["limit"] is True and fill["liquidity"] == "taker"
+    assert p.positions[TICKER].quantity == sum(f["quantity"] for f in p.fills)
+    assert fill["notional"] == pytest.approx(p.starting_cash - p.cash)
+
+
+def test_a_limit_order_that_fills_nothing_at_once_adds_no_fill():
+    e = market()
+    p = tradefloor.Portfolio(cash=1e9)
+    bid = e.book(TICKER).best_bid
+    report = p.submit_limit(e, TICKER, 100, round(bid * 0.8, 2))
+    assert report["filled"] == 0
+    assert p.fills == []
+
+
+def test_the_agent_sees_its_own_limit_fills():
+    """Tomas Herrera's case: a buy limit above the ask for 10,000 shares on
+    step 19. The position was 10,000 and the fills list was empty."""
+    universe = tradefloor.Universe.random(20, seed=111)
+    seen = []
+
+    class Buyer:
+        def act(self, obs):
+            seen.append(sum(f["quantity"] for f in obs.portfolio.fills
+                            if f["ticker"] == "AAC"))
+            if obs.step == 19:
+                ask = obs.book("AAC").best_ask
+                return {"AAC": tradefloor.Limit(10_000, round(ask + 0.05, 2))}
+            return {}
+
+    world = tradefloor.World(seed=7, universe=universe, agent=Buyer(),
+                             cash=1e9, max_leverage=None)
+    world.run(4)
+    held = world.portfolio.positions["AAC"].quantity
+    assert held == 10_000
+    assert sum(f["quantity"] for f in world.portfolio.fills
+               if f["ticker"] == "AAC") == held
+    assert seen[20] == held
+    # World's own trace records the order once, from the engine's report,
+    # and its summary does not count the new fill a second time.
+    assert world.summary()["trades"] == 1

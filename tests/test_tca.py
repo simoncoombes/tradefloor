@@ -345,3 +345,62 @@ def test_a_refused_trade_is_not_an_execution():
 
     execution = analyse(Impossible())
     assert all(f["quantity"] != 0 for f in execution.fills)
+
+
+# --------------------------------------------------------------------------
+# What analyse takes from act()
+# --------------------------------------------------------------------------
+
+SMALL = tradefloor.Universe.random(4, seed=7)
+
+
+class OnStepZero:
+    def __init__(self, value):
+        self.value = value
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        return self.value(obs) if callable(self.value) else self.value
+
+
+def test_a_limit_order_is_refused_naming_the_step():
+    """A tf.Limit reached float() and raised a bare TypeError. The part of
+    a limit order that waits has no untraded price to be measured against,
+    so the analysis refuses it and says why."""
+    agent = OnStepZero(lambda obs: {obs.tickers[0]: tradefloor.Limit(
+        100, obs.book(obs.tickers[0]).best_bid)})
+    with pytest.raises(tradefloor.ValidationError,
+                       match=r"step 0: the agent sent Limit\(100, .*market "
+                             r"orders only"):
+        tradefloor.tca.analyse(agent, seed=1, universe=SMALL)
+
+
+def test_a_return_that_is_not_a_mapping_is_refused_naming_the_step():
+    agent = OnStepZero(lambda obs: [(obs.tickers[0], 10)])
+    with pytest.raises(tradefloor.ValidationError,
+                       match=r"step 0: act\(\) must return a mapping"):
+        tradefloor.tca.analyse(agent, seed=1, universe=SMALL)
+
+
+def test_a_quantity_that_is_not_a_number_is_not_an_execution():
+    agent = OnStepZero(lambda obs: {obs.tickers[0]: "100",
+                                    obs.tickers[1]: True})
+    execution = tradefloor.tca.analyse(agent, seed=1, universe=SMALL)
+    assert execution.fills == []
+
+
+def test_both_worlds_are_copies_of_one_engine(monkeypatch):
+    from tradefloor import tca
+
+    built = []
+    real = tca.Engine
+
+    def counting(*args, **kwargs):
+        built.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(tca, "Engine", counting)
+    execution = tca.analyse(BuyOnce(), seed=5, universe=SMALL)
+    assert len(built) == 1
+    assert execution.fills

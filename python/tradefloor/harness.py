@@ -51,11 +51,13 @@ scorecard records all three. See :mod:`tradefloor.sandbox`.
 from __future__ import annotations
 
 import struct
+from collections import Counter
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from ._core import check_seed
-from .portfolio import Portfolio
+from .portfolio import (Cancel, LeverageError, Limit, Portfolio, check_order,
+                        order_items)
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .universe_util import fingerprint_of
@@ -235,8 +237,14 @@ class Observation:
 class Agent(Protocol):
     """The interface an agent implements.
 
-    ``act`` returns share quantities keyed by ticker: positive buys, negative
-    sells, omitted or zero does nothing.
+    ``act`` returns a mapping keyed by ticker. A value is a number of
+    shares for a market order, positive buys and negative sells, or a
+    :class:`tradefloor.Limit` or :class:`tradefloor.Cancel`. A ticker left
+    out, or a value of zero or None, does nothing, and so does returning
+    None or ``{}``. A string, a ``bool``, NaN or an infinity is refused as
+    an order, and a return that is not a mapping at all, such as a list of
+    pairs, trades nothing that step. :func:`evaluate` records both in the
+    scorecard's ``errors``. See :func:`tradefloor.portfolio.check_order`.
 
     ``explain`` is optional. When present it returns the factor the agent
     believes drove the largest recent move, one of ``Engine.FACTORS``. That is
@@ -244,7 +252,8 @@ class Agent(Protocol):
     reasons, rather than only whether it made money.
     """
 
-    def act(self, obs: Observation) -> dict[str, float]: ...
+    def act(self, obs: Observation
+            ) -> dict[str, float | Limit | Cancel] | None: ...
 
 
 class Scorecard:
@@ -254,13 +263,42 @@ class Scorecard:
     The loop was shorter and made the class opaque: nothing could introspect
     it, no checker could see a field, and a mistyped key would have set
     nothing and read back ``None``.
+
+    Read ``errors`` before the P&L. It holds every step at which the agent
+    raised, returned something that is not an order mapping, or sent an
+    order the market refused, and a step with an error traded nothing for
+    that order. An agent that broke on step 3 of 30 and held cash from then
+    on scores like an agent that chose to hold cash. The repr shows
+    ``errors=N`` when there are any.
+
+    ``equity_curve`` is net worth after each day's close, one value per
+    day, the last equal to ``final_net_worth``. ``max_drawdown_pct`` is the
+    largest fall from a running peak along it, starting from the cash the
+    agent was given, so it is measured on closes and misses a dip that
+    recovered inside a day, and it passes 100 when net worth goes below
+    zero. ``ruined`` is True when net worth was at or
+    below zero at any close. There is no margin call: under
+    ``max_leverage=None`` a ruined agent keeps its positions and the
+    scorecard reports what they did. With a leverage limit set, every
+    order is refused once net worth is gone, because leverage over a net
+    worth at or below zero is infinite.
+
+    ``leverage_refusals`` is the part of ``rejected`` that the leverage
+    limit refused. ``explanation_baseline`` is what always giving the same
+    answer to ``explain`` would have scored on the same days: the share of
+    scored days won by the factor that won most often. Read
+    ``explanation_accuracy`` against it, because on most markets one or
+    two factors win most days, and a constant answer scores well above
+    one in eleven.
     """
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
                  "strategy_fingerprint", "model_fingerprint", "trusted",
-                 "uses_hidden_state", "tampered")
+                 "uses_hidden_state", "tampered", "equity_curve",
+                 "max_drawdown_pct", "ruined", "leverage_refusals",
+                 "explanation_baseline")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -270,6 +308,9 @@ class Scorecard:
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
         model_fingerprint: str = "", trusted: bool = False,
         uses_hidden_state: bool = False, tampered: bool = False,
+        equity_curve: list[float] | None = None, max_drawdown_pct: float = 0.0,
+        ruined: bool = False, leverage_refusals: int = 0,
+        explanation_baseline: float | None = None,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -314,6 +355,18 @@ class Scorecard:
         #: order path. ``errors`` names the step. The score is of a market
         #: the agent rewrote and ranks nothing.
         self.tampered = tampered
+        #: Net worth after each day's close, in day order.
+        self.equity_curve = list(equity_curve or [])
+        #: The largest fall from a running peak of ``equity_curve``, which
+        #: starts at the cash the agent was given, in percent.
+        self.max_drawdown_pct = max_drawdown_pct
+        #: Net worth was at or below zero at some close.
+        self.ruined = ruined
+        #: How many of ``rejected`` the leverage limit refused.
+        self.leverage_refusals = leverage_refusals
+        #: The accuracy a constant answer to ``explain`` would have had on
+        #: the same days. None when nothing was scored.
+        self.explanation_baseline = explanation_baseline
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -321,13 +374,15 @@ class Scorecard:
     def __repr__(self) -> str:
         flags = "".join(
             f", {flag}" for flag, on in (("TAMPERED", self.tampered),
+                                         ("RUINED", self.ruined),
                                          ("trusted", self.trusted),
                                          ("hidden-state",
                                           self.uses_hidden_state)) if on)
+        errors = f", errors={len(self.errors)}" if self.errors else ""
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
-            f"impact={self.impact_bps:+.2f}bps{flags})"
+            f"impact={self.impact_bps:+.2f}bps{errors}{flags})"
         )
 
 
@@ -443,6 +498,29 @@ def evaluate(
     ``tampered=True`` with an error line naming the step. See
     :mod:`tradefloor.sandbox`.
 
+    An agent that raises, or returns something that is not an order
+    mapping, is scored rather than allowed to end the run: the step trades
+    nothing and its card's ``errors`` names the step and what came back. A
+    bad entry in a good mapping, an unknown ticker or a quantity of
+    ``"100"``, is refused and counted in ``rejected``, and the rest of the
+    mapping trades. See :class:`Agent` for what ``act`` may return. A
+    :class:`tradefloor.Limit` rests in the engine's book as it does under
+    :class:`tradefloor.World`, and what fills later is collected after each
+    session.
+
+    One exception does end the run.
+    :class:`~tradefloor.integrations.common.ReplayMiss` means a recording
+    has no answer for this input, usually because the seed, the roster or
+    the prompt changed after it was made. It propagates with a note naming
+    the step, the agent and the seed. Scored as an error, it would read as
+    an agent that held cash from that step on.
+
+    Every engine in one call, the untraded baseline's and each agent's, is
+    a copy (:meth:`Engine.fork`) of one engine built once. Building one on
+    ``Universe.random(12, seed=7)`` takes 0.65 to 1.0 s of CPU on pt-v20,
+    most of it the 755-day macro burn-in, and about 0.02 s on pt-v19. A
+    copy takes microseconds and is the same market to the bit.
+
     Returns a scorecard per agent, keyed by name.
     """
     from .spec import StrategySpec
@@ -463,9 +541,16 @@ def evaluate(
     # market, so a per-agent hash would be the same value hashed N times.
     fingerprint = fingerprint_of(universe)
 
+    # Built once and copied for the baseline and for each agent. A copy of
+    # a fresh engine has its state hash and runs to the same prices, and
+    # on pt-v20 construction is the 755-day burn-in, which was paid once
+    # per agent plus once for the baseline.
+    template = Engine(seed=seed, universe=universe, macro_state=macro,
+                      model=model)
+
     baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
                              ticks_per_step, hour, minute, day_of_week,
-                             scenario, model)
+                             scenario, model, engine=template.fork(1)[0])
 
     for name, entry in agents.items():
         agent = entry.build() if isinstance(entry, StrategySpec) else entry
@@ -480,15 +565,17 @@ def evaluate(
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
             cash_interest, bool(trusted_agents),
+            engine=template.fork(1)[0],
         )
     return results
 
 
 def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
                   hour, minute, day_of_week, scenario=None,
-                  model=None) -> list[float]:
-    engine = Engine(seed=seed, universe=universe, macro_state=macro,
-                    model=model)
+                  model=None, *, engine=None) -> list[float]:
+    if engine is None:
+        engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                        model=model)
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
@@ -504,14 +591,26 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
     return _f64(engine.prices())
 
 
+def _is_replay_miss(exc: BaseException) -> bool:
+    """Whether ``exc`` is a recording with no answer for this input.
+
+    Imported late and only when an agent has raised: the integrations
+    import the counterfactual module, which imports this one, and an
+    evaluation whose agents never raise has no reason to load them.
+    """
+    from .integrations.common import ReplayMiss
+    return isinstance(exc, ReplayMiss)
+
+
 def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
-                  trusted=False) -> Scorecard:
-    engine = Engine(seed=seed, universe=universe, macro_state=macro,
-                    model=model)
+                  trusted=False, *, engine=None) -> Scorecard:
+    if engine is None:
+        engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                        model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
                           cash_interest=cash_interest)
     tickers = engine.tickers
@@ -528,9 +627,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
     trades = 0
     turnover = 0.0
     rejected = 0
+    leverage_refusals = 0
     errors: list[str] = []
     peak_leverage = 0.0
     explanations: list[tuple[str, str]] = []
+    equity_curve: list[float] = []
 
     step = 0
     for day in range(days):
@@ -559,31 +660,68 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # run this day. This is what makes the fills table joinable
             # to bars and truth on (day, tick, instrument_id).
             portfolio.stamp(day, step, (step % steps_per_day) * ticks_per_step)
+            orders = None
             try:
                 with guard:
-                    orders = agent.act(obs) or {}
+                    orders = agent.act(obs)
             except Exception as exc:                      # noqa: BLE001
+                if _is_replay_miss(exc):
+                    # A broken recording is a broken experiment. Scored as
+                    # an error it would read as an agent that held cash
+                    # from this step on, and the run would publish that.
+                    exc.add_note(f"tradefloor.evaluate stopped at step {step} "
+                                 f"(day {day}) of agent {name!r}, seed {seed}.")
+                    raise
                 # An agent that throws is scored, not crashed. A harness that
                 # died on one bad agent would lose every other agent's result
                 # in the same run.
                 errors.append(f"step {step}: {type(exc).__name__}: {exc}")
-                orders = {}
+                orders = None
             if guard.tampered:
                 tampered = True
                 errors.append(f"step {step}: tampered: agent code changed "
                               f"the market during act() ({guard.what})")
 
-            for ticker, quantity in orders.items():
-                if not quantity:
-                    continue
+            # What came back, checked for shape first. A list of pairs or a
+            # string is a step that trades nothing and an error line, never
+            # an exception out of the harness: that would lose every other
+            # agent's result in the same run.
+            try:
+                entries = order_items(orders)
+            except ValidationError as exc:
+                errors.append(f"step {step}: {exc}")
+                entries = []
+
+            for ticker, value in entries:
                 try:
-                    fill = portfolio.execute(engine, ticker, quantity)
+                    order = check_order(ticker, value)
+                    if order is None:
+                        continue
+                    if isinstance(order, Cancel):
+                        portfolio.cancel(engine, ticker=ticker)
+                        continue
+                    if isinstance(order, Limit):
+                        # As World does it: a new limit on a name replaces
+                        # the one waiting there. What fills at once is a
+                        # trade now, and what fills later is collected
+                        # after the session below.
+                        portfolio.cancel(engine, ticker=ticker)
+                        report = portfolio.submit_limit(
+                            engine, ticker, order.quantity, order.price)
+                        if report["filled"] > 0:
+                            trades += 1
+                            turnover += sum(f["quantity"] * f["price"]
+                                            for f in report["fills"])
+                        continue
+                    fill = portfolio.execute(engine, ticker, order)
                     trades += 1
                     turnover += abs(fill["notional"])
                 except (OrderError, ValidationError) as exc:
                     # Refused trades are counted rather than raised. Being
                     # unable to size a position is information about the agent.
                     rejected += 1
+                    if isinstance(exc, LeverageError):
+                        leverage_refusals += 1
                     errors.append(f"step {step}: {exc}")
 
             # The clock advances with the step, so a day of N steps traverses
@@ -598,6 +736,12 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             engine.run_session(step_hour, step_minute, step_dow, ticks_per_step,
                                fills=portfolio.pending_flow())
             portfolio.clear_flow()
+            # What a resting limit order filled during the session, as
+            # World.run collects it. Asks the engine nothing for a portfolio
+            # that never sent an order to the book.
+            for taken in portfolio.sync(engine):
+                trades += 1
+                turnover += taken["quantity"] * taken["price"]
 
             leverage = portfolio.leverage(engine)
             if leverage != float("inf"):
@@ -611,6 +755,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                 with guard:
                     claimed = explain(day)
             except Exception as exc:                      # noqa: BLE001
+                if _is_replay_miss(exc):
+                    exc.add_note(f"tradefloor.evaluate stopped at day {day}'s "
+                                 f"explain() of agent {name!r}, seed {seed}.")
+                    raise
                 errors.append(f"day {day} explain: {type(exc).__name__}: {exc}")
                 claimed = None
             if guard.tampered:
@@ -624,6 +772,9 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # the close's macro step can move it. Nothing with the option off.
         portfolio.accrue(engine)
         engine.close_market()
+        # Marked after the close, which on pt-v20 re-marks every name, so
+        # the last value is the final net worth below.
+        equity_curve.append(portfolio.net_worth(engine))
 
     final = portfolio.net_worth(engine)
     actual_prices = _f64(engine.prices())
@@ -639,6 +790,20 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         / len(explanations)
         if explanations else None
     )
+    # What a constant answer scores on the same days: the share won by the
+    # factor that won most often. One or two factors win most days, so
+    # this is far above one in eleven, and accuracy means little without it.
+    explanation_baseline = (
+        Counter(actual for _, actual in explanations).most_common(1)[0][1]
+        / len(explanations)
+        if explanations else None
+    )
+
+    peak, drawdown = cash, 0.0
+    for worth in equity_curve:
+        peak = max(peak, worth)
+        if peak > 0:
+            drawdown = max(drawdown, (peak - worth) / peak)
 
     return Scorecard(
         name=name,
@@ -660,6 +825,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         trusted=trusted,
         uses_hidden_state=privileged,
         tampered=tampered,
+        equity_curve=equity_curve,
+        max_drawdown_pct=drawdown * 100.0,
+        ruined=any(worth <= 0 for worth in equity_curve),
+        leverage_refusals=leverage_refusals,
+        explanation_baseline=explanation_baseline,
     )
 
 
@@ -710,6 +880,16 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
        saying whether the ordering is established at all -- because even the
        across-seed aggregate can order two agents that a paired test cannot
        separate.
+
+    A tampered card (``Scorecard.tampered``) is sorted after every other
+    card whatever it scored, because its score is of a market the agent
+    rewrote. :func:`tradefloor.rank` leaves such an agent out altogether.
+    A card from an agent that read hidden state (``uses_hidden_state``, the
+    Oracle for one) or that was handed the live engine (``trusted``) is
+    ranked with the rest, and its repr says ``hidden-state`` or
+    ``trusted``, since neither is a peer of a sandboxed agent. The repr
+    also says ``TAMPERED``, ``RUINED`` and ``errors=N``, so printing the
+    list shows each of these next to the score.
     """
     if by not in ("pnl", "return_pct", "impact_bps", "turnover"):
         raise ValidationError(f"cannot rank by {by!r}")
@@ -721,4 +901,6 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
     # test caught: two agents with identical scores came back zeta-then-alpha.
     descending = by != "impact_bps"
     sign = -1.0 if descending else 1.0
-    return sorted(scores.values(), key=lambda s: (sign * getattr(s, by), s.name))
+    return sorted(scores.values(),
+                  key=lambda s: (bool(getattr(s, "tampered", False)),
+                                 sign * getattr(s, by), s.name))

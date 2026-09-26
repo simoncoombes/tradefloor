@@ -683,3 +683,98 @@ def test_a_cohort_arms_pnl_since_starts_from_each_agents_mark_at_the_fork():
         summary = arm.summary(agent=label)
         assert summary["value_at_start"] == worth
         assert summary["pnl_since"] == summary["final_net_worth"] - worth
+
+
+# --------------------------------------------------------------------------
+# Orders World cannot take, handled the way evaluate handles them
+# --------------------------------------------------------------------------
+
+FOUR = tf.Universe.random(4, seed=7)
+
+
+class OnStepZero:
+    def __init__(self, value):
+        self.value = value
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        return self.value(obs) if callable(self.value) else self.value
+
+
+def test_a_summary_after_a_resting_limit_order_does_not_raise():
+    """A limit order that filled nothing when sent is in the trace with
+    price None, and summary() subtracted the mid from it (0.8.5 review:
+    Priya Raman)."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: {obs.tickers[0]: tf.Limit(100, obs.book(obs.tickers[0])
+                                              .best_bid)}))
+    world.run(days=2)
+    first = world.trace[0]["fills"][0]
+    assert first["limit"] is True and first["price"] is None
+    summary = world.summary()
+    assert summary["trades"] == 1
+    assert summary["execution_cost"] == 0.0
+
+
+@pytest.mark.parametrize("policy", ["raise", "skip"])
+def test_an_unknown_ticker_is_refused_and_the_run_goes_on(policy):
+    """World raised on an unknown ticker, even under on_refusal="skip",
+    where evaluate recorded a rejection (0.8.5 review: Tomas Herrera)."""
+    world = World(seed=1, universe=FOUR, on_refusal=policy,
+                  agent=OnStepZero(lambda obs: {"ZZZZ": 10,
+                                                obs.tickers[0]: 10}))
+    world.run(days=1)
+    summary = world.summary()
+    assert summary["refused"] == 1 and summary["trades"] == 1
+    assert "ZZZZ" in world.rejected[0]
+
+
+@pytest.mark.parametrize("value, said", [("100", "got '100' (str)"),
+                                         (True, "got True (bool)")])
+def test_a_quantity_that_is_not_a_number_is_refused(value, said):
+    world = World(seed=1, universe=FOUR,
+                  agent=OnStepZero(lambda obs: {obs.tickers[0]: value}))
+    world.run(days=1)
+    assert world.summary()["trades"] == 0
+    assert world.trace[0]["refused"] and said in world.trace[0]["refused"][0]
+
+
+def test_a_return_that_is_not_a_mapping_raises_a_validation_error():
+    """A list of pairs raised AttributeError from inside the run (0.8.5
+    review: Tomas Herrera)."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: [(obs.tickers[0], 10)]))
+    with pytest.raises(tf.ValidationError,
+                       match=r"step 0: act\(\) must return a mapping"):
+        world.run(days=1)
+
+
+def test_under_skip_a_return_that_is_not_a_mapping_is_unusable():
+    world = World(seed=1, universe=FOUR, on_refusal="skip",
+                  agent=OnStepZero(lambda obs: [(obs.tickers[0], 10)]))
+    world.run(days=1)
+    summary = world.summary()
+    assert summary["unusable_responses"] == 1 and summary["trades"] == 0
+    assert "It returned a list" in world.trace[0]["unusable"]
+
+
+def test_resample_does_not_say_a_prompt_change_is_nothing():
+    """With identical inputs the footer said the gap was "agent noise and
+    nothing else", which is wrong for a fork whose arms run different
+    prompts (0.8.5 review: Priya Raman)."""
+    from tradefloor.counterfactual import Resample
+
+    stats = {"samples": 8, "refusals": 0, "distinct": 1, "modal_share": 1.0,
+             "mean_net": 0.0, "stdev_net": 0.1, "mean_gross": 0.0,
+             "stdev_gross": 0.0}
+    probe = Resample(
+        at=48, n=8, control="v1", treatment="v2",
+        noise={"v1": dict(stats), "v2": dict(stats, mean_net=0.92)},
+        separation={"gap_net": 0.92, "floor_net": 0.1, "net": 9.2,
+                    "gap_gross": 0.0, "floor_gross": 0.0, "gross": None},
+        identical_inputs=True, differing_lines=[], intervened_fields=[])
+    text = probe.render()
+    assert "nothing else" not in text
+    assert "market did not differ" in text
+    assert "different prompt" in text

@@ -1068,3 +1068,44 @@ def test_capture_ratio_reports_above_one_rather_than_clamping():
 
     ratios = capture_ratio({"oracle": Card(100.0), "better": Card(150.0)})
     assert ratios["better"] == pytest.approx(1.5)
+
+
+# --------------------------------------------------------------------------
+# A tampered agent is not compared with anything
+# --------------------------------------------------------------------------
+
+def _card(name, pnl, **flags):
+    from tradefloor.harness import Scorecard
+
+    return Scorecard(
+        name=name, pnl=pnl, return_pct=pnl / 1e4, trades=0, turnover=0.0,
+        impact_bps=0.0, max_leverage=0.0, rejected=0, explanations=[],
+        explanation_accuracy=None, final_net_worth=1e6 + pnl, errors=[],
+        **flags)
+
+
+def test_versus_buy_and_hold_leaves_a_tampered_agent_out():
+    """An agent that wrote $500,000 into its own cash was reported with a
+    $507,638 excess over buy-and-hold (0.8.5 review: Jordan Okafor)."""
+    scores = {"buy_and_hold": _card("buy_and_hold", 7_638.0),
+              "cheat": _card("cheat", 507_638.0, tampered=True),
+              "honest": _card("honest", 7_000.0),
+              "oracle": _card("oracle", 9_000.0, uses_hidden_state=True)}
+    assert versus_buy_and_hold(scores) == {"honest": -638.0, "oracle": 1_362.0}
+
+
+def test_versus_buy_and_hold_refuses_a_tampered_reference():
+    scores = {"buy_and_hold": _card("buy_and_hold", 7_638.0, tampered=True),
+              "honest": _card("honest", 7_000.0)}
+    with pytest.raises(tradefloor.ValidationError, match="tampered"):
+        versus_buy_and_hold(scores)
+
+
+def test_capture_ratio_leaves_a_tampered_agent_out_and_refuses_a_tampered_oracle():
+    scores = {"oracle": _card("oracle", 10_000.0),
+              "cheat": _card("cheat", 500_000.0, tampered=True),
+              "honest": _card("honest", 5_000.0)}
+    assert capture_ratio(scores) == {"honest": 0.5}
+    scores["oracle"] = _card("oracle", 10_000.0, tampered=True)
+    with pytest.raises(tradefloor.ValidationError, match="tampered"):
+        capture_ratio(scores)

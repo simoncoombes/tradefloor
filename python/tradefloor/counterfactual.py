@@ -183,7 +183,7 @@ from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
 from .checkpoint import Checkpoint, branch
 from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
-from .portfolio import Cancel, Limit, Portfolio
+from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .interventions import Intervention
@@ -840,7 +840,7 @@ class World:
         if label in self._frozen:
             return {}, None, None
         agent = self._agents[label]
-        orders, unusable = self._ask(agent, obs)
+        orders, unusable = self._ask(agent, obs, label)
         # No decision on a refused step. The adapter's last decision is
         # still the one BEFORE this step, and reading it here would put a
         # decision the agent did not take into the row that records it not
@@ -848,8 +848,8 @@ class World:
         # comparing exactly this field.
         return orders, unusable, (None if unusable else self._decision(agent))
 
-    def _ask(self, agent: Any,
-             obs: "Observation") -> tuple[dict[str, float], str | None]:
+    def _ask(self, agent: Any, obs: "Observation",
+             label: str = SOLO) -> tuple[dict[str, float], str | None]:
         """The agent's orders for this step, and its refusal if it gave one.
 
         Under ``on_refusal="raise"`` -- the default, and what this module
@@ -883,16 +883,41 @@ class World:
         and publishes that. Measured, before this exemption: two arms
         replayed against a transcript covering neither, reported twenty
         refusals each, and produced an empty series.
+
+        A return that is not an order mapping, such as a list of pairs or
+        a string, is the same failure seen from this side: output that was
+        never an order. Under ``"raise"`` it raises
+        :class:`ValidationError` naming the step and what came back, and
+        under ``"skip"`` the step is recorded as unusable with that text.
+        :func:`tradefloor.evaluate` writes the same text to the scorecard's
+        ``errors``. See :func:`tradefloor.portfolio.order_items`.
         """
         if self.on_refusal == "raise":
-            return agent.act(obs) or {}, None
+            return self._order_mapping(agent.act(obs), obs, label), None
         refusal, miss = _refusal_types()
         try:
-            return agent.act(obs) or {}, None
+            orders = agent.act(obs)
         except miss:
             raise
         except refusal as exc:
             return {}, f"{type(exc).__name__}: {exc}"
+        try:
+            return self._order_mapping(orders, obs, label), None
+        except ValidationError as exc:
+            return {}, f"{type(exc).__name__}: {exc}"
+
+    def _order_mapping(self, orders: Any, obs: "Observation",
+                       label: str) -> dict[Any, Any]:
+        """What ``act()`` returned, as a plain dict, or a
+        :class:`ValidationError` naming the step, and the agent on a
+        cohort, when it is not a mapping.
+        """
+        try:
+            return dict(order_items(orders))
+        except ValidationError as exc:
+            where = (f"step {obs.step}" if self._single
+                     else f"step {obs.step} {label}")
+            raise ValidationError(f"{where}: {exc}") from None
 
     def _decision(self, agent: Any) -> Any:
         """Whatever the agent chose to publish about its last decision."""
@@ -910,7 +935,10 @@ class World:
         Refused trades are recorded and counted, not raised. Being unable to
         size a position is information about the agent, and information the
         comparison wants -- an arm that hit its leverage cap and an arm
-        that did not are behaving differently.
+        that did not are behaving differently. An entry that is not an
+        order at all, an unknown ticker, a quantity of ``"100"`` or
+        ``True``, NaN, is refused the same way and the rest of the mapping
+        trades (:func:`tradefloor.portfolio.check_order`).
         """
         fills: list[dict] = []
         refused: list[str] = []
@@ -920,23 +948,26 @@ class World:
         # a label to point at.
         where = f"step {self._step}" if self._single \
             else f"step {self._step} {label}"
-        for ticker, quantity in orders.items():
-            if isinstance(quantity, Cancel):
-                portfolio.cancel(self.engine, ticker=ticker)
-                continue
-            if not quantity:
-                continue
-            # The step's arrival mid: the book's before ANY agent's order
-            # this step, read once per name. Off a live book every agent in
-            # the step reads the same book, so this is the mid the agent's
-            # own sweep started from, as it always was. On one, a later
-            # agent meets the book an earlier one left, and its slippage
-            # against the step's mid holds the levels the earlier one took,
-            # which is what `externalities` reads as `levels`.
-            if ticker not in self._step_mids:
-                self._step_mids[ticker] = self.engine.book(ticker).mid_price
-            mid = self._step_mids[ticker]
+        for ticker, value in orders.items():
             try:
+                quantity = check_order(ticker, value)
+                if quantity is None:
+                    continue
+                if isinstance(quantity, Cancel):
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    continue
+                # The step's arrival mid: the book's before ANY agent's order
+                # this step, read once per name. Off a live book every agent
+                # in the step reads the same book, so this is the mid the
+                # agent's own sweep started from, as it always was. On one, a
+                # later agent meets the book an earlier one left, and its
+                # slippage against the step's mid holds the levels the
+                # earlier one took, which is what `externalities` reads as
+                # `levels`. Read inside the `try`, because an unknown ticker
+                # is refused here, and outside it ended the run.
+                if ticker not in self._step_mids:
+                    self._step_mids[ticker] = self.engine.book(ticker).mid_price
+                mid = self._step_mids[ticker]
                 if isinstance(quantity, Limit):
                     # A new limit on a name replaces the one waiting there.
                     portfolio.cancel(self.engine, ticker=ticker)
@@ -1770,12 +1801,14 @@ def _execution_cost(fills: Sequence[dict]) -> float:
     mid and a seller who received below it both add. Fills with no mid --
     a book with one side empty -- are skipped rather than priced against a
     guess, which is the same rule :class:`tradefloor.Execution` applies to a
-    fill it cannot reference.
+    fill it cannot reference. So are entries with no price: a limit order
+    that filled nothing when it was sent is in the trace with
+    ``price=None``, and it has no cost until something fills.
     """
     total = 0.0
     for fill in fills:
         mid = fill.get("mid")
-        if mid is None:
+        if mid is None or fill.get("price") is None:
             continue
         total += fill["quantity"] * (fill["price"] - mid)
     return total
@@ -2274,14 +2307,16 @@ class Resample:
         #: large number, it is an undefined one, and `inf` in a published
         #: table reads as a result.
         self.separation = separation
-        #: True when the two inputs are BYTE-IDENTICAL, which means the
-        #: intervention had not reached the agent by this step. Worth
+        #: True when the two inputs are BYTE-IDENTICAL, which means no
+        #: market intervention had reached the agent by this step. Worth
         #: knowing before reading a gap: with identical inputs the two
-        #: arms answered the same question, so the whole gap is agent
-        #: noise and there is no intervention effect in it to find. False
-        #: is the ordinary case, and the differences are in
-        #: :attr:`differing_lines`; anything they cannot account for was
-        #: already refused.
+        #: arms were asked the same question, so there is no market
+        #: effect in the gap to find. What is left is the agent's own
+        #: noise, or a change made on the agent's side, such as a fork
+        #: whose arms run different prompts or models, which this cannot
+        #: see. False is the ordinary case for a market intervention, and
+        #: the differences are in :attr:`differing_lines`; anything they
+        #: cannot account for was already refused.
         self.identical_inputs = identical_inputs
         #: The lines the two inputs differ on, for the write-up. Every one
         #: of them is attributable to an intervened field, because a
@@ -2339,9 +2374,11 @@ class Resample:
                        f"{gap:+.2f} against a noise floor of {floor:.2f} "
                        f"-- {said}")
         if self.identical_inputs:
-            out.append("  the two inputs are identical: the intervention "
-                       "had not reached the agent by this step, so the "
-                       "gap above is agent noise and nothing else")
+            out.append("  the two inputs are identical: anything intervened "
+                       "on had not reached the agent by this step, and the")
+            out.append("  market did not differ. The gap above is the "
+                       "agent's own noise, or a change on the agent's side "
+                       "such as a different prompt")
         else:
             fields = ", ".join(self.intervened_fields) or "nothing"
             out.append(f"  inputs differ in {fields} and nowhere else")

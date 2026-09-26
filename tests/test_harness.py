@@ -405,3 +405,302 @@ def test_the_observation_repr_says_which_index_is_which():
     assert "day=1" in text
     assert "step_of_day=1/6" in text
     assert "step=7 of run" in text
+
+
+# --------------------------------------------------------------------------
+# What act() may return, and what evaluate does with anything else
+# --------------------------------------------------------------------------
+
+SMALL = tradefloor.Universe.random(5, seed=1)
+
+
+class Returns:
+    """Returns one fixed thing on step zero, and nothing after."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        return self.value(obs) if callable(self.value) else self.value
+
+
+def test_a_return_that_is_not_a_mapping_is_an_error_line_not_a_crash():
+    """A list of pairs raised AttributeError out of evaluate, and every
+    other agent's result in the same call went with it (0.8.5 review:
+    Jordan Okafor, Marcus Bell). The step now trades nothing and says
+    what came back."""
+    shapes = {
+        "pairs": Returns(lambda obs: [(obs.tickers[0], 10)]),
+        "text": Returns("buy AAA"),
+        "number": Returns(10),
+        "empty_list": Returns([]),
+    }
+    scores = tradefloor.evaluate({"idle": Idle(), **shapes}, seed=5,
+                                 universe=SMALL, days=1)
+    assert scores["idle"].errors == []
+    for name in shapes:
+        card = scores[name]
+        assert (card.trades, card.rejected) == (0, 0), name
+        assert len(card.errors) == 1, (name, card.errors)
+        assert card.errors[0].startswith("step 0: act() must return a mapping")
+        assert "errors=1" in repr(card)
+    assert "It returned a list: [('AAA', 10)] (list)" in scores["pairs"].errors[0]
+    assert "It returned a str" in scores["text"].errors[0]
+    assert "errors" not in repr(scores["idle"])
+
+
+def test_none_and_an_empty_mapping_trade_nothing_quietly():
+    scores = tradefloor.evaluate({"none": Returns(None), "empty": Returns({})},
+                                 seed=5, universe=SMALL, days=1)
+    for card in scores.values():
+        assert (card.trades, card.rejected, card.errors) == (0, 0, [])
+
+
+def test_a_bad_entry_is_refused_and_the_rest_of_the_mapping_trades():
+    """An int key and a complex quantity crashed evaluate; "100" and True
+    traded 100 shares and 1 share, which the adapters refuse; -inf was
+    refused as "got inf" (0.8.5 review: Jordan Okafor, Marcus Bell)."""
+    def orders(obs):
+        t = obs.tickers
+        return {t[0]: 10, 0: 100, t[1]: 1 + 2j, t[2]: "100", t[3]: True,
+                t[4]: float("-inf")}
+
+    card = tradefloor.evaluate({"a": Returns(orders)}, seed=5, universe=SMALL,
+                               days=1)["a"]
+    assert card.trades == 1
+    assert card.rejected == 5
+    assert card.leverage_refusals == 0
+    joined = "\n".join(card.errors)
+    assert "a ticker must be a string, got 0 (int)" in joined
+    assert "got (1+2j) (complex)" in joined
+    assert "got '100' (str)" in joined
+    assert "got True (bool)" in joined
+    assert "must be finite, got -inf" in joined
+
+
+def test_numpy_quantities_are_numbers_of_shares():
+    np = pytest.importorskip("numpy")
+    card = tradefloor.evaluate(
+        {"a": Returns(lambda obs: {obs.tickers[0]: np.float64(10),
+                                   obs.tickers[1]: np.int64(5)})},
+        seed=5, universe=SMALL, days=1)["a"]
+    assert (card.trades, card.errors) == (2, [])
+
+
+class RestingBid:
+    """A limit order at the bid on step zero: it rests, and fills later."""
+
+    def act(self, obs):
+        t = obs.tickers[0]
+        return ({t: tradefloor.Limit(100, obs.book(t).best_bid)}
+                if obs.step == 0 else {})
+
+
+@pytest.mark.parametrize("model", ["pt-v20", "pt-v19"])
+def test_evaluate_takes_a_limit_order(model):
+    """tf.Limit is documented as a value in the act() mapping and World
+    took it, but evaluate called float() on it and the TypeError ended the
+    whole evaluation (0.8.5 review: Marcus Bell, Priya Raman, Tomas
+    Herrera). What rests is collected after each session, as World does."""
+    scores = tradefloor.evaluate(
+        {"limit": RestingBid(), "idle": Idle()}, seed=1,
+        universe=tradefloor.Universe.random(4, seed=7), days=2, model=model)
+    card = scores["limit"]
+    assert card.errors == [] and card.rejected == 0
+    # It rested, so everything it traded was collected after a session.
+    assert card.trades >= 1 and card.turnover > 0
+    assert scores["idle"].errors == []
+
+
+def test_a_cancel_withdraws_what_is_waiting():
+    seen = []
+
+    class FarBidThenCancel:
+        def act(self, obs):
+            t = obs.tickers[0]
+            seen.append(len(obs.portfolio.open_orders(obs.engine)))
+            if obs.step == 0:
+                return {t: tradefloor.Limit(100, obs.book(t).best_bid * 0.8)}
+            if obs.step == 1:
+                return {t: tradefloor.Cancel()}
+            return {}
+
+    card = tradefloor.evaluate({"x": FarBidThenCancel()}, seed=1,
+                               universe=tradefloor.Universe.random(4, seed=7),
+                               days=1, trusted_agents=True)["x"]
+    assert card.errors == []
+    assert seen[:3] == [0, 1, 0]
+
+
+def test_a_replay_miss_stops_evaluate_and_names_the_step():
+    """A replay that has no recording for the input was scored as an
+    agent error, so a wrong-seed replay read as an agent that held cash
+    (0.8.5 review: Jordan Okafor, Priya Raman). The integrations README
+    says the run stops and names the step, and now it does."""
+    from tradefloor.integrations.callable import callable_agent
+    from tradefloor.integrations.common import ReplayMiss, Transcript
+
+    def buy(payload):
+        return {"actions": [{"symbol": payload["assets"][0]["symbol"],
+                             "side": "BUY", "quantity": 1}],
+                "rationale": "buy"}
+
+    recording = Transcript()
+    live = tradefloor.evaluate({"s": callable_agent(buy, recorder=recording)},
+                               seed=777, universe=SMALL, days=1)["s"]
+    # The recording replays its own market.
+    again = tradefloor.evaluate(
+        {"s": callable_agent(buy, mode="replay", transcript=recording)},
+        seed=777, universe=SMALL, days=1)["s"]
+    assert again.as_dict() == live.as_dict()
+
+    with pytest.raises(ReplayMiss) as caught:
+        tradefloor.evaluate(
+            {"idle": Idle(),
+             "s": callable_agent(buy, mode="replay", transcript=recording)},
+            seed=778, universe=SMALL, days=1)
+    assert "step 0" in str(caught.value)
+    assert any("agent 's'" in note and "seed 778" in note
+               for note in caught.value.__notes__)
+
+
+class Levered:
+    """Puts ``gross`` times its net worth into the roster at step zero."""
+
+    def __init__(self, gross):
+        self.gross = gross
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        worth = obs.portfolio.net_worth()
+        each = self.gross * worth / len(obs.tickers)
+        return {t: each / obs.price(t) for t in obs.tickers}
+
+
+def test_the_scorecard_has_an_equity_curve_a_drawdown_and_a_ruin_flag():
+    """The scorecard had no drawdown, no equity curve and no way to say an
+    agent went broke (0.8.5 review: Elena Varga, Marcus Bell, Jordan
+    Okafor). Measured on seed 1: 100x short ends the second day at about
+    -$700,000, 100x long at about +$2.3m."""
+    scores = tradefloor.evaluate(
+        {"long": Levered(100), "short": Levered(-100)}, seed=1,
+        universe=tradefloor.Universe.random(8, seed=1), days=2,
+        max_leverage=None)
+    for card in scores.values():
+        assert len(card.equity_curve) == 2
+        assert card.equity_curve[-1] == card.final_net_worth
+        peak, worst = 1_000_000.0, 0.0
+        for worth in card.equity_curve:
+            peak = max(peak, worth)
+            worst = max(worst, (peak - worth) / peak)
+        assert card.max_drawdown_pct == pytest.approx(worst * 100.0)
+    short, long = scores["short"], scores["long"]
+    assert short.ruined and short.equity_curve[-1] < 0
+    assert short.max_drawdown_pct > 100.0
+    assert "RUINED" in repr(short)
+    assert not long.ruined and "RUINED" not in repr(long)
+
+
+def test_leverage_refusals_are_counted_apart_from_other_refusals():
+    def orders(obs):
+        t = obs.tickers[0]
+        return {t: 3.0 * obs.portfolio.net_worth() / obs.price(t),
+                "ZZZZ": 10}
+
+    card = tradefloor.evaluate({"a": Returns(orders)}, seed=5, universe=SMALL,
+                               days=1, max_leverage=2.0)["a"]
+    assert card.rejected == 2
+    assert card.leverage_refusals == 1
+
+
+def test_the_explanation_baseline_is_what_a_constant_answer_scores():
+    """Answering "random_noise" every day scored 0.65 on this market with
+    nothing beside it to say that is what a constant earns (0.8.5 review:
+    Jordan Okafor)."""
+    claims = ("random_noise", "fair_value_shift", "momentum")
+    scores = tradefloor.evaluate({c: Explainer(c) for c in claims}, seed=2026,
+                                 universe=tradefloor.Universe.random(12, seed=7),
+                                 days=20)
+    baselines = {card.explanation_baseline for card in scores.values()}
+    assert baselines == {0.65}
+    assert scores["random_noise"].explanation_accuracy == 0.65
+    for card in scores.values():
+        assert card.explanation_accuracy <= card.explanation_baseline
+    idle = tradefloor.evaluate({"idle": Idle()}, seed=5, universe=SMALL,
+                               days=1)["idle"]
+    assert idle.explanation_baseline is None
+
+
+def _card(name, pnl, **flags):
+    return harness.Scorecard(
+        name=name, pnl=pnl, return_pct=pnl / 1e4, trades=0, turnover=0.0,
+        impact_bps=0.0, max_leverage=0.0, rejected=0, explanations=[],
+        explanation_accuracy=None, final_net_worth=1e6 + pnl, errors=[],
+        **flags)
+
+
+def test_the_leaderboard_puts_a_tampered_card_last():
+    """An agent that wrote $500,000 into its own cash ranked first (0.8.5
+    review: Jordan Okafor). tf.rank already left it out."""
+    scores = {"cheat": _card("cheat", 500_000.0, tampered=True),
+              "honest": _card("honest", 10.0),
+              "oracle": _card("oracle", 5.0, uses_hidden_state=True)}
+    board = tradefloor.leaderboard(scores)
+    assert [c.name for c in board] == ["honest", "oracle", "cheat"]
+    assert "TAMPERED" in repr(board[-1])
+    assert "hidden-state" in repr(board[1])
+    assert [c.name for c in tradefloor.leaderboard(scores, by="impact_bps")][-1] \
+        == "cheat"
+
+
+def test_a_tampering_agent_is_found_and_ranked_last():
+    class Cheat:
+        def act(self, obs):
+            if obs.step == 0:
+                obs.portfolio._PortfolioView__portfolio.cash += 5e5
+            return {}
+
+    scores = tradefloor.evaluate({"cheat": Cheat(), "honest": Idle()},
+                                 seed=3, universe=SMALL, days=1)
+    assert scores["cheat"].tampered
+    assert scores["cheat"].pnl > scores["honest"].pnl
+    assert [c.name for c in tradefloor.leaderboard(scores)] == ["honest", "cheat"]
+
+
+def test_one_engine_is_built_per_evaluation(monkeypatch):
+    """pt-v20 spends about 0.65 s of CPU building an engine, most of it
+    the macro burn-in, and evaluate built one per agent plus one for the
+    baseline (0.8.5 review: Priya Raman). The others are copies now."""
+    built = []
+    real = harness.Engine
+
+    def counting(*args, **kwargs):
+        built.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(harness, "Engine", counting)
+    tradefloor.evaluate({"a": Idle(), "b": BuyFirst(), "c": Churner()},
+                        seed=5, universe=SMALL, days=1)
+    assert len(built) == 1
+
+
+@pytest.mark.parametrize("model", ["pt-v20", "pt-v19"])
+def test_a_copied_engine_scores_the_same_as_a_freshly_built_one(model):
+    """The copies are the same market to the bit: every card is the one
+    the old path, an engine built per agent, produces."""
+    from tradefloor.universe_util import fingerprint_of
+
+    agents = {"churn": Churner, "buy": BuyFirst}
+    scores = run({name: make() for name, make in agents.items()}, days=2,
+                 model=model)
+    baseline = harness._run_untraded(2026, UNIVERSE, None, 2, 4, 60, 9, 30, 3,
+                                     None, model)
+    for name, make in agents.items():
+        fresh = harness._evaluate_one(
+            name, make(), 2026, UNIVERSE, None, 2, 4, 60, 200_000_000, 2.0,
+            9, 30, 3, baseline, None, fingerprint_of(UNIVERSE), "", model,
+            False, False)
+        assert fresh.as_dict() == scores[name].as_dict()

@@ -119,7 +119,7 @@ from typing import Any, Sequence
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import Observation, session_clock
-from .portfolio import Portfolio
+from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .universe_util import as_universe, fingerprint_of
@@ -405,6 +405,20 @@ def analyse(
     ``act`` is refused with a :class:`ValidationError`, because a shortfall
     against a market the agent rewrote measures nothing.
 
+    ``act`` returns what it returns to :func:`tradefloor.evaluate`, with
+    one difference. A :class:`tradefloor.Limit` is refused with a
+    :class:`ValidationError` naming the step, because the part of a limit
+    order that waits fills inside a session, and the untraded world has a
+    price for the step's start and none for the minute it filled. Send
+    market orders here, or run the agent in :class:`tradefloor.World`,
+    whose trace records each limit order's fills. A return that is not an
+    order mapping raises the same way. An entry the market refuses,
+    including a quantity that is not a number, is skipped, as a refused
+    trade always has been here.
+
+    Both worlds are copies (:meth:`Engine.fork`) of one engine built once,
+    which on pt-v20 saves one 755-day macro burn-in per call.
+
     Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
     TCA cannot make, because the benchmark it compares against is a market
     that never happened.
@@ -417,12 +431,13 @@ def analyse(
     tickers = None
     adv = [instrument.avg_volume for instrument in universe]
 
-    def fresh():
-        return Engine(seed=seed, universe=universe, macro_state=macro,
-                      model=model)
+    # One construction, two copies of it. A copy of a fresh engine is the
+    # same market to the bit, and on pt-v20 construction is the 755-day
+    # macro burn-in.
+    engine, quiet = Engine(seed=seed, universe=universe, macro_state=macro,
+                           model=model).fork(2)
 
     # -- world A: the trader exists ---------------------------------------
-    engine = fresh()
     tickers = engine.tickers
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
     shown_engine = engine if trusted_agents else MarketView(engine)
@@ -449,14 +464,35 @@ def analyse(
                               adv if trusted_agents else tuple(adv),
                               steps_per_day, hidden=hidden)
             with guard:
-                orders = agent.act(obs) or {}
+                orders = agent.act(obs)
             if guard.tampered:
                 raise ValidationError(
                     f"step {step}: the agent changed the market during act() "
                     f"({guard.what}), so there is no execution to price. "
                     "See tradefloor.sandbox.")
-            for ticker, quantity in orders.items():
-                if not quantity:
+            try:
+                entries = order_items(orders)
+            except ValidationError as exc:
+                raise ValidationError(f"step {step}: {exc}") from None
+            for ticker, value in entries:
+                try:
+                    quantity = check_order(ticker, value)
+                except ValidationError:
+                    # Not an order, so not an execution: skipped like a
+                    # refused one.
+                    continue
+                if isinstance(quantity, Limit):
+                    raise ValidationError(
+                        f"step {step}: the agent sent {quantity!r} for "
+                        f"{ticker!r}, and analyse() prices market orders "
+                        "only. The part of a limit order that waits fills "
+                        "inside a session, and the untraded world has no "
+                        "price for the minute it filled. Send a number of "
+                        "shares, or run the agent in tradefloor.World, whose "
+                        "trace records each limit order's fills.")
+                if quantity is None or isinstance(quantity, Cancel):
+                    # A Cancel has nothing to cancel: no limit order is
+                    # ever sent from here.
                     continue
                 try:
                     portfolio.execute(engine, ticker, quantity)
@@ -477,7 +513,6 @@ def analyse(
     # -- world B: nobody trades -------------------------------------------
     #
     # Run second, so an agent that raises does so before this work is spent.
-    quiet = fresh()
     baseline_path: list[list[float]] = []
     for day in range(days):
         if scenario is not None:
