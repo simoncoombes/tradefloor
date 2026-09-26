@@ -6,83 +6,67 @@ applies. The last step is the owner's.
 
 ## The branch today
 
-`release/0.8.5` merges `fix/agent-flow-once`, `feature/order-book-depth`,
-`feature/bonds`, `docs/model-spec`, `preset/pt-v20`, `fixtures/pt-v20`,
-`fix/ptv20-core` (the Oracle, `fair_value_shift`, the corporate-yield fixes)
-and `docs/model-spec-v20`, plus five commits cherry-picked from `dev`
-(c618089, d1cb9a6, a46575e, fbdcac1, d445d9c; 1c653e7 is superseded).
-pt-v20 is the default. At 0b8dbbc the full Python suite read 23 failures,
-all explained in step 1 (the fixture replays and pt-v20's stale record);
-before 99969c7 it passed 4,084 with none failing, and `cargo test` passed
-552 of 552.
+`integration/0.8.5` (2026-09-26) is `release/0.8.5` (6a808c0) with
+`fix/ptv20-final` (1b21118, pt-v20's graded arm), `feature/seed64`
+(d589c04) and `fix/harness-sandbox` (238571b) merged, one merge commit
+each, and RELEASING 5b run on the final vector. It is pushed and not yet
+merged into `release/0.8.5`. `release/0.8.5` before it merged
+`fix/agent-flow-once`, `feature/order-book-depth`, `feature/bonds`,
+`docs/model-spec`, `preset/pt-v20`, `fixtures/pt-v20`, `fix/ptv20-core`
+(the Oracle, `fair_value_shift`, the corporate-yield fixes) and
+`docs/model-spec-v20`, plus five commits cherry-picked from `dev` (c618089,
+d1cb9a6, a46575e, fbdcac1, d445d9c; 1c653e7 is superseded). pt-v20 is the
+default, at the vector the grade box ptv20g6 passed 40 of 40 on.
+
+On the integration head the full Python suite (`pytest -n 4`) fails only
+the 17 tests that replay the five recorded LLM fixtures (see step 1), and
+`cargo test` passes 564 with none failing.
 
 | digest | value |
 |---|---|
-| `simulationSha256` (KAT 28) | `4528d93a...` |
-| `sha256` (known answer) | `f4a81e0b...` |
+| `simulationSha256` (KAT 28) | `72485a9f...` |
+| `sha256` (known answer) | `ac004fea...` |
 | `metadataSha256` | `8804ef0e...` |
-| `bondsSha256` | `b8798418...` |
-| book `sha256` | `1e7f1884...` (BOOK_KAT_VERSION 1) |
-| presets, 19 rows | combined `f131be87...`; pt-v20's row `9befa413...` |
+| `bondsSha256` | `cac3ff44...` |
+| book `sha256` | `81aceb27...` (BOOK_KAT_VERSION 1; `d075094c...` without the state hash) |
+| presets, 19 rows | combined `87f0b185...`; pt-v20's row `07ab6e0c...` |
+| 64-bit seed line | `cef62229...` (seed 2**63 + 12345, pt-v19) |
 
-These are at 99969c7's dials, which are withdrawn, and all move with the
-final ones. The book digest and the eighteen rows before pt-v20 do not.
-AWS spend on this release so far is about $0.29.
-
-The eighteen per-preset rows before pt-v20 match the published 0.8.1 wheel
-with the two treasury yields left out.
+These are pt-v20's graded arm, produced on macOS arm64. The eighteen
+per-preset rows before pt-v20 are `release/0.8.5`'s and match the published
+0.8.1 wheel with the two treasury yields left out; seed64 and the sandbox
+moved no digest.
 
 ## 1. The last engine changes
 
-State at the handover on 2026-09-25. `release/0.8.5` is at 2c8b32b (docs
-`release/0.8.5` at 8535734), both pushed. Every step below waits for all of
-this.
-
-- [ ] **E3's `fix/ptv20-core` is NOT final.** It is at 1cb4f6f on origin,
-      not merged here. Open on it: forward-looking valuation (so the model
-      can fall as fast as March 2020), the 2022 rate-to-P/E sensitivity,
-      volatility memory re-tested in the same grid, the cycle-phase blocker
-      the audit raised, and a new registered row C10, then a regrade of
-      every row. `release/0.8.5` still carries 99969c7's dials
-      (`volume_move_response` 0.6, `garch_beta` 0.85). `garch_beta` 0.85 is
-      withdrawn (box g5 read `index_drift_pct` 1.047 against the floor of
-      1.1) and comes back to 0.7905 with E3's final merge.
-- [ ] **E7's `feature/seed64` (d589c04) is ready, not yet merged.** 64-bit
-      seeds, and seeds below 2**32 stay bit-identical. A sixth known-answer
-      line pins a seed above 2**32 on pt-v19 (`cef62229...`). Checked on a
-      build of d589c04: the known answer, bonds, book and all nineteen
-      per-preset digests equal this branch's, and the eighteen frozen rows
-      still match the 0.8.1 wheel. It merges cleanly with `fix/ptv20-core`
-      (E7's `git merge-tree` check). Merge it with E3's final branch and
-      check every digest again on the merged build.
-- [ ] **`fix/harness-sandbox` is in progress**, for the audit's `obs.engine`
-      finding. Merge it when it lands.
-- [ ] **The independent adversarial audit of pt-v20 is in progress.** It
-      re-runs on E3's final commit, after RELEASING 5b and before the PR,
-      and the bar is no open blockers or majors. Any finding goes back to
-      E3 for a fix and a regrade, and every step from here is re-run on the
-      fixed vector before the PR.
-- [ ] **The five LLM fixtures are re-recorded once, after E3 is final.**
-      Until then 21 tests that replay them fail on this branch, and
-      `test_preset_records[pt-v20]` fails because pt-v20's record predates
-      99969c7's dials.
-- [ ] Once the dials are final, re-run RELEASING 5b for the final vector:
-      pt-v20's record with its level block (`tools/presets/level_panel.py`
-      on pt-v20 and pt-v19, `level_rows.py`, `record.py --level-rows`),
-      `envelope_tables.py --write`, the default's known answer in
-      `tests/known_answer.json`, and pt-v20's row in
-      `tests/known_answer_presets.json`. KAT 28 has never shipped, so it is
-      re-based in place rather than bumped; the eighteen rows before pt-v20
-      may not change.
+- [x] **E3's `fix/ptv20-final` is merged** (1b21118): the graded arm,
+      `garch_beta` back at 0.7905, the known answers re-based in place
+      (KAT 28 has never shipped).
+- [x] **E7's `feature/seed64` is merged** (d589c04), and every digest
+      checked again on the merged build.
+- [x] **`fix/harness-sandbox` is merged** (238571b).
+- [ ] **The independent adversarial audit of pt-v20** re-runs on the final
+      commit, after RELEASING 5b and before the PR, and the bar is no open
+      blockers or majors. Any finding goes back to E3 for a fix and a
+      regrade, and every step from here is re-run on the fixed vector
+      before the PR.
+- [ ] **The five LLM fixtures are re-recorded once**, with API keys. Until
+      then the 17 tests that replay them fail on this branch.
+- [x] RELEASING 5b on the final vector: pt-v20's record from the grade
+      box's preset panel (ptv20g6), its level block from a paired run on
+      this build (`tools/presets/results/level-rows-pt-v20-2026-09-26.json`,
+      the control pt-v19 reproducing its four constants), its long-run
+      block from `verdict-pt-v20-g6.json`, `envelope_tables.py --write`,
+      and the known answers as re-based on `fix/ptv20-final`.
 - [ ] Re-run the envelope gap measurements on the final vector
       (`tools/calibration/aws/user-data-envgaps.sh`, one box, about $0.15)
       and fold them into `envelope.py` and `loss.py`. The runs on branches
       `envgaps/pt-v20` (folded) and `envgaps/pt-v20-final` (6fa7462, not
       folded, measured at `garch_beta` 0.85) are superseded by that run.
-- [ ] The CHANGELOG's pt-v20 figures, the README's realism section,
-      MODEL.md's values, notebooks 00 to 06 and 09 and the pt-v19 figures
-      left in the docs glossary and core-concepts pages follow the final
-      vector.
+- [ ] The CHANGELOG's release note (it quotes the ptv20g3 figures), the
+      README's realism section, notebooks 00 to 06 and 09 and the pt-v19
+      figures left in the docs glossary and core-concepts pages follow the
+      final vector. MODEL.md's values follow it on `integration/0.8.5`.
 
 ## 2. The docs branch against the final engine
 
@@ -155,6 +139,8 @@ venv that holds a build of the final engine commit:
       owner, then `curl -sI https://tradefloor.dev/` and `indexnow.py`.
 - [ ] Merge `main` into `dev`.
 - [ ] Delete the working branches and worktrees: `integration/0.8.5`,
+      `archive/integration-0.8.5-677ca51` (the earlier local integration
+      branch, renamed when this one was made),
       `flip/a`, `flip/b`, `flip/c`, `envgaps/pt-v20`, `remeasure/pt-v20`,
       and in the docs repo `figures/pt-v20`.
 
