@@ -171,11 +171,18 @@ jobs:
           cd "${{ runner.temp }}"
           python -c "import tradefloor as tf; print('import ok on', tf.__version__)"
           cd "${{ github.workspace }}"
+          # test_python_versions.py compares an agent-driven run with
+          # digests taken on 3.11. The other four each run inside one
+          # interpreter and could not see a difference between two: 0.8.5
+          # shipped with the random baseline's orders differing between
+          # 3.11 and 3.12 in the last bits (built-in sum() over floats
+          # changed in 3.12) and this job stayed green.
           python -m pytest -q \
             tests/test_forking.py \
             tests/test_checkpoint.py \
             tests/test_replay.py \
-            tests/test_packaging.py
+            tests/test_packaging.py \
+            tests/test_python_versions.py
 
   complete:
     name: the suite is green

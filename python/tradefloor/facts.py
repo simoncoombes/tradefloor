@@ -388,6 +388,7 @@ import statistics
 import textwrap
 from typing import Any, Iterable, Mapping, Sequence
 
+from ._arith import ordered_sum
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
 
@@ -2524,7 +2525,7 @@ def level_ar1(series: Sequence[float]) -> float:
             f"a lag-one autocorrelation needs at least three observations, "
             f"got {len(values)}")
     mean = statistics.fmean(values)
-    if sum((v - mean) ** 2 for v in values) == 0.0:
+    if ordered_sum((v - mean) ** 2 for v in values) == 0.0:
         raise ValidationError(
             "a constant series has no lag-one autocorrelation, and 0.0 -- "
             "which `_autocorrelation` returns for one -- would enter a "
@@ -3279,8 +3280,8 @@ def aggregate_panels(panels: Sequence[Mapping[str, Any]],
             sessions = [p.get(session_key) for p in panels]
             if (all(h is not None for h in hits)
                     and all(n is not None for n in sessions)
-                    and sum(sessions)):
-                out[key] = 100.0 * sum(hits) / sum(sessions)
+                    and ordered_sum(sessions)):
+                out[key] = 100.0 * ordered_sum(hits) / ordered_sum(sessions)
             continue
         present = [p[key] for p in panels if p.get(key) is not None]
         if present:
@@ -3381,10 +3382,10 @@ def _autocorrelation(series: Sequence[float], lag: int) -> float:
     if len(series) <= lag + 1:
         return 0.0
     mean = statistics.mean(series)
-    variance = sum((x - mean) ** 2 for x in series)
+    variance = ordered_sum((x - mean) ** 2 for x in series)
     if variance == 0:
         return 0.0
-    return sum(
+    return ordered_sum(
         (series[i] - mean) * (series[i - lag] - mean)
         for i in range(lag, len(series))
     ) / variance
@@ -3407,7 +3408,7 @@ def _unit_centred(series: Sequence[float]) -> list[float] | None:
     """
     mean = statistics.mean(series)
     centred = [x - mean for x in series]
-    norm = math.sqrt(sum(x * x for x in centred))
+    norm = math.sqrt(ordered_sum(x * x for x in centred))
     if norm == 0:
         return None
     return [x / norm for x in centred]
@@ -3425,7 +3426,7 @@ def _correlation(a: Sequence[float], b: Sequence[float]) -> float | None:
     unit_a, unit_b = _unit_centred(a[:n]), _unit_centred(b[:n])
     if unit_a is None or unit_b is None:
         return None
-    return sum(x * y for x, y in zip(unit_a, unit_b))
+    return ordered_sum(x * y for x, y in zip(unit_a, unit_b))
 
 
 def _zumbach_terms(
@@ -3781,7 +3782,7 @@ def _index_drift_pct(
     if not by_day:
         return None
     daily = [math.log(statistics.mean(values)) for values in by_day.values()]
-    return sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
+    return ordered_sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
 
 
 #: Window, in sessions, for the correlation-persistence diagnostic. The
@@ -3850,7 +3851,7 @@ def _dependence(
             for b in keys[position + 1:]:
                 if unit[b] is None:
                     continue
-                rho = sum(x * y for x, y in zip(unit[a], unit[b]))
+                rho = ordered_sum(x * y for x, y in zip(unit[a], unit[b]))
                 pairwise.append(rho)
                 if sectors is not None and a in sectors and b in sectors:
                     (same_sector if sectors[a] == sectors[b] else cross_sector).append(rho)
@@ -3877,7 +3878,8 @@ def _dependence(
                     for b in live[position + 1:]:
                         if sub[b] is None:
                             continue
-                        rhos.append(sum(x * y for x, y in zip(sub[a], sub[b])))
+                        rhos.append(ordered_sum(
+                            x * y for x, y in zip(sub[a], sub[b])))
                 return statistics.fmean(rhos) if rhos else None
 
             if m_sd > 0:
@@ -4342,7 +4344,7 @@ def _excess_kurtosis(values: Sequence[float]) -> float | None:
     if sd == 0:
         return None
     standard = [(x - mean) / sd for x in values]
-    return sum(x ** 4 for x in standard) / len(standard) - 3.0
+    return ordered_sum(x ** 4 for x in standard) / len(standard) - 3.0
 
 
 def crisis_dispersion(
@@ -4569,8 +4571,9 @@ def panel_statistics(
         "instruments": count,
         "observations": len(pooled),
         "annualised_vol_pct": sd * math.sqrt(252) * 100.0,
-        "excess_kurtosis": sum(x ** 4 for x in standard) / len(standard) - 3.0,
-        "skew": sum(x ** 3 for x in standard) / len(standard),
+        "excess_kurtosis": (ordered_sum(x ** 4 for x in standard)
+                            / len(standard) - 3.0),
+        "skew": ordered_sum(x ** 3 for x in standard) / len(standard),
         # Medians across instruments, not a pooled series. Splicing sixty
         # histories end to end would measure the joins.
         "return_acf1": statistics.median(return_acf1),
@@ -6469,8 +6472,8 @@ def binomial_two_sided(n: int, k: int) -> float:
     if n < 1 or not 0 <= k <= n:
         raise ValidationError(f"need 0 <= k <= n and n >= 1, got k={k}, n={n}")
     total = 2 ** n
-    upper = sum(math.comb(n, j) for j in range(k, n + 1)) / total
-    lower = sum(math.comb(n, j) for j in range(0, k + 1)) / total
+    upper = ordered_sum(math.comb(n, j) for j in range(k, n + 1)) / total
+    lower = ordered_sum(math.comb(n, j) for j in range(0, k + 1)) / total
     return min(1.0, 2.0 * min(upper, lower))
 
 

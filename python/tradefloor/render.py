@@ -48,6 +48,7 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol, Sequence, runtime_checkable
 
+from ._arith import ordered_sum
 from ._core import ValidationError
 
 #: The values :class:`TextRenderer` accepts for `units`, `order` and
@@ -321,8 +322,10 @@ def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
             "sector": sector,
             "names": len(members),
             "held": sum(1 for m in members if m["position"]),
-            "exposure": sum(m["position"] * m["price"] for m in members),
-            "return_5d": (sum(returns) / len(returns)) if returns else None,
+            "exposure": ordered_sum(m["position"] * m["price"]
+                                    for m in members),
+            "return_5d": ((ordered_sum(returns) / len(returns))
+                          if returns else None),
         })
     return rows
 

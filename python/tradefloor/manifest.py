@@ -1468,8 +1468,14 @@ class RunManifest:
             "label": label,
             "written_by": {
                 "pretium_version": version(),
+                # The Python version as well, since 0.8.5. The engine does
+                # not depend on it, so a replay of this log does not either;
+                # an agent re-run to regenerate the log does, because the
+                # agent is Python. Manifests written before it was recorded
+                # load and replay the same way.
                 "platform": {"os": _platform.system(),
-                             "machine": _platform.machine()},
+                             "machine": _platform.machine(),
+                             "python": _platform.python_version()},
                 # The FULL preset surface of the model the engine actually
                 # ran, not the build's default, with "name" as its
                 # fingerprint. Embedding the values is what lets a custom
@@ -1753,6 +1759,21 @@ class RunManifest:
             f"{recorded['digest'][:12]}... (draws consumed "
             f"{engine.draws_consumed} against {recorded['draws_consumed']}). "
         )
+        python_there = wrote.get("python")
+        python_here = _platform.python_version()
+        if python_there is not None and python_there != python_here:
+            # Named so that it is ruled out rather than chased. Python 3.12
+            # changed float sum(), which is a real cause of two runs of the
+            # same AGENT disagreeing, and a reader who sees two versions here
+            # will suspect it.
+            head += (
+                f"It was written under Python {python_there} and replayed "
+                f"under {python_here}. That does not explain this: a replay "
+                "hands the recorded orders to the engine, which is compiled "
+                "Rust, and no Python arithmetic runs between them. A "
+                "different Python explains a different order log when an "
+                "agent is re-run, which is a different failure. "
+            )
         bisect = (" Bisect with tradefloor.replay(log, ..., until=n): replay "
                   "both to step n and compare, and the first n that differs "
                   "is the operation to look at.")
@@ -2125,6 +2146,7 @@ class RunManifest:
         checking it here would compare against."""
         doc = self._doc
         wrote = doc["written_by"]
+        python = wrote["platform"].get("python")
         lines = [
             f"run manifest{f' {self.label!r}' if self.label else ''}: "
             f"seed {doc['seed']}, "
@@ -2132,7 +2154,8 @@ class RunManifest:
             f"{doc['result']['days']} days, "
             f"{len(doc['order_log'])} log entries",
             f"  written by tradefloor {wrote['pretium_version']} on "
-            f"{wrote['platform']['os']}-{wrote['platform']['machine']}, "
+            f"{wrote['platform']['os']}-{wrote['platform']['machine']}"
+            f"{f' under Python {python}' if python else ''}, "
             f"model {wrote['model'].get('name')!r}, "
             f"era {wrote['era']['digest'][:12]}...",
             f"  universe: carried "

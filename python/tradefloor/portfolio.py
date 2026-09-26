@@ -62,6 +62,7 @@ import struct
 from typing import Literal
 
 from . import _core
+from ._arith import ordered_sum
 from ._core import Engine, OrderError, ValidationError
 from ._core import rate_specs as _rate_specs
 
@@ -399,8 +400,9 @@ class Portfolio:
             "quantity": filled,
             "price": out["average_price"],
             "worst_price": out["worst_price"],
-            "notional": sum((f["quantity"] if side == "buy" else -f["quantity"])
-                            * f["price"] for f in out["fills"]),
+            "notional": ordered_sum(
+                (f["quantity"] if side == "buy" else -f["quantity"])
+                * f["price"] for f in out["fills"]),
             "requested": quantity,
             "partial": out["filled"] < size,
             "day": self._stamp[0],
@@ -455,7 +457,7 @@ class Portfolio:
             gross += abs(quantity) * prices.get(held.ticker, held.avg_cost)
         if ticker not in self.positions:
             gross += abs(filled) * price
-        equity = (self.cash - notional) + sum(
+        equity = (self.cash - notional) + ordered_sum(
             (held.quantity + (filled if held.ticker == ticker else 0.0))
             * prices.get(held.ticker, held.avg_cost)
             for held in self.positions.values()
@@ -475,7 +477,7 @@ class Portfolio:
         trader and a reckless one as identical.
         """
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             abs(p.quantity) * prices[p.ticker]
             for p in self.positions.values()
             if p.ticker in prices
@@ -495,7 +497,7 @@ class Portfolio:
 
     def market_value(self, engine: Engine) -> float:
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             p.market_value(prices[p.ticker])
             for p in self.positions.values()
             if p.ticker in prices
@@ -511,14 +513,14 @@ class Portfolio:
 
     def unrealised(self, engine: Engine) -> float:
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             p.unrealised(prices[p.ticker])
             for p in self.positions.values()
             if p.ticker in prices
         )
 
     def realised(self) -> float:
-        return sum(p.realised for p in self.positions.values())
+        return ordered_sum(p.realised for p in self.positions.values())
 
     # -- cash -------------------------------------------------------------
 

@@ -88,6 +88,7 @@ from typing import Any, Literal
 
 import tradefloor as tf
 from tradefloor import baselines, envelope
+from tradefloor._arith import ordered_sum
 from tradefloor._core import check_seed
 from tradefloor.facts import REAL_MARKETS, band_distance
 
@@ -261,7 +262,7 @@ def _nodes(tree: dict[str, Any]) -> int:
     number of nodes rather than as an empty list that could equally mean
     nothing was replayed.
     """
-    return 1 + sum(_nodes(child) for child in tree["children"])
+    return 1 + ordered_sum(_nodes(child) for child in tree["children"])
 
 
 def _statistic_line(name: str) -> str:
@@ -1555,7 +1556,7 @@ def explain_price_move(
     rows = []
     for i, tk in enumerate(tickers):
         parts = {f: cols[f][i] for f in tf.Engine.FACTORS}
-        total = sum(parts.values())
+        total = ordered_sum(parts.values())
         # Rounded for readability, but the residual is measured on the
         # ROUNDED values that are actually returned. Reporting the model's
         # ~1e-16 residual next to figures rounded to 1e-10 would be a
@@ -1567,7 +1568,7 @@ def explain_price_move(
             "ticker": tk,
             "total_log_move": shown_total,
             "factors": shown,
-            "residual": abs(sum(shown.values()) - shown_total),
+            "residual": abs(ordered_sum(shown.values()) - shown_total),
             "largest_factor": max(parts, key=lambda f: abs(parts[f])),
         })
 

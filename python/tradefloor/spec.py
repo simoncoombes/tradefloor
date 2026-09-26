@@ -87,6 +87,7 @@ import json
 import math
 from typing import Any, Mapping, Sequence
 
+from ._arith import ordered_sum
 from ._core import GameRng, ValidationError, check_seed
 
 #: Bumped when the MEANING of a spec changes, never for additive growth. A new
@@ -264,7 +265,7 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
     # the weight vector, so 1.2/0.8 and 0.6/0.4 build bit-identical agents,
     # and an unnormalised form would hash equal strategies apart. Signs and
     # ratios survive, so a net-short-signal tilt is still expressible.
-    total = sum(abs(c["weight"]) for c in merged.values())
+    total = ordered_sum(abs(c["weight"]) for c in merged.values())
     ordered = sorted(merged.values(), key=_identity_of)
     for component in ordered:
         component["weight"] = component["weight"] / total

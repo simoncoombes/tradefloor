@@ -178,6 +178,7 @@ import struct
 from collections import Counter
 from typing import Any, Sequence
 
+from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
@@ -964,7 +965,7 @@ class World:
     def _limit_fill(report: dict, mid: float | None) -> dict:
         """A limit order's trace entry: what filled at once, and what waits."""
         sign = 1.0 if report["side"] == "buy" else -1.0
-        notional = sum(f["quantity"] * f["price"] for f in report["fills"])
+        notional = ordered_sum(f["quantity"] * f["price"] for f in report["fills"])
         return {
             "ticker": report["ticker"],
             "quantity": sign * report["filled"],
@@ -1664,7 +1665,7 @@ class World:
         start = 0 if start is None else max(0, min(start, len(self.trace)))
         window = [_fields_of(row, label) for row in self.trace[start:]]
         fills = [f for row in window for f in row["fills"]]
-        turnover = sum(abs(f["notional"]) for f in fills)
+        turnover = ordered_sum(abs(f["notional"]) for f in fills)
         cost = _execution_cost(fills)
 
         if (self._fork_worth is not None and start == self.fork_step
@@ -2203,8 +2204,9 @@ def _net(decision: Any) -> float:
 
 def _gross(decision: Any) -> float:
     """Shares moved, both directions."""
-    return float(sum(abs(action.quantity) for action in decision.actions
-                     if action.side.upper() in ("BUY", "SELL")))
+    return float(ordered_sum(abs(action.quantity)
+                             for action in decision.actions
+                             if action.side.upper() in ("BUY", "SELL")))
 
 
 def _lines(prompt: Any) -> list[str]:
@@ -2710,7 +2712,8 @@ class Invariance:
                 rate = matched / n
                 totals[a].append(rate)
                 totals[b].append(rate)
-        return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
+        return {k: (ordered_sum(v) / len(v) if v else 0.0)
+                for k, v in totals.items()}
 
     def most_agreed(self) -> str | None:
         """The renderer key with the STRICTLY highest :meth:`agreement_rate`,

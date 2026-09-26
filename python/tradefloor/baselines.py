@@ -135,6 +135,7 @@ if TYPE_CHECKING:
     # for everyone who is not a type checker.
     from ._core import FactorName
 
+from ._arith import ordered_sum
 from ._core import Engine, GameRng, check_seed
 from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
@@ -287,7 +288,7 @@ class RandomTrader:
 
     def act(self, obs: Observation) -> dict[str, float]:
         raw = [self.rng.next_float() * 2.0 - 1.0 for _ in obs.tickers]
-        total = sum(abs(x) for x in raw)
+        total = ordered_sum(abs(x) for x in raw)
         if total == 0:
             return {}
         scale = self.gross / total
@@ -434,7 +435,7 @@ class Balanced:
         self.bonds = dict(DEFAULT_BOND_SLEEVE if bonds is None else bonds)
         if self.equity < 0 or any(w < 0 for w in self.bonds.values()):
             raise ValueError("weights must not be negative")
-        if self.equity + sum(self.bonds.values()) > 1.0 + 1e-12:
+        if self.equity + ordered_sum(self.bonds.values()) > 1.0 + 1e-12:
             raise ValueError("equity and bond weights sum to more than 1")
         self.band = None if band is None else float(band)
         self.max_participation = float(max_participation)
@@ -461,8 +462,10 @@ class Balanced:
             return {}
         worth = obs.portfolio.net_worth(obs.engine)
         held = {t: obs.position(t) * obs.price(t) for t in obs.tickers}
-        equity_value = sum(v for t, v in held.items() if t not in RATE_TICKERS)
-        bond_value = sum(v for t, v in held.items() if t in RATE_TICKERS)
+        equity_value = ordered_sum(v for t, v in held.items()
+                                   if t not in RATE_TICKERS)
+        bond_value = ordered_sum(v for t, v in held.items()
+                                 if t in RATE_TICKERS)
         self.marks.append((obs.day, equity_value, bond_value))
         if not self._started:
             self._started = True

@@ -72,6 +72,7 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
+from ._arith import ordered_sum
 from ._core import ValidationError, preset_names
 from . import facts as _facts
 from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
@@ -2279,7 +2280,7 @@ def score(panel: Mapping[str, float], *,
         # Both numbers are right about different row sets, which is exactly
         # the state `row-value-carries-its-container` refuses, so each count
         # now says what it was taken over.
-        "edge_form_rows": (sum(_facts.edge_liveness_counts(
+        "edge_form_rows": (ordered_sum(_facts.edge_liveness_counts(
             horizon_days).values()) if basis == BAR_BAND_BASIS else None),
         "panel_rows": len(rows),
         # The split. A gate reads `shape_in_band` against `shape_of`; the
@@ -2355,12 +2356,12 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
     hit_key, session_key = _facts.pooled_rate_counts(TAIL_ROW)
     hits = [p.get(hit_key) for p in panels]
     sessions = [p.get(session_key) for p in panels]
-    if any(h is None for h in hits) or not sum(n or 0 for n in sessions):
+    if any(h is None for h in hits) or not ordered_sum(n or 0 for n in sessions):
         return None
 
     bands, _, ruler_name = RULERS_BY_BASIS[basis][horizon_days]
     low, high = bands[TAIL_ROW]
-    rate = 100.0 * sum(hits) / sum(sessions)
+    rate = 100.0 * ordered_sum(hits) / ordered_sum(sessions)
     rates = [100.0 * h / n for h, n in zip(hits, sessions) if n]
     se_m = (statistics.stdev(rates) / math.sqrt(len(rates))
             if len(rates) > 1 else None)
@@ -2379,8 +2380,8 @@ def tail_block(panels: Sequence[Mapping[str, Any]], *,
         "basis": basis,
         "basis_detail": _facts.band_basis(ruler_name),
         "seeds": len(rates),
-        "hits": sum(hits),
-        "sessions": sum(sessions),
+        "hits": ordered_sum(hits),
+        "sessions": ordered_sum(sessions),
         "rate": rate,
         "band": [low, high],
         "in_band": low <= rate <= high,

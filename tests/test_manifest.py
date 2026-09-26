@@ -433,3 +433,67 @@ def test_a_short_history_is_named_as_an_input_difference():
     assert "did not cover how it reached its state" in message
     # And specifically NOT the platform, which is the same on both sides.
     assert "different platforms" not in message
+
+
+# --------------------------------------------------------------------------
+# The Python version
+# --------------------------------------------------------------------------
+
+
+def test_a_manifest_records_the_python_it_was_written_under():
+    """Python 3.12 changed float sum(), which split agent-driven runs in
+    0.8.5 between 3.11 and 3.12. A manifest that records only the OS and
+    the machine cannot tell a reader which side of that change it came from.
+    """
+    import platform as _p
+
+    universe = tradefloor.Universe.random(4, seed=1)
+    engine = tradefloor.Engine(seed=1, universe=universe)
+    engine.run_days(1, record=False)
+    manifest = tradefloor.RunManifest.of(engine, seed=1, universe=universe)
+    assert manifest.written_by["platform"]["python"] == _p.python_version()
+    assert f"under Python {_p.python_version()}" in manifest.describe()
+    # And it survives the trip through JSON.
+    loaded = tradefloor.RunManifest.from_json(manifest.to_json())
+    assert loaded.written_by["platform"]["python"] == _p.python_version()
+
+
+def test_a_divergence_under_another_python_rules_python_out():
+    """Named so a reader does not chase it. The replay feeds the log to the
+    compiled engine, so the Python version cannot move the market digest,
+    and the message says so rather than leaving two version numbers side by
+    side for the reader to draw the wrong conclusion from."""
+    import platform as _p
+
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        _diverging_manifest(os=_p.system(), machine=_p.machine(),
+                            python="3.11.0").reproduce()
+    message = str(raised.value)
+    if _p.python_version() != "3.11.0":
+        assert "written under Python 3.11.0" in message
+        assert "That does not explain this" in message
+    # The platform diagnosis is unchanged: same OS and machine.
+    assert "platform difference is NOT the explanation" in message
+
+
+def test_a_manifest_from_before_the_python_field_still_loads():
+    """Every manifest written before 0.8.5 lacks the key. Loading,
+    describing and diagnosing one must not depend on it."""
+    import json
+    import platform as _p
+
+    universe = tradefloor.Universe.random(4, seed=1)
+    engine = tradefloor.Engine(seed=1, universe=universe)
+    engine.run_days(1, record=False)
+    doc = json.loads(tradefloor.RunManifest.of(
+        engine, seed=1, universe=universe).to_json())
+    del doc["written_by"]["platform"]["python"]
+    old = tradefloor.RunManifest.from_json(json.dumps(doc))
+    assert "under Python" not in old.describe()
+    old.reproduce()
+
+    doc["result"]["digest"] = "0" * 64
+    doc["written_by"]["platform"].update(os=_p.system(), machine=_p.machine())
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        tradefloor.RunManifest.from_json(json.dumps(doc)).reproduce()
+    assert "Python" not in str(raised.value)
