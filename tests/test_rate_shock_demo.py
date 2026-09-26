@@ -16,6 +16,7 @@ and reproduced by somebody who was not there.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -322,3 +323,93 @@ def test_the_demo_completes_quickly(tmp_path, capsys):
     report = demo.main(out=tmp_path, chart=False)
     capsys.readouterr()
     assert report["seconds"] < 30.0
+
+
+# ---------------------------------------------------------------------------
+# The walkthrough quotes the demo
+# ---------------------------------------------------------------------------
+
+WALKTHROUGH = STUDY / "README.md"
+
+
+@pytest.fixture(scope="module")
+def printed(tmp_path_factory) -> str:
+    """What the demo prints, from one run shared by the checks below."""
+    import contextlib
+    import io
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        demo.main(out=tmp_path_factory.mktemp("walkthrough"), chart=False)
+    return out.getvalue()
+
+
+def _squash(line: str) -> str:
+    return " ".join(line.split())
+
+
+def _plain_blocks(text: str) -> list[list[str]]:
+    """The fenced blocks with no language, line by line. A regex pairs a
+    closing fence with the next opening one as readily as with its own."""
+    blocks, body, plain = [], None, False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            if body is None:
+                body, plain = [], line.strip() == "```"
+            else:
+                if plain:
+                    blocks.append(body)
+                body = None
+        elif body is not None:
+            body.append(line)
+    return blocks
+
+
+def test_the_walkthrough_quotes_what_the_demo_prints(printed):
+    """Every output block in the walkthrough is lines the demo printed.
+
+    The walkthrough is the page the README sends a first-time reader to, and
+    at 0.8.5 every block of output in it was from an older market: prices,
+    book levels, the cut table, the forty-day prices and both books, none of
+    which the script printed any more. A reader comparing the page with the
+    terminal would conclude the install was broken.
+
+    A plain fenced block whose first line the demo prints is taken as quoted
+    output, and then all of it must be. Blocks whose first line it does not
+    print (the diagram, the formula, the directory listing) are left alone.
+    """
+    text = WALKTHROUGH.read_text(encoding="utf-8")
+    lines = {_squash(line) for line in printed.splitlines() if line.strip()}
+    quoted = 0
+    for block in _plain_blocks(text):
+        body = [_squash(line) for line in block if line.strip()]
+        if not body or body[0] not in lines:
+            continue
+        quoted += 1
+        stale = [line for line in body if line not in lines]
+        assert not stale, (
+            f"examples/rate-shock/README.md quotes lines the demo no longer "
+            f"prints: {stale}. Paste the current output of "
+            f"counterfactual.py into that block.")
+    # The four blocks: the agreement, the cut, the prices and the books.
+    assert quoted >= 4, f"found {quoted} quoted output blocks, expected 4"
+
+
+def test_the_walkthrough_states_the_checkpoint_size_it_writes(printed):
+    """'About 21 kB' stood beside a checkpoint of 29,809 bytes."""
+    text = WALKTHROUGH.read_text(encoding="utf-8")
+    claimed = re.search(r"about (\d+) kB of JSON", text)
+    assert claimed, "the walkthrough no longer states the checkpoint's size"
+    written = re.search(r"([\d,]+) bytes of JSON", printed)
+    assert written, printed[:2000]
+    size = int(written.group(1).replace(",", ""))
+    assert abs(int(claimed.group(1)) * 1000 - size) <= 0.1 * size, (
+        f"the walkthrough says about {claimed.group(1)} kB and the demo "
+        f"writes {size:,} bytes")
+
+
+def test_the_printed_rate_sensitivity_is_the_presets(printed):
+    """The line that explains the rate channel names the running preset's
+    coefficient. It said 1.5 after the default moved to pt-v20, whose 3 is
+    what the forty-day price table shows."""
+    sensitivity = tf.ModelParams.from_preset().to_dict()["rate_pe_sensitivity"]
+    assert f"(discount - neutral) x {sensitivity:g} x" in printed, printed[:2000]

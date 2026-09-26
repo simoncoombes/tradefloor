@@ -89,7 +89,9 @@ SHOCKED_DISCOUNT_RATE = DISCOUNT_RATE + SHOCK_BPS / 10_000
 #: Four companies, written down rather than drawn, so the roster is pinned
 #: exactly and the story is legible. They differ in the one property that
 #: decides rate sensitivity in this model: revenue growth is the duration term
-#: in `1 - (discount - neutral) * 1.5 * (1 + growth * 2)`.
+#: in `1 - (discount - neutral) * sensitivity * (1 + growth * 2)`, where
+#: `sensitivity` is the preset's `rate_pe_sensitivity`, 3 on pt-v20 and 1.5
+#: through pt-v19.
 #:
 #: Opening prices sit near each company's fair value at the starting discount
 #: rate, so the market does not begin with a large mispricing correction that
@@ -216,8 +218,12 @@ def _show_market(roster: tf.Universe) -> None:
                               neutral_discount_rate=neutral)
         print(f"  {ticker:<6}{sector:<22}{growth:>8.2f}{price:>9.2f}"
               f"{value.fair_value:>12.2f}   {label}")
+    # The preset's own coefficient: 1.5 through pt-v19 and 3 on pt-v20, and
+    # this line said 1.5 after the default moved.
+    sensitivity = tf.ModelParams.from_preset().to_dict()["rate_pe_sensitivity"]
     print()
-    print("  Rate sensitivity here is 1 - (discount - neutral) x 1.5 x")
+    print(f"  Rate sensitivity here is 1 - (discount - neutral) x "
+          f"{sensitivity:g} x")
     print("  (1 + growth x 2), so revenue growth IS the duration term, and")
     print("  the same 200bp shift costs NOVA the most and STAP the least.")
 

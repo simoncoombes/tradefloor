@@ -100,7 +100,9 @@ SHOCKED_DISCOUNT_RATE = DISCOUNT_RATE + SHOCK_BPS / 10_000
 
 #: Four companies, written down rather than drawn. They differ in the one
 #: property that decides rate sensitivity in this model: revenue growth is the
-#: duration term in `1 - (discount - neutral) * 1.5 * (1 + growth * 2)`.
+#: duration term in `1 - (discount - neutral) * sensitivity * (1 + growth * 2)`,
+#: where `sensitivity` is the preset's `rate_pe_sensitivity`, 3 on pt-v20
+#: and 1.5 through pt-v19.
 #:
 #: ticker, sector, what it is, price, shares, eps, book value, revenue growth,
 #: average daily volume, beta, short interest.
