@@ -211,25 +211,25 @@ PRESET = "pt-v20"
 #: is what every caller that GRADES this table reads. `band_distance(None,
 #: ...)` is a TypeError, and a row with no reading has no verdict to give.
 CERTIFIED: dict[str, float | None] = {
-    "annualised_vol_pct": 20.0846,
-    "excess_kurtosis": 17.7886,
+    "annualised_vol_pct": 20.5456,
+    "excess_kurtosis": 18.1072,
     "return_acf1": 0.0130,
-    "abs_return_acf1": 0.0342,
-    "abs_return_acf5": 0.0221,
-    "abs_return_acf20": 0.0101,
-    "cross_sectional_corr": 0.2893,
-    "volume_abs_return_corr": 0.5757,
-    "leverage_effect": -0.0320,
-    "volume_change_acf1": -0.2580,
-    "corr_asymmetry": 0.0591,
-    "corr_asymmetry_lagged": 0.1076,
-    "sector_excess_corr": 0.1230,
-    "corr_persistence_acf1": 0.2843,
+    "abs_return_acf1": 0.0282,
+    "abs_return_acf5": 0.0188,
+    "abs_return_acf20": 0.0044,
+    "cross_sectional_corr": 0.3053,
+    "volume_abs_return_corr": 0.5084,
+    "leverage_effect": -0.0341,
+    "volume_change_acf1": -0.2540,
+    "corr_asymmetry": 0.0791,
+    "corr_asymmetry_lagged": 0.0860,
+    "sector_excess_corr": 0.1165,
+    "corr_persistence_acf1": 0.2303,
     # Read on 4 of the 30 seeds at this preset, with the reason above.
     # Written by `envelope_tables.py` from the record's `panel_252`, which
     # carries the row only when a seed read it; `dispersion["panel_252"]` on
     # the record carries how many of the thirty did and why the rest did not.
-    "crisis_sector_dispersion": 1.4041,
+    "crisis_sector_dispersion": 1.3040,
 }
 
 
@@ -288,6 +288,15 @@ def certified_panel() -> dict[str, float]:
 #: 15.6 points on one preset, because a drawn roster opens away from fair
 #: value by a draw worth several points of first-year drift.
 CERTIFIED_LEVEL: dict[str, float] = {
+    # pt-v20's graded arm (0.8.5) reads +7.6957 on the level protocol, at
+    # position 0.53 of the 2015-2025 band of 2.90 to 11.90 and 0.72 of the
+    # ruled band of 1.1 to 10.3, on a thirty-seed standard deviation of
+    # 10.41. pt-v20 before its graded arm read +1.1446, below the 2015-2025
+    # floor. The control, pt-v19, reproduced its own four published
+    # constants on the same build and seeds (paired run in
+    # `tools/presets/results/level-rows-pt-v20-2026-09-26.json`). The rest of
+    # this comment describes pt-v19, the default in 0.8.0 and 0.8.1.
+    #
     # The default preset RETURNS 7.65 per cent a year on its fifth
     # composition, inside the 2015-2025 band of 2.90 to 11.90 at band
     # position 0.53, and inside the ruled band of 1.1 to 10.3 that `score`
@@ -299,7 +308,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # here for three eras, and this row exists because of that. The seed
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
-    "index_drift_pct": 1.1446,
+    "index_drift_pct": 7.6957,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -347,8 +356,13 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # stood on 52 sessions, which is thin, against 118 under the pre-31ef261
     # vector, so the median moved on fewer and deeper falls rather than on
     # more of them. The record does not carry the fifth composition's count.
-    "fear_gauge_dn1": 1.7201,
-    "fear_gauge_dn3": 5.1188,
+    # pt-v20's graded arm reads 1.6594 and 4.2616 on the two fear rows and
+    # 0.8898 on the index tail below (67 sessions at or below -3 per cent in
+    # 7,530), all inside their 2015-2025 bands; before its graded arm it
+    # read 1.7201, 5.1188 and 0.8234. The comments above and below describe
+    # pt-v19's fifth composition.
+    "fear_gauge_dn1": 1.6594,
+    "fear_gauge_dn3": 4.2616,
     # The index tail row on the same thirty seeds, fifth composition: 86
     # sessions at or below -3 per cent in 7,530, a pooled rate of 1.1421 per
     # cent against the 2015-2025 band of 0.47 to 1.96 (position 0.45) and
@@ -376,7 +390,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # which as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: the level run is 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.8234,
+    "index_tail_dn3_pct": 0.8898,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -627,23 +641,23 @@ BAR_BAND_BASIS = "ruled"
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
 #: `BANDS_504`, and the count is over the rows this table can be graded by.
 MEASURED_504: dict[str, float | None] = {
-    "annualised_vol_pct": 20.1191,
-    "excess_kurtosis": 20.2711,
-    "return_acf1": 0.0257,
-    "abs_return_acf1": 0.0416,
-    "abs_return_acf5": 0.0328,
-    "abs_return_acf20": 0.0117,
-    "cross_sectional_corr": 0.2769,
-    "volume_abs_return_corr": 0.6181,
-    "leverage_effect": -0.0317,
-    "volume_change_acf1": -0.2406,
-    "corr_asymmetry": 0.0403,
-    "corr_asymmetry_lagged": 0.0724,
-    "sector_excess_corr": 0.1112,
-    "corr_persistence_acf1": 0.3768,
+    "annualised_vol_pct": 21.1128,
+    "excess_kurtosis": 19.2141,
+    "return_acf1": 0.0250,
+    "abs_return_acf1": 0.0384,
+    "abs_return_acf5": 0.0246,
+    "abs_return_acf20": 0.0092,
+    "cross_sectional_corr": 0.3116,
+    "volume_abs_return_corr": 0.5614,
+    "leverage_effect": -0.0365,
+    "volume_change_acf1": -0.2415,
+    "corr_asymmetry": 0.0489,
+    "corr_asymmetry_lagged": 0.0842,
+    "sector_excess_corr": 0.1102,
+    "corr_persistence_acf1": 0.2778,
     # Read on 9 of the 30 seeds at this preset, and the value is their
     # median. See the note above and `CERTIFIED`'s.
-    "crisis_sector_dispersion": 1.5426,
+    "crisis_sector_dispersion": 1.6591,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.

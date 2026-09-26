@@ -109,7 +109,11 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # record grades it on, 1.1 to 10.3 from 98 years of ^GSPC, it is in, at
     # the floor, and the three crisis rows are in on both. Both readings are
     # asserted, so the row cannot leave either table in silence.
-    EXPECTED_RED = {"index_drift_pct"}
+    #
+    # EMPTY AGAIN on pt-v20's graded arm, which reads +7.6957 on the level
+    # protocol, inside both tables (2015-2025 position 0.53, ruled 0.72);
+    # the set held {"index_drift_pct"} at the +1.1446 above.
+    EXPECTED_RED: set[str] = set()
     ruled, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
