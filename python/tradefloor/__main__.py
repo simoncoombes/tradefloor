@@ -4,10 +4,13 @@ A scenario is configuration, and configuration that can only be checked by
 running a hundred-day simulation is configuration nobody checks. These
 commands parse, validate, resolve and fingerprint a file in milliseconds:
 
-    tradefloor scenario validate scenarios/liquidity_crisis.yml
-    tradefloor scenario show     scenarios/oil_price_spike.yml
-    tradefloor scenario diff     scenarios/rate_shock.yml scenarios/recession.yml
+    tradefloor scenario validate liquidity_crisis ./my-scenario.yml
+    tradefloor scenario show     oil_price_spike
+    tradefloor scenario diff     rate_shock recession
     tradefloor scenario targets
+
+A name from `tradefloor scenario list` reads the file that ships with the
+library, and anything else is a path.
 
 `python -m tradefloor ...` is the same thing without the console script, for
 a checkout or an environment where scripts are not on PATH.

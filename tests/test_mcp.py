@@ -49,6 +49,28 @@ def test_every_tool_registers_with_a_description():
         assert t.input_schema is not None, t.name
 
 
+def test_the_readme_counts_the_tools_the_server_registers():
+    """The README's Contents table said twelve at 0.8.5, when the server
+    registered thirteen. The count is read off that row and compared with
+    the server, not with a literal here."""
+    import pathlib
+    import re
+    readme = (pathlib.Path(__file__).resolve().parent.parent
+              / "README.md").read_text(encoding="utf-8")
+    row = re.search(r"^\| MCP server \| (\w+) read-only tools", readme, re.M)
+    assert row, "README.md's Contents table has no MCP server row"
+    words = ["zero", "one", "two", "three", "four", "five", "six", "seven",
+             "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+             "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+             "nineteen", "twenty"]
+    word = row.group(1).lower()
+    claimed = int(word) if word.isdigit() else words.index(word)
+    tools = asyncio.run(mcp.server.list_tools())
+    assert claimed == len(tools), (
+        f"README.md says {word} tools and the server registers {len(tools)}: "
+        f"{sorted(t.name for t in tools)}")
+
+
 def test_the_catalogue_lists_the_pack_the_constructors_and_the_registry():
     out = mcp.list_scenarios()
     assert out["ok"] is True

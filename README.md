@@ -53,13 +53,17 @@ month.
 ## The demo
 
 ```
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 python examples/rate-shock/counterfactual.py
 ```
 
 Run an agent in a controlled market, checkpoint the world and fork it, then
 raise rates by 200bps in one branch and compare what the same agent does next.
+The wheel carries the library and not the examples, so the clone is what puts
+the script on disk.
 
-The run takes about two seconds and needs no keys and no network. It prints
+The run takes a few seconds and needs no keys and no network. It prints
 the nine checks that show the two branches started identical, the step at
 which the agent's behavior changed, and the two branches side by side. The
 walkthrough is
@@ -121,7 +125,7 @@ lists what the view serves and what the check cannot catch.
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| MCP server | twelve read-only tools for a coding agent, scenarios included |
+| MCP server | thirteen read-only tools for a coding agent, scenarios included |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
 Historical data shows that a stock fell. `truth()` also says why, for example
@@ -156,12 +160,14 @@ reads. The file keeps the shock apart from the knock-on effects you assume
 follow it:
 
 ```
-tradefloor scenario show scenarios/oil_price_spike.yml
+tradefloor scenario show oil_price_spike
 
 Exogenous shocks
+----------------------------------------------------------
   day 50+            commodity.oil            x1.4
 
 Assumed transmission
+----------------------------------------------------------
   day 55..74 ramp    macro.inflation          +1.50pp
   day 55+            macro.corporate_yield    +0.50pp
 ```
@@ -185,7 +191,7 @@ index. They are not real securities. Each is priced off the engine's own
 curve, returning `yield / 252 - D * dy + 0.5 * C * dy**2` a day, with
 duration and convexity of 1.9 and 4.6, 8.5 and 84, and 7.0 and 100. They
 trade through the same books, fills, portfolio and tape as the equities, and
-they leave every equity price unchanged. `scenarios/curve_shock.yml` moves
+they leave every equity price unchanged. `Scenario.load("curve_shock")` moves
 the whole curve 200 basis points in one day, which takes about 15% off
 `UST10Y`; `tradefloor.baselines.Balanced` is a 60/40 portfolio with a drift
 band. `evaluate(..., cash_interest=True)` pays uninvested cash the policy
@@ -267,9 +273,9 @@ Five limits are measured and written down:
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
 | roster | certification used a sector-balanced roster. Four concentrated sector mixes are also measured, on the shape rows only and for up to two years |
 
-`tf.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://tradefloor.dev/realism-envelope.html) says
-what each one forbids.
+`tf.envelope.check(horizon_days=...)` refuses a question that falls outside
+a limit, and [the realism envelope](https://tradefloor.dev/realism-envelope.html)
+says what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
 model, so a strategy that happens to match it will score well here and may
@@ -306,7 +312,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in ten to twenty seconds and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel the repair uses, with the same path on `pt-v19` at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel the repair uses, with the same path on the default, `pt-v20`, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -347,7 +353,9 @@ model gives a different answer each time. So an adapter records each call
 and its answer, and can replay the recording later without the framework or
 a key. The four examples are in
 [`examples/integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations),
-which says what each framework contributes and what tradefloor keeps.
+which says what each framework contributes and what tradefloor keeps. They
+run from a clone of this repository, because they read recorded runs from its
+`tests/fixtures/`.
 
 ## FinRobot integration
 
@@ -358,6 +366,7 @@ same agent responds. It is the rate-shock demo above with the agent swapped and
 nothing else changed.
 
 ```bash
+git clone https://github.com/simoncoombes/tradefloor && cd tradefloor
 pip install "tradefloor[finrobot]"
 python examples/integrations/finrobot/rate_shock.py            # replays a real recorded run
 python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot

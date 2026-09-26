@@ -246,10 +246,11 @@ hashes as it did.
 On pt-v20 market moves mostly stick: each shock moves fair value for good,
 so even perfect knowledge of the model's fair value leaves little edge. The
 Oracle made money in 10 of 14 test markets over 30 days (rosters
-`Universe.random(20, seed=3, 42, 11)`), and its P&L follows the market's
-month. A capture ratio there would measure the month. The Oracle stays in
-`reference_agents` as a reference agent, and the library reports no capture
-ratio on pt-v20. Scores are read against buy-and-hold instead.
+`Universe.random(20, seed=s)` for s in 3, 42 and 11), and its P&L follows
+the market's month. A capture ratio there would measure the month. The
+Oracle stays in `reference_agents` as a reference agent, and the library
+reports no capture ratio on pt-v20. Scores are read against buy-and-hold
+instead.
 
 `baselines.ORACLE_NOT_A_CEILING` names the presets without a ceiling, each
 with the reason a result gives, and holds pt-v20 alone. The check reads a
@@ -565,6 +566,13 @@ each file says so. The fingerprints are `sha256:c0cbfcb7...` and
 The earnings shocks write through `Engine.set_fundamentals`, which the order
 log did not record, so a `RunManifest` of such a run failed its own digest.
 The log now carries the write as `set_fundamentals`, and replay restores it.
+
+The new `liquidity_crisis.yml` broke `examples/11-scenario-fork.py`. It read
+the book around the last day of any intervention in the file, which the
+earnings recovery moved to day 175, past the end of its 80-day run, so it
+took no reading and stopped on a `TypeError`. It reads around the depth
+window now, and the default test run executes it, along with a check that
+names the test that runs each example script.
 
 ### The model specification and the support policy
 
