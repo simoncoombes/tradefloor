@@ -422,10 +422,10 @@ impl RateInstrument {
             level_step: 0.5,
         });
         for level in &bids {
-            book.append_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
+            book.push_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
         }
         for level in &asks {
-            book.append_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
+            book.push_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
         }
         book
     }
