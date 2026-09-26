@@ -30,7 +30,8 @@ import struct
 import time
 
 import tradefloor as tf
-from tradefloor.baselines import Momentum, capture_ratio, reference_agents
+from tradefloor.baselines import (Momentum, capture_ratio, capture_withheld,
+                                  reference_agents, versus_buy_and_hold)
 
 
 def main() -> dict:
@@ -66,10 +67,19 @@ def main() -> dict:
         print(f"     {card.name:16s} {card.return_pct:+7.2f}%  "
               f"impact {card.impact_bps:+8.2f} bps")
 
-    # The number worth reporting. Raw P&L is not comparable across markets,
-    # since a seed with more dispersion pays every strategy more, and dividing by
-    # what a perfectly-informed reference earned in THAT market removes
-    # exactly that.
+    # Raw P&L is not comparable across markets, so read each agent against a
+    # reference that traded the same one. Buy-and-hold first: did the agent
+    # earn more than owning the market did?
+    versus = versus_buy_and_hold(scores)
+    report["versus_buy_and_hold"] = versus
+    print(f"     P&L over buy-and-hold: "
+          f"{ {k: round(v) for k, v in versus.items()} }")
+
+    # Then the Oracle, where it is a ceiling. On pt-v19 and before, dividing
+    # by what a perfectly-informed reference earned in THAT market removes
+    # the market's dispersion from the score. On pt-v20, the default, market
+    # moves mostly stick, the Oracle's P&L follows the market's month, and
+    # `capture_ratio` returns nothing; `capture_withheld` says why.
     #
     # A ratio above 1.0 is legal. The Oracle is not an upper bound: it gets
     # the same gross exposure as everyone else and spends it on a naive
@@ -83,8 +93,12 @@ def main() -> dict:
     # nothing here clamps it.
     ratios = capture_ratio(scores)
     report["capture"] = ratios
-    print(f"     capture vs the oracle: "
-          f"{ {k: round(v, 3) for k, v in ratios.items()} }")
+    withheld = capture_withheld(scores)
+    if withheld is None:
+        print(f"     capture vs the oracle: "
+              f"{ {k: round(v, 3) for k, v in ratios.items()} }")
+    else:
+        print(f"     {withheld}")
 
     # ...and that table ranks the SEED at least as much as the agents. Twelve
     # markets, and a single seed picks the top agent half the time. So the
@@ -96,7 +110,12 @@ def main() -> dict:
     mark = time.time()
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(8),
                       universe=universe, days=5, workers=8)
-    report["ranking"] = {r.name: r.pooled_capture for r in ranking.table()}
+    # The headline: pooled capture where the Oracle is a ceiling, and mean
+    # P&L over buy-and-hold's where it is not.
+    report["ranking"] = {
+        r.name: (r.mean_excess_pnl if ranking.capture_withheld
+                 else r.pooled_capture)
+        for r in ranking.table()}
     print(f"     ranked across 8 seeds in {time.time() - mark:.1f}s")
     for line in ranking.report().splitlines()[1:]:
         print(f"  {line}")
@@ -113,24 +132,30 @@ def main() -> dict:
 
     # The spread of the leader across single seeds against its margin over
     # the runner-up. Until 0.8.5 the spread was always the wider, and this
-    # asserted it. On pt-v20, the default from 0.8.5, it is not: the Oracle
-    # loses money on five of these eight five-day markets, so capture is
-    # measurable on three, the ratios are large, and buy-and-hold leads
-    # mean reversion by 5.37 against a spread of 4.01 -- and wins all eight
-    # paired seeds. So what is asserted is that a margin wider than the
-    # spread only stands where the paired test backs it: a leader that is
-    # neither inside its own noise nor separated would be the coin flip in
-    # nicer clothes this section warns about.
-    span = first.capture_range[1] - first.capture_range[0]
-    margin = first.pooled_capture - second.pooled_capture
+    # asserted it. On pt-v20, the default from 0.8.5, the Oracle is no
+    # ceiling and the table reads P&L over buy-and-hold's, so the spread is
+    # the leader's per-seed P&L range and the margin the gap in mean P&L:
+    # buy-and-hold leads random by 25,044 a seed against a range of
+    # 38,450, and wins all eight paired seeds. So what is asserted is that a
+    # margin wider than the spread only stands where the paired test backs
+    # it: a leader that is neither inside its own noise nor separated would
+    # be the coin flip in nicer clothes this section warns about.
+    if ranking.capture_withheld is None:
+        span = first.capture_range[1] - first.capture_range[0]
+        margin = first.pooled_capture - second.pooled_capture
+        unit = ".3f"
+    else:
+        span = max(first.pnls) - min(first.pnls)
+        margin = first.mean_excess_pnl - second.mean_excess_pnl
+        unit = ",.0f"
     report["span_exceeds_margin"] = span > margin
     assert span > margin or verdict["p_value"] < 0.05, (
-        f"per-seed spread {span:.3f} is under the {margin:.3f} margin between "
-        f"the top two and the sign test does not separate them "
+        f"per-seed spread {span:{unit}} is under the {margin:{unit}} margin "
+        f"between the top two and the sign test does not separate them "
         f"(p={verdict['p_value']:.3f}): the table names a leader nothing "
         "supports")
-    print(f"     one seed swings the leader by {span:.3f}, against a "
-          f"{margin:.3f} margin over second place")
+    print(f"     one seed swings the leader by {span:{unit}}, against a "
+          f"{margin:{unit}} margin over second place")
 
     # 4. What did the winner's trading cost? Every fill priced against a market
     #    where it never traded, the benchmark real TCA cannot have.

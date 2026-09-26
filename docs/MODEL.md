@@ -1730,8 +1730,28 @@ month:
   buy-and-hold's -175,280.
 
 So the Oracle is measured as a ceiling on pt-v19 (`tests/test_baselines.py`,
-`CEILING_PRESET`). On pt-v20 a capture ratio measures the market's month,
-and `capture_ratio` declines to answer in every month the Oracle loses.
+`CEILING_PRESET`). On pt-v20 it stays in the reference set as a reference
+agent, not a ceiling, and the library reports no capture ratio there. A
+fraction of the Oracle's P&L would measure the market's month, not the
+agent.
+
+`baselines.ORACLE_NOT_A_CEILING` names the presets this applies to, each
+with the reason a result gives. It holds pt-v20 alone. The check reads a
+scorecard's `model_fingerprint`, so a custom model (`custom-XXXXXXXX`) keeps
+the ratio whatever preset it was built from. Where a preset is named:
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned, and
+  `capture_withheld` returns the reason;
+- `versus_buy_and_hold` gives each agent's P&L less buy-and-hold's in the
+  same market, the comparison to quote;
+- `rank` sets `Ranking.capture_withheld`, counts no seed as unmeasurable,
+  leaves every capture `None` and out of `as_dict()`, and sorts the table
+  on each agent's mean P&L over buy-and-hold's (`mean_excess_pnl`, with
+  `seeds_ahead`);
+- the MCP tools `evaluate_strategies` and `rank_strategies` send no capture
+  field. They send the buy-and-hold comparison and the reason in its place.
+
+On pt-v19 and every earlier preset each of these reports the capture ratio
+as before.
 
 ## Volume
 

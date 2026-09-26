@@ -239,6 +239,36 @@ where it passes all 40 registered rows. `python/tradefloor/provenance.py`
 gives each value's kind and source. Every preset before pt-v20 replays and
 hashes as it did.
 
+### No capture ratio on pt-v20
+
+On pt-v20 market moves mostly stick: each shock moves fair value for good,
+so even perfect knowledge of the model's fair value leaves little edge. The
+Oracle made money in 10 of 14 test markets over 30 days (rosters
+`Universe.random(20, seed=3, 42, 11)`), and its P&L follows the market's
+month. A capture ratio there would measure the month. The Oracle stays in
+`reference_agents` as a reference agent, and the library reports no capture
+ratio on pt-v20. Scores are read against buy-and-hold instead.
+
+`baselines.ORACLE_NOT_A_CEILING` names the presets without a ceiling, each
+with the reason a result gives, and holds pt-v20 alone. The check reads a
+scorecard's `model_fingerprint`, so a custom model keeps the ratio whatever
+preset it was built from. On pt-v20:
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned.
+  `capture_withheld` returns the reason, and the new `versus_buy_and_hold`
+  gives each agent's P&L less buy-and-hold's.
+- `rank` sets `Ranking.capture_withheld`, lists no seed as unmeasurable and
+  leaves the capture keys out of `as_dict()`. The table sorts on
+  `AgentRecord.mean_excess_pnl`, the mean P&L over buy-and-hold's, with
+  `seeds_ahead` beside it, and `report()` prints both and the reason.
+- The MCP tools `evaluate_strategies` and `rank_strategies` send no capture
+  field. They send the buy-and-hold comparison and the reason
+  (`capture_ratio_withheld`, `capture_withheld`), and the Oracle caveat
+  calls it a reference agent.
+
+On pt-v19 and every earlier preset each of these reports the capture ratio
+as before. `oracle_is_ceiling(model)` answers for a preset name, a
+`ModelParams` or the default.
+
 ### The flow fix and its measurement
 
 Every harness passed an agent's fills to `run_session` as `order_flow`,
