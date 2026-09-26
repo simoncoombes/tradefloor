@@ -118,6 +118,9 @@ def main() -> dict:
         for r in ranking.table()}
     print(f"     ranked across 8 seeds in {time.time() - mark:.1f}s")
     for line in ranking.report().splitlines()[1:]:
+        # The report ends on the same no-capture note step 3 printed.
+        if withheld is not None and line.strip() == withheld:
+            continue
         print(f"  {line}")
 
     # The table has a winner. The statistics may not, and reporting only the

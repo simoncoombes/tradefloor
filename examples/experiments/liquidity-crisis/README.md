@@ -82,23 +82,30 @@ and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
 4242, universe seed 4242, preset `pt-v16`, at commit `679ef3d`. The
 notebook prints this table from `ex.depth_readings(worlds)`.
 
-`experiment.py` pins `pt-v16`, and the shipped default from 0.8.0 is
-`pt-v19`. The recording replays only in the market it was made in, so the
+`experiment.py` pins `pt-v16`, and the shipped default from 0.8.5 is
+`pt-v20`. The recording replays only in the market it was made in, so the
 study stays on the preset it was recorded under.
 
 ## Reading it
 
 `notebook.ipynb` carries its output, so it reads on GitHub without a
-kernel. To re-execute it:
+kernel. That committed copy is the one to read at 0.8.5, because
+re-executing it fails. Every decision the agent took was recorded once,
+live, and is replayed from
+[`tests/fixtures/finrobot/liquidity-crisis.json`](../../../tests/fixtures/finrobot/liquidity-crisis.json),
+and for the reason in the note at the top of this page the replay stops
+matching after the first trade. The run then goes on with the agent holding,
+and the notebook stops with a `StopIteration` at the cell that compares the
+first prompts after the fork, because no decision was replayed there.
+`tests/test_examples.py` skips this notebook for that reason.
+
+Once the recordings are re-recorded, this rebuilds and re-executes it, with
+no model call, no API key and no network:
 
 ```bash
 pip install "tradefloor[arrow]" matplotlib nbformat nbclient
 python build_notebook.py
 ```
-
-No model call, no API key, no network. Every decision the agent took was
-recorded once, live, and is replayed from
-[`tests/fixtures/finrobot/liquidity-crisis.json`](../../../tests/fixtures/finrobot/liquidity-crisis.json).
 
 ## What is here
 
@@ -118,15 +125,20 @@ recording drift apart.
 ## The scenario
 
 `scenarios/liquidity_crisis_at_fork.yml` is the packaged `liquidity_crisis`
-with one field changed. Every packaged scenario fires `at: 50`, and
-`World.apply` rebases that onto the day it is applied on, so handing the
-packaged file to an arm forked on day 20 fires it on day 70. Fifty
-post-fork days before the shock is fifty days of the two arms drifting
-apart on nothing but the agent answering the same question two ways.
+as it was before 0.8.5, with one field changed. Every packaged scenario
+fires `at: 50`, and `World.apply` rebases that onto the day it is applied
+on, so handing the packaged file to an arm forked on day 20 fires it on day
+70. Fifty post-fork days before the shock is fifty days of the two arms
+drifting apart on nothing but the agent answering the same question two
+ways.
 
 So `at: 0`, and nothing else. Both fingerprints are recorded, and the
 notebook checks that every shock, value and window matches the packaged
-file rather than asking you to believe it.
+file rather than asking you to believe it. The committed output shows that
+check passing. 0.8.5 recalibrated the packaged file (the VIX goes three and
+a half times rather than two, and earnings fall 15% and recover), so against
+the 0.8.5 package the check reads False. The study keeps the file it was
+recorded under.
 
 `market.liquidity` is the one target here that is not a macro field, and
 the only lever that touches execution. It scales the volume column the

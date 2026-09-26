@@ -8,7 +8,7 @@ short version is that the numbers are a curriculum and a directory is a study.
 **[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py)** is the
 canonical demo: one market, one agent, twenty days of shared history, a
 checkpoint, a fork into two identical worlds, +200bps in one of them, and a
-comparison of what the same agent did next. It runs in about a second and
+comparison of what the same agent did next. It runs in a few seconds and
 needs nothing installed beyond the library.
 
 ```
@@ -53,7 +53,7 @@ same experiment two ways, and writes its output to its own git-ignored
 
 | | what it asks |
 |---|---|
-| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Two seconds, no keys |
+| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. A few seconds, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
@@ -71,7 +71,7 @@ read the Arrow tables and need `tradefloor[arrow]`, and 05 needs
 dependencies.
 
 `rate-shock/counterfactual.py`, `10-forking-a-market.py` and
-`11-scenario-fork.py` each run in about a second and need nothing extra. The
+`11-scenario-fork.py` each run in a few seconds and need nothing extra. The
 first writes a chart if `matplotlib` is installed and says so if it is not.
 `07-research-workflow.py` takes ten to twenty seconds and needs
 `tradefloor[arrow]`, because its realism step reads the daily bars table.
@@ -85,24 +85,32 @@ money per decision, so it's the one file here that isn't run automatically.
 
 `tests/test_examples.py` checks them. It walks `examples/` rather than
 globbing `0*`, so both tiers are covered and a new example cannot arrive
-unchecked. The scripts are syntax-checked on every test run, which catches a
-rename that missed a reference. `rate-shock/counterfactual.py` gets more than
-that: `tests/test_rate_shock_demo.py`
-runs it end to end on every test run and checks its claims, not only its exit
-code -- that the arms started identical, that nothing diverged before the
-intervention, that the experiment reruns to the bit, and that both manifests
-reproduce. `integrations/finrobot/rate_shock.py` has the same in
-`tests/test_finrobot.py`, which replays its recorded FinRobot run end to end
-on every pass. The rest is opt-in, because executing every notebook takes
-several minutes:
+unchecked. Every script is syntax-checked on every test run, and each one is
+listed in that file's `RUN_BY` beside the test that executes it, or in
+`NOT_RUN` with the reason nothing does. A script in neither fails the run.
+
+These run on every test run. `10-forking-a-market.py` and
+`11-scenario-fork.py` run end to end and must print PASS.
+`08-claude-agent.py` must refuse readably, with no API key and no provider
+reachable, rather than print a traceback. The four scripts in
+`integrations/` run when their framework is installed, and what they print
+is read back against the table in their README.
+`tests/test_rate_shock_demo.py` runs `rate-shock/counterfactual.py` and
+checks its claims, not only its exit code: that the arms started identical,
+that nothing diverged before the intervention, that the experiment reruns to
+the bit, that both manifests reproduce, and that the walkthrough quotes what
+the script prints. `tests/test_finrobot.py` replays the recorded FinRobot run
+end to end.
+
+The rest is opt-in, because executing every notebook takes several minutes:
 
 ```
 TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
 ```
 
-That executes every notebook, confirms the committed copies carry output,
-runs `07-research-workflow.py` end to end, and checks `08-claude-agent.py`
-refuses readably when its extra is missing rather than raising a traceback.
+That executes every notebook except the liquidity-crisis study's, whose
+recordings no longer replay (its README says why), confirms the committed
+copies carry output, and runs `07-research-workflow.py` end to end.
 
 Regenerate the committed output with:
 
@@ -113,4 +121,5 @@ python examples/experiments/liquidity-crisis/build_notebook.py
 ```
 
 The second line re-runs the integration notebooks, which replay recorded
-model calls. The third rebuilds the liquidity-crisis study from its module.
+model calls. The third rebuilds the liquidity-crisis study from its module,
+and fails until that study's recordings are re-recorded.
