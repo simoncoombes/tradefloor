@@ -601,14 +601,16 @@ pub struct Engine {
     /// opening phase, so until the lag's worth of sessions has closed the
     /// opening phase is what an observer reads. Empty, never touched,
     /// unsnapshotted and unhashed while the dial is 0.0, which every preset
-    /// carries, so such an engine is the engine it was before this existed.
+    /// through pt-v19 carries, so such an engine is the engine it was
+    /// before this existed.
     cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
 
     /// The GDP growth figure as published under `gdp_publication_lag`, and
     /// what it is computed from: the quarter being averaged and the
     /// quarters averaged and awaiting release. Seeded at construction with
     /// the opening growth. Default, never touched, unsnapshotted and
-    /// unhashed while the dial is 0.0, which every preset carries.
+    /// unhashed while the dial is 0.0, which every preset through pt-v19
+    /// carries.
     gdp_publication: GdpPublication,
 }
 
@@ -926,16 +928,16 @@ impl Engine {
         Ok(())
     }
 
-    /// Whether this engine's model can move a fair-value level, which is
-    /// when the snapshot and the state hash carry them. Off on every preset
-    /// through pt-v19, so their snapshots and hashes are the ones they were.
     /// Whether this engine's model carries the volatility feedback's
     /// smoothed exposure, which is when the snapshot and the state hash
-    /// carry it. Off on every preset.
+    /// carry it. Off on every preset through pt-v19; on for pt-v20.
     pub fn carries_vix_feedback(&self) -> bool {
         self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0
     }
 
+    /// Whether this engine's model can move a fair-value level, which is
+    /// when the snapshot and the state hash carry them. Off on every preset
+    /// through pt-v19, so their snapshots and hashes are the ones they were.
     pub fn carries_fair_value_offsets(&self) -> bool {
         self.params.fair_value_news_share != 0.0
             || self.params.fair_value_market_share != 0.0
@@ -5032,7 +5034,8 @@ impl Engine {
         // after the VIX has moved: the log excess of the VIX over the knee,
         // pulled at a half-life of `fair_value_vix_half_life` sessions.
         // Nothing runs unless both the gain and the half-life are set, so
-        // every preset leaves the field at 0.0 and takes no draw.
+        // every preset through pt-v19 leaves the field at 0.0. It takes no
+        // draw at any setting.
         if self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0 {
             let target = crate::market::tick::vix_excess(&self.params, self.economy.vix);
             let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_vix_half_life);

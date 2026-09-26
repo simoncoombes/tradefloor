@@ -575,8 +575,8 @@ pub struct ModelParams {
     /// programme/ptv20-scenario-size.md section 5).
     pub rate_pe_sensitivity: f64,
     /// Sessions between a turn of the business cycle and its publication.
-    /// 0.0, which every preset carries, publishes the phase the economy is
-    /// in. Off zero, every route that reports the phase -- `macro_fields`,
+    /// 0.0, which every preset through pt-v19 carries, publishes the phase
+    /// the economy is in; pt-v20 sets 252.0. Off zero, every route that reports the phase -- `macro_fields`,
     /// `macro_state`, and what reads them: a World's trace rows, a hosted
     /// market log's cycle events -- reports the phase of this many sessions
     /// before, as the NBER dates a recession about a year after it began,
@@ -590,8 +590,8 @@ pub struct ModelParams {
     pub cycle_publication_lag: f64,
     /// Sessions between the end of a quarter and the publication of its GDP
     /// growth, as the BEA's advance estimate comes about a month after the
-    /// quarter. 0.0, which every preset carries, is off: `gdp_growth` is
-    /// reported daily, as the economy runs it. Off zero, every route that
+    /// quarter. 0.0, which every preset through pt-v19 carries, is off
+    /// (pt-v20 sets 21.0): `gdp_growth` is reported daily, as the economy runs it. Off zero, every route that
     /// reports growth -- `macro_fields["gdp_growth"]` and the recorded
     /// `macro_table()`, and what reads them: a dataset export's
     /// `macro.arrow`, an explanation's state -- reports a QUARTERLY figure,
@@ -608,7 +608,8 @@ pub struct ModelParams {
     /// The snapshot and the state hash carry its state only while this is set.
     pub gdp_publication_lag: f64,
     /// The half-life, in sessions, of unemployment's response to its
-    /// cyclical drivers. 0.0, which every preset carries, is off: at each
+    /// cyclical drivers. 0.0, which every preset through pt-v19 carries, is
+    /// off (pt-v20 sets 84.0): at each
     /// monthly release the rate moves by the whole of what the phase's trend
     /// and Okun's law on the day's growth ask for, so the first release
     /// after a contraction begins carries a rise of about 1.2 pp (desk seeds
@@ -624,7 +625,8 @@ pub struct ModelParams {
     /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
     /// and the state hash carry the impulse only while this is set.
     pub unemployment_adjustment_half_life: f64,
-    /// A switch, 0.0 or 1.0. 0.0, which every preset carries, is off: the
+    /// A switch, 0.0 or 1.0. 0.0, which every preset through pt-v19
+    /// carries, is off (pt-v20 sets 1.0): the
     /// fear/greed index's target reads the business-cycle phase (a bonus of
     /// +15 in an expansion to -25 in a contraction) and the GDP growth the
     /// economy runs at, so it falls about 35 points in the five sessions
@@ -638,7 +640,7 @@ pub struct ModelParams {
     /// Whether a name's price takes the change the close's macro step makes
     /// to its fair value at the moment the step is published, rather than
     /// at the next session's first tick. 0.0, which every preset through
-    /// pt-v20 carries, leaves it to the tick: the central bank meets at the
+    /// pt-v19 carries, leaves it to the tick (pt-v20 sets 1.0): the central bank meets at the
     /// close, the new policy rate, corporate yield and cycle are readable
     /// from then on, and the price stays at the day's last print until the
     /// first tick of the next session re-values the name, so an agent that
@@ -729,8 +731,8 @@ pub struct ModelParams {
     /// name's fair-value level, as the stock-level share does. In [0, 1].
     pub fair_value_market_share: f64,
     /// Which part of a market shock `fair_value_market_share` makes
-    /// permanent. 0.0, which every preset through pt-v20 carries, is the
-    /// whole of the name's market input. 1.0 is its plain loading on the
+    /// permanent. 0.0, which every preset through pt-v19 carries, is the
+    /// whole of the name's market input; pt-v20 sets 1.0. 1.0 is its plain loading on the
     /// draw, `beta * F`, which has zero mean in every regime; the down-tick
     /// tilt, the lagged down-day wire, the crisis injection, the crash
     /// amplifier and the recentring stay in `s` and revert.
@@ -748,8 +750,9 @@ pub struct ModelParams {
     pub fair_value_market_linear: f64,
     /// A ceiling, in multiples of `market_factor_sigma`, on the market
     /// volatility whose shocks `fair_value_market_share` makes permanent.
-    /// 0.0, which every preset through pt-v20 carries, is no ceiling: the
-    /// share applies to every market shock whatever the regime.
+    /// 0.0, which every preset through pt-v19 carries, is no ceiling: the
+    /// share applies to every market shock whatever the regime. pt-v20
+    /// sets 1.5.
     ///
     /// Off zero, a market shock drawn at a daily sigma above `this *
     /// market_factor_sigma` moves fair value by the share times `this *
@@ -764,7 +767,8 @@ pub struct ModelParams {
     pub fair_value_market_vol_cap: f64,
     /// Volatility feedback: a discount on every name's fair value while the
     /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
-    /// knee))`. 0.0, which every preset through pt-v20 carries, is none.
+    /// knee))`. 0.0, which every preset through pt-v19 carries, is none;
+    /// pt-v20 sets 0.35.
     ///
     /// A function of the VIX alone and no state, so it is transient by
     /// construction: it deepens a fall while fear is high and is given back
@@ -778,12 +782,13 @@ pub struct ModelParams {
     /// re-mark and the stationary opening. In [0, 1].
     pub fair_value_vix_discount: f64,
     /// The VIX level above which `fair_value_vix_discount` applies. 30.0,
-    /// which every preset carries, is unread while the discount is 0.0.
+    /// which every preset through pt-v19 carries, is unread while the
+    /// discount is 0.0. pt-v20 sets 40.0.
     /// In (0, 200].
     pub fair_value_vix_knee: f64,
     /// Half-life, in sessions, of the VIX exposure the volatility-feedback
-    /// discount reads. 0.0, which every preset carries, reads the VIX as it
-    /// stands, so the discount's whole daily change lands with the VIX's
+    /// discount reads. 0.0, which every preset through pt-v19 carries,
+    /// reads the VIX as it stands (pt-v20 sets 5.0), so the discount's whole daily change lands with the VIX's
     /// move: on a held-out grid (ptv20vr6-7) that doubled the sessions under
     /// -5 per cent and took the 2008 replay's worst month to 122 per cent
     /// against 84. Off zero, the close pulls a smoothed exposure
@@ -795,7 +800,8 @@ pub struct ModelParams {
     pub fair_value_vix_half_life: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
-    /// which every preset carries, is none.
+    /// which every preset through pt-v19 carries, is none; pt-v20 sets
+    /// 0.15.
     ///
     /// The term reads the yield at today's price and applies it over the
     /// whole elapsed time, so a name whose price collapses toward the 0.01
@@ -3084,6 +3090,19 @@ pub struct ModelParams {
     /// [`crate::market::tick::buyback_scale`] for the arithmetic, its
     /// residual against the exact path integral, and the clamp on a
     /// loss-maker.
+    ///
+    /// # pt-v20's 0.75 is not this record
+    ///
+    /// pt-v20 ships 0.75, and none of the above is its source. It is a
+    /// CALIBRATION: the earnings anticipation and the rate sensitivity cost
+    /// the index its one-year drift, no arm at a third held the level
+    /// band's floor, and 0.75 restores it (design repository, tenth and
+    /// eleventh registrations, grids ptv20e6-e8). At the 0.0555 earnings
+    /// yield above it is a buyback yield of about 4.2 per cent, over twice
+    /// the 1.5 to 2.0 per cent the value record shows. The model pays no
+    /// dividends, so the term carries the whole of the drift that payouts
+    /// would; that is a reading of the gap, not a measurement behind the
+    /// value.
     pub buyback_payout_share: f64,
     /// How much of the drift the market jump's mean carries is given back.
     /// 0.0, which every preset before pt-v18 carries, is bit-identical. 1.0
@@ -7130,6 +7149,32 @@ impl ModelParams {
     /// tightly, so `volume_move_response` 0.6 keeps that tie inside the
     /// certified band at every horizon.
     ///
+    /// THE MARKET'S LONG HORIZON. With every market shock in the
+    /// mispricing, the index reverted far faster than the S&P: its five-year
+    /// variance ratio over one year read 0.42 against a real 0.87 (audit
+    /// major 5). `fair_value_market_share` 1.0 with `fair_value_market_linear`
+    /// makes the plain market draw permanent, and `fair_value_market_vol_cap`
+    /// 1.5 keeps the excess a fear regime adds transient. The earnings cycle
+    /// then carries less of the index's yearly spread, and 0.2 deep puts its
+    /// contraction on Shiller's median fall. A volatility-feedback discount
+    /// above a VIX of 40 (`fair_value_vix_discount`, `_knee`, `_half_life`)
+    /// gives a crash its depth and gives it back as the fear goes.
+    ///
+    /// LOOKING AHEAD. Fair value reads the earnings cycle's expected path
+    /// (`earnings_anticipation_half_life` 126), a P/E compresses by
+    /// `rate_pe_sensitivity` 3 per unit of yield, and `buyback_payout_share`
+    /// 0.75, capped at a 15 per cent yield (`buyback_yield_cap`), restores
+    /// the drift the first two cost.
+    ///
+    /// WHAT IS PUBLISHED. Timing rules on the reported macro data beat
+    /// buy-and-hold (pt-v20 audit, findings 1 and 3). The phase is published a
+    /// year late and GDP growth quarterly a month late, as the NBER and the
+    /// BEA publish them; unemployment turns over months; the fear and greed
+    /// index reads the published figures; and a macro step is priced when
+    /// it is published (`cycle_publication_lag`, `gdp_publication_lag`,
+    /// `unemployment_adjustment_half_life`, `fear_greed_published_inputs`,
+    /// `macro_publication_repricing`).
+    ///
     /// A LIMIT. The model's inflation almost never leaves the under-3-per-
     /// cent regime, so stocks and Treasuries are always in flight to
     /// quality: their correlation matches the 2015-24 pooled figure, not the
@@ -7148,14 +7193,26 @@ impl ModelParams {
         p.closing_auction = 1.0;
         p.fair_value_news_share = 1.0;
         p.opening_mispricing_sigma = 0.016;
-        p.opening_market_sigma = 0.10;
+        // 0.10 until the graded arm (2026-09-26): the market's own
+        // mispricing's stationary spread while every market shock sat in it.
+        // With the plain market draw permanent (below) that mispricing
+        // carries only the excess above the volatility ceiling, and the
+        // grid carried the opening down with the transient share (0.04 at a
+        // share of 0.6, 0.025 at 0.75, 0.015 at 0.85; boxes ptv20vr1-vr4).
+        // 0.001 at a share of 1.0 is CHOSEN, not measured: the smallest
+        // opening that keeps the stationary form, where 0.0 would adopt the
+        // roster's day-zero premium.
+        p.opening_market_sigma = 0.001;
         p.cascade_gain = 0.1;
         // The yield curve (2026-09-24, for the bonds this release prices off
         // it): the 2-year its own process, the flight to quality reading the
         // session's return, the corporate yield moving between meetings, and
         // the 10-year's noise trimmed because its meeting-day moves already
-        // carry most of its variance.
-        p.treasury_10y_noise = 0.025;
+        // carry most of its variance. Trimmed to 0.025 on 2026-09-24; on the
+        // arms with the publication dials and the permanent market share
+        // that read 4.16 to 4.25 bp a day against the tape's 5.41 and failed
+        // R2 (boxes ptv20vr4-vr7), and 0.038 reads 5.12 (ptv20vr9).
+        p.treasury_10y_noise = 0.038;
         p.treasury_2y_noise = 0.022;
         p.flight_to_quality_gain = 0.008;
         p.flight_to_quality_day = 1.0;
@@ -7180,8 +7237,13 @@ impl ModelParams {
         // index its real year-to-year spread; the market factor's daily
         // shock at 0.85 of pt-v19's and market jumps at half their rate take
         // out the transient variance the cycle adds, so the mispricing's
-        // share of index variance stays in its band.
-        p.earnings_cycle_depth = 0.35;
+        // share of index variance stays in its band. 0.35 until the graded
+        // arm (2026-09-26): once the market's own shocks are permanent
+        // (below) the cycle no longer has to carry the yearly spread, and
+        // at 0.35 the aggregate earnings fall in a contraction read -0.28
+        // against Shiller's median -0.17 (row E1). 0.2 reads -0.173 and
+        // keeps B9 at 18.1 against 17.4 (boxes ptv20vr3b, vr4, vr9).
+        p.earnings_cycle_depth = 0.2;
         p.earnings_cycle_upside = 0.09;
         p.market_factor_sigma = 0.006454071;
         p.jump_intensity_market = 0.02828766685;
@@ -7197,6 +7259,66 @@ impl ModelParams {
         // ceiling at every horizon measured (design repository,
         // programme/results/ptv20/d1screen.py and the fifth registration).
         p.volume_move_response = 0.6;
+        // THE GRADED ARM (2026-09-26): the design repository's twelfth
+        // registration, programme/ptv20-registration.md, "The graded arm".
+        // Chosen on held-out seeds (201-230, 501-530, 801-830; box
+        // ptv20vr9), where it passes all 40 registered rows; the grade seeds
+        // (101-130, 401-430, 701-730) had not been run on it. Each value's
+        // kind and source are in `python/tradefloor/provenance.py`.
+        //
+        // What is published (pt-v20 audit, findings 1 and 3). The phase a
+        // year late, as the NBER dates a turn (owner, 2026-09-25); GDP
+        // growth as the BEA's quarterly advance estimate, a month after the
+        // quarter (owner, 2026-09-25); unemployment adjusting with an
+        // 84-session half-life, which puts the first monthly rise of a
+        // contraction at 0.16 pp where UNRATE's first months of 2001 and
+        // 2008 rose 0.1 to 0.3; the fear and greed index on the published
+        // figures; and the close's macro step priced when it is published.
+        p.cycle_publication_lag = 252.0;
+        p.gdp_publication_lag = 21.0;
+        p.unemployment_adjustment_half_life = 84.0;
+        p.fear_greed_published_inputs = 1.0;
+        p.macro_publication_repricing = 1.0;
+        // Looking ahead (grids ptv20e6-e8). Fair value reads the earnings
+        // cycle's expected path at a 126-session half-life, so the price
+        // trough leads the earnings trough (L1); a P/E compresses by 3 per
+        // unit of yield, where 1.5 moved the 2022 replay's P/E 1.2 per cent
+        // per 100 bp of Baa against the S&P's 5.2 (R6). Both cost the
+        // one-year drift, and the buyback share restores it: at 1/3 no arm
+        // held the level band's 1.1 floor, at 0.75 H126 rate 3 reads 1.79
+        // (desk, 30 rosters). 0.75 is a CALIBRATION to that drift, not a
+        // measurement of buybacks; B8, the long-run return, bounds it.
+        p.earnings_anticipation_half_life = 126.0;
+        p.rate_pe_sensitivity = 3.0;
+        p.buyback_payout_share = 0.75;
+        // The market's long horizon (audit major 5, row V1). The plain
+        // loading on the market draw moves fair value for good, up to a
+        // daily market sigma of 1.5 times `market_factor_sigma`; above it
+        // the excess stays in `s` and reverts, so fear-regime excess is
+        // transient (Poterba and Summers 1988; Kim, Nelson and Startz 1991;
+        // Spierdijk, Bikker and van den Hoek 2012). V1 reads 0.80 and 0.66
+        // against bands of 0.75 to 1.15 and 0.55 to 1.20 (ptv20vr9); the
+        // leading arm without it read 0.70 and 0.42. A ceiling of 2 took
+        // B7, the index volatility, to 27.9 against 18.1 (ptv20vr4).
+        p.fair_value_market_share = 1.0;
+        p.fair_value_market_linear = 1.0;
+        p.fair_value_market_vol_cap = 1.5;
+        // Volatility feedback (French, Schwert and Stambaugh 1987; Campbell
+        // and Hentschel 1992): fair value discounted by exp(-0.35 beta
+        // ln(vix / 40)) on the VIX smoothed over a 5-session half-life. It
+        // takes the driven 2020 fall to 0.266 in 35.5 sessions (F1, real
+        // 0.339 in 23; 0.192 in 41 without it). At a knee of 30 or 35 the
+        // sessions under -5 per cent ran past twice the tape's (B5; boxes
+        // ptv20vr8, vr9).
+        p.fair_value_vix_discount = 0.35;
+        p.fair_value_vix_knee = 40.0;
+        p.fair_value_vix_half_life = 5.0;
+        // A GUARD. The buyback term compounds today's yield over every
+        // elapsed year, and a name near the price floor read a yield in the
+        // hundreds: the index rose 86-fold in one close on 1 of 90 held-out
+        // histories (grid ptv20vr6). At 0.75 of earnings the cap binds only
+        // below a P/E of 5.
+        p.buyback_yield_cap = 0.15;
         p
     }
 

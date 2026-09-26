@@ -212,11 +212,6 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
-    "rate_pe_sensitivity":
-        "the P/E compression per unit of yield, a constant (1.5) until it "
-        "became a dial at 0.8.5 at the value it carried. Read on the shipped "
-        "path at every valuation of every name, so 1.5 is a choice, and one "
-        "the 2022 P/E response measures at about three times that",
     "earnings_cycle_half_life":
         "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
         "how fast earnings reach the phase's level. Unread while "
@@ -227,13 +222,6 @@ POST_BASELINE = {
         "the level's own daily noise. Unread while `earnings_cycle_depth` "
         "is 0.0, as it ships through pt-v19; LIVE on pt-v20, where 0.0 is "
         "a choice (the phase path alone)",
-    "fair_value_market_share":
-        "added for pt-v20 (2026-09-24) beside `fair_value_news_share`: the "
-        "share of MARKET-WIDE shocks that moves fair value for good. Every "
-        "preset ships 0.0, so the market's mispricing keeps the whole market "
-        "move and pulls it back on its half-life; that is a choice with a "
-        "measured cost (the index's annual spread, B9) and the owner decides "
-        "it on the ptv20g1 box's arms",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -383,79 +371,15 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
-    "cycle_publication_lag":
-        "inert at 0.0 as shipped: `Engine::published_cycle_phase` returns "
-        "the phase the economy is in and no history is kept. It moves what "
-        "the engine reports as the phase, never a price or a draw (0.8.5, "
-        "pt-v20 work: the published phase predicted returns, design repo "
-        "programme/ptv20-status-2026-09-25.md)",
-    "gdp_publication_lag":
-        "inert at 0.0 as shipped: `Engine::published_gdp_growth` returns "
-        "the growth the economy runs at and no quarter is averaged. It moves "
-        "what the engine reports as GDP growth, never a price or a draw "
-        "(0.8.5, pt-v20 work: the daily growth stepped at every turn of the "
-        "cycle and gave the turn away, design repo "
-        "programme/ptv20-status-2026-09-25.md)",
-    "unemployment_adjustment_half_life":
-        "inert at 0.0 as shipped: `DailyInputs::unemployment_adjustment` is "
-        "0.0 and the monthly release adds the whole cyclical drive, the "
-        "expression that stood; the impulse is never read or written. It "
-        "moves the TRUE unemployment rate when set (0.8.5, pt-v20 work: the "
-        "first release after a contraction began rose about 1.2 pp, four "
-        "times the spread of a release otherwise, and announced the turn; "
-        "84 sessions takes it to 0.16 pp, design repo "
-        "programme/ptv20-status-2026-09-25.md)",
-    "fear_greed_published_inputs":
-        "inert at 0.0 as shipped: `DailyInputs::fear_greed_published` is "
-        "None and the index reads the economy's own phase and growth, the "
-        "expression that stood; with both publication lags at 0 the switch "
-        "is inert as well. Nothing a price, the bank, the cycle or a draw "
-        "reads is downstream of the index (0.8.5, pt-v20 work: the index "
-        "fell about 35 points in the five sessions after a contraction "
-        "began, design repo programme/ptv20-status-2026-09-25.md)",
-    "macro_publication_repricing":
-        "inert at 0.0 as shipped: `Engine::published_macro_marks` returns "
-        "None, so `reprice_to_published_macro` writes nothing and the close's "
-        "macro step reaches prices at the next session's first tick "
-        "(0.8.5, pt-v20 audit finding 3)",
-    "buyback_yield_cap":
-        "inert at 0.0 as shipped: `market::tick::buyback_scale` compounds "
-        "the uncapped yield. Keeps the term's elasticity under one for a "
-        "name whose price collapses toward the floor (0.8.5, pt-v20 work: "
-        "the close's re-mark diverged on a 0.10 name, grid ptv20vr6)",
-    "fair_value_vix_discount":
-        "inert at 0.0 as shipped: `market::tick::with_vix_discount` returns "
-        "fair value unscaled without reading the VIX. A transient discount "
-        "on fair value while the VIX is above `fair_value_vix_knee` (0.8.5, "
-        "pt-v20 work: audit major 5 and minor 13, the 2020 fall's depth "
-        "and timing under a permanent market share)",
-    "fair_value_vix_half_life":
-        "unread at 0.0 while `fair_value_vix_discount` is 0.0; off zero the "
-        "close carries a smoothed exposure, snapshotted and hashed only while "
-        "both are set (0.8.5, pt-v20 work, grids ptv20vr6-7)",
-    "fair_value_vix_knee":
-        "unread at its 30.0 while `fair_value_vix_discount` is 0.0 (0.8.5, "
-        "pt-v20 work)",
-    "fair_value_market_vol_cap":
-        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
-        "the only reader. A ceiling on the volatility whose market shocks "
-        "are permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
-        "reversion)",
-    "fair_value_market_linear":
-        "inert at 0.0 as shipped: no preset carries `fair_value_market_share`, "
-        "the only reader. Chooses the plain loading on the market draw as the "
-        "permanent part (0.8.5, pt-v20 work: audit major 5, the long-horizon "
-        "reversion)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "
         "year of the market input on pt-v20) sits in `s` as a constant "
-        "discount while `fair_value_market_share` is 0.0 (0.8.5, pt-v20 "
-        "work: audit major 5, the long-horizon reversion)",
-    "earnings_anticipation_half_life":
-        "inert at 0.0 as shipped: `Engine::earnings_anticipation_terms` "
-        "returns None and the valuation reads the earnings cycle's level "
-        "alone (0.8.5, pt-v20 work, grid ptv20e6)",
+        "discount while `fair_value_market_share` is 0.0, or while "
+        "`fair_value_market_linear` is 1.0 as pt-v20 ships it, which keeps "
+        "the tilt and the recentring in `s` and makes only the plain market "
+        "draw permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -1758,7 +1682,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.3333333333333333},
+        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.75},
         "what_would_determine_it": "the dispersion of net buyback yield "
                                    "across the US large-cap filing record "
                                    "the value is taken from. The point "
@@ -1769,6 +1693,23 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "declared_chosen_in_source": True,
         "source": "rust/src/params.rs, pt_v18, 'The one CHOSEN constant in "
                   "this era'",
+        # pt-v20's value has a different source and a different kind of
+        # claim, and the entry says so rather than letting the filing record
+        # above stand behind it.
+        "pt_v20": "0.75 is a CALIBRATION to the index's one-year drift, not "
+                  "a measurement of buybacks. The earnings anticipation and "
+                  "the rate sensitivity cost the drift about 0.7 and 0.8 "
+                  "points a year; at a third no arm of grid ptv20e6 held "
+                  "the level band's floor of 1.1, and the desk read 1.04 at "
+                  "0.6 and 1.79 at 0.75 on H126 rate 3 (30 rosters). Grid "
+                  "ptv20e7 then passed its 33 rows at 0.75, and the graded "
+                  "arm keeps it (box ptv20vr9, B8 the long-run return 7.2 "
+                  "against 6.25 plus or minus 2). At the model's median "
+                  "earnings yield of 0.0555 it is a buyback yield of about "
+                  "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
+                  "value record; the model pays no dividends (design "
+                  "repository, programme/ptv20-registration.md, tenth and "
+                  "eleventh registrations and 'The graded arm')",
     },
     "sector_factor_sigma": {
         # A DERIVATION EXISTS AND IT IS NOT FOR THIS VALUE. ws-b derived
@@ -3842,28 +3783,49 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_market_share": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0},
-        "what_would_determine_it": "the index's annual return spread (B9, "
-            "S&P 500 calendar years 1990-2024, sd 17.4) and a replayed "
-            "crisis's persistence against 2008, 2020 and 2022, graded with "
-            "the fifteen on the ptv20g1 box's arms at 0.5 and 1.0 (design "
-            "repository programme/ptv20-registration.md section B9); a "
-            "ruling by the owner, since it rewrites the index's variance "
-            "structure the B rows were calibrated on",
+        "presets": {"pt-v20": 1.0},
+        "what_would_determine_it": "a tape estimate of the permanent share "
+            "of a market-wide shock, with its error: the long-horizon "
+            "variance ratio V1 reads it only jointly with the volatility "
+            "ceiling and the earnings cycle. FITTED, at the end point: the "
+            "grids ptv20vr1-vr4 tried 0.6, 0.75, 0.85 and 1.0; 0.85 failed "
+            "B5 and B7 without a ceiling (box ptv20vr4), and 1.0 with "
+            "`fair_value_market_linear` and a ceiling of 1.5 is the graded "
+            "arm, passing all 40 rows on held-out seeds (ptv20vr9) with V1 "
+            "at 0.80 (2y/1y, band 0.75 to 1.15) and 0.66 (5y/1y, band 0.55 "
+            "to 1.20), where the leading arm without it read 0.70 and 0.42 "
+            "(design repository, programme/ptv20-registration.md, twelfth "
+            "registration, V1 and 'The graded arm')",
+        "superseded": "0.0 on every preset until 2026-09-26, recorded in "
+                      "POST_BASELINE as a choice with a measured cost (B9) "
+                      "for the owner to rule on",
     },
     "opening_market_sigma": {
-        "kind": "measured",
-        "presets": {"pt-v20": 0.1},
-        "source": "programme/results/ptv20/ (desk, mkts.py; design repository)",
-        "date": "2026-09-24",
-        "script": "the cap-weighted mean of s over the certified roster, its "
-                  "time-series sd over sessions 250-2660, pt-v20's vector",
-        "estimator": "the stationary spread of the market's own mispricing: "
-                     "the sd over sessions of the cap-weighted s, certified "
-                     "roster, untraded, seeds 201-203",
-        "residual": "0.148, 0.105 and 0.042 on the three seeds (mean 0.099): "
-                    "the level is episodic, and the opening draws from the "
-                    "mean spread",
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.001},
+        "what_would_determine_it": "the estimator that set 0.1 (below), "
+            "re-run on the graded arm's vector: the sd over sessions "
+            "250-2660 of the cap-weighted s, certified roster, untraded. "
+            "Not run. CHOSEN: with `fair_value_market_share` 1.0 the plain "
+            "market draw is permanent and the market's own mispricing "
+            "carries only the excess above the volatility ceiling, so its "
+            "stationary spread is small; the grids carried the opening down "
+            "with the transient share (0.04 at a share of 0.6, 0.025 at "
+            "0.75, 0.015 at 0.85; boxes ptv20vr1-vr4), and 0.001 at 1.0 is "
+            "the smallest opening that keeps the stationary form, where 0.0 "
+            "would adopt the roster's day-zero premium",
+        "superseded": {
+            "value": 0.1,
+            "kind": "measured",
+            "source": "programme/results/ptv20/ (desk, mkts.py; design "
+                      "repository), 2026-09-24",
+            "estimator": "the stationary spread of the market's own "
+                         "mispricing: the sd over sessions of the "
+                         "cap-weighted s, certified roster, untraded, seeds "
+                         "201-203, when every market shock sat in s",
+            "residual": "0.148, 0.105 and 0.042 on the three seeds (mean "
+                        "0.099)",
+        },
     },
     # The agent-facing book (E4, feature/order-book-depth), taken by pt-v20.
     # Read only on an agent's path, so no untraded statistic moves with any
@@ -3959,18 +3921,27 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "treasury_10y_noise": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.025},
-        "source": "programme/results/ptv20/real_rates.json and the desk curve "
-                  "runs (design repository)",
-        "date": "2026-09-24",
-        "script": "the desk's rates.py: sd of the daily change of the 10-year, "
-                  "seeds 204-209, 1008 sessions; the tape's from FRED DGS10",
-        "estimator": "the noise at which the model's 10-year daily change sd, "
-                     "most of it meeting-day moves toward the policy target, "
-                     "meets the tape's 5.41 bp. 0.03 through pt-v19 is the "
-                     "reference literal, unmeasured",
-        "residual": "6.1 bp at 0.03 with the flight to quality on, against "
-                    "5.41; 0.025 trims it",
+        "presets": {"pt-v20": 0.038},
+        "source": "programme/results/ptv20/real_rates.json (the tape, FRED "
+                  "DGS10) and the grading boxes ptv20vr4-vr9 (design "
+                  "repository)",
+        "date": "2026-09-26",
+        "script": "programme/longrun/criteria.py, row R2: the sd of the "
+                  "10-year's daily change over the pooled long run",
+        "estimator": "the noise at which the model's 10-year daily change "
+                     "sd, most of it meeting-day moves toward the policy "
+                     "target, meets the tape's 5.41 bp, on the graded arm's "
+                     "vector. One value was tried on that family: 0.025 "
+                     "read 4.16 to 4.25 bp on every arm of boxes ptv20vr4 "
+                     "to vr7 and failed R2, and 0.038 was set once and "
+                     "carried through vr6 to vr9. 0.03 through pt-v19 is "
+                     "the reference literal, unmeasured",
+        "residual": "5.12 bp against 5.41 at 0.038 on 90 held-out histories "
+                    "(box ptv20vr9, arm K40g35h5); 5.15 and 5.16 on the "
+                    "arms of vr6 to vr8",
+        "superseded": "0.025 (2026-09-24, desk rates.py, seeds 204-209): "
+                      "6.1 bp at 0.03 with the flight to quality on, "
+                      "against 5.41; 0.025 trimmed it",
     },
     "flight_to_quality_gain": {
         "kind": "measured",
@@ -4016,28 +3987,33 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_cycle_depth": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.35},
-        "source": "programme/results/ptv20/grid-e4.txt and box-e4/ (design "
-                  "repository), box ptv20e4",
-        "date": "2026-09-24",
-        "script": "programme/results/ptv20/grid_table.py over longrun.py's "
-                  "report, 90 pooled histories (seeds 101-130, 401-430, "
-                  "701-730), 21 years each",
-        "estimator": "row B9, the sd of annual index log returns over "
-                     "non-overlapping 252-session blocks, years 2-21, "
-                     "pooled, against the S&P 500's 17.4 (1990-2024), "
-                     "among the arms that keep every long-run row in its "
-                     "band. Depth 0 reads 11.7; 0.25, 0.30 and 0.35 read "
-                     "14.6, 15.4 and 16.4 at pt-v19's transient shocks, "
-                     "and 0.35 reads 16.8 with the market factor at 0.85 "
-                     "and market jumps at half rate, the arm shipped. "
-                     "Deeper moves B3 out first",
-        # The bar: B9's real value carries a bootstrap se of 2.8 points over
-        # calendar years, and the pooled reading moves about 20 points per
-        # unit of depth, so the depth the tape pins is +/- 0.14.
-        "standard_error": 0.14,
-        "residual": -0.6,
-        "estimate": 0.35,
+        "presets": {"pt-v20": 0.2},
+        "source": "the grading boxes ptv20vr3b, vr4 and vr9 (design "
+                  "repository, programme/ptv20-registration.md, twelfth "
+                  "registration and 'The graded arm')",
+        "date": "2026-09-26",
+        "script": "programme/longrun/criteria.py, row E1: the median fall "
+                  "of aggregate earnings in a contraction over the pooled "
+                  "long run, against Shiller's reported earnings around "
+                  "the NBER recessions (median -0.17)",
+        "estimator": "the depth at which E1 meets the real -0.170 once the "
+                     "market's own shocks are permanent "
+                     "(`fair_value_market_share` 1.0), so the cycle no "
+                     "longer has to carry the index's yearly spread. E1 "
+                     "reads -0.280 at 0.35, -0.173 at 0.2 and -0.132 at 0.15 "
+                     "(box ptv20vr4), and B9 stays in band at 0.2 (18.1 "
+                     "against 17.4 on ptv20vr9). The real figure is a median "
+                     "over recessions whose falls run 2 to 54 per cent, and "
+                     "no error bar is recorded for it",
+        "residual": "-0.173 against -0.170 on 90 held-out histories (box "
+                    "ptv20vr9, arm K40g35h5)",
+        "superseded": {
+            "value": 0.35,
+            "date": "2026-09-24",
+            "source": "box ptv20e4, row B9 at pt-v19's transient market "
+                      "shocks: 16.8 against 17.4, standard error of the "
+                      "depth 0.14",
+        },
     },
     "earnings_cycle_upside": {
         "kind": "derived",
@@ -4101,6 +4077,209 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "standard_error": 0.11,
         "estimate": 0.12,
     },
+    # pt-v20's graded arm (2026-09-26): the design repository's twelfth
+    # registration, programme/ptv20-registration.md, "The graded arm", with
+    # the grids behind each value (ptv20e6-e8 for the valuation, ptv20vr1-vr9
+    # for the market's long horizon, chosen on held-out seeds 201-230,
+    # 501-530 and 801-830). The grade seeds had not been run on it when
+    # these were written.
+    "cycle_publication_lag": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 252.0},
+        "what_would_determine_it": "the NBER's announcement delays over the "
+            "post-war turns, as a distribution the one lag stands for; it "
+            "announced the December 2007 peak on 1 December 2008 and the "
+            "June 2009 trough on 20 September 2010. CHOSEN by the owner "
+            "(2026-09-25): the phase is published about a year late, as the "
+            "NBER dates a recession. With the phase in real time no arm of "
+            "grid ptv20e8 passed C10 (out in peak and contraction beat "
+            "holding by +0.2 to +1.3 points a year); read 252 sessions late, "
+            "every arm did (design repository, programme/ptv20-registration.md, "
+            "eleventh registration)",
+    },
+    "gdp_publication_lag": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 21.0},
+        "what_would_determine_it": "the BEA's release calendar read as "
+            "sessions after each quarter's end. CHOSEN by the owner "
+            "(2026-09-25): a quarterly figure, the quarter's mean, released "
+            "21 sessions after the quarter, about the advance estimate's "
+            "month. The daily figure stepped about -3 points at the first "
+            "close of a contraction, and a rule out for 63 sessions after "
+            "that drop beat holding in 88 of 90 histories; simulated offline "
+            "on grid ptv20e8, the quarterly release takes the GDP rules to "
+            "ahead in at most 36 per cent (design repository, twelfth "
+            "registration)",
+    },
+    "unemployment_adjustment_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 84.0},
+        "what_would_determine_it": "a fit of the partial adjustment's "
+            "half-life to FRED UNRATE's monthly path over the NBER "
+            "recessions, with its error. FITTED to two recessions, "
+            "not estimated: 84 sessions matches 2001 (4.3 to 5.5 per cent) "
+            "and 2007-09 (5.0 to 9.5), where the first month rose 0.1 to 0.3 "
+            "points; the model's first monthly rise of a contraction goes "
+            "from about 1.2 points to 0.16, 15 per cent of the rise comes in "
+            "the first 63 sessions, and on desk seeds 201-212 the "
+            "largest-rise rule goes from ahead in 7 of 12 to 0 of 12 "
+            "(design repository, twelfth registration)",
+    },
+    "fear_greed_published_inputs": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the real index is "
+                    "built from market data and knows no recession dating, "
+                    "so what it may read of the economy is what has been "
+                    "published. Off, its target read the true phase and "
+                    "growth and fell 34.6 points in the five sessions "
+                    "entering a contraction, 7.9 times a normal spread",
+        "terms": {"84 of 90 -> 1 of 12": "histories where a rule out for 63 "
+                                         "sessions after a five-session fall "
+                                         "above 20 points beats holding: "
+                                         "grid ptv20e8 with the switch off; "
+                                         "desk seeds 201-212 with it on and "
+                                         "both publication lags set"},
+        "source": "programme/ptv20-registration.md, twelfth registration "
+                  "(design repository)",
+        "date": "2026-09-25",
+    },
+    "macro_publication_repricing": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: a decision "
+                    "readable after the close is priced when it is "
+                    "published, as event studies find the S&P 500's whole "
+                    "response to an FOMC statement inside about 30 minutes "
+                    "(Gurkaynak, Sack and Swanson 2005; Bernanke and "
+                    "Kuttner 2005); the drift around a decision comes "
+                    "before it, not after (Lucca and Moench 2015)",
+        "terms": {"-62.2 / +162.9 bp -> +0.6 / +3.9": "the index's first "
+                      "65-minute bar after a published hike and cut, less "
+                      "all days, off and on (box ratenews1, seeds 601-630)",
+                  "+1.90 -> -0.28 points a year": "the audit's rate-news "
+                      "agent over holding, ahead in 30 of 30 and 7 of 30"},
+        "source": "pt-v20 audit, finding 3; programme/ptv20-registration.md, "
+                  "twelfth registration, row R7 (design repository)",
+        "date": "2026-09-25",
+    },
+    "earnings_anticipation_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 126.0},
+        "what_would_determine_it": "a tape estimate of the horizon over "
+            "which the market prices the earnings cycle's expected path. "
+            "FITTED on grids ptv20e6 to e8 over 0, 42, 63, 84, 126, 168, "
+            "189, 252 and 504 sessions: without it the price trough does "
+            "not lead the earnings trough (L1 fails), at 252 and longer the "
+            "driven 2020 fall is too shallow (F1), and 126 with a rate "
+            "sensitivity of 3 and a buyback share of 0.75 passed all 33 "
+            "rows of grid e7. On the graded arm L1 reads +20 sessions "
+            "against the real +68 (box ptv20vr9) (design repository, "
+            "eighth to eleventh registrations)",
+    },
+    "rate_pe_sensitivity": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 3.0},
+        "what_would_determine_it": "a regression of the market P/E on the "
+            "corporate yield with its error. The one reading is 2022: the "
+            "S&P 500's trailing P/E fell 4.9 to 5.5 per cent per 100 bp of "
+            "Baa (row R6, -5.2), where the constant 1.5 gives about 2 per "
+            "cent of fair value at the median duration and read -1.17 on "
+            "the driven 2022 path. FITTED below that reading: 4 read -4.69 "
+            "but failed B3 on grid ptv20e6, and at 3 the arm with H126 and "
+            "buybacks 0.75 passed all 33 rows of grid e7; the graded arm reads R6 at -4.02 against a band of "
+            "-10.4 to -2.6 (box ptv20vr9). It costs the one-year drift "
+            "about 0.8 points a year at 3 (design repository, "
+            "programme/ptv20-scenario-size.md section 5; eighth to "
+            "eleventh registrations)",
+        "superseded": "1.5 on every preset through pt-v19, the constant "
+                      "that stood before it was a dial, which no record "
+                      "derives",
+    },
+    "fair_value_market_linear": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the plain loading "
+                    "on the market draw, beta F, has zero mean in every "
+                    "regime and is news about value, so it is the part made "
+                    "permanent. The down-tick tilt, the lagged wire, the "
+                    "crisis injection, the crash amplifier and the "
+                    "recentring are not zero-mean at a high VIX (the "
+                    "amplifier fires on a threshold in baseline sigmas), so "
+                    "made permanent they are a drift that runs while fear "
+                    "lasts; in s they are a discount that reverts",
+        "terms": {"about -0.45": "the cap-weighted fair-value level's fall "
+                                 "in the hundred sessions after the VIX "
+                                 "peak on the driven 2020 path at a market "
+                                 "share of 1.0 without the switch (desk, "
+                                 "seed 101)"},
+        "source": "rust/src/params.rs, ModelParams::fair_value_market_linear; "
+                  "engine commit 2b6a93c (fix/ptv20-vr)",
+        "date": "2026-09-25",
+    },
+    "fair_value_market_vol_cap": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 1.5},
+        "what_would_determine_it": "the market volatility above which real "
+            "index shocks stop being permanent, from a regime-switching "
+            "estimate of the variance ratio with its error. The form follows "
+            "the evidence that mean reversion concentrates in turbulent "
+            "periods (Poterba and Summers 1988; Kim, Nelson and Startz 1991; "
+            "Spierdijk, Bikker and van den Hoek 2012); the level is FITTED: "
+            "on the driven 2020 path the trough's lead over earnings reads "
+            "+3.0 sessions at ceilings of 1 and 1.5 against -5.5 without "
+            "(desk, seeds 101-116), and a ceiling of 2 took B7, the index "
+            "volatility, to 27.9 against 18.1 (box ptv20vr4) where 1.5 "
+            "reads 20.6",
+    },
+    "fair_value_vix_discount": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.35},
+        "what_would_determine_it": "a tape estimate of the volatility "
+            "feedback's elasticity, the price response to expected "
+            "volatility above the knee (French, Schwert and Stambaugh 1987; "
+            "Campbell and Hentschel 1992 give the sign and the mechanism, "
+            "not this number). FITTED on held-out grids ptv20vr6-vr9 over "
+            "0.1 to 0.35: without it the driven 2020 fast crash is 0.192 in "
+            "41 sessions and fails F1 (real 0.339 in 23); the graded arm "
+            "reads 0.266 in 35.5 and passes all 40 rows (box ptv20vr9, arm "
+            "K40g35h5), where K40g30h3 at 0.3 passed as well",
+    },
+    "fair_value_vix_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 40.0},
+        "what_would_determine_it": "the VIX level at which the feedback "
+            "starts, from the same estimate. FITTED: at a knee of 30 or 35 "
+            "every smoothed arm tried put the sessions under -5 per cent past twice "
+            "the tape's 6.2 a decade (B5, 12.6 to 14.1; boxes ptv20vr8 and "
+            "vr9), and at 40 the two arms read 11.7 and 11.5",
+    },
+    "fair_value_vix_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 5.0},
+        "what_would_determine_it": "how fast the market prices a change "
+            "in the volatility regime, from a tape estimate. FITTED: read "
+            "unsmoothed, the discount's whole daily change landed with the "
+            "VIX's move and took the sessions under -5 per cent from 10.6 "
+            "to 18 to 25 a decade and the 2008 replay's worst month to 109 "
+            "to 137 against 84 (grids ptv20vr6-vr7); at 3 and 5 sessions "
+            "on the knee of 30 B5 read 14.1 and 12.7 at a gain of 0.25 "
+            "(ptv20vr8), and the graded arm at 5 reads 11.5 (ptv20vr9)",
+    },
+    "buyback_yield_cap": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.15},
+        "what_would_determine_it": "nothing on the tape: a GUARD, not a "
+            "claim about markets. The buyback term compounds the yield at "
+            "today's price over every elapsed year, so a name near the "
+            "0.01 price floor read a yield in the hundreds and the close's "
+            "re-mark diverged (a name from 0.10 to 38,220 in one close, the "
+            "index 86-fold, seed 821, session 4851, grid ptv20vr6; 1 of 90 "
+            "held-out histories without the feedback too). At 0.15 the same "
+            "session moves the index 1 per cent. CHOSEN: at pt-v20's "
+            "buyback share of 0.75 it binds only on a profitable name "
+            "priced under 5 times earnings",
+    },
 
 }
 
@@ -4144,11 +4323,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
-    # `rate_pe_sensitivity` became a dial at 0.8.5 at the constant that
-    # stood, 1.5, which no record derives (POST_BASELINE says why it is in
-    # scope); the 2022 measurement that would set it is design repo
-    # programme/ptv20-scenario-size.md section 5.
-    "rate_pe_sensitivity",
+    # `rate_pe_sensitivity` left on 2026-09-26: it became a dial at 0.8.5 at
+    # the constant that stood, 1.5, and sat here while no preset moved it;
+    # pt-v20's graded arm sets 3.0 and its entry says where that came from.
     # `macro_calendar_days_per_year`, `macro_compound_days_per_year` and
     # `cycle_stationary_opening` left on 2026-09-23 with pt-v19's fifth
     # composition, which moves all three and carries an entry for each: the

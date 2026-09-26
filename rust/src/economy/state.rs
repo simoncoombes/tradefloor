@@ -436,7 +436,7 @@ pub struct EconomyState {
     /// The smoothed log excess of the VIX over `fair_value_vix_knee` that
     /// the volatility-feedback discount reads when
     /// `fair_value_vix_half_life` is set. 0.0, and never written, on every
-    /// preset, whose `fair_value_vix_discount` is 0.0.
+    /// preset through pt-v19, whose `fair_value_vix_discount` is 0.0.
     pub vix_feedback: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
