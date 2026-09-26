@@ -364,10 +364,10 @@ pub fn build_live_book(company: &CompanyMicrostructure, options: &LiveBookOption
     // `quote_ladder` emits both sides best-first, so append straight on
     // rather than paying the insertion scan per level.
     for level in &bids {
-        book.append_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
+        book.push_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
     }
     for level in &asks {
-        book.append_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
+        book.push_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
     }
 
     // Player/AI orders join the same queue as maker liquidity and are ranked
