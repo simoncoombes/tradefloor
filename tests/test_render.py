@@ -114,7 +114,10 @@ def test_renderers_are_pure_stdlib_no_engine_no_observation():
     """`render.py` imports the standard library, `._core.ValidationError`,
     and -- inside `TextRenderer.render`, lazily, to avoid a load-time
     cycle with `counterfactual.py` -- `.counterfactual.MACRO_FIELDS`, a
-    plain tuple of field names. Nothing else, and nothing engine-shaped:
+    plain tuple of field names -- and `._arith.ordered_sum`, float
+    addition in a fixed order so a figure is the same on Python 3.11 and
+    3.12 (it imports only `functools`, `operator` and `typing`). Nothing
+    else, and nothing engine-shaped:
     a renderer that could reach `Engine` or `Observation` would put the
     ground-truth boundary `serialize_observation` guards behind a
     formatting choice.
@@ -141,12 +144,13 @@ def test_renderers_are_pure_stdlib_no_engine_no_observation():
             # top-level package that happened to share one of these
             # names would be a different thing entirely.
             name = node.module
-            if name in ("_core", "counterfactual"):
+            if name in ("_core", "counterfactual", "_arith"):
                 assert node.level >= 1, (
                     f"{name!r} imported absolutely, not package-relative")
             imported.add(name)
 
-    allowed = {"json", "typing", "__future__", "_core", "counterfactual"}
+    allowed = {"json", "typing", "__future__", "_core", "counterfactual",
+               "_arith"}
     assert imported <= allowed, (
         f"render.py imports {imported - allowed}, outside the allowed "
         f"{allowed}")
