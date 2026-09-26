@@ -5403,6 +5403,20 @@ impl PyEngine {
         self.inner.book_live()
     }
 
+    /// The order in which a cohort's orders reach the book on one step.
+    ///
+    /// ``labels`` sorted at ``book_arrival_shuffle`` 0.0, the order every
+    /// preset carries. With the switch on, a seeded shuffle that is fresh
+    /// every step: the labels sorted by a counter-based priority of this
+    /// engine's seed, ``day``, ``step_of_day`` and the label
+    /// (``rust/src/rng.rs``, ``arrival_priority``). It takes no draw and
+    /// moves nothing, and a label's priority does not depend on which other
+    /// labels are present, so removing one never reorders the rest.
+    /// ``World.run`` reads it for a cohort.
+    fn arrival_order(&self, day: u64, step_of_day: u64, labels: Vec<String>) -> Vec<String> {
+        self.inner.arrival_order(day, step_of_day, &labels)
+    }
+
     /// Every input that crossed into this engine, in order.
     ///
     /// # A seed alone does not reproduce a run

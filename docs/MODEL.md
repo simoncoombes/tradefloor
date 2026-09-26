@@ -1924,6 +1924,31 @@ half-life rather than lasting for good. The model's own flow never meets
 consumed or latent depth, so an agent's temporary impact reaches the tape
 only through the maker's inventory.
 
+### Arrival order in a cohort
+
+Several agents in one `World` are asked together and then execute one after
+another against the one book, so on a live book the second meets what the
+first left: it pays for the levels the first took and stands behind it in
+the queue at an equal price. Which one arrives first is
+`Engine.arrival_order` (`engine.rs`, `rng.rs::arrival_priority`). At
+`book_arrival_shuffle` 0, which every preset carries, it is sorted label
+order on every step, so a label is a standing priority: on pt-v20 the later
+label of two identical buyers of 10% of a name's daily volume pays about
+23 bp more on every held-out seed. At 1 it is the labels sorted by
+
+```math
+p_\ell = m\big(m(m(m(\sigma(\text{seed}, 11)) \oplus d) \oplus k) \oplus h(\ell)\big)
+```
+
+with $m$ SplitMix64's finalizer, $\sigma$ the stream derivation's input,
+$d$ the world's day, $k$ the step within the day and $h$ FNV-1a of the
+label. Each label is first equally often and the order is independent from
+step to step, as agent-based toolkits reshuffle their activation order
+(Axtell 2001), and exchanges rank equal prices by time and never by name
+(Nasdaq Rule 4757). A label's priority does not depend on which others are
+present, so an externality arm that removes one agent keeps the others'
+order. It takes no draw and holds no state.
+
 With $\gamma \ne 0$ agents' flow no longer enters the order-flow law $O$,
 which now carries only flow a caller supplies directly:
 
@@ -1941,6 +1966,7 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 | | `book_shared` | 1 (0) | derived | a switch: agents consume one book |
 | $H_B$ | `book_refill_half_life` | 27 ticks (0) | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
 | | `book_resting` | 1 (0) | derived | a switch: limit orders rest with queue priority |
+| | `book_arrival_shuffle` | 0 | out of scope | a switch: a cohort's arrival order at the book is a seeded shuffle, fresh every step; 0 is label order |
 | $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |

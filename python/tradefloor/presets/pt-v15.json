@@ -2,8 +2,9 @@
   "schema": 1,
   "preset": "pt-v15",
   "fingerprint": "pt-v15",
-  "coefficient_digest": "a8641424130f9440fbe6558c7d5db2dceb057c55a72309dbd9d344cf89af954f",
+  "coefficient_digest": "2fb1e192fac58aa9092357bbd315d84b2b977888bb6b2e6dd71cb6de9b2cfee4",
   "coefficients": {
+    "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
     "book_depth_reach": 0.0,

@@ -315,6 +315,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "book_shared": (0.0, 1.0),
     "book_refill_half_life": (0.0, 120.0),
     "book_resting": (0.0, 1.0),
+    # A switch: a cohort's arrival order at the book is a seeded per-step
+    # shuffle rather than label order.
+    "book_arrival_shuffle": (0.0, 1.0),
     "fill_impact_coefficient": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest

@@ -371,6 +371,14 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "book_arrival_shuffle":
+        "inert at 0.0 as shipped: `World.run` executes a cohort in sorted "
+        "label order, so on a live book the same label takes the levels and "
+        "the queue first on every step. Read only by a cohort of two or "
+        "more agents; a single agent, `evaluate` and an untraded market "
+        "never read it (0.8.5, arrival-order work: the later of two "
+        "identical 10%-of-ADV buyers paid about 23 bp more on 30 of 30 "
+        "held-out seeds on pt-v20)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

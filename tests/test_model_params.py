@@ -924,6 +924,9 @@ PERTURBATIONS = [
     ("book_shared", 0.0, False),
     ("book_refill_half_life", 10.0, False),
     ("book_resting", 0.0, False),
+    # INERT: read only by a World cohort of two or more agents, and the
+    # probe runs none. tests/test_arrival_order.py moves it with a cohort.
+    ("book_arrival_shuffle", 1.0, False),
     ("fill_impact_coefficient", 0.5, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
