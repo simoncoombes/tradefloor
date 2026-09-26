@@ -10,6 +10,9 @@ harness to refusing them by default and flagging them under the opt-in.
 
 from __future__ import annotations
 
+import copy
+import gc
+import pickle
 import struct
 
 import pytest
@@ -32,8 +35,12 @@ class Peek:
     """Forks the engine, runs the fork to the end of the step, buys what
     rises. Look-ahead."""
 
+    @staticmethod
+    def reach(obs):
+        return obs.engine
+
     def act(self, obs):
-        fork = obs.engine.fork(1)[0]
+        fork = self.reach(obs).fork(1)[0]
         k = obs.step_of_day
         hh, mm = divmod(9 * 60 + 30 + k * 65, 60)
         fork.run_session(hh, mm, 3, 65)
@@ -114,12 +121,13 @@ def test_rewriting_the_market_under_the_opt_in_is_flagged_tampered():
 
 def test_a_write_reached_around_the_view_is_still_flagged():
     """The view is a guard against accident, not a wall. The hash check is
-    what catches a write however the agent reached the engine."""
+    what catches a write however the agent reached the engine, here through
+    the module's own table."""
 
     class Around:
         def act(self, obs):
             if obs.step == 2:
-                engine = obs.engine._MarketView__engine
+                engine = tf.sandbox._WRAPPED[obs.engine]
                 engine.pin_macro(federal_funds_rate=0.2)
             return {}
 
@@ -127,6 +135,110 @@ def test_a_write_reached_around_the_view_is_still_flagged():
     assert card.tampered and not card.trusted
     assert any("step 2: tampered:" in e and "state hash" in e
                for e in card.errors)
+
+
+# -- no attribute of a view leads to what it wraps ----------------------------
+#
+# Until the last pre-release of 0.8.5 each view kept what it wrapped in a
+# name-mangled slot. `dir(obs.engine)` listed `_MarketView__engine`, and one
+# attribute access handed an agent the live engine. Two reviewers used it:
+# one forked the engine at each step and traded on the fork (+4.2% to +8.2%
+# in five days against +0.2% to +2.3% for buy-and-hold, four seeds of four),
+# and one read `mispricing_s`. Neither card carried a flag, because a read
+# changes no state and the tamper check compares state.
+
+
+class ThroughTheSlot(Peek):
+    """The first reviewer's agent: Peek, reaching the engine through the
+    view's private slot."""
+
+    @staticmethod
+    def reach(obs):
+        return obs.engine._MarketView__engine
+
+
+class AnswerThroughTheSlot:
+    """The second reviewer's read: the mispricing column, through the slot."""
+
+    def act(self, obs):
+        s = _f64(obs.engine._MarketView__engine.column("mispricing_s"))
+        return {obs.tickers[min(range(len(s)), key=s.__getitem__)]: 10.0}
+
+
+def test_look_ahead_through_the_private_slot_is_refused():
+    card = _run({"slot": ThroughTheSlot()})["slot"]
+    assert card.trades == 0 and card.pnl == 0.0
+    assert card.errors and all("SandboxError" in e
+                               and "_MarketView__engine" in e
+                               for e in card.errors)
+    assert not card.trusted and not card.tampered
+
+
+def test_a_hidden_column_through_the_private_slot_is_refused():
+    card = _run({"slot": AnswerThroughTheSlot()})["slot"]
+    assert card.trades == 0
+    assert card.errors and all("SandboxError" in e for e in card.errors)
+    assert not card.uses_hidden_state
+
+
+def _wrapped():
+    engine = tf.Engine(seed=1, universe=U)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 65)
+    portfolio = tf.Portfolio(cash=1_000_000.0)
+    views = {"market": MarketView(engine), "hidden": HiddenState(engine),
+             "portfolio": PortfolioView(portfolio, engine)}
+    return engine, portfolio, views
+
+
+#: The slots each view used to have, spelled as an agent would reach them.
+OLD_SLOTS = ("_MarketView__engine", "_HiddenState__raw",
+             "_PortfolioView__portfolio", "_PortfolioView__engine")
+
+
+@pytest.mark.parametrize("kind", ["market", "hidden", "portfolio"])
+def test_no_attribute_of_a_view_leads_to_the_live_objects(kind):
+    engine, portfolio, views = _wrapped()
+    view = views[kind]
+    live = (engine, portfolio)
+    for name in dir(view):
+        try:
+            value = getattr(view, name)
+        except Exception:
+            continue
+        assert not any(value is x for x in live), name
+    for name in OLD_SLOTS:
+        with pytest.raises(SandboxError):
+            getattr(view, name)
+        # No slot at all, so going under `__getattr__` finds nothing either.
+        with pytest.raises(AttributeError):
+            object.__getattribute__(view, name)
+    assert not any(ref is x for ref in gc.get_referents(view) for x in live)
+    # The view still reads the live objects, through the module's table.
+    if kind == "portfolio":
+        assert view.net_worth() == portfolio.net_worth(engine)
+    else:
+        assert view.prices() == engine.prices()
+
+
+@pytest.mark.parametrize("kind", ["market", "hidden", "portfolio"])
+def test_a_view_refuses_to_be_copied_or_pickled(kind):
+    _, _, views = _wrapped()
+    for how in (copy.copy, copy.deepcopy, pickle.dumps):
+        with pytest.raises(SandboxError, match="cannot be copied or pickled"):
+            how(views[kind])
+
+
+def test_forking_a_world_whose_agent_keeps_the_view_says_what_to_do():
+    class Keeps:
+        def act(self, obs):
+            self.view = obs.engine
+            return {}
+
+    world = tf.World(seed=2, universe=U, agent=Keeps())
+    world.run(1)
+    with pytest.raises(SandboxError, match=r"fork\(\) method"):
+        world.fork("arm")
 
 
 def test_the_portfolio_cannot_be_written_or_traded_directly():
@@ -225,6 +337,83 @@ def test_the_market_view_serves_what_a_trader_sees():
     for item in view.news():
         assert set(item) == {"ticker", "sector", "day"}
     assert view.model_fingerprint == engine.model_fingerprint
+
+
+class History:
+    """Asks for a daily history at the third day's open, as a reviewer of
+    the pre-release did, at every grain."""
+
+    ASKS = {"day": {"grain": "day"}, "minutes": {"minutes": 5},
+            "tick": {}, "one day": {"day": 1, "grain": "day"}}
+
+    def __init__(self):
+        self.got = {}
+        self.recorded = None
+
+    def act(self, obs):
+        if obs.day == 2 and obs.step_of_day == 0:
+            import pyarrow as pa
+
+            for label, kwargs in self.ASKS.items():
+                try:
+                    self.got[label] = pa.table(
+                        obs.engine.bars(**kwargs)).to_pydict()
+                except SandboxError as exc:
+                    self.got[label] = str(exc)
+            try:
+                self.recorded = obs.engine.recorded_days
+            except SandboxError:
+                self.recorded = "not served"
+        return {}
+
+
+def test_bars_refuses_when_the_harness_records_nothing():
+    """`evaluate` never records, and the engine's fallback was the last
+    step's prints labelled day 0: on day 2, one bar per name labelled day 0
+    covering the last 65 minutes of day 1, and no warning."""
+    pytest.importorskip("pyarrow")
+    agent = History()
+    card = tf.evaluate({"h": agent}, seed=3, universe=U, days=3)["h"]
+    assert card.errors == []
+    assert set(agent.got) == set(History.ASKS)
+    for label, got in agent.got.items():
+        assert isinstance(got, str), (label, got)
+        assert "never record" in got and "column('open')" in got
+    assert agent.recorded == 0
+
+
+def test_bars_serves_the_recorded_days_unchanged():
+    pa = pytest.importorskip("pyarrow")
+    agent = History()
+    world = tf.World(seed=3, universe=U, agents={"h": agent})
+    world.run(3, record=True)
+    assert agent.recorded == 2
+    engine = world.engine
+    for label, kwargs in History.ASKS.items():
+        if "day" in kwargs:
+            want = pa.table(engine.bars(**kwargs))
+        else:
+            # Asked at day 2's open, so days 0 and 1 of the three.
+            want = pa.concat_tables([pa.table(engine.bars(day=d, **kwargs))
+                                     for d in (0, 1)])
+        assert agent.got[label] == want.to_pydict(), label
+    assert sorted(set(agent.got["day"]["day"])) == [0, 1]
+
+
+def test_the_market_view_bars_is_the_engine_bars_once_recorded():
+    pa = pytest.importorskip("pyarrow")
+    engine = tf.Engine(seed=1, universe=U)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 65)
+    view = MarketView(engine)
+    assert view.recorded_days == 0
+    with pytest.raises(SandboxError, match="needs recorded days"):
+        view.bars(grain="day")
+    engine.record(0)
+    assert view.recorded_days == 1
+    for kwargs in ({}, {"grain": "day"}, {"minutes": 5}, {"day": 0}):
+        assert pa.table(view.bars(**kwargs)).equals(
+            pa.table(engine.bars(**kwargs))), kwargs
 
 
 @pytest.mark.parametrize("name", [

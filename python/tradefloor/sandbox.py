@@ -13,7 +13,11 @@ scorecard carried an error or a flag.
 and nothing else:
 
 - prices, the columns a data vendor publishes (:data:`PUBLIC_COLUMNS`), each
-  instrument's book and the bars of the sessions already run
+  instrument's book, and the bars of the days the engine has recorded. A
+  World run with ``record=True`` records each day as it ends.
+  ``evaluate``, ``rank``, ``tca.analyse`` and the gym environment never
+  record, so there :meth:`MarketView.bars` refuses and says how to keep a
+  history
 - the published macro fields (:data:`PUBLISHED_MACRO`, an allowlist) and
   the curve. ``cycle`` there is the phase as published, late, the way the
   NBER dates a turn; the true phase is not served
@@ -47,7 +51,9 @@ elsewhere runs the future, and the economy block: the true phase,
   payload built from the view.
 - :class:`tradefloor.gym.TradingEnv`: the observation is an array of
   returns and holdings, and ``env.engine`` and ``env.portfolio`` are the
-  views, so training code holding the env cannot read past them either.
+  views. The env runs the market itself and keeps the live engine as
+  ``env._engine``, so the views keep training code from reaching it by
+  accident and no further.
 - The MCP server: a strategy is data, run through ``evaluate`` and
   ``rank`` with no opt-in. See :mod:`tradefloor.mcp` for its research
   tools, which answer the experimenter after a run and hand no strategy
@@ -83,18 +89,27 @@ out of its table and says so.
 
 ## What this is not
 
-It is not a security boundary. The agent runs in the harness's own Python
-process, and a determined author can walk the interpreter (``gc``, frame
-objects, a closure's cells) to the engine, or build a second engine from a
-guessed seed and run it ahead. The view closes the route the harness itself
-handed over, and the hash check catches any write, however it was reached;
-a second engine built from scratch writes nothing and is not caught. For
-code you do not trust, run it out of process against the MCP server, where
-strategies are data and there is no Python to submit.
+It is not a security boundary. No view keeps the engine or the portfolio as
+an attribute. A table in this module holds them, keyed by the view, so
+``dir(obs.engine)`` names nothing that leads to the live engine. The agent
+still runs in the harness's own Python process, and code that walks the
+interpreter (``gc``, frame objects, this module's table) reaches the engine.
+It can also build a second engine from a guessed seed and run it ahead.
+
+The hash check catches a write however it was reached. It cannot see a
+read, because a read changes no state: a fork run ahead for look-ahead and
+a hidden column read through a reached engine both leave ``tampered`` False
+and ``uses_hidden_state`` False. Counting forks on the engine would take a
+change to the Rust core and to ``state_hash``, which the ledgers and
+:meth:`tradefloor.World.fork` rely on, so it is not done.
+
+Run code you do not trust in a separate process, against the MCP server,
+where a strategy is data and there is no Python to submit.
 """
 
 from __future__ import annotations
 
+import weakref
 from typing import Any, Iterable
 
 from ._core import Engine
@@ -214,6 +229,37 @@ class PublishedMacro:
                 f"cycle={v['cycle']!r})")
 
 
+#: What each view wraps, keyed by the view: the engine for a
+#: :class:`MarketView` or :class:`HiddenState`, and ``(portfolio, engine)``
+#: for a :class:`PortfolioView`. Kept here rather than on the view, so that
+#: no attribute of an observation leads to the live objects and ``dir()``
+#: names none. Weak on the view, so an entry goes when its view does. It
+#: closes the one-attribute route, and the module docstring says what it
+#: leaves open.
+_WRAPPED: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
+
+
+def _no_copy(what: str, holds: str) -> SandboxError:
+    return SandboxError(
+        f"the {what} cannot be copied or pickled, because the copy would "
+        f"carry the live {holds}. Keep the values you need rather than the "
+        f"view. An agent that holds a view between steps and runs in a "
+        f"forked World needs a fork() method that leaves the view behind, as "
+        f"tradefloor.baselines.Oracle has.")
+
+
+_NO_BARS = (
+    "bars() needs recorded days, and this engine has none. tf.evaluate, "
+    "tf.rank, tf.tca.analyse and tf.gym.TradingEnv never record. A World "
+    "records a day as it ends, and only under run(record=True). With "
+    "nothing recorded the engine would hand back the prints of the last "
+    "step alone, labelled day 0 whatever the day. To keep a daily history, "
+    "store what you need as the run goes: obs.prices at each step, and "
+    "obs.engine.column('open'), 'high' and 'low', which hold today's open "
+    "and the high and low so far, as little-endian f64 bytes. "
+    "obs.engine.recorded_days counts the days bars() can serve.")
+
+
 class MarketView:
     """What a trader can see of the market. The default ``obs.engine``.
 
@@ -222,30 +268,30 @@ class MarketView:
     docstring for what is here and what is not.
     """
 
-    # Name-mangled so `view._engine` is not the obvious spelling. This is a
-    # guard against accident, not a wall: see the module docstring.
-    __slots__ = ("__engine",)
+    # No slot holds the engine: `_WRAPPED` does. `__weakref__` is the one
+    # slot, so the table can key on the view.
+    __slots__ = ("__weakref__",)
 
     def __init__(self, engine: Engine) -> None:
-        object.__setattr__(self, "_MarketView__engine", engine)
+        _WRAPPED[self] = engine
 
     # -- the roster -------------------------------------------------------
 
     @property
     def tickers(self) -> list[str]:
-        return list(self.__engine.tickers)
+        return list(_WRAPPED[self].tickers)
 
     def __len__(self) -> int:
-        return len(self.__engine)
+        return len(_WRAPPED[self])
 
     def index_of(self, ticker: str) -> int | None:
-        return self.__engine.index_of(ticker)
+        return _WRAPPED[self].index_of(ticker)
 
     # -- prices and depth -------------------------------------------------
 
     def prices(self) -> bytes:
         """Every instrument's last print, as little-endian f64 bytes."""
-        return self.__engine.prices()
+        return _WRAPPED[self].prices()
 
     def column(self, field: str) -> bytes:
         """One of :data:`PUBLIC_COLUMNS`, as little-endian f64 bytes."""
@@ -256,27 +302,50 @@ class MarketView:
                    if field.startswith("mispricing_s") else "")
                 + f". The market view serves {sorted(PUBLIC_COLUMNS)}. "
                 f"{_OPT_IN}")
-        return self.__engine.column(field)
+        return _WRAPPED[self].column(field)
 
     def book(self, ticker: str):
         """A copy of the instrument's order book. Trading on it changes
         nothing: orders go through the ``act`` mapping."""
-        return self.__engine.book(ticker)
+        return _WRAPPED[self].book(ticker)
 
-    def bars(self, **kwargs: Any):
-        """``Engine.bars``: prints and volume of sessions already run."""
-        return self.__engine.bars(**kwargs)
+    @property
+    def recorded_days(self) -> int:
+        """How many days the engine has recorded, which is what
+        :meth:`bars` can serve. Always 0 under ``tf.evaluate`` and in the
+        gym environment."""
+        return _WRAPPED[self].recorded_days
+
+    def bars(self, *, day: int | None = None, minutes: int | None = None,
+             grain: str | None = None):
+        """``Engine.bars`` over the days recorded so far.
+
+        A World run with ``record=True`` records each day as it ends, and
+        there this is ``Engine.bars`` unchanged. ``tf.evaluate``,
+        ``tf.rank``, ``tf.tca.analyse`` and the gym environment never
+        record, and neither does a World run without ``record=True`` or
+        before its first close. With nothing recorded the engine falls back
+        to the prints of its last ``run_session``, which inside a harness is
+        the last step alone, labelled day 0 whatever the day. So with
+        :attr:`recorded_days` at 0 this raises :class:`SandboxError` at
+        every grain, tick included, and the message says how to keep a
+        history of your own.
+        """
+        engine = _WRAPPED[self]
+        if not engine.recorded_days:
+            raise SandboxError(_NO_BARS)
+        return engine.bars(day=day, minutes=minutes, grain=grain)
 
     # -- the economy ------------------------------------------------------
 
     @property
     def macro_state(self) -> PublishedMacro:
-        return PublishedMacro(self.__engine.macro_state)
+        return PublishedMacro(_WRAPPED[self].macro_state)
 
     @property
     def macro_fields(self) -> dict[str, Any]:
         """The published macro fields (:data:`PUBLISHED_MACRO`)."""
-        return {k: v for k, v in self.__engine.macro_fields.items()
+        return {k: v for k, v in _WRAPPED[self].macro_fields.items()
                 if k in PUBLISHED_MACRO}
 
     @property
@@ -284,13 +353,13 @@ class MarketView:
         """The yield curve, as ``Engine.curve`` (a property there too)
         gives it, copied. Until this was a property it raised on every
         call, because the engine's is not a method."""
-        return dict(self.__engine.curve)
+        return dict(_WRAPPED[self].curve)
 
     @property
     def rate_instruments(self) -> list[dict[str, Any]]:
         """Each rate index's quote, as ``Engine.rate_instruments`` (a
         property there too) gives it, copied. Fixed with ``curve``."""
-        return [dict(row) for row in self.__engine.rate_instruments]
+        return [dict(row) for row in _WRAPPED[self].rate_instruments]
 
     def news(self) -> list[dict[str, Any]]:
         """Today's company and sector news: who, not how much.
@@ -301,17 +370,17 @@ class MarketView:
         """
         return [{"ticker": e.get("ticker"), "sector": e.get("sector"),
                  "day": e.get("day")}
-                for e in self.__engine.session_news()]
+                for e in _WRAPPED[self].session_news()]
 
     # -- identity and the clock -------------------------------------------
 
     @property
     def model_fingerprint(self) -> str:
-        return self.__engine.model_fingerprint
+        return _WRAPPED[self].model_fingerprint
 
     @property
     def session_tick(self) -> int | None:
-        return self.__engine.session_tick
+        return _WRAPPED[self].session_tick
 
     # -- everything else --------------------------------------------------
 
@@ -320,6 +389,10 @@ class MarketView:
 
     def __setattr__(self, name: str, value: Any) -> None:
         raise SandboxError("the market view is read-only")
+
+    def __reduce_ex__(self, protocol: Any) -> Any:
+        # copy.copy, copy.deepcopy and pickle all arrive here.
+        raise _no_copy("market view", "engine")
 
     def __repr__(self) -> str:
         return f"MarketView({len(self)} instruments)"
@@ -335,51 +408,50 @@ class HiddenState(MarketView):
     news with its size. Still no fork, no snapshot and no writes.
     """
 
-    __slots__ = ("__raw",)
-
-    def __init__(self, engine: Engine) -> None:
-        super().__init__(engine)
-        object.__setattr__(self, "_HiddenState__raw", engine)
+    __slots__ = ()
 
     def column(self, field: str) -> bytes:
-        return self.__raw.column(field)
+        return _WRAPPED[self].column(field)
 
     def attribution(self, factor: str) -> bytes:
-        return self.__raw.attribution(factor)
+        return _WRAPPED[self].attribution(factor)
 
     @property
     def FACTORS(self) -> list[str]:
-        return list(self.__raw.FACTORS)
+        return list(_WRAPPED[self].FACTORS)
 
     @property
     def model_params(self) -> dict[str, Any]:
-        return dict(self.__raw.model_params)
+        return dict(_WRAPPED[self].model_params)
 
     @property
     def macro_state(self) -> Any:
-        return self.__raw.macro_state
+        return _WRAPPED[self].macro_state
 
     @property
     def macro_fields(self) -> dict[str, Any]:
-        return dict(self.__raw.macro_fields)
+        return dict(_WRAPPED[self].macro_fields)
 
     def economy(self) -> dict[str, Any]:
         """The economy block of ``Engine.state_snapshot``, and only that:
         the whole snapshot carries the generator state."""
-        return dict(self.__raw.state_snapshot()["economy"])
+        return dict(_WRAPPED[self].state_snapshot()["economy"])
 
     def fundamentals(self) -> tuple[list[float], list[float], list[float]]:
-        eps, bv, growth = self.__raw.fundamentals()
+        eps, bv, growth = _WRAPPED[self].fundamentals()
         return list(eps), list(bv), list(growth)
 
     def session_news(self) -> list[dict[str, Any]]:
-        return [dict(e) for e in self.__raw.session_news()]
+        return [dict(e) for e in _WRAPPED[self].session_news()]
 
     def truth(self, **kwargs: Any):
-        return self.__raw.truth(**kwargs)
+        return _WRAPPED[self].truth(**kwargs)
 
     def __getattr__(self, name: str) -> Any:
         raise _refuse("hidden state", name)
+
+    def __reduce_ex__(self, protocol: Any) -> Any:
+        raise _no_copy("hidden state", "engine")
 
     def __repr__(self) -> str:
         return f"HiddenState({len(self)} instruments)"
@@ -394,42 +466,42 @@ class PortfolioView:
     copies.
     """
 
-    __slots__ = ("__portfolio", "__engine")
+    # As on MarketView: the portfolio and the engine live in `_WRAPPED`.
+    __slots__ = ("__weakref__",)
 
     def __init__(self, portfolio: Any, engine: Engine) -> None:
-        object.__setattr__(self, "_PortfolioView__portfolio", portfolio)
-        object.__setattr__(self, "_PortfolioView__engine", engine)
+        _WRAPPED[self] = (portfolio, engine)
 
     @property
     def cash(self) -> float:
-        return self.__portfolio.cash
+        return _WRAPPED[self][0].cash
 
     @property
     def starting_cash(self) -> float:
-        return self.__portfolio.starting_cash
+        return _WRAPPED[self][0].starting_cash
 
     @property
     def max_leverage(self) -> float | None:
-        return self.__portfolio.max_leverage
+        return _WRAPPED[self][0].max_leverage
 
     @property
     def cash_interest(self) -> bool:
-        return self.__portfolio.cash_interest
+        return _WRAPPED[self][0].cash_interest
 
     @property
     def interest(self) -> float:
-        return self.__portfolio.interest
+        return _WRAPPED[self][0].interest
 
     @property
     def owner(self) -> str:
-        return self.__portfolio.owner
+        return _WRAPPED[self][0].owner
 
     @property
     def positions(self) -> dict[str, Any]:
         from .portfolio import Position
 
         out: dict[str, Position] = {}
-        for ticker, held in self.__portfolio.positions.items():
+        for ticker, held in _WRAPPED[self][0].positions.items():
             twin = Position(ticker)
             twin.quantity = held.quantity
             twin.avg_cost = held.avg_cost
@@ -439,34 +511,42 @@ class PortfolioView:
 
     @property
     def fills(self) -> list[dict]:
-        return [dict(f) for f in self.__portfolio.fills]
+        return [dict(f) for f in _WRAPPED[self][0].fills]
 
     def marks(self, engine: Any = None) -> dict[str, float]:
-        return self.__portfolio.marks(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.marks(live)
 
     def market_value(self, engine: Any = None) -> float:
-        return self.__portfolio.market_value(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.market_value(live)
 
     def net_worth(self, engine: Any = None) -> float:
-        return self.__portfolio.net_worth(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.net_worth(live)
 
     def pnl(self, engine: Any = None) -> float:
-        return self.__portfolio.pnl(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.pnl(live)
 
     def unrealised(self, engine: Any = None) -> float:
-        return self.__portfolio.unrealised(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.unrealised(live)
 
     def realised(self) -> float:
-        return self.__portfolio.realised()
+        return _WRAPPED[self][0].realised()
 
     def gross_exposure(self, engine: Any = None) -> float:
-        return self.__portfolio.gross_exposure(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.gross_exposure(live)
 
     def leverage(self, engine: Any = None) -> float:
-        return self.__portfolio.leverage(self.__engine)
+        portfolio, live = _WRAPPED[self]
+        return portfolio.leverage(live)
 
     def open_orders(self, engine: Any = None) -> list[dict]:
-        return [dict(o) for o in self.__portfolio.open_orders(self.__engine)]
+        portfolio, live = _WRAPPED[self]
+        return [dict(o) for o in portfolio.open_orders(live)]
 
     def __getattr__(self, name: str) -> Any:
         raise SandboxError(
@@ -477,9 +557,12 @@ class PortfolioView:
     def __setattr__(self, name: str, value: Any) -> None:
         raise SandboxError("the portfolio view is read-only")
 
+    def __reduce_ex__(self, protocol: Any) -> Any:
+        raise _no_copy("portfolio view", "portfolio and engine")
+
     def __repr__(self) -> str:
         return (f"PortfolioView(cash={self.cash:,.2f}, "
-                f"positions={len(self.__portfolio.positions)})")
+                f"positions={len(_WRAPPED[self][0].positions)})")
 
 
 def declares_hidden_state(agent: Any) -> bool:

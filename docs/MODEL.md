@@ -1952,7 +1952,7 @@ harness loops in `harness.py`, `counterfactual.py` and `tca.py` hand
 `act(obs)` the following:
 
 - `obs.prices`, `obs.tickers`, `obs.avg_volume(t)` and `obs.book(t)`, the last prints, the roster, $\bar A_i$ and a copy of the book at the step's start;
-- `obs.engine`, a `MarketView`: the columns price, previous close, previous tick price, open, high, low, volume, $\bar A_i$, market cap, last daily return, $\beta_i$, short interest and float; `bars`; the published macro fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as published); the curve; and which names and sectors have news today, without its size;
+- `obs.engine`, a `MarketView`: the columns price, previous close, previous tick price, open, high, low, volume, $\bar A_i$, market cap, last daily return, $\beta_i$, short interest and float; `bars` of the days recorded so far, which a World run with `record=True` has and `tf.evaluate` does not; the published macro fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as published); the curve; and which names and sectors have news today, without its size;
 - `obs.portfolio`, a read-only view of the agent's own cash, positions and fills.
 
 Nothing in the observation carries $s_i$, its momentum $\mu_i$, the maker's

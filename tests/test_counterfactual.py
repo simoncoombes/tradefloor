@@ -618,7 +618,7 @@ def test_a_forked_oracle_forgets_the_engine_it_was_reading():
     def reads(agent, engine):
         held = agent._engine
         return (isinstance(held, HiddenState)
-                and held._HiddenState__raw is engine)
+                and tf.sandbox._WRAPPED[held] is engine)
 
     world = World(seed=SEED, universe=tf.Universe.random(8, seed=7),
                   agent=tf.baselines.Oracle())
