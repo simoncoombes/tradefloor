@@ -26,7 +26,9 @@ Everything reported is ground truth about THIS market. It is a controlled
 synthetic experiment, not a prediction about how real securities would react
 to a real rate rise.
 
-Takes about a second. No API keys, no network, no data files.
+Takes under ten seconds of CPU. About half of that is building the five
+pt-v20 engines the run uses, about 0.7 seconds each, because pt-v20 runs a
+755-day burn-in before day 0. No API keys, no network, no data files.
 """
 
 from __future__ import annotations

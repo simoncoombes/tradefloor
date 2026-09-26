@@ -11,9 +11,11 @@ python examples/rate-shock/counterfactual.py
 
 The wheel carries the library, not the examples, so the clone is what puts
 the script on disk. `matplotlib` is optional and only decides whether you get
-the chart.
+the chart. About half the run's CPU goes on building the five pt-v20 engines
+it uses, about 0.7 seconds each, because pt-v20 runs a 755-day burn-in before
+day 0.
 
-It runs in about a second and answers one question:
+It takes under ten seconds of CPU and answers one question:
 
 > **How does the exact same trading agent behave when interest rates
 > unexpectedly rise by 200 basis points?**
@@ -61,8 +63,8 @@ is discounted by
 rate_adjustment = 1 - (discount - neutral) * 1.5 * (1 + growth * 2)
 ```
 
-where `neutral` is the preset's `neutral_discount_rate`, 0.0482 on `pt-v19`.
-Revenue growth **is** the duration term. On `pt-v19` a 200bp rise costs `NOVA`
+where `neutral` is the preset's `neutral_discount_rate`, 0.0482 on `pt-v20`.
+Revenue growth **is** the duration term. On `pt-v20` a 200bp rise costs `NOVA`
 about 5.2% of its multiple and `STAP` about 3.1%.
 
 That correspondence is honest for this market and does not transfer. A real
@@ -126,12 +128,12 @@ print(agree(control, shock).render())
 
 ```
   market columns         identical  18 columns x 4
-  prices                 identical  122.13  93.20  71.99  54.74
-  order book             identical  80 levels
+  prices                 identical  122.94  93.23  71.31  55.37
+  order book             identical  232 levels
   generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  37 fields, day 20
-  portfolio              identical  $4,046,100 cash, 4 positions
+  whole engine state     identical  41 fields, day 20
+  portfolio              identical  $7,397,523 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
 ```
@@ -142,7 +144,7 @@ not identical here, everything downstream is comparing two different markets.
 
 The two forks are for different things. `fork()` copies the engine's state
 snapshot and takes under a millisecond; `checkpoint()` records the seed, the
-roster and every input that reached the engine as about 21 kB of JSON, costs
+roster and every input that reached the engine as about 30 kB of JSON, costs
 what the run cost to restore, and survives the process. Use the first for an
 experiment inside one script and the second for anything you save or cite.
 
@@ -189,31 +191,31 @@ not cut evenly:
 
 ```
             growth   control    shock      cut
-    NOVA      0.35    0.2266   0.0799   -64.7%
-    HELX      0.18    0.2266   0.0884   -61.0%
-    BRDG      0.06    0.2266   0.0955   -57.9%
-    STAP      0.01    0.2266   0.0988   -56.4%
+    NOVA      0.35    0.2127   0.0535   -74.9%
+    HELX      0.18    0.2127   0.0591   -72.2%
+    BRDG      0.06    0.2127   0.0639   -70.0%
+    STAP      0.01    0.2127   0.0661   -68.9%
 ```
 
 Twenty days later the two markets are apart, in the same order:
 
 ```
                                NOVA       HELX       BRDG       STAP
-  control        40 days     117.90      93.27      73.67      52.17
-  +200bps        40 days     111.35      89.41      70.97      50.41
-  difference                 -5.56%     -4.14%     -3.66%     -3.37%
+  control        40 days     119.92      94.15      73.21      53.12
+  +200bps        40 days     107.26      86.27      68.24      49.81
+  difference                -10.55%     -8.37%     -6.79%     -6.22%
 ```
 
 And the two books:
 
 ```
                                     control          +200bps
-  final gross exposure                0.95x            0.38x
-  turnover                      $15,302,836      $34,909,691
-  cost against arrival               $4,775          $16,059
-  cash                           $2,652,843      $32,030,346
-  P&L since the fork              $-620,983      $-1,053,830
-  max drawdown since                  5.28%            3.58%
+  final gross exposure                0.90x            0.38x
+  turnover                      $17,479,798      $37,342,227
+  cost against arrival               $4,962          $15,561
+  cash                           $5,166,814      $30,466,941
+  P&L since the fork              $-282,549      $-3,602,512
+  max drawdown since                  4.80%            8.16%
 ```
 
 The behaviour comes first here deliberately. The P&L difference is one draw of

@@ -82,8 +82,8 @@ and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
 4242, universe seed 4242, preset `pt-v16`, at commit `679ef3d`. The
 notebook prints this table from `ex.depth_readings(worlds)`.
 
-`experiment.py` pins `pt-v16`, and the shipped default from 0.8.0 is
-`pt-v19`. The recording replays only in the market it was made in, so the
+`experiment.py` pins `pt-v16`, and the shipped default from 0.8.5 is
+`pt-v20`. The recording replays only in the market it was made in, so the
 study stays on the preset it was recorded under.
 
 ## Reading it

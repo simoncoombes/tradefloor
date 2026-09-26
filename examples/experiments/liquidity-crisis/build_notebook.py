@@ -105,7 +105,7 @@ Every price, spread, fill and order-book state after step zero is generated
 by Tradefloor under the `pt-v16` preset.
 
 `experiment.py` pins `pt-v16`. The shipped default has moved on since the
-recording was made (it is `pt-v19` from 0.8.0), and a replay is keyed to
+recording was made (it is `pt-v20` from 0.8.5), and a replay is keyed to
 the exact text the agent was sent, so it only replays in the market it was
 recorded in. Every earlier preset stays selectable, which is what lets this
 run reproduce. The numbers below describe `pt-v16`.
