@@ -234,3 +234,29 @@ def test_tradefloor_mcp_without_the_extra_prints_one_line():
     assert len(lines) == 1, done.stderr
     assert 'pip install "tradefloor[mcp]"' in lines[0]
 
+
+def test_the_classifiers_name_the_pythons_ci_runs():
+    """PyPI's sidebar lists these, and a reader picks a Python from them.
+
+    They must be the versions CI tests: 3.11 in every job, and the matrix
+    of the `versions` job in suite.yml. 0.8.5 listed only
+    `Programming Language :: Python :: 3`, which says nothing, and had no
+    Issues link, so the PyPI page had nowhere to report a problem.
+    """
+    project = _pyproject()["project"]
+    classifiers = set(project["classifiers"])
+    prefix = "Programming Language :: Python :: 3."
+    listed = {c[len("Programming Language :: Python :: "):]
+              for c in classifiers if c.startswith(prefix)}
+    suite = (ROOT / ".github" / "workflows" / "suite.yml").read_text(
+        encoding="utf-8")
+    matrix = re.search(r'python: \[([^\]]+)\]', suite)
+    assert matrix is not None, "suite.yml has no python matrix"
+    tested = {"3.11"} | {v.strip().strip('"') for v in
+                         matrix.group(1).split(",")}
+    assert listed == tested, (listed, tested)
+    assert {"Programming Language :: Python :: 3 :: Only",
+            "Programming Language :: Python :: Implementation :: CPython",
+            "Typing :: Typed"} <= classifiers
+    assert project["urls"]["Issues"] == (
+        "https://github.com/simoncoombes/tradefloor/issues")

@@ -22,14 +22,27 @@ license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-APACHE", "LICENSE-MIT", "NOTICE"]
 authors = [{ name = "Simon Coombes" }]
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic", "backtesting"]
+# The Python versions are the ones CI runs: 3.11 in every job, 3.12 and 3.13
+# in the `versions` job of .github/workflows/suite.yml. tests/test_packaging.py
+# checks the two lists agree. The operating systems are the ones release.yml
+# builds wheels for. `Typing :: Typed` because py.typed and _core.pyi ship.
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Financial and Insurance Industry",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Rust",
   "Topic :: Office/Business :: Financial :: Investment",
   "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
 ]
 
 [project.urls]
@@ -39,6 +52,8 @@ Documentation = "https://tradefloor.dev"
 # PyPI has no changelog field, so a project page can only point at one.
 # Without this a visitor has no route from the package to its release notes.
 Changelog = "https://github.com/simoncoombes/tradefloor/releases"
+# Without it the PyPI sidebar has no link for reporting a problem.
+Issues = "https://github.com/simoncoombes/tradefloor/issues"
 
 [project.optional-dependencies]
 # The core package depends on NOTHING. These are for surfaces that genuinely
