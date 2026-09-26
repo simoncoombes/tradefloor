@@ -2410,5 +2410,14 @@ own `exp`, `log`, `pow`, `sin` and `cos`, so no system maths library can
 change a result. A `RunManifest` records every input a run needs, and
 `RunManifest.reproduce()` stops at the first mismatch.
 
+Agents are Python, so an agent-driven run also depends on the Python
+version. Python 3.12 changed built-in `sum()` over floats, and until 0.8.5
+that moved the reference agents' orders in their last digit between 3.11
+and 3.12. The package now adds floats in a fixed order, and
+`tests/test_python_versions.py` checks an agent-driven run on 3.11, 3.12
+and 3.13 against one digest. An agent you write that calls `sum()` over
+floats can still differ between 3.11 and 3.12, so name the Python version
+with a result that depends on one; a manifest records it.
+
 To cite the model, name the version and the preset: "tradefloor 0.8.5,
 preset pt-v20". See the README's "Citing tradefloor" section.
