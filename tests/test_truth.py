@@ -336,7 +336,8 @@ def test_attribution_covers_the_whole_day_not_the_last_step():
     )
 
 
-def test_attribution_equals_the_tape_for_every_factor():
+@pytest.mark.parametrize("vix", [None, 60.0])
+def test_attribution_equals_the_tape_for_every_factor(vix):
     """The two ground-truth surfaces must describe the same window.
 
     `truth` is per-tick and `attribution` is per-day, so summing one over a
@@ -344,6 +345,13 @@ def test_attribution_equals_the_tape_for_every_factor():
     session being confused for each other, in either direction, and it failed
     in BOTH directions before: the tape held only the last session's ticks and
     attribution held only the last session's total.
+
+    Run twice: as the default opens, and with the VIX pinned at 60 before
+    each day, above pt-v20's knee of 40, so the volatility feedback's
+    discount is on the fair value (`vix_feedback` 0.04 after the first
+    close). The discount scales the fair value and never moves `s`, so it
+    has no column in the decomposition; it is in `fundamental_value`, and
+    the two surfaces agree with it on to the last bit.
     """
     pa = pytest.importorskip("pyarrow")
     pc = pytest.importorskip("pyarrow.compute")
@@ -352,14 +360,22 @@ def test_attribution_equals_the_tape_for_every_factor():
     engine = tradefloor.Engine(seed=1, universe=universe)
 
     def run_a_day(day):
+        if vix is not None:
+            engine.pin_macro(vix=vix)
         engine.open_market()
         for step in range(4):
             hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
             engine.run_session(hour, minute, 3, 60)
         engine.close_market()
         engine.record(day)
-        return {f: _f64(engine.attribution(f))[0]
-                for f in tradefloor.Engine.FACTORS}
+        recorded = {f: _f64(engine.attribution(f))[0]
+                    for f in tradefloor.Engine.FACTORS}
+        # What the close's jump moved from `s` to the fair value, waiting
+        # for the tape row that observes the jump. The wrapper holds it only
+        # while some name's is non-zero.
+        pending = engine.state_snapshot().get("pending_fair_value")
+        recorded["jump_fair_value_shift"] = _f64(pending)[0] if pending else 0.0
+        return recorded
 
     # TWO days, because the jump is a day-level move and the tape carries it
     # on the FIRST TICK OF THE NEXT DAY -- `record_day_jump` says so, and so
@@ -375,16 +391,39 @@ def test_attribution_equals_the_tape_for_every_factor():
     # tape jump is day 0's attribution to the last bit.
     first = run_a_day(0)
     second = run_a_day(1)
+    if vix is not None:
+        # The discount is on, or the second run compared nothing new.
+        assert engine.state_snapshot()["economy"]["vix_feedback"] > 0.0
 
     truth = pa.table(engine.truth())
     rows = truth.filter(pc.equal(truth.column("instrument_id"), 0))
     day_two = rows.filter(pc.equal(rows.column("day"), 1))
+    # `fair_value_shift` holds two kinds of move, and each crosses the
+    # boundary its cause does. What left `s` during the day's ticks is on
+    # both surfaces the same day. What left `s` at the close's jump, under
+    # pt-v20's permanent shares, is booked by the attribution with the jump,
+    # on the day of the close, and by the tape beside the jump, on the next
+    # day's first row. So the tape's day 1 holds day 0's jump share and not
+    # day 1's. The market-wide share (`fair_value_market_share` 1.0) takes
+    # part of the jump compensator, which lands every day, so the two
+    # windows differ on every day of pt-v20: this compared the whole column
+    # within the day until 0.8.5 and missed by 1.3e-5 once the market share
+    # was set. The bookkeeping is the jump's own, and it reconciles to the
+    # last bit with the boundary applied.
+    assert first["jump_fair_value_shift"] != 0.0
+    assert second["jump_fair_value_shift"] != 0.0
     checked = 0
     for factor in tradefloor.Engine.FACTORS:
         if factor not in truth.column_names:
             continue
         # The jump is compared across the boundary it actually crosses.
-        recorded = first[factor] if factor == "jump" else second[factor]
+        if factor == "jump":
+            recorded = first[factor]
+        elif factor == "fair_value_shift":
+            recorded = (second[factor] - second["jump_fair_value_shift"]
+                        + first["jump_fair_value_shift"])
+        else:
+            recorded = second[factor]
         tape = sum(v for v in day_two.column(factor).to_pylist()
                    if v is not None)
         assert recorded == pytest.approx(tape, abs=1e-15), (

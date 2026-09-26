@@ -1704,15 +1704,34 @@ rule is picked from the preset's own dials, never from the preset's name.
   short by its sign. The gross splits between the two in proportion to what
   each earns per unit of gross.
 
-Measured on pt-v20, over 30 days on rosters `Universe.random(20, seed=3, 42,
-11)` at sim seeds 0-3:
-- the Oracle is positive on 12 of 12 markets;
-- it is ahead of every price-only reference agent on 11 of 12;
-- the exception is buy-and-hold, in a month the market rose 2.2 per cent
-  against the Oracle's 1.4.
+Before pt-v20's graded arm, over 30 days on rosters `Universe.random(20,
+seed=3, 42, 11)` at sim seeds 0-3, the Oracle was positive on 12 of 12
+markets and ahead of every price-only reference agent on 11 of 12. Its edge
+then was the market's opening mispricing (`opening_market_sigma` 0.10),
+which reverts.
 
-Its edge is market-wide and a few basis points a day, so over five days it is
-behind buy-and-hold as often as not. Quote a capture ratio with its horizon.
+On the graded arm it trades close to no edge. The market's plain shocks move fair
+value for good (`fair_value_market_share` 1.0, `fair_value_market_linear` 1)
+and the opening mispricing is 0.001, so little that hidden state knows
+predicts a return. The index's next-day return correlates with the rule's
+predicted common return at 0.11, and the cross-sectional rank IC is 0.014.
+The rule is net long most days and its P&L takes the sign of the market's
+month:
+- positive on 10 of 14 markets on those rosters (sim seeds 0-3, 0-3 and
+  0-5), and on 30 of 48 over sim seeds 0-15;
+- every loss is a month buy-and-hold lost more; on sim seed 3 the index
+  fell about 11 per cent in log terms, 10 points of it in the names'
+  permanent fair-value offsets, with the VIX below the discount's knee and
+  the earnings cycle unmoved;
+- adding the terms the rule leaves out (the crowd's lean on $s$, the
+  anticipated earnings' drift, the volatility discount's approach to its
+  target) moves the count to 26-30 of 48, with the mean P&L still near zero;
+- at `opening_market_sigma` 0.10 the same seed 3 pays it +152,102 against
+  buy-and-hold's -175,280.
+
+So the Oracle is measured as a ceiling on pt-v19 (`tests/test_baselines.py`,
+`CEILING_PRESET`). On pt-v20 a capture ratio measures the market's month,
+and `capture_ratio` declines to answer in every month the Oracle loses.
 
 ## Volume
 

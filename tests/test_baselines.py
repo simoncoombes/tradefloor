@@ -45,19 +45,39 @@ def scores():
 #: The roster the Oracle's measurements below are made on, from 0.8.5.
 ORACLE_UNIVERSE = tradefloor.Universe.random(20, seed=11)
 
+#: The preset the Oracle is measured as a CEILING on, from pt-v20's graded
+#: arm. A ceiling needs hidden state that predicts returns, and pt-v19 is the
+#: last preset where it does: every shock there is mispricing that reverts.
+#: pt-v20 as graded moves every shock into fair value for good (the name's
+#: own at `fair_value_news_share` 1.0, the market's plain loading at
+#: `fair_value_market_share` 1.0 with `fair_value_market_linear`) and opens
+#: the market-wide mispricing at `opening_market_sigma` 0.001, a hundredth of
+#: the 0.10 the Oracle's earlier pt-v20 measurements stood on. What is left
+#: to know is a drift of a few basis points a day against a month's
+#: permanent market move, and there the Oracle is a long-biased book whose
+#: sign is the market's: see
+#: `test_on_pt_v20_the_oracle_loses_where_the_market_falls_for_good`.
+CEILING_PRESET = "pt-v19"
+
 
 @pytest.fixture(scope="module")
 def long_scores():
     # The Oracle's own fixture, from 0.8.5: thirty days on a twenty-name
-    # roster. On the default preset (pt-v20) the edge that hidden state
-    # carries is market-wide and small against a day's market noise, so
-    # over five days buy-and-hold's luck in a rising week beats it as often
-    # as not; over thirty it is ahead of every price-only agent on 11 of 12
-    # markets (rosters 3, 42 and 11, sim seeds 0-3) and positive on all 12.
-    # Seed 0 here: oracle +37,113, buy_and_hold +19,421, random -65,763,
-    # mean_reversion -71,936, momentum -72,875.
+    # roster, on `CEILING_PRESET`. Seed 0 there: oracle +127,475,
+    # buy_and_hold +49,655, mean_reversion -339, random -70,539, momentum
+    # -201,694, and the Oracle is ahead of every reference agent on all 14
+    # markets of rosters 3, 42 and 11 (sim seeds 0-3, 0-3 and 0-5).
+    #
+    # On pt-v20 until its graded arm this fixture ran on the default, where
+    # it read oracle +37,113, buy_and_hold +19,421, random -65,763,
+    # mean_reversion -71,936, momentum -72,875, the Oracle ahead of every
+    # price-only agent on 11 of 12 markets and positive on all 12. On the
+    # graded arm the same seed reads buy_and_hold +40,063, oracle +24,220,
+    # random -63,402, momentum -73,625, mean_reversion -74,324: a rising
+    # month, which a long book half the size of buy-and-hold's trails.
     return tradefloor.evaluate(reference_agents(seed=3), seed=0,
-                            universe=ORACLE_UNIVERSE, days=30)
+                               universe=ORACLE_UNIVERSE, days=30,
+                               model=CEILING_PRESET)
 
 
 # --------------------------------------------------------------------------
@@ -259,7 +279,15 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(long_scores):
     # volume response went to 0.6 and the bottom pair swapped, 936 apart:
     # oracle +37,113, buy_and_hold +19,421, random -65,763, mean_reversion
     # -71,936, momentum -72,875. The top three held.
-    assert ranked == ["oracle", "buy_and_hold", "random", "mean_reversion",
+    #
+    # Then pt-v20 took its graded arm, which leaves the Oracle no transient
+    # market-wide mispricing to trade (see `CEILING_PRESET`), and on it this
+    # seed reads buy_and_hold first, +40,063 against the Oracle's +24,220:
+    # the first time in this comment's history the oracle has moved, and
+    # not because it stopped reading the truth. The fixture moved to
+    # pt-v19, where the Oracle is a ceiling: oracle +127,475, buy_and_hold
+    # +49,655, mean_reversion -339, random -70,539, momentum -201,694.
+    assert ranked == ["oracle", "buy_and_hold", "mean_reversion", "random",
                       "momentum"]
 
 
@@ -336,9 +364,17 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # Oracle makes 2.8 to 16.7, every seed. So the claim that survives is the
     # ordering, on every seed, rather than a ratio of two numbers of opposite
     # sign.
+    #
+    # On `CEILING_PRESET` from pt-v20's graded arm, where the Oracle has
+    # mispricing to trade (see there): random loses 5.9 to 10.8 per cent
+    # and the Oracle makes 12.1 to 17.0, every seed. On the graded arm the
+    # Oracle lost 7.6 per cent on seed 3, a month the market fell 11 per
+    # cent, most of it for good, and random, which lost 7.2, came out ahead
+    # of it; that ordering is the market's month, not the noise floor.
     for seed in range(6):
         sc = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
-                              universe=ORACLE_UNIVERSE, days=30)
+                                 universe=ORACLE_UNIVERSE, days=30,
+                                 model=CEILING_PRESET)
         assert sc["oracle"].pnl > 0, seed
         assert sc["random"].pnl < sc["oracle"].pnl, seed
 
@@ -397,12 +433,24 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     # are measurable. The Oracle's own P&L grows with the horizon on every
     # seed: 1,631 to 52,632, -2,909 to 9,082, 9,639 to 72,346 and -12,102
     # to 298,219.
+    #
+    # From pt-v20's graded arm on `CEILING_PRESET`. On the graded arm the
+    # Oracle's sixty days fell below its five on seeds 1 and 3 (-8,908 to
+    # -13,199 and 12,420 to -47,725): with no transient mispricing left to
+    # converge, a longer horizon adds market months rather than edge, and
+    # the claim that the edge accrues with the horizon has nothing to
+    # stand on there. On pt-v19 it grows on every seed: 13,633 to 218,149,
+    # 9,562 to 243,449, 28,758 to 219,605 and 27,527 to 275,065. Momentum
+    # loses at both ends, so every gap is measurable: 1.28, 3.97, -0.52
+    # and -0.16, median |gap| 0.90.
     gaps = []
     for seed in range(4):
         short = tradefloor.evaluate({"oracle": Oracle(), "momentum": Momentum()},
-                                 seed=seed, universe=ORACLE_UNIVERSE, days=5)
+                                    seed=seed, universe=ORACLE_UNIVERSE, days=5,
+                                    model=CEILING_PRESET)
         long = tradefloor.evaluate({"oracle": Oracle(), "momentum": Momentum()},
-                                seed=seed, universe=ORACLE_UNIVERSE, days=60)
+                                   seed=seed, universe=ORACLE_UNIVERSE, days=60,
+                                   model=CEILING_PRESET)
         assert long["oracle"].pnl > short["oracle"].pnl
         near = capture_ratio(short).get("momentum")
         far = capture_ratio(long).get("momentum")
@@ -618,7 +666,9 @@ def test_capture_ratio_is_a_fraction_of_the_ceiling(long_scores):
     # Every agent below the ceiling on this fixture, and buy-and-hold a
     # fraction of it. The fraction was momentum's until 0.8.5 (0.281); with
     # its fills applied once it loses money over these five days (-0.402),
-    # and a negative capture is a loss, not a fraction.
+    # and a negative capture is a loss, not a fraction. On `CEILING_PRESET`
+    # from pt-v20's graded arm, buy-and-hold's is 0.390; on the graded arm
+    # it read 1.654, a rising month, and the Oracle was no ceiling there.
     assert all(r < 1.0 for r in ratios.values()), ratios
     assert 0.0 < ratios["buy_and_hold"] < 1.0
 
@@ -781,7 +831,8 @@ def test_no_reference_agent_beats_the_oracle_once_it_pays_its_own_impact():
         universe = tradefloor.Universe.random(20, seed=useed)
         for seed in range(4):
             scores = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
-                                      universe=universe, days=30)
+                                         universe=universe, days=30,
+                                         model=CEILING_PRESET)
             ratios = capture_ratio(scores)
             if not ratios:
                 continue
@@ -798,7 +849,15 @@ def test_no_reference_agent_beats_the_oracle_once_it_pays_its_own_impact():
     # market rose 2.2 per cent in the month and the Oracle, holding a
     # smaller net long, made 1.4. A market-wide edge of a few basis points a
     # day does not out-run a lucky month; it wins the other seven.
-    assert non_traders <= 1, f"an agent trading no signal beat the Oracle {non_traders} times"
+    #
+    # From pt-v20's graded arm on `CEILING_PRESET`, where none of the eight
+    # is: the Oracle makes 163,040 to 208,107 and the best reference agent
+    # 45,464 (mean reversion, roster 3, seed 3). On the graded arm the
+    # Oracle lost money on two of the eight (sim seed 3 on both rosters,
+    # -60,597 and -61,479, where buy-and-hold lost -110,031 and -106,823),
+    # so six were measurable, and buy-and-hold out-earned it on four of
+    # those six rising months.
+    assert non_traders == 0, f"an agent trading no signal beat the Oracle {non_traders} times"
     assert signal_traders == 0, (
         f"a price-only signal beat the Oracle {signal_traders} times in 16; "
         "check that no harness applies an agent's fills more than once"
@@ -846,13 +905,21 @@ def test_the_oracle_is_capital_limited_not_information_limited():
     gross makes it dominate. That is the evidence for calling it a reference
     portfolio rather than a maximum.
     """
+    # On `CEILING_PRESET` from pt-v20's graded arm, where the edge is the
+    # cross-section of `s` and the Oracle trades it (medians 62,938 narrow,
+    # 40,289 wide, 84,119 levered). On the graded arm the Oracle trades its
+    # expected-return rule, whose net long carries almost all of its P&L,
+    # and a wider book there is a smaller residual beside the same net
+    # position: wide out-earned narrow, 7,696 to 5,648. That is a statement
+    # about the size of a net long, not about information.
     universe = tradefloor.Universe.random(30, seed=11)
 
     def median_pnl(make_oracle):
         pnls = []
         for seed in range(4):
             scores = tradefloor.evaluate({"o": make_oracle()}, seed=seed,
-                                      universe=universe, days=10)
+                                         universe=universe, days=10,
+                                         model=CEILING_PRESET)
             pnls.append(scores["o"].pnl)
         return statistics.median(pnls)
 
@@ -862,6 +929,57 @@ def test_the_oracle_is_capital_limited_not_information_limited():
 
     assert wide < narrow, "spreading the same information should dilute it"
     assert levered > narrow, "gross exposure is what raises the ceiling"
+
+
+def test_on_pt_v20_the_oracle_loses_where_the_market_falls_for_good():
+    """What the Oracle is on pt-v20's graded arm: a long-biased book.
+
+    pt-v20 as graded moves every shock into fair value for good, the
+    market's plain loading included, and opens the market-wide mispricing
+    at `opening_market_sigma` 0.001. The Oracle still reads the truth, but
+    the truth predicts little: the transient part of `s` that is left, the
+    fair value's drift of a few basis points a day, and the earnings
+    cycle's pull, against a month's permanent market move. So it is net
+    long most days and its P&L takes the market's sign. Measured on roster
+    3 over thirty days: +22,477, +13,707 and +20,641 on sim seeds 0-2, and
+    -60,597 on seed 3, where buy-and-hold lost -110,031. From the first
+    close to the last the index fell 10.7 per cent in log terms, 9.9 points
+    of it in the names' permanent fair-value offsets and 2.2 in `s`; the
+    VIX peaked at 25.8, below the volatility discount's knee of 40, and the
+    earnings cycle stayed in expansion at its level. No hidden state
+    foretold that fall.
+
+    A fuller model does no better. Adding what `expected_returns` leaves
+    out (the crowd's lean on `s`, the anticipated earnings' own drift in
+    place of the cycle's pull, the volatility discount's approach to its
+    target) and re-measuring on 48 markets (rosters 3, 42 and 11, sim seeds 0-15,
+    thirty days) moves nothing that matters: positive on 30 of 48 as it
+    stands, 26 to 30 with those terms, and a mean P&L near zero either way.
+    The index's next-day return correlates with the Oracle's predicted
+    common return at 0.11 over 1,392 days, and the cross-sectional rank IC
+    is 0.014.
+
+    What the Oracle traded before the graded arm is the market's OPENING
+    mispricing. Put `opening_market_sigma` back to 0.10 and the same seed
+    opens with the market dear, the Oracle goes short, and it makes
+    +152,102 while buy-and-hold loses -175,280. That dispersion is the
+    edge; at 0.001 there is none to know.
+    """
+    universe = tradefloor.Universe.random(20, seed=3)
+
+    def month(seed, model=None):
+        return tradefloor.evaluate({"oracle": Oracle(), "buy_and_hold": BuyAndHold()},
+                                   seed=seed, universe=universe, days=30,
+                                   model=model)
+
+    for seed in range(3):
+        assert month(seed)["oracle"].pnl > 0, seed
+    fell = month(3)
+    assert fell["buy_and_hold"].pnl < fell["oracle"].pnl < 0
+    assert capture_ratio(fell) == {}
+    dispersed = month(3, tradefloor.ModelParams.from_preset(
+        "pt-v20", opening_market_sigma=0.10))
+    assert dispersed["oracle"].pnl > 0 > dispersed["buy_and_hold"].pnl
 
 
 def test_capture_ratio_reports_above_one_rather_than_clamping():
