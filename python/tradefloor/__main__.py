@@ -73,6 +73,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     return _targets()
 
 
+#: What a bad scenario file raises. A file that is not UTF-8 raises
+#: UnicodeDecodeError, a ValueError, which is neither of the other two, so
+#: `validate a.yml b.yml` used to stop at it with a traceback instead of
+#: reporting it and reading the next file.
+_UNREADABLE = (ValidationError, OSError, UnicodeDecodeError)
+
+
 def _load(target: str) -> Scenario:
     """A path to a file, or the name of one that ships with the library.
 
@@ -99,7 +106,7 @@ def _validate(paths: Sequence[str]) -> int:
             print()
         try:
             scenario = _load(path)
-        except (ValidationError, OSError) as exc:
+        except _UNREADABLE as exc:
             failed += 1
             print(f"{path}\nScenario invalid.\n\n{exc}")
             continue
@@ -118,7 +125,7 @@ def _validate(paths: Sequence[str]) -> int:
 def _show(path: str) -> int:
     try:
         print(_load(path).describe())
-    except (ValidationError, OSError) as exc:
+    except _UNREADABLE as exc:
         print(f"Scenario invalid.\n\n{exc}")
         return 1
     return 0
@@ -127,7 +134,7 @@ def _show(path: str) -> int:
 def _diff(left_path: str, right_path: str) -> int:
     try:
         left, right = _load(left_path), _load(right_path)
-    except (ValidationError, OSError) as exc:
+    except _UNREADABLE as exc:
         print(f"Scenario invalid.\n\n{exc}")
         return 1
 

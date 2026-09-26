@@ -54,6 +54,12 @@ alias one part of the document into another. The output is dicts, lists,
 strings, numbers, booleans and None -- and the scenario loader then refuses
 every key it does not recognise, so the reachable surface is the schema.
 
+Two limits keep a hostile file cheap to refuse. Blocks nest at most
+:data:`MAX_DEPTH` (32) deep, and an integer longer than Python's digit limit
+(4,300 by default) is refused; before either was checked, the file raised
+RecursionError or ValueError rather than a :class:`YamlSubsetError`. Every
+pattern here runs in time linear in the line it reads.
+
 Numbers are narrower than YAML 1.1 on purpose, and the narrowing is a
 REFUSAL rather than a different answer. `1:30` is ninety to a YAML parser and
 one-thirty to a reader; `007` is seven; `2026-08-29` is a datetime object;
@@ -86,6 +92,7 @@ and on a corpus of accepted fragments.
 from __future__ import annotations
 
 import re
+import sys
 from typing import Any
 
 from ._core import ValidationError
@@ -99,9 +106,24 @@ class YamlSubsetError(ValidationError):
     def __init__(self, message: str, *, line: int, text: str = "") -> None:
         detail = f"line {line}: {message}"
         if text.strip():
-            detail += f"\n  {text.rstrip()}"
+            shown = text.rstrip()
+            # A refused line can be any length, and `tradefloor scenario
+            # validate` prints the message whole.
+            if len(shown) > _ECHO:
+                shown = shown[:_ECHO] + f"... ({len(shown):,} characters)"
+            detail += f"\n  {shown}"
         super().__init__(detail)
         self.line = line
+
+
+#: How much of a refused line a message repeats.
+_ECHO = 200
+
+#: How deep blocks may nest. Every shipped scenario opens blocks two deep
+#: (`scenario:`, then `shocks:` under it). Each level costs the parser a few
+#: Python frames, so before this limit a file nested about 250 deep raised
+#: RecursionError where it should have been refused.
+MAX_DEPTH = 32
 
 
 _TRUE = {"true", "yes", "on"}
@@ -138,13 +160,15 @@ class _Doc:
     fingerprint.
     """
 
-    __slots__ = ("lines", "raw", "ends_with_newline")
+    __slots__ = ("lines", "raw", "ends_with_newline", "depth")
 
     def __init__(self, lines: list[_Line], raw: list[str],
                  ends_with_newline: bool) -> None:
         self.lines = lines
         self.raw = raw
         self.ends_with_newline = ends_with_newline
+        #: How many blocks the parse is inside, for `MAX_DEPTH`.
+        self.depth = 0
 
 
 def read(text: str) -> Any:
@@ -327,15 +351,28 @@ def _finish_pair(doc: _Doc, index: int, rest: str, indent: int,
     if index >= len(doc.lines):
         return None, index
     nxt = doc.lines[index]
-    if nxt.indent > indent:
-        return _parse_block(doc, index, nxt.indent)
     # A sequence may sit at its key's own indent -- `shocks:` on one line and
     # `- target: ...` at the same column on the next is the commonest way
     # anybody writes YAML, and reading it as an empty value would drop every
     # intervention in the file without an error.
-    if nxt.indent == indent and nxt.text.startswith("- "):
-        return _parse_sequence(doc, index, indent)
-    return None, index
+    same_column = nxt.indent == indent and nxt.text.startswith("- ")
+    if nxt.indent <= indent and not same_column:
+        return None, index
+    # Every nested block opens here, so this is the one place to count them.
+    if doc.depth >= MAX_DEPTH:
+        raise YamlSubsetError(
+            f"blocks nested more than {MAX_DEPTH} deep. The shipped "
+            f"scenarios nest two deep, and this reader stops here rather "
+            f"than follow the file down until Python runs out of stack",
+            line=nxt.number, text=nxt.raw,
+        )
+    doc.depth += 1
+    try:
+        if same_column:
+            return _parse_sequence(doc, index, indent)
+        return _parse_block(doc, index, nxt.indent)
+    finally:
+        doc.depth -= 1
 
 
 def _block_scalar(doc: _Doc, index: int, indent: int, style: str,
@@ -545,7 +582,17 @@ def _scalar(text: str, line: _Line) -> Any:
     if lowered in _NULL:
         return None
     _refuse_ambiguous_number(text, line)
-    number = _number(text)
+    try:
+        number = _number(text)
+    except ValueError:
+        # int() refuses a decimal string longer than Python's digit limit,
+        # 4300 by default, because converting one takes quadratic time.
+        raise YamlSubsetError(
+            f"an integer {len(text):,} characters long, more digits than "
+            f"Python will convert ({sys.get_int_max_str_digits():,}). No "
+            f"scenario value is that long; quote it if it is text",
+            line=line.number, text=line.raw,
+        ) from None
     return text if number is None else number
 
 
@@ -578,7 +625,12 @@ _AMBIGUOUS = (
     (re.compile(r"^[-+]?0[xXoObB][0-9a-fA-F_]+$"),
      "YAML 1.1 reads this as hexadecimal, octal or binary, so 0x1f is "
      "thirty-one. Write it in decimal, or quote it"),
-    (re.compile(r"^[-+]?[0-9][0-9_]*_[0-9_.eE+-]*$"),
+    # Digits up to the first underscore, then anything from the wider
+    # class. This matches exactly what `[0-9][0-9_]*_[0-9_.eE+-]*` did, and
+    # runs in linear time: that spelling let the two starred classes split a
+    # run of underscores every possible way, so a value of `1`, 16,000
+    # underscores and an `x` took seven seconds to read.
+    (re.compile(r"^[-+]?[0-9]+_[0-9_.eE+-]*$"),
      "YAML 1.1 reads an underscore in a number as a digit separator, so "
      "1_000 is a thousand. Write it without the underscores"),
 )
@@ -593,11 +645,18 @@ _INDICATOR_ALONE = frozenset("-?:")
 _INDICATOR_RESERVED = frozenset("%@`,")
 
 
+def _shown(text: str) -> str:
+    """``repr(text)``, cut to `_ECHO` characters for a message."""
+    if len(text) <= _ECHO:
+        return repr(text)
+    return f"{text[:_ECHO]!r}... ({len(text):,} characters)"
+
+
 def _refuse_ambiguous_number(text: str, line: _Line) -> None:
     for pattern, why in _AMBIGUOUS:
         if pattern.match(text):
             raise YamlSubsetError(
-                f"{text!r} is ambiguous: {why}",
+                f"{_shown(text)} is ambiguous: {why}",
                 line=line.number, text=line.raw,
             )
 
@@ -606,15 +665,16 @@ def _refuse_indicator(text: str, line: _Line) -> None:
     """A plain scalar that a real parser would not read as a scalar at all."""
     if text in _INDICATOR_ALONE or text[:2] in ("- ", "? ", ": "):
         raise YamlSubsetError(
-            f"{text!r} begins with {text[0]!r}, which opens a block sequence "
-            f"or a complex key rather than a value. A YAML parser calls this "
-            f"document malformed; quote it if you meant the text",
+            f"{_shown(text)} begins with {text[0]!r}, which opens a block "
+            f"sequence or a complex key rather than a value. A YAML parser "
+            f"calls this document malformed; quote it if you meant the text",
             line=line.number, text=line.raw,
         )
     if text[:1] in _INDICATOR_RESERVED:
         raise YamlSubsetError(
-            f"{text!r} begins with the reserved indicator {text[0]!r}, which "
-            f"a plain scalar cannot. Quote it if you meant the text",
+            f"{_shown(text)} begins with the reserved indicator "
+            f"{text[0]!r}, which a plain scalar cannot. Quote it if you "
+            f"meant the text",
             line=line.number, text=line.raw,
         )
 
@@ -630,7 +690,10 @@ def _number(text: str) -> int | float | None:
     body = text[1:] if text[:1] in "+-" else text
     if not body:
         return None
-    if body.isdigit():
+    # ASCII only. `str.isdigit` is also true of `²` and of other scripts'
+    # digits: int() raised ValueError on the first and read `٣` as 3, where
+    # YAML reads both as text.
+    if body.isascii() and body.isdigit():
         return int(text)
     if "." not in text:
         return None
