@@ -47,9 +47,10 @@ deterministic function standing where a model would sit, so what runs offline
 is the adapter and the framework and not a mock of either.
 
 All four have the same shape with one part swapped: build a market, ask the
-agent once a simulated day for five days, print the scorecard and the
-decision record. The rule is the same five-day mean-reversion rule in every
-one, so the part that changes is who reads the payload and answers.
+agent once a simulated day, print the scorecard and the decision record. The
+three offline rule examples run twenty days and the LangGraph one runs five,
+as the table below says. The rule is the same five-day mean-reversion rule in
+every one, so the part that changes is who reads the payload and answers.
 
 The market is where they diverge, deliberately. Each example sizes its own
 book to show something its own section explains, and the LangGraph one runs
@@ -58,24 +59,25 @@ roster the other three use. The scorecards differ accordingly, and a
 difference between two rows here is a fact about two markets and not about
 two adapters:
 
-| example | trades | return | impact |
-|---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 10 | -1.16% | +0.04 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 10 | -1.16% | +0.04 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 10 | -2.18% | +0.95 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.64% | +1.24 bps |
+| example | days | trades | return | impact |
+|---|---|---|---|---|
+| [`callable/five_days.py`](callable/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 10 | -2.18% | +0.95 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 1 | +0.64% | +1.24 bps |
 
 Re-measured at 0.8.5 three times over. The default preset moved to pt-v20,
-and on its market the three offline examples trade nothing over ten days, so
-they now run twenty (below). pt-v20 then took its graded arm, which moved
-every row: before it they read callable and openai_agents 9 trades -1.31%
-+0.05 bps, pydantic_ai 9 trades -3.34% +0.96 bps, and langgraph no trades. And an agent's fills stopped being counted on every
-tick of a step and reach the market once. On pt-v19 with the fills applied
-once, over ten days, the rows read callable and openai_agents 3 trades
-+1.62% +0.00 bps and pydantic_ai 3 trades +6.24% -1.55 bps; before the fill
-change, +1.60% -1.10 bps and +6.28% +2.51 bps. The impact column is the
-end-of-run price against the untraded run, and at these sizes it is mostly
-which way the tape's noise fell.
+and on its market as first composed the three offline examples traded
+nothing over ten days, so they now run twenty (below). pt-v20 then took its
+graded arm, which moved every row: before it they read callable and
+openai_agents 9 trades -1.31% +0.05 bps, pydantic_ai 9 trades -3.34%
++0.96 bps, and langgraph no trades. And an agent's fills stopped being
+counted on every tick of a step and reach the market once. On pt-v19 with
+the fills applied once, over ten days, the rows read callable and
+openai_agents 3 trades +1.62% +0.00 bps and pydantic_ai 3 trades +6.24%
+-1.55 bps; before the fill change, +1.60% -1.10 bps and +6.28% +2.51 bps.
+The impact column is the end-of-run price against the untraded run, and at
+these sizes it is mostly which way the tape's noise fell.
 
 Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
 price in these markets moved with it -- and measured again each time pt-v19
@@ -84,11 +86,11 @@ there were callable and openai_agents 2 trades +1.20% +0.47 bps,
 pydantic_ai 2 trades +4.77% -0.27 bps, and langgraph 1 trade +0.63%
 +25.71 bps; at the fourth composition before that, callable and
 openai_agents 3 trades +1.47%, pydantic_ai 3 trades +5.78% +1.55 bps, and
-langgraph +0.62% +18.99 bps. The langgraph row reads no trades at all: it
-runs five days, not ten, and on pt-v19's market no name in its roster fell
-more than two per cent over five days on any of them -- the deepest, HELX,
-fell 1.83 per cent on day 1 -- so the rule bought nothing, had nothing to
-trim, and held every day. It traded nothing on pt-v20 before its graded
+langgraph +0.62% +18.99 bps. After the fifth composition the langgraph row
+read no trades at all. It runs five days, not ten, and on that market no
+name in its roster fell more than two per cent over five days (the deepest,
+HELX, fell 1.83 per cent on day 1), so the rule bought nothing, had nothing
+to trim, and held every day. It traded nothing on pt-v20 before its graded
 arm either, and trades once on the arm. Nothing else
 about these examples changed until 0.8.5: the rule, the rosters, the seed
 and the horizons were the ones 0.7.0 shipped, so every difference in the

@@ -53,14 +53,17 @@ DAYS = 5
 #: refusals.
 #:
 #: Ten until 0.8.5, because it gave the five-day rule five usable days
-#: instead of one and stayed inside the funding limit. Twenty since: on
-#: pt-v20, the default from 0.8.5, no name on this roster falls two per
-#: cent over five days in the first fifteen, so ten days trades nothing.
-#: Measured on pt-v20: 5, 8, 10, 12 and 15 days 0 trades, 20 days 9 with
-#: none refused, 25 days 15 to 17 (callable and openai_agents meet market
-#: refusals there). The RULE is untouched: lowering its threshold until
-#: this market tripped it would be fitting a demonstration to a market,
-#: and the threshold is the thing being demonstrated.
+#: instead of one and stayed inside the funding limit. Twenty since. On
+#: pt-v20 before its graded arm no name on this roster fell two per cent
+#: over five days in the first fifteen, so ten days traded nothing: 5, 8,
+#: 10, 12 and 15 days 0 trades, 20 days 9 with none refused, 25 days 15 to
+#: 17 with market refusals in callable and openai_agents. On pt-v20 as it
+#: shipped, graded arm included: 5 days 0 trades, 8 days 1, 10 to 15 days
+#: 2, 20 days 10 with none refused, and 25 days 17 with six refused in
+#: callable and openai_agents and 13 with none in pydantic_ai. The RULE is
+#: untouched: lowering its threshold until this market tripped it would be
+#: fitting a demonstration to a market, and the threshold is the thing
+#: being demonstrated.
 #:
 #: The recorded model runs stay at `DAYS`. A language model reads the
 #: observation rather than waiting for a window, and both recordings trade
