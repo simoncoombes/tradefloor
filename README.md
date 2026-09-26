@@ -121,7 +121,7 @@ lists what the view serves and what the check cannot catch.
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| MCP server | twelve read-only tools for a coding agent, scenarios included |
+| MCP server | thirteen read-only tools for a coding agent, scenarios included |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
 Historical data shows that a stock fell. `truth()` also says why, for example
