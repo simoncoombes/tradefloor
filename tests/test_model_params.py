@@ -1690,7 +1690,15 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
     # The published VIX's premium approaches its cap, so the gain is refused
     # without one; the cap alone is unread, so both arms are the default's.
-    "vix_stress_premium": {"vix_stress_premium_cap": 0.25},
+    # The premium also reads the identity's read-back at the anchor memory's
+    # rate, so it is refused without both. They are the default's own shipped
+    # values (the memory needs its weight), so on the default only the cap
+    # bites; they bite on a base that ships the identity off, which is the
+    # nominal-growth derivation's pt-v18.
+    "vix_stress_premium": {"vix_stress_premium_cap": 0.25,
+                           "vix_level_identity": 1.0,
+                           "vix_anchor_weight": 0.375,
+                           "vix_anchor_memory": 1.0 / 18.0},
 }
 
 
