@@ -28,16 +28,26 @@ def offsets(engine):
     return floats(engine.state_snapshot()["fair_value_offset"])
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets fair_value_market_linear to 1 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_market_linear"] == 0.0
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["fair_value_market_linear"] == 1.0
 
 
 def test_it_reads_nothing_without_a_market_share():
     runs = []
     for linear in (0.0, 1.0):
         e = tf.Engine(seed=7, universe=UNIVERSE,
-                      model=tf.ModelParams.from_preset("pt-v20", fair_value_market_linear=linear))
+                      # The market share off: pt-v20 carries it at 1.0 since
+                      # its graded arm (2026-09-26); was pt-v20 as it stood.
+                      model=tf.ModelParams.from_preset("pt-v20", fair_value_market_share=0.0,
+                                                       fair_value_market_linear=linear))
         e.run_days(20, record=False)
         runs.append(floats(e.prices()))
     assert runs[0] == runs[1]

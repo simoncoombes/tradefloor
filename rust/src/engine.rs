@@ -7297,7 +7297,9 @@ mod tests {
     #[test]
     fn the_published_phase_lags_the_true_one_only_under_the_dial() {
         use crate::economy::CyclePhase;
-        let off = engine(7);
+        // "Off" is pt-v19: the default, pt-v20, sets the lag since its
+        // graded arm (2026-09-26). Was `engine(7)`, the default.
+        let off = engine_v19(7);
         assert!(off.cycle_history().is_empty());
         assert_eq!(off.published_cycle_phase(), off.economy().cycle_phase);
 
@@ -7340,7 +7342,7 @@ mod tests {
         other.set_cycle_history(history).unwrap();
         assert_ne!(other.state_hash(12, false), before);
         assert!(other.set_cycle_history(vec![opening; lag]).is_err());
-        assert!(engine(7).clone().set_cycle_history(vec![opening]).is_err());
+        assert!(engine_v19(7).clone().set_cycle_history(vec![opening]).is_err());
     }
 
     /// `gdp_publication_lag`: off, the published growth is the true one and
@@ -7349,7 +7351,9 @@ mod tests {
     /// closes after the quarter's last day, and the opening growth until then.
     #[test]
     fn the_published_growth_is_the_quarter_mean_released_late_only_under_the_dial() {
-        let off = engine(7);
+        // "Off" is pt-v19: the default, pt-v20, sets the lag since its
+        // graded arm (2026-09-26). Was `engine(7)`, the default.
+        let off = engine_v19(7);
         assert_eq!(off.gdp_publication(), &GdpPublication::default());
         assert_eq!(off.published_gdp_growth(), off.economy().gdp_growth);
 
@@ -7404,7 +7408,7 @@ mod tests {
         let mut empty = e.gdp_publication().clone();
         empty.count = 0;
         assert!(e.clone().set_gdp_publication(empty).is_err());
-        assert!(engine(7).clone().set_gdp_publication(GdpPublication {
+        assert!(engine_v19(7).clone().set_gdp_publication(GdpPublication {
             count: 1,
             ..GdpPublication::default()
         }).is_err());
@@ -7595,8 +7599,13 @@ mod tests {
         // after the day boundary; a pinned run and its baseline never saw
         // the same noise again. Now the market stream's position is
         // identical whatever the macro chain consumed.
+        // On pt-v19. On the default since pt-v20 took its graded arm
+        // (2026-09-26) the two phase ages happen to draw the same number of
+        // economy normals at this seed, so the precondition below found
+        // nothing to test; the stream split it tests is the same on every
+        // preset. Was `engine(4242)`, the default.
         let run = |fresh_phase: bool| {
-            let mut e = engine(4242);
+            let mut e = engine_v19(4242);
             // A phase that changed TODAY draws the phase-change shock
             // uniform; one 0.9 months in draws neither that (window passed)
             // nor the transition roll (min_months not reached). The counts

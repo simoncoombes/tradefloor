@@ -175,7 +175,13 @@ PERTURBATIONS = [
     # The move is a fraction of a cent on most names and the print rounds it
     # away: volume moves on eight names and one name's low by a cent, and
     # no macro field differs at the probe's close.
-    ("qe_pe_gain", 0.5, True),
+    #
+    # INERT AGAIN since pt-v20's graded arm (2026-09-26), measured. Its
+    # burn-in at seed 42 now leaves fed funds at 0.0 with the bank's QE
+    # inactive and `qe_pe_boost` 0.0 when the probe opens (unemployment's
+    # partial adjustment is among the dials that moved the macro path), so
+    # the term is 1.0 on every tick. Was (0.5, True).
+    ("qe_pe_gain", 0.5, False),
     # The dollar's crisis gate (0.4.3). Lowering it to 15 does fire the
     # safe-haven drift, but the dollar reaches equities only through the
     # macro chain: usd_index moves inflation, inflation moves the economy,
@@ -368,7 +374,12 @@ PERTURBATIONS = [
     # cent, so volume moves and the printed columns do not. It moved the
     # economy stream on pt-v19 and does not on pt-v20: see
     # ECONOMY_STREAM_MOVERS below.
-    ("fed_liftoff_rule", 0.0, True),
+    #
+    # INERT since pt-v20's graded arm (2026-09-26), measured: its burn-in
+    # at seed 42 leaves fed funds at 0.0 at the probe's opening with the
+    # rule as without it, so no valuation reads a different rate and no
+    # economy draw moves. Was (0.0, True).
+    ("fed_liftoff_rule", 0.0, False),
     # LIVE on this probe since the fifth composition, and the reason it read
     # inert is the reason it moves now. The US table changes phase durations
     # only, and under the old default the burn-in restored the opening
@@ -555,7 +566,10 @@ PERTURBATIONS = [
     # Whether herding continues a jump. Inert for the same reason as the
     # sizes above and one more: at the default preset no jump ever fires, so
     # there is nothing for the share to withhold from the momentum term.
-    ("jump_momentum_share", 1.0, True),  # was False; the burn-in reaches it (see above)     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
+    # INERT again since pt-v20's graded arm (2026-09-26), measured: the
+    # burn-in at seed 42 no longer reaches it. Was (1.0, True), and False
+    # before that.
+    ("jump_momentum_share", 1.0, False),     # perturbed away from the default (0.0 since pt-v6); needs a jump inside the three sessions, which is a 7% chance a day
     # A spread across names, applied at the day close. It DOES move the
     # trajectory on its own: unlike the jump parameters it needs no
     # occurrence, only a roster with more than one market cap in it.
@@ -678,7 +692,13 @@ PERTURBATIONS = [
     # there and moves that close's VIX from 21.1425 to 20.4335, which no
     # tick after it reads. At 0.08 it binds on the second session and moves
     # volume, `mispricing_s` and `garch_variance`, measured.
-    ("vix_return_clamp", 0.12, False),
+    #
+    # LIVE since pt-v20's graded arm (2026-09-26), measured: 0.12 moves
+    # price, low and market cap on the probe, and no economy draw. The arm
+    # prices the close's macro step at the close
+    # (`macro_publication_repricing`), so a VIX the clamp moves at a close
+    # now reaches that close's prices. Was (0.12, False).
+    ("vix_return_clamp", 0.12, True),
     ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
@@ -819,9 +839,17 @@ PERTURBATIONS = [
     # an expansion and stays in it, so the level sits on its target, the
     # pull `pull * (target - level)` is zero every session, and nothing a
     # price reads changes.
-    ("earnings_cycle_depth", 0.3, False),
-    ("earnings_cycle_upside", 0.1, False),
-    ("earnings_cycle_half_life", 30.0, False),
+    #
+    # RE-MEASURED 2026-09-26, when pt-v20 took its graded arm (depth 0.2 and
+    # `macro_publication_repricing` 1.0): all three now move the probe, and
+    # all three are inert again with the repricing switched off on the same
+    # base (measured), so the reason above still holds for the tick. With
+    # the switch on, the close's re-mark (`Engine::reprice_to_published_macro`)
+    # reads fair value with the level on both sides of the macro step and
+    # writes the price, which is where they reach it. Were False.
+    ("earnings_cycle_depth", 0.3, True),
+    ("earnings_cycle_upside", 0.1, True),
+    ("earnings_cycle_half_life", 30.0, True),
     # LIVE on pt-v20, inert on pt-v19. With a depth, a non-zero sigma adds a
     # normal to the level every session (`engine.rs`, `Site::EconomyCycle`
     # 1), so the level leaves its target on the probe's first session and
@@ -835,32 +863,48 @@ PERTURBATIONS = [
     # anticipated level is a constant offset, and the stationary opening
     # books a constant into the names' fair-value levels, moving no price.
     # It moves prices at a turn of phase (tests/test_anticipation.py).
-    ("earnings_anticipation_half_life", 126.0, False),
-    ("rate_pe_sensitivity", 3.0, True),
+    #
+    # RE-VALUED 2026-09-26: 126 is pt-v20's own value since its graded arm,
+    # so the row perturbs to 63, and it is LIVE there: through
+    # `macro_publication_repricing`, whose re-mark reads the anticipated
+    # level at each close. With the repricing off on the same base it is
+    # inert, for the reason above (measured). Was (126.0, False).
+    ("earnings_anticipation_half_life", 63.0, True),
+    # RE-VALUED 2026-09-26: 3.0 is pt-v20's own value since its graded arm.
+    # Was (3.0, True).
+    ("rate_pe_sensitivity", 4.0, True),
     # INERT on every probe by construction: it moves what the engine
     # REPORTS as the phase (`macro_fields`, `macro_state`), never the phase
     # a price or a draw reads. tests/test_cycle_publication_lag.py holds
-    # the lag itself.
-    ("cycle_publication_lag", 252.0, False),
+    # the lag itself. RE-VALUED 2026-09-26: 252 is pt-v20's own value since
+    # its graded arm, so the row perturbs to 126; still inert, measured.
+    ("cycle_publication_lag", 126.0, False),
     # INERT on every probe by construction: it moves what the engine
     # REPORTS as GDP growth (`macro_fields`, `macro_table`), never the
     # growth output and earnings compound. tests/test_gdp_publication_lag.py
-    # holds the figure itself.
-    ("gdp_publication_lag", 21.0, False),
+    # holds the figure itself. RE-VALUED 2026-09-26: 21 is pt-v20's own
+    # value since its graded arm, so the row perturbs to 42; still inert.
+    ("gdp_publication_lag", 42.0, False),
     # LIVE: the probe's economy burns in for hundreds of sessions, and the
     # partially adjusted unemployment rate it opens at reaches inflation,
     # the bank and the curve. tests/test_unemployment_adjustment.py holds
-    # the mechanism.
-    ("unemployment_adjustment_half_life", 84.0, True),
-    # INERT by construction: with the publication lags at 0 the published
-    # phase and growth are the true ones, and with them set nothing a price
-    # reads is downstream of the index (tests/test_fear_greed_published.py).
-    ("fear_greed_published_inputs", 1.0, False),
+    # the mechanism. RE-VALUED 2026-09-26: 84 is pt-v20's own value since
+    # its graded arm, so the row perturbs to 42; LIVE, and it moves the
+    # economy stream as before (two fewer economy draws, measured).
+    ("unemployment_adjustment_half_life", 42.0, True),
+    # INERT by construction: nothing a price reads is downstream of the
+    # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
+    # is pt-v20's own value since its graded arm, so the row perturbs back
+    # to 0.0, pt-v19's, where the index reads the true phase and growth
+    # while pt-v20's lags publish them late; still inert, measured.
+    ("fear_greed_published_inputs", 0.0, False),
     # LIVE on the probe: pt-v20 moves the corporate yield at every close
     # (`corporate_yield_daily`), so every close's macro step moves fair
     # value, and with the switch on the price takes it as the step ends
     # (`Engine::reprice_to_published_macro`) rather than at the next tick.
-    ("macro_publication_repricing", 1.0, True),
+    # RE-VALUED 2026-09-26: 1.0 is pt-v20's own value since its graded arm,
+    # so the row perturbs back to 0.0, pt-v19's; LIVE, measured.
+    ("macro_publication_repricing", 0.0, True),
     ("opening_market_sigma", 0.05, True),
     # The agent-facing book (2026-09-24, feature/order-book-depth). INERT on
     # this probe by construction: every one is read only on the path an
@@ -938,21 +982,30 @@ PERTURBATIONS = [
     # recentring all being on, which the default carries, so the probe's
     # market moves once a lagged session comes.
     ("market_beta_down_asym_lag_recentre", 1.0, True),
-    # INERT on this probe by construction: it chooses which part of a
-    # market shock `fair_value_market_share` makes permanent, and the
-    # default carries no market share. tests/test_market_linear.py holds it.
-    ("fair_value_market_linear", 1.0, False),
-    # INERT on this probe for the same reason: a ceiling on the volatility
-    # whose market shocks the market share makes permanent, and the default
-    # carries no market share. tests/test_market_linear.py holds it.
-    ("fair_value_market_vol_cap", 1.5, False),
+    # Which part of a market shock `fair_value_market_share` makes
+    # permanent. RE-VALUED 2026-09-26: pt-v20's graded arm carries the
+    # market share at 1.0 and this switch at 1.0, so the row perturbs back
+    # to 0.0, the whole market input, and is LIVE (measured). Was (1.0,
+    # False), inert while the default carried no market share.
+    # tests/test_market_linear.py holds it.
+    ("fair_value_market_linear", 0.0, True),
+    # A ceiling on the volatility whose market shocks the market share
+    # makes permanent. RE-VALUED 2026-09-26: pt-v20 carries 1.5, and 2.0
+    # and 0.0 are both inert on this probe (measured), whose market sigma
+    # never reaches 1.5 times the base; 0.5 binds on every tick and is
+    # LIVE. Was (1.5, False). tests/test_market_linear.py holds it.
+    ("fair_value_market_vol_cap", 0.5, True),
     # INERT on this probe: the discount applies only while the VIX is above
-    # its knee (30), and the probe's three calm days sit below it.
-    # tests/test_vix_discount.py holds the mechanism.
+    # its knee (40 on pt-v20, 30 by default), and the probe's three calm
+    # days sit below it. tests/test_vix_discount.py holds the mechanism.
     ("fair_value_vix_discount", 0.2, False),
-    # INERT: read only with fair_value_vix_discount non-zero.
+    # INERT at 25: pt-v20 carries the discount since its graded arm, so the
+    # knee is read, but the probe's VIX stays under 25 as well as under
+    # pt-v20's 40 (measured; a knee of 15 moves every column).
     ("fair_value_vix_knee", 25.0, False),
-    # INERT: read only with fair_value_vix_discount non-zero.
+    # INERT: the smoothed exposure is pulled toward the VIX's excess over
+    # the knee, which is zero on this probe (above), so it stays 0.0 at
+    # any half-life. Was inert because the default carried no discount.
     ("fair_value_vix_half_life", 10.0, False),
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
@@ -1182,7 +1235,11 @@ PERTURBATIONS = [
     # `qe_pe_gain`) leaves the ratio at 1.0116 when the probe opens, so the
     # term is 0.5 * ln(1.0116) on every tick. Volume moves on seven names
     # and one name's low by a cent; the print rounds the rest away.
-    ("qe_pe_stock_gain", 0.5, True),
+    #
+    # INERT AGAIN since pt-v20's graded arm (2026-09-26), measured: its
+    # burn-in at seed 42 leaves the bank's QE inactive when the probe opens
+    # (see `qe_pe_gain`), and the gain moves nothing. Was (0.5, True).
+    ("qe_pe_stock_gain", 0.5, False),
     # How much of a VIX jump survives into the next day. A PAIR with
     # `vix_jump_intensity`: with the intensity at its shipped 0.0 there is no
     # jump to decay, so the ratio has nothing to act on.
@@ -1436,6 +1493,14 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # transition roll through the 755-day burn-in, so which state-dependent
     # sites fire moves with it; the market stream stays put.
     "unemployment_adjustment_half_life",
+    # TWO RETURNED WITH pt-v20's GRADED ARM (2026-09-26), measured on this
+    # probe: `oil_supply_response` 0.5 moves the economy stream by +34
+    # draws and `oil_opec_symmetry` 0.5 by -2, the market stream by 0. The
+    # arm's burn-in at seed 42 opens the probe with oil inventory at 73.7,
+    # outside the 40-to-60 dead zone, and the OPEC arm's conditional draws
+    # follow the path the two dials move. Both were here at 0.8.0 and left
+    # with pt-v20's first composition.
+    "oil_supply_response", "oil_opec_symmetry",
     # THREE ARRIVED WITH THE FIFTH COMPOSITION (2026-09-23), and all three
     # through the drawn opening it switched on: at seed 42 the burn-in now
     # runs from an expansion past its minimum duration, where the cycle's

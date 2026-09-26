@@ -85,7 +85,10 @@ def expected(true, q, lag):
     return out, sorted(releases)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets gdp_publication_lag to 21 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     """0.0 on every preset: the growth reported is the growth the economy
     runs at, a pin reads straight back, and the snapshot carries no state."""
@@ -96,6 +99,10 @@ def test_off_on_every_shipped_preset(preset):
     e.pin_macro(gdp_growth=-0.031)
     assert e.macro_fields["gdp_growth"] == -0.031
     assert "gdp_publication" not in e.state_snapshot()["economy"]
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["gdp_publication_lag"] == 21.0
 
 
 @pytest.mark.parametrize("preset", ["pt-v20", "pt-v16"])
@@ -180,7 +187,8 @@ def test_the_macro_table_reports_the_published_figure():
 
 
 def test_the_snapshot_and_the_hash_carry_the_state_only_while_set():
-    off = tf.Engine(seed=8, universe=UNIVERSE, model="pt-v20")
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+    off = tf.Engine(seed=8, universe=UNIVERSE, model=lagged(0))
     off.run_days(3)
     assert "gdp_publication" not in off.state_snapshot()["economy"]
     assert state_hash(off.state_snapshot()) == off.state_hash()
@@ -266,7 +274,8 @@ def test_a_restore_refuses_the_state_where_the_dial_is_off():
     # Past the model check, to the state itself.
     del snap["model_fingerprint"]
     with pytest.raises(tf.ValidationError, match="gdp_publication_lag is 0"):
-        tf.Engine(seed=11, universe=UNIVERSE, model="pt-v20").restore_state(snap)
+        # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+        tf.Engine(seed=11, universe=UNIVERSE, model=lagged(0)).restore_state(snap)
 
 
 def test_a_snapshot_without_the_state_reseeds_from_its_growth():

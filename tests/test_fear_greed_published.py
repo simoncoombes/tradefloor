@@ -48,10 +48,17 @@ def walk(m, days, seed=2, pin_on=5):
     return out, e
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets fear_greed_published_inputs to 1 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()[
         "fear_greed_published_inputs"] == 0.0
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["fear_greed_published_inputs"] == 1.0
 
 
 def test_inert_without_a_publication_lag():

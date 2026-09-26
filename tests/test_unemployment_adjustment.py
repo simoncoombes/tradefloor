@@ -54,13 +54,20 @@ def releases(path):
     return [(path[d] - path[d - 1]) * 100 for d in range(MONTH, len(path), MONTH)]
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets unemployment_adjustment_half_life to 84 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()[
         "unemployment_adjustment_half_life"] == 0.0
     e = tf.Engine(seed=1, universe=UNIVERSE, model=preset)
     e.run_days(2)
     assert "unemployment_impulse" not in economy(e)
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["unemployment_adjustment_half_life"] == 84.0
 
 
 def test_the_impulse_opens_at_its_drive_and_moves_only_at_a_release():
@@ -78,7 +85,8 @@ def test_a_contraction_arrives_in_unemployment_over_months():
     the whole step; with it, the impulse turns from the expansion's fall
     toward the contraction's rise over months, so the first release barely
     moves and the rise builds release on release."""
-    off = releases(unemployment_path(tf.ModelParams.from_preset("pt-v20"), 6 * MONTH))
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+    off = releases(unemployment_path(adjusted(0.0), 6 * MONTH))
     on = releases(unemployment_path(adjusted(), 6 * MONTH))
     assert off[0] > 0.5
     assert on[0] < 0.2 * off[0]
@@ -90,7 +98,8 @@ def test_a_contraction_arrives_in_unemployment_over_months():
 
 
 def test_the_snapshot_and_the_hash_carry_the_impulse_only_while_set():
-    off = tf.Engine(seed=4, universe=UNIVERSE, model="pt-v20")
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+    off = tf.Engine(seed=4, universe=UNIVERSE, model=adjusted(0.0))
     off.run_days(3)
     assert state_hash(off.state_snapshot()) == off.state_hash()
 
@@ -138,7 +147,8 @@ def test_a_restore_refuses_an_impulse_where_the_dial_is_off():
     snap = on.state_snapshot()
     del snap["model_fingerprint"]
     with pytest.raises(tf.ValidationError, match="unemployment_adjustment_half_life is 0"):
-        tf.Engine(seed=7, universe=UNIVERSE, model="pt-v20").restore_state(snap)
+        # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+        tf.Engine(seed=7, universe=UNIVERSE, model=adjusted(0.0)).restore_state(snap)
 
 
 def test_a_restore_refuses_a_non_finite_impulse():

@@ -23,13 +23,25 @@ def floats(raw):
 
 
 def engine(gain, **extra):
+    # The knee at 30 and the exposure unsmoothed unless a test says
+    # otherwise: the defaults these tests were written on. pt-v20 carries
+    # a knee of 40 and a 5-session half-life since its graded arm
+    # (2026-09-26).
+    extra = {"fair_value_vix_knee": 30.0, "fair_value_vix_half_life": 0.0, **extra}
     return tf.Engine(seed=7, universe=UNIVERSE, model=tf.ModelParams.from_preset(
         "pt-v20", fair_value_vix_discount=gain, **extra))
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets fair_value_vix_discount to 0.35 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_vix_discount"] == 0.0
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["fair_value_vix_discount"] == 0.35
 
 
 def test_nothing_moves_below_the_knee():

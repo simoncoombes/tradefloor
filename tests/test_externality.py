@@ -744,7 +744,12 @@ def test_a_pinned_vix_moves_the_corporate_yield_by_nothing():
     change.
     """
     universe = list(tf.Universe.random(8, seed=99))
-    for days in (1, 5, 10, 20):
+    # Up to 16 sessions, the last before the first meeting. Since pt-v20's
+    # graded arm (2026-09-26) the run's first meeting at seed 42 falls on
+    # session 17 (it fell after session 20 before), and a meeting re-anchors
+    # the yield to the formula at the pinned VIX, +39 bp here: the meeting's
+    # rule, not the ratchet this test is about. Was (1, 5, 10, 20).
+    for days in (1, 5, 10, 16):
         e = tf.run_scenario(tf.Scenario().hold(vix=45.0), seed=42,
                             universe=universe, days=days, ticks_per_day=30,
                             model="pt-v20")

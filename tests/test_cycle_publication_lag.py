@@ -53,7 +53,10 @@ def walk(engine, days, pins=None):
     return true, published
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# Every preset through pt-v19. pt-v20 sets cycle_publication_lag to 252 since its graded
+# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# which the test below holds. Was parametrized over every preset.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):
     """0.0 on every preset: the phase reported is the phase the economy is
     in, a pin reads straight back, and the snapshot carries no history."""
@@ -63,6 +66,10 @@ def test_off_on_every_shipped_preset(preset):
     assert e.macro_fields["cycle"] == "contraction"
     assert e.macro_state.cycle == "contraction"
     assert "cycle_history" not in e.state_snapshot()["economy"]
+
+
+def test_pt_v20_sets_the_graded_arms_value():
+    assert tf.ModelParams.from_preset("pt-v20").to_dict()["cycle_publication_lag"] == 252.0
 
 
 def test_the_published_phase_is_the_true_phase_lag_sessions_earlier():
@@ -141,7 +148,8 @@ def test_the_trace_rows_of_a_world_report_the_published_phase():
 
 
 def test_the_snapshot_and_the_hash_carry_the_history_only_while_set():
-    off = tf.Engine(seed=7, universe=UNIVERSE, model="pt-v20")
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
+    off = tf.Engine(seed=7, universe=UNIVERSE, model=lagged(0))
     off.run_days(3)
     assert "cycle_history" not in off.state_snapshot()["economy"]
     assert state_hash(off.state_snapshot()) == off.state_hash()

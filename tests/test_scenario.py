@@ -853,7 +853,10 @@ def test_the_packaged_recession_ends():
     for day in range(460):
         scenario.apply(engine, day)
         engine.run_days(1)
-        phases.append(engine.macro_fields["cycle"])
+        # The TRUE phase: pt-v20, the default, publishes the phase 252
+        # sessions late since its graded arm (2026-09-26), and the scenario
+        # sets the phase the economy is in. Was macro_fields["cycle"].
+        phases.append(engine.state_snapshot()["economy"]["cycle_phase"])
     assert phases[cycle[1].at] == "trough"
     assert phases[cycle[2].at] == "recovery"
     assert phases[-1] in ("recovery", "expansion")
