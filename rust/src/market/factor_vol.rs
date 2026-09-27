@@ -699,16 +699,33 @@ impl MarketVarianceState {
     /// while the dial is set.
     fn step_leverage_memory(&mut self, params: &crate::params::ModelParams) {
         let b = params.market_factor_sigma * params.market_factor_sigma;
-        let sd_b = mathx::sqrt(b);
         let a = params.market_vol_leverage_down;
         let f = self.day_factor;
-        let u = if f < 0.0 { -f / sd_b } else { -(1.0 - a) * f / sd_b };
+        // THE UNIT THE DAY IS COUNTED IN. At `market_vol_leverage_standardise`
+        // 0.0 -- the form that stood -- the baseline sd, so a fall on a day
+        // drawn at twice the baseline sd counts twice and the memory's own
+        // spread grows with the variance it drives. At 1.0 the sd the day
+        // was drawn at, so the memory takes the day's z-score, its spread is
+        // the baseline's at every level and the multiplier's mean is one in
+        // a storm as in a calm. In between, `sd_b^(1-s) * sd_v^s`. A branch,
+        // so at 0.0 the arithmetic is the expression that stood, to the bit.
+        // See `ModelParams::market_vol_leverage_standardise`.
+        let s = params.market_vol_leverage_standardise;
+        let unit = if s == 0.0 {
+            mathx::sqrt(b)
+        } else {
+            mathx::pow(b, 0.5 * (1.0 - s)) * mathx::pow(self.variance, 0.5 * s)
+        };
+        let u = if f < 0.0 { -f / unit } else { -(1.0 - a) * f / unit };
         // The mean the asymmetry adds at the variance the day was drawn at:
-        // `E[u] = a * sqrt(v / b) / sqrt(2 pi)` for `F ~ N(0, v)`.
+        // `E[u] = a * sqrt(v) / unit / sqrt(2 pi)` for `F ~ N(0, v)`, which is
+        // `a * sqrt(v / b) / sqrt(2 pi)` at standardise 0.0.
         let centre = if a == 0.0 {
             0.0
-        } else {
+        } else if s == 0.0 {
             a * mathx::sqrt(self.variance / b) / mathx::sqrt(2.0 * std::f64::consts::PI)
+        } else {
+            a * mathx::sqrt(self.variance) / unit / mathx::sqrt(2.0 * std::f64::consts::PI)
         };
         let phi = leverage_phi(params);
         self.leverage_memory = phi * self.leverage_memory + (1.0 - phi) * (u - centre);
@@ -2272,6 +2289,84 @@ mod crash_vol_state {
         assert_eq!(plain.leverage_memory(), 0.0);
         assert_eq!(plain.variance().to_bits(),
                    MarketVarianceState::forced_level(&q, anchor, 30.0, 1.0).to_bits());
+    }
+
+    #[test]
+    fn standardise_zero_is_the_baseline_unit_to_the_bit() {
+        // The dial at 0.0 takes the branch that stood: a memory stepped on a
+        // day drawn off the baseline is the baseline-unit memory, bit for bit.
+        let p = with_memory(3.0, 40.0, 0.5);
+        assert_eq!(p.market_vol_leverage_standardise, 0.0);
+        let b = p.market_factor_sigma * p.market_factor_sigma;
+        let mut s = MarketVarianceState::new_with(&p);
+        s.variance = 3.0 * b;
+        s.day_factor = -0.017;
+        s.step_leverage_memory(&p);
+        let phi = leverage_phi(&p);
+        let sd_b = crate::mathx::sqrt(b);
+        let u = 0.017 / sd_b
+            - 0.5 * crate::mathx::sqrt(3.0 * b / b) / crate::mathx::sqrt(2.0 * std::f64::consts::PI);
+        assert_eq!(s.leverage_memory().to_bits(), ((1.0 - phi) * u).to_bits());
+    }
+
+    #[test]
+    fn standardised_memory_counts_a_day_in_its_own_sd() {
+        // At 1.0 a fall drawn at four times the baseline variance moves the
+        // memory as far as half that fall drawn at the baseline: the z-score.
+        let mut p = with_memory(3.0, 40.0, 0.0);
+        p.market_vol_leverage_standardise = 1.0;
+        let b = p.market_factor_sigma * p.market_factor_sigma;
+        let mut storm = MarketVarianceState::new_with(&p);
+        storm.variance = 4.0 * b;
+        storm.day_factor = -0.02;
+        storm.step_leverage_memory(&p);
+        let mut calm = MarketVarianceState::new_with(&p);
+        calm.variance = b;
+        calm.day_factor = -0.01;
+        calm.step_leverage_memory(&p);
+        assert!((storm.leverage_memory() - calm.leverage_memory()).abs() < 1e-15);
+        // Down 1.0: a rise counts nothing and the centre is the z-score's,
+        // the same at every variance.
+        p.market_vol_leverage_down = 1.0;
+        let mut up_storm = MarketVarianceState::new_with(&p);
+        up_storm.variance = 9.0 * b;
+        up_storm.day_factor = 0.03;
+        up_storm.step_leverage_memory(&p);
+        let mut up_calm = MarketVarianceState::new_with(&p);
+        up_calm.variance = b;
+        up_calm.day_factor = 0.001;
+        up_calm.step_leverage_memory(&p);
+        assert!((up_storm.leverage_memory() - up_calm.leverage_memory()).abs() < 1e-15);
+    }
+
+    #[test]
+    fn the_standardised_multiplier_averages_one_in_a_storm_too() {
+        // Drawn at four times the baseline variance, the baseline-unit memory
+        // overshoots its normalisation and the multiplier's mean runs over
+        // one; the z-score memory's does not.
+        for &(std, over) in &[(0.0, true), (1.0, false)] {
+            let mut p = with_memory(3.0, 15.0, 0.0);
+            p.market_vol_leverage_standardise = std;
+            let b = p.market_factor_sigma * p.market_factor_sigma;
+            let mut s = MarketVarianceState::new_with(&p);
+            s.variance = 4.0 * b;
+            let mut z = Normals(20260927);
+            let (mut sum, mut n) = (0.0, 0u32);
+            for i in 0..200_000 {
+                s.day_factor = 2.0 * crate::mathx::sqrt(b) * z.next();
+                s.step_leverage_memory(&p);
+                if i >= 2_000 {
+                    sum += MarketVarianceState::leverage_multiplier(&p, s.leverage_memory);
+                    n += 1;
+                }
+            }
+            let mean = sum / n as f64;
+            if over {
+                assert!(mean > 1.2, "baseline units in a storm: E[m] {mean}");
+            } else {
+                assert!((mean - 1.0).abs() < 0.02, "z-score units in a storm: E[m] {mean}");
+            }
+        }
     }
 
     #[test]

@@ -1626,6 +1626,14 @@ the state hash carry $\ell$ only while $k$ is set.
 | $k$ | `market_vol_leverage` | 0 (off) | | in $[0, 50]$ |
 | $H$ | `market_vol_leverage_half_life` | 0 | | sessions; positive when $k$ is set |
 | $a$ | `market_vol_leverage_down` | 0 | | 0 counts rises and falls alike, 1 falls only |
+| $\varsigma$ | `market_vol_leverage_standardise` | 0 | | the unit a day is counted in: $\sqrt{b_m}^{\,1-\varsigma}\sqrt{v_d}^{\,\varsigma}$ in place of $\sqrt{b_m}$ above; 1 is the day's z-score |
+
+With $\varsigma = 1$ the memory's spread is the same at every variance, so the
+multiplier's mean is one in a storm as in a calm and a fall raises the next
+session's variance by its surprise, not by its size. In baseline units
+($\varsigma = 0$) a fall drawn at twice the baseline sd moves $\ell$ twice as
+far, which amplifies crashes: on pt-v20 that form bought its leverage sum
+with B5 (15.3 against a ceiling of 12.4).
 
 #### The business cycle in the market's volatility
 
