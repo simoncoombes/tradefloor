@@ -383,6 +383,12 @@ def _column(buffer: bytes, count: int, name: str) -> tuple[float, ...]:
     return struct.unpack("<%dd" % count, buffer)
 
 
+#: The per-name idiosyncratic variance state's snapshot keys, in the order
+#: the state hash covers them: carried together, and only while
+#: `idio_vol_alpha`, `idio_vol_beta` or `idio_vol_jump_bump` is set.
+_IDIO_VOL_KEYS = ("idio_variance", "idio_jump_pending", "idio_jump_var_pending")
+
+
 def state_hash(snapshot: dict[str, Any]) -> str:
     """sha256 over an engine's state: the per-day ledger leaf, in Python.
 
@@ -487,8 +493,18 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "earnings_key", "earnings_withheld",
          # Tonight's market draw under a night split, only while the
          # session's live lagged wire reads it.
-         "night_market_factor"}
+         "night_market_factor",
+         # The per-name idiosyncratic variance state, its three vectors
+         # together, only while `idio_vol_alpha`, `_beta` or `_jump_bump`
+         # is set.
+         *_IDIO_VOL_KEYS}
         & carried)
+    if carried & set(_IDIO_VOL_KEYS) and not set(_IDIO_VOL_KEYS) <= carried:
+        raise ValidationError(
+            "this snapshot carries part of the idiosyncratic variance state "
+            f"({sorted(carried & set(_IDIO_VOL_KEYS))}). The engine writes "
+            "all three vectors or none, so it was edited or assembled from "
+            "two snapshots.")
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
             "this snapshot carries one of fair_value_offset and opening_z "
@@ -662,6 +678,19 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         raw = snapshot["dividend"]
         for value in _column(raw, len(raw) // 8, "dividend"):
             _f64(buf, value)
+    # The per-name idiosyncratic variance state, only while it runs, each
+    # vector length-prefixed: `Engine::state_hash`'s order and rule.
+    if "idio_variance" in snapshot:
+        for name in _IDIO_VOL_KEYS:
+            raw = snapshot[name]
+            if len(raw) % 8:
+                raise ValidationError(
+                    f"snapshot field {name!r} carries {len(raw)} bytes, which "
+                    "is not a whole number of f64s.")
+            values = _column(raw, len(raw) // 8, name)
+            _u32(buf, len(values))
+            for value in values:
+                _f64(buf, value)
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the
@@ -1185,7 +1214,9 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: names hold back of the earnings cycle for their reports. Encoded
 #: where present and left out where not.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
-                            "buyback_log_shares", "earnings_withheld")
+                            "buyback_log_shares", "earnings_withheld",
+                            "idio_variance", "idio_jump_pending",
+                            "idio_jump_var_pending")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

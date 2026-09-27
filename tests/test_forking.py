@@ -1434,7 +1434,14 @@ def test_the_drift_guard_notices_every_field_the_snapshot_carries():
         damaged.pop(key)
         restored = tf.Engine(seed=SEED, universe=UNIVERSE, macro_state=CRISIS,
                              model=model)
-        restored.restore_state(damaged)
+        # A field carried as one of a group (the idiosyncratic variance
+        # state's three vectors) is refused when dropped alone: the restore
+        # names it, which is the drop noticed.
+        try:
+            restored.restore_state(damaged)
+        except tf.ValidationError as refused:
+            assert key in str(refused), (key, str(refused))
+            continue
         _continue(reference)
         _continue(restored)
         if not _diverged(restored, reference):

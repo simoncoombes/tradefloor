@@ -173,6 +173,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             order_volumes: &[],
             sector_keys: &keys,
             sector_sigmas: &[],
+            idio_vol_ratios: &[],
             // The constant-sigma baseline: this harness probes the draw
             // schedule, which must not depend on the factor's conditional
             // sigma at all.

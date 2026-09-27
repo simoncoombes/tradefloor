@@ -462,6 +462,19 @@ pub struct Engine {
     /// The per-name jump excitation `h_i`, live when `jump_idio_excitation`
     /// is set: the idiosyncratic arrival rate is `lambda (1 + h_i)`.
     jump_excitation: Vec<f64>,
+    /// The per-name idiosyncratic variance RATIO state
+    /// (`ModelParams::idio_vol_alpha`): mean one, multiplying the variance
+    /// of the name's own draw. 0.0 is unseeded and reads 1.0. Beside it, the
+    /// name's own jump the last close applied (the next session realises it,
+    /// so it enters that session's shock) with the jump variance expected at
+    /// the rate it was drawn, and the same pair for tonight's close, which
+    /// is empty between sessions. Never read or written while all three dials
+    /// are 0.0, which every preset carries.
+    idio_variance: Vec<f64>,
+    idio_jump_pending: Vec<f64>,
+    idio_jump_var_pending: Vec<f64>,
+    idio_jump_today: Vec<f64>,
+    idio_jump_var_today: Vec<f64>,
     /// Per-company attribution, accumulated across the current day.
     ///
     /// Four entries per company -- company_news, order_flow_impact,
@@ -1174,6 +1187,51 @@ impl Engine {
         Ok(())
     }
 
+    /// Whether this engine runs the per-name idiosyncratic variance state
+    /// (`ModelParams::idio_vol_alpha`), which is when the snapshot and the
+    /// state hash carry it. Off on every preset, whose two dials are 0.0.
+    pub fn carries_idio_vol_state(&self) -> bool {
+        self.idio_state_on()
+    }
+
+    /// The per-name idiosyncratic variance state, for checkpoints and forks:
+    /// the ratio (0.0 unseeded), the own jump the last close applied and
+    /// the jump variance expected at the rate it was drawn, each in roster
+    /// order. Between sessions this is the whole state: tonight's pair is
+    /// moved into the pending one at the close and is empty until the next.
+    pub fn idio_vol_state(&self) -> (&[f64], &[f64], &[f64]) {
+        (&self.idio_variance, &self.idio_jump_pending, &self.idio_jump_var_pending)
+    }
+
+    /// Put the per-name idiosyncratic variance state back. See
+    /// [`Engine::idio_vol_state`]. Each vector must be the roster's width:
+    /// the states are positional, so a mismatch is refused rather than
+    /// padded or truncated.
+    pub fn set_idio_vol_state(
+        &mut self,
+        variance: &[f64],
+        jump: &[f64],
+        jump_var: &[f64],
+    ) -> Result<(), String> {
+        let n = self.companies.len();
+        for (name, v) in [("ratios", variance), ("pending own jumps", jump),
+                          ("pending jump variances", jump_var)] {
+            if v.len() != n {
+                return Err(format!(
+                    "this snapshot carries {} idiosyncratic variance {} and the roster \
+                     holds {} companies. The states are positional against the roster, \
+                     so this restore is refused rather than padded or truncated.",
+                    v.len(), name, n));
+            }
+        }
+        self.idio_variance = variance.to_vec();
+        self.idio_jump_pending = jump.to_vec();
+        self.idio_jump_var_pending = jump_var.to_vec();
+        self.idio_jump_today = vec![0.0; n];
+        self.idio_jump_var_today = vec![0.0; n];
+        Ok(())
+    }
+
     /// Whether this engine's model carries the volatility feedback's
     /// smoothed exposure, which is when the snapshot and the state hash
     /// carry it. Off on every preset through pt-v19; on for pt-v20.
@@ -1405,6 +1463,11 @@ impl Engine {
             sector_day_factor: vec![0.0; sector_keys.len()],
             sector_target_day: 0.0,
             jump_excitation: vec![0.0; companies_len],
+            idio_variance: vec![0.0; companies_len],
+            idio_jump_pending: vec![0.0; companies_len],
+            idio_jump_var_pending: vec![0.0; companies_len],
+            idio_jump_today: vec![0.0; companies_len],
+            idio_jump_var_today: vec![0.0; companies_len],
             sector_keys,
             draws: StreamDraws::default(),
             current_day: 0,
@@ -2177,6 +2240,114 @@ impl Engine {
         self.params.sector_vol_alpha != 0.0 || self.params.sector_vol_beta != 0.0
     }
 
+    /// Whether the per-name idiosyncratic variance state runs: either of
+    /// `idio_vol_alpha`, `idio_vol_beta` and `idio_vol_jump_bump` off zero.
+    /// Off on every preset.
+    fn idio_state_on(&self) -> bool {
+        self.params.idio_vol_alpha != 0.0
+            || self.params.idio_vol_beta != 0.0
+            || self.params.idio_vol_jump_bump != 0.0
+    }
+
+    /// The per-name idiosyncratic variance ratio of each name
+    /// `index_variance_names` lists, in that order, or EMPTY when the state
+    /// is off: the VIX identity then prices the idiosyncratic term exactly
+    /// as before. An unseeded name reads 1.0.
+    fn index_variance_idio_ratios(&self) -> Vec<f64> {
+        if !self.idio_state_on() {
+            return Vec::new();
+        }
+        let mut total = 0.0;
+        for c in self.companies.iter() {
+            if c.is_public && !c.is_bankrupt && c.stock.market_cap > 0.0 {
+                total += c.stock.market_cap;
+            }
+        }
+        if !(total > 0.0) {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(self.companies.len());
+        for (i, c) in self.companies.iter().enumerate() {
+            if !c.is_public || c.is_bankrupt || c.stock.market_cap <= 0.0 {
+                continue;
+            }
+            out.push(self.idio_ratio_at(i));
+        }
+        out
+    }
+
+    /// One name's idiosyncratic variance ratio as the draws read it: the
+    /// state, or 1.0 where it is unseeded.
+    fn idio_ratio_at(&self, index: usize) -> f64 {
+        match self.idio_variance.get(index) {
+            Some(v) if *v > 0.0 => *v,
+            _ => 1.0,
+        }
+    }
+
+    /// The close of the per-name idiosyncratic variance state
+    /// (`ModelParams::idio_vol_alpha`). `u^2` is the session's own noise
+    /// (the own-noise part the ticks drew, already at the state's scale)
+    /// over its expected variance, `kappa^2 max(h, idio_sigma_floor)`
+    /// (`kappa^2` is `noise_own_scale2`, which carries the state). The jump
+    /// channel adds `idio_vol_jump_bump * (I - lambda)`, `I` whether the own
+    /// jump the previous close applied was non-zero and `lambda` the rate it
+    /// was drawn at (its expected variance over `jump_sigma_idio^2`). `h_day` is each
+    /// name's GJR variance before tonight's `close_day`, the one the day's
+    /// draws were scaled by. Then tonight's own jump becomes tomorrow's.
+    /// Runs after `apply_jumps`, and not at all while the state is off.
+    fn close_idio_state(&mut self, h_day: &[f64]) {
+        if !self.idio_state_on() {
+            return;
+        }
+        let p = &self.params;
+        let (a, b) = (p.idio_vol_alpha, p.idio_vol_beta);
+        let n = self.companies.len();
+        for v in [
+            &mut self.idio_variance,
+            &mut self.idio_jump_pending,
+            &mut self.idio_jump_var_pending,
+            &mut self.idio_jump_today,
+            &mut self.idio_jump_var_today,
+        ] {
+            if v.len() < n {
+                v.resize(n, 0.0);
+            }
+        }
+        let bump = p.idio_vol_jump_bump;
+        let var1 = p.jump_sigma_idio * p.jump_sigma_idio;
+        for i in 0..n {
+            let prev = if self.idio_variance[i] > 0.0 { self.idio_variance[i] } else { 1.0 };
+            let own = self.noise_parts.get(i).map(|x| x[2]).unwrap_or(0.0);
+            let k2 = self.noise_own_scale2.get(i).copied().unwrap_or(0.0);
+            let h = h_day.get(i).copied().unwrap_or(0.0);
+            let expected = k2 * crate::mathx::max(h, p.idio_sigma_floor);
+            // A name that did not trade today (bankrupt, private, or not yet
+            // ticked) has no expected variance and keeps its state.
+            if expected > 0.0 && own.is_finite() {
+                let u2 = own * own / expected;
+                // The jump channel, re-centred on the rate the jump realised
+                // today was drawn at, so it adds nothing to the mean.
+                let jump_term = if bump != 0.0 && var1 > 0.0 {
+                    let rate = self.idio_jump_var_pending[i] / var1;
+                    let hit = if self.idio_jump_pending[i] != 0.0 { 1.0 } else { 0.0 };
+                    bump * (hit - rate)
+                } else {
+                    0.0
+                };
+                let raw = (1.0 - a - b) + a * u2 + b * prev + jump_term;
+                self.idio_variance[i] = crate::mathx::max(
+                    crate::mathx::min(raw, p.garch_ceiling_multiple),
+                    p.garch_floor_multiple,
+                );
+            }
+            self.idio_jump_pending[i] = self.idio_jump_today[i];
+            self.idio_jump_var_pending[i] = self.idio_jump_var_today[i];
+            self.idio_jump_today[i] = 0.0;
+            self.idio_jump_var_today[i] = 0.0;
+        }
+    }
+
     /// One daily sigma per sector key from the state, or EMPTY when the
     /// state is off (the tick and the read-back then use the shared
     /// VIX-coupled sigma exactly as before). An unseeded sector reads the
@@ -2414,6 +2585,7 @@ impl Engine {
             vec![sector_sigma; self.sector_keys.len()]
         };
         let excitations = self.index_variance_excitations();
+        let idio_ratios = self.index_variance_idio_ratios();
         crate::market::index_var::index_conditional_variance_terms_with_states(
             &self.params,
             &names,
@@ -2421,6 +2593,7 @@ impl Engine {
             factor_variance,
             &sigmas,
             &excitations,
+            &idio_ratios,
             rate_scale,
             crisis_spike,
             // THE LAGGED TRANSMISSION WIRE, and the timing is the point.
@@ -3222,6 +3395,14 @@ impl Engine {
         // calendar.
         let earnings_volume = self.earnings_volume_column();
 
+        // The per-name idiosyncratic variance ratios, one per roster slot,
+        // or EMPTY while the state is off, in which case the tick multiplies
+        // nothing.
+        let idio_vol_ratios: Vec<f64> = if self.idio_state_on() {
+            (0..self.companies.len()).map(|i| self.idio_ratio_at(i)).collect()
+        } else {
+            Vec::new()
+        };
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -3262,6 +3443,7 @@ impl Engine {
                 order_volumes,
                 sector_keys: &self.sector_keys,
                 sector_sigmas: &sector_sigmas,
+                idio_vol_ratios: &idio_vol_ratios,
                 market_sigma_daily,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
@@ -5171,6 +5353,11 @@ impl Engine {
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let idio_ratios: Vec<f64> = if self.idio_state_on() {
+            (0..self.companies.len()).map(|i| self.idio_ratio_at(i)).collect()
+        } else {
+            Vec::new()
+        };
         for (index, company) in self.companies.iter_mut().enumerate() {
             if company.is_bankrupt || !company.is_public {
                 continue;
@@ -5195,6 +5382,14 @@ impl Engine {
                 * crate::market::factors::idio_scale_for(p, beta)
                 * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap)
                 * z_idio[index];
+            // The idiosyncratic variance state reaches the night's own draw
+            // as it reaches the session's. A branch, so nothing is
+            // multiplied while it is off.
+            let idio = if idio_ratios.is_empty() {
+                idio
+            } else {
+                idio * crate::mathx::sqrt(idio_ratios[index])
+            };
             let night = scale * (market + sector + idio);
             let after = crate::market::tick::clamp_s(p, s + night);
             let moved = after - s;
@@ -5584,6 +5779,16 @@ impl Engine {
         let key = self.earnings_key;
         let day = self.current_day;
         let noise_slot = random_noise_index();
+        // The idiosyncratic variance state (`idio_vol_alpha`) reaches the
+        // night's own draw as it reaches the session's: through the own unit,
+        // so `noise_own_scale2` carries it and the close's `u^2` reads the
+        // whole day's own noise against the whole day's expected variance.
+        // EMPTY while the state is off, a branch.
+        let idio_ratios: Vec<f64> = if self.idio_state_on() {
+            (0..self.companies.len()).map(|i| self.idio_ratio_at(i)).collect()
+        } else {
+            Vec::new()
+        };
         for (index, company) in self.companies.iter_mut().enumerate() {
             if company.is_bankrupt || !company.is_public {
                 continue;
@@ -5605,6 +5810,10 @@ impl Engine {
                 crate::mathx::max(company.stock.garch_variance, p.idio_sigma_floor));
             let own_unit = crate::market::factors::idio_scale_for(p, beta)
                 * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap);
+            let own_unit = match idio_ratios.get(index) {
+                Some(&r) => own_unit * crate::mathx::sqrt(r),
+                None => own_unit,
+            };
             let t = t_scales.get(index).copied().unwrap_or(1.0);
             let idio = si * daily_sigma * own_unit * z_idio[index] * t;
             let own = sector + idio;
@@ -5982,6 +6191,14 @@ impl Engine {
             // anchor makes such a day read as the old form did.
             if implied > 0.0 { implied } else { self.vix_anchor }
         };
+        // The GJR variance each name's draws were scaled by today, before
+        // `close_day` steps it: the idiosyncratic state's expected
+        // variance reads it after the jumps. Empty while the state is off.
+        let idio_h_day: Vec<f64> = if self.idio_state_on() {
+            self.companies.iter().map(|c| c.stock.garch_variance).collect()
+        } else {
+            Vec::new()
+        };
         for (i, company) in self.companies.iter_mut().enumerate() {
             close_day_with(
                 &self.params,
@@ -6016,6 +6233,7 @@ impl Engine {
         // sector, forced-flow or stress updates touch. The known-answer
         // digest is the proof rather than this paragraph.
         self.apply_jumps();
+        self.close_idio_state(&idio_h_day);
         // The market factor's own close: its variance updates from the
         // day's accumulated factor, beside the per-name GARCH updates
         // above and with the same zero-draw discipline. The VIX read here
@@ -6406,8 +6624,19 @@ impl Engine {
         // each name's `s` before the generated body, so the company's own
         // jump can be told from the market's after it. Empty, and nothing
         // below runs, at 0.0.
+        //
+        // The idiosyncratic variance state reads the same split for its own
+        // shock, so it takes `s_before` too, and the excitation each name's
+        // rate is drawn at (the generated body below steps it forward).
+        let idio_on = self.idio_state_on();
+        let excitation_drawn: Vec<f64> = if idio_on && self.params.jump_idio_excitation != 0.0 {
+            self.jump_excitation.clone()
+        } else {
+            Vec::new()
+        };
         let s_before: Vec<f64> = if self.params.fair_value_news_share != 0.0
             || self.params.fair_value_market_share != 0.0
+            || idio_on
         {
             self.companies.iter().map(|c| c.stock.mispricing_s.unwrap_or(f64::NAN)).collect()
         } else {
@@ -6502,6 +6731,24 @@ impl Engine {
         // normal). `psi` of it moves to the fair-value level, as the tick
         // does with the name's own noise and news. The attribution slot
         // keeps the whole jump: it reports what moved the price.
+        // THE OWN JUMP'S EXPECTED VARIANCE, for the idiosyncratic variance
+        // state: the rate each name was drawn at tonight (the VIX scale and
+        // the excitation before the body stepped it) times
+        // `jump_sigma_idio^2`, in the generated body's own spelling.
+        if idio_on {
+            let p = &self.params;
+            let ratio = self.economy.vix / self.vix_anchor;
+            let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
+            let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else if p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+            let var1 = p.jump_sigma_idio * p.jump_sigma_idio;
+            for i in 0..self.companies.len() {
+                let ex = excitation_drawn.get(i).copied().unwrap_or(0.0);
+                let rate = crate::mathx::min(intensity_idio * (1.0 + ex), 1.0);
+                if let Some(slot) = self.idio_jump_var_today.get_mut(i) {
+                    *slot = rate * var1;
+                }
+            }
+        }
         if !s_before.is_empty() {
             let psi = self.params.fair_value_news_share;
             let psim = crate::market::tick::market_permanent_share(
@@ -6519,6 +6766,13 @@ impl Engine {
                 // market's on the market-wide share (a name the clamp held
                 // back from the market jump keeps the share of what it took).
                 let own = if own.abs() <= 1e-9 { 0.0 } else { own };
+                // The own jump, which tomorrow's session realises and
+                // tomorrow's close reads into the idiosyncratic state.
+                if idio_on {
+                    if let Some(slot) = self.idio_jump_today.get_mut(index) {
+                        *slot = own;
+                    }
+                }
                 let taken_common = (after - before) - own;
                 let dv = psi * own + psim * taken_common;
                 if dv == 0.0 {
@@ -8121,6 +8375,17 @@ impl Engine {
         // realised no report and holds back nothing.
         self.earnings_moves.push(0.0);
         self.earnings_withheld.push(0.0);
+        // The idiosyncratic variance state likewise: a name that joins is
+        // unseeded (reads 1.0) and has no jump pending.
+        for v in [
+            &mut self.idio_variance,
+            &mut self.idio_jump_pending,
+            &mut self.idio_jump_var_pending,
+            &mut self.idio_jump_today,
+            &mut self.idio_jump_var_today,
+        ] {
+            v.push(0.0);
+        }
         // The print decomposition, on the same argument as everything above
         // it: these are per-SLOT columns, and a roster edit that grew
         // `companies` without growing them would leave the new name reading
@@ -8210,6 +8475,17 @@ impl Engine {
         }
         if index < self.earnings_withheld.len() {
             self.earnings_withheld.remove(index);
+        }
+        for v in [
+            &mut self.idio_variance,
+            &mut self.idio_jump_pending,
+            &mut self.idio_jump_var_pending,
+            &mut self.idio_jump_today,
+            &mut self.idio_jump_var_today,
+        ] {
+            if index < v.len() {
+                v.remove(index);
+            }
         }
         // Removed rather than left behind, because the tail shifts down by
         // one and a column that did not shift with it would report every
@@ -8840,6 +9116,16 @@ impl Engine {
         if self.carries_dividends() {
             for value in self.dividend_states() {
                 hash_f64(&mut buf, value);
+            }
+        }
+        // The per-name idiosyncratic variance state, only while it runs, so
+        // every preset hashes as it did. Length-prefixed, each vector.
+        if self.carries_idio_vol_state() {
+            for v in [&self.idio_variance, &self.idio_jump_pending, &self.idio_jump_var_pending] {
+                hash_u32(&mut buf, v.len() as u32);
+                for value in v {
+                    hash_f64(&mut buf, *value);
+                }
             }
         }
         // The crisis episode. Hashed for the reason every field here is:
@@ -11179,6 +11465,44 @@ mod tests {
         e.write_prices(&[1.0, 2.0, 3.0]);
         assert_eq!(e.prices(), vec![1.0, 2.0, 3.0]);
         assert_eq!(e.column(PriceField::MarketCap)[0], 1.0 * 1e8);
+    }
+
+    /// `idio_vol_alpha`: the VIX identity's idiosyncratic term reads the
+    /// per-name ratio, as the tick's own draw does. A ratio of 4 on every
+    /// name is exactly 4 times the term (a power of two scales each
+    /// summand without rounding); one name at 4 lands in between; a ratio
+    /// of one is the term with the state off. Every other term is the
+    /// same. Dropping the ratio from `index_var.rs`, or passing the engine's
+    /// ratios as an empty slice, fails here.
+    #[test]
+    fn the_vix_identity_reads_the_idiosyncratic_variance_ratio() {
+        let off = engine(7).index_conditional_variance_terms_now();
+        let params = crate::params::ModelParams {
+            idio_vol_alpha: 0.2,
+            idio_vol_beta: 0.5,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let one = e.index_conditional_variance_terms_now();
+        assert_eq!(one, off);
+        e.set_idio_vol_state(&[4.0; 3], &[0.0; 3], &[0.0; 3]).unwrap();
+        let four = e.index_conditional_variance_terms_now();
+        assert!(one.idio_raw > 0.0);
+        assert_eq!(four.idio_raw, 4.0 * one.idio_raw);
+        assert_eq!(
+            crate::market::index_var::IndexVarianceTerms { idio_raw: one.idio_raw, ..four },
+            one
+        );
+        e.set_idio_vol_state(&[4.0, 1.0, 1.0], &[0.0; 3], &[0.0; 3]).unwrap();
+        let first = e.index_conditional_variance_terms_now();
+        assert!(first.idio_raw > one.idio_raw && first.idio_raw < four.idio_raw);
     }
 
     #[test]

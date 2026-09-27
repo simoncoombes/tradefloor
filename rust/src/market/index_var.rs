@@ -833,7 +833,7 @@ pub fn index_conditional_variance_terms(
     // replaced.
     let sigmas = vec![sector_sigma; sector_count];
     index_conditional_variance_terms_with_states(
-        p, names, sector_count, factor_variance, &sigmas, &[], jump_rate_scale,
+        p, names, sector_count, factor_variance, &sigmas, &[], &[], jump_rate_scale,
         crisis_spike, prev_day_down, k)
 }
 
@@ -847,6 +847,11 @@ pub fn index_conditional_variance_terms(
 /// 0.72, and a read-back that priced the stateless forms while the tick
 /// ran the stateful ones would be the same defect this module was written
 /// to close.
+///
+/// `idio_ratios` is the per-name idiosyncratic variance state
+/// (`ModelParams::idio_vol_alpha`), in `names`' order, a RATIO that
+/// multiplies the variance of the name's own draw; empty means none, and
+/// the idiosyncratic term is then summed exactly as before.
 pub fn index_conditional_variance_terms_with_states(
     p: &ModelParams,
     names: &[NameVariance],
@@ -854,6 +859,7 @@ pub fn index_conditional_variance_terms_with_states(
     factor_variance: f64,
     sector_sigmas: &[f64],
     jump_excitations: &[f64],
+    idio_ratios: &[f64],
     jump_rate_scale: f64,
     crisis_spike: f64,
     prev_day_down: bool,
@@ -879,7 +885,10 @@ pub fn index_conditional_variance_terms_with_states(
         beta_w += name.weight * name.beta;
         weight_sq += name.weight * name.weight;
         let idio = idio_sigma_daily(p, name);
-        idio_var += name.weight * name.weight * idio * idio;
+        match idio_ratios.get(index) {
+            Some(r) => idio_var += name.weight * name.weight * idio * idio * r,
+            None => idio_var += name.weight * name.weight * idio * idio,
+        }
         if name.sector < sector_count {
             let loaded = name.weight * crate::market::factors::sector_loading_for(p, name.beta);
             sector_loaded[name.sector] += loaded;

@@ -354,6 +354,11 @@ PARAM_SPECS: dict[str, dict] = {
     "sector_vol_beta": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.99)},
     "jump_idio_excitation": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
     "jump_idio_excitation_decay": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.95)},
+    # The per-name idiosyncratic variance state; alpha + beta < 1 is
+    # validated by the engine.
+    "idio_vol_alpha": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5)},
+    "idio_vol_beta": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.95)},
+    "idio_vol_jump_bump": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 4.0)},
     "jump_idio_vix_decoupled": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "forced_flow_gain": {"kind": "abs", "step_unit": 0.0001, "hard_range": (0.0, 0.01)},
     "forced_flow_threshold": {"kind": "abs", "step_unit": 1.0, "hard_range": (20.0, 60.0)},

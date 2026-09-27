@@ -2409,6 +2409,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Variance cascade and per-name persistence spread** (`garch_cascade_components`, `garch_beta_dispersion`, `garch_omega_sector_scaled`, `garch_innovation_commensurate`).
 - **Market-variance extras** (`market_vol_level_sigma`, `market_vol_vix_excursion`, `market_vol_alpha_excursion`, `market_vol_vix_smooth`, `market_burn_in_sessions`).
 - **Self-exciting jumps** (`jump_idio_excitation`), and jumps in the market-variance shock (`jump_market_variance_share`).
+- **Per-name idiosyncratic variance state** (`idio_vol_alpha`, `idio_vol_beta`, `idio_vol_jump_bump`): no state is kept, so a name's own jump leaves no aftershock. When on, a ratio $s_i$ with a mean of one multiplies the variance of the name's own draw, in the session and overnight, and the VIX identity's idiosyncratic term reads it. At each close $s_i' = \mathrm{clip}\big((1-a-b) + a\,u_i^{2} + b\,s_i + c\,(I_i - \lambda_i);\ f_g,\ C_g\big)$, where $u_i$ is the session's own noise over its expected size, $I_i$ is 1 if the name's own jump landed that session, and $\lambda_i$ is the rate it was drawn at.
 - **Smooth size and spread curves** (`size_effect_smoothness`, `spread_size_smoothness`): the step functions above are used.
 - **Square-root impact** (`order_flow_impact_law`): the clamped participation law above is used.
 - **Company volume state** (`volume_idio_persistence`, `volume_idio_sigma`).

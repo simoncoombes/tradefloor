@@ -4154,6 +4154,14 @@ impl PyEngine {
         if self.inner.carries_night_market_factor() {
             out.set_item("night_market_factor", self.inner.night_market_factor())?;
         }
+        // The per-name idiosyncratic variance state, only while it runs, so
+        // every preset's snapshot is the one it was.
+        if self.inner.carries_idio_vol_state() {
+            let (ratio, jump, jump_var) = self.inner.idio_vol_state();
+            out.set_item("idio_variance", f64_bytes(py, ratio))?;
+            out.set_item("idio_jump_pending", f64_bytes(py, jump))?;
+            out.set_item("idio_jump_var_pending", f64_bytes(py, jump_var))?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -4732,6 +4740,35 @@ impl PyEngine {
                 .collect();
             self.inner
                 .set_opening_z(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(raw) = snapshot.get_item("idio_variance")? {
+            let mut parts: Vec<Vec<f64>> = Vec::with_capacity(3);
+            for key in ["idio_variance", "idio_jump_pending", "idio_jump_var_pending"] {
+                let raw = if key == "idio_variance" {
+                    raw.clone()
+                } else {
+                    match snapshot.get_item(key)? {
+                        Some(r) => r,
+                        None => {
+                            return Err(ValidationError::new_err(format!(
+                                "this snapshot carries idio_variance without {key}. The \
+                                 engine writes the three together, so it was edited or \
+                                 assembled from two snapshots."
+                            )))
+                        }
+                    }
+                };
+                let bytes: &[u8] = raw.extract()?;
+                parts.push(
+                    bytes
+                        .chunks_exact(8)
+                        .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                        .collect(),
+                );
+            }
+            self.inner
+                .set_idio_vol_state(&parts[0], &parts[1], &parts[2])
                 .map_err(ValidationError::new_err)?;
         }
         for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {

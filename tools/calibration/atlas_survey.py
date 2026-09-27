@@ -573,6 +573,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "sector_vol_beta": (0.0, 0.98),
     "jump_idio_excitation": (0.0, 4.0),
     "jump_idio_excitation_decay": (0.0, 0.9),
+    # The per-name idiosyncratic variance state: a shock share up to 0.3 and
+    # a persistence up to 0.9, the box the vol-clustering grid searched
+    # (half-lives of a session to a few weeks). `ModelParams::invariants`
+    # refuses a sum of 1 or more, so the box's top corner (alpha + beta past
+    # 1) is refused as the epicentre's gap above is.
+    "idio_vol_alpha": (0.0, 0.3),
+    "idio_vol_beta": (0.0, 0.9),
+    "idio_vol_jump_bump": (0.0, 3.0),
     "jump_idio_vix_decoupled": (0.0, 1.0),
     # Flow composition: lean per VIX point above threshold. At 0.001 and
     # the covid peak (40 points above), the daily common shock is 0.04 --

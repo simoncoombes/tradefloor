@@ -641,6 +641,24 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    # The per-name idiosyncratic variance state (0.8.5, realism work
+    # vol-clustering). Inert on every preset; a value is for a registration.
+    "idio_vol_alpha":
+        "inert at 0.0 with `idio_vol_beta` and `idio_vol_jump_bump` 0.0: `Engine::idio_state_on` is "
+        "false, no state is read or written, the tick receives an empty "
+        "ratio slice and the snapshot and state hash omit the state. The "
+        "reference panel's idiosyncratic |e| lag-1 ACF (0.088) and "
+        "aftershock (1.29) are the targets a registration would fit it to",
+    "idio_vol_beta":
+        "inert at 0.0 with `idio_vol_alpha` and `idio_vol_jump_bump` 0.0 "
+        "(see that entry); off zero with both of those still 0.0 the state "
+        "runs but the ratio stays at exactly one, so nothing moves. With "
+        "`idio_vol_jump_bump` on, beta carries each jump's bump into "
+        "later sessions",
+    "idio_vol_jump_bump":
+        "inert at 0.0 with `idio_vol_alpha` and `idio_vol_beta` 0.0 (see "
+        "that entry); off zero it moves the ratio the session after an own "
+        "jump, re-centred on the jump rate so the ratio's mean stays one",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "

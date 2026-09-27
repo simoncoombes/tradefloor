@@ -293,6 +293,7 @@ fn check_scenario(file: &str) {
                 order_volumes: &[],
                 sector_keys: &sector_keys,
                 sector_sigmas: &[],
+                idio_vol_ratios: &[],
                 // Replaying a RECORDED reference stream: the tape holds the
                 // draws the reference consumed, four-or-zero at settlement,
                 // and `ScriptedRng::finish` asserts exact consumption.
