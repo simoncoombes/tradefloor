@@ -1398,6 +1398,83 @@ pub struct ModelParams {
     /// phase's own normal counts. Unread at `market_vol_cycle_ratio` 0.0.
     /// In [0, 1].
     pub market_vol_cycle_cap_relative: f64,
+    /// A switch, 0.0 or 1.0: on a session whose VIX a caller pinned
+    /// (`pin_macro(vix=...)`: a replay's path, a scenario's VIX
+    /// transmission) the cycle multiplier is not applied -- the session's
+    /// cap scale, tonight's variance level and coupling denominator and
+    /// the VIX anchor's scale all read a multiplier of one -- and the
+    /// multiplier itself steps toward one at its half-life instead of
+    /// toward its phase's value, so when the pins stop it rises or falls
+    /// from there to where its phase puts it rather than jumping. 0.0,
+    /// every preset, is the multiplier as it was. A forced close
+    /// (`vix_sets_variance`) already did not apply it; this extends the
+    /// rule to every pinned VIX. Unread at `market_vol_cycle_ratio` 0.0.
+    ///
+    /// Why. A pinned VIX is the caller's statement of the market's fear,
+    /// and the variance the model takes from it already carries the state.
+    /// The long run's 2020 replay pins the real VIX of 2020-21 over an
+    /// engine whose own cycle is in an expansion on almost every seed (six
+    /// of six on 201-206 held the expansion through the whole replay but
+    /// one, which the engine does not know is 2020). There an expansion
+    /// multiplier under one scaled the replay's variance by `k_e^2`
+    /// whatever the pinned VIX said: on N4 with the cycle at expansion
+    /// 0.85 the replay's worst month read 59 per cent against 69 without
+    /// it (A1, floor 66.2) and the peak stock correlation 0.70 against
+    /// 0.73 (A3), the multiplier at ln 0.85 on every replay session
+    /// (sim/r14 e2e2d21, r14 screen arm N4B85, seeds 201-230, 501-530,
+    /// 801-830). With the switch the replay reads what it reads without
+    /// the cycle, given the state the burn-in left.
+    pub market_vol_cycle_pin_neutral: f64,
+    /// A switch, 0.0 or 1.0: the rule `market_vol_cycle_pin_neutral`
+    /// states for a pinned VIX, on a session whose cycle PHASE a caller
+    /// pinned (`pin_macro(cycle=...)`: a scenario's `macro.cycle` shock).
+    /// 0.0, every preset, is the multiplier as it was. Unread at
+    /// `market_vol_cycle_ratio` 0.0.
+    ///
+    /// Why. A scenario that pins the phase states the recession and brings
+    /// its own transmission with it -- the packaged recession.yml triples
+    /// the VIX for sixty sessions, widens credit and cuts earnings 35 per
+    /// cent, and its S1a/S2 were tuned on the model without the multiplier
+    /// (fix/ptv20-recession2). Applied on top, the contraction's doubled
+    /// factor volatility over the 315 pinned sessions deepened the fall and
+    /// moved the low later, onto the scenario's turn (median low day 380
+    /// against 294, drawdown -66 per cent against -60, VIX at the low 68
+    /// against 43, seeds 201-212), and the index's level 252 sessions
+    /// after the low is where the recovering earnings put it either way
+    /// (0.70 of the peak against 0.69), so the rise from the deeper low
+    /// read +106 per cent against +72 (S2, band +25 to +80; +102 against
+    /// +64 on 201-230 in the r14 screen).
+    pub market_vol_cycle_pin_phase: f64,
+    /// The share `g` of the contraction's excess, in logs, that the TROUGH
+    /// gives back: the trough's target is `ln(k_e) + (1 - g) ln(R)`. 0.0,
+    /// every preset, is the trough at the contraction's multiplier, as it
+    /// was; 1.0 is the trough at the expansion's. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 1].
+    ///
+    /// Why. The trough is the cycle turning up, and real volatility falls
+    /// as it does: the VIX and realised volatility peak near the market's
+    /// low, which leads the NBER trough. 2009: the VIX 49.7 at the 9 March
+    /// low, 26.4 at the 30 June trough; 2020: 61.6 at the 23 March low,
+    /// 34.2 at the April trough (Yahoo ^VIX, the long run's tape
+    /// 1990-2025). Held at the contraction's level through the trough, the
+    /// multiplier keeps the storm on while the recovery starts. See
+    /// `market_vol_cycle_release_half_life`.
+    pub market_vol_cycle_trough_release: f64,
+    /// The half-life, in sessions, of the cycle multiplier's move while it
+    /// FALLS toward a lower target (a phase turning up, or a trough under
+    /// `market_vol_cycle_trough_release`). 0.0, every preset, is
+    /// `market_vol_cycle_half_life` both ways, as it was. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 2520].
+    ///
+    /// Why. Volatility falls fast after a bear's low. At the four VIX-era
+    /// lows (1990-10-11, 2002-10-09, 2009-03-09, 2020-03-23) the VIX read
+    /// 34, 42, 50 and 62, and 63 sessions later 27, 26, 30 and 32 (medians
+    /// of the 21 sessions around); the index's realised volatility over
+    /// sessions 42-63 after the low was 12.5, 21.4, 26.0 and 26.4 per cent
+    /// against 20.8, 30.4, 38.1 and 82.7 over the 21 before (Yahoo ^GSPC
+    /// and ^VIX, the long run's tape). One half-life both ways keeps a
+    /// contraction's multiplier on well into the recovery.
+    pub market_vol_cycle_release_half_life: f64,
     /// The published VIX's stress premium: the gain `g` of a premium the
     /// QUOTE carries over the engine's VIX state while the variance
     /// read-back's memory is high. 0.0, which every preset carries, is
@@ -6284,6 +6361,10 @@ impl ModelParams {
             market_vol_cycle_relative: 0.0,
             market_vol_cycle_relative_calm: 0.0,
             market_vol_cycle_cap_relative: 0.0,
+            market_vol_cycle_pin_neutral: 0.0,
+            market_vol_cycle_pin_phase: 0.0,
+            market_vol_cycle_trough_release: 0.0,
+            market_vol_cycle_release_half_life: 0.0,
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
@@ -8675,6 +8756,10 @@ impl ModelParams {
             "market_vol_cycle_relative" => self.market_vol_cycle_relative,
             "market_vol_cycle_relative_calm" => self.market_vol_cycle_relative_calm,
             "market_vol_cycle_cap_relative" => self.market_vol_cycle_cap_relative,
+            "market_vol_cycle_pin_neutral" => self.market_vol_cycle_pin_neutral,
+            "market_vol_cycle_pin_phase" => self.market_vol_cycle_pin_phase,
+            "market_vol_cycle_trough_release" => self.market_vol_cycle_trough_release,
+            "market_vol_cycle_release_half_life" => self.market_vol_cycle_release_half_life,
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
@@ -8982,6 +9067,10 @@ impl ModelParams {
             "market_vol_cycle_relative" => out.market_vol_cycle_relative = value,
             "market_vol_cycle_relative_calm" => out.market_vol_cycle_relative_calm = value,
             "market_vol_cycle_cap_relative" => out.market_vol_cycle_cap_relative = value,
+            "market_vol_cycle_pin_neutral" => out.market_vol_cycle_pin_neutral = value,
+            "market_vol_cycle_pin_phase" => out.market_vol_cycle_pin_phase = value,
+            "market_vol_cycle_trough_release" => out.market_vol_cycle_trough_release = value,
+            "market_vol_cycle_release_half_life" => out.market_vol_cycle_release_half_life = value,
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
@@ -9683,6 +9772,31 @@ impl ModelParams {
                  fair-value volatility cap's ceiling is scaled by in a stormier phase, in [0, 1].",
                 self.market_vol_cycle_cap_relative));
         }
+        if !(self.market_vol_cycle_pin_neutral == 0.0 || self.market_vol_cycle_pin_neutral == 1.0) {
+            return Err(format!(
+                "market_vol_cycle_pin_neutral is {}. It is a switch, 0 or 1: the cycle \
+                 multiplier is not applied on a session whose VIX a caller pinned.",
+                self.market_vol_cycle_pin_neutral));
+        }
+        if !(self.market_vol_cycle_pin_phase == 0.0 || self.market_vol_cycle_pin_phase == 1.0) {
+            return Err(format!(
+                "market_vol_cycle_pin_phase is {}. It is a switch, 0 or 1: the cycle \
+                 multiplier is not applied on a session whose cycle phase a caller pinned.",
+                self.market_vol_cycle_pin_phase));
+        }
+        if !(self.market_vol_cycle_trough_release >= 0.0 && self.market_vol_cycle_trough_release <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_trough_release is {}. It is the share of the contraction's \
+                 volatility multiplier (in logs) the trough gives back, in [0, 1].",
+                self.market_vol_cycle_trough_release));
+        }
+        if !(self.market_vol_cycle_release_half_life >= 0.0
+            && self.market_vol_cycle_release_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_release_half_life is {}. It is a half-life in sessions, in \
+                 [0, 2520]; 0 is market_vol_cycle_half_life.",
+                self.market_vol_cycle_release_half_life));
+        }
         if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
             return Err(format!(
                 "vix_stress_premium is {}. It is the published VIX premium's gain per \
@@ -10350,6 +10464,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_cycle_relative",
         "market_vol_cycle_relative_calm",
         "market_vol_cycle_cap_relative",
+        "market_vol_cycle_pin_neutral",
+        "market_vol_cycle_pin_phase",
+        "market_vol_cycle_trough_release",
+        "market_vol_cycle_release_half_life",
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",

@@ -4989,6 +4989,19 @@ impl Engine {
         if self.params.vix_stress_premium != 0.0 {
             keep |= PIN_VIX;
         }
+        // And the cycle's volatility multiplier, which a pinned VIX or a
+        // pinned phase withholds (`market_vol_cycle_pin_neutral`,
+        // `market_vol_cycle_pin_phase`). The phase bit's other readers act
+        // only under their own dials (`macro_pins_hold`,
+        // `cycle_nowcast_accuracy`).
+        if self.params.market_vol_cycle_ratio != 0.0 {
+            if self.params.market_vol_cycle_pin_neutral != 0.0 {
+                keep |= PIN_VIX;
+            }
+            if self.params.market_vol_cycle_pin_phase != 0.0 {
+                keep |= PIN_CYCLE;
+            }
+        }
         self.macro_pins_today |= bits & keep;
     }
 
@@ -6481,7 +6494,10 @@ impl Engine {
             if self.vix_sets_variance_pending {
                 (market_vol_level, vix_ratio_denominator)
             } else {
-                let m = crate::mathx::exp(l);
+                // As the session applied it: one on a session a caller's
+                // pins cover (`market_vol_cycle_pin_neutral`,
+                // `market_vol_cycle_pin_phase`), `l` itself otherwise.
+                let m = crate::mathx::exp(self.market_vol_cycle_applied_log(l));
                 (market_vol_level * m * m, vix_ratio_denominator * self.market_vol_cycle_vix_scale())
             }
         };
@@ -7844,7 +7860,18 @@ impl Engine {
             1.0 / crate::mathx::sqrt(1.0 - s + r * r * s)
         };
         let k = match self.economy.cycle_phase {
-            CyclePhase::Contraction | CyclePhase::Trough => r * ke,
+            CyclePhase::Contraction => r * ke,
+            // The turn: the trough gives back the share
+            // `market_vol_cycle_trough_release` of the contraction's excess
+            // (in logs); at 0.0, every preset, it is the contraction's.
+            CyclePhase::Trough => {
+                let g = self.params.market_vol_cycle_trough_release;
+                if g == 0.0 {
+                    r * ke
+                } else {
+                    return crate::mathx::log(ke) + (1.0 - g) * crate::mathx::log(r);
+                }
+            }
             _ => ke,
         };
         crate::mathx::log(k)
@@ -7865,8 +7892,24 @@ impl Engine {
     /// it and for the live rate mark's projection of the close
     /// (`rate_intraday_live`), which must read the close's own multiplier.
     fn market_vol_cycle_next_log(&self) -> f64 {
-        let target = self.market_vol_cycle_target_log();
-        let hl = self.params.market_vol_cycle_half_life;
+        // On a session a caller's pins cover, the multiplier relaxes toward
+        // one (a log of 0.0), which is what the session applies, so a run
+        // the pins release steps from there toward its phase's value at
+        // the half-life instead of jumping to it
+        // (`market_vol_cycle_pin_neutral`, `market_vol_cycle_pin_phase`).
+        let target = if self.market_vol_cycle_pinned() {
+            0.0
+        } else {
+            self.market_vol_cycle_target_log()
+        };
+        // The release half-life (`market_vol_cycle_release_half_life`)
+        // while the multiplier falls toward a lower target, as a phase
+        // turns up; the one half-life otherwise, and always at 0.0.
+        let release = self.params.market_vol_cycle_release_half_life;
+        let hl = match self.market_vol_cycle_log {
+            Some(prev) if release != 0.0 && target < prev => release,
+            _ => self.params.market_vol_cycle_half_life,
+        };
         match self.market_vol_cycle_log {
             Some(prev) if hl > 0.0 => {
                 let a = 1.0 - crate::mathx::exp(-std::f64::consts::LN_2 / hl);
@@ -7894,7 +7937,8 @@ impl Engine {
     /// only there; at the shipped candidates the scale is 0.8 or more
     /// against a floor of about 0.48.
     fn market_vol_cycle_vix_scale(&self) -> f64 {
-        self.market_vol_cycle_vix_scale_at(self.market_vol_cycle_log)
+        self.market_vol_cycle_vix_scale_at(
+            self.market_vol_cycle_log.map(|l| self.market_vol_cycle_applied_log(l)))
     }
 
     /// [`Engine::market_vol_cycle_vix_scale`] at an explicit multiplier.
@@ -7929,11 +7973,42 @@ impl Engine {
     /// before the first close.
     pub fn market_vol_cycle_cap_scale(&self) -> f64 {
         let p = self.params.market_vol_cycle_cap_relative;
-        match self.market_vol_cycle_log {
+        match self.market_vol_cycle_log.map(|l| self.market_vol_cycle_applied_log(l)) {
             Some(l) if self.params.market_vol_cycle_ratio != 0.0 && p != 0.0 && l > 0.0 => {
                 crate::mathx::exp(p * l)
             }
             _ => 1.0,
+        }
+    }
+
+    /// Whether a caller's pins withhold the cycle multiplier today: a
+    /// session whose VIX a caller pinned under
+    /// `market_vol_cycle_pin_neutral`, or whose cycle phase a caller pinned
+    /// under `market_vol_cycle_pin_phase`. Always false with both switches
+    /// at 0.0, every preset.
+    ///
+    /// A pinned VIX or phase is the caller's statement of the state (a
+    /// replay's 2020 is 2020 whatever phase the engine's own cycle happens
+    /// to be in; a scenario's recession arrives with its own VIX, credit
+    /// and earnings transmission), so scaling the variance by the engine's
+    /// own phase on top double-counts or contradicts it. See
+    /// `ModelParams::market_vol_cycle_pin_neutral`.
+    fn market_vol_cycle_pinned(&self) -> bool {
+        (self.params.market_vol_cycle_pin_neutral != 0.0 && self.macro_pins_today & PIN_VIX != 0)
+            || (self.params.market_vol_cycle_pin_phase != 0.0
+                && self.macro_pins_today & PIN_CYCLE != 0)
+    }
+
+    /// The cycle multiplier as today's session and tonight's close APPLY
+    /// it, in logs, given the multiplier `l` itself: 0.0 (a multiplier of
+    /// one) on a session a caller's pins cover
+    /// ([`Engine::market_vol_cycle_pinned`]), and `l` itself, bit for bit,
+    /// on every other.
+    fn market_vol_cycle_applied_log(&self, l: f64) -> f64 {
+        if self.market_vol_cycle_pinned() {
+            0.0
+        } else {
+            l
         }
     }
 
@@ -8341,7 +8416,7 @@ impl Engine {
         let (level, denominator, cycle_vix_scale) = if self.params.market_vol_cycle_ratio == 0.0 {
             (level, denominator, 1.0)
         } else {
-            let l = self.market_vol_cycle_next_log();
+            let l = self.market_vol_cycle_applied_log(self.market_vol_cycle_next_log());
             let scale = self.market_vol_cycle_vix_scale_at(Some(l));
             if self.vix_sets_variance_pending {
                 (level, denominator, scale)
