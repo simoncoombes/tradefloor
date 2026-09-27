@@ -1173,6 +1173,17 @@ PERTURBATIONS = [
     # under 4, so the 10-year's term premium falls, and fair value reads
     # the rate. No draw: the economy stream is untouched.
     ("treasury_haven_gain", 0.015, True),
+    # LIVE: the default moves the corporate yield every close
+    # (`corporate_yield_daily`) by the formula's VIX slope, and the VIX moves
+    # every session, so cutting the slope moves the discount rate fair value
+    # reads. No draw.
+    ("corporate_spread_vix_cut", 0.5, True),
+    # LIVE: the gap steps on every session's index return and the daily move
+    # carries it into the corporate yield, which fair value reads. Carries
+    # its half-life as a companion, without which it is refused. No draw.
+    ("corporate_spread_equity_gain", 1.5, True),
+    # INERT: read only with corporate_spread_equity_gain non-zero.
+    ("corporate_spread_equity_half_life", 126.0, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1950,6 +1961,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # without one; the half-life alone is unread, so both arms are the
     # default's.
     "fed_put_gain": {"fed_put_half_life": 126.0},
+    # Credit's leverage gap is averaged at its half-life, so the gain is
+    # refused without one; the half-life alone is unread, so both arms are
+    # the default's.
+    "corporate_spread_equity_gain": {"corporate_spread_equity_half_life": 126.0},
 }
 
 

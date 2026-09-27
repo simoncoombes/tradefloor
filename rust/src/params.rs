@@ -1543,6 +1543,50 @@ pub struct ModelParams {
     /// both at 0.008. So at a flight to quality of 0.016 take this to 0.010,
     /// and at 0.020 or more to 0.0 to 0.010; neither pair has been run.
     pub treasury_haven_gain: f64,
+    /// The share of the VIX slope taken out of the corporate spread's
+    /// formula, `(1 + 0.02 (1 - cut) (VIX - 12) + ...) * multiplier`, in the
+    /// meeting's re-anchor, the close's daily move and a pinned VIX's credit
+    /// leg. 0.0, which every preset carries, is the slope that stood.
+    ///
+    /// The VIX reverts within days of a sell-off while the index stays down,
+    /// so a spread that is the VIX's formula widens with the session and
+    /// then narrows back through the month. On the r14 screen's N4 arm
+    /// (sim/r14 e2e2d21, 8 held-out histories of 3000 sessions) 78 per cent
+    /// of the same-close covariance between the index and minus the
+    /// corporate yield's change is reversed over the next 20 sessions, the
+    /// spread change's variance ratio at 21 sessions is 0.44, and its daily
+    /// sd is 5.3 bp against 3.1 on FRED BAA10Y (1990-2026). The daily
+    /// stock-IG correlation on held closes reads 0.43 and the monthly 0.15,
+    /// against +0.27 and +0.47 for SPY and LQD, 2015-2025. See
+    /// `corporate_spread_equity_gain`, which puts the credit's link to the
+    /// index on the index itself. No draw. No state. In [0, 1].
+    pub corporate_spread_vix_cut: f64,
+    /// Credit's leverage term: percentage points of corporate spread, times
+    /// the cycle's spread multiplier, per unit of the index's log fall below
+    /// its own slow average (`EconomyState::spread_equity_gap`, half-life
+    /// `corporate_spread_equity_half_life`). 0.0, which every preset
+    /// carries, is off: no state is written and the spread is the VIX's
+    /// formula.
+    ///
+    /// In a structural model of default (Merton 1974; Collin-Dufresne,
+    /// Goldstein and Martin 2001) the spread widens as the firm's equity
+    /// falls against its debt and stays wide until the equity recovers or
+    /// the firm re-levers, so the credit move made on a down day is not
+    /// given back when the VIX reverts. Off zero, each close steps
+    /// `D = 0.5^(1/H) (D - ln(1 + r))` on the session's index return `r`
+    /// (from the last close, the quantity the flight to quality reads), and
+    /// the formula's base gains `gain * D`: in the close's daily move
+    /// (`corporate_yield_daily`), in the meeting's re-anchor and in the
+    /// rate indices' live projection of the close. A VIX pin does not stop
+    /// it; a pinned corporate yield or spread does, as it stops the VIX
+    /// term. No draw. The snapshot and the state hash carry the gap only
+    /// while this is non-zero. In [0, 10].
+    pub corporate_spread_equity_gain: f64,
+    /// Half-life, in sessions, of the index's slow average that
+    /// `corporate_spread_equity_gain` measures the fall against: how long a
+    /// spread widened by a fall stays wide while the index stays down. Must
+    /// be positive with the gain set; read by nothing otherwise. In [0, 1260].
+    pub corporate_spread_equity_half_life: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -6293,6 +6337,9 @@ impl ModelParams {
             fed_put_emergency_vix: 0.0,
             treasury_put_pricing: 0.0,
             treasury_haven_gain: 0.0,
+            corporate_spread_vix_cut: 0.0,
+            corporate_spread_equity_gain: 0.0,
+            corporate_spread_equity_half_life: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -8684,6 +8731,9 @@ impl ModelParams {
             "fed_put_emergency_vix" => self.fed_put_emergency_vix,
             "treasury_put_pricing" => self.treasury_put_pricing,
             "treasury_haven_gain" => self.treasury_haven_gain,
+            "corporate_spread_vix_cut" => self.corporate_spread_vix_cut,
+            "corporate_spread_equity_gain" => self.corporate_spread_equity_gain,
+            "corporate_spread_equity_half_life" => self.corporate_spread_equity_half_life,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8991,6 +9041,9 @@ impl ModelParams {
             "fed_put_emergency_vix" => out.fed_put_emergency_vix = value,
             "treasury_put_pricing" => out.treasury_put_pricing = value,
             "treasury_haven_gain" => out.treasury_haven_gain = value,
+            "corporate_spread_vix_cut" => out.corporate_spread_vix_cut = value,
+            "corporate_spread_equity_gain" => out.corporate_spread_equity_gain = value,
+            "corporate_spread_equity_half_life" => out.corporate_spread_equity_half_life = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -9753,6 +9806,34 @@ impl ModelParams {
                  term premium per VIX point above 20, in [0, 0.05]; 0 is none.",
                 self.treasury_haven_gain));
         }
+        if !(self.corporate_spread_vix_cut >= 0.0 && self.corporate_spread_vix_cut <= 1.0) {
+            return Err(format!(
+                "corporate_spread_vix_cut is {}. It is the share of the VIX slope taken out \
+                 of the corporate spread's formula, in [0, 1]; 0 is the slope as it stands.",
+                self.corporate_spread_vix_cut));
+        }
+        if !(self.corporate_spread_equity_gain >= 0.0 && self.corporate_spread_equity_gain <= 10.0) {
+            return Err(format!(
+                "corporate_spread_equity_gain is {}. It is percentage points of corporate \
+                 spread per unit of the index's log fall below its slow average, in [0, 10]; \
+                 0 is off.",
+                self.corporate_spread_equity_gain));
+        }
+        if !(self.corporate_spread_equity_half_life >= 0.0
+            && self.corporate_spread_equity_half_life <= 1260.0)
+        {
+            return Err(format!(
+                "corporate_spread_equity_half_life is {}. It is a half-life in sessions, \
+                 in [0, 1260].",
+                self.corporate_spread_equity_half_life));
+        }
+        if self.corporate_spread_equity_gain != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
+            return Err(format!(
+                "corporate_spread_equity_gain is {} but corporate_spread_equity_half_life is 0. \
+                 The gain reads the index's fall below its own average at that half-life, \
+                 so it needs one above 0.",
+                self.corporate_spread_equity_gain));
+        }
         if self.fed_put_gain != 0.0 && self.fed_put_half_life == 0.0 {
             return Err(format!(
                 "fed_put_gain is {} but fed_put_half_life is 0. The put's stock decays \
@@ -10359,6 +10440,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_put_emergency_vix",
         "treasury_put_pricing",
         "treasury_haven_gain",
+        "corporate_spread_vix_cut",
+        "corporate_spread_equity_gain",
+        "corporate_spread_equity_half_life",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

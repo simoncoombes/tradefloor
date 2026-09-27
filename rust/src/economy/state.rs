@@ -456,6 +456,12 @@ pub struct EconomyState {
     /// close's log change is read against. Written only with
     /// `fed_put_gain` set.
     pub fed_put_mcap_prev: f64,
+    /// The index's log fall below its own slow average, the credit leverage
+    /// term's state (`ModelParams::corporate_spread_equity_gain`): each close
+    /// steps `D = 0.5^(1/H) (D - ln(1 + r))` on the session's index return
+    /// from the last close, H the dial's half-life. Written only with that
+    /// gain set; 0.0, and never written, on every preset.
+    pub spread_equity_gap: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -621,6 +627,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         fed_put: 0.0,
         fed_put_owed: 0.0,
         fed_put_mcap_prev: 0.0,
+        spread_equity_gap: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
         market_pe: Some(18.0),

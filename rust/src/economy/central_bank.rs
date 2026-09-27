@@ -176,6 +176,13 @@ pub struct PolicyOptions {
     /// `treasury_haven_gain`: 0.0 is no haven in the meeting's 10-year
     /// target.
     pub haven_gain: f64,
+    /// `corporate_spread_vix_cut`: the share of the VIX slope taken out of
+    /// the meeting's corporate spread formula. 0.0 is the slope that stood.
+    pub spread_vix_cut: f64,
+    /// `corporate_spread_equity_gain`: percentage points added to the
+    /// formula's base per unit of `EconomyState::spread_equity_gap`. 0.0 is
+    /// none.
+    pub spread_equity_gain: f64,
 }
 
 impl PolicyOptions {
@@ -194,6 +201,8 @@ impl PolicyOptions {
             put_threshold: 0.0,
             put_pricing: 0.0,
             haven_gain: 0.0,
+            spread_vix_cut: 0.0,
+            spread_equity_gain: 0.0,
         }
     }
 }
@@ -214,6 +223,19 @@ pub fn spread_multiplier_of(phase: CyclePhase) -> f64 {
 /// meeting clamps it.
 pub fn spread_formula(vix: f64, multiplier: f64) -> f64 {
     clamp((1.0 + (vix - 12.0) * 0.02) * multiplier, CORPORATE_SPREAD_FLOOR, 6.0)
+}
+
+/// [`spread_formula`] with the VIX slope cut by `vix_cut`
+/// (`corporate_spread_vix_cut`) and `equity` percentage points added to the
+/// base before the multiplier (`corporate_spread_equity_gain` times the
+/// index's gap, `EconomyState::spread_equity_gap`). Read only with one of
+/// the two dials set; [`spread_formula`] is what stood.
+pub fn spread_formula_with(vix: f64, multiplier: f64, vix_cut: f64, equity: f64) -> f64 {
+    clamp(
+        (1.0 + (vix - 12.0) * 0.02 * (1.0 - vix_cut) + equity) * multiplier,
+        CORPORATE_SPREAD_FLOOR,
+        6.0,
+    )
 }
 
 /// Run a scheduled (or emergency) FOMC-style meeting.
@@ -570,7 +592,17 @@ pub fn update_central_bank_with(
     }
 
     // ── Corporate spread ──────────────────────────────────────────────────
-    let base_corporate_spread = 1.0 + (economy.vix - 12.0) * 0.02;
+    // The VIX slope's cut and credit's leverage term
+    // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`), as the
+    // close's daily move carries them, so the meeting re-anchors the level
+    // the daily move keeps. Guarded: with both at 0.0 the base is the
+    // expression that stood.
+    let base_corporate_spread = if options.spread_vix_cut != 0.0 || options.spread_equity_gain != 0.0 {
+        1.0 + (economy.vix - 12.0) * 0.02 * (1.0 - options.spread_vix_cut)
+            + options.spread_equity_gain * economy.spread_equity_gap
+    } else {
+        1.0 + (economy.vix - 12.0) * 0.02
+    };
     let cycle_spread_multiplier = match options.spread_multiplier {
         Some(m) => m,
         None => spread_multiplier_of(economy.cycle_phase),
