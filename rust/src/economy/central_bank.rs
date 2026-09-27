@@ -573,28 +573,38 @@ pub fn update_central_bank_with(
     // put takes is owed and given back, so the change the forecast reads is
     // the rate's change plus the change in what is owed.
     let path_on = options.path_gain != 0.0;
+    let owed_moved = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
     let path_after = if path_on {
-        let owed = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
         options.path_before
-            + options.path_gain * (new_economy.federal_funds_rate - current_rate + owed)
+            + options.path_gain * (new_economy.federal_funds_rate - current_rate + owed_moved)
     } else {
         0.0
     };
     let surprise = if path_on { surprise + (path_after - options.path_before) } else { surprise };
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year reads
-    // the rate, as priced, pulled toward the neutral rate by the dial, so its
-    // target and the day's surprise carry `1 - d` of the rate's move. A
-    // branch: with the dial off both are as they stood.
+    // the rate the ladder sets (the policy rate plus what the put owes) and
+    // the priced path, pulled toward the neutral rate by the dial; the put's
+    // own overlay passes through whole. So the target and the day's surprise
+    // carry `1 - d` of the ladder's move and the path's, and all of the
+    // put's. A branch: with the dial off both are as they stood.
     let damp = options.rate_damping;
-    let surprise = if damp != 0.0 { surprise * (1.0 - damp) } else { surprise };
+    let surprise = if damp != 0.0 {
+        let ladder = (new_economy.federal_funds_rate - current_rate) + owed_moved
+            + (path_after - options.path_before);
+        surprise - damp * ladder
+    } else {
+        surprise
+    };
 
     let treasury_target_10y = new_economy.federal_funds_rate
         + 1.0
         + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3);
     let treasury_target_10y = if path_on { treasury_target_10y + path_after } else { treasury_target_10y };
     let treasury_target_10y = if damp != 0.0 {
+        let owed = if put_on { new_economy.fed_put_owed } else { 0.0 };
         treasury_target_10y
-            - damp * (new_economy.federal_funds_rate + path_after - super::daily::TREASURY_NEUTRAL_RATE)
+            - damp * (new_economy.federal_funds_rate + owed + path_after
+                - super::daily::TREASURY_NEUTRAL_RATE)
     } else {
         treasury_target_10y
     };

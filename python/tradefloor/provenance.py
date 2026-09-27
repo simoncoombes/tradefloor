@@ -668,6 +668,13 @@ OUT_OF_SCOPE = {
         "(sim/r15-postcut)",
     "treasury_path_half_life":
         "unread while `treasury_path_pricing` is 0.0 (sim/r15-postcut)",
+    "treasury_policy_damping":
+        "inert at 0.0 as shipped: the 10-year reads the policy rate one for "
+        "one. Off zero its anchor and a meeting's target read the priced rate "
+        "pulled toward a neutral 2.5 by this share, and a meeting's surprise "
+        "moves it by the rest; paired with `treasury_path_pricing` so a "
+        "decision moves the 10-year on the day by what it did before while "
+        "the forecast takes out the drift after (sim/r15-postcut)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

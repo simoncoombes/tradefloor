@@ -1584,7 +1584,9 @@ pub struct ModelParams {
     ///
     /// Off zero `M` is the sum of the policy rate's past changes, each
     /// decayed at `treasury_path_half_life` sessions: the market's forecast
-    /// that a cycle continues. At a meeting the rate change moves `M` by its own
+    /// that a cycle continues. The Fed put's own cut and give-back are left
+    /// out (a change counts with the change in `fed_put_owed` added back),
+    /// since what the put takes is given back. At a meeting the rate change moves `M` by its own
     /// size, and the 10-year's surprise is the change in the rate plus this
     /// times the change in `M`, so the expected path is priced the day it is
     /// published and not in the weeks after. No draw. `M` is carried in the
@@ -1595,9 +1597,12 @@ pub struct ModelParams {
     /// market's forecast `M` (`treasury_path_pricing`). Read only with the
     /// pricing on, which needs it above 0. In [0, 504].
     pub treasury_path_half_life: f64,
-    /// The share of the priced policy rate's distance from a neutral 2.5
-    /// per cent that the 10-year's anchor and the meeting's 10-year target
-    /// leave out. 0.0, which every preset carries, is off: the 10-year reads
+    /// The share of the ladder's rate's distance from a neutral 2.5 per cent
+    /// that the 10-year's anchor and the meeting's 10-year target leave out:
+    /// the rate the ladder sets (the policy rate plus what the Fed put owes)
+    /// plus the priced path is pulled toward neutral, and the put's own
+    /// overlay (its cut, and what the curve prices of it) passes through
+    /// whole. 0.0, which every preset carries, is off: the 10-year reads
     /// the policy rate one for one, and a meeting's surprise moves it by the
     /// whole change. The 2-year's formula reads the rate undamped.
     ///

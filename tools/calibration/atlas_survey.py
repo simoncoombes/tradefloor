@@ -490,6 +490,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # prices, and that forecast's half-life in sessions.
     "treasury_path_pricing": (0.0, 2.0),
     "treasury_path_half_life": (0.0, 252.0),
+    # The share of the policy rate's distance from neutral the 10-year
+    # leaves out.
+    "treasury_policy_damping": (0.0, 0.8),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

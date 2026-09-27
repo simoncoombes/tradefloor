@@ -1183,6 +1183,9 @@ PERTURBATIONS = [
     ("treasury_path_pricing", 1.0, True),
     # INERT: read only with treasury_path_pricing non-zero.
     ("treasury_path_half_life", 63.0, False),
+    # LIVE: the 10-year's anchor reads the rate pulled toward 2.5 from the
+    # first close, and fair value reads the corporate yield on it. No draw.
+    ("treasury_policy_damping", 0.5, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

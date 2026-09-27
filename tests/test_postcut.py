@@ -21,7 +21,8 @@ import tradefloor as tf
 from tradefloor import manifest
 
 UNIVERSE = list(tf.Universe.random(12, seed=3))
-DIALS = ("fed_stress_hold", "treasury_path_pricing", "treasury_path_half_life")
+DIALS = ("fed_stress_hold", "treasury_path_pricing", "treasury_path_half_life",
+         "treasury_policy_damping")
 HOLD = {"fed_stress_hold": 63.0}
 PATH = {"treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0}
 
@@ -59,6 +60,8 @@ def test_the_default_fingerprint_does_not_carry_them_at_zero():
     {"treasury_path_pricing": -0.1, "treasury_path_half_life": 63.0},
     {"treasury_path_pricing": 3.5, "treasury_path_half_life": 63.0},
     {"treasury_path_half_life": 600.0},
+    {"treasury_policy_damping": -0.1},
+    {"treasury_policy_damping": 0.95},
     # A forecast that never decays would price every change for ever.
     {"treasury_path_pricing": 1.0},
 ])
@@ -169,3 +172,20 @@ def test_the_priced_path_moves_the_ten_year_after_a_cut():
     change = runs[False][first][0] - runs[False][first - 1][0]
     gap = runs[True][first][1] - runs[False][first][1]
     assert gap == pytest.approx(change, abs=0.02 + 0.05 * abs(change))
+
+
+def test_the_damping_pulls_the_ten_year_toward_neutral_and_takes_no_state():
+    # The 10-year's anchor reads the rate pulled toward 2.5 by the share,
+    # and the daily pull closes 5 per cent of the gap: with the rate above
+    # 2.5 the damped 10-year sits under the undamped one after 40 sessions.
+    ten = {}
+    for d in (0.0, 0.5):
+        e = engine(treasury_policy_damping=d)
+        assert "treasury_policy_path" not in e.state_snapshot()
+        e.run_days(40, record=False)
+        snap = e.state_snapshot()["economy"]
+        ten[d] = (snap["federal_funds_rate"], snap["treasury_yield_10y"])
+    rate = ten[0.0][0]
+    gap = ten[0.0][1] - ten[0.5][1]
+    assert gap * (rate - 2.5) > 0
+    assert abs(gap) == pytest.approx(0.5 * abs(rate - 2.5) * (1 - 0.95 ** 40), rel=0.5)

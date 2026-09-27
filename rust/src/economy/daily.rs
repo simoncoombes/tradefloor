@@ -1048,8 +1048,12 @@ pub fn vix_and_yields(
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
     // anchor reads the priced rate pulled toward the neutral rate; the
     // 2-year's formula below reads it undamped. Guarded, as above.
+    // The damped rate is the ladder's (the policy rate plus what the Fed put
+    // owes) and the priced path: the put's overlay, owed and priced, passes
+    // through whole.
     let rate_for_10y_anchor = if inputs.yields.rate_damping != 0.0 {
-        fed_rate_for_10y - inputs.yields.rate_damping * (fed_rate_for_10y - TREASURY_NEUTRAL_RATE)
+        let ladder = new_state.federal_funds_rate + new_state.fed_put_owed + inputs.yields.priced_path;
+        fed_rate_for_10y - inputs.yields.rate_damping * (ladder - TREASURY_NEUTRAL_RATE)
     } else {
         fed_rate_for_10y
     };

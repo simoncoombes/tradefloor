@@ -485,8 +485,13 @@ formula read $r^{p} + kM$ in place of $r^{p}$, the meeting's 10-year target
 adds $kM'$ (the forecast after the decision) and its surprise adds
 $k(M' - M)$, so a change the ladder's own serial correlation makes
 forecastable is priced on the day it is published rather than in the weeks
-after. No draw; $M$ is carried in the snapshot and the state hash while $k$
-is set.
+after. The put's cut and give-back are left out of $M$ (a change counts
+with the change in $O$ added back). No draw; $M$ is carried in the snapshot
+and the state hash while $k$ is set. `treasury_policy_damping` $d$ (0 on
+every preset) pulls the rate the 10-year's anchor and the meeting's target
+read toward a neutral 2.5 by the share $d$, and scales the meeting's
+surprise by $1 - d$, so with both on a decision moves the 10-year by
+$(1-d)(1+k)$ of itself on the day; the 2-year reads the rate undamped.
 
 **Quantitative easing** starts when the policy rate is at or below 0.25 in a
 contraction, with purchases of USD 120bn a month, and tapers by 15 a meeting
@@ -2628,7 +2633,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
-- **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
+- **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work
