@@ -145,3 +145,30 @@ fn shipped_options_carry_neither() {
     assert_eq!(s.path_gain, 0.0);
     assert_eq!(s.path_before, 0.0);
 }
+
+#[test]
+fn the_damping_halves_a_ladder_move_and_passes_the_put_whole() {
+    // The rate at the neutral 2.5, so only the move is damped.
+    let mut e = calm_economy();
+    e.federal_funds_rate = 2.5;
+    e.treasury_yield_10y = 3.5;
+    let stress = PolicyOptions { stress_cut: 0.25, stress_vix: 30.0, stress_level: 35.0,
+                                 ..PolicyOptions::shipped() };
+    let (plain, _) = meet(&e, &stress);
+    let (damped, _) = meet(&e, &PolicyOptions { rate_damping: 0.5, ..stress });
+    assert_eq!(damped.economy.federal_funds_rate, plain.economy.federal_funds_rate);
+    let moved = |o: &MeetingOutcome| o.economy.treasury_yield_10y - 3.5;
+    assert!((moved(&damped) - 0.5 * moved(&plain)).abs() < 1e-12);
+    // The 2-year reads the rate undamped.
+    assert!((damped.economy.treasury_yield_2y
+        - (2.25 * 0.85 + damped.economy.treasury_yield_10y * 0.15)).abs() < 1e-12);
+    // A put cut: owed rises by the cut, so the ladder's rate is unmoved and
+    // the put's move passes through whole.
+    let mut f = e.clone();
+    f.intermeeting_return = (0.9f64).ln();
+    let put = PolicyOptions { put_gain: 5.0, ..PolicyOptions::shipped() };
+    let (p0, _) = meet(&f, &put);
+    let (p1, _) = meet(&f, &PolicyOptions { rate_damping: 0.5, ..put });
+    assert_eq!(p0.economy.federal_funds_rate, 2.0);
+    assert!((p1.economy.treasury_yield_10y - p0.economy.treasury_yield_10y).abs() < 1e-12);
+}
