@@ -115,6 +115,12 @@ pub const PIN_ALL: u16 = 0x3fff;
 /// that pin sets it.
 pub const PIN_SPREAD: u16 = 0x4000;
 
+/// The fewest steps, in minutes of the engine's clock (a step is a day of
+/// 24 * 60), between the last central-bank meeting and an intermeeting one
+/// (`fed_put_emergency_vix`): 21, a month of sessions on the session
+/// calendar pt-v20 runs, so one stressed month calls at most one.
+pub const FED_PUT_EMERGENCY_GAP_MINUTES: i64 = 21 * 24 * 60;
+
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
 ///
@@ -1270,6 +1276,32 @@ impl Engine {
     /// it to 0.0.
     pub fn set_market_vol_leverage_memory(&mut self, value: f64) {
         self.market_vol.set_leverage_memory(value);
+    }
+
+    /// Whether this engine's model carries the Fed put's state (the
+    /// intermeeting return, the put's stock, what it owes and the previous
+    /// close's market cap), which is when the snapshot and the state hash
+    /// carry it: with `fed_put_gain` non-zero. Off on every preset.
+    pub fn carries_fed_put(&self) -> bool {
+        self.params.fed_put_gain != 0.0
+    }
+
+    /// The Fed put's cut the curve prices tonight (`treasury_put_pricing`),
+    /// percentage points: the share of the cut the put would ask for at a
+    /// meeting now, no more than the policy rate, and 0.0 with inflation at
+    /// or above the put's ceiling. 0.0 unless both dials are set.
+    fn priced_fed_put(&self) -> f64 {
+        let p = &self.params;
+        if p.fed_put_gain == 0.0
+            || p.treasury_put_pricing == 0.0
+            || self.economy.inflation_rate >= crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+        {
+            return 0.0;
+        }
+        let asked = crate::economy::central_bank::fed_put_ask(
+            p.fed_put_gain, p.fed_put_threshold, self.economy.intermeeting_return);
+        p.treasury_put_pricing
+            * crate::mathx::min(asked, crate::mathx::max(0.0, self.economy.federal_funds_rate))
     }
 
     /// Whether this engine's model can move a fair-value level, which is
@@ -7017,6 +7049,26 @@ impl Engine {
         };
         let holds = |bit: u16| held.is_some() && pins_today & bit != 0;
 
+        // THE FED PUT'S CLOCK (`fed_put_gain`): the close's log change of
+        // total public market cap into the intermeeting return, which the
+        // next meeting reads and restarts, and one session's decay of the
+        // put's stock. Nothing runs with the dial at 0.0, and no draw at any
+        // setting. The first close only records its base.
+        if self.params.fed_put_gain != 0.0 {
+            let mut mcap = 0.0;
+            for c in self.companies.iter() {
+                if c.is_public && !c.is_bankrupt {
+                    mcap += c.stock.market_cap;
+                }
+            }
+            if self.economy.fed_put_mcap_prev > 0.0 && mcap > 0.0 {
+                self.economy.intermeeting_return +=
+                    crate::mathx::log(mcap / self.economy.fed_put_mcap_prev);
+            }
+            self.economy.fed_put_mcap_prev = mcap;
+            self.economy.fed_put *= crate::mathx::pow(0.5, 1.0 / self.params.fed_put_half_life);
+        }
+
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
         // non-zero, so the shipped path is untouched. `previous_close` is
@@ -7201,7 +7253,30 @@ impl Engine {
             stress_inflation_gap: self.params.fed_stress_inflation_gap,
             stress_level: self.stress_vix_max,
             hold_rate: holds(PIN_POLICY),
+            put_gain: self.params.fed_put_gain,
+            put_threshold: self.params.fed_put_threshold,
+            put_pricing: self.params.treasury_put_pricing,
+            haven_gain: self.params.treasury_haven_gain,
         };
+        // THE INTERMEETING MEETING (`fed_put_emergency_vix`): a VIX close at
+        // or above the dial, with inflation under the put's ceiling and room
+        // to cut, brings the next meeting forward to tonight, at least 21
+        // sessions after the last and only while the next is not yet due.
+        // Real ones: 2001-01-03, 2001-09-17, 2008-01-22, 2008-10-08 and
+        // March 2020. The calendar the meeting then sets is the ordinary one.
+        // The meeting is an ordinary one: it takes a meeting's economy draws
+        // on a session the calendar would not, and re-anchors the corporate
+        // yield at tonight's VIX (see `ModelParams::fed_put_emergency_vix`).
+        if self.params.fed_put_gain != 0.0
+            && self.params.fed_put_emergency_vix != 0.0
+            && self.economy.vix >= self.params.fed_put_emergency_vix
+            && self.economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+            && self.economy.federal_funds_rate > 0.0
+            && request.timestamp - self.central_bank.last_meeting_date >= FED_PUT_EMERGENCY_GAP_MINUTES
+            && request.timestamp < self.central_bank.next_meeting_date
+        {
+            self.central_bank.next_meeting_date = request.timestamp;
+        }
         let meeting =
             {
                 rng.site(Site::CentralBank, 0);
@@ -7424,6 +7499,12 @@ impl Engine {
                 } else {
                     None
                 },
+                // The Fed put the curve prices tonight and the Treasury
+                // haven (`treasury_put_pricing`, `treasury_haven_gain`), both
+                // 0.0 unless their dials are set; the live mark's projection
+                // reads them as the close does.
+                priced_put: self.priced_fed_put(),
+                haven_gain: self.params.treasury_haven_gain,
             },
             volatility: request.volatility,
             active_shocks: request.active_shocks,
@@ -9422,6 +9503,13 @@ impl Engine {
         // live lagged wire reads it.
         if self.carries_night_market_factor() {
             hash_f64(&mut buf, self.night_market_factor);
+        }
+        // The Fed put's four fields, on the same rule.
+        if self.carries_fed_put() {
+            hash_f64(&mut buf, self.economy.intermeeting_return);
+            hash_f64(&mut buf, self.economy.fed_put);
+            hash_f64(&mut buf, self.economy.fed_put_owed);
+            hash_f64(&mut buf, self.economy.fed_put_mcap_prev);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

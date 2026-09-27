@@ -675,6 +675,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # Tonight's market draw, only while the live lagged wire reads it.
     if "night_market_factor" in snapshot:
         _f64(buf, snapshot["night_market_factor"])
+    # The Fed put's state, only on a model with `fed_put_gain` set.
+    if "fed_put" in snapshot["economy"]:
+        for name in ("intermeeting_return", "fed_put", "fed_put_owed",
+                     "fed_put_mcap_prev"):
+            _f64(buf, snapshot["economy"][name])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -792,7 +797,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # hashed after the history. `unemployment_impulse` only on a model with
     # `unemployment_adjustment_half_life` set; hashed before it.
     # `vix_feedback` only with the volatility feedback smoothed; hashed
-    # after `earnings_cycle`.
+    # after `earnings_cycle`. The Fed put's four fields only with
+    # `fed_put_gain` set, together; hashed after the night's market draw.
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
@@ -805,6 +811,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "unemployment_impulse", "vix_feedback", "cycle_nowcast",
          "cycle_publication", "anticipation_drift", "anticipation_raw"}
         & set(economy))
+    if "fed_put" in economy:
+        economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
+                             "fed_put_mcap_prev"}
     if ("anticipation_drift" in economy) != ("anticipation_raw" in economy):
         raise ValidationError(
             "this snapshot carries one of the economy's anticipation_drift "

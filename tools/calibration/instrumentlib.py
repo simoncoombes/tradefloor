@@ -206,6 +206,12 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_stress_premium": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
     "vix_stress_premium_knee": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
     "vix_stress_premium_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "fed_put_gain": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},
+    "fed_put_threshold": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.2)},
+    "fed_put_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 504.0)},
+    "fed_put_emergency_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 90.0)},
+    "treasury_put_pricing": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "treasury_haven_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

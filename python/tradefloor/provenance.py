@@ -610,6 +610,43 @@ OUT_OF_SCOPE = {
     "vix_stress_premium_cap":
         "unread while `vix_stress_premium` is 0.0 (0.8.5 realism work, "
         "vix-peaks)",
+    "fed_put_gain":
+        "inert at 0.0 as shipped: the close writes no intermeeting return, "
+        "the ladder decides every meeting and the curve reads the policy "
+        "rate as it stands. Off zero the bank cuts at a meeting by the gain "
+        "times the index's log fall since the last one (inflation under 4), "
+        "holds any hike at a VIX of 30 or more, and gives the cut back at "
+        "calm meetings as the put's stock decays. Target: the policy rate's "
+        "change over the 63 sessions after a VIX close at or above 30 "
+        "(rate at least 0.5, CPI inflation under 4), -0.41pp on the S&P 500 "
+        "and VIX tape with FRED DFF 1990-2025 (calendar-year bootstrap SE "
+        "0.14), against pt-v20's -0.03 on held-out seeds; no FOMC target "
+        "change at a VIX of 30 or more with CPI inflation under 4 was a hike "
+        "(0 of 9, FRED DFEDTAR and DFEDTARU; 0 of 14 at any inflation) "
+        "against 52 per cent on pt-v20 on the same filter (0.8.5 realism "
+        "work, bond-hedge-fed)",
+    "fed_put_threshold":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "fed_put_half_life":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "fed_put_emergency_vix":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "treasury_put_pricing":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "treasury_haven_gain":
+        "inert at 0.0 as shipped: the 10-year's term premium does not read "
+        "the VIX. Off zero it falls by the gain per VIX point above 20 while "
+        "inflation is under 4, daily and at a meeting. Target: the 10-year's "
+        "change over 63-session windows with the index down more than 10 per "
+        "cent and CPI inflation under 4, -0.62pp on FRED DGS10 against the "
+        "tape 1990-2025 (SE 0.11), against pt-v20's 0.00 on held-out seeds. "
+        "Fitted with `flight_to_quality_gain`, which also makes the monthly "
+        "stock-bond correlation more negative at low inflation (0.8.5 "
+        "realism work, bond-hedge-fed)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

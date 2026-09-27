@@ -335,6 +335,16 @@ pub struct YieldDials {
     pub treasury_10y_pinned: bool,
     /// The same for the 2-year.
     pub treasury_2y_pinned: bool,
+    /// The Fed put's expected cut the curve prices tonight, percentage
+    /// points: `treasury_put_pricing` times the cut the put would ask for at
+    /// a meeting now, no more than the policy rate. 0.0 unless
+    /// `fed_put_gain` and `treasury_put_pricing` are both set. See
+    /// [`crate::params::ModelParams::treasury_put_pricing`].
+    pub priced_put: f64,
+    /// Percentage points off the 10-year's term premium per VIX point above
+    /// 20 while inflation is under 4. See
+    /// [`crate::params::ModelParams::treasury_haven_gain`].
+    pub haven_gain: f64,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -347,6 +357,20 @@ pub struct YieldDials {
 /// recorded move. Read only with `corporate_yield_daily` on, so no preset
 /// through pt-v19 reads it.
 pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
+
+/// The VIX level above which the Treasury haven lowers the 10-year's term
+/// premium (`treasury_haven_gain`). 20 is about the tape's long-run mean
+/// VIX (19.5 on ^VIX 1990-2025, S&P 500 and VIX tape in the design
+/// repository; the median is 17.6), so the haven acts on the 38 per cent of
+/// sessions above it, and most on the stressed ones.
+pub const TREASURY_HAVEN_VIX: f64 = 20.0;
+
+/// The Treasury haven's cut to the 10-year's term premium: `gain` points per
+/// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
+/// the meeting's 10-year target, only with `treasury_haven_gain` set.
+pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
+    gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
+}
 
 impl Default for YieldDials {
     fn default() -> Self {
@@ -361,6 +385,8 @@ impl Default for YieldDials {
             spread_multiplier: None,
             treasury_10y_pinned: false,
             treasury_2y_pinned: false,
+            priced_put: 0.0,
+            haven_gain: 0.0,
         }
     }
 }
@@ -964,7 +990,35 @@ pub fn vix_and_yields(
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
     let term_premium_10y =
         1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
-    let fed_rate_for_10y = new_state.federal_funds_rate;
+    // THE TREASURY HAVEN (`treasury_haven_gain`): the term premium falls
+    // with the VIX above 20 while inflation is under 4, so the 10-year
+    // rallies through a stressed month in a low-inflation regime. Guarded,
+    // so at 0.0 the premium is the expression that stood.
+    //
+    // WITH THE FLIGHT TO QUALITY BELOW. `flight_to_quality_gain` moves the
+    // yield by an increment, which this anchor's 5 per cent pull erases in
+    // about 60 sessions; the haven moves the anchor, so it lasts while the
+    // VIX does. Both push the stock-bond correlation negative at low
+    // inflation (the flight to quality below 3, the haven below 4), so the
+    // two are fitted together: see `ModelParams::treasury_haven_gain`.
+    // Here in the step the live rate mark projects too
+    // (`rate_intraday_live`), so the projection carries the haven and the
+    // priced put below.
+    let term_premium_10y = if inputs.yields.haven_gain != 0.0
+        && economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+    {
+        term_premium_10y - haven_term_cut(inputs.yields.haven_gain, new_state.vix)
+    } else {
+        term_premium_10y
+    };
+    // THE PRICED FED PUT (`treasury_put_pricing`): the 10-year's anchor, and
+    // the 2-year's formula, read the policy rate the market expects after
+    // the next meeting rather than the one standing. Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.priced_put != 0.0 {
+        new_state.federal_funds_rate - inputs.yields.priced_put
+    } else {
+        new_state.federal_funds_rate
+    };
     let current_10y = new_state.treasury_yield_10y;
 
     // D5, decided: KEEP the draw. In production `wasm10Y ?? (…)` short-

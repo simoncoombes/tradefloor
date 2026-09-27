@@ -1436,6 +1436,113 @@ pub struct ModelParams {
     /// with `vix_stress_premium` non-zero, and is read by nothing
     /// otherwise. In [0, 1].
     pub vix_stress_premium_cap: f64,
+    /// The Fed put: percentage points of policy-rate cut per unit of the
+    /// index's log fall since the last meeting. 0.0, which every preset
+    /// carries, is off: no state is written, the Taylor ladder decides
+    /// every meeting and the curve reads the policy rate as it stands.
+    ///
+    /// The ladder has no financial-conditions term, so pt-v20 does not ease
+    /// into a sell-off and hikes into one as often as it cuts: on held-out
+    /// histories (seeds 201-230, 21 years) the policy rate moves -0.03pp
+    /// over the 63 sessions after a VIX close at or above 30 (inflation
+    /// under 4, rate at least 0.5), against -0.41 (calendar-year bootstrap
+    /// SE 0.14) on the S&P 500 and VIX tape with FRED DFF, 1990-2025, and
+    /// 52 per cent of its rate changes at a VIX close of 30 or more with
+    /// inflation under 4 are hikes (n 108), against none of the 9 FOMC
+    /// target changes on the same filter (FRED DFEDTAR and DFEDTARU; none of
+    /// the 14 at a VIX of 30 or more at any inflation, the other 5 cuts
+    /// coming at CPI 4.1 to 6.2). Cieslak and Vissing-Jorgensen (2021, RFS)
+    /// find about 30bp of cut per 10 per cent intermeeting fall, a gain of
+    /// about 3. At 5, the value screened for pt-v20, with the threshold at
+    /// 0.0, any intermeeting fall of 2.5 per cent or more rounds to a
+    /// quarter-point cut: rate changes double (4.9 a year against 2.35
+    /// without the put and 3.0 real) and the mean policy rate falls from
+    /// about 2.6 to 1.9, against 2.88 real (review, held-out seeds 801-830).
+    ///
+    /// Off zero, each close adds the log change of total public market cap
+    /// to `EconomyState::intermeeting_return`. At a meeting with inflation
+    /// under 4 the put asks for `E = gain * max(0, -I - fed_put_threshold)`,
+    /// rounded to a quarter point and no more than the rate; that cut
+    /// replaces the ladder's decision when the ladder would cut less, hike
+    /// or hold, and a VIX at or above 30 holds any hike. What the put takes
+    /// off the ladder's path is owed (`EconomyState::fed_put_owed`), the
+    /// Taylor rate the ladder reads is lowered by it, and it is given back a
+    /// quarter point at a calm meeting (VIX under 30, no put cut, the ladder
+    /// not cutting) once the put's own decaying stock (`EconomyState::fed_put`,
+    /// half-life `fed_put_half_life`) is an eighth of a point under it. The
+    /// intermeeting return restarts at every meeting. The put's arithmetic
+    /// takes no draw and leaves the meeting's draw table as it stands; the
+    /// rate path it moves can change which of the economy's state-dependent
+    /// draw sites fire later, as any macro dial's does, and a meeting
+    /// `fed_put_emergency_vix` calls takes a meeting's draws. The snapshot
+    /// and the state hash carry the four fields only while this is non-zero.
+    /// In [0, 10].
+    pub fed_put_gain: f64,
+    /// The intermeeting log fall the Fed put ignores. 0.0 is none; 0.05
+    /// lets a five per cent fall pass. Read only with `fed_put_gain`
+    /// non-zero. In [0, 0.2].
+    pub fed_put_threshold: f64,
+    /// Half-life, in sessions, of the Fed put's stock (`EconomyState::fed_put`),
+    /// which sets how long a put cut stays in before the calm meetings give
+    /// it back. Must be positive with `fed_put_gain` non-zero; read by
+    /// nothing otherwise. In [0, 504].
+    pub fed_put_half_life: f64,
+    /// A VIX close at or above which the bank meets between meetings, as it
+    /// did on 2001-01-03, 2001-09-17, 2008-01-22, 2008-10-08 and in March
+    /// 2020: with inflation under 4, a policy rate above zero, at least 21
+    /// sessions since the last meeting and the next one not yet due, the
+    /// next meeting is brought forward to tonight. 0.0 is never. Read only
+    /// with `fed_put_gain` non-zero. In [0, 90]; a level under about 25 calls
+    /// a meeting every 21 sessions in an ordinary market.
+    ///
+    /// The meeting it calls is an ordinary meeting, with two costs. It
+    /// takes a meeting's draws from the economy stream (the announcement
+    /// variant and the next meeting's date) on a session the calendar would
+    /// not, so from the first one on an arm with this set no longer shares
+    /// the control's economy draws. And it re-anchors the corporate yield
+    /// to the meeting's formula at the session's VIX: on the prototype
+    /// screened for the design (box bhf1, held-out seeds 201-230), meetings
+    /// called at a VIX of 40 widened the spread by 2.3 to 3.75 points at
+    /// once, and the 10th percentile of each history's worst session went
+    /// from -12.3 to -14.7 per cent. 0.0 avoids both.
+    pub fed_put_emergency_vix: f64,
+    /// The share of the Fed put's expected cut the curve prices before the
+    /// meeting. 0.0 prices none, so the 10-year and 2-year move only when the
+    /// cut lands. Off zero the daily anchor of the 10-year reads the policy
+    /// rate minus this share of `E` (no more than the rate), and the
+    /// meeting's surprise on the 10-year is the rate change plus the same
+    /// share of `E`, so a priced cut is not news on the day. Read only with
+    /// `fed_put_gain` non-zero. In [0, 1].
+    pub treasury_put_pricing: f64,
+    /// The Treasury haven: percentage points off the 10-year's term premium
+    /// per VIX point above 20, while inflation is under 4, in the daily
+    /// anchor and in the meeting's 10-year target. 0.0, which every preset
+    /// carries, is none.
+    ///
+    /// In 63-session windows with the index down more than 10 per cent and
+    /// inflation under 4, the 10-year falls 0.62pp on FRED DGS10 against the
+    /// tape, 1990-2025 (SE 0.11), and 0.00 on pt-v20's held-out histories;
+    /// the monthly correlation of the index with the 10-year's fall, in
+    /// months starting with inflation under 3, is -0.19 real (SE 0.08) and
+    /// +0.02 on pt-v20 (Connolly, Stivers and Sun 2005; Baele, Bekaert and
+    /// Inghelbrecht 2010; Campbell, Sunderam and Viceira 2017). No draw.
+    /// No state. In [0, 0.05].
+    ///
+    /// Fit it with `flight_to_quality_gain`. That dial moves the 10-year by
+    /// an increment on the session's return, which the anchor's 5 per cent
+    /// daily pull erases in about 60 sessions, so it sets the daily
+    /// stock-bond correlation and barely moves the 63-session one; this
+    /// moves the anchor, so it lasts while the VIX stays up. Both make the
+    /// monthly correlation more negative at low inflation, and the flight
+    /// to quality does more of it. With the put at 5 (box bhf1, held-out
+    /// seeds 201-230), the correlation in months starting with inflation
+    /// under 3 read -0.20 with this at 0.0, -0.24 at 0.015, and -0.32 at
+    /// 0.015 with the flight to quality raised from pt-v20's 0.008 to
+    /// 0.016, against -0.19 real and a proposed band of [-0.35, -0.02]; on
+    /// seeds 501-530 (box bhf2) 0.010 read -0.21 against 0.015's -0.22,
+    /// both at 0.008. So at a flight to quality of 0.016 take this to 0.010,
+    /// and at 0.020 or more to 0.0 to 0.010; neither pair has been run.
+    pub treasury_haven_gain: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -6180,6 +6287,12 @@ impl ModelParams {
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
+            fed_put_gain: 0.0,
+            fed_put_threshold: 0.0,
+            fed_put_half_life: 0.0,
+            fed_put_emergency_vix: 0.0,
+            treasury_put_pricing: 0.0,
+            treasury_haven_gain: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -8565,6 +8678,12 @@ impl ModelParams {
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
+            "fed_put_gain" => self.fed_put_gain,
+            "fed_put_threshold" => self.fed_put_threshold,
+            "fed_put_half_life" => self.fed_put_half_life,
+            "fed_put_emergency_vix" => self.fed_put_emergency_vix,
+            "treasury_put_pricing" => self.treasury_put_pricing,
+            "treasury_haven_gain" => self.treasury_haven_gain,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8866,6 +8985,12 @@ impl ModelParams {
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
+            "fed_put_gain" => out.fed_put_gain = value,
+            "fed_put_threshold" => out.fed_put_threshold = value,
+            "fed_put_half_life" => out.fed_put_half_life = value,
+            "fed_put_emergency_vix" => out.fed_put_emergency_vix = value,
+            "treasury_put_pricing" => out.treasury_put_pricing = value,
+            "treasury_haven_gain" => out.treasury_haven_gain = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -9594,6 +9719,47 @@ impl ModelParams {
                     self.vix_anchor_memory));
             }
         }
+        if !(self.fed_put_gain >= 0.0 && self.fed_put_gain <= 10.0) {
+            return Err(format!(
+                "fed_put_gain is {}. It is percentage points of policy-rate cut per \
+                 unit of the index's log fall since the last meeting, in [0, 10]; 0 is off.",
+                self.fed_put_gain));
+        }
+        if !(self.fed_put_threshold >= 0.0 && self.fed_put_threshold <= 0.2) {
+            return Err(format!(
+                "fed_put_threshold is {}. It is the intermeeting log fall the Fed put \
+                 ignores, in [0, 0.2].",
+                self.fed_put_threshold));
+        }
+        if !(self.fed_put_half_life >= 0.0 && self.fed_put_half_life <= 504.0) {
+            return Err(format!(
+                "fed_put_half_life is {}. It is a half-life in sessions, in [0, 504].",
+                self.fed_put_half_life));
+        }
+        if !(self.fed_put_emergency_vix >= 0.0 && self.fed_put_emergency_vix <= 90.0) {
+            return Err(format!(
+                "fed_put_emergency_vix is {}. It is a VIX level, in [0, 90]; 0 is never.",
+                self.fed_put_emergency_vix));
+        }
+        if !(self.treasury_put_pricing >= 0.0 && self.treasury_put_pricing <= 1.0) {
+            return Err(format!(
+                "treasury_put_pricing is {}. It is the share of the Fed put's expected \
+                 cut the curve prices, in [0, 1].",
+                self.treasury_put_pricing));
+        }
+        if !(self.treasury_haven_gain >= 0.0 && self.treasury_haven_gain <= 0.05) {
+            return Err(format!(
+                "treasury_haven_gain is {}. It is percentage points off the 10-year's \
+                 term premium per VIX point above 20, in [0, 0.05]; 0 is none.",
+                self.treasury_haven_gain));
+        }
+        if self.fed_put_gain != 0.0 && self.fed_put_half_life == 0.0 {
+            return Err(format!(
+                "fed_put_gain is {} but fed_put_half_life is 0. The put's stock decays \
+                 at that half-life and the calm meetings give the cut back as it does, \
+                 so a put needs one above 0.",
+                self.fed_put_gain));
+        }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
@@ -10187,6 +10353,12 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
+        "fed_put_gain",
+        "fed_put_threshold",
+        "fed_put_half_life",
+        "fed_put_emergency_vix",
+        "treasury_put_pricing",
+        "treasury_haven_gain",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",
