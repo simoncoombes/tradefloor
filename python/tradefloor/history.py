@@ -9,23 +9,34 @@ a 200-day average, a 12-month trend, a 60-day volatility estimate, spends
 the start of the run in cash waiting for its window to fill, and a
 comparison with buy-and-hold charges that wait to the rule.
 
-Measured with one estimator on both sides, over one-year windows starting
-every 21 sessions (the prehistory gap study, 2026-09-26):
+Measured with one estimator on both sides, on the index rather than
+through the harness: one-year windows of the S&P 500 starting every 21
+sessions, and of pt-v20's cap-weighted index starting every 63 (the
+prehistory gap study, 2026-09-26). Real and model are warm minus cold,
+in points a year:
 
-======================  ==============  =================
-rule                    idle when cold  warm minus cold
-======================  ==============  =================
-SMA200 filter           79% of the year real +5.1, model +2.5 pts/yr
-12-month TSMOM          100%            real +7.7, model +2.8
-20-day breakout         8%              real +0.3, model +0.2
-60-day vol target       24%             real +2.0, model +1.4
-======================  ==============  =================
+=================  ==============  =============  ==============
+rule               idle when cold  real           model
+=================  ==============  =============  ==============
+SMA200 filter      79%             +5.1 (se 1.7)  +2.5 (se 0.25)
+12-month TSMOM     100%            +7.7 (se 2.0)  +2.8 (se 0.3)
+20-day breakout    8%              +0.3 (se 0.5)  +0.2 (se 0.05)
+60-day vol target  24%             +2.0 (se 1.2)  +1.4 (se 0.1)
+=================  ==============  =============  ==============
 
 Real is the S&P 500 price index 1990-2025 (Yahoo ^GSPC daily closes, the
-long-run tape); model is the cap-weighted index of pt-v20 on 90 held-out
-21-year histories (seeds 201-230, 501-530, 801-830). The model's past carries what a real past carries: the
-correlation of log realised volatility over the 20 sessions before and after
-a seam is 0.691 in the model and 0.659 in the S&P 500.
+long-run tape) with idle cash earning nothing; on a total-return basis with
+idle cash at the T-bill rate (Ken French daily market) the gaps are +5.1,
++7.2, +0.45 and +2.0, the same. Model is pt-v20's cap-weighted index on 90
+held-out 21-year histories (seeds 201-230, 501-530, 801-830). These are
+index-level measurements. A paired warm-against-cold run through the
+harness itself (12 held-out seeds, 252 scored days, 8 names) reads +0.5
+(se 2.2) for SMA200 and -0.8 (se 1.8) for TSMOM: consistent with the
+index figures at that sample size, not a confirmation of them.
+
+The model's past carries what a real past carries: the correlation of log
+realised volatility over the 20 sessions before and after a seam is 0.691
+in the model and 0.659 in the S&P 500.
 
 ## What a pre-history is
 
@@ -68,8 +79,10 @@ scenario, so nothing about a coming scenario is in the bars.
 
 from __future__ import annotations
 
+import numbers
 import struct
 from array import array
+from types import MappingProxyType
 from typing import Any, Sequence
 
 from ._core import Engine, ValidationError
@@ -94,10 +107,15 @@ def _f64(buf: bytes) -> array:
 
 
 def check_history_days(days: Any) -> int:
-    """``days`` as an int in ``0..MAX_HISTORY_DAYS``, or a ValidationError."""
-    if isinstance(days, bool) or not isinstance(days, int):
+    """``days`` as an int in ``0..MAX_HISTORY_DAYS``, or a ValidationError.
+
+    Any integer type is accepted (``numpy.int64`` from a sweep included);
+    ``bool`` is not, because ``True`` is a mistake rather than one day.
+    """
+    if isinstance(days, bool) or not isinstance(days, numbers.Integral):
         raise ValidationError(
             f"history_days must be an integer, got {type(days).__name__}")
+    days = int(days)
     if not 0 <= days <= MAX_HISTORY_DAYS:
         raise ValidationError(
             f"history_days must be 0..{MAX_HISTORY_DAYS} (ten years), got "
@@ -112,6 +130,12 @@ class History:
     Built by :func:`prehistory`; the harness appends each scored day after
     its close. Every accessor returns a copy, so an agent that edits what it
     was handed edits its own copy.
+
+    A day, once appended, is immutable all the way down: its bars and step
+    prices are tuples of floats and its macro a read-only mapping. The
+    harness hands each agent a :meth:`copy` that shares those days, so this
+    is what stops an agent that writes through the private attributes from
+    changing what the next agent is shown.
     """
 
     __slots__ = ("_tickers", "_labels", "_bars", "_macro", "_steps",
@@ -123,27 +147,31 @@ class History:
         self._steps_per_day = int(steps_per_day)
         self._first = int(first_label)
         self._labels: list[int] = []
-        self._bars: dict[str, list[array]] = {f: [] for f in BAR_FIELDS}
-        self._macro: list[dict[str, Any]] = []
-        # One array per day holding every step's opening prices, row after
-        # row: steps_per_day * n doubles.
-        self._steps: list[array] = []
+        self._bars: dict[str, list[tuple[float, ...]]] = {
+            f: [] for f in BAR_FIELDS}
+        self._macro: list[MappingProxyType] = []
+        # One tuple per day holding every step's opening prices, row after
+        # row: steps_per_day * n floats.
+        self._steps: list[tuple[float, ...]] = []
 
     # -- building (the harness's side) ------------------------------------
 
-    def _append(self, *, open_: array, high: array, low: array,
-                close: array, volume: array, macro: dict[str, Any],
-                steps: array) -> None:
+    def _append(self, *, open_: Sequence[float], high: Sequence[float],
+                low: Sequence[float], close: Sequence[float],
+                volume: Sequence[float], macro: dict[str, Any],
+                steps: Sequence[float]) -> None:
+        # Stored as tuples and a read-only mapping, never the buffers passed
+        # in: copies share these days, so nothing about one may be writable.
         label = self._first + len(self._labels)
         self._labels.append(label)
-        self._bars["open"].append(open_)
-        self._bars["high"].append(array("d", map(max, high, close)))
-        self._bars["low"].append(array("d", map(min, low, close)))
-        self._bars["close"].append(close)
-        self._bars["volume"].append(volume)
-        self._macro.append({k: v for k, v in macro.items()
-                            if k in PUBLISHED_MACRO})
-        self._steps.append(steps)
+        self._bars["open"].append(tuple(open_))
+        self._bars["high"].append(tuple(map(max, high, close)))
+        self._bars["low"].append(tuple(map(min, low, close)))
+        self._bars["close"].append(tuple(close))
+        self._bars["volume"].append(tuple(volume))
+        self._macro.append(MappingProxyType(
+            {k: v for k, v in macro.items() if k in PUBLISHED_MACRO}))
+        self._steps.append(tuple(steps))
 
     def copy(self) -> "History":
         """An independent history with the same days, to grow separately.
@@ -151,8 +179,9 @@ class History:
         The harness hands each agent its own, because after day zero each
         agent's market is its own: the bars it is shown are the ones its
         trading printed, never another agent's or the untraded baseline's.
-        The days already held are shared, which is safe because nothing
-        edits a day once it is appended.
+        The days already held are shared, which is safe because a day is
+        immutable once appended (tuples and a read-only mapping), so no
+        holder of one copy can change what another copy shows.
         """
         out = History(self._tickers, self._steps_per_day, self._first)
         out._labels = list(self._labels)

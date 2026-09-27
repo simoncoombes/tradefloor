@@ -2083,7 +2083,9 @@ class FrameworkAdapter:
         #: memory, and the only reason it can quote a return or a volatility
         #: without asking the simulator for one. It lives on the adapter
         #: rather than in the serializer because it is state a fork has to
-        #: copy and :func:`tradefloor.agree` has to compare.
+        #: copy and :func:`tradefloor.agree` has to compare. Under
+        #: ``evaluate(history_days=...)`` it is filled from ``obs.history``
+        #: on the run's first step, so the first decision is not cold.
         self.history: list[list[float]] = []
         #: Every decision point, for examples and notebooks: the exchange
         #: (digest, exact input, raw response) joined to the decision it
@@ -2200,6 +2202,14 @@ class FrameworkAdapter:
         The Observation is read, never written: the same object is what the
         harness executes against after this returns.
         """
+        past = getattr(obs, "history", None)
+        if past is not None and (obs.step == 0 or not self.history):
+            # Under evaluate(history_days=...) the memory starts full, with
+            # the step prices it would have recorded had it been trading
+            # then, so the first decision already quotes a return and a
+            # volatility. Refilled on each run's first step.
+            self.history = past.window(HISTORY_STEPS - 1,
+                                       getattr(obs, "steps_per_day", 1))
         self.history.append(list(obs.prices))
         if len(self.history) > HISTORY_STEPS:
             self.history.pop(0)

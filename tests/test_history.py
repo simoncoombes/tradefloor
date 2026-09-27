@@ -77,6 +77,22 @@ def test_history_days_validated(bad):
         check_history_days(bad)
 
 
+def test_history_days_accepts_any_integer_type():
+    np = pytest.importorskip("numpy")
+    got = check_history_days(np.int64(2))
+    assert got == 2 and type(got) is int
+    with pytest.raises(tf.ValidationError):
+        check_history_days(np.bool_(True))
+
+
+def test_appended_days_are_immutable():
+    hist = prehistory(_engine(_universe()), 2)
+    for rows in (*hist._bars.values(), hist._steps):
+        assert all(type(row) is tuple for row in rows)
+    with pytest.raises(TypeError):
+        hist._macro[0]["vix"] = 1.0
+
+
 # -- wired into the harness ------------------------------------------------
 #
 # The rows registered for pre-history (PH1-PH3) in their small form: the
@@ -138,6 +154,125 @@ def test_without_history_nothing_changes():
     assert all(c.history_days == 0 for c in cards.values())
     assert all("history_days" not in c.as_dict() for c in cards.values())
     assert "history" not in repr(cards["h"])
+
+
+def test_an_agent_cannot_write_into_another_agents_history():
+    # Each agent's history is a copy sharing the pre-history's days. An
+    # agent that writes through the private attributes must reach nothing
+    # the next agent is shown: the review probe, seed 2003.
+    u = _universe()
+    seen = {}
+
+    def attempt(write):
+        try:
+            write()
+        except (TypeError, AttributeError):
+            pass
+
+    class Poison:
+        def act(self, obs):
+            if obs.step == 0:
+                h = obs.history
+                attempt(lambda: h._bars["close"][0].__setitem__(0, -999.0))
+                attempt(lambda: h._macro[0].__setitem__("vix", 12345.0))
+                attempt(lambda: h._steps[0].__setitem__(0, -1.0))
+                # Rebinding its own copy's rows is allowed, and stays its own.
+                h._bars["close"][0] = (-999.0,) * len(obs.tickers)
+                h._steps[0] = (-1.0,) * len(obs.tickers)
+                h._macro[0] = {"vix": 12345.0}
+                h._labels[0] = 77
+            return {}
+
+    class Victim:
+        def act(self, obs):
+            if obs.step == 0:
+                h = obs.history
+                seen.update(close=h.close(obs.tickers[0])[0],
+                            vix=h.macro("vix")[0], step=h.steps()[0][0],
+                            day=h.days[0])
+            return {}
+
+    ref = prehistory(tf.Engine(seed=2003, universe=u, model="pt-v20"), 3)
+    tf.evaluate({"a_poison": Poison(), "b_victim": Victim()}, seed=2003,
+                universe=u, days=1, model="pt-v20", history_days=3)
+    assert seen == {"close": ref.close(ref.tickers[0])[0],
+                    "vix": ref.macro("vix")[0], "step": ref.steps()[0][0],
+                    "day": -3}
+
+
+def test_agents_trade_on_the_forked_engine():
+    # The market an agent trades under history_days=N is the market an
+    # untraded run reaches after N sessions, not a fresh day-0 engine. An
+    # untraded agent's step prices on scored days 0..T-1 are the step rows
+    # of an untraded run's days N..N+T-1, and the bars its history gains
+    # after each scored close are that run's bars.
+    u = _universe()
+    n, t = 3, 2
+    shown = []
+    last = {}
+
+    class Watch:
+        def act(self, obs):
+            shown.append(list(obs.prices))
+            last["h"] = obs.history
+            return {}
+
+    tf.evaluate({"w": Watch()}, seed=SEED, universe=u, days=t,
+                model="pt-v20", history_days=n)
+    ref = prehistory(_engine(u), n + t)
+    assert shown == ref.steps(t * SPD)
+    h = last["h"]              # the agent's history, grown to the last close
+    assert h.days == list(range(-n, t))
+    for field in ("open", "high", "low", "close", "volume"):
+        assert h.rows(field) == ref.rows(field), field
+    assert h.macro("vix") == ref.macro("vix")
+    # And a trading agent's card is the card of the same agent run on a
+    # fork of that pre-history by hand.
+    from tradefloor.harness import _evaluate_one
+    from tradefloor.universe_util import fingerprint_of
+    card = tf.evaluate({"h": BuyAndHold()}, seed=SEED, universe=u, days=t,
+                       model="pt-v20", history_days=n)["h"]
+    root = _engine(u)
+    past = prehistory(root, n)
+    base, mine = root.fork(2)
+    from tradefloor.harness import _advance_untraded
+    baseline = _advance_untraded(base, t, SPD, TPS, 9, 30, 3)
+    by_hand = _evaluate_one("h", BuyAndHold(), SEED, u, None, t, SPD, TPS,
+                            1_000_000.0, 2.0, 9, 30, 3, baseline, None,
+                            fingerprint_of(u), "", "pt-v20", False, False,
+                            engine=mine, history=past.copy(), history_days=n)
+    assert card.as_dict() == by_hand.as_dict()
+
+
+def test_reused_agent_refills_its_window_each_run():
+    u = _universe()
+    kw = dict(seed=SEED, universe=u, days=2, model="pt-v20", history_days=2)
+    reused = Momentum(lookback_days=2)
+    tf.evaluate({"m": reused}, **kw)
+    again = tf.evaluate({"m": reused}, **kw)["m"]
+    fresh = tf.evaluate({"m": Momentum(lookback_days=2)}, **kw)["m"]
+    assert again.as_dict() == fresh.as_dict()
+
+
+def test_adapter_memory_is_prefilled_from_history():
+    from tradefloor.integrations.callable import CallableAgentAdapter
+    u = _universe()
+    first = {}
+
+    def policy(payload):
+        first.setdefault("assets", payload["assets"])
+        return {"actions": [], "rationale": "watch"}
+
+    def first_quote(history_days):
+        first.clear()
+        tf.evaluate({"c": CallableAgentAdapter(policy)}, seed=SEED,
+                    universe=u, days=1, model="pt-v20",
+                    history_days=history_days)
+        a = first["assets"][0]
+        return a["return_1d"], a["volatility"]
+
+    assert first_quote(0) == (None, None)
+    assert None not in first_quote(2)
 
 
 def test_each_agent_grows_its_own_history():
@@ -259,13 +394,18 @@ def test_gym_reset_with_history():
     assert env.history is None and "history_days" not in info
     obs, info = env.reset(options={"history_days": 2})
     assert info["history_days"] == 2 and env.history.days == [-2, -1]
-    # The episode's market is the one an untraded run of two days reached.
-    ref = _engine(u)
-    prehistory(ref, 2)
+    # The episode's market is the one an untraded run of two days reached,
+    # and a flat episode day is that run's third day.
+    ref = prehistory(_engine(u), 3)
+    assert env.history.closes() == ref.closes()[:2]
+    assert env.history.steps() == ref.steps()[:2 * SPD]
     import numpy as np
     for _ in range(SPD):
         env.step(np.zeros(len(u)))
     assert env.history.days == [-2, -1, 0]
     assert len(env.history.steps()) == 3 * SPD
+    for field in ("open", "high", "low", "close", "volume"):
+        assert env.history.rows(field) == ref.rows(field), field
+    assert env.history.steps() == ref.steps()
     with pytest.raises(tf.ValidationError):
         env.reset(options={"history_days": -3})

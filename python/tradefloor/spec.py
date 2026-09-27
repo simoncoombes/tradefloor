@@ -737,9 +737,10 @@ class _BlendAgent:
         if self._lookbacks is None:
             self._lookbacks = self._resolve_lookbacks(obs)
         past = getattr(obs, "history", None)
-        if past is not None and not self._history:
+        if past is not None and (obs.step == 0 or not self._history):
             # Filled from the pre-history, as the shipped trend agents do,
-            # so a blend speaks from the first scored step.
+            # so a blend speaks from the first scored step. Refilled on each
+            # run's first step, so a reused agent drops the last run's window.
             needed = max((lb for lb in self._lookbacks if lb is not None),
                          default=0)
             self._history = past.window(needed,

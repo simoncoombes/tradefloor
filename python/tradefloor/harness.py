@@ -467,8 +467,10 @@ def evaluate(
     starts on the seed's first session with one price per name, so a rule
     with a lookback (a 200-day average, a 12-month trend) sits in cash until
     its window fills, and a comparison with buy-and-hold charges it for the
-    wait: 2 to 8 points a year for a lookback of 60 days or more, measured on
-    the S&P 500 and on pt-v20 alike. With ``history_days=N`` the harness runs
+    wait. For a lookback of 60 days or more the wait costs 2 to 8 points a
+    year on the S&P 500 1990-2025 and 1.4 to 2.8 on pt-v20's index, both
+    measured on the index rather than through this harness (see
+    :mod:`tradefloor.history`). With ``history_days=N`` the harness runs
     N untraded sessions first, on the same loop as the baseline and with no
     scenario, then forks that engine once per agent and once for the
     baseline. ``obs.history`` holds the N sessions' daily bars and grows by
@@ -478,8 +480,16 @@ def evaluate(
     scored window starts N sessions later in the same seed's life, with no
     warm-up regime added. 252 covers a year's lookback and 273 a 12-1 rule;
     the cap is ten years. The shipped lookback agents fill their windows
-    from it. Each card records ``history_days``, and 0, the default, runs
-    exactly what it always did. See :mod:`tradefloor.history`.
+    from it, and so do the framework adapters' price memories. Each card
+    records ``history_days``, and 0, the default, runs exactly what it always
+    did. See :mod:`tradefloor.history`.
+
+    Days stay scored-relative under ``history_days``: ``obs.day``, the
+    scenario clock and the ``day`` column of each card's fills table count
+    from the first scored session, while the forked engine's own day count,
+    the one its recorded bars and truth carry, runs N sessions ahead. Join
+    fills to those on ``day + history_days``, or to ``obs.history`` on its
+    labels, which are scored-relative too.
 
     Returns a scorecard per agent, keyed by name.
     """
