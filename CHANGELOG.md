@@ -717,8 +717,10 @@ All three are 0.0 on every preset, where no state is read or written and the
 snapshot and state hash carry nothing new. The sim, presets and per-preset
 digests are unchanged. The book known answer is re-based for its fingerprint
 only, as each new dial has done. The 19 preset records are restamped, and
-`tests/test_idio_vol.py` holds the mechanism: the mean of one, the jump
-channel, the snapshot, the fork and the refusals.
+`tests/test_idio_vol.py` holds the mechanism: the own draw scaled by
+exactly the square root of the ratio in the session and overnight, the mean
+of one, the jump channel, the snapshot, the fork and the refusals. A Rust
+test holds the VIX identity's idiosyncratic term to the ratio.
 
 ## 0.8.1
 

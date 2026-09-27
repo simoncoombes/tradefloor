@@ -428,8 +428,11 @@ OUT_OF_SCOPE = {
         "reference panel's idiosyncratic |e| lag-1 ACF (0.088) and "
         "aftershock (1.29) are the targets a registration would fit it to",
     "idio_vol_beta":
-        "inert at 0.0 with `idio_vol_alpha` 0.0 (see that entry); off zero "
-        "with alpha at 0.0 the state stays at its mean of one",
+        "inert at 0.0 with `idio_vol_alpha` and `idio_vol_jump_bump` 0.0 "
+        "(see that entry); off zero with both of those still 0.0 the state "
+        "runs but the ratio stays at exactly one, so nothing moves. With "
+        "`idio_vol_jump_bump` on, beta carries each jump's bump into "
+        "later sessions",
     "idio_vol_jump_bump":
         "inert at 0.0 with `idio_vol_alpha` and `idio_vol_beta` 0.0 (see "
         "that entry); off zero it moves the ratio the session after an own "

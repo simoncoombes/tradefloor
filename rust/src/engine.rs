@@ -8708,6 +8708,44 @@ mod tests {
         assert_eq!(e.column(PriceField::MarketCap)[0], 1.0 * 1e8);
     }
 
+    /// `idio_vol_alpha`: the VIX identity's idiosyncratic term reads the
+    /// per-name ratio, as the tick's own draw does. A ratio of 4 on every
+    /// name is exactly 4 times the term (a power of two scales each
+    /// summand without rounding); one name at 4 lands in between; a ratio
+    /// of one is the term with the state off. Every other term is the
+    /// same. Dropping the ratio from `index_var.rs`, or passing the engine's
+    /// ratios as an empty slice, fails here.
+    #[test]
+    fn the_vix_identity_reads_the_idiosyncratic_variance_ratio() {
+        let off = engine(7).index_conditional_variance_terms_now();
+        let params = crate::params::ModelParams {
+            idio_vol_alpha: 0.2,
+            idio_vol_beta: 0.5,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let one = e.index_conditional_variance_terms_now();
+        assert_eq!(one, off);
+        e.set_idio_vol_state(&[4.0; 3], &[0.0; 3], &[0.0; 3]).unwrap();
+        let four = e.index_conditional_variance_terms_now();
+        assert!(one.idio_raw > 0.0);
+        assert_eq!(four.idio_raw, 4.0 * one.idio_raw);
+        assert_eq!(
+            crate::market::index_var::IndexVarianceTerms { idio_raw: one.idio_raw, ..four },
+            one
+        );
+        e.set_idio_vol_state(&[4.0, 1.0, 1.0], &[0.0; 3], &[0.0; 3]).unwrap();
+        let first = e.index_conditional_variance_terms_now();
+        assert!(first.idio_raw > one.idio_raw && first.idio_raw < four.idio_raw);
+    }
+
     #[test]
     fn a_full_session_runs_and_stays_bounded() {
         // 390 ticks with the day's boundaries, as an embedder would drive it.
