@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "f101d55ca006b5bfaebf3c2ea6f671cd0013e76faeaa11f6b3f1251873e38de3",
+  "coefficient_digest": "6da68f252078479d85812b47bdc20b0c6a99813911b9f6533accdd16f01fb93f",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -87,6 +87,9 @@
     "idio_sigma_beta_exponent": 0.0,
     "idio_sigma_floor": 0.0001,
     "idio_sigma_scale": 0.59604441,
+    "idio_vol_alpha": 0.0,
+    "idio_vol_beta": 0.0,
+    "idio_vol_jump_bump": 0.0,
     "inflation_ceiling": 6.0,
     "inflation_floor": -1.0,
     "inflation_reversion": 0.55,

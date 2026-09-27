@@ -125,6 +125,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             order_volumes: &[],
             sector_keys: &sectors(),
             sector_sigmas: &[],
+            idio_vol_ratios: &[],
             // The constant-sigma baseline: these tests predate the factor's
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -279,6 +280,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -347,6 +349,7 @@ fn the_band_holds_in_extended_hours_too() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
@@ -425,6 +428,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,

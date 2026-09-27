@@ -696,6 +696,30 @@ view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
 scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
 or pass `trusted_agents=True`.
 
+### Per-name volatility clustering (off by default)
+
+Three dials, `idio_vol_alpha`, `idio_vol_beta` and `idio_vol_jump_bump`, add
+a per-name variance ratio `s` with a mean of one. It scales the variance of
+the name's own idiosyncratic draw, in the session and overnight, and the VIX
+identity's idiosyncratic term reads it. At each close,
+`s' = (1 - a - b) + a u^2 + b s + c (I - lambda)`, clamped to the GARCH
+floor and ceiling multiples. `u` is the session's own noise over its
+expected size, `I` whether the name's own jump landed that session and
+`lambda` the rate it was drawn at, so the jump term adds nothing to the mean.
+
+Why: on the forty-name reference panel (2015-2025) a name's idiosyncratic
+`|e|` has a lag-1 autocorrelation of 0.088, and the day after a top-2.5 per
+cent move averages 1.29 times the usual size. pt-v20 reads about 0.03 and
+1.04, because its per-name GARCH is fed the whole day's noise and never the
+name's own jumps. On held-out seeds, 0.2, 0.5 and 2.0 read 0.080 and 1.28.
+
+All three are 0.0 on every preset, where no state is read or written and the
+snapshot and state hash carry nothing new. The sim, presets and per-preset
+digests are unchanged. The book known answer is re-based for its fingerprint
+only, as each new dial has done. The 19 preset records are restamped, and
+`tests/test_idio_vol.py` holds the mechanism: the mean of one, the jump
+channel, the snapshot, the fork and the refusals.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

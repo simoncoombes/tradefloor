@@ -4164,17 +4164,17 @@ pub struct ModelParams {
     /// unconditional mean one, the same form as the sector state
     /// (`sector_vol_alpha`): the variance of the name's own idiosyncratic
     /// draw is its GJR variance times `s`, with
-    /// `s' = (1 - a - b) + a u^2 + b s` at the close, clamped to
-    /// [`garch_floor_multiple`, `garch_ceiling_multiple`]. `u` is the
-    /// session's OWN shock -- the own noise the ticks drew plus the name's
-    /// own jump the session realised (the one applied at the previous
-    /// close) -- over its expected sd, `kappa^2 max(h, idio_sigma_floor)`
-    /// (kappa^2 already carrying `s`) plus the idiosyncratic jump rate drawn
-    /// times `jump_sigma_idio^2`. The tick scales the own draw by `sqrt(s)`
-    /// through the per-company volatility multiplier; the overnight own
-    /// draw and the VIX identity's idiosyncratic term read the same `s`.
-    /// The per-name GJR, the market factor and the VIX process are
-    /// untouched.
+    /// `s' = (1 - a - b) + a u^2 + b s + c (I - lambda)` at the close,
+    /// clamped to [`garch_floor_multiple`, `garch_ceiling_multiple`]. `u` is
+    /// the session's own NOISE (the own-noise part the ticks drew) over its
+    /// expected sd, `kappa^2 max(h, idio_sigma_floor)`, where `kappa^2`
+    /// (`noise_own_scale2`) already carries `s`, so `E[u^2] = 1` whatever
+    /// `s` is. The jump term is `idio_vol_jump_bump` (`c`): `I` is whether
+    /// the name's own jump was realised this session and `lambda` the rate
+    /// it was drawn at. The tick scales the own draw by `sqrt(s)` through
+    /// the per-company volatility multiplier; the overnight own draw and
+    /// the VIX identity's idiosyncratic term read the same `s`. The per-name
+    /// GJR, the market factor and the VIX process are untouched.
     ///
     /// Why: the per-name GJR is fed the day's NOISE (market, sector and own
     /// together), never the name's own jumps or news, so a name's large
@@ -4189,8 +4189,8 @@ pub struct ModelParams {
     /// two sessions, which is what this state carries; the per-name long
     /// lags are already above the tape's, so the missing memory is short.
     ///
-    /// Either dial non-zero switches the state on. At (0.0, 0.0), which
-    /// every preset carries, no state is read or written, the tick receives
+    /// Any of the three dials non-zero switches the state on. At
+    /// (0.0, 0.0, 0.0), which every preset carries, no state is read or written, the tick receives
     /// an empty ratio slice and nothing is multiplied: every trajectory and
     /// digest is the one it was. The snapshot and the state hash carry the
     /// state (the ratio, the own jump pending for tomorrow's shock and its

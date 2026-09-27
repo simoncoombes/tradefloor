@@ -339,7 +339,7 @@ pub struct Engine {
     /// name's own jump the last close applied (the next session realises it,
     /// so it enters that session's shock) with the jump variance expected at
     /// the rate it was drawn, and the same pair for tonight's close, which
-    /// is empty between sessions. Never read or written while both dials
+    /// is empty between sessions. Never read or written while all three dials
     /// are 0.0, which every preset carries.
     idio_variance: Vec<f64>,
     idio_jump_pending: Vec<f64>,
@@ -1720,12 +1720,13 @@ impl Engine {
     }
 
     /// The close of the per-name idiosyncratic variance state
-    /// (`ModelParams::idio_vol_alpha`). `u^2` is the session's own shock --
-    /// the own noise the ticks drew (already at the state's scale) plus the
-    /// own jump the session realised, which the previous close applied --
+    /// (`ModelParams::idio_vol_alpha`). `u^2` is the session's own noise
+    /// (the own-noise part the ticks drew, already at the state's scale)
     /// over its expected variance, `kappa^2 max(h, idio_sigma_floor)`
-    /// (`kappa^2` is `noise_own_scale2`, which carries the state) plus the
-    /// jump's expected variance at the rate it was drawn. `h_day` is each
+    /// (`kappa^2` is `noise_own_scale2`, which carries the state). The jump
+    /// channel adds `idio_vol_jump_bump * (I - lambda)`, `I` whether the own
+    /// jump the previous close applied was non-zero and `lambda` the rate it
+    /// was drawn at (its expected variance over `jump_sigma_idio^2`). `h_day` is each
     /// name's GJR variance before tonight's `close_day`, the one the day's
     /// draws were scaled by. Then tonight's own jump becomes tomorrow's.
     /// Runs after `apply_jumps`, and not at all while the state is off.

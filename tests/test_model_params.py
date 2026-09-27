@@ -1294,6 +1294,18 @@ PERTURBATIONS = [
     # `sector_vol_alpha` is also 0.0 -- was true and pt-v19 now ships alpha
     # at 0.067, so the sector variance state is read and beta with it.
     ("sector_vol_beta", 0.9, True),
+    # The per-name idiosyncratic variance state (0.8.5, vol-clustering),
+    # off on every preset. The shock share is LIVE: from the first close the
+    # ratio moves with each name's own noise and the next session's own draw
+    # reads it. The persistence is MEASURED False for the reason
+    # `sector_vol_beta` once was: the ratio's fixed point is 1.0, and with no
+    # shock share and no jump bump beta alone leaves it there, so every
+    # draw is multiplied by 1.0. The jump bump is LIVE: the re-centring
+    # term -c lambda moves every name's ratio at the first close, jump or
+    # not.
+    ("idio_vol_alpha", 0.2, True),
+    ("idio_vol_beta", 0.5, False),
+    ("idio_vol_jump_bump", 1.0, True),
     # RE-VALUED at the 0.8.0 vector adoption. pt-v19 now ships 2.0, so this
     # row perturbed to the SHIPPED value: the fingerprint never became
     # `custom-` and the row could not fail. Measured at 0.0, 1.0 and 4.0,

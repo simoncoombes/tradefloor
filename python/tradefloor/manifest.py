@@ -473,7 +473,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # shift waiting for its tape row.
          "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
          # The per-name idiosyncratic variance state, its three vectors
-         # together, only while `idio_vol_alpha` or `_beta` is set.
+         # together, only while `idio_vol_alpha`, `_beta` or `_jump_bump`
+         # is set.
          *_IDIO_VOL_KEYS}
         & carried)
     if carried & set(_IDIO_VOL_KEYS) and not set(_IDIO_VOL_KEYS) <= carried:

@@ -542,7 +542,7 @@ pub struct TickInputs<'a> {
     /// The per-name idiosyncratic variance state
     /// (`ModelParams::idio_vol_alpha`): one RATIO per company slot,
     /// multiplying the variance of the name's own draw, or EMPTY when
-    /// `idio_vol_alpha` and `_beta` are both 0.0, which is the draw every
+    /// `idio_vol_alpha`, `_beta` and `_jump_bump` are all 0.0, which is the draw every
     /// preset runs and multiplies nothing.
     pub idio_vol_ratios: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
