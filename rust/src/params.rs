@@ -1538,9 +1538,21 @@ pub struct ModelParams {
     /// 12.4), reads 11.5 at 0, 11.7 at 0.2, 12.3 at 0.3 and 12.7 and 12.9 at
     /// 0.45 and 0.6; and D1's excess kurtosis in the held-out-seeds cell
     /// (ceiling 24.0) reads 18.8 at 0, 23.4 at 0.2 and 24.1 to 24.9 from
-    /// 0.3. So 0.2 is the largest value tried that keeps every row graded
-    /// on those seeds; see the crash-vol-state calibration (design
-    /// repository) for the rows that were not.
+    /// 0.3. So 0.3, 0.45 and 0.6 fail, and 0.2 is the largest value tried
+    /// that passes the rows graded at it. That is not the full grade:
+    ///
+    /// - Graded at 0.1, 0.15 and 0.2 (box cvsg2): A1-A3, B1-B8, C1, C2 and
+    ///   D1 in all four certification cells, all pass; V1a and V1b from the
+    ///   same long run pass (V1b 0.649 at 0.2, floor 0.55).
+    /// - Graded at 0, 0.3, 0.45 and 0.6 only (box cvsg1), so inferred at
+    ///   0.1-0.2: B9, C4a, C4b, C5-C8, R1-R6, E1, D2, F1, L1 and C10. All
+    ///   pass on those arms.
+    /// - Not measured at any value: C3, C9, R7a, R7b, S1a, S1b and S2.
+    ///
+    /// The certification's VIX AR(1) row (reported, not gated) moves up:
+    /// on pt-v20 it passes panel_252 and held-out seeds and reads
+    /// refused/below in panel_504; at 0.1 it passes all three; it reads
+    /// refused/above in panel_252 from 0.15 and in panel_504 at 0.2.
     ///
     /// Read only with `market_vol_slow_weight` non-zero: the single-component
     /// close has no slow component. In [0, 1], with
