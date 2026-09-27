@@ -378,7 +378,10 @@ OUT_OF_SCOPE = {
         "gamma reaches `s`. The square-root law of impact on the tape, "
         "fitted on held-out seeds against the metaorder rows Q1-Q7 "
         "(`tools/calibration/metaorder_curve.py`; 0.8.5 realism work, "
-        "sqrt-impact); for a new registration",
+        "sqrt-impact); for a new registration. Best arm on seeds "
+        "2001-2030 x 12 names (box sqrtimpact1): 0.5 with half-life 45, "
+        "slow half-life 15600, slow weight 0.1, crossover 0.001, where all "
+        "seven rows pass, C9 is unchanged and no round trip pays",
     "impact_memory_half_life":
         "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
         ": the memory's fast half-life in open ticks",
