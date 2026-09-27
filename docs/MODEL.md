@@ -2215,11 +2215,48 @@ close, 0.57 at the next close and 0.33 five closes later, and a day TWAP at
 and pays only the half-spread, so a sliced order, which pays the memory,
 costs 1.1 to 1.3 times as much there.
 
+### The latent depth nested behind the ladder (off on every preset)
+
+The latent pool above sits beside the maker's ladder: its $Q$-th share is
+priced on the law as if the ladder were not there, so the depth within a
+distance of the touch is the ladder's plus the law's. The ladder holds 0.3
+to 1% of $\bar A_i$ at its first level and 2.6 to 5% over ten, so a block of
+3% of daily volume fills mostly at the ladder's prices and the law's own
+front at once. Every share, in a block or a slice, pays the half-spread
+(0.044 $\sigma$ at the median name), which is then half of such a block's
+cost, and a day TWAP at 3% costs 0.83 of it with the memory on, above the
+0.5 to 0.8 of Almgren et al. (2005) and Bacry et al. (2015). With
+`book_depth_nesting` $k > 0$ the pool's cumulative size through a level is
+
+```math
+Q^{\mathrm{nested}}(p) = \max\big(Q^{\mathrm{placed}},\ Q(p) - k\,L(p)\big)
+```
+
+with $Q(p)$ the law's cumulative size at the level's price and $L(p)$ the
+ladder's shares at that price or better. At $k = 1$ the depth within any
+distance is the larger of the ladder's and the law's: the ladder is the
+displayed front of the latent book (Tóth et al. 2011), not a second book
+beside it. A slice inside the ladder's first level pays exactly what it
+did; a block past the ladder pays the law. (`agent_book.rs`,
+`append_latent_depth`.)
+
+Measured on the r14 screen's closest candidate N4 with $k = 1$ (boxes
+r15imp1 and r15imp2, held-out seeds only; `metaorder_curve.py` on
+2501-2530 x 12 names): a day TWAP costs 0.68 of a block at 3% of daily
+volume (0.83 at $k = 0$) and 0.64 at 10% (0.79); Q1-Q7 do not move
+(the half-day print exponent 0.645, the peak at 10% 0.377); the cost of
+size (row C9) fits $0.469\,\sigma (Q/V)^{0.456}$ (0.436 and 0.460 at
+$k = 0$); the best round trip, wash included, loses 0.91 bp; every other
+registered and proposed row reads as at $k = 0$, bar C4b (-0.1 points
+against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
++0.03). At $k = 0.5$ the day TWAP costs 0.75 and 0.70 of a block.
+
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.487 and coefficient 0.468 |
 | $\delta$ | `book_depth_exponent` | 0.5 | derived | the square-root law (Tóth et al. 2011) |
 | $R$ | `book_depth_reach` | 1.0 | derived | the latent book reaches one day's volume |
+| $k$ | `book_depth_nesting` | 0 (beside) | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
 | | `book_shared` | 1 (0) | derived | a switch: agents consume one book |
 | $H_B$ | `book_refill_half_life` | 27 ticks (0) | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
 | | `book_resting` | 1 (0) | derived | a switch: limit orders rest with queue priority |
