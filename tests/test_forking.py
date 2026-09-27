@@ -1414,6 +1414,15 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "close, so the target after the close differs from the one the "
         "draws were made at, and the sector state then carries the "
         "difference into the next day.",
+    "vix_stress_memory":
+        "the published VIX's stress memory (`vix_stress_premium`). It moves "
+        "the QUOTE only -- macro_fields['vix'], the macro table, the wasm "
+        "getter -- and nothing inside the engine reads it, so by "
+        "construction no price, draw or tape row can see it, and this guard "
+        "compares those. tests/test_vix_stress_premium.py::test_the_snapshot_"
+        "and_a_restore_carry_the_memory is the test that does see it: it "
+        "restores the memory and compares the published quote and the state "
+        "hash, which carries it.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "

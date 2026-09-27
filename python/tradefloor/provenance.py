@@ -593,6 +593,23 @@ OUT_OF_SCOPE = {
         "unread while `earnings_surprise_sigma` is 0.0: "
         "`Engine::earnings_volume_column` is empty and the tick reads no "
         "multiple; 0.0 and 1.0 are both no multiple",
+    "vix_stress_premium":
+        "inert at 0.0 as shipped: `Engine::published_vix` returns the VIX "
+        "state untouched and the close writes no memory. Off zero it scales "
+        "the PUBLISHED VIX only (macro_fields, macro_state, the macro table, "
+        "the wasm getter) by a premium on the variance read-back's memory "
+        "above `vix_stress_premium_knee`, capped by `vix_stress_premium_cap`; "
+        "no internal reader moves. Target: the median VIX over trailing "
+        "21-session realised volatility on sessions with it at 40 or more, "
+        "0.831 on the S&P 500 and ^VIX tape 1990-2025 (calendar-year "
+        "bootstrap SE 0.045) against pt-v20's 0.668 on held-out seeds "
+        "(0.8.5 realism work, vix-peaks)",
+    "vix_stress_premium_knee":
+        "unread while `vix_stress_premium` is 0.0 (0.8.5 realism work, "
+        "vix-peaks)",
+    "vix_stress_premium_cap":
+        "unread while `vix_stress_premium` is 0.0 (0.8.5 realism work, "
+        "vix-peaks)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

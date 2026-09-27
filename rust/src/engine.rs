@@ -599,6 +599,13 @@ pub struct Engine {
     /// value; never touched with the dial at 0.0, where the snapshot and the
     /// state hash do not carry it.
     market_vol_cycle_log: Option<f64>,
+    /// The published VIX's stress-premium memory: the read-back's log
+    /// deviation from the anchor's centre, kept at `vix_anchor_memory`'s
+    /// rate and set to 0.0 by a pinned VIX. Moves only with
+    /// `vix_stress_premium` non-zero, which no preset sets, and is carried
+    /// by the snapshot and the state hash only then. See
+    /// `ModelParams::vix_stress_premium` and [`Engine::published_vix`].
+    vix_stress_memory: f64,
     /// Whether a crisis EPISODE is running. The episode starts at the open
     /// of the first session whose VIX is above `crisis_vix_threshold` with
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
@@ -1476,6 +1483,7 @@ impl Engine {
             vix_log_level: 0.0,
             vix_anchor_slow: 0.0,
             market_vol_cycle_log: None,
+            vix_stress_memory: 0.0,
             crisis_in_episode: false,
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
@@ -4927,7 +4935,8 @@ impl Engine {
     /// always kept; the VIX and corporate bits while `corporate_yield_daily`
     /// is on, the VIX bit also under `pinned_vix_feedback`; every bit under
     /// `macro_pins_hold`; the cycle bit also while `cycle_nowcast_accuracy` is
-    /// set. Each is kept only while something reads it.
+    /// set; the VIX bit also while `vix_stress_premium` is set. Each is kept
+    /// only while something reads it.
     pub fn mark_macro_pins_today(&mut self, bits: u16) {
         let mut keep = PIN_SPREAD;
         if self.params.corporate_yield_daily != 0.0 {
@@ -4941,6 +4950,12 @@ impl Engine {
         }
         if self.params.cycle_nowcast_accuracy != 0.0 {
             keep |= PIN_CYCLE;
+        }
+        // The published VIX's premium is another reader of a VIX pin:
+        // tonight's close keeps its memory at 0.0 (`Engine::published_vix`,
+        // `vix_stress_premium`).
+        if self.params.vix_stress_premium != 0.0 {
+            keep |= PIN_VIX;
         }
         self.macro_pins_today |= bits & keep;
     }
@@ -7070,6 +7085,20 @@ impl Engine {
                 self.vix_anchor_slow = (1.0 - h) * self.vix_anchor_slow
                     + h * crate::mathx::log(implied / anchor);
             }
+            // THE PUBLISHED VIX'S STRESS MEMORY, the same deviation at the
+            // same rate, so in a free run it is the anchor's memory to the
+            // last bit; a session whose VIX a caller pinned holds it at 0.0,
+            // so the quote publishes the pin. Arithmetic only, no draw, and
+            // not run at all with `vix_stress_premium` at 0.0.
+            if self.params.vix_stress_premium != 0.0 {
+                if pins_today & PIN_VIX != 0 {
+                    self.vix_stress_memory = 0.0;
+                } else if implied > 0.0 && anchor > 0.0 {
+                    let h = self.params.vix_anchor_memory;
+                    self.vix_stress_memory = (1.0 - h) * self.vix_stress_memory
+                        + h * crate::mathx::log(implied / anchor);
+                }
+            }
         }
         rng.site(Site::EconomyDaily, 0);
         let mut inputs =
@@ -7628,6 +7657,68 @@ impl Engine {
 
     pub fn set_vix_anchor_slow(&mut self, value: f64) {
         self.vix_anchor_slow = value;
+    }
+
+    /// Whether this engine's model carries the published VIX's stress
+    /// memory, which is when the snapshot and the state hash carry it: only
+    /// with `vix_stress_premium` non-zero, which no preset sets.
+    pub fn carries_vix_stress_memory(&self) -> bool {
+        self.params.vix_stress_premium != 0.0
+    }
+
+    pub fn vix_stress_memory(&self) -> f64 {
+        self.vix_stress_memory
+    }
+
+    pub fn set_vix_stress_memory(&mut self, value: f64) {
+        self.vix_stress_memory = value;
+    }
+
+    /// A caller wrote the VIX: the stress memory restarts from 0.0, so the
+    /// quote publishes the pin now and through tonight's close (which keeps
+    /// it at 0.0 on a pinned session). Nothing with `vix_stress_premium` at
+    /// 0.0.
+    pub fn note_vix_pinned(&mut self) {
+        if self.params.vix_stress_premium != 0.0 {
+            self.vix_stress_memory = 0.0;
+        }
+    }
+
+    /// The stress premium the published VIX carries over the state, in log
+    /// units: `cap * (1 - exp(-g * max(0, m - knee) / cap))` on the stress
+    /// memory `m`. Exactly 0.0 with `vix_stress_premium` at 0.0 or the
+    /// memory at or below the knee. See `ModelParams::vix_stress_premium`.
+    pub fn vix_stress_premium_now(&self) -> f64 {
+        let p = &self.params;
+        if p.vix_stress_premium == 0.0 {
+            return 0.0;
+        }
+        let excess = self.vix_stress_memory - p.vix_stress_premium_knee;
+        if !(excess > 0.0) {
+            return 0.0;
+        }
+        let cap = p.vix_stress_premium_cap;
+        cap * (1.0 - crate::mathx::exp(-p.vix_stress_premium * excess / cap))
+    }
+
+    /// THE VIX AS PUBLISHED: what `macro_fields`, `macro_state`, the macro
+    /// table and its Arrow batch, and the wasm getter report. The engine's
+    /// VIX state (`economy().vix`, `state_snapshot()["economy"]["vix"]`),
+    /// which every internal reader reads, times `exp(premium)` under
+    /// `vix_stress_premium` and never above `vix_ceiling`; the state itself,
+    /// bit for bit, with the dial at 0.0, which every preset carries.
+    pub fn published_vix(&self) -> f64 {
+        let vix = self.economy.vix;
+        let premium = self.vix_stress_premium_now();
+        if !(premium > 0.0) {
+            return vix;
+        }
+        let quote = vix * crate::mathx::exp(premium);
+        if quote > self.params.vix_ceiling {
+            crate::mathx::max(self.params.vix_ceiling, vix)
+        } else {
+            quote
+        }
     }
 
     /// The VIX level's per-session innovation AS APPLIED, after the
@@ -9294,6 +9385,10 @@ impl Engine {
             if let Some(l) = self.market_vol_cycle_log {
                 hash_f64(&mut buf, l);
             }
+        }
+        // The published VIX's stress memory, on the same rule.
+        if self.carries_vix_stress_memory() {
+            hash_f64(&mut buf, self.vix_stress_memory);
         }
         // The aggregate earnings cycle, on the same rule.
         if self.params.earnings_cycle_depth != 0.0 {

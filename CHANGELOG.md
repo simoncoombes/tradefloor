@@ -268,6 +268,16 @@ so no round trip earns the displacement. Every preset, pt-v20 included,
 carries 0.0, and every known-answer digest is unchanged; the values are for
 a new registration (`tools/calibration/metaorder_curve.py` measures them).
 
+`vix_stress_premium`, `vix_stress_premium_knee` and `vix_stress_premium_cap`
+lift the published VIX in stress, where the damped VIX state reads too low
+against realised volatility. The quote is the state times
+`exp(cap * (1 - exp(-gain * max(0, m - knee) / cap)))`, with `m` the anchor's
+slow memory of the variance read-back, and never above `vix_ceiling`. Only
+`macro_fields["vix"]`, `macro_state.vix`, the macro table and the wasm getter
+move; every price, every other macro series and
+`state_snapshot()["economy"]["vix"]` stay as they are. All three are 0 on
+every preset.
+
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
 the earnings cycle's expected path from the cycle's own hazards, so a turn
 of phase moves prices at once and a price trough leads the earnings trough;

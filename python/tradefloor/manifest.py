@@ -461,7 +461,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         )
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
-    # `vix_anchor_memory` off zero; every other snapshot omits it. So is
+    # `vix_anchor_memory` off zero; every other snapshot omits it, and the
+    # published VIX's stress memory only with `vix_stress_premium` set. So is
     # the market factor's return memory, only with `market_vol_leverage` set,
     # and the cycle's volatility multiplier, only with
     # `market_vol_cycle_ratio` set and once a close has set it.
@@ -472,8 +473,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # buyback share-count reductions are carried only with
     # `buyback_accrual` and `buyback_payout_share` both set.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "market_vol_leverage_memory", "market_vol_cycle_log",
-         "rates", "book", "fair_value_offset", "opening_z", "buyback_log_shares",
+        {"vix_anchor_slow", "vix_stress_memory", "market_vol_leverage_memory",
+         "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
+         "buyback_log_shares",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -641,6 +643,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `market_vol_cycle_ratio` set: `Engine::state_hash`'s order and rule.
     if "market_vol_cycle_log" in snapshot:
         _f64(buf, snapshot["market_vol_cycle_log"])
+    # The published VIX's stress memory, only on a model with
+    # `vix_stress_premium` set: `Engine::state_hash`'s order and rule.
+    if "vix_stress_memory" in snapshot:
+        _f64(buf, snapshot["vix_stress_memory"])
     # The aggregate earnings cycle, only on a model with the cycle on, and
     # then the fair-value levels and the unapplied opening draws, only on a
     # model that can move a level: `Engine::state_hash`'s order and rule.

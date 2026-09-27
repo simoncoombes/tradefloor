@@ -459,6 +459,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_cycle_relative_calm": (0.0, 1.0),
     # The power on the fair-value cap's ceiling, in [0, 1].
     "market_vol_cycle_cap_relative": (0.0, 1.0),
+    # The published VIX's stress premium: a gain per unit of the anchor
+    # memory above the knee. 2 takes a memory 0.2 above the knee to about
+    # the cap; the premium moves only the published quote.
+    "vix_stress_premium": (0.0, 2.0),
+    # A log deviation of the read-back's memory from the anchor's centre;
+    # 1.5 is about 4.5 times the centre, past any calibrated arm's peak.
+    "vix_stress_premium_knee": (0.0, 1.5),
+    # The largest log premium of the quote over the state; 0.5 is 1.65x.
+    "vix_stress_premium_cap": (0.0, 0.5),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

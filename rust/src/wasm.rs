@@ -209,10 +209,12 @@ impl Sim {
         self.inner.params().fingerprint()
     }
 
-    /// The macro state's VIX, the one number a trading page always wants.
+    /// The macro state's VIX as published, the one number a trading page
+    /// always wants: the state itself unless `vix_stress_premium` is set
+    /// (`Engine::published_vix`).
     #[wasm_bindgen(getter)]
     pub fn vix(&self) -> f64 {
-        self.inner.economy().vix
+        self.inner.published_vix()
     }
 
     /// Advance one trading day: open, trade, close, step the macro chain.

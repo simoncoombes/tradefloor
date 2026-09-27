@@ -2976,7 +2976,9 @@ impl PyEngine {
     fn macro_state(&self) -> PyMacro {
         let e = self.inner.economy();
         PyMacro {
-            vix: e.vix,
+            // The VIX as PUBLISHED (`Engine::published_vix`): the state
+            // with `vix_stress_premium` at 0.0, which every preset carries.
+            vix: self.inner.published_vix(),
             federal_funds_rate: crate::units::percent_to_fraction(e.federal_funds_rate),
             corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
@@ -3292,6 +3294,9 @@ impl PyEngine {
         // A pinned corporate yield holds through tonight's close.
         if vix.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
+            // The published VIX's stress memory restarts, so the quote is
+            // the pin (`vix_stress_premium`; nothing with it at 0.0).
+            self.inner.note_vix_pinned();
             // `pinned_vix_feedback`: the discount lands in this pin's
             // re-mark, and the credit leg, where it applies, in the corporate
             // index's.
@@ -3403,7 +3408,11 @@ impl PyEngine {
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
         let out = PyDict::new_bound(py);
-        out.set_item("vix", e.vix)?;
+        // The VIX as PUBLISHED: under `vix_stress_premium` the quote carries
+        // a stress premium over the state, which
+        // `state_snapshot()["economy"]["vix"]` holds and every internal
+        // reader reads. The state itself with the dial at 0.0.
+        out.set_item("vix", self.inner.published_vix())?;
         out.set_item(
             "federal_funds_rate",
             crate::units::percent_to_fraction(e.federal_funds_rate),
@@ -4049,6 +4058,11 @@ impl PyEngine {
             if let Some(l) = self.inner.market_vol_cycle_log() {
                 out.set_item("market_vol_cycle_log", l)?;
             }
+        }
+        // The published VIX's stress memory, only where the hash covers it:
+        // with `vix_stress_premium` non-zero.
+        if self.inner.carries_vix_stress_memory() {
+            out.set_item("vix_stress_memory", self.inner.vix_stress_memory())?;
         }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
@@ -4855,6 +4869,11 @@ impl PyEngine {
             None => None,
         };
         self.inner.set_market_vol_cycle_log(cycle_log);
+        // Absent means a model without the published VIX's premium, where
+        // the memory is 0.0 and unread.
+        if let Some(raw) = snapshot.get_item("vix_stress_memory")? {
+            self.inner.set_vix_stress_memory(raw.extract()?);
+        }
         // The crisis episode. Absent means a snapshot from a build without
         // it, and every such run shipped `crisis_epicentre_extra` at 0.0,
         // where no episode is ever entered -- which is what the defaults
@@ -5326,7 +5345,9 @@ impl PyEngine {
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
             day,
-            vix: e.vix,
+            // As published (`vix_stress_premium`), as `macro_fields`
+            // reports it: the state with the dial at 0.0.
+            vix: self.inner.published_vix(),
             // Fractional on the way out, matching the way in. A results table
             // reporting percent while the constructor takes fractions would
             // reintroduce the unit trap on the return journey.

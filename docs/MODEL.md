@@ -144,10 +144,10 @@ process in the market reads it back.
 
 ### The order of a session
 
-1. **Open** (`engine.rs:3920-4037`). The crisis episode is stepped (start, end, epicentre), the day's company news is drawn, and each company's opening price $P^{o}$ is set to its last print. On the first session only, the stationary opening splits each company's day-zero premium between $s$ and $v$ (`engine.rs:4520-4559`).
-2. **390 ticks** (`market/tick.rs:823-1678`). Each tick: apply the agents' fills from the last step, once, on the first tick (`engine.rs:2513-2537`); draw the market factor and the sector factors; for each company, draw its own noise, update $s$ and $v$, compute $V$ and $P^{\ast}$, draw tick volume, and settle the print through the book. The last tick is the closing cross (`market/tick.rs:1542-1554`).
-3. **Close** (`engine.rs:4219-4500`). Each company's GJR variance is updated from the day's noise, the momentum term rolls, jumps are drawn and applied to $s$, the market-factor and sector variances are updated, and the volume state steps.
-4. **Macro step** (`engine.rs:5472-5559`, `engine.rs:4864-5150`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:5072-5115`).
+1. **Open** (`engine.rs:3933-4050`). The crisis episode is stepped (start, end, epicentre), the day's company news is drawn, and each company's opening price $P^{o}$ is set to its last print. On the first session only, the stationary opening splits each company's day-zero premium between $s$ and $v$ (`engine.rs:4533-4572`).
+2. **390 ticks** (`market/tick.rs:823-1678`). Each tick: apply the agents' fills from the last step, once, on the first tick (`engine.rs:2521-2545`); draw the market factor and the sector factors; for each company, draw its own noise, update $s$ and $v$, compute $V$ and $P^{\ast}$, draw tick volume, and settle the print through the book. The last tick is the closing cross (`market/tick.rs:1542-1554`).
+3. **Close** (`engine.rs:4232-4513`). Each company's GJR variance is updated from the day's noise, the momentum term rolls, jumps are drawn and applied to $s$, the market-factor and sector variances are updated, and the volume state steps.
+4. **Macro step** (`engine.rs:5561-5648`, `engine.rs:4877-5177`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:5099-5142`).
 
 The next session reads the new VIX, rates and output.
 
@@ -179,8 +179,8 @@ sealed seed from all 64 bits.
 
 **The opening.** Before session 1 the economy runs 755 macro steps on its
 own, with the market frozen and the day's return set to zero
-(`engine.rs:1987-2056`). The business cycle's opening phase and its age are
-drawn from the cycle's stationary law first (`engine.rs:1900-1924`). Because
+(`engine.rs:1995-2064`). The business cycle's opening phase and its age are
+drawn from the cycle's stationary law first (`engine.rs:1908-1932`). Because
 the market is frozen during this burn-in, the VIX settles near a fixed level
 that depends on the roster and hardly on the seed: on
 `Universe.random(40, seed=111)` it opens at 17.66 on 27 of seeds 101 to 130,
@@ -189,12 +189,12 @@ depends on where the cycle opens, 2.5% to 6.7% across the same seeds.
 
 ## The macro economy
 
-The economy steps once per session, after the close (`engine.rs:5440-5450`).
+The economy steps once per session, after the close (`engine.rs:5529-5539`).
 Its day counter $d$ starts at 1 on the first close. Within one step the order
 is: the market P/E and the day's index return are read from prices, the VIX
 and the economy are updated, the business cycle may change phase, and then
-the central bank meets if a meeting is due (`engine.rs:5494-5559`,
-`engine.rs:4943-5125`). All macro draws come from the economy stream.
+the central bank meets if a meeting is due (`engine.rs:5583-5648`,
+`engine.rs:4970-5152`). All macro draws come from the economy stream.
 
 The price path reads four things from the economy: the **corporate bond
 yield**, as the discount rate in fair value; **nominal output** and the
@@ -254,7 +254,7 @@ growth and $\mathrm{PE}$ the market's trailing P/E:
 
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
-earnings of [Fair value](#fair-value) (`engine.rs:5494-5540`).
+earnings of [Fair value](#fair-value) (`engine.rs:5583-5629`).
 
 | Phase | Min age (months) | Weibull shape $k$ | Weibull scale $\lambda$ | Mean length (months) |
 |---|---|---|---|---|
@@ -514,23 +514,23 @@ meetings.
 | $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
 | | `flight_to_quality_day` | 1 (0) | derived | a switch: the step reads the session's own return |
 | | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
-| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4846-4861`) |
+| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4884-4899`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
 the 0.8 floor are chosen. One limit: the model's inflation almost never
 leaves the under-3% regime, so stocks and Treasuries are nearly always in
 flight to quality. They match the pooled 2015-24 correlation, not the
-positive one of a 2022-style inflation regime (`params.rs:7180-7183`).
+positive one of a 2022-style inflation regime (`params.rs:7221-7224`).
 
 ### The aggregate earnings cycle
 
 **Timescale:** one step a session, in the macro step, after the phase
-check and before the central bank (`engine.rs:5072-5097`). **State:**
+check and before the central bank (`engine.rs:5099-5124`). **State:**
 $\chi_d$, a log level on every company's earnings beyond what nominal
 output gives them (`economy/state.rs:430-435`).
 
 The level is pulled toward a target set by the business cycle
-(`engine.rs:1515-1525`, `engine.rs:5076-5097`):
+(`engine.rs:1523-1533`, `engine.rs:5103-5124`):
 
 ```math
 \chi^{\ast}(\mathcal{P}) = \begin{cases} -\delta_E & \mathcal{P} \in \lbrace C, T \rbrace \\ \delta_E\,u_E & \mathcal{P} \in \lbrace E, P, R \rbrace \end{cases},
@@ -542,7 +542,7 @@ The level is pulled toward a target set by the business cycle
 Earnings therefore fall toward $e^{-0.2} - 1 = -18.1\%$ in a contraction
 and trough and recover toward $+1.8\%$ otherwise; the upside is set so the
 level averages to zero over a cycle. The run opens at the target of the
-phase it opens in (`engine.rs:1205-1212`). $\chi$ multiplies every
+phase it opens in (`engine.rs:1213-1220`). $\chi$ multiplies every
 company's restated earnings and book value through $n_d$ in
 [Fair value](#fair-value), so a move written at the close reaches prices on
 the next session.
@@ -615,7 +615,9 @@ over holding, in 30 of 30 21-year histories (design repository,
 
 Every other field of `macro_fields` reports the value the engine holds. The
 policy rate is known from the meeting that sets it, and yields, the VIX and
-oil are market prices, known as they print. Inflation and unemployment change
+oil are market prices, known as they print. Under `vix_stress_premium`,
+which is 0 on every preset, the published VIX carries a premium over the
+state in stress (see The published quote). Inflation and unemployment change
 only at the monthly step and are reported on the close that computes them,
 where the BLS publishes both a week or two after the month. A sandboxed
 agent's market view serves `macro_fields` through an allowlist of published
@@ -639,11 +641,11 @@ close $d$ is the true phase $L_c$ closes before:
 
 $\mathcal{P}_0$ is the opening phase, the one the run opens in after the
 burn-in and the stationary opening draw, so it stays published until $L_c$
-sessions have closed (`engine.rs:1371-1376`). At the end of each close's
+sessions have closed (`engine.rs:1379-1384`). At the end of each close's
 macro step, after the cycle and the central bank, the engine appends the
-phase to the history and drops the oldest (`engine.rs:1423-1432`,
-`engine.rs:5137`). The burn-in runs the same step, and the construction then
-refills the history with the opening phase (`engine.rs:1216`).
+phase to the history and drops the oldest (`engine.rs:1431-1440`,
+`engine.rs:5164`). The burn-in runs the same step, and the construction then
+refills the history with the opening phase (`engine.rs:1224`).
 
 A scenario or a `pin_macro` that sets the phase sets the true phase at once,
 so prices, the earnings cycle and the hazards react as they did before. The
@@ -657,7 +659,7 @@ arrives on the same schedule.
 `state_snapshot()["economy"]["cycle_phase"]` stays the true phase. While
 $L_c > 0$ the economy block also carries `cycle_history`, the $L_c + 1$ phase
 names oldest first, and the state hash takes the history after the phase, as
-a `u32` length then each name (`engine.rs:6612-6617`,
+a `u32` length then each name (`engine.rs:6705-6710`,
 `manifest.state_hash`). A restore refuses a history of the wrong length, or
 any history on an engine whose lag is 0. A snapshot without one, restored
 under the dial, refills the history with the restored phase, so that phase is
@@ -687,12 +689,12 @@ last day:
 \hat g_d = \begin{cases} g_0 & d < q - 1 + L_g \\ \bar g_{k^{\ast}},\quad k^{\ast} = \max\lbrace k : (k+1)q - 1 + L_g \le d \rbrace & \text{otherwise} \end{cases}
 ```
 
-(`engine.rs:1260-1265`, `engine.rs:1329-1356`). The step runs at the end of
-each close's macro step, after the phase is recorded (`engine.rs:5141`):
+(`engine.rs:1268-1273`, `engine.rs:1337-1364`). The step runs at the end of
+each close's macro step, after the phase is recorded (`engine.rs:5168`):
 the close's growth joins its quarter, the first close of a new quarter queues
 the last one's mean, and every figure due by that close is released. The
 construction seeds the figure with the opening growth after the burn-in
-(`engine.rs:1218`). A pin on growth writes the true growth, which reaches the
+(`engine.rs:1226`). A pin on growth writes the true growth, which reaches the
 published figure only through the mean of the quarter it falls in.
 
 The daily growth steps at every change of phase: the growth shock on entering
@@ -707,7 +709,7 @@ keys `published`, `quarter`, `count`, `sum`, `pending_days` and
 `pending_values`, in the economy's percent. The state hash takes it after the
 unemployment impulse below: the published figure, the quarter, the count, the
 sum, then a `u32` count of pending releases and each one's day and figure
-(`engine.rs:6626-6637`). A restore refuses the block on an engine whose lag
+(`engine.rs:6719-6730`). A restore refuses the block on an engine whose lag
 is 0, a quarter with no close in it, a non-finite figure and releases out of
 order. A snapshot without it, restored under the dial, publishes the
 restored growth and averages its quarter from the restore day on.
@@ -745,8 +747,8 @@ u_d = \mathrm{clip}\big(u + m_d + 0.06\,(u^{\ast} - u) + 0.06\,Z;\ 2.5,\ 15\big)
 
 $M$ is the macro month in sessions, 21 on pt-v19 and pt-v20. The NAIRU pull
 and the noise are as before, and the noise draw is taken in the same place. The impulse opens at the drive of the starting economy,
-before the burn-in, which then runs it (`engine.rs:1201`,
-`engine.rs:1235-1244`). At $H_u = 84$ sessions, $a = 0.159$, and the first
+before the burn-in, which then runs it (`engine.rs:1209`,
+`engine.rs:1243-1252`). At $H_u = 84$ sessions, $a = 0.159$, and the first
 monthly rise of a contraction is about 0.16 points on the same seeds. US
 unemployment rose from 4.3% to 5.5% over the 2001 recession and from 5.0% to
 9.5% from December 2007 to June 2009, by 0.1 to 0.3 points in each first
@@ -756,7 +758,7 @@ This dial moves the true unemployment rate, not a published copy of it, and
 so moves everything that reads the rate: inflation, confidence, the central
 bank and the phase hazards. While $H_u > 0$ the snapshot's economy block
 carries `unemployment_impulse`, and the state hash takes it after the phase
-history and before the GDP figure (`engine.rs:6620-6622`). A restore refuses
+history and before the GDP figure (`engine.rs:6713-6715`). A restore refuses
 it on an engine whose half-life is 0, and re-seeds it from the restored
 economy when a snapshot has none.
 
@@ -786,7 +788,7 @@ With `fear_greed_published_inputs` off, $\mathcal{P}'$ and $g'$ are the true
 phase and growth, so the index fell about 35 points in the five sessions
 after a contraction began and announced the turn to anyone reading it. With
 the switch on they are the published phase and growth as of the previous
-close, read before the step (`engine.rs:5051-5055`), so the index steps when
+close, read before the step (`engine.rs:5078-5082`), so the index steps when
 the turn is published. The switch adds no state, and with both publication
 lags at 0 it changes nothing. On desk seeds 201 to 212, with the cycle lag at
 252, the GDP lag at 21 and the unemployment half-life at 84, a rule that trades a five-session
@@ -814,8 +816,8 @@ an FOMC statement inside a 30-minute window (Gurkaynak, Sack and Swanson
 2005; Bernanke and Kuttner 2005).
 
 With `macro_publication_repricing` on, each public, solvent name that has
-traded is re-marked as the step ends (`engine.rs:5549-5557`,
-`engine.rs:5567-5671`). With $P$ its last print, $V_0$ its fair value before
+traded is re-marked as the step ends (`engine.rs:5638-5646`,
+`engine.rs:5656-5760`). With $P$ its last print, $V_0$ its fair value before
 the step and $V_1$ after it, both computed as the tick computes them on the
 same day (`market/tick.rs:1764-1797`), the new price solves
 
@@ -829,8 +831,8 @@ $P' = P V_1(P) / V_0$ until a step moves nothing, at most 16 times; with the
 buyback share at 0 the first step is exact. The mispricing $s$ is left as it
 was, so the next tick starts on the model price the new state implies. The
 day's high, low and market cap follow the new price. A `pin_macro` re-marks
-the same way, around its write (`python_engine.rs:3047`,
-`python_engine.rs:3125-3126`).
+the same way, around its write (`python_engine.rs:3049`,
+`python_engine.rs:3130-3131`).
 
 The re-mark reads the true state the step leaves, as the next tick would.
 The policy rate and the corporate yield are published as they are set, so
@@ -915,7 +917,7 @@ What follows from this:
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
-| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2874-2916`); see [Known gaps](#known-gaps) |
+| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2912-2954`); see [Known gaps](#known-gaps) |
 | $\eta$ | `earnings_nominal_growth` | 1.0 | derived | holds the earnings share of nominal output constant |
 | $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
 | $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | guard | keeps the buyback term finite for a company near the price floor |
@@ -956,7 +958,7 @@ curve (0.15 while the market is closed). The price moves by the whole shock
 either way; what changes is how much of it later reverts. The
 $-\tfrac{1}{2}\Delta v^{2}$ term keeps $e^{v}$ a martingale. The close's jumps
 are split the same way: a company's own jump on $\psi$, the market jump on
-$\psi_m$ (`engine.rs:4704-4744`).
+$\psi_m$ (`engine.rs:4717-4757`).
 
 The market's share $\psi_m$ = `fair_value_market_share` is cut above a
 ceiling on the market factor's current daily sigma $\sigma_t$, with $c$ =
@@ -1019,15 +1021,15 @@ x = \begin{cases} \max\big(0,\ \ln(X/K)\big) & H_x = 0 \\ x_d & H_x > 0 \end{cas
 x_{d} = x_{d-1} + \big(1 - 0.5^{1/H_x}\big)\big(\max(0, \ln(X_d/K)) - x_{d-1}\big)
 ```
 
-(`market/tick.rs:1690-1723`, `engine.rs:5099-5109`). $X$ is the VIX and
+(`market/tick.rs:1690-1723`, `engine.rs:5126-5136`). $X$ is the VIX and
 $H_x$ = `fair_value_vix_half_life` in sessions; the smoothed exposure steps
 once at each close, after the VIX has moved, and takes no draw. The discount
 is applied in the tick (`market/tick.rs:1128`), the overnight opening print
-(`engine.rs:4185`), the re-mark at publication and the stationary opening
+(`engine.rs:4198`), the re-mark at publication and the stationary opening
 (`market/tick.rs:1755`, `market/tick.rs:1796`). It has no permanent part: it
 deepens a fall while fear is high and is given back as the VIX comes down.
 While $g > 0$ and $H_x > 0$ the snapshot's economy block carries
-`vix_feedback`, and the state hash takes it (`engine.rs:6501-6504`).
+`vix_feedback`, and the state hash takes it (`engine.rs:6594-6597`).
 
 Why pt-v20 takes it. With the market's plain shocks permanent, the driven
 2020 path fell 0.192 in 41 sessions against the S&P 500's 0.339 in 23 (long-run
@@ -1110,9 +1112,9 @@ profitable company $\ln u_i^{PE} - \ln R_{i,0}$ and for a loss-maker
 $-\ln u_i^{K}$. The model's own stationary spread of $s$ is about 0.016, so
 putting the whole premium into $s$ would open every run with a months-long
 drift back to fair value. Instead, at the first open tick, the premium is
-split between $s$ and the fair-value level $v$ (`engine.rs:4520-4559`), using
+split between $s$ and the fair-value level $v$ (`engine.rs:4533-4572`), using
 $n + 1$ normals drawn once from the opening stream when the engine is built
-(`engine.rs:1114-1123`):
+(`engine.rs:1121-1130`):
 
 ```math
 s_{i,0} = \mathrm{clip}\big(\sigma_c\,z_{n+1} + \sigma_o\,(z_i - \bar z);\ -0.9,\ 0.9\big),
@@ -1188,7 +1190,7 @@ The momentum term rolls at the close, before the jumps
 (`market/daily.rs:240-244`): $\mu_{i,d+1} = s_i^{\mathrm{close}} - s_i^{\mathrm{ref}}$,
 then $s_i^{\mathrm{ref}} \leftarrow s_i^{\mathrm{close}}$. Jumps are excluded
 from the next day's momentum (`jump_momentum_share` = 0,
-`engine.rs:4661-4666`).
+`engine.rs:4674-4679`).
 
 **As a daily AR(2).** Summed over a session, with the crowd term in its
 linear range and no clamp binding, the close-to-close mispricing follows
@@ -1238,7 +1240,7 @@ $N^{M}$ is market-wide news, which stays in $s$. The Ito term keeps
 $e^{v}$ a martingale. The price takes the whole shock on the tick either
 way; what changes is that the company's part no longer reverts on the
 mispricing's half-life. At the close the company's own jump goes to $v$ the
-same way (`engine.rs:4696-4744`). The market's share of both, which
+same way (`engine.rs:4709-4757`). The market's share of both, which
 pt-v20 also sets, is in [The permanent share of market moves](#the-permanent-share-of-market-moves):
 
 ```math
@@ -1360,7 +1362,7 @@ and down ladders mirror images, and it and the ladder constants are chosen.
 
 At each open every company draws a uniform and a normal on the news stream.
 With probability $\lambda_N$ it has a news event of log size
-$\nu_e = \sigma_N Z$ (`engine.rs:3997-4014`). An event reaches company $i$
+$\nu_e = \sigma_N Z$ (`engine.rs:4010-4027`). An event reaches company $i$
 with weight
 
 ```math
@@ -1386,7 +1388,7 @@ and the news term in the mispricing equation is
 N_{i,t} = 390 \sum_{e} w_{e,i}\,\nu_e\,\big(\mathcal{A}(t + 1) - \mathcal{A}(t)\big)
 ```
 
-(`engine.rs:2443-2453`, `market/factors.rs:536-589`). Over the session an
+(`engine.rs:2451-2461`, `market/factors.rs:536-589`). Over the session an
 event moves $s$ by $w \nu_e$: 61% of that in the first minute, 89% by the
 fifth and 99% by the 150th. The market
 maker re-quotes by the tick's news term before any trade, so the traded price
@@ -1406,7 +1408,7 @@ carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1487-1505`)
 ### Jumps
 
 **Timescale:** once a day, at the close, on the jumps stream
-(`engine.rs:4601-4745`). A market jump hits every company with unit loading;
+(`engine.rs:4614-4758`). A market jump hits every company with unit loading;
 an idiosyncratic jump hits one company. Both rates rise with the VIX, and the
 expected market jump is subtracted so jumps add no drift:
 
@@ -1670,7 +1672,7 @@ e_{i,d} = \sum_{t} u(\tau_t)\,\varepsilon_{i,t}
 ```
 
 The innovation $e_{i,d}$ is the day's whole noise term for the company:
-market, sector and own parts together (`engine.rs:3664-3667`). The
+market, sector and own parts together (`engine.rs:3672-3675`). The
 persistence $\alpha + \beta + \gamma/2 = 0.9416$ is a half-life of 11.5
 sessions. The recursion's own unconditional level,
 $\omega / (1 - 0.9416) = 3.4 \times 10^{-5}$, sits below the floor
@@ -1690,7 +1692,7 @@ not $\omega$, holds the resting level.
 ### Sector variance
 
 **Timescale:** daily, at the close. **State:** $h_{k,d}^{S}$, a variance ratio
-whose fixed point is 1 (`engine.rs:1661-1689`). $D_{k,d} = \sum_t G_{k,t}$ is
+whose fixed point is 1 (`engine.rs:1669-1697`). $D_{k,d} = \sum_t G_{k,t}$ is
 the day's summed sector factor.
 
 ```math
@@ -1735,7 +1737,7 @@ structure; $\Lambda_d = (1 + a_L)^{2}$ if today's summed market factor
 was negative, else 1; and $J_d^{V}$ is the variance the jumps and news add.
 
 The VIX it implies, and the anchor $A$ (`market/index_var.rs:1189-1191`,
-`engine.rs:1575-1598`):
+`engine.rs:1583-1606`):
 
 ```math
 I_d = (1 + \varpi)\cdot 100\,\sqrt{252\,V_d},
@@ -1759,9 +1761,9 @@ or two uniforms on the economy stream, and one normal on the VIX level
 stream at the close. **State:** $X_d$, a slow log level $q_d$, and the
 anchor's slow memory $M_d$.
 
-A slow level wanders around the anchor (`engine.rs:4339-4352`,
-`engine.rs:5390-5413`), and a slow memory tracks the read-back
-(`engine.rs:4924-4941`):
+A slow level wanders around the anchor (`engine.rs:4352-4365`,
+`engine.rs:5479-5502`), and a slow memory tracks the read-back
+(`engine.rs:4937-4968`):
 
 ```math
 q_d = \phi_q\,q_{d-1} + \frac{\sigma_\ell}{G_\ell}\,Z,
@@ -1832,6 +1834,44 @@ does not move, it takes no noise and no jump.
 | $\phi_q$, $\sigma_\ell$, $G_\ell$ | `vix_level_persistence`, `vix_level_sigma`, `vix_level_loop_gain` | 0.9979, 0.0181, 1.79 | derived | yearly medians of the log VIX, 1990 to 2024 |
 | | `vix_return_clamp` | 15 | guard | |
 
+### The published quote
+
+**Timescale:** once a day, at the close. **Draws:** none. **State:** a
+stress memory $m_d$, carried only while the gain is set.
+
+The loop damps the VIX state against the anchor's slow memory $M_d$, which
+it needs for stability. The damping costs the quote its level in stress: on
+pt-v20's held-out histories the median VIX over trailing 21-session realised
+volatility, on sessions with that volatility at 40 or more, is 0.67, where
+the S&P 500 and ^VIX tape, 1990 to 2025, gives 0.83. Three dials, 0 on every
+preset, lift the published quote only (`engine.rs:4954-4967`,
+`engine.rs:5431-5466`):
+
+```math
+m_d = \begin{cases} 0 & \text{the VIX was pinned today} \\
+(1 - h_M)\,m_{d-1} + h_M \ln\dfrac{I_d}{A\,e^{-c_A}} & \text{otherwise} \end{cases}
+\qquad
+\pi_d = P\Big(1 - e^{-g\,(m_d - k)^{+} / P}\Big),
+\qquad
+Q_d = \min\big(X_d\,e^{\pi_d},\ X_{\max}\big)
+```
+
+In a free run $m_d$ is $M_d$ to the bit. $Q_d$ is what `macro_fields["vix"]`,
+`macro_state.vix`, `macro_table()` and the wasm getter report. Every reader
+inside the engine reads the state $X_d$: the variance couplings, the
+fair-value discount, the book, rates, the central bank, fear and greed, the
+crisis thresholds and $M_d$ itself. So with the premium on, every price and
+every other macro series is the one the premium-off run gives, and
+`state_snapshot()["economy"]["vix"]` and the `macro.vix` intervention's read
+are the state. A pin writes the state and resets $m_d$, so the quote reads
+the pin back.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $g$ | `vix_stress_premium` | 0 (off) | fitted | vix-peaks design, held-out seeds 201-230, 501-530, 801-830; not adopted |
+| $k$ | `vix_stress_premium_knee` | 0 | fitted | on $M_d$'s log scale |
+| $P$ | `vix_stress_premium_cap` | 0 | chosen | the largest log premium; the quote is at most $e^{P}$ times the state |
+
 ## Crisis regimes
 
 A crisis is a state of the VIX. There is no separate regime switch: every
@@ -1850,7 +1890,7 @@ that once raised every company's market loading in a crisis is switched off
 (`crisis_blend_gain` = 0): the data showed no crisis correlation beyond
 what the higher common volatility already gives.
 
-**The crisis episode and its epicentre** (`engine.rs:3708-3780`). An episode
+**The crisis episode and its epicentre** (`engine.rs:3716-3788`). An episode
 starts at the open of the first session with $X_d > X_c$. One uniform on the
 epicentre stream picks the sector it starts in: financial services with
 probability 0.6, no epicentre with 0.4. The episode ends after 21
@@ -2026,9 +2066,9 @@ D_{t+1} = D_t\,2^{-1/H_B}
 ```
 
 and a fill against the maker moves the maker's inventory at the next
-re-quote (`engine.rs:2779-2798`), and at the open everything resets.
+re-quote (`engine.rs:2787-2806`), and at the open everything resets.
 
-A limit order's remainder rests (`engine.rs:3240-3256`). Each tick it is
+A limit order's remainder rests (`engine.rs:3248-3264`). Each tick it is
 also posted into the settlement book, where the background flow can fill it
 at its limit, as a maker fill (`microstructure.rs:674-716`,
 `microstructure.rs:740-755`).
@@ -2036,8 +2076,8 @@ at its limit, as a maker fill (`microstructure.rs:674-716`,
 ### The path of a fill to the price
 
 All agents' taker fills since the last tick are applied once, on the next
-open tick (`engine.rs:2513-2537`). Each agent's net fill leaves a linear
-permanent impact on $s$, Almgren's law (`engine.rs:2801-2806`):
+open tick (`engine.rs:2521-2545`). Each agent's net fill leaves a linear
+permanent impact on $s$, Almgren's law (`engine.rs:2809-2814`):
 
 ```math
 \Delta s_i = \sum_{a} \gamma\,\sigma_i\,\frac{b_{a,i} - x_{a,i}}{\bar A_i}
@@ -2264,7 +2304,7 @@ $c^{\mathrm{vol}}(\tau)$ is the intraday U-shape: 2.9 at the open, 1.07 at its l
 around 12:50, 2.4 at the close. Two more multipliers, one for closed-market
 ticks and one for news a caller supplies, are 1 in a normal run.
 $\Psi$ raises volume with the day's move so far, measured on the model price. The persistent volume state is an AR(1)
-stepped at each close (`engine.rs:4792-4804`):
+stepped at each close (`engine.rs:4805-4817`):
 
 ```math
 \vartheta_{d+1} = \rho_V\,\vartheta_d + \sigma_V\,Z
@@ -2413,7 +2453,7 @@ transmission while the spread is held.
 **What a pin does to the economy underneath.** A pin writes the value each
 morning. The macro step still runs at every close, starting from the pinned
 value, and every other field follows from it; the next morning the pin
-overwrites the pinned field again (`python_engine.rs:3048-3096`). When the
+overwrites the pinned field again (`python_engine.rs:3050-3098`). When the
 pin ends, the economy carries on from the last value. Two fixes on
 `fix/ptv20-core` for this release (commits `cd15126` and `fe8bcef`) close
 a leak the daily corporate yield opened on pt-v20: a pinned corporate yield
@@ -2527,6 +2567,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Down-market idiosyncratic suppression** (`market_idio_down_suppress`) and a beta-dependent idiosyncratic scale (`idio_sigma_beta_exponent`).
 - **Macro pins that hold through the close** (`macro_pins_hold`). On, every field pinned on a session holds at its pinned value through that night's close, the meeting included: the cycle's roll is taken and dropped while the phase keeps ageing, the 10- and 2-year's steps are taken and dropped, a pinned policy rate forces a hold after the ladder's draws, and a held 10-year takes its re-anchoring change off the corporate and mortgage rates. Every draw is still taken, so the economy stream does not move. A pin that changes the phase starts the new phase's clock.
 - **A pinned VIX priced when it is published** (`pinned_vix_feedback`; read only with `fair_value_vix_discount` and `fair_value_vix_half_life` set). On, a VIX pin sets the smoothed exposure to the pinned VIX's own excess over the knee before the pin's re-mark, and the close holds it; the pull resumes on the first session nobody pins. With `macro_pins_hold` and `corporate_yield_daily` also on, and no level or spread pinned that session, the pin charges the corporate yield the close's own VIX term (2 bp a point times the phase's multiplier) on the pin's change, so a pinned rise reaches credit as the fall after its release does.
+- **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work
