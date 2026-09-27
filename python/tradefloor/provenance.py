@@ -470,6 +470,14 @@ OUT_OF_SCOPE = {
     "fed_stress_inflation_gap":
         "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
         "stress branch that reads it does not run",
+    "book_arrival_shuffle":
+        "inert at 0.0 as shipped: `World.run` executes a cohort in sorted "
+        "label order, so on a live book the same label takes the levels and "
+        "the queue first on every step. Read only by a cohort of two or "
+        "more agents; a single agent, `evaluate` and an untraded market "
+        "never read it (0.8.5, arrival-order work: the later of two "
+        "identical 10%-of-ADV buyers paid about 23 bp more on 30 of 30 "
+        "held-out seeds on pt-v20)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

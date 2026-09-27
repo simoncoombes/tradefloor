@@ -356,6 +356,11 @@ pub struct DayAdvanceOutcome {
 /// without anyone remembering to.
 #[derive(Clone)]
 pub struct Engine {
+    /// The root seed the streams were derived from. Kept only to key
+    /// [`Engine::arrival_order`], which is a function of it and holds no
+    /// state, so nothing snapshots, restores or hashes it: an engine is
+    /// always built from its seed.
+    root_seed: u64,
     market_rng: GameRng,
     economy_rng: GameRng,
     external_rng: GameRng,
@@ -1276,6 +1281,7 @@ impl Engine {
         let nominal_output_base = economy.gdp * economy.cpi;
         let mut engine = Self {
             nominal_output_base,
+            root_seed: seed,
             market_rng: GameRng::substream(seed, stream::MARKET),
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
@@ -3500,6 +3506,26 @@ impl Engine {
     /// share, or when their limit orders rest in it.
     pub fn book_live(&self) -> bool {
         self.params.book_shared != 0.0 || self.params.book_resting != 0.0
+    }
+
+    /// The order in which a cohort's orders reach the book on one step:
+    /// `labels` sorted, which is the order at `book_arrival_shuffle` 0.0,
+    /// or with the switch on sorted by [`crate::rng::arrival_priority`] of
+    /// this engine's seed, `day` and `step_of_day`, ties (a 2^-64 event)
+    /// broken by the label. Reads no stream and moves nothing.
+    pub fn arrival_order(&self, day: u64, step_of_day: u64, labels: &[String]) -> Vec<String> {
+        let mut out: Vec<String> = labels.to_vec();
+        if self.params.book_arrival_shuffle == 0.0 {
+            out.sort();
+            return out;
+        }
+        let seed = self.root_seed;
+        let mut keyed: Vec<(u64, String)> = out
+            .drain(..)
+            .map(|l| (crate::rng::arrival_priority(seed, day, step_of_day, &l), l))
+            .collect();
+        keyed.sort();
+        keyed.into_iter().map(|(_, l)| l).collect()
     }
 
     /// Whether the book a caller reads is the agent-facing one rather than

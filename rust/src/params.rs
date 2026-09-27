@@ -4192,6 +4192,31 @@ pub struct ModelParams {
     /// partially when that flow is smaller than the queue ahead of it plus
     /// the order, and at its own price. Cancelling removes it.
     pub book_resting: f64,
+    /// Whether the arrival order of a cohort's orders at the shared book is
+    /// a seeded shuffle, fresh every step. A switch.
+    ///
+    /// 0.0, which every preset carries: a `World` cohort executes in sorted
+    /// label order on every step, so on a live book (`book_shared`) the
+    /// same label always takes the levels first and stands first in the
+    /// resting queue. The label is then a latency advantage nobody chose:
+    /// on pt-v20's graded arm the later label of two identical 10%-of-ADV
+    /// buyers pays about 23 bp more on 30 of 30 held-out seeds, and two
+    /// identical momentum agents split by about 4 per cent in 20 days.
+    ///
+    /// 1.0: each step's order is the labels sorted by
+    /// [`crate::rng::arrival_priority`], a counter-based function of the
+    /// run's seed, the world's day, the step within the day and the label.
+    /// Each label is first equally often and the order is independent from
+    /// step to step, so a name buys no priority (Nasdaq Rule 4757 ranks
+    /// orders by price and then time, never by identity; agent-based
+    /// toolkits reshuffle the activation order every step, Axtell 2001).
+    /// The priority is pairwise, so removing or freezing an agent never
+    /// reorders the others. It holds no state and takes no draw from any
+    /// stream, so nothing is snapshotted, restored or hashed, and no market
+    /// draw moves. Read only by a cohort (`World` with two or more agents):
+    /// a single agent, `evaluate` and an untraded market never read it.
+    /// Off the live book it orders only `World.rejected`.
+    pub book_arrival_shuffle: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills.
@@ -5500,6 +5525,7 @@ impl ModelParams {
             book_shared: 0.0,
             book_refill_half_life: 0.0,
             book_resting: 0.0,
+            book_arrival_shuffle: 0.0,
             fill_impact_coefficient: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
@@ -7849,6 +7875,7 @@ impl ModelParams {
             "book_shared" => self.book_shared,
             "book_refill_half_life" => self.book_refill_half_life,
             "book_resting" => self.book_resting,
+            "book_arrival_shuffle" => self.book_arrival_shuffle,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
@@ -8114,6 +8141,7 @@ impl ModelParams {
             "book_shared" => out.book_shared = value,
             "book_refill_half_life" => out.book_refill_half_life = value,
             "book_resting" => out.book_resting = value,
+            "book_arrival_shuffle" => out.book_arrival_shuffle = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
@@ -8494,7 +8522,8 @@ impl ModelParams {
                           ("pinned_vix_feedback", self.pinned_vix_feedback),
                           ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
-                          ("book_resting", self.book_resting)] {
+                          ("book_resting", self.book_resting),
+                          ("book_arrival_shuffle", self.book_arrival_shuffle)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -9130,6 +9159,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_shared",
         "book_refill_half_life",
         "book_resting",
+        "book_arrival_shuffle",
         "fill_impact_coefficient",
         "news_peer_vix_coupling",
         "news_peer_weight",

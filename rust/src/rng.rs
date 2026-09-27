@@ -519,6 +519,16 @@ pub mod stream {
     /// this stream.
     pub const CYCLE_NOWCAST: u32 = 11;
 
+    /// The arrival order of a cohort's orders at the shared book, under
+    /// `book_arrival_shuffle`. Not a generator at all: the id only keys
+    /// [`super::arrival_priority`], a counter-based function of the seed,
+    /// the day, the step and the label, so there is no position to
+    /// snapshot, restore or mark and it sits outside [`COUNT`] as
+    /// [`OPENING`] does. No stream's draws move at any setting. It is 12,
+    /// not the 11 sim/real-arrival-order chose, because [`CYCLE_NOWCAST`]
+    /// took 11 in sim/r13.
+    pub const ARRIVAL: u32 = 12;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
@@ -601,6 +611,37 @@ fn stream_mix(root_seed: u64, stream_id: u32) -> u64 {
     } else {
         root_seed ^ splitmix64_mix(((stream::SEED64_TAG as u64) << 32) | stream_id as u64)
     }
+}
+
+/// FNV-1a over bytes, 64-bit. Integer-only; keys a label for
+/// [`arrival_priority`].
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xCBF2_9CE4_8422_2325;
+    for &b in bytes {
+        h = (h ^ b as u64).wrapping_mul(0x0000_0100_0000_01B3);
+    }
+    h
+}
+
+/// A label's priority at the book on one step, under
+/// `book_arrival_shuffle`: the step's arrival order is the labels sorted by
+/// `(priority, label)`, lowest first.
+///
+/// ```text
+/// base = splitmix64_mix(stream_mix(seed, ARRIVAL))
+/// key  = splitmix64_mix(splitmix64_mix(base ^ day) ^ step_of_day)
+/// prio = splitmix64_mix(key ^ fnv1a64(utf8(label)))
+/// ```
+///
+/// Counter-based, so it consumes no draw and holds no state. Each label's
+/// priority depends on nothing but its own name, so the relative order of
+/// two labels is the same whichever other labels are present: removing,
+/// freezing or adding an agent never reorders the rest. `stream_mix` is the
+/// stream derivation's own, so a seed at or above `2^32` keys it whole.
+pub fn arrival_priority(seed: u64, day: u64, step_of_day: u64, label: &str) -> u64 {
+    let base = splitmix64_mix(stream_mix(seed, stream::ARRIVAL));
+    let key = splitmix64_mix(splitmix64_mix(base ^ day) ^ step_of_day);
+    splitmix64_mix(key ^ fnv1a64(label.as_bytes()))
 }
 
 /// The draw interface the engine modules consume.
@@ -1673,6 +1714,20 @@ mod seed64_tests {
             assert!(!narrow.contains(&GameRng::surgery(WIDE, id, 1).snapshot().increment));
             assert!(!narrow.contains(&GameRng::surgery(42, id, 1 << 40).snapshot().increment));
         }
+    }
+
+    /// The arrival priority is the documented formula, pinned by golden
+    /// values that `tests/test_arrival_order.py` computes independently in
+    /// Python.
+    #[test]
+    fn arrival_priority_is_the_documented_formula() {
+        assert_eq!(arrival_priority(201, 0, 0, "a"), 0x09f6_9160_e6ea_96dc);
+        assert_eq!(arrival_priority(201, 3, 1, "b"), 0x3bc1_d0a9_9543_6b68);
+        assert_eq!(arrival_priority((1 << 40) + 7, 5, 2, "claude"), 0x32c6_8be7_c13f_fe3b);
+        // order(201, 3, 1, [a, b]) is [b, a].
+        assert!(arrival_priority(201, 3, 1, "b") < arrival_priority(201, 3, 1, "a"));
+        assert_eq!(fnv1a64(b""), 0xCBF2_9CE4_8422_2325);
+        assert_eq!(fnv1a64(b"a"), 0xAF63_DC4C_8601_EC8C);
     }
 
     /// The raw generator takes the seed whole: below `2^32` it is the

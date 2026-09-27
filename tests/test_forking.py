@@ -1100,7 +1100,10 @@ def _nothing_dormant():
                    rate_intraday_live=1.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
-                   pinned_vix_feedback=1.0)
+                   pinned_vix_feedback=1.0,
+                   # A switch. It moves only a World cohort's order, which an
+                   # untraded market does not have.
+                   book_arrival_shuffle=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

@@ -83,6 +83,10 @@ in a cohort take no levels from each other, because
 :meth:`Portfolio.execute` reads the ladder and removes nothing. Under a
 model with ``book_shared`` on, as pt-v20, the default, has it, they do: an
 agent later in a step's arrival order meets the book an earlier one left.
+That order is label order at ``book_arrival_shuffle`` 0.0, so ``levels``
+then runs mostly from the earlier label to the later one; with the switch
+on it is a seeded shuffle fresh every step, and the matrix measures the
+agents rather than their names.
 That arrives through fills rather than prices, so it is measured apart, as
 :attr:`Externality.levels`: ``levels[a][b]`` is what b's
 execution cost against each step's opening mid changes by when a stops

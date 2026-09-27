@@ -715,6 +715,8 @@ PARAM_SPECS: dict[str, dict] = {
                               "hard_range": (0.0, 390.0), "derived": True},
     "book_resting": {"kind": "abs", "step_unit": 1.0,
                      "hard_range": (0.0, 1.0), "derived": False},
+    "book_arrival_shuffle": {"kind": "abs", "step_unit": 1.0,
+                             "hard_range": (0.0, 1.0), "derived": False},
     "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
                                 "hard_range": (0.0, 5.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
