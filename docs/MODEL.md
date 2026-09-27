@@ -740,7 +740,7 @@ A scenario or a `pin_macro` that sets the phase sets the true phase at once,
 so prices, the earnings cycle and the hazards react as they did before. The
 new phase is published $L_c$ closes after the first close it holds for, and
 a pinned phase reads back from `macro_fields["cycle"]` only then. The
-packaged `recession.yml`, for example, sets contraction on day 50 and trough
+packaged `recession.yml`, for example, sets contraction on day 71 and trough
 on day 365, and an observer reads them about $L_c$ sessions later. A
 turn announced in a World's trace rows or a hosted market log's cycle events
 arrives on the same schedule.
@@ -2574,27 +2574,31 @@ sessions from the start of the run, or from the fork.
 
 ### The packaged recession
 
-`recession.yml` is dated on September 2007: day 50 is December 2007, the
-NBER peak, and a month is 21 sessions. From 0.8.5 the recession ends and
-hands back to the model's own cycle
+`recession.yml` is dated on September 2007 on the NBER's phases: day 50 is
+December 2007, the NBER peak, and a month is 21 sessions. From r15 it is the
+r13 scenario-frontrun design's candidate I
 (`python/tradefloor/scenarios/recession.yml`):
 
-- The cycle is set to contraction on day 50 and held 315 sessions, to March 2009. On day 365 it is set to trough, and on day 428, June 2009, the NBER's trough, to recovery, and then left to the model's own cycle. Left to its own hazards from day 365, the model's cycle kept one seed in 30 in trough for more than 24 months after the onset.
-- Growth is held at -2% from day 50 to day 364, then released.
-- The VIX is multiplied by 3 for 60 sessions from day 50.
-- The corporate yield is 150 bp wider for 378 sessions from day 50, comes back to its day-50 level over the next 252, eases 110 bp more over the 378 after that, and is released to the model's own chain on day 1058. Moody's Baa yield (FRED DBAA) was 6.65% in December 2007, 9.2% at its peak in November 2008, 6.3% in September 2009 and 5.25% in December 2011.
-- Every company's earnings are multiplied down to 0.65 of their level by day 301, in two ramps (0.808 over 121 sessions from day 50, 0.805 over 131 from day 171), held there to day 490, September 2009, and restored in two ramps: to 0.96 of their pre-shock level by day 680, June 2010 (1.477 over 189 sessions from day 491), and to 1 by day 932 (1.042 over 252 from day 680). The cut stacks on pt-v20's earnings cycle, which takes about 18% off in a contraction at its depth of 0.2. Together they fall about 47% by day 365. S&P 500 four-quarter operating earnings fell 57%, from 91.47 dollars in Q2 2007 to 39.61 in Q3 2009, and were about 0.92 of the 2007 peak over 2010 and 1.05 over 2011.
+- The cycle is held at peak from day 50 and in contraction from day 71 to day 364, with growth held at -2% through the contraction. On day 365 it is set to trough, and on day 428, June 2009, the NBER's trough, to recovery, and then left to the model's own cycle.
+- Every company's earnings are multiplied down to 0.93 of their level by day 249 and to 0.70 by day 364, held to day 490 (September 2009), and restored to 0.96 by day 742 and to 1 by day 994. The cut stacks on pt-v20's earnings cycle. S&P 500 four-quarter operating earnings fell 57% from Q2 2007 to Q3 2009 and were about 0.92 of the 2007 peak over 2010.
+- The VIX is doubled over 20 sessions from day 250 (Lehman), held 40 sessions, eased to 0.6 of that level by day 428 and released. The doubling is of the model's own VIX on day 250.
+- Credit moves on the spread over the 10-year (`macro.corporate_spread`): +70 bp by day 249, +150 bp by day 289, held to day 364, back to +35 bp by day 616 and to nothing by day 805, then released. The 10-year's own noise and the policy rate still move the level.
 
-The first 120 sessions are the 0.8.5 recalibration's, to within the last
-bit, and it measured -44.7% at 120 sessions, paired against the same seed
-with no scenario, on the certified roster over seeds 301 to 330. That was
-pt-v20 before its graded arm (box ptv20g3). The scenario sets the true phase
-and growth. Under [the publication dials](#true-and-published-state) an
-observer reads contraction about $L_c$ sessions after day 50 and growth as
-quarterly means. The recovery was tuned on the arm's permanent market share
-without the volatility feedback (the file's header gives the path), and the
-grade measures it on pt-v20 as it ships (rows S1a, S1b and S2 of the
-twelfth registration).
+The 0.8.5 file fired everything on day 50 (the contraction, a corporate
+level 150 bp up and held, the VIX times 3 for 60 sessions): the paired index
+gapped -13.9% (log) on the morning of the December 2007 date, a VIX timer
+(out above 40, back below 30) beat holding by 20 to 23 points on 21 or 22 of
+30 seeds, and the held level froze the corporate yield. On pt-v20 with r13's
+and r14's dials and `pinned_vix_feedback` 0.8, `pinned_vix_variance_share`
+0.7 (box r15scen1, held-out seeds 201-230), the index wins back 57% of its
+fall in the 252 sessions after its low (row S1a; 2009: 62%), rises 69.1% in
+those sessions (S2; 2009: 69%), every seed is out of contraction within 24
+months (S1b), the day-50 morning moves it -4.5% and the VIX timer beats
+holding by +1.7 points (ahead on 4 of 30 seeds). On pt-v20 as graded (r14
+screen) the file reads S1a 0.68, S1b 30 of 30 and S2 +79.8, 0.2 inside the
+band. The scenario sets the true phase and growth; under [the publication
+dials](#true-and-published-state) an observer reads the phase about $L_c$
+sessions later and growth as quarterly means.
 
 ### Scenario operations
 
@@ -2657,8 +2661,9 @@ pinned VIX is published at the open, but the volatility feedback's smoothed
 exposure (`fair_value_vix_half_life`) reaches it only through the close's
 pull, so the discount lands over the following weeks: a VIX held at x3.5
 for 25 sessions moves the paired index 0.00 on the morning it is published
-and -21.7% (log) over the next 24 sessions. Two switches, both off on
-pt-v20, change this; see [Off in pt-v20](#off-in-pt-v20).
+and -21.7% (log) over the next 24 sessions. Three dials, all off on pt-v20,
+change this (`macro_pins_hold`, `pinned_vix_feedback`,
+`pinned_vix_variance_share`); see [Off in pt-v20](#off-in-pt-v20).
 
 A **pinned spread** (`macro.corporate_spread`,
 `pin_macro(corporate_spread=...)`) sets the corporate yield to the 10-year
@@ -2721,7 +2726,7 @@ roster over seeds 301 to 330, and is measured again on the graded arm,
 paired against the same seed with no scenario (box ptv20g6); the r13 files
 carry desk figures on the same roster:
 
-- `recession`, to 2008's path, as [The packaged recession](#the-packaged-recession) sets it out: contraction on day 50 held to March 2009, then trough, recovery on the NBER trough date and the model's own cycle; growth held at -2% to day 364; the VIX times 3 for 60 sessions; credit 150 bp wider, then easing along Baa to 2011; earnings cut to 0.65 by day 301, held to day 490 and restored by day 932. The index falls 28.1% by session 63 and 39.3% by session 120 (30.4% and 44.7% on pt-v20 before its graded arm, box ptv20g3). It wins back 49% of its fall within 252 sessions of the low (row S1a, 2009: 62%) and rises 54.6% in those sessions (row S2, 2009: 69%), and every seed is out of contraction within 24 months (S1b).
+- `recession`, to 2008's path on the NBER's phases, as [The packaged recession](#the-packaged-recession) sets it out: peak from day 50, contraction from day 71 to March 2009, trough, recovery on the NBER trough date and the model's own cycle; growth held at -2% through the contraction; earnings to 0.70 by day 364; the VIX doubled from day 250 (Lehman); credit +150 bp on the spread by day 289. It replaced the 0.8.5 file in r15. Graded on the 0.8.5 file, pt-v20 won back 49% of its fall within 252 sessions of the low (row S1a, 2009: 62%) and rose 54.6% (row S2, 2009: 69%), every seed out of contraction within 24 months (S1b, box ptv20g6); on this file it reads 0.68, +79.8 and 30 of 30 on held-out seeds.
 - `liquidity_crisis`, to March 2020's speed, reshaped in r13: book depth times 0.4 for 25 sessions; the VIX times 3 over ten sessions, held to day 74, then to 0.6 of that over ten and held twenty more; credit +50 bp on the spread over the 10-year for 25 sessions, ramped back over ten; earnings times 0.9 over a month and back over two. Desk figures on seeds 201-212 (not the grade): the morning of day 50 moves the index -2.0% (log), the close 24 sessions later is -17.7% below that mark, and a VIX timer (out above 40, back in below 30) earns -3.6 points against holding (mean). Before it, the VIX went times 3.5 at once, the price reached it over the following weeks, and the same timer earned +10.4 (ahead on 10 of 12 seeds).
 - `curve_shock`: the policy rate held 200 bp higher, and both Treasury yields and the corporate yield moved up 200 bp on day 50 and carried by the chain from there. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 7.2% by day 120. `rate_shock` is the same without the 2-year.
 
@@ -2750,7 +2755,14 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Company volume state** (`volume_idio_persistence`, `volume_idio_sigma`).
 - **Down-market idiosyncratic suppression** (`market_idio_down_suppress`) and a beta-dependent idiosyncratic scale (`idio_sigma_beta_exponent`).
 - **Macro pins that hold through the close** (`macro_pins_hold`). On, every field pinned on a session holds at its pinned value through that night's close, the meeting included: the cycle's roll is taken and dropped while the phase keeps ageing, the 10- and 2-year's steps are taken and dropped, a pinned policy rate forces a hold after the ladder's draws, and a held 10-year takes its re-anchoring change off the corporate and mortgage rates. Every draw is still taken, so the economy stream does not move. A pin that changes the phase starts the new phase's clock.
-- **A pinned VIX priced when it is published** (`pinned_vix_feedback`; read only with `fair_value_vix_discount` and `fair_value_vix_half_life` set). On, a VIX pin sets the smoothed exposure to the pinned VIX's own excess over the knee before the pin's re-mark, and the close holds it; the pull resumes on the first session nobody pins. With `macro_pins_hold` and `corporate_yield_daily` also on, and no level or spread pinned that session, the pin charges the corporate yield the close's own VIX term (2 bp a point times the phase's multiplier) on the pin's change, so a pinned rise reaches credit as the fall after its release does.
+- **A pinned VIX priced when it is published** (`pinned_vix_feedback`, a share $w$ in $[0, 1]$; read only with `fair_value_vix_discount` and `fair_value_vix_half_life` set). Above zero, a VIX pin moves the smoothed exposure $w$ of the way to the pinned VIX's own excess over the knee before the pin's re-mark, $e \leftarrow e + w\,(\max(0, \ln(\mathrm{VIX}/K)) - e)$, and the close holds it; the pull resumes on the first session nobody pins. $w = 1$ closes the whole gap (the r13 switch). At $w = 0.8$ the 2008 and 2020 replays' same-day slope of the index's log return on the day's log VIX change, sessions above a VIX of 40, reads -0.335 and -0.341 against the S&P 500's -0.345 and -0.307 (corr -0.69 / -0.86 against -0.85 / -0.78); at 1 it reads -0.42 / -0.44, and with the smoothed exposure alone -0.04 / -0.06. With `macro_pins_hold` and `corporate_yield_daily` also on, and no level or spread pinned that session, the pin charges the corporate yield the close's own VIX term (2 bp a point times the phase's multiplier) on the pin's change, so a pinned rise reaches credit as the fall after its release does.
+- **A priced VIX move takes part of the session's market variance** (`pinned_vix_variance_share`, a share $s$ in $[0, 1]$; read only with `pinned_vix_feedback` on). The pin records the discount's change $J = g\,\Delta e$ at a beta of one, summed over the session's pins, and that session's market-factor draws, the tick's and the night's, take
+
+```math
+\sigma_d = \sqrt{v_d}\;\sqrt{\max\Big(1 - \frac{J^2}{v_d},\ 1 - s\Big)}
+```
+
+  for the state's daily variance $v_d$: a small priced move leaves the day's total at $v_d$, and a large one keeps at least $1 - s$ of the draw. The variance state reads each draw rescaled to $\sqrt{v_d}$, so it evolves as it would have without the scale. Off, a replay that pins the real VIX every session adds the priced move to a full draw: with $w = 1$ the 2008 replay's worst month read 131.8 against the real 84.3 (seed 201). Real: above a VIX of 40 the day's log VIX change explains 0.61 (2020) to 0.72 (2007-09) of the S&P 500's daily variance. The move is carried by the snapshot and both state hashes only while non-zero, and the close clears it.
 - **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.

@@ -673,6 +673,13 @@ pub struct Engine {
     /// The corporate spread over the 10-year a caller pinned today, in
     /// percent; read only while `PIN_SPREAD` is marked.
     pinned_corporate_spread: f64,
+    /// The volatility-feedback discount today's VIX pins moved the index
+    /// by, in log points at a beta of one (`pinned_vix_variance_share`):
+    /// `fair_value_vix_discount` times the change the pins made to the
+    /// smoothed exposure. Summed over the session's pins and cleared by the
+    /// close; 0.0, never written, with the dial off. Carried by the snapshot
+    /// and the state hash only while non-zero, as `macro_pins_today` is.
+    pinned_vix_jump: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -1546,6 +1553,7 @@ impl Engine {
             vix_sets_variance_pending: false,
             macro_pins_today: 0,
             pinned_corporate_spread: 0.0,
+            pinned_vix_jump: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -3357,7 +3365,7 @@ impl Engine {
         // today's variance state would price recorded draws under dynamics
         // the recording never had.
         let market_sigma_daily = match settle_draws {
-            SettleDrawPolicy::FourAlways => self.market_vol.sigma_daily(),
+            SettleDrawPolicy::FourAlways => self.market_sigma_today(),
             SettleDrawPolicy::FourOrZero => crate::market::tick::MARKET_FACTOR_SIGMA,
         };
 
@@ -3559,7 +3567,10 @@ impl Engine {
         // update. A closed tick contributes exactly zero (the factor is
         // not drawn), and the replay path accumulates harmlessly into
         // state it never reads.
-        self.market_vol.accumulate(outcome.shared_factors.market_factor);
+        // Under a priced VIX move (`pinned_vix_variance_share`) the state
+        // reads the draw at the variance it would have had: the priced move
+        // stands in for the part of the draw it took.
+        self.market_vol.accumulate(self.factor_for_state(outcome.shared_factors.market_factor));
         if self.sector_state_on() {
             for (k, (_, f)) in outcome.shared_factors.sector_factors.iter().enumerate() {
                 if let Some(acc) = self.sector_day_factor.get_mut(k) {
@@ -5031,10 +5042,13 @@ impl Engine {
     }
 
     /// A PINNED VIX IS PRICED WHEN IT IS PUBLISHED (`pinned_vix_feedback`):
-    /// the volatility feedback's smoothed exposure is set to the VIX's own
-    /// excess over the knee as the pin writes it, before the pin's re-mark,
-    /// and the close holds it there (`advance_day_with`). Nothing with the
-    /// dial off, or without the gain and the half-life.
+    /// the volatility feedback's smoothed exposure moves the dial's share of
+    /// the way to the VIX's own excess over the knee as the pin writes it
+    /// (all of it at 1.0), before the pin's re-mark, and the close holds it
+    /// there (`advance_day_with`). Under `pinned_vix_variance_share` the
+    /// discount's change is recorded for the session's market draws
+    /// (`market_sigma_today`). Nothing with the dial off, or without the
+    /// gain and the half-life.
     ///
     /// Returns whether the credit leg moved the corporate yield, so the
     /// caller re-marks the corporate index.
@@ -5042,8 +5056,23 @@ impl Engine {
         if self.params.pinned_vix_feedback == 0.0 || !self.carries_vix_feedback() {
             return false;
         }
-        self.economy.vix_feedback =
-            crate::market::tick::vix_excess(&self.params, self.economy.vix);
+        let exposure_before = self.economy.vix_feedback;
+        let excess = crate::market::tick::vix_excess(&self.params, self.economy.vix);
+        // The whole gap at 1.0, bit for bit; a share of it below.
+        let w = self.params.pinned_vix_feedback;
+        self.economy.vix_feedback = if w == 1.0 {
+            excess
+        } else {
+            exposure_before + w * (excess - exposure_before)
+        };
+        // THE PRICED MOVE IS PART OF THE DAY'S VARIANCE
+        // (`pinned_vix_variance_share`): the discount's change is recorded
+        // for the session's market factor, which draws only what the
+        // variance leaves after it.
+        if self.params.pinned_vix_variance_share != 0.0 {
+            self.pinned_vix_jump += self.params.fair_value_vix_discount
+                * (self.economy.vix_feedback - exposure_before);
+        }
         // THE CREDIT LEG: the chain's own VIX slope (the meeting formula's
         // 2 bp a point times the phase's multiplier) on the pin's change, at
         // the pin, where the close would have charged it had the VIX moved
@@ -5081,6 +5110,57 @@ impl Engine {
             e.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
         );
         true
+    }
+
+    /// The market factor's sigma for today's draws: the state's, or, when
+    /// today's VIX pins moved the volatility-feedback discount
+    /// (`pinned_vix_variance_share`), the state's times
+    /// `sqrt(max(1 - J^2 / v, 1 - share))` for the priced move `J` and the
+    /// state's daily variance `v`. The priced move is the part of the day's
+    /// variance the VIX accounts for; the draw carries the rest, and at
+    /// least `1 - share` of it. The state's sigma, bit for bit, with no such
+    /// move.
+    pub fn market_sigma_today(&self) -> f64 {
+        let sigma = self.market_vol.sigma_daily();
+        let j = self.pinned_vix_jump;
+        if j == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
+            return sigma;
+        }
+        let v = self.market_vol.variance();
+        if !(v > 0.0) {
+            return sigma;
+        }
+        let keep = crate::mathx::max(1.0 - j * j / v, 1.0 - self.params.pinned_vix_variance_share);
+        sigma * crate::mathx::sqrt(keep)
+    }
+
+    /// A market-factor draw as the variance state reads it: the draw
+    /// itself, or, on a session whose draws a priced VIX move scaled
+    /// (`market_sigma_today`), the draw at the state's full sigma, so the
+    /// state evolves as it would have without the scale. The draw itself,
+    /// bit for bit, with no such move.
+    fn factor_for_state(&self, f: f64) -> f64 {
+        if self.pinned_vix_jump == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
+            return f;
+        }
+        let full = self.market_vol.sigma_daily();
+        let today = self.market_sigma_today();
+        if today > 0.0 && today != full {
+            f * (full / today)
+        } else {
+            f
+        }
+    }
+
+    /// Today's priced VIX move (`pinned_vix_variance_share`), for the
+    /// snapshot; 0.0 off a pinned session.
+    pub fn pinned_vix_jump(&self) -> f64 {
+        self.pinned_vix_jump
+    }
+
+    /// Put today's priced VIX move back, for checkpoints.
+    pub fn set_pinned_vix_jump(&mut self, value: f64) {
+        self.pinned_vix_jump = value;
     }
 
     /// PIN THE CORPORATE SPREAD over the 10-year, in percent: the level is
@@ -5472,7 +5552,7 @@ impl Engine {
         }
         let p = &self.params;
         let scale = crate::mathx::sqrt(ratio);
-        let market_sigma_daily = self.market_vol.sigma_daily();
+        let market_sigma_daily = self.market_sigma_today();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
         let idio_ratios: Vec<f64> = if self.idio_state_on() {
@@ -5822,16 +5902,19 @@ impl Engine {
         let p = &self.params;
         let sm = crate::mathx::sqrt(p.overnight_market_share);
         let si = crate::mathx::sqrt(p.overnight_idio_share);
-        let market_sigma_daily = self.market_vol.sigma_daily();
+        let market_sigma_daily = self.market_sigma_today();
         let prev_down = self.market_vol.prev_day_down();
         // The night's market factor, per unit of beta, before the tilt.
         let f = sm * market_sigma_daily * z_market;
-        self.market_vol.accumulate(f);
+        // What the variance state reads: `f` itself unless a priced VIX
+        // move scaled the draw (`factor_for_state`).
+        let f_state = self.factor_for_state(f);
+        self.market_vol.accumulate(f_state);
         // Kept for the session's live lagged-wire condition, which reads the
         // day factor less it (see the field). Written only where that wire
         // reads it, so the state carried is the state read.
         if self.carries_night_market_factor() {
-            self.night_market_factor = f;
+            self.night_market_factor = f_state;
         }
         // The sector draws, at the sector state's sigma where it runs.
         let shared_sigma =
@@ -7408,6 +7491,7 @@ impl Engine {
                 self.economy.treasury_yield_10y + self.pinned_corporate_spread;
         }
         self.macro_pins_today = 0;
+        self.pinned_vix_jump = 0.0;
         self.advance_anticipation_drift();
         self.refresh_earnings_anticipation();
         // The close's phase into the published history. The burn-in runs
@@ -9819,6 +9903,12 @@ impl Engine {
             for value in marks {
                 hash_f64(&mut buf, value);
             }
+        }
+        // Today's priced VIX move, only while a pin has made one
+        // (`pinned_vix_variance_share`), behind its own tag.
+        if self.pinned_vix_jump != 0.0 {
+            hash_f64(&mut buf, 10.0);
+            hash_f64(&mut buf, self.pinned_vix_jump);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

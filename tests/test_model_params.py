@@ -1042,6 +1042,9 @@ PERTURBATIONS = [
     # mechanisms.
     ("macro_pins_hold", 1.0, False),
     ("pinned_vix_feedback", 1.0, False),
+    # INERT: read only with `pinned_vix_feedback` on and a VIX pinned that
+    # session; tests/test_pinned_vix_variance.py holds the mechanism.
+    ("pinned_vix_variance_share", 0.7, False),
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
