@@ -113,6 +113,17 @@ pub struct PolicyOptions {
     /// the bank takes a risk-management cut; 0.0 is off. See
     /// [`crate::params::ModelParams::fed_growth_cut`].
     pub growth_cut: f64,
+    /// `fed_stress_cut`, points per step: 0.0 is the shipped ladder, and
+    /// nothing below reads the three fields after it. See
+    /// [`crate::params::ModelParams::fed_stress_cut`].
+    pub stress_cut: f64,
+    /// `fed_stress_vix`: the stress level the cut starts at.
+    pub stress_vix: f64,
+    /// `fed_stress_inflation_gap`: inflation must be under target plus this.
+    pub stress_inflation_gap: f64,
+    /// The stress the meeting reads: the highest published VIX since the
+    /// last meeting, which the engine keeps only with the cut on.
+    pub stress_level: f64,
 }
 
 impl PolicyOptions {
@@ -122,6 +133,10 @@ impl PolicyOptions {
             liftoff: 0.0,
             spread_multiplier: None,
             growth_cut: 0.0,
+            stress_cut: 0.0,
+            stress_vix: 30.0,
+            stress_inflation_gap: 1.0,
+            stress_level: 0.0,
         }
     }
 }
@@ -330,6 +345,31 @@ pub fn update_central_bank_with(
         rate_change = 0.25;
         decision = Decision::Hike;
         new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score + 0.2, -1.0, 1.0);
+    }
+
+    // THE STRESS CUT (`fed_stress_cut`). The ladder has no market-stress
+    // term, so on pt-v20 a meeting after a VIX of 30 to 40 cut within 42
+    // sessions 0.29 of the time and hiked 0.25, against 0.53 and 0.01 on the
+    // target rate over 1990-2025. A branch: at 0.0 nothing here runs. At a
+    // stress level (the highest published VIX since the last meeting) at or
+    // over `stress_vix`, with inflation under target plus the gap and the
+    // rate over zero, the bank cuts one step, one more per further ten VIX
+    // points, at most four, never below zero; the cut replaces a smaller cut
+    // or any hike the ladder chose, and a deeper cut the ladder chose
+    // stands. No draw.
+    if options.stress_cut != 0.0
+        && options.stress_level >= options.stress_vix
+        && economy.inflation_rate < central_bank.target_inflation + options.stress_inflation_gap
+        && current_rate > 0.0
+    {
+        let steps = mathx::min(
+            4.0, 1.0 + ((options.stress_level - options.stress_vix) / 10.0).floor());
+        let cut = mathx::min(current_rate, options.stress_cut * steps);
+        if rate_change > -cut {
+            rate_change = -cut;
+            decision = if cut > 0.25 { Decision::EmergencyCut } else { Decision::Cut };
+            new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score - 0.2, -1.0, 1.0);
+        }
     }
 
     // Urgency amplifies HIKES only. Amplifying cuts by an inflation gap would
@@ -547,5 +587,110 @@ mod tests {
         assert_eq!(meeting(1.0, 1.4, 2.0, &liftoff), Some(Decision::Hike));
         assert_eq!(meeting(1.0, 1.4, 2.0, &both), Some(Decision::Cut));
         assert_eq!(meeting(3.0, 1.4, 2.0, &both), Some(Decision::Hike));
+    }
+}
+
+#[cfg(test)]
+mod stress_cut {
+    use super::*;
+    use crate::economy::state::{
+        create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
+    };
+
+    struct Silent;
+    impl Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            0.5
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    /// A meeting on a calm economy the ladder holds at: inflation on target,
+    /// unemployment at its target, the rate at the rule's.
+    fn meet(economy: &EconomyState, options: &PolicyOptions) -> MeetingOutcome {
+        let mut cb = create_initial_central_bank_state(0);
+        cb.next_meeting_date = -1;
+        update_central_bank_with(&cb, economy, 1000, &mut Silent, options)
+    }
+
+    fn calm() -> EconomyState {
+        let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+        e.inflation_rate = 2.0;
+        e.unemployment_rate = 4.0;
+        e.federal_funds_rate = 2.0;
+        e.gdp_growth = 2.0;
+        e
+    }
+
+    fn with(level: f64) -> PolicyOptions {
+        PolicyOptions { stress_cut: 0.25, stress_vix: 30.0, stress_level: level, ..PolicyOptions::shipped() }
+    }
+
+    #[test]
+    fn off_the_cut_reads_nothing_it_is_given() {
+        let e = calm();
+        let shipped = meet(&e, &PolicyOptions::shipped());
+        let off = PolicyOptions { stress_level: 80.0, stress_vix: 10.0, stress_inflation_gap: 9.0,
+                                  ..PolicyOptions::shipped() };
+        assert_eq!(meet(&e, &off), shipped);
+    }
+
+    #[test]
+    fn the_cut_fires_at_the_stress_level_and_steps_every_ten_points() {
+        let e = calm();
+        let hold = meet(&e, &PolicyOptions::shipped());
+        assert_eq!(hold.decision, Some(Decision::Hold), "the calm economy holds");
+        // Below the start: the ladder's decision, bit for bit.
+        assert_eq!(meet(&e, &with(29.99)), hold);
+        let cases = [(30.0, 0.25, Decision::Cut), (39.9, 0.25, Decision::Cut),
+                     (40.0, 0.5, Decision::EmergencyCut), (49.9, 0.5, Decision::EmergencyCut),
+                     (50.0, 0.75, Decision::EmergencyCut), (60.0, 1.0, Decision::EmergencyCut),
+                     (200.0, 1.0, Decision::EmergencyCut)];
+        for (level, cut, decision) in cases {
+            let out = meet(&e, &with(level));
+            assert_eq!(out.decision, Some(decision), "level {level}");
+            assert!((out.economy.federal_funds_rate - (2.0 - cut)).abs() < 1e-12,
+                    "level {level}: rate {}", out.economy.federal_funds_rate);
+            assert!((out.central_bank.hawkish_dovish_score - (-0.2)).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn the_cut_never_takes_the_rate_below_zero_and_waits_on_inflation() {
+        let mut e = calm();
+        e.federal_funds_rate = 0.3;
+        let out = meet(&e, &PolicyOptions { stress_cut: 0.5, ..with(60.0) });
+        assert_eq!(out.economy.federal_funds_rate, 0.0);
+        e.federal_funds_rate = 0.0;
+        assert_ne!(meet(&e, &with(60.0)).decision, Some(Decision::EmergencyCut));
+        // Inflation at target plus the gap closes the gate.
+        let mut hot = calm();
+        hot.inflation_rate = 3.0;
+        let gated = meet(&hot, &with(45.0));
+        assert_eq!(gated, meet(&hot, &PolicyOptions::shipped()));
+        let wide = meet(&hot, &PolicyOptions { stress_inflation_gap: 2.0, ..with(45.0) });
+        assert!(wide.economy.federal_funds_rate < hot.federal_funds_rate);
+    }
+
+    #[test]
+    fn the_cut_replaces_a_hike_and_a_smaller_cut_but_not_a_deeper_one() {
+        // A hike: inflation over target plus one with the rate under the rule.
+        let mut e = calm();
+        e.inflation_rate = 3.2;
+        e.federal_funds_rate = 1.0;
+        let ladder = meet(&e, &PolicyOptions::shipped());
+        assert!(ladder.economy.federal_funds_rate > 1.0, "the ladder hikes here");
+        let stressed = meet(&e, &PolicyOptions { stress_inflation_gap: 1.5, ..with(35.0) });
+        assert_eq!(stressed.decision, Some(Decision::Cut));
+        assert!((stressed.economy.federal_funds_rate - 0.75).abs() < 1e-12);
+        // A deeper cut the ladder chose (a deep recession) stands.
+        let mut slump = calm();
+        slump.gdp_growth = -3.0;
+        slump.unemployment_rate = 11.0;
+        slump.federal_funds_rate = 4.0;
+        let deep = meet(&slump, &PolicyOptions::shipped());
+        assert_eq!(meet(&slump, &with(35.0)), deep);
     }
 }

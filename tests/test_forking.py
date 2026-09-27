@@ -1092,7 +1092,12 @@ def _nothing_dormant():
                    cycle_publication_lag_draw=0.0,
                    # A switch as well: the accrued buyback share counts,
                    # which the snapshot carries only while it is on.
-                   buyback_accrual=1.0)
+                   buyback_accrual=1.0,
+                   # The rate indices' close re-mark and live mark are
+                   # switches, and the live mark needs the re-mark (r13 bond
+                   # timing); the stress cut takes the blanket 0.05.
+                   rate_close_remark=1.0,
+                   rate_intraday_live=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1253,6 +1258,16 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "fed_stress_vix_max":
+        "the central bank's stress level, the highest VIX published since "
+        "the last meeting (`fed_stress_cut`). `CRISIS` holds the VIX at 45 "
+        "every session, so each close writes 45 whatever the level was, and "
+        "an engine restored without it (0.0) is back at 45 at its first "
+        "close, before any meeting reads it. What it takes to see it is a "
+        "VIX that spikes and falls back before a meeting. tests/"
+        "test_bond_timing.py::test_a_restore_without_the_stress_level_loses_"
+        "the_cut is that scenario: without the key the meeting holds where "
+        "the parent cut.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "

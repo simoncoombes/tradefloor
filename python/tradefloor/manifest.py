@@ -471,7 +471,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
          # The market's cycle nowcast's generator, only while
          # `cycle_nowcast_accuracy` is set; the belief rides in the economy.
-         "cycle_nowcast_rng"}
+         "cycle_nowcast_rng",
+         # The central bank's stress level, only while `fed_stress_cut` is
+         # set, and the rate indices' live mark, only while
+         # `rate_intraday_live` is set and a session holds one.
+         "fed_stress_vix_max", "rate_live_marks"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -637,6 +641,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("macro_pins_today"):
         _f64(buf, 7.0)
         _f64(buf, float(snapshot["macro_pins_today"]))
+    # The stress level and the live mark, each behind its own tag, only
+    # while carried: `Engine::state_hash`'s order and rule.
+    if "fed_stress_vix_max" in snapshot:
+        _f64(buf, 8.0)
+        _f64(buf, float(snapshot["fed_stress_vix_max"]))
+    if "rate_live_marks" in snapshot:
+        marks = list(snapshot["rate_live_marks"])
+        if len(marks) != 6:
+            raise ValidationError(
+                f"this snapshot's rate_live_marks carries {len(marks)} values; "
+                "the state hash covers 6.")
+        _f64(buf, 9.0)
+        for value in marks:
+            _f64(buf, float(value))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

@@ -687,6 +687,441 @@ pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f6
 /// load-bearing throughout, since many lines read the OLD value after a new
 /// one has been written — impossible to express faithfully.
 
+/// The close's VIX and its three yields (the 10-year, the 2-year and the
+/// corporate yield between meetings), written into `new_state` from
+/// `economy`: the block of [`update_economy_daily`] from `// ── VIX` to the
+/// corporate yield, factored out so [`project_close_yields`] runs the same
+/// arithmetic. `shock_gdp_impact` is the step's shock aggregate. Draws
+/// exactly what the block drew, in the same order.
+pub fn vix_and_yields(
+    economy: &EconomyState,
+    inputs: &DailyInputs,
+    new_state: &mut EconomyState,
+    shock_gdp_impact: f64,
+    rng: &mut impl Rng,
+) {
+    let volatility = inputs.volatility;
+    let day = inputs.game_day;
+    let cal = inputs.macro_calendar;
+    let year = cal.days_per_year;
+    let day_of_year = ((day - 1) % year) + 1;
+    // ── VIX ───────────────────────────────────────────────────────────────
+    // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported by
+    // the economy module and never called — an import-driven worklist would
+    // invent work here.
+    let phase_vix = match economy.cycle_phase {
+        CyclePhase::Expansion => 14.0,
+        CyclePhase::Peak => 18.0,
+        CyclePhase::Contraction => 25.0,
+        CyclePhase::Trough => 22.0,
+        CyclePhase::Recovery => 16.0,
+    };
+    // THE LEVEL. Under the identity it is the index's own conditional
+    // variance in VIX points and the table above is not read at all: the
+    // business cycle reaches the VIX through the variance processes or not
+    // at all. At 0.0 the branch is not taken and every preset before pt-v19
+    // reproduces bit for bit. See `ModelParams::vix_level_identity`.
+    //
+    // THE CLOCK THE CLUSTERING RUNS ON. Those five constants move on a
+    // multi-year cycle, so volatility regimes here are years long and a
+    // one-year window contains no regime change at all. At amplitude 1.0
+    // this is the shipped arithmetic exactly. See §71.
+    let identity_level = inputs.vix_level_identity != 0.0;
+    let mut target_vix = if identity_level {
+        // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
+        // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
+        // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
+        // so at 0.0 the target is the read-back bit for bit. See
+        // `ModelParams::vix_anchor_weight`.
+        // The centre and the level law are guarded, so with both at 0.0 the
+        // weight and the reference are the dial and `L * anchor` exactly.
+        let centre_level = if inputs.vix_anchor_centre != 0.0 {
+            inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
+        } else {
+            inputs.vix_anchor_level
+        };
+        let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
+            // The knee is where the held read-back's elasticity reaches the
+            // level the law holds, a property of the VIX's ABSOLUTE level; the
+            // switch takes the slow regime level out of it. Guarded, so at
+            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
+            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
+                inputs.vix_anchor_level_fixed
+            } else {
+                inputs.vix_anchor_level
+            };
+            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+            } else {
+                knee_base
+            };
+            anchor_weight_at_level(
+                inputs.vix_anchor_weight,
+                inputs.vix_anchor_weight_level,
+                inputs.vix_anchor_weight_level_cap,
+                inputs.vix_anchor_weight_level_below,
+                economy.vix,
+                knee,
+            )
+        } else {
+            inputs.vix_anchor_weight
+        };
+        if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
+            // Against the slow memory: today's move passes in full. The
+            // memory is kept against the centre by the engine.
+            inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
+        } else if inputs.vix_anchor_weight != 0.0 {
+            let a = weight;
+            mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
+                + a * mathx::log(centre_level))
+        } else {
+            inputs.vix_implied_from_market
+        }
+    } else if inputs.vix_cycle_amplitude == 1.0 {
+        phase_vix
+    } else {
+        VIX_PHASE_MEAN + inputs.vix_cycle_amplitude * (phase_vix - VIX_PHASE_MEAN)
+    };
+    // The CURRENT day's return, not the previous one, so VIX reacts same-day
+    // and the negative correlation is real.
+    let clamp_vix = inputs.vix_return_clamp;
+    // WHICH RETURN THE VIX IS AFRAID OF. `market_return_pct` is the final
+    // tick's cap-weighted move, so the fear channel has been reading the
+    // closing minute rather than the session: a -7.87% day moved the VIX
+    // +0.15 points and the correlation between the day's return and the
+    // next day's VIX change is -0.065 even with the gain at 5000 (§70). At
+    // source 0.0 this branch is not taken and every preset reproduces.
+    let driving_return = if identity_level {
+        // THE SESSION, always. The excursion below is made zero-mean
+        // against the session's own conditional sigma, and the same
+        // correction applied to a closing MINUTE would be twenty times the
+        // quantity it is correcting. So the identity does not read
+        // `vix_return_source`; a preset that turns it on gets the day.
+        inputs.market_day_return_pct
+    } else if inputs.vix_return_source == 0.0 {
+        inputs.market_return_pct
+    } else {
+        let s = inputs.vix_return_source;
+        (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
+    };
+    let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
+    let return_spike = return_spike_at_level(
+        current_mkt_ret_vix, inputs.vix_return_gain,
+        inputs.vix_return_gain_up, inputs.vix_return_exponent,
+        inputs.vix_return_exponent_up, inputs.vix_return_level_exponent,
+        inputs.vix_return_level_exponent_up, economy.vix);
+    let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
+    let shock_adj = shock_gdp_impact.abs() * 2.0;
+    target_vix += mathx::min(
+        inputs.vix_target_shock_cap,
+        return_spike + inflation_adj + shock_adj,
+    );
+
+    // THE EXCURSION'S OWN MEAN, which is what the offset was for.
+    //
+    // An asymmetric gain over a zero-mean return injects a standing
+    // positive excursion, and `vix_target_offset` was a number fitted to
+    // cancel it. Under the identity it is cancelled by its own closed form
+    // instead, computed each day from the index's conditional sigma: see
+    // `expected_return_spike`. Nothing is fitted and nothing is left over.
+    if identity_level {
+        target_vix -= expected_return_spike_at_level(
+            inputs.vix_index_sigma_pct,
+            inputs.vix_return_gain,
+            inputs.vix_return_gain_up,
+            inputs.vix_return_exponent,
+            inputs.vix_return_exponent_up,
+            inputs.vix_return_level_exponent,
+            inputs.vix_return_level_exponent_up,
+            economy.vix,
+        );
+    }
+
+    // Earnings-season bump. The 30.44 is a mean month length, so this is not
+    // the same day-of-month the month-start blocks above use.
+    //
+    // Not read under the identity: half a point on the first half of a
+    // month is a level constant, and the level is the variance now.
+    let month_len = cal.mean_month_len();
+    let earnings_month_vix = (((day_of_year - 1) % year) as f64 / month_len).floor() + 1.0;
+    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * month_len).floor();
+    if !identity_level && day_of_month_vix <= cal.scale_days(15) as f64 {
+        target_vix += 0.5;
+    }
+
+    // THE FEEDBACK LOOP, WHICH RAN ONE WAY. The VIX sets the market
+    // factor's variance target and the market's own volatility never came
+    // back, so the VIX was a function of the business cycle and not of the
+    // market: it tracked trailing realised volatility at +0.28 against a
+    // real +0.82, and never once crossed its own crisis threshold in a year
+    // A constant level on the target, before the blend, so it scales by
+    // `1 - weight` exactly as the phase anchor does. It exists because an
+    // ASYMMETRIC return gain injects a standing positive excursion, and the
+    // offset cancels it. Guarded rather than added: `x + 0.0` is not a no-op
+    // on a negative zero, which is the same reason `apply_jumps` guards its
+    // own total, and a dial that ships inert must leave the state it does not
+    // touch bit-identical.
+    if !identity_level && inputs.vix_target_offset != 0.0 {
+        target_vix += inputs.vix_target_offset;
+    }
+
+    // (§68). At weight zero this branch is not taken and every preset
+    // reproduces bit for bit.
+    // Not read under the identity: the WHOLE target is the read-back, so
+    // there is nothing to blend it with.
+    if !identity_level && inputs.vix_realised_vol_weight != 0.0 {
+        let w = inputs.vix_realised_vol_weight;
+        target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
+    }
+
+    // Asymmetric reversion: fear arrives at the full rate and decays at
+    // `vix_decay_ratio` of it. At 1.0 the branch collapses to the shipped
+    // arithmetic exactly (same multiply, same operand order).
+    let vix_mr = if target_vix < economy.vix {
+        inputs.vix_mean_reversion * inputs.vix_decay_ratio
+    } else {
+        inputs.vix_mean_reversion
+    };
+    // Exogenous fear events (round 134). STRICTLY no draws at zero: any
+    // draw here would shift every later draw in the economy schedule and
+    // break bit-reproduction of recorded runs.
+    //
+    // THE VIX'S OWN INNOVATION. The shipped noise is 0.15 points a day,
+    // under one per cent of the level; the tape's VIX, once its response
+    // to the index return is removed, moves by 3.3 per cent of its level
+    // a session plus a part that scales with the session's own size. See
+    // `ModelParams::vix_innovation_sigma`. With both innovation dials at
+    // 0.0 the scale is the expression that stood here, `0.15 * volatility`,
+    // and the draw is the same draw.
+    let innovation_on = inputs.vix_innovation_sigma != 0.0
+        || inputs.vix_innovation_return_sigma != 0.0;
+    let vix_noise_sd = if innovation_on {
+        let s0 = inputs.vix_innovation_sigma;
+        let sr = inputs.vix_innovation_return_sigma * current_mkt_ret_vix;
+        economy.vix * mathx::sqrt(s0 * s0 + sr * sr)
+    } else {
+        0.15 * volatility
+    };
+    let fear_jump = if inputs.vix_jump_intensity != 0.0
+        || inputs.vix_jump_return_intensity != 0.0
+    {
+        // The arrival rate per year, with the part that rises on a down
+        // session added only when that dial is set, so a preset carrying
+        // the constant rate alone computes exactly what it did.
+        let rate = if inputs.vix_jump_return_intensity != 0.0 {
+            inputs.vix_jump_intensity
+                + inputs.vix_jump_return_intensity * mathx::max(0.0, -current_mkt_ret_vix)
+        } else {
+            inputs.vix_jump_intensity
+        };
+        let p_daily = rate / 252.0;
+        if rng.next_f64() < p_daily {
+            // Exponential magnitude: mean `vix_jump_scale` points, or mean
+            // `vix_jump_level_scale` innovation scales.
+            let draw = -mathx::log(mathx::max(rng.next_f64(), 1e-12));
+            if inputs.vix_jump_level_scale != 0.0 {
+                let unit = if innovation_on { vix_noise_sd } else { economy.vix };
+                inputs.vix_jump_level_scale * unit * draw
+            } else {
+                inputs.vix_jump_scale * draw
+            }
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    let stepped_vix = economy.vix
+        + (target_vix - economy.vix) * vix_mr
+        + random_normal(rng, 0.0, vix_noise_sd)
+        + fear_jump;
+    // THE ANCHOR THE LOOP LACKS. Under the identity the VIX reverts to the
+    // read-back and the read-back reverts to the VIX; neither reverts to a
+    // level, so the pair's only anchor is that its static gain is under one.
+    // This term is the third thing: a slow pull toward the identity's own
+    // derived anchor, times the regime level's multiplier. Guarded rather
+    // than added, for the reason `vix_target_offset` is guarded -- `x + 0.0`
+    // is not a no-op on a negative zero -- so at 0.0 the sum above is the
+    // literal expression that stood here and every preset reproduces.
+    // See `ModelParams::vix_anchor_reversion`.
+    let stepped_vix = if inputs.vix_anchor_reversion != 0.0 {
+        stepped_vix + inputs.vix_anchor_reversion * (inputs.vix_anchor_level - economy.vix)
+    } else {
+        stepped_vix
+    };
+    new_state.vix = clamp(stepped_vix, 10.0, inputs.vix_ceiling);
+
+    // ── Treasury yields ───────────────────────────────────────────────────
+    let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
+    let term_premium_10y =
+        1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
+    let fed_rate_for_10y = new_state.federal_funds_rate;
+    let current_10y = new_state.treasury_yield_10y;
+
+    // D5, decided: KEEP the draw. In production `wasm10Y ?? (…)` short-
+    // circuits and this normal is never taken — a consequence of `??`, not a
+    // modelling choice. Dropping it would also flip the Box-Muller spare
+    // parity for every later normal in the engine.
+    new_state.treasury_yield_10y = clamp(
+        current_10y
+            + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
+            + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
+        0.5,
+        12.0,
+    );
+    // THE 2-YEAR. The formula has no noise of its own: between meetings the
+    // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
+    // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
+    // own process, pulled at the 10-year's rate toward the formula, with
+    // its own noise: one more normal on the economy stream, taken only
+    // under the dial.
+    let target_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    let own_2y = inputs.yields.treasury_2y_noise != 0.0;
+    new_state.treasury_yield_2y = if own_2y {
+        clamp(
+            economy.treasury_yield_2y
+                + (target_2y - economy.treasury_yield_2y) * 0.05
+                + random_normal(rng, 0.0, inputs.yields.treasury_2y_noise * volatility),
+            0.0,
+            12.0,
+        )
+    } else {
+        target_2y
+    };
+
+    // Bond-stock correlation regime: inflation sets the sign.
+    //
+    // WHICH RETURN, AND WHEN. The shipped rule reads the PREVIOUS session's
+    // closing-minute return behind a 0.5 per cent gate, which that return
+    // never crosses, so the rule has never fired and the curve has no
+    // stock-bond correlation at all. `flight_to_quality_day` 1.0 reads THIS
+    // session's index return (the step runs after the close, so the yield
+    // it writes is the session's own close) with no gate: the relation is
+    // linear in the move.
+    let (prev_mkt_ret, ftq_gate) = if inputs.yields.flight_to_quality_day != 0.0 {
+        (inputs.market_day_return_pct, 0.0)
+    } else {
+        (economy.previous_day_market_return, 0.5)
+    };
+    let ftq_gain = inputs.yields.flight_to_quality_gain;
+    if prev_mkt_ret.abs() > ftq_gate {
+        let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
+            // Positive correlation: stocks down, yields up.
+            -prev_mkt_ret * ftq_gain
+        } else if economy.inflation_rate < 3.0 {
+            // Flight to quality.
+            prev_mkt_ret * ftq_gain
+        } else {
+            0.0
+        };
+        new_state.treasury_yield_10y = clamp(
+            new_state.treasury_yield_10y + bond_stock_yield_shift,
+            0.5,
+            12.0,
+        );
+        new_state.treasury_yield_2y = if own_2y {
+            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
+        } else {
+            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+        };
+    }
+
+    // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
+    // central-bank meeting, so fair value's discount rate, and an IG bond
+    // priced off it, sat still for six weeks at a time. Off zero it moves
+    // every session by the 10-year's move and by the meeting formula's own
+    // VIX slope (2 bp a point, times the cycle phase's multiplier) on the
+    // session's VIX change: increments, so a scenario's write to the level
+    // survives, and the next meeting re-anchors the level to the formula.
+    //
+    // A PINNED VIX TAKES NO VIX TERM. When a caller wrote the VIX before the
+    // session (`Scenario().hold(vix=...)`, `pin_macro(vix=...)`), the close
+    // moves it by the VIX law's reversion from the written level, and the
+    // next morning's pin writes the level back without passing through here.
+    // Charging the close's move to the credit spread then ratchets it: under
+    // hold(vix=45) the corporate yield fell 2.81 -> 2.42 per cent in five
+    // sessions with the 10-year flat. It also carried the market return,
+    // which moves the close's VIX, into every name's discount rate, so two
+    // worlds that differ only by one agent's trades no longer agreed on the
+    // names it never touched, against the advice to pin the VIX for exactly
+    // that. The 10-year's own move still passes through, and with it the
+    // flight to quality (`flight_to_quality_day`), which reads the session's
+    // index return: that is a second path from one agent's flow to names it
+    // never touched, which a VIX pin does not hold (`tca.Execution.moved`).
+    //
+    // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE. A caller that wrote
+    // the level wants that level for the session and the night after it,
+    // which is what every preset without the daily move gives: without this
+    // the close moved it by the 10-year's change and the next morning's pin
+    // put it back, so it was never the pinned value overnight.
+    if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
+        let cycle_spread_multiplier =
+            crate::economy::central_bank::spread_multiplier_of(economy.cycle_phase);
+        // THE PRICED MULTIPLIER (`cycle_nowcast_accuracy`,
+        // `corporate_spread_cycle`): the move is the meeting formula's whole
+        // change over the session, the VIX's and the multiplier's, so the
+        // level stays on the formula and the next meeting finds it there.
+        // A pinned VIX still takes no VIX term; the multiplier's change
+        // passes through at the VIX written.
+        let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
+            let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
+            crate::economy::central_bank::spread_formula(vix_close, m1)
+                - crate::economy::central_bank::spread_formula(economy.vix, m0)
+        } else if inputs.yields.vix_pinned {
+            0.0
+        } else {
+            0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
+        };
+        let moved = clamp(
+            (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term,
+            -CORPORATE_DAILY_MOVE_CAP,
+            CORPORATE_DAILY_MOVE_CAP,
+        );
+        new_state.corporate_bond_yield = mathx::max(
+            economy.corporate_bond_yield + moved,
+            new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
+        );
+    }
+}
+
+/// A draw source at the means: every normal is 0.0 and every uniform sits
+/// just under one, so no event fires (a VIX jump, an OPEC move). For a
+/// projection of the close; not an engine stream, and nothing it returns is
+/// kept.
+pub struct MeanDraws;
+
+impl Rng for MeanDraws {
+    fn next_f64(&mut self) -> f64 {
+        1.0 - f64::EPSILON
+    }
+    fn next_normal(&mut self) -> f64 {
+        0.0
+    }
+}
+
+/// The (2-year, 10-year, corporate) yields, in per cent, that
+/// [`update_economy_daily`] would publish from `economy` on `inputs` with its
+/// draws at their means ([`MeanDraws`]) and no active shock: the VIX and
+/// yields block and the credit floor, and nothing else, since no other part
+/// of the step writes or reads what they produce. For the rate indices' live
+/// mark (`rate_intraday_live`). Takes no draw from any engine stream.
+pub fn project_close_yields(economy: &EconomyState, inputs: &DailyInputs) -> (f64, f64, f64) {
+    let mut next = economy.clone();
+    let mut shock_gdp_impact = 0.0;
+    for shock in inputs.active_shocks {
+        shock_gdp_impact += shock.gdp_impact * shock.severity;
+    }
+    vix_and_yields(economy, inputs, &mut next, shock_gdp_impact, &mut MeanDraws);
+    if inputs.daily_credit_floor_gain > 0.0 {
+        next.corporate_bond_yield = mathx::max(
+            next.corporate_bond_yield,
+            next.treasury_yield_10y + inputs.daily_credit_floor_gain * CORPORATE_SPREAD_FLOOR,
+        );
+    }
+    (next.treasury_yield_2y, next.treasury_yield_10y, next.corporate_bond_yield)
+}
+
+
 pub fn update_economy_daily(
     economy: &EconomyState,
     inputs: &DailyInputs,
@@ -1305,383 +1740,11 @@ pub fn update_economy_daily(
         50.0,
     );
 
-    // ── VIX ───────────────────────────────────────────────────────────────
-    // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported by
-    // the economy module and never called — an import-driven worklist would
-    // invent work here.
-    let phase_vix = match economy.cycle_phase {
-        CyclePhase::Expansion => 14.0,
-        CyclePhase::Peak => 18.0,
-        CyclePhase::Contraction => 25.0,
-        CyclePhase::Trough => 22.0,
-        CyclePhase::Recovery => 16.0,
-    };
-    // THE LEVEL. Under the identity it is the index's own conditional
-    // variance in VIX points and the table above is not read at all: the
-    // business cycle reaches the VIX through the variance processes or not
-    // at all. At 0.0 the branch is not taken and every preset before pt-v19
-    // reproduces bit for bit. See `ModelParams::vix_level_identity`.
-    //
-    // THE CLOCK THE CLUSTERING RUNS ON. Those five constants move on a
-    // multi-year cycle, so volatility regimes here are years long and a
-    // one-year window contains no regime change at all. At amplitude 1.0
-    // this is the shipped arithmetic exactly. See §71.
-    let identity_level = inputs.vix_level_identity != 0.0;
-    let mut target_vix = if identity_level {
-        // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
-        // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
-        // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
-        // so at 0.0 the target is the read-back bit for bit. See
-        // `ModelParams::vix_anchor_weight`.
-        // The centre and the level law are guarded, so with both at 0.0 the
-        // weight and the reference are the dial and `L * anchor` exactly.
-        let centre_level = if inputs.vix_anchor_centre != 0.0 {
-            inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
-        } else {
-            inputs.vix_anchor_level
-        };
-        let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
-            // The knee is where the held read-back's elasticity reaches the
-            // level the law holds, a property of the VIX's ABSOLUTE level; the
-            // switch takes the slow regime level out of it. Guarded, so at
-            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
-            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
-                inputs.vix_anchor_level_fixed
-            } else {
-                inputs.vix_anchor_level
-            };
-            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
-                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
-            } else {
-                knee_base
-            };
-            anchor_weight_at_level(
-                inputs.vix_anchor_weight,
-                inputs.vix_anchor_weight_level,
-                inputs.vix_anchor_weight_level_cap,
-                inputs.vix_anchor_weight_level_below,
-                economy.vix,
-                knee,
-            )
-        } else {
-            inputs.vix_anchor_weight
-        };
-        if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
-            // Against the slow memory: today's move passes in full. The
-            // memory is kept against the centre by the engine.
-            inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
-        } else if inputs.vix_anchor_weight != 0.0 {
-            let a = weight;
-            mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
-                + a * mathx::log(centre_level))
-        } else {
-            inputs.vix_implied_from_market
-        }
-    } else if inputs.vix_cycle_amplitude == 1.0 {
-        phase_vix
-    } else {
-        VIX_PHASE_MEAN + inputs.vix_cycle_amplitude * (phase_vix - VIX_PHASE_MEAN)
-    };
-    // The CURRENT day's return, not the previous one, so VIX reacts same-day
-    // and the negative correlation is real.
-    let clamp_vix = inputs.vix_return_clamp;
-    // WHICH RETURN THE VIX IS AFRAID OF. `market_return_pct` is the final
-    // tick's cap-weighted move, so the fear channel has been reading the
-    // closing minute rather than the session: a -7.87% day moved the VIX
-    // +0.15 points and the correlation between the day's return and the
-    // next day's VIX change is -0.065 even with the gain at 5000 (§70). At
-    // source 0.0 this branch is not taken and every preset reproduces.
-    let driving_return = if identity_level {
-        // THE SESSION, always. The excursion below is made zero-mean
-        // against the session's own conditional sigma, and the same
-        // correction applied to a closing MINUTE would be twenty times the
-        // quantity it is correcting. So the identity does not read
-        // `vix_return_source`; a preset that turns it on gets the day.
-        inputs.market_day_return_pct
-    } else if inputs.vix_return_source == 0.0 {
-        inputs.market_return_pct
-    } else {
-        let s = inputs.vix_return_source;
-        (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
-    };
-    let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
-    let return_spike = return_spike_at_level(
-        current_mkt_ret_vix, inputs.vix_return_gain,
-        inputs.vix_return_gain_up, inputs.vix_return_exponent,
-        inputs.vix_return_exponent_up, inputs.vix_return_level_exponent,
-        inputs.vix_return_level_exponent_up, economy.vix);
-    let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
-    let shock_adj = shock_gdp_impact.abs() * 2.0;
-    target_vix += mathx::min(
-        inputs.vix_target_shock_cap,
-        return_spike + inflation_adj + shock_adj,
-    );
-
-    // THE EXCURSION'S OWN MEAN, which is what the offset was for.
-    //
-    // An asymmetric gain over a zero-mean return injects a standing
-    // positive excursion, and `vix_target_offset` was a number fitted to
-    // cancel it. Under the identity it is cancelled by its own closed form
-    // instead, computed each day from the index's conditional sigma: see
-    // `expected_return_spike`. Nothing is fitted and nothing is left over.
-    if identity_level {
-        target_vix -= expected_return_spike_at_level(
-            inputs.vix_index_sigma_pct,
-            inputs.vix_return_gain,
-            inputs.vix_return_gain_up,
-            inputs.vix_return_exponent,
-            inputs.vix_return_exponent_up,
-            inputs.vix_return_level_exponent,
-            inputs.vix_return_level_exponent_up,
-            economy.vix,
-        );
-    }
-
-    // Earnings-season bump. The 30.44 is a mean month length, so this is not
-    // the same day-of-month the month-start blocks above use.
-    //
-    // Not read under the identity: half a point on the first half of a
-    // month is a level constant, and the level is the variance now.
-    let month_len = cal.mean_month_len();
-    let earnings_month_vix = (((day_of_year - 1) % year) as f64 / month_len).floor() + 1.0;
-    let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * month_len).floor();
-    if !identity_level && day_of_month_vix <= cal.scale_days(15) as f64 {
-        target_vix += 0.5;
-    }
-
-    // THE FEEDBACK LOOP, WHICH RAN ONE WAY. The VIX sets the market
-    // factor's variance target and the market's own volatility never came
-    // back, so the VIX was a function of the business cycle and not of the
-    // market: it tracked trailing realised volatility at +0.28 against a
-    // real +0.82, and never once crossed its own crisis threshold in a year
-    // A constant level on the target, before the blend, so it scales by
-    // `1 - weight` exactly as the phase anchor does. It exists because an
-    // ASYMMETRIC return gain injects a standing positive excursion, and the
-    // offset cancels it. Guarded rather than added: `x + 0.0` is not a no-op
-    // on a negative zero, which is the same reason `apply_jumps` guards its
-    // own total, and a dial that ships inert must leave the state it does not
-    // touch bit-identical.
-    if !identity_level && inputs.vix_target_offset != 0.0 {
-        target_vix += inputs.vix_target_offset;
-    }
-
-    // (§68). At weight zero this branch is not taken and every preset
-    // reproduces bit for bit.
-    // Not read under the identity: the WHOLE target is the read-back, so
-    // there is nothing to blend it with.
-    if !identity_level && inputs.vix_realised_vol_weight != 0.0 {
-        let w = inputs.vix_realised_vol_weight;
-        target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
-    }
-
-    // Asymmetric reversion: fear arrives at the full rate and decays at
-    // `vix_decay_ratio` of it. At 1.0 the branch collapses to the shipped
-    // arithmetic exactly (same multiply, same operand order).
-    let vix_mr = if target_vix < economy.vix {
-        inputs.vix_mean_reversion * inputs.vix_decay_ratio
-    } else {
-        inputs.vix_mean_reversion
-    };
-    // Exogenous fear events (round 134). STRICTLY no draws at zero: any
-    // draw here would shift every later draw in the economy schedule and
-    // break bit-reproduction of recorded runs.
-    //
-    // THE VIX'S OWN INNOVATION. The shipped noise is 0.15 points a day,
-    // under one per cent of the level; the tape's VIX, once its response
-    // to the index return is removed, moves by 3.3 per cent of its level
-    // a session plus a part that scales with the session's own size. See
-    // `ModelParams::vix_innovation_sigma`. With both innovation dials at
-    // 0.0 the scale is the expression that stood here, `0.15 * volatility`,
-    // and the draw is the same draw.
-    let innovation_on = inputs.vix_innovation_sigma != 0.0
-        || inputs.vix_innovation_return_sigma != 0.0;
-    let vix_noise_sd = if innovation_on {
-        let s0 = inputs.vix_innovation_sigma;
-        let sr = inputs.vix_innovation_return_sigma * current_mkt_ret_vix;
-        economy.vix * mathx::sqrt(s0 * s0 + sr * sr)
-    } else {
-        0.15 * volatility
-    };
-    let fear_jump = if inputs.vix_jump_intensity != 0.0
-        || inputs.vix_jump_return_intensity != 0.0
-    {
-        // The arrival rate per year, with the part that rises on a down
-        // session added only when that dial is set, so a preset carrying
-        // the constant rate alone computes exactly what it did.
-        let rate = if inputs.vix_jump_return_intensity != 0.0 {
-            inputs.vix_jump_intensity
-                + inputs.vix_jump_return_intensity * mathx::max(0.0, -current_mkt_ret_vix)
-        } else {
-            inputs.vix_jump_intensity
-        };
-        let p_daily = rate / 252.0;
-        if rng.next_f64() < p_daily {
-            // Exponential magnitude: mean `vix_jump_scale` points, or mean
-            // `vix_jump_level_scale` innovation scales.
-            let draw = -mathx::log(mathx::max(rng.next_f64(), 1e-12));
-            if inputs.vix_jump_level_scale != 0.0 {
-                let unit = if innovation_on { vix_noise_sd } else { economy.vix };
-                inputs.vix_jump_level_scale * unit * draw
-            } else {
-                inputs.vix_jump_scale * draw
-            }
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
-    let stepped_vix = economy.vix
-        + (target_vix - economy.vix) * vix_mr
-        + random_normal(rng, 0.0, vix_noise_sd)
-        + fear_jump;
-    // THE ANCHOR THE LOOP LACKS. Under the identity the VIX reverts to the
-    // read-back and the read-back reverts to the VIX; neither reverts to a
-    // level, so the pair's only anchor is that its static gain is under one.
-    // This term is the third thing: a slow pull toward the identity's own
-    // derived anchor, times the regime level's multiplier. Guarded rather
-    // than added, for the reason `vix_target_offset` is guarded -- `x + 0.0`
-    // is not a no-op on a negative zero -- so at 0.0 the sum above is the
-    // literal expression that stood here and every preset reproduces.
-    // See `ModelParams::vix_anchor_reversion`.
-    let stepped_vix = if inputs.vix_anchor_reversion != 0.0 {
-        stepped_vix + inputs.vix_anchor_reversion * (inputs.vix_anchor_level - economy.vix)
-    } else {
-        stepped_vix
-    };
-    new_state.vix = clamp(stepped_vix, 10.0, inputs.vix_ceiling);
-
-    // ── Treasury yields ───────────────────────────────────────────────────
-    let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
-    let term_premium_10y =
-        1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
-    let fed_rate_for_10y = new_state.federal_funds_rate;
-    let current_10y = new_state.treasury_yield_10y;
-
-    // D5, decided: KEEP the draw. In production `wasm10Y ?? (…)` short-
-    // circuits and this normal is never taken — a consequence of `??`, not a
-    // modelling choice. Dropping it would also flip the Box-Muller spare
-    // parity for every later normal in the engine.
-    new_state.treasury_yield_10y = clamp(
-        current_10y
-            + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
-            + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
-        0.5,
-        12.0,
-    );
-    // THE 2-YEAR. The formula has no noise of its own: between meetings the
-    // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
-    // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
-    // own process, pulled at the 10-year's rate toward the formula, with
-    // its own noise: one more normal on the economy stream, taken only
-    // under the dial.
-    let target_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
-    let own_2y = inputs.yields.treasury_2y_noise != 0.0;
-    new_state.treasury_yield_2y = if own_2y {
-        clamp(
-            economy.treasury_yield_2y
-                + (target_2y - economy.treasury_yield_2y) * 0.05
-                + random_normal(rng, 0.0, inputs.yields.treasury_2y_noise * volatility),
-            0.0,
-            12.0,
-        )
-    } else {
-        target_2y
-    };
-
-    // Bond-stock correlation regime: inflation sets the sign.
-    //
-    // WHICH RETURN, AND WHEN. The shipped rule reads the PREVIOUS session's
-    // closing-minute return behind a 0.5 per cent gate, which that return
-    // never crosses, so the rule has never fired and the curve has no
-    // stock-bond correlation at all. `flight_to_quality_day` 1.0 reads THIS
-    // session's index return (the step runs after the close, so the yield
-    // it writes is the session's own close) with no gate: the relation is
-    // linear in the move.
-    let (prev_mkt_ret, ftq_gate) = if inputs.yields.flight_to_quality_day != 0.0 {
-        (inputs.market_day_return_pct, 0.0)
-    } else {
-        (economy.previous_day_market_return, 0.5)
-    };
-    let ftq_gain = inputs.yields.flight_to_quality_gain;
-    if prev_mkt_ret.abs() > ftq_gate {
-        let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
-            // Positive correlation: stocks down, yields up.
-            -prev_mkt_ret * ftq_gain
-        } else if economy.inflation_rate < 3.0 {
-            // Flight to quality.
-            prev_mkt_ret * ftq_gain
-        } else {
-            0.0
-        };
-        new_state.treasury_yield_10y = clamp(
-            new_state.treasury_yield_10y + bond_stock_yield_shift,
-            0.5,
-            12.0,
-        );
-        new_state.treasury_yield_2y = if own_2y {
-            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
-        } else {
-            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
-        };
-    }
-
-    // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
-    // central-bank meeting, so fair value's discount rate, and an IG bond
-    // priced off it, sat still for six weeks at a time. Off zero it moves
-    // every session by the 10-year's move and by the meeting formula's own
-    // VIX slope (2 bp a point, times the cycle phase's multiplier) on the
-    // session's VIX change: increments, so a scenario's write to the level
-    // survives, and the next meeting re-anchors the level to the formula.
-    //
-    // A PINNED VIX TAKES NO VIX TERM. When a caller wrote the VIX before the
-    // session (`Scenario().hold(vix=...)`, `pin_macro(vix=...)`), the close
-    // moves it by the VIX law's reversion from the written level, and the
-    // next morning's pin writes the level back without passing through here.
-    // Charging the close's move to the credit spread then ratchets it: under
-    // hold(vix=45) the corporate yield fell 2.81 -> 2.42 per cent in five
-    // sessions with the 10-year flat. It also carried the market return,
-    // which moves the close's VIX, into every name's discount rate, so two
-    // worlds that differ only by one agent's trades no longer agreed on the
-    // names it never touched, against the advice to pin the VIX for exactly
-    // that. The 10-year's own move still passes through, and with it the
-    // flight to quality (`flight_to_quality_day`), which reads the session's
-    // index return: that is a second path from one agent's flow to names it
-    // never touched, which a VIX pin does not hold (`tca.Execution.moved`).
-    //
-    // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE. A caller that wrote
-    // the level wants that level for the session and the night after it,
-    // which is what every preset without the daily move gives: without this
-    // the close moved it by the 10-year's change and the next morning's pin
-    // put it back, so it was never the pinned value overnight.
-    if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
-        let cycle_spread_multiplier =
-            crate::economy::central_bank::spread_multiplier_of(economy.cycle_phase);
-        // THE PRICED MULTIPLIER (`cycle_nowcast_accuracy`,
-        // `corporate_spread_cycle`): the move is the meeting formula's whole
-        // change over the session, the VIX's and the multiplier's, so the
-        // level stays on the formula and the next meeting finds it there.
-        // A pinned VIX still takes no VIX term; the multiplier's change
-        // passes through at the VIX written.
-        let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
-            let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
-            crate::economy::central_bank::spread_formula(vix_close, m1)
-                - crate::economy::central_bank::spread_formula(economy.vix, m0)
-        } else if inputs.yields.vix_pinned {
-            0.0
-        } else {
-            0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
-        };
-        let moved = clamp(
-            (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term,
-            -CORPORATE_DAILY_MOVE_CAP,
-            CORPORATE_DAILY_MOVE_CAP,
-        );
-        new_state.corporate_bond_yield = mathx::max(
-            economy.corporate_bond_yield + moved,
-            new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
-        );
-    }
+    // The VIX and the three yields, factored out so the rate indices'
+    // live mark (`rate_intraday_live`) projects tonight's curve with the
+    // very arithmetic this step runs. Same expressions, same draws, same
+    // order.
+    vix_and_yields(economy, inputs, &mut new_state, shock_gdp_impact, rng);
 
     // ── Fear/greed ────────────────────────────────────────────────────────
     // `fear_greed_published_inputs`: the phase and growth the index reads
@@ -3566,5 +3629,77 @@ mod anchor_weight_level {
         let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 1.95 * 18.5, 18.5);
         assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 80.0, 18.5), at_cap);
         assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 1.0, 9.0, 18.5), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod live_projection {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    /// The live mark's projection is the step's own yields with its draws at
+    /// their means, BIT FOR BIT, whatever else the step does that day: a
+    /// month start (releases), a quarter start, each phase, both signs of
+    /// the session, the corporate yield's daily move and the credit floor.
+    #[test]
+    fn the_projection_is_the_steps_yields_at_the_means() {
+        let phases = [CyclePhase::Expansion, CyclePhase::Peak, CyclePhase::Contraction,
+                      CyclePhase::Trough, CyclePhase::Recovery];
+        let mut checked = 0;
+        for (k, phase) in phases.iter().enumerate() {
+            for (day, ret) in [(17_i64, -2.3), (30, 1.1), (90, 0.0), (91, -0.4)] {
+                for (inflation, floor) in [(2.1, 0.0), (5.0, 1.0), (3.5, 1.0)] {
+                    let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+                    e.cycle_phase = *phase;
+                    e.inflation_rate = inflation;
+                    e.vix = 14.0 + 6.0 * k as f64;
+                    let inputs = DailyInputs {
+                        game_day: day,
+                        market_day_return_pct: ret,
+                        vix_return_source: 1.0,
+                        daily_credit_floor_gain: floor,
+                        yields: YieldDials {
+                            treasury_10y_noise: 0.038,
+                            treasury_2y_noise: 0.022,
+                            flight_to_quality_gain: 0.016,
+                            flight_to_quality_day: 1.0,
+                            corporate_yield_daily: 1.0,
+                            ..YieldDials::default()
+                        },
+                        ..Default::default()
+                    };
+                    let full = update_economy_daily(&e, &inputs, &mut MeanDraws);
+                    let (y2, y10, corp) = project_close_yields(&e, &inputs);
+                    assert_eq!(y2.to_bits(), full.treasury_yield_2y.to_bits());
+                    assert_eq!(y10.to_bits(), full.treasury_yield_10y.to_bits());
+                    assert_eq!(corp.to_bits(), full.corporate_bond_yield.to_bits());
+                    checked += 1;
+                }
+            }
+        }
+        assert_eq!(checked, 60);
+    }
+
+    /// The session's move reaches the projection through the flight to
+    /// quality and the corporate yield's VIX term, which is what the live
+    /// mark prices.
+    #[test]
+    fn the_projection_moves_with_the_session() {
+        let e = create_initial_economy_state(&InitialEconomyOptions::default());
+        let at = |ret: f64| {
+            project_close_yields(&e, &DailyInputs {
+                market_day_return_pct: ret,
+                vix_return_source: 1.0,
+                yields: YieldDials {
+                    flight_to_quality_gain: 0.016,
+                    flight_to_quality_day: 1.0,
+                    corporate_yield_daily: 1.0,
+                    ..YieldDials::default()
+                },
+                ..Default::default()
+            })
+        };
+        let (down, flat, up) = (at(-2.0), at(0.0), at(2.0));
+        assert!(down.1 < flat.1 && flat.1 < up.1, "{down:?} {flat:?} {up:?}");
     }
 }

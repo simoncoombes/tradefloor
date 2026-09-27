@@ -556,6 +556,13 @@ impl MarketVarianceState {
         }
     }
 
+    /// This state with today's accumulated factor replaced, for a projection
+    /// of the close on a copy (`rate_intraday_live`).
+    pub fn with_day_factor(mut self, day_factor: f64) -> Self {
+        self.day_factor = day_factor;
+        self
+    }
+
     /// Whether yesterday's session accumulated a DOWN market factor. For
     /// the lagged transmission wire; false before the first close.
     pub fn prev_day_down(&self) -> bool {

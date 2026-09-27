@@ -403,6 +403,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "cycle_publication_lag_draw": (0.0, 1.0),
     # A switch: 0.0 is the term that stood, 1.0 accrues the share count.
     "buyback_accrual": (0.0, 1.0),
+    # The rate indices' close re-mark and live mark (r13): switches, whole
+    # meaning. The engine refuses the live mark without the re-mark, and the
+    # survey records a draw there as the model's refusal.
+    "rate_close_remark": (0.0, 1.0),
+    "rate_intraday_live": (0.0, 1.0),
+    # The central bank's stress cut, points per step: 0.5 is a half-point
+    # step, two steps a point, which is 2001's and 2008's emergency size.
+    "fed_stress_cut": (0.0, 0.5),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

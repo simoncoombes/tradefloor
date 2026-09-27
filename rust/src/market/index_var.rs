@@ -335,13 +335,20 @@ pub struct NameVariance {
 /// engine realises. Derived, not chosen — there is no constant here to
 /// disagree with.
 pub fn intraday_variance_factor() -> f64 {
-    let mut total = 0.0;
-    for i in 0..TICKS_PER_SESSION {
-        let t = i as f64 / TICKS_PER_SESSION as f64;
-        let m = crate::market::hours::intraday_vol(t);
-        total += m * m;
-    }
-    total / TICKS_PER_SESSION as f64
+    // A constant of the build: computed once, by the same loop in the same
+    // order, so every call returns the f64 the loop gives. The rate indices'
+    // live mark (`rate_intraday_live`) reads the index variance nine times a
+    // refresh, and the 390 `pow`s were most of its cost.
+    static FACTOR: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *FACTOR.get_or_init(|| {
+        let mut total = 0.0;
+        for i in 0..TICKS_PER_SESSION {
+            let t = i as f64 / TICKS_PER_SESSION as f64;
+            let m = crate::market::hours::intraday_vol(t);
+            total += m * m;
+        }
+        total / TICKS_PER_SESSION as f64
+    })
 }
 
 /// `1 / sqrt(2 pi)`, the standard normal's density at zero. A literal
