@@ -502,6 +502,18 @@ OUT_OF_SCOPE = {
         "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
         ", and refused off zero without "
         "`impact_memory_slow_half_life`: the slow part's weight",
+    "book_depth_nesting":
+        "inert at 0.0 as shipped: `append_latent_depth` places the latent "
+        "pool beside the maker's ladder exactly as before, and the dial is "
+        "read nowhere else. Read only in the book an agent meets, so no "
+        "untraded statistic moves. At 1.0 the latent curve counts the "
+        "ladder's shares as its own front (the ladder is the displayed part "
+        "of the latent book, Toth et al. 2011), so a block of 3 to 10 per "
+        "cent of daily volume pays the law past the ladder rather than the "
+        "ladder's and the law's depth summed; for a new registration "
+        "(0.8.5 realism work, sim/r15-impact3: row Q9, a day TWAP over a "
+        "block at 3 per cent of daily volume, 0.83 on N4 against a band of "
+        "0.5 to 0.8)",
     "impact_memory_crossover":
         "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
         ": the linear regime below m* of daily volume (Bucci, "

@@ -550,6 +550,15 @@ fn cents_away(price: f64, side: Side) -> f64 {
 /// volume: 0.0 is the law above; off zero, on the side the metaorder memory
 /// leans, the `Q`-th share is priced at `touch * (1 + Y sigma ((from +
 /// Q/V)^delta - from^delta))`, the curve continued from the memory's point.
+///
+/// With `book_depth_nesting` `k` off zero, the pool counts `k` times the
+/// ladder's shares at a price as good as a level's or better as already on
+/// its curve: the cumulative size placed through that level is `Q - k L`
+/// (never less than what is already placed), `Q` the law's cumulative size
+/// at the level's price and `L` the ladder's. At `k` = 1 the depth within
+/// any distance of the touch is the larger of the ladder's and the law's.
+/// The ladder is read from `book` as it stands, so this is called before
+/// anything else is added to that side. At 0.0 nothing here is read.
 pub fn append_latent_depth(
     book: &mut OrderBook,
     side: Side,
@@ -579,6 +588,17 @@ pub fn append_latent_depth(
     }
     bounds.reverse();
 
+    // The ladder on this side, best first, for the nesting.
+    let nest = params.book_depth_nesting;
+    let ladder: Vec<(f64, f64)> = if nest > 0.0 {
+        let orders = match side {
+            Side::Buy => &book.bids,
+            Side::Sell => &book.asks,
+        };
+        orders.iter().map(|o| (o.price, o.remaining)).collect()
+    } else {
+        Vec::new()
+    };
     // Integer shares: a level is the difference of two floored cumulative
     // sizes, so the floors never accumulate. Levels on the same cent merge
     // into one order, carried until the price moves on.
@@ -600,6 +620,20 @@ pub fn append_latent_depth(
         if !(price > 0.0) {
             break;
         }
+        // A branch, so the pool beside the ladder is placed as it always was.
+        let bound = if nest > 0.0 {
+            let ahead: f64 = ladder
+                .iter()
+                .filter(|(p, _)| match side {
+                    Side::Sell => *p <= price,
+                    Side::Buy => *p >= price,
+                })
+                .map(|(_, q)| *q)
+                .sum();
+            mathx::max(placed, bound - nest * ahead)
+        } else {
+            bound
+        };
         let shares = bound.floor() - placed;
         if !(shares >= 1.0) {
             continue;
@@ -1102,6 +1136,49 @@ mod tests {
         let b = agent_book(&inputs(&c, &off, &[]));
         assert_eq!(a.asks, b.asks);
         assert_eq!(a.bids, b.bids);
+    }
+
+    /// `book_depth_nesting`: at 1.0 the depth within any price of the touch
+    /// is the larger of the ladder's and the law's (to a share and the
+    /// grid's rounding), never their sum and never less than the law; the
+    /// ladder itself is untouched; at 0.0 the book is the book beside it.
+    #[test]
+    fn nesting_makes_the_depth_the_larger_of_ladder_and_law() {
+        let c = company(50.0, 2e5, 0.0004);
+        let beside = tail_params(0.75);
+        let mut nested = beside.clone();
+        nested.book_depth_nesting = 1.0;
+        let a = agent_book(&inputs(&c, &beside, &[]));
+        let b = agent_book(&inputs(&c, &nested, &[]));
+        let ladder = maker_ladder(&c, 15.0, &beside);
+        let within = |orders: &[BookOrder], owner: Option<&str>, price: f64| -> f64 {
+            orders.iter().filter(|o| o.price <= price && owner.map_or(true, |w| o.owner_id == w))
+                .map(|o| o.remaining).sum()
+        };
+        // The ladder is the same in both.
+        let maker = |bk: &OrderBook| -> Vec<(f64, f64)> {
+            bk.asks.iter().filter(|o| o.owner_id == MARKET_MAKER_ID).map(|o| (o.price, o.remaining)).collect()
+        };
+        assert_eq!(maker(&a), maker(&b));
+        let mut thinner = false;
+        for o in &a.asks {
+            let p = o.price;
+            let lad = within(&ladder.asks, None, p);
+            let law_beside = within(&a.asks, Some(DEPTH_OWNER), p);
+            let total_nested = within(&b.asks, None, p);
+            // Never less than either pool alone, never more than the larger
+            // plus the one level the law's grid may carry past it.
+            assert!(total_nested + 1.0 >= lad.max(law_beside) - 1.0, "{p}");
+            assert!(total_nested <= lad.max(law_beside) + law_beside * 0.25 + 2.0, "{p}");
+            if total_nested + 1.0 < within(&a.asks, None, p) {
+                thinner = true;
+            }
+        }
+        assert!(thinner, "nesting must remove the double-counted front somewhere");
+        // Off, identical to the book without the dial.
+        let mut zero = beside.clone();
+        zero.book_depth_nesting = 0.0;
+        assert_eq!(agent_book(&inputs(&c, &zero, &[])).asks, a.asks);
     }
 
     /// Leaning long (agents have net bought), the asks continue the latent

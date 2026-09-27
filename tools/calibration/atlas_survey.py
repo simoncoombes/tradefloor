@@ -312,6 +312,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),
     "book_depth_reach": (0.0, 2.0),
+    "book_depth_nesting": (0.0, 1.0),
     "book_shared": (0.0, 1.0),
     "book_refill_half_life": (0.0, 120.0),
     "book_resting": (0.0, 1.0),

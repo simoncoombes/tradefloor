@@ -4777,6 +4777,35 @@ pub struct ModelParams {
     /// reach is cut off there, as an order past the ladder is without the
     /// tail.
     pub book_depth_reach: f64,
+    /// How much of the maker's ladder the latent depth counts as its own
+    /// front, in [0, 1]. Read only with
+    /// [`ModelParams::book_depth_coefficient`] off zero, and refused off
+    /// zero without it.
+    ///
+    /// 0.0, which every preset carries: the latent pool sits BESIDE the
+    /// ladder, its `Q`-th share priced on the law as if the ladder were not
+    /// there, so the depth within a distance `d` of the touch is the
+    /// ladder's plus the law's. Near the touch the ladder holds 0.3 to 1%
+    /// of daily volume at its first level and 2.6 to 5% over ten, so an
+    /// immediate order of 3% of daily volume fills mostly from the ladder
+    /// and the law's own front at once, paying the half-spread and little
+    /// more: on N4 (sim/r14) a day TWAP at 3% costs 0.83 of such a block
+    /// against the 0.5 to 0.8 of Almgren et al. (2005) and Bacry et al.
+    /// (2015), because the half-spread every share pays is half the block's
+    /// cost.
+    ///
+    /// 1.0: the latent curve counts every ladder share at a price as good
+    /// or better as already on it, so the depth within `d` is the larger of
+    /// the ladder's and the law's, not their sum. The ladder is the
+    /// displayed front of the latent book (Toth et al. 2011; Bouchaud,
+    /// Bonart, Donier and Gould, Trades, Quotes and Prices, 2018, ch. 19),
+    /// not a second book beside it: the law holds for everything past it,
+    /// and past the ladder the next share is priced where the law puts the
+    /// shares already taken. Between 0 and 1 that fraction of the ladder
+    /// is counted. Read only in the book an agent meets, so no untraded
+    /// statistic moves; a slice smaller than the first level pays exactly
+    /// what it did.
+    pub book_depth_nesting: f64,
     /// Whether agents consume the book they share. A switch.
     ///
     /// 0.0, which every preset through pt-v19 carries: an agent's order is priced against the
@@ -6298,6 +6327,7 @@ impl ModelParams {
             book_depth_coefficient: 0.0,
             book_depth_exponent: 0.0,
             book_depth_reach: 0.0,
+            book_depth_nesting: 0.0,
             book_shared: 0.0,
             book_refill_half_life: 0.0,
             book_resting: 0.0,
@@ -8689,6 +8719,7 @@ impl ModelParams {
             "book_depth_coefficient" => self.book_depth_coefficient,
             "book_depth_exponent" => self.book_depth_exponent,
             "book_depth_reach" => self.book_depth_reach,
+            "book_depth_nesting" => self.book_depth_nesting,
             "book_shared" => self.book_shared,
             "book_refill_half_life" => self.book_refill_half_life,
             "book_resting" => self.book_resting,
@@ -8996,6 +9027,7 @@ impl ModelParams {
             "book_depth_coefficient" => out.book_depth_coefficient = value,
             "book_depth_exponent" => out.book_depth_exponent = value,
             "book_depth_reach" => out.book_depth_reach = value,
+            "book_depth_nesting" => out.book_depth_nesting = value,
             "book_shared" => out.book_shared = value,
             "book_refill_half_life" => out.book_refill_half_life = value,
             "book_resting" => out.book_resting = value,
@@ -9169,7 +9201,8 @@ impl ModelParams {
         }
         if y == 0.0 {
             for (name, v) in [("book_depth_exponent", self.book_depth_exponent),
-                              ("book_depth_reach", self.book_depth_reach)] {
+                              ("book_depth_reach", self.book_depth_reach),
+                              ("book_depth_nesting", self.book_depth_nesting)] {
                 if v != 0.0 {
                     return Err(format!(
                         "{name} is {v} but book_depth_coefficient is 0: it shapes \
@@ -9190,6 +9223,14 @@ impl ModelParams {
                 "book_depth_reach is {r}. It is how far the latent depth reaches, \
                  in multiples of daily volume, inside [0, 10]; 0.0 reads as one \
                  day's volume."));
+        }
+        let k = self.book_depth_nesting;
+        if !(k >= 0.0 && k <= 1.0) {
+            return Err(format!(
+                "book_depth_nesting is {k}. It is the share of the maker's ladder \
+                 the latent depth counts as its own front, in [0, 1]: 0.0 puts \
+                 the latent pool beside the ladder, 1.0 makes the depth within \
+                 any distance the larger of the two."));
         }
         let h = self.book_refill_half_life;
         if !(h >= 0.0 && h <= 390.0) {
@@ -10364,6 +10405,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_depth_coefficient",
         "book_depth_exponent",
         "book_depth_reach",
+        "book_depth_nesting",
         "book_shared",
         "book_refill_half_life",
         "book_resting",

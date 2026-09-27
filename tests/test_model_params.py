@@ -934,6 +934,7 @@ PERTURBATIONS = [
     ("book_depth_coefficient", 0.5, False),
     ("book_depth_exponent", 0.6, False),
     ("book_depth_reach", 2.0, False),
+    ("book_depth_nesting", 1.0, False),
     ("book_shared", 0.0, False),
     ("book_refill_half_life", 10.0, False),
     ("book_resting", 0.0, False),
@@ -1896,6 +1897,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # refill without both the depth and the shared book (order-book-depth).
     "book_depth_exponent": {"book_depth_coefficient": 0.5},
     "book_depth_reach": {"book_depth_coefficient": 0.5},
+    "book_depth_nesting": {"book_depth_coefficient": 0.5},
     "book_refill_half_life": {"book_depth_coefficient": 0.5, "book_shared": 1.0},
     # The shared book goes off in its row, and the refill it would read is
     # refused without it, so the refill is off in both arms: 0.0 against

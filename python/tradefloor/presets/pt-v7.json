@@ -2,11 +2,12 @@
   "schema": 1,
   "preset": "pt-v7",
   "fingerprint": "pt-v7",
-  "coefficient_digest": "26f8e9f99cc35a97249a01fedb5a84db094b5e062443ad24c35afce7f3dc84f3",
+  "coefficient_digest": "ee0c624917d3388ad81069c20716427ccab8426cd535485de41b5ebb3a039571",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
+    "book_depth_nesting": 0.0,
     "book_depth_reach": 0.0,
     "book_levels": 10.0,
     "book_refill_half_life": 0.0,
