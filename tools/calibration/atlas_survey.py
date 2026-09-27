@@ -379,6 +379,22 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # The Fed put: pp of cut per unit of intermeeting log fall. 10 cuts a
+    # point on a 10 per cent fall, over three times Cieslak and
+    # Vissing-Jorgensen's 30bp.
+    "fed_put_gain": (0.0, 10.0),
+    # The intermeeting log fall the put ignores; 0.1 is a ten per cent fall.
+    "fed_put_threshold": (0.0, 0.1),
+    # The put stock's half-life in sessions; 252 is a year.
+    "fed_put_half_life": (0.0, 252.0),
+    # The VIX close that calls an intermeeting meeting; 0 is never, and
+    # under about 25 it calls one every 21 sessions in a calm market.
+    "fed_put_emergency_vix": (0.0, 90.0),
+    # The share of the put the curve prices before the meeting.
+    "treasury_put_pricing": (0.0, 1.0),
+    # pp off the 10-year's term premium per VIX point above 20; 0.03 takes
+    # 1.2 points off at a VIX of 60.
+    "treasury_haven_gain": (0.0, 0.03),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

@@ -50,6 +50,27 @@ pub const CORPORATE_SPREAD_FLOOR: f64 = 0.8;
 /// is luck rather than a guarantee, so it is floored too.
 pub const MORTGAGE_SPREAD_FLOOR: f64 = 0.5;
 
+/// The inflation rate at or above which the Fed put stands aside
+/// (`fed_put_gain`), and at or above which the Treasury haven does
+/// (`treasury_haven_gain`). Real target changes at a VIX of 30 or more,
+/// 1990-2025, were all cuts (14 of 14, FRED DFEDTAR and DFEDTARU) with CPI
+/// inflation under 4; 2022, at 6.9, hiked 4.75 points through a 25 per cent
+/// fall, and the stock-bond correlation turns positive above about 3 to 4
+/// (Campbell, Sunderam and Viceira 2017).
+pub const FED_PUT_INFLATION_CEILING: f64 = 4.0;
+
+/// The VIX at or above which the Fed put holds any hike and gives nothing
+/// back (`fed_put_gain`): no FOMC target change 1990-2025 was a hike at a
+/// VIX close of 30 or more.
+pub const FED_PUT_HOLD_VIX: f64 = 30.0;
+
+/// The cut the Fed put asks for, percentage points, before rounding:
+/// `gain * max(0, -intermeeting_return - threshold)`. Read by the meeting
+/// and, for the priced put, by the daily anchor.
+pub fn fed_put_ask(gain: f64, threshold: f64, intermeeting_return: f64) -> f64 {
+    gain * mathx::max(0.0, -intermeeting_return - threshold)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Decision {
     AggressiveHike,
@@ -103,11 +124,28 @@ pub struct PolicyOptions {
     /// `fed_liftoff_rule`: 0.0 is the shipped ladder. See
     /// [`crate::params::ModelParams::fed_liftoff_rule`].
     pub liftoff: f64,
+    /// `fed_put_gain`: 0.0 is no put. See
+    /// [`crate::params::ModelParams::fed_put_gain`].
+    pub put_gain: f64,
+    /// `fed_put_threshold`, read only with `put_gain` non-zero.
+    pub put_threshold: f64,
+    /// `treasury_put_pricing`, read only with `put_gain` non-zero.
+    pub put_pricing: f64,
+    /// `treasury_haven_gain`: 0.0 is no haven in the meeting's 10-year
+    /// target.
+    pub haven_gain: f64,
 }
 
 impl PolicyOptions {
     pub const fn shipped() -> Self {
-        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0 }
+        PolicyOptions {
+            calendar: MacroCalendar::shipped(),
+            liftoff: 0.0,
+            put_gain: 0.0,
+            put_threshold: 0.0,
+            put_pricing: 0.0,
+            haven_gain: 0.0,
+        }
     }
 }
 
@@ -159,6 +197,12 @@ pub fn update_central_bank_with(
         + 0.5 * inflation_gap_taylor
         + 0.5 * output_gap_taylor
         + 0.1 * central_bank.hawkish_dovish_score;
+    // THE FED PUT'S OVERLAY (`fed_put_gain`): the ladder reads its rule less
+    // what the put still owes, so the lift-off branch does not undo a put
+    // cut at the next calm meeting; the calm meetings give it back instead,
+    // below. Guarded, so with the dial at 0.0 the rule is the one that stood.
+    let put_on = options.put_gain != 0.0;
+    let taylor_rate = if put_on { taylor_rate - economy.fed_put_owed } else { taylor_rate };
 
     let current_rate = economy.federal_funds_rate;
     let rate_diff = taylor_rate - current_rate;
@@ -290,6 +334,48 @@ pub fn update_central_bank_with(
         rate_change *= urgency;
     }
 
+    // THE FED PUT (`fed_put_gain`), after the ladder and its urgency. The
+    // index's log fall since the last meeting asks for a cut, in quarter
+    // points and no more than the rate, while inflation is under
+    // `FED_PUT_INFLATION_CEILING`; it replaces the ladder's decision when
+    // the ladder would cut less, hold or hike, and a VIX at or above
+    // `FED_PUT_HOLD_VIX` holds any hike. What the overlay takes off the
+    // ladder's path is owed (`fed_put_owed`) and given back a quarter point
+    // at a calm meeting once the put's decaying stock (`fed_put`) sits an
+    // eighth under it. No draw, so the meeting's draw count is the one the
+    // module's table states.
+    let ladder_change = rate_change;
+    let mut asked = 0.0;
+    let mut put_cut = 0.0;
+    let mut unwind = 0.0;
+    if put_on && economy.inflation_rate < FED_PUT_INFLATION_CEILING {
+        asked = fed_put_ask(options.put_gain, options.put_threshold, economy.intermeeting_return);
+        put_cut = mathx::min((asked / 0.25).round() * 0.25, mathx::max(0.0, current_rate));
+        if put_cut > 0.0 && rate_change > -put_cut {
+            rate_change = -put_cut;
+            decision = Decision::Cut;
+            new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score - 0.2, -1.0, 1.0);
+        }
+        if economy.vix >= FED_PUT_HOLD_VIX && rate_change > 0.0 {
+            rate_change = 0.0;
+            decision = Decision::Hold;
+            new_cb.hawkish_dovish_score = central_bank.hawkish_dovish_score;
+        }
+    }
+    if put_on
+        && put_cut == 0.0
+        && rate_change >= 0.0
+        && ladder_change >= 0.0
+        && economy.vix < FED_PUT_HOLD_VIX
+        && economy.fed_put_owed - economy.fed_put > 0.125
+    {
+        unwind = mathx::min(0.25, economy.fed_put_owed);
+        rate_change += unwind;
+        if decision == Decision::Hold {
+            decision = Decision::Hike;
+        }
+    }
+
     // DRAW SITE — always. The announcement text is not built here, but the
     // draw that chooses it is taken at exactly this point.
     let announcement_variant = (rng.next_f64() * ANNOUNCEMENT_VARIANTS).floor() as usize;
@@ -299,16 +385,48 @@ pub fn update_central_bank_with(
     // Volcker went past 20%.
     new_economy.federal_funds_rate = clamp(current_rate + rate_change, 0.0, 8.0);
     new_economy.prime_rate = new_economy.federal_funds_rate + 3.0;
+    // The put's books: a quarter given back pays the debt down; otherwise
+    // whatever the overlay took off the ladder's path (a cut deepened, a
+    // hike held) is added to the debt and to the decaying stock. The
+    // intermeeting return restarts.
+    if put_on {
+        let ladder_rate = clamp(current_rate + ladder_change, 0.0, 8.0);
+        let taken = mathx::max(0.0, ladder_rate - new_economy.federal_funds_rate);
+        if unwind > 0.0 {
+            new_economy.fed_put_owed = mathx::max(0.0, economy.fed_put_owed - unwind);
+        } else if taken > 0.0 {
+            new_economy.fed_put_owed = economy.fed_put_owed + taken;
+            new_economy.fed_put = economy.fed_put + taken;
+        }
+        new_economy.intermeeting_return = 0.0;
+    }
+    // What the 10-year hears on the day: the rate change, less the share of
+    // the put the curve had priced (`treasury_put_pricing`), so a priced cut
+    // is not news. The rate change itself with the put off.
+    let surprise = if put_on && options.put_pricing != 0.0 {
+        rate_change + options.put_pricing * mathx::min(asked, mathx::max(0.0, current_rate))
+    } else {
+        rate_change
+    };
 
     let treasury_target_10y = new_economy.federal_funds_rate
         + 1.0
         + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3);
+    // The Treasury haven (`treasury_haven_gain`) in the target too, so the
+    // meeting does not undo what the daily anchor has priced.
+    let treasury_target_10y = if options.haven_gain != 0.0
+        && economy.inflation_rate < FED_PUT_INFLATION_CEILING
+    {
+        treasury_target_10y - super::daily::haven_term_cut(options.haven_gain, economy.vix)
+    } else {
+        treasury_target_10y
+    };
     // Half the gap closes on announcement day; daily mean-reversion does the
     // rest.
     new_economy.treasury_yield_10y = clamp(
         economy.treasury_yield_10y
             + (treasury_target_10y - economy.treasury_yield_10y) * 0.50
-            + rate_change * 0.5,
+            + surprise * 0.5,
         0.5,
         12.0,
     );

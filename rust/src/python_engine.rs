@@ -3929,6 +3929,13 @@ impl PyEngine {
         if self.inner.carries_vix_feedback() {
             econ.set_item("vix_feedback", economy.vix_feedback)?;
         }
+        // The Fed put's state, on the same rule: only with `fed_put_gain` set.
+        if self.inner.carries_fed_put() {
+            econ.set_item("intermeeting_return", economy.intermeeting_return)?;
+            econ.set_item("fed_put", economy.fed_put)?;
+            econ.set_item("fed_put_owed", economy.fed_put_owed)?;
+            econ.set_item("fed_put_mcap_prev", economy.fed_put_mcap_prev)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -4481,6 +4488,20 @@ impl PyEngine {
             }
             if let Some(v) = d.get_item("vix_feedback")? {
                 economy.vix_feedback = v.extract()?;
+            }
+            // The Fed put's state. Absent means a model without the put,
+            // where the four fields are 0.0 and unread.
+            if let Some(v) = d.get_item("intermeeting_return")? {
+                economy.intermeeting_return = v.extract()?;
+            }
+            if let Some(v) = d.get_item("fed_put")? {
+                economy.fed_put = v.extract()?;
+            }
+            if let Some(v) = d.get_item("fed_put_owed")? {
+                economy.fed_put_owed = v.extract()?;
+            }
+            if let Some(v) = d.get_item("fed_put_mcap_prev")? {
+                economy.fed_put_mcap_prev = v.extract()?;
             }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;

@@ -1010,6 +1010,25 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # INERT on this probe, measured: the put reads the index's fall since
+    # the last meeting, and the burn-in's prices do not move, the probe's
+    # three sessions hold no meeting, and no burn-in meeting is at a VIX of
+    # 30 or more, so nothing is cut, held or owed. Carries its half-life as
+    # a companion, without which it is refused. tests/test_fed_put.py holds
+    # the mechanism.
+    ("fed_put_gain", 5.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_threshold", 0.05, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_half_life", 126.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_emergency_vix", 40.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("treasury_put_pricing", 1.0, False),
+    # LIVE: the burn-in's VIX sits above 20 on some sessions with inflation
+    # under 4, so the 10-year's term premium falls, and fair value reads
+    # the rate. No draw: the economy stream is untouched.
+    ("treasury_haven_gain", 0.015, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1677,6 +1696,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The fixed opening the row's decomposition was measured on, where the
     # probe's first two days are phase-change days (see the row).
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
+    # The Fed put's stock decays at its half-life, so the gain is refused
+    # without one; the half-life alone is unread, so both arms are the
+    # default's.
+    "fed_put_gain": {"fed_put_half_life": 126.0},
 }
 
 

@@ -593,6 +593,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
     if "vix_feedback" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["vix_feedback"])
+    # The Fed put's state, only on a model with `fed_put_gain` set.
+    if "fed_put" in snapshot["economy"]:
+        for name in ("intermeeting_return", "fed_put", "fed_put_owed",
+                     "fed_put_mcap_prev"):
+            _f64(buf, snapshot["economy"][name])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -667,10 +672,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # hashed after the history. `unemployment_impulse` only on a model with
     # `unemployment_adjustment_half_life` set; hashed before it.
     # `vix_feedback` only with the volatility feedback smoothed; hashed
-    # after `earnings_cycle`.
+    # after `earnings_cycle`. The Fed put's four fields only with
+    # `fed_put_gain` set, together; hashed after `vix_feedback`.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback"} & set(economy))
+    if "fed_put" in economy:
+        economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
+                             "fed_put_mcap_prev"}
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "

@@ -225,6 +225,19 @@ The term reads the yield at today's price, so a company near the 0.01 floor
 read a yield in the hundreds, and on one held-out history the index rose
 86-fold in one close. pt-v20 sets 0.15.
 
+`fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
+under 4, it cuts by the gain times the index's log fall since the last
+meeting, in quarter points, where the ladder would cut less, hold or hike,
+and a VIX of 30 or more holds any hike. The cut is owed back to the ladder's
+path and returned a quarter point at calm meetings as the put's stock decays
+(`fed_put_half_life`). `fed_put_threshold` is a fall the put ignores,
+`fed_put_emergency_vix` calls a meeting between meetings on a VIX close at or
+above it, and `treasury_put_pricing` lets the curve price the expected cut
+before the meeting. `treasury_haven_gain` lowers the 10-year's term premium
+per VIX point above 20 while inflation is under 4, so Treasuries rally in a
+low-inflation sell-off. All six are 0 on every preset. The snapshot and the
+state hash carry the put's four state fields only while the gain is set.
+
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
 the earnings cycle's expected path from the cycle's own hazards, so a turn
 of phase moves prices at once and a price trough leads the earnings trough;

@@ -438,6 +438,24 @@ pub struct EconomyState {
     /// `fair_value_vix_half_life` is set. 0.0, and never written, on every
     /// preset through pt-v19, whose `fair_value_vix_discount` is 0.0.
     pub vix_feedback: f64,
+    /// The index's log return since the last central-bank meeting: the
+    /// log change of total public market cap, summed over the closes and
+    /// restarted by every meeting. Written only with `fed_put_gain` set;
+    /// 0.0, and never written, on every preset.
+    pub intermeeting_return: f64,
+    /// The Fed put's stock, percentage points: each put cut adds what it
+    /// took off the ladder's path, and it decays at `fed_put_half_life`.
+    /// The calm meetings give the put back once this has fallen an eighth
+    /// under `fed_put_owed`. Written only with `fed_put_gain` set.
+    pub fed_put: f64,
+    /// The Fed put's overlay not yet given back, percentage points: the
+    /// ladder's own path less the policy rate. The Taylor rate the ladder
+    /// reads is lowered by it. Written only with `fed_put_gain` set.
+    pub fed_put_owed: f64,
+    /// Total public market cap at the previous close, the base the next
+    /// close's log change is read against. Written only with
+    /// `fed_put_gain` set.
+    pub fed_put_mcap_prev: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -599,6 +617,10 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         rolling_market_return_30d: 0.0,
         earnings_cycle: 0.0,
         vix_feedback: 0.0,
+        intermeeting_return: 0.0,
+        fed_put: 0.0,
+        fed_put_owed: 0.0,
+        fed_put_mcap_prev: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
         market_pe: Some(18.0),
