@@ -1678,8 +1678,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # pt-v20's 27, as the depth companions above carry 0.5 against its 0.75.
     "book_shared": {"book_refill_half_life": 0.0},
     # The metaorder memory is refused without its fast half-life, and its
-    # slow weight without the slow half-life (sqrt-impact).
-    "impact_memory_coefficient": {"impact_memory_half_life": 120.0},
+    # slow weight without the slow half-life (sqrt-impact). It also needs
+    # the shared book and its depth, which pt-v20 ships and a base before
+    # it does not (the earnings derivation sweeps on pt-v18).
+    "impact_memory_coefficient": {"impact_memory_half_life": 120.0,
+                                  "book_shared": 1.0,
+                                  "book_depth_coefficient": 0.75},
     "impact_memory_slow_weight": {"impact_memory_slow_half_life": 15600.0},
     # The excursion reads the VIX's distance above the identity's read-back,
     # so it is refused off the identity; a no-op on the default.
