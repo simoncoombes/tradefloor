@@ -1332,6 +1332,24 @@ pub struct ModelParams {
     /// ratio 2.5, one power of 0.75 on both sides) read 4.02 per cent above
     /// 30 on seeds 2001-2090 and 2.82 on 2001-2011.
     ///
+    /// # Measured settings (bearcycle fix, sim/r15-bearcycle)
+    ///
+    /// On top of the r14 screen's N4 arm, with both pin switches on
+    /// (`market_vol_cycle_pin_neutral`, `market_vol_cycle_pin_phase`), a
+    /// contraction multiplier of 2.1 over an expansion of 0.85 (ratio
+    /// 2.47), half-life 10, `market_vol_cycle_relative` 0.75,
+    /// `market_vol_cycle_relative_calm` 0 and `market_vol_cycle_cap_relative`
+    /// 1 read, on the 90 held-out histories (201-230, 501-530, 801-830):
+    /// index volatility in a contraction over the rest 1.98 (real 1.87), the
+    /// VIX's median 1.67 (real 1.62), 50 per cent of 20 per cent bears
+    /// touching a contraction (real 64), and all forty registered rows in
+    /// (box r15bcg1). The half-life and the power matter for the audit's
+    /// timing rules: at 21 sessions and a power of 1 (the r14 screen's
+    /// N4B85), 23 levered turn rules and 12 spread rules beat holding by
+    /// more than a point a year in more than two thirds of histories; at 10
+    /// sessions and a power of 0.75, none (N4: 0 and 2). A calmer expansion
+    /// (0.8) brought 18 turn rules back.
+    ///
     /// In [0, 5]; 0 is off.
     pub market_vol_cycle_ratio: f64,
     /// The market factor's volatility multiplier outside a contraction or a
