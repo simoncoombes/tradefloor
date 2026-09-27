@@ -272,9 +272,11 @@ included, earns the market's total return. A short pays its dividend in
 cash. Without the plan a holder keeps its dividends as cash, which earns
 nothing unless `cash_interest` is set, and it trails any strategy that
 re-targets its net worth: on pt-v20 with dividends on, the registered
-rate-news agent went from behind such a holder to ahead of it in 21 to 22
-of 30 held-out histories from that alone. `reinvest_dividends=False` keeps
-the cash. Nothing changes on a model without dividends.
+rate-news agent beat such a holder by 0.25 to 0.29 points a year in 21 to
+24 of 30 held-out histories, and under the plan trails it by 0.48 to 0.49
+(4 or 5 of 30 ahead; 0.34 behind and 5 of 30 without dividends).
+`reinvest_dividends=False` keeps the cash. Nothing changes on a model
+without dividends.
 
 ### No capture ratio on pt-v20
 

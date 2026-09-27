@@ -589,10 +589,13 @@ class Portfolio:
         Why reinvestment is the default: a holder that buys once and keeps
         its dividends as cash holds less of the market every quarter, and
         with cash earning nothing any strategy that re-targets its net worth
-        beats it by reinvesting them. On pt-v20 with dividends on, the
-        registered rate-news agent (R7b) went from 0.3 points a year behind
-        such a holder to 0.3 ahead, 21 to 22 of 30 histories, from that
-        alone.
+        beats it by reinvesting them. On pt-v20 with dividends on (held-out
+        seeds 201-230, ten years), the registered rate-news agent (R7b) beat
+        such a holder by 0.25 to 0.29 points a year, ahead in 21 to 24 of
+        30 histories; under the plan it trails by 0.48 to 0.49, ahead in 4
+        or 5 (0.34 behind, 5 of 30, without dividends). The paired
+        difference is the plan's +0.75 points; the market's own change is
+        -0.15.
 
         Call it once per session, right after ``open_market`` and before
         trading; the harness, the gym, a World and the TCA path all do.
