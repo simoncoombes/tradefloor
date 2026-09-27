@@ -40,6 +40,9 @@ COMPONENTS = [
     # zero on every earlier preset. Without it the columns above sum to the
     # move in `s + v` on pt-v20, missing `Δs` by up to 0.0087 on every row.
     "fair_value_shift",
+    # The change in `s` at an ex-date open; zero on every model without
+    # dividends (`dividend_payout_share`).
+    "dividend",
 ]
 
 LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
@@ -94,6 +97,22 @@ def test_every_preset_reconstructs_the_change_in_mispricing(preset):
     carries = (params.get("fair_value_news_share", 0.0) != 0.0
                or params.get("fair_value_market_share", 0.0) != 0.0)
     assert moved == carries, (preset, moved, carries)
+
+
+def test_the_reconstruction_holds_across_an_ex_date():
+    """With dividends on, the ex-date drop re-reads `s` at the open and the
+    `dividend` column books that move on the day's first row, so the
+    columns still sum to the change in `s`. Seventy sessions, so every
+    paying name goes ex at least once."""
+    model = tradefloor.ModelParams.from_preset(
+        "pt-v20", dividend_payout_share=1.2, dividend_buyback_substitution=1.0,
+        buyback_payout_share=1.1)
+    universe = tradefloor.Universe.random(6, seed=2)
+    engine = tradefloor.Engine(seed=5, universe=universe, model=model)
+    engine.run_days(70, ticks_per_day=20, record=True)
+    table = pa.table(engine.truth()).to_pydict()
+    assert any(table["dividend"])
+    assert max(residuals(table, 6)) < 1e-14
 
 
 def test_the_reconstruction_still_holds_with_news_and_order_flow():
@@ -431,7 +450,7 @@ def test_attribution_equals_the_tape_for_every_factor(vix):
             f"{tape:+.6e}"
         )
         checked += 1
-    assert checked == 11, f"only {checked} factors compared"
+    assert checked == 12, f"only {checked} factors compared"
     # And at least one of them must be non-zero, or this compared zeros.
     assert any(second[f] != 0.0
                for f in tradefloor.Engine.FACTORS if f in truth.column_names)

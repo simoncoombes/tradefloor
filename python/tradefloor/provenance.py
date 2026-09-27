@@ -371,6 +371,45 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # CASH DIVIDENDS (0.8.5 realism work, sim/real-dividends). Inert on
+    # every shipped preset; a candidate for a new registration, with the
+    # graded arm as the fallback.
+    "dividend_payout_share":
+        "inert at 0.0 as shipped: `Engine::apply_dividends` returns before "
+        "touching anything, no name carries a `DividendState`, and "
+        "`market::dividends::with_accrual` returns fair value bit for bit. "
+        "Off zero it scales `Sector::dividend_payout` (payers' yield times "
+        "the anchor P/E, measured on the forty-name tape 2015-2025 and "
+        "Damodaran's sector yields, January 2026). US large caps paid 1.8 "
+        "per cent a year in dividends and 0.80 of earnings in dividends and "
+        "buybacks together over 2001-2025 (Damodaran, S&P 500 implied "
+        "premium file); without dividends pt-v20's equity premium over "
+        "bills is 4.3 points a year on held-out seeds against a real 6.6 "
+        "(Ken French Mkt-RF, log, 1926-2025)",
+    "dividend_growth_cutoff":
+        "unread while `dividend_payout_share` is 0.0: the revenue growth at "
+        "or above which a profitable name pays no dividend. 0.30 is CHOSEN "
+        "so that the roster's fast growers are the non-payers, as growth "
+        "names are on the tape",
+    "dividend_adjustment_speed":
+        "unread while `dividend_payout_share` is 0.0: the annual Lintner "
+        "speed of the declared amount toward its target. Lintner fits of "
+        "the S&P 500's dividend on its earnings (Shiller, 1946-2023 and "
+        "1990-2023) give 0.11 to 0.13 a year; 0.4 is set against the "
+        "rule's own input, the name's price EMA, which is noisier than "
+        "earnings",
+    "dividend_yield_ceiling":
+        "unread while `dividend_payout_share` is 0.0: a forced cut once a "
+        "name's yield on its declaring close is this many times its target. "
+        "A GUARD: without it a collapsed name paid 20 to 46 per cent a year "
+        "(offline design, held-out seeds)",
+    "dividend_buyback_substitution":
+        "unread while `dividend_payout_share` is 0.0: at 1 a name's buyback "
+        "share is `buyback_payout_share` less its dividend payout, so the "
+        "former reads as the total payout (Grullon and Michaely 2002, JF "
+        "57(4)); without it dividends on top of buybacks gave a D/P-quintile "
+        "total-return spread of +4.1 to +4.4 points a year against a real "
+        "+0.9 (Ken French D/P portfolios, 1927-2025)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "
@@ -1705,9 +1744,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "ptv20e7 then passed its 33 rows at 0.75, and the graded "
                   "arm keeps it (box ptv20vr9, B8 the long-run return 7.2 "
                   "against 6.25 plus or minus 2). At the model's median "
-                  "earnings yield of 0.0555 it is a buyback yield of about "
-                  "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
-                  "value record; the model pays no dividends (design "
+                  "earnings yield of 0.0555 it would be a buyback yield of "
+                  "4.2 per cent, but the index's DELIVERED yield (the "
+                  "cap-weighted log rate of the buyback factor) is 2.0 per "
+                  "cent on held-out seeds, decaying from 3.3 in year 2 to "
+                  "0.8 in year 21; the shipped preset pays no dividends "
+                  "(`dividend_payout_share`) (design "
                   "repository, programme/ptv20-registration.md, tenth and "
                   "eleventh registrations and 'The graded arm')",
     },

@@ -127,6 +127,7 @@ from __future__ import annotations
 
 import copy
 import math
+import struct as _struct
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -138,7 +139,7 @@ if TYPE_CHECKING:
 from ._core import Engine, GameRng, check_seed
 from ._core import rate_specs as _rate_specs
 from .harness import FACTOR_NAMES, Observation
-from .sandbox import economy_of, hidden_state
+from .sandbox import dividend_states_of, economy_of, hidden_state
 
 # The stream the random baseline draws on. Distinct from the market stream, so
 # a random agent's decisions cannot perturb the market it is trading in --
@@ -686,6 +687,30 @@ class Oracle:
                for i in range(len(s)) if tickers[i] not in RATE_TICKERS}
         macro = engine.macro_fields
         economy = economy_of(engine)
+        # The cash dividend a holder receives over the session, as a return:
+        # fair value accrues the next amount at a 63rd of it a session, the
+        # price carries that accrual until the ex-date drop, and the drop is
+        # paid back in cash, so a holder earns the accrual every session.
+        # Under `dividend_buyback_substitution` the name's buyback term reads
+        # the total payout less its dividend payout, so the buyback part of
+        # the common drift below is too high for it by that payout's yield.
+        # Nothing, and no snapshot read, on a model without dividends.
+        if model.get("dividend_payout_share", 0.0) != 0.0:
+            states = dividend_states_of(engine) or b""
+            prices = _f64(engine.column("price"))
+            values = _struct.unpack("<%dd" % (len(states) // 8), states)
+            substitution = (model.get("dividend_buyback_substitution", 0.0) != 0.0
+                            and model.get("market_pe_buybacks", 0.0) != 0.0
+                            and economy["market_pe"] > 0)
+            for i in own:
+                if 7 * i + 3 >= len(values):
+                    continue
+                payout, amount = values[7 * i], values[7 * i + 3]
+                if amount == amount and amount > 0.0 and prices[i] > 0.0:
+                    own[i] += amount / 63.0 / prices[i]
+                if substitution and payout == payout and payout > 0.0:
+                    given_up = min(payout, model["buyback_payout_share"])
+                    own[i] -= given_up / economy["market_pe"] / 252.0
         # The TRUE growth, which output compounds: `macro_fields` reports
         # the published quarterly figure under `gdp_publication_lag`. The
         # core's percent over 100 is `macro_fields`' own figure at 0.0.

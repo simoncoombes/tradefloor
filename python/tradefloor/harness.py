@@ -67,7 +67,7 @@ if TYPE_CHECKING:
     from .spec import StrategySpec
 
 
-# The eleven components, as literals a checker can match against
+# The twelve components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #
@@ -84,16 +84,19 @@ if TYPE_CHECKING:
 # `fair_value_shift`, arrived with pt-v20 (0.8.5): the part of the day's news
 # and noise that changed the name's fair value for good, entered as a negative
 # because it left the mispricing. The ten above report the whole shock, which
-# is what moved the price; zero on every preset through pt-v19.
+# is what moved the price; zero on every preset through pt-v19. The twelfth,
+# `dividend`, is the change in `s` at an ex-date open, where the price drops
+# by the amount and fair value gives up its accrued dividend; zero on every
+# model without dividends (`dividend_payout_share`).
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
     Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
-    Literal["fair_value_shift"],
+    Literal["fair_value_shift"], Literal["dividend"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
      "order_flow_impact", "short_squeeze_effect", "random_noise",
-     "circuit_breaker", "jump", "overnight", "fair_value_shift")
+     "circuit_breaker", "jump", "overnight", "fair_value_shift", "dividend")
 
 
 def _f64(buf: bytes) -> list[float]:
@@ -260,7 +263,7 @@ class Scorecard:
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
                  "strategy_fingerprint", "model_fingerprint", "trusted",
-                 "uses_hidden_state", "tampered")
+                 "uses_hidden_state", "tampered", "dividends")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -270,6 +273,7 @@ class Scorecard:
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
         model_fingerprint: str = "", trusted: bool = False,
         uses_hidden_state: bool = False, tampered: bool = False,
+        dividends: float = 0.0,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -314,6 +318,10 @@ class Scorecard:
         #: order path. ``errors`` names the step. The score is of a market
         #: the agent rewrote and ranks nothing.
         self.tampered = tampered
+        #: Net cash dividends the portfolio received (paid, on a short)
+        #: over the run, already inside ``pnl``. 0.0 on every model without
+        #: dividends (``dividend_payout_share``).
+        self.dividends = dividends
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -546,6 +554,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
         engine.open_market()
+        # The cash dividends this open made payable, before the agent acts:
+        # the price already carries the ex-date drop. Nothing on a model
+        # without dividends.
+        portfolio.collect_dividends(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
@@ -660,6 +672,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         trusted=trusted,
         uses_hidden_state=privileged,
         tampered=tampered,
+        dividends=portfolio.dividends,
     )
 
 

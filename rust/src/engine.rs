@@ -269,6 +269,18 @@ pub struct DayAdvanceOutcome {
     pub draws_consumed: usize,
 }
 
+/// One declared cash dividend: the name's roster slot and ticker, the
+/// session it was declared on, the session it goes ex, and the amount per
+/// share. See [`crate::market::dividends`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Distribution {
+    pub company: usize,
+    pub ticker: String,
+    pub declared_day: i64,
+    pub ex_day: i64,
+    pub amount: f64,
+}
+
 /// Cloneable, and that is a correctness property rather than a convenience.
 ///
 /// An in-memory fork is `self.clone()`. The alternative -- rebuilding a fresh
@@ -306,6 +318,15 @@ pub struct Engine {
     /// Per-day state like `overnight_moves`: the tape books it onto the row
     /// where the jump is observed, beside the jump.
     jump_fair_value_moves: Vec<f64>,
+    /// The move each name's `s` took at the last open's ex-date drop
+    /// (`dividend_payout_share`), in roster order, 0.0 where nothing went
+    /// ex. Per-day state like `overnight_moves`, and for the same reader:
+    /// the tape books it onto the day's first row.
+    dividend_moves: Vec<f64>,
+    /// Every dividend declared so far, in declaration order. A record for
+    /// the reader, like the tape: not state, not hashed, not in the
+    /// snapshot. Empty on every preset.
+    distribution_log: Vec<Distribution>,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -1123,6 +1144,8 @@ impl Engine {
             },
             overnight_moves: vec![0.0; companies_len],
             jump_fair_value_moves: vec![0.0; companies_len],
+            dividend_moves: vec![0.0; companies_len],
+            distribution_log: Vec::new(),
             companies,
             economy,
             central_bank,
@@ -3478,12 +3501,14 @@ impl Engine {
         anchor: &[f64],
     ) -> Result<(), String> {
         let n = self.companies.len();
-        // Nine-wide attribution rows predate the overnight slot and ten-wide
-        // ones the fair-value shift; each restores with the slots it lacks at
-        // zero, which is what such a day held. Likewise eight-wide tick rows.
+        // Nine-wide attribution rows predate the overnight slot, ten-wide
+        // ones the fair-value shift and eleven-wide ones the dividend; each
+        // restores with the slots it lacks at zero, which is what such a day
+        // held. Likewise eight-wide tick rows.
         let width = crate::market::factors::COMPONENT_COUNT;
         let attribution: Vec<f64> = match (n, attribution.len()) {
-            (n, len) if n > 0 && (len == n * (width - 1) || len == n * (width - 2)) => {
+            (n, len) if n > 0
+                && (len == n * (width - 1) || len == n * (width - 2) || len == n * (width - 3)) => {
                 let old = len / n;
                 attribution
                     .chunks_exact(old)
@@ -4017,6 +4042,11 @@ impl Engine {
         // anchors on the post-gap open and the gap sits outside it.
         self.apply_overnight();
 
+        // The dividends: declarations, the ex-date drops and the accrual
+        // fair value reads today. Nothing, and no state, with
+        // `dividend_payout_share` at 0.0.
+        self.apply_dividends();
+
         reset_daily_prices(&mut self.companies);
 
         // The rate indices' open: a day's carry if a close came before, then
@@ -4183,6 +4213,11 @@ impl Engine {
             )
             .fair_value;
             let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
+            // The dividend accrued since the last ex-date, as the tick reads
+            // it. (This print leaves out the buyback term the tick carries;
+            // latent while `overnight_variance_ratio` is 0.0 on every preset
+            // with buybacks.)
+            let fv = crate::market::dividends::with_accrual(fv, company);
             let price = crate::mathx::min(
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
@@ -4201,6 +4236,218 @@ impl Engine {
     /// process, in roster order; 0.0 where nothing moved.
     pub fn overnight_moves(&self) -> &[f64] {
         &self.overnight_moves
+    }
+
+    /// The move each name's `s` took at the last open's ex-date drop, in
+    /// roster order; 0.0 where nothing went ex.
+    pub fn dividend_moves(&self) -> &[f64] {
+        &self.dividend_moves
+    }
+
+    /// True when the model pays dividends (`dividend_payout_share` set):
+    /// the snapshot and the state hash carry the per-name states only then.
+    pub fn carries_dividends(&self) -> bool {
+        self.params.dividend_payout_share != 0.0
+    }
+
+    /// Each name's dividend state as `STATE_WIDTH` f64s, roster order, NaN
+    /// for a name without one. For the snapshot.
+    pub fn dividend_states(&self) -> Vec<f64> {
+        let w = crate::market::dividends::STATE_WIDTH;
+        let mut out = Vec::with_capacity(self.companies.len() * w);
+        for c in &self.companies {
+            match c.stock.dividend {
+                Some(d) => out.extend_from_slice(&d.to_array()),
+                None => out.extend(std::iter::repeat(f64::NAN).take(w)),
+            }
+        }
+        out
+    }
+
+    /// Write the dividend states back from [`Engine::dividend_states`].
+    pub fn set_dividend_states(&mut self, values: &[f64]) -> Result<(), String> {
+        let w = crate::market::dividends::STATE_WIDTH;
+        if values.len() != self.companies.len() * w {
+            return Err(format!(
+                "dividend has {} values, expected {} ({} per company)",
+                values.len(), self.companies.len() * w, w));
+        }
+        for (c, chunk) in self.companies.iter_mut().zip(values.chunks_exact(w)) {
+            c.stock.dividend = crate::market::dividends::DividendState::from_slice(chunk);
+        }
+        Ok(())
+    }
+
+    /// The amount per share each name paid at this session's open, roster
+    /// order; 0.0 where nothing went ex, and on every preset.
+    pub fn dividends_today(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| c.stock.dividend.map(|d| d.paid_today).unwrap_or(0.0))
+            .collect()
+    }
+
+    /// Every dividend declared so far, in declaration order.
+    pub fn distributions(&self) -> &[Distribution] {
+        &self.distribution_log
+    }
+
+    /// THE DIVIDENDS (`dividend_payout_share`), once per name at the open,
+    /// after the overnight move and before the day's marks are set.
+    ///
+    /// Per name: the EMA of closes takes the last close; on the name's
+    /// declaration session (21 before its ex-date) the next amount is
+    /// declared; on its ex-date the price drops by the amount exactly, `s`
+    /// is re-read against the fair value without the accrual (the small
+    /// change is the `dividend` slot of the attribution, so the slots still
+    /// sum to the change in `s`), a resting agent buy limit on the name is
+    /// lowered by the amount (FINRA Rule 5330), and the amount is recorded
+    /// as paid today; then the accrual fair value reads today is set. See
+    /// [`crate::market::dividends`].
+    ///
+    /// No draw. With the dial at 0.0 it returns before touching anything,
+    /// so every preset is bit-identical.
+    fn apply_dividends(&mut self) {
+        use crate::market::dividends as dv;
+        if self.params.dividend_payout_share == 0.0 {
+            return;
+        }
+        let n = self.companies.len();
+        self.dividend_moves.clear();
+        self.dividend_moves.resize(n, 0.0);
+        for c in self.companies.iter_mut() {
+            if let Some(d) = c.stock.dividend.as_mut() {
+                d.paid_today = 0.0;
+            }
+        }
+        let day = self.current_day;
+        let alpha = dv::ema_weight();
+        for i in 0..n {
+            let (ticker, price, fresh) = {
+                let c = &self.companies[i];
+                if c.is_bankrupt || !c.is_public {
+                    continue;
+                }
+                (c.ticker.clone(), c.stock.price, c.stock.dividend.is_none())
+            };
+            let k = dv::sessions_since_ex(&ticker, day);
+            if fresh {
+                // A new state takes today's price as its reference and pays
+                // nothing today; the accrual starts where the quarter is.
+                let mut st = dv::new_state(&self.params, &self.companies[i], price);
+                if k >= dv::DIVIDEND_PERIOD - dv::DECLARATION_LEAD {
+                    st.declared = true;
+                }
+                if st.declared && st.target_yield > 0.0 {
+                    self.distribution_log.push(Distribution {
+                        company: i,
+                        ticker: ticker.clone(),
+                        declared_day: day,
+                        ex_day: day + dv::DIVIDEND_PERIOD - k,
+                        amount: st.amount,
+                    });
+                }
+                st.accrual = dv::accrual_for(&self.params, &st, price, k);
+                self.companies[i].stock.dividend = Some(st);
+                // A name that has traded keeps its price: `s` is re-read
+                // against the fair value with the accrual in it.
+                if self.companies[i].stock.mispricing_s.is_some() && st.accrual != 0.0 {
+                    let fv = crate::market::tick::tick_fair_value(
+                        &self.params, &self.economy, self.nominal_output_base, day,
+                        &self.companies[i], price);
+                    if fv > 0.0 && price > 0.0 {
+                        let s_new = crate::market::tick::clamp_s(
+                            &self.params, crate::mathx::log(price / fv));
+                        let stock = &mut self.companies[i].stock;
+                        let before = stock.mispricing_s.unwrap_or(s_new);
+                        stock.mispricing_s = Some(s_new);
+                        if let Some(prev) = stock.mispricing_s_prev_close {
+                            stock.mispricing_s_prev_close = Some(prev + (s_new - before));
+                        }
+                    }
+                }
+                continue;
+            }
+            let mut st = self.companies[i].stock.dividend.unwrap();
+            st.price_ema += alpha * (price - st.price_ema);
+            let mut paid = 0.0;
+            if k == 0 {
+                if !st.declared {
+                    st.amount = dv::declare(&self.params, &st, price);
+                    if st.target_yield > 0.0 {
+                        self.distribution_log.push(Distribution {
+                            company: i,
+                            ticker: ticker.clone(),
+                            declared_day: day,
+                            ex_day: day,
+                            amount: st.amount,
+                        });
+                    }
+                }
+                paid = st.amount;
+                st.declared = false;
+            } else if k == dv::DIVIDEND_PERIOD - dv::DECLARATION_LEAD {
+                st.amount = dv::declare(&self.params, &st, price);
+                st.declared = true;
+                if st.target_yield > 0.0 {
+                    self.distribution_log.push(Distribution {
+                        company: i,
+                        ticker: ticker.clone(),
+                        declared_day: day,
+                        ex_day: day + dv::DECLARATION_LEAD,
+                        amount: st.amount,
+                    });
+                }
+            }
+            st.accrual = dv::accrual_for(&self.params, &st, price, k);
+            st.paid_today = paid;
+            self.companies[i].stock.dividend = Some(st);
+            if paid > 0.0 {
+                self.go_ex(i, paid);
+            }
+        }
+    }
+
+    /// The ex-date open for one name: the price drops by `amount`, `s` is
+    /// re-read against today's fair value (whose accrual has just returned
+    /// to zero), and resting agent buy limits drop by the amount.
+    fn go_ex(&mut self, i: usize, amount: f64) {
+        let day = self.current_day;
+        let old = self.companies[i].stock.price;
+        let new = crate::mathx::max(0.01, old - amount);
+        {
+            let stock = &mut self.companies[i].stock;
+            stock.price = new;
+            stock.market_cap = new * stock.shares_outstanding;
+        }
+        if let Some(v) = self.repriced_pending.get_mut(i) {
+            *v += crate::mathx::log(new / old);
+        }
+        if self.companies[i].stock.mispricing_s.is_some() {
+            let fv = crate::market::tick::tick_fair_value(
+                &self.params, &self.economy, self.nominal_output_base, day,
+                &self.companies[i], new);
+            if fv > 0.0 {
+                let s_new = crate::market::tick::clamp_s(&self.params, crate::mathx::log(new / fv));
+                let stock = &mut self.companies[i].stock;
+                let before = stock.mispricing_s.unwrap_or(s_new);
+                let moved = s_new - before;
+                stock.mispricing_s = Some(s_new);
+                if let Some(prev) = stock.mispricing_s_prev_close {
+                    stock.mispricing_s_prev_close = Some(prev + moved);
+                }
+                if let Some(acc) = self.attribution.get_mut(i) {
+                    acc[crate::market::factors::DIVIDEND_SLOT] += moved;
+                }
+                self.dividend_moves[i] = moved;
+            }
+        }
+        let ticker = self.companies[i].ticker.clone();
+        for o in self.book.orders.iter_mut() {
+            if o.ticker == ticker && o.side == crate::order_book::Side::Buy {
+                o.limit = crate::mathx::max(0.01, o.limit - amount);
+            }
+        }
     }
 
     /// What each name's `s` gave up to its fair value at the last close's
@@ -4554,7 +4801,24 @@ impl Engine {
             c.stock.mispricing_s = Some(s0);
             c.stock.mispricing_s_prev_close = Some(s0);
             c.stock.mispricing_momentum = Some(0.0);
-            c.stock.fair_value_offset = Some(gap[i] - s0);
+            // With a dividend accrued, fair value is `base * exp(v) + A`
+            // rather than `(base + A) * exp(v)`, so the level that opens the
+            // name at its own price solves `(base * exp(v) + A) * exp(s0) =
+            // P`. A branch: without an accrual, the line that stood.
+            let a = crate::market::dividends::accrual(c);
+            let v = if a == 0.0 {
+                gap[i] - s0
+            } else {
+                let price = crate::mathx::max(0.01, c.stock.price);
+                let base = price / crate::mathx::exp(gap[i]) - a;
+                let rest = price / crate::mathx::exp(s0) - a;
+                if base > 0.0 && rest > 0.0 {
+                    crate::mathx::log(rest / base)
+                } else {
+                    gap[i] - s0
+                }
+            };
+            c.stock.fair_value_offset = Some(v);
         }
     }
 
@@ -5515,8 +5779,9 @@ impl Engine {
                     // multiple read without it rises by the buyback yield
                     // every year. A branch, so 0.0 is the line that stood.
                     let earnings = if self.params.market_pe_buybacks != 0.0 {
-                        earnings * crate::market::tick::buyback_scale(
-                            &self.params, Some(earnings), c.stock.price, self.current_day)
+                        earnings * crate::market::tick::buyback_scale_at(
+                            &self.params, crate::market::dividends::buyback_share(&self.params, c),
+                            Some(earnings), c.stock.price, self.current_day)
                     } else {
                         earnings
                     };
@@ -6340,7 +6605,7 @@ impl Engine {
     /// Empty slices for a caller that has none, which is every core-only
     /// caller and every test below.
     pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
-        self.state_hash_with_pending(day_count, market_open, &[], &[], &[])
+        self.state_hash_with_pending(day_count, market_open, &[], &[], &[], &[])
     }
 
     /// [`Engine::state_hash`], carrying the wrapper's pending tape state.
@@ -6351,6 +6616,7 @@ impl Engine {
         pending_jump: &[f64],
         pending_overnight: &[f64],
         pending_fair_value: &[f64],
+        pending_dividend: &[f64],
     ) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
@@ -6418,6 +6684,16 @@ impl Engine {
             }
             for row in &self.tick_components {
                 hash_f64(&mut buf, row[crate::market::factors::TICK_FAIR_VALUE]);
+            }
+        }
+        // The dividend's slot, after the attribution's last, on the same
+        // rule: only on a model that pays dividends or where it is non-zero,
+        // so every other engine hashes as it did before the slot.
+        if self.carries_dividends()
+            || self.attribution.iter().any(|r| r[crate::market::factors::DIVIDEND_SLOT] != 0.0)
+        {
+            for row in &self.attribution {
+                hash_f64(&mut buf, row[crate::market::factors::DIVIDEND_SLOT]);
             }
         }
         for value in &self.tick_fundamental {
@@ -6513,6 +6789,13 @@ impl Engine {
                 hash_f64(&mut buf, *value);
             }
         }
+        // The dividend states, on the same rule: only on a model that pays
+        // them. NaN (one pattern) for a name without one.
+        if self.carries_dividends() {
+            for value in self.dividend_states() {
+                hash_f64(&mut buf, value);
+            }
+        }
         // The crisis episode. Hashed for the reason every field here is:
         // two engines alike in every column, one of them three sessions
         // into a financial-services episode and the other not in an episode
@@ -6552,6 +6835,15 @@ impl Engine {
         if !pending_fair_value.is_empty() {
             hash_u32(&mut buf, pending_fair_value.len() as u32);
             for value in pending_fair_value {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        // The ex-date's move in `s` waiting for its tape row, on the same
+        // rule: only while non-empty, which only a model paying dividends
+        // can make it.
+        if !pending_dividend.is_empty() {
+            hash_u32(&mut buf, pending_dividend.len() as u32);
+            for value in pending_dividend {
                 hash_f64(&mut buf, *value);
             }
         }
@@ -7347,6 +7639,7 @@ mod tests {
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
                 fair_value_offset: None,
+                dividend: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,
                 garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],

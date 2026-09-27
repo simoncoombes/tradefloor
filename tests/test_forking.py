@@ -1081,7 +1081,11 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # A switch as well; the dividend at 0.05 of the sector
+                   # payouts is small but pays, so a restore that lost a
+                   # name's dividend state would move its next amount.
+                   dividend_buyback_substitution=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

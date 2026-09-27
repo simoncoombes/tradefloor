@@ -669,6 +669,7 @@ mod tests {
                 short_interest: 0.0,
                 float: 1e8,
                 fair_value_offset: None,
+                dividend: None,
             },
             sector_volatility: Some(1.0),
             sector_avg_pe: None,

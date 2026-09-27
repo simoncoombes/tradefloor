@@ -165,6 +165,11 @@ PARAM_SPECS: dict[str, dict] = {
     "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
     "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
     "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "dividend_payout_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
+    "dividend_growth_cutoff": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "dividend_adjustment_speed": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.01, 1.0)},
+    "dividend_yield_ceiling": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 100.0)},
+    "dividend_buyback_substitution": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down
@@ -243,9 +248,11 @@ PARAM_SPECS: dict[str, dict] = {
                            "hard_range": (0.0, 1095.0)},
     # A SHARE of earnings, so [0, 1]. Past 1.0 a company returns more than
     # it earns every year, which is a claim about leverage this model does
-    # not carry.
+    # not carry -- except under `dividend_buyback_substitution`, where this
+    # is the TOTAL payout and a name's buyback share is it less the name's
+    # dividend payout, so the box reaches 1.5.
     "buyback_payout_share": {"kind": "abs", "step_unit": 0.05,
-                             "hard_range": (0.0, 1.0)},
+                             "hard_range": (0.0, 1.5)},
     # The overnight move's variance as a fraction of a session's. A RATIO
     # of variances, so an absolute box from zero; 1.0 is a night as large
     # as a session, and the real share of 0.23 to 0.43 sits well below it

@@ -165,6 +165,10 @@ pub struct TickStock {
     /// stand. See `ModelParams::fair_value_news_share` and
     /// `ModelParams::opening_mispricing_sigma`.
     pub fair_value_offset: Option<f64>,
+    /// The name's dividend state (`ModelParams::dividend_payout_share`).
+    /// `None` on every preset, which pays no dividend; see
+    /// [`crate::market::dividends`].
+    pub dividend: Option<crate::market::dividends::DividendState>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
     /// The variance cascade's components, when one is running.
@@ -257,7 +261,20 @@ pub const MARKET_DAYS_PER_YEAR: f64 = 252.0;
 /// roster once rather than branching on a zero-mean quantity every day. On
 /// `Universe.random(40, seed=111)` it is 3 names of 40.
 pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64) -> f64 {
-    if p.buyback_payout_share == 0.0 {
+    buyback_scale_at(p, p.buyback_payout_share, eps, price, elapsed_days)
+}
+
+/// [`buyback_scale`] at an explicit share of earnings: the name's own under
+/// `dividend_buyback_substitution` (`market::dividends::buyback_share`),
+/// `buyback_payout_share` otherwise, where the two are the same arithmetic.
+pub fn buyback_scale_at(
+    p: &ModelParams,
+    share: f64,
+    eps: Option<f64>,
+    price: f64,
+    elapsed_days: i64,
+) -> f64 {
+    if p.buyback_payout_share == 0.0 || share == 0.0 {
         return 1.0;
     }
     let eps = match eps {
@@ -267,7 +284,7 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
     if !(price > 0.0) || !price.is_finite() || elapsed_days <= 0 {
         return 1.0;
     }
-    let b = p.buyback_payout_share * eps / price;
+    let b = share * eps / price;
     // The yield is read at TODAY's price and applied over every elapsed
     // year, so a name whose price collapses toward the 0.01 floor reads a
     // yield of hundreds and a fair value of exp(hundreds): the re-mark's
@@ -1116,7 +1133,9 @@ pub fn simulate_market_tick(
         // Per NAME, unlike the growth term above: the yield is this
         // company's own earnings over its own price. A BRANCH at 1.0 for
         // the same reason as the one above.
-        let buyback = buyback_scale(p, grown.eps, current_prices[i], inputs.elapsed_days);
+        let buyback = buyback_scale_at(
+            p, crate::market::dividends::buyback_share(p, &companies[idx]),
+            grown.eps, current_prices[i], inputs.elapsed_days);
         let valuation = if buyback == 1.0 {
             grown
         } else {
@@ -1126,6 +1145,9 @@ pub fn simulate_market_tick(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
         let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
+        // The dividend accrued since the last ex-date, in price units. A
+        // branch inside: no state, or no accrual, is `fv` bit for bit.
+        let fv = crate::market::dividends::with_accrual(fv, &companies[idx]);
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
         // so enabling the model — or loading an old save — causes no level
@@ -1740,7 +1762,9 @@ pub fn published_fair_value(
     } else {
         scale_valuation(company.valuation(), nominal)
     };
-    let buyback = buyback_scale(p, grown.eps, company.stock.price, elapsed_days);
+    let buyback = buyback_scale_at(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps,
+        company.stock.price, elapsed_days);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1752,7 +1776,8 @@ pub fn published_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
 }
 
 /// A name's fair value as the tick's phase 2 computes it: the nominal
@@ -1781,7 +1806,8 @@ pub fn tick_fair_value(
     } else {
         scale_valuation(grown, mathx::exp(v_level))
     };
-    let buyback = buyback_scale(p, grown.eps, price, elapsed_days);
+    let buyback = buyback_scale_at(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps, price, elapsed_days);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1793,7 +1819,8 @@ pub fn tick_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {

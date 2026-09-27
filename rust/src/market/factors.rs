@@ -61,7 +61,8 @@ pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
 pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
 pub const FAIR_VALUE_SLOT: usize = OVERNIGHT_SLOT + 1;
-pub const COMPONENT_COUNT: usize = FAIR_VALUE_SLOT + 1;
+pub const DIVIDEND_SLOT: usize = FAIR_VALUE_SLOT + 1;
+pub const COMPONENT_COUNT: usize = DIVIDEND_SLOT + 1;
 
 /// A name's loading on its sector factor, from its beta (§108).
 ///
@@ -411,6 +412,14 @@ pub const S_COMPONENT_KEYS: [&str; 8] = [
 /// valuation. Exactly zero on every preset through pt-v19. The last factor,
 /// so every earlier one keeps its position.
 pub const FAIR_VALUE_COMPONENT_KEY: &str = "fair_value_shift";
+
+/// The ex-date's slot in the ENGINE's attribution, after the fair-value
+/// shift: the change in `s` when a name goes ex at the open and `s` is
+/// re-read against the fair value without the accrued dividend
+/// (`dividend_payout_share`). The price itself drops by the amount; this is
+/// only what that did to the mispricing, so every slot together still sums
+/// to the change in `s`. Exactly zero on every preset.
+pub const DIVIDEND_COMPONENT_KEY: &str = "dividend";
 
 /// The tick's own rows: the eight `S_COMPONENT_KEYS`, then the tick's
 /// fair-value shift at [`TICK_FAIR_VALUE`].

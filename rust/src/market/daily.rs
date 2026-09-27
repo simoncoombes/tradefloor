@@ -301,6 +301,7 @@ mod tests {
             mispricing_s_prev_close: Some(0.04),
             mispricing_momentum: Some(0.0),
             fair_value_offset: None,
+            dividend: None,
             maker_inventory: Some(0.0),
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],

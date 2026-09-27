@@ -465,7 +465,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
-         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # The dividend states, on a model that pays dividends, and an
+         # ex-date's move in `s` waiting for its tape row.
+         "dividend", "pending_dividend"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -523,19 +526,27 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # fair-value offsets (whose snapshot has the "fair_value_offset" key), as
     # `Engine::state_hash_with_pending` does, so every other engine hashes as
     # it did before the slot existed.
+    # The dividend's slot follows it in an attribution row, and is hashed
+    # after the fair-value shift's on the same rule: only on a model that
+    # pays dividends (whose snapshot has the "dividend" key) or where it is
+    # non-zero.
     width_a, width_t = len(Engine.FACTORS), 9
     rows_a = _column(snapshot["attribution"], n * width_a, "attribution")
     rows_t = _column(snapshot["tick_components"], n * width_t, "tick_components")
     for i in range(n):
-        for value in rows_a[i * width_a:(i + 1) * width_a - 1]:
+        for value in rows_a[i * width_a:(i + 1) * width_a - 2]:
             _f64(buf, value)
     for i in range(n):
         for value in rows_t[i * width_t:(i + 1) * width_t - 1]:
             _f64(buf, value)
-    fv_a = [rows_a[(i + 1) * width_a - 1] for i in range(n)]
+    fv_a = [rows_a[(i + 1) * width_a - 2] for i in range(n)]
     fv_t = [rows_t[(i + 1) * width_t - 1] for i in range(n)]
     if ("fair_value_offset" in snapshot or any(fv_a) or any(fv_t)):
         for value in fv_a + fv_t:
+            _f64(buf, value)
+    dv_a = [rows_a[(i + 1) * width_a - 1] for i in range(n)]
+    if "dividend" in snapshot or any(dv_a):
+        for value in dv_a:
             _f64(buf, value)
     for name, width in (("tick_fundamental", 1), ("tick_anchor", 1),
                         # The day's noise split, its idiosyncratic scale and
@@ -607,6 +618,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # The dividend states, seven f64s a name, only on a model that pays
+    # dividends: `Engine::state_hash`'s order and rule.
+    if "dividend" in snapshot:
+        raw = snapshot["dividend"]
+        for value in _column(raw, len(raw) // 8, "dividend"):
+            _f64(buf, value)
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the
@@ -643,6 +660,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("pending_fair_value"):
         raw = snapshot["pending_fair_value"]
         values = _column(raw, len(raw) // 8, "pending_fair_value")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The ex-date's move in `s` waiting for its tape row, on the same rule.
+    if snapshot.get("pending_dividend"):
+        raw = snapshot["pending_dividend"]
+        values = _column(raw, len(raw) // 8, "pending_dividend")
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)

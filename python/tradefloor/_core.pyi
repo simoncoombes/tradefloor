@@ -30,7 +30,7 @@ ColumnField = Literal[
     "volume", "avg_volume", "market_cap", "mispricing_s",
     "mispricing_s_prev_close", "mispricing_momentum", "last_daily_return",
     "maker_inventory", "garch_variance", "beta", "short_interest",
-    "float_shares",
+    "float_shares", "dividend",
 ]
 FactorName = Literal[
     "reversion", "momentum", "crowd_lean",
@@ -318,6 +318,10 @@ class Engine:
     # core does not have.
     def prices(self) -> bytes: ...
     def column(self, field: ColumnField) -> bytes: ...
+    def dividends_today(self) -> list[float]: ...
+    def distributions(self, day: int | None = None) -> Any: ...
+    @property
+    def day_count(self) -> int: ...
     def attribution(self, factor: FactorName) -> bytes: ...
     # The rate indices' own decomposition; zero in every equity's slot.
     RATE_COMPONENTS: list[str]

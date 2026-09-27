@@ -140,7 +140,8 @@ class Portfolio:
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
                  "max_leverage", "_stamp", "cash_interest", "interest",
-                 "owner", "_in_book")
+                 "owner", "_in_book", "dividends", "distributions",
+                 "_collected")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
@@ -175,6 +176,15 @@ class Portfolio:
         self.cash_interest = bool(cash_interest)
         # Interest credited so far, net of any charged on a negative balance.
         self.interest = 0.0
+        #: Cash dividends received so far, net of any paid on a short.
+        self.dividends = 0.0
+        #: One entry per position that went ex: ``day``, ``ticker``,
+        #: ``quantity``, ``amount`` per share and ``cash`` (quantity x
+        #: amount, negative on a short). See :meth:`collect_dividends`.
+        self.distributions: list[dict] = []
+        # The (engine, day) last collected, so a second call on one open
+        # credits nothing.
+        self._collected = None
         self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
@@ -549,6 +559,51 @@ class Portfolio:
         self.cash += amount
         self.interest += amount
         return amount
+
+    def collect_dividends(self, engine: Engine) -> float:
+        """Credit the cash dividends this session's open made payable.
+
+        On a model that pays dividends (``dividend_payout_share``), a name
+        going ex opens lower by the amount per share; a holder of record is
+        owed ``quantity * amount`` in cash and a short owes it, as a stock
+        loan makes the borrower pay the lender. Call it once per session,
+        right after ``open_market`` and before trading; the harness, the gym,
+        a World and the TCA path all do. Returns the net cash credited,
+        added to :attr:`cash` and :attr:`dividends`, with one entry per
+        position in :attr:`distributions`. 0.0 on every model without
+        dividends, where nothing is read. A second call on the same open
+        credits nothing.
+        """
+        amounts = struct.unpack("<%dd" % len(engine.tickers),
+                                engine.column("dividend"))
+        if not any(amounts):
+            return 0.0
+        key = (id(engine), int(engine.day_count))
+        if self._collected == key:
+            return 0.0
+        self._collected = key
+        index = {t: i for i, t in enumerate(engine.tickers)}
+        total = 0.0
+        for ticker, position in self.positions.items():
+            i = index.get(ticker)
+            if i is None or not position.quantity:
+                continue
+            amount = amounts[i]
+            if amount == 0.0:
+                continue
+            cash = position.quantity * amount
+            total += cash
+            self.distributions.append({
+                "day": int(engine.day_count), "ticker": ticker,
+                "quantity": position.quantity, "amount": amount, "cash": cash,
+            })
+        self.cash += total
+        self.dividends += total
+        return total
+
+    def distributions_table(self):
+        """:attr:`distributions` as a list of dicts, oldest first."""
+        return list(self.distributions)
 
     # -- impact -----------------------------------------------------------
 

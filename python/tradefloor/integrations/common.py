@@ -931,6 +931,20 @@ def orders_from(decision: Decision, obs: Any, *,
 # -- observation -> framework -------------------------------------------------
 
 
+def _dividends_paid(engine: Any) -> list[float] | None:
+    """Today's ex-date amounts per instrument on a model that pays
+    dividends, from a :class:`~tradefloor.sandbox.MarketView` or a live
+    engine; None on any other model, and on an engine without the method."""
+    try:
+        on = engine.pays_dividends
+    except Exception:
+        try:
+            on = engine.model.dividend_payout_share != 0.0
+        except Exception:
+            return None
+    return list(engine.dividends_today()) if on else None
+
+
 def serialize_observation(obs: Any, *,
                           history: Sequence[Sequence[float]] = (),
                           fundamentals: dict[str, dict[str, Any]] | None = None,
@@ -986,10 +1000,17 @@ def serialize_observation(obs: Any, *,
 
     rows = [list(row) for row in history]
     facts = fundamentals or {}
+    # The cash dividend per share each name went ex for at today's open, on
+    # a model that pays dividends (`dividend_payout_share`) only: public, on
+    # the tape's `distribution` column, and the reason a holder's price
+    # opened lower. Absent otherwise, so every other payload is the one it
+    # was.
+    paid = _dividends_paid(obs.engine)
     assets = []
     for i, ticker in enumerate(obs.tickers):
         book = obs.book(ticker)
         adv = obs.avg_volume(ticker)
+        extra = {} if paid is None else {"dividend": paid[i]}
         assets.append({
             "symbol": ticker,
             "price": obs.price(ticker),
@@ -1002,6 +1023,7 @@ def serialize_observation(obs: Any, *,
             "max_order_shares": max_participation * adv,
             "position": obs.position(ticker),
             "fundamentals": dict(facts.get(ticker, {})),
+            **extra,
         })
 
     portfolio = obs.portfolio

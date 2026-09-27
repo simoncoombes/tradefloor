@@ -1010,6 +1010,25 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # LIVE: a name's fair value accrues its next dividend from the first
+    # session after its state is made, so every payer's `s` moves at once.
+    # tests/test_dividends.py holds the mechanism.
+    ("dividend_payout_share", 1.0, True),
+    # The four below are read only with dividend_payout_share set, so each
+    # row carries it as a companion (COMPANIONS) and reads the dial on it.
+    # A cutoff of zero stops every name with non-negative revenue growth
+    # from paying.
+    ("dividend_growth_cutoff", 0.0, True),
+    # The accrual before a declaration is the amount the rule would declare
+    # today, which the speed sets.
+    ("dividend_adjustment_speed", 1.0, True),
+    # LIVE at 1.0: the accrual before a declaration is the amount the rule
+    # would declare today, and at a ceiling of the target yield itself it
+    # binds on any name whose close sits under its price EMA (measured).
+    ("dividend_yield_ceiling", 1.0, True),
+    # LIVE: pt-v20 carries buyback_payout_share 0.75, and substitution takes
+    # each payer's dividend payout out of its buyback term.
+    ("dividend_buyback_substitution", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1674,6 +1693,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # only, and the probe's VIX stays below it. 0.0 on the calm exponent is
     # the branch that reads this one on both sides (see the row).
     "market_vol_vix_exponent": {"market_vol_vix_exponent_below": 0.0},
+    # The dividend's companions are read only with a dividend.
+    "dividend_growth_cutoff": {"dividend_payout_share": 1.0},
+    "dividend_adjustment_speed": {"dividend_payout_share": 1.0},
+    "dividend_yield_ceiling": {"dividend_payout_share": 1.0},
+    "dividend_buyback_substitution": {"dividend_payout_share": 1.0},
     # The fixed opening the row's decomposition was measured on, where the
     # probe's first two days are phase-change days (see the row).
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
