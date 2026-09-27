@@ -174,6 +174,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // schedule, which must not depend on the factor's conditional
             // sigma at all.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+            market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
             // The depth counterfactual, off. It reaches no company field.

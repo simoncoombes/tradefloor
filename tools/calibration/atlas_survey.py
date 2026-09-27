@@ -388,8 +388,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_cycle_expansion": (0.0, 1.5),
     # Sessions; 0 is instant, 126 half a year.
     "market_vol_cycle_half_life": (0.0, 126.0),
-    # A power in [0, 1].
+    # Powers in [0, 1], at or over one and under one.
     "market_vol_cycle_relative": (0.0, 1.0),
+    "market_vol_cycle_relative_calm": (0.0, 1.0),
+    # The power on the fair-value cap's ceiling, in [0, 1].
+    "market_vol_cycle_cap_relative": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

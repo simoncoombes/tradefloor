@@ -128,6 +128,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             // The constant-sigma baseline: these tests predate the factor's
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+            market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
             // The depth counterfactual, off. It reaches no company field.
@@ -282,6 +283,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
@@ -350,6 +352,7 @@ fn the_band_holds_in_extended_hours_too() {
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
@@ -428,6 +431,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.

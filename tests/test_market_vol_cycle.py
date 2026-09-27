@@ -4,18 +4,21 @@
 contraction or trough over its volatility in every other phase;
 `market_vol_cycle_expansion` is the multiplier outside them (0.0 derives it
 from the stationary phase shares), `market_vol_cycle_half_life` smooths the
-log multiplier toward its phase's value, and `market_vol_cycle_relative` is
-the power of the multiplier the VIX's reading of fear is scaled by
+log multiplier toward its phase's value, and `market_vol_cycle_relative` and
+`market_vol_cycle_relative_calm` are the powers of the multiplier the VIX's
+reading of fear is scaled by, at or over one and under one
 (rust/src/params.rs, `ModelParams::market_vol_cycle_ratio`).
 
-All four are 0.0 on every shipped preset and change nothing there; the
+All five are 0.0 on every shipped preset and change nothing there; the
 known-answer digests hold that. These tests hold that they are off on every
 preset, that the ratio and its companions move the market when set, that the
 multiplier is carried by the snapshot and both state hashes only while set
 and a restore reproduces the run, and the validation. The arithmetic (the
 target by phase, the half-life, the derived multiplier's share-weighted
-variance, a free close's scaling and a forced close's pass-through) is held
-by the Rust tests in engine.rs, module `market_vol_cycle`.
+variance, the VIX scale's two powers and its floor, the anchor memory's and
+the anchor level's scaling, a free close's scaling and a forced close's
+pass-through) is held by the Rust tests in engine.rs, module
+`market_vol_cycle`.
 """
 
 import struct
@@ -27,9 +30,12 @@ from tradefloor.manifest import state_hash
 
 UNIVERSE = list(tf.Universe.random(12, seed=3))
 DIALS = ("market_vol_cycle_ratio", "market_vol_cycle_expansion",
-         "market_vol_cycle_half_life", "market_vol_cycle_relative")
-CYCLE = {"market_vol_cycle_ratio": 2.25, "market_vol_cycle_expansion": 0.75,
-         "market_vol_cycle_half_life": 21.0, "market_vol_cycle_relative": 1.0}
+         "market_vol_cycle_half_life", "market_vol_cycle_relative",
+         "market_vol_cycle_relative_calm", "market_vol_cycle_cap_relative")
+# The setting the bear-dynamics fix recommends for pt-v20.
+CYCLE = {"market_vol_cycle_ratio": 2.5, "market_vol_cycle_expansion": 0.8,
+         "market_vol_cycle_half_life": 21.0, "market_vol_cycle_relative": 0.75,
+         "market_vol_cycle_relative_calm": 0.0, "market_vol_cycle_cap_relative": 1.0}
 
 
 def floats(raw):
@@ -59,38 +65,78 @@ def test_setting_them_to_zero_changes_nothing():
 
 def test_the_companions_are_unread_without_the_ratio():
     assert prices(market_vol_cycle_expansion=0.75, market_vol_cycle_half_life=21.0,
-                  market_vol_cycle_relative=1.0) == prices()
+                  market_vol_cycle_relative=1.0,
+                  market_vol_cycle_relative_calm=1.0,
+                  market_vol_cycle_cap_relative=1.0) == prices()
 
 
 @pytest.mark.parametrize("dials", [
     {"market_vol_cycle_ratio": 2.0},
     CYCLE,
     {**CYCLE, "market_vol_cycle_relative": 0.0},
-], ids=["ratio_derived", "design_centre", "relative_zero"])
+    {**CYCLE, "market_vol_cycle_relative_calm": 1.0},
+], ids=["ratio_derived", "centre", "relative_zero", "calm_one"])
 def test_each_moves_the_market(dials):
     assert prices(**dials) != prices()
 
 
-def test_an_expansion_multiplier_under_one_calms_an_expansion():
-    # A 60-session history on the default opening (an expansion at seed 7)
-    # with the multiplier at 0.75 and the ratio at 2.25: the index's daily
-    # moves are smaller than the off engine's.
+def test_the_calm_power_moves_a_calm_phase():
+    # Under one outside a contraction, so the calm-side power is read there.
+    assert prices(**CYCLE) != prices(**{**CYCLE, "market_vol_cycle_relative_calm": 0.5})
+
+
+def test_the_cap_power_moves_a_stormy_phase_only():
+    # Over one (an expansion multiplier of 2, read at power 0 so the fear
+    # loop lets the factor's sigma rise past the cap's unscaled ceiling
+    # inside 15 sessions) the ceiling is scaled and the market moves; under
+    # one (0.75 outside a contraction) it is not, and the run is
+    # bit-identical.
+    stormy = {**CYCLE, "market_vol_cycle_ratio": 1.0, "market_vol_cycle_expansion": 2.0,
+              "market_vol_cycle_relative": 0.0, "market_vol_cycle_half_life": 0.0,
+              "market_vol_cycle_cap_relative": 0.0}
+    assert prices(**stormy) != prices(**{**stormy, "market_vol_cycle_cap_relative": 1.0})
+    calm = {**CYCLE, "market_vol_cycle_ratio": 1.0, "market_vol_cycle_expansion": 0.75,
+            "market_vol_cycle_cap_relative": 0.0}
+    assert prices(**calm) == prices(**{**calm, "market_vol_cycle_cap_relative": 1.0})
+
+
+def index_moves(days=60, pin=None, **dials):
+    # The cap-weighted index's daily moves and the true phase each session.
+    e = engine(**dials)
+    if pin:
+        e.pin_macro(cycle=pin)
+    shares = [u.shares_outstanding for u in UNIVERSE]
+    caps, phases = [], []
+    for day in range(days):
+        e.run_days(1, record=False, first_day=day)
+        caps.append(sum(p * s for p, s in zip(floats(e.prices()), shares)))
+        phases.append(e.state_snapshot()["economy"]["cycle_phase"])
+    return [b / a - 1.0 for a, b in zip(caps, caps[1:])], phases
+
+
+@pytest.mark.parametrize("calm", [0.0, 1.0])
+def test_an_expansion_multiplier_under_one_calms_an_expansion(calm):
+    # A 60-session history held in an expansion (seed 7 turns to a
+    # contraction inside 60 sessions unpinned), with the multiplier at 0.8:
+    # the index's daily moves are smaller than the off engine's, at either
+    # calm-side power.
     import statistics
 
-    def index_moves(**dials):
-        e = engine(**dials)
-        shares = [u.shares_outstanding for u in UNIVERSE]
-        caps = []
-        for day in range(60):
-            e.run_days(1, record=False, first_day=day)
-            caps.append(sum(p * s for p, s in zip(floats(e.prices()), shares)))
-        assert e.state_snapshot()["economy"]["cycle_phase"] in (
-            "expansion", "peak", "recovery", "contraction", "trough")
-        return [b / a - 1.0 for a, b in zip(caps, caps[1:])]
-
-    on = index_moves(**CYCLE)
-    off = index_moves()
+    on, phases = index_moves(pin="expansion", **{**CYCLE, "market_vol_cycle_relative_calm": calm})
+    off, off_phases = index_moves(pin="expansion")
+    assert set(phases) == set(off_phases) == {"expansion"}
     assert statistics.pstdev(on[20:]) < statistics.pstdev(off[20:])
+
+
+def test_a_calm_power_of_zero_calms_an_expansion_further_than_one():
+    # At power 0 the coupling's reference is not lowered with the variance,
+    # so the fear loop reads the calm as calm and deepens it; at power 1 it
+    # reads fear against the lowered level and does not.
+    import statistics
+
+    zero, _ = index_moves(pin="expansion", **{**CYCLE, "market_vol_cycle_relative_calm": 0.0})
+    one, _ = index_moves(pin="expansion", **{**CYCLE, "market_vol_cycle_relative_calm": 1.0})
+    assert statistics.pstdev(zero[20:]) < statistics.pstdev(one[20:])
 
 
 def test_the_multiplier_is_carried_only_while_set_and_a_restore_reproduces_the_run():
@@ -171,6 +217,10 @@ def test_the_state_hash_is_unchanged_while_off():
     {"market_vol_cycle_half_life": 3000.0},
     {"market_vol_cycle_relative": -0.1},
     {"market_vol_cycle_relative": 1.5},
+    {"market_vol_cycle_relative_calm": -0.1},
+    {"market_vol_cycle_relative_calm": 1.5},
+    {"market_vol_cycle_cap_relative": -0.1},
+    {"market_vol_cycle_cap_relative": 1.5},
 ])
 def test_the_ranges(dials):
     with pytest.raises(Exception):

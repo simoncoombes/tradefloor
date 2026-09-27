@@ -172,6 +172,8 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_cycle_expansion": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
     "market_vol_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
     "market_vol_cycle_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_relative_calm": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_cap_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

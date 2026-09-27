@@ -2576,6 +2576,8 @@ impl Engine {
             None => request.order_volumes,
         };
 
+        // Read before the tick borrows the companies.
+        let market_permanent_ceiling_scale = self.market_vol_cycle_cap_scale();
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -2608,6 +2610,7 @@ impl Engine {
                 sector_keys: &self.sector_keys,
                 sector_sigmas: &sector_sigmas,
                 market_sigma_daily,
+                market_permanent_ceiling_scale,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
@@ -4731,7 +4734,8 @@ impl Engine {
         if !s_before.is_empty() {
             let psi = self.params.fair_value_news_share;
             let psim = crate::market::tick::market_permanent_share(
-                &self.params, self.market_vol.sigma_daily());
+                &self.params, self.market_vol.sigma_daily(),
+                self.market_vol_cycle_cap_scale());
             let common = market - compensator;
             for (index, company) in self.companies.iter_mut().enumerate() {
                 let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
@@ -4953,7 +4957,7 @@ impl Engine {
             let implied = crate::market::index_var::vix_from_variance(
                 self.params.vix_variance_premium, index_variance) * mult;
             // Times the cycle's VIX scale, exactly 1.0 with
-            // `market_vol_cycle_ratio` or `market_vol_cycle_relative` at 0.0,
+            // `market_vol_cycle_ratio` at 0.0 or the side's power at 0.0,
             // so the memory reads fear against the phase's normal level.
             let anchor = self.vix_anchor * mult * self.market_vol_cycle_vix_scale();
             // The memory is kept against the CENTRE the weight pulls to;
@@ -5476,16 +5480,57 @@ impl Engine {
         l
     }
 
-    /// `exp(d l)`: the cycle multiplier to the power
-    /// `market_vol_cycle_relative`, which the VIX coupling's denominator,
-    /// the anchor's slow memory and the anchor level are scaled by. Exactly
-    /// 1.0 with `market_vol_cycle_ratio` or `market_vol_cycle_relative` at
-    /// 0.0, and before the first close.
+    /// `exp(d l)`: the cycle multiplier to a power, which the VIX
+    /// coupling's denominator, the anchor's slow memory and the anchor level
+    /// are scaled by. The power is `market_vol_cycle_relative` while the
+    /// multiplier is at or over one (`l >= 0`, a stormier phase than
+    /// normal) and `market_vol_cycle_relative_calm` while it is under one
+    /// (a calmer phase). Exactly 1.0 with `market_vol_cycle_ratio` at 0.0,
+    /// with the side's power at 0.0, and before the first close.
+    ///
+    /// Floored at `VIX_STATE_FLOOR / vix_anchor`, so the scaled denominator
+    /// and anchor never fall below the level the VIX itself is floored at.
+    /// Without the floor a multiplier under about 0.5 at a power of 1 put
+    /// the denominator under the VIX's floor of 10, the VIX-over-denominator
+    /// ratio ran away, and the factor variance went to its ceiling: a
+    /// quiet phase read as a panic (bear-dynamics review: a 0.05 multiplier
+    /// at power 1 gave index volatility of 64 per cent). The floor binds
+    /// only there; at the shipped candidates the scale is 0.8 or more
+    /// against a floor of about 0.48.
     fn market_vol_cycle_vix_scale(&self) -> f64 {
-        let d = self.params.market_vol_cycle_relative;
         match self.market_vol_cycle_log {
-            Some(l) if self.params.market_vol_cycle_ratio != 0.0 && d != 0.0 => {
-                crate::mathx::exp(d * l)
+            Some(l) if self.params.market_vol_cycle_ratio != 0.0 => {
+                let d = if l < 0.0 {
+                    self.params.market_vol_cycle_relative_calm
+                } else {
+                    self.params.market_vol_cycle_relative
+                };
+                if d == 0.0 {
+                    1.0
+                } else {
+                    let floor = if self.vix_anchor > 0.0 {
+                        crate::params::VIX_STATE_FLOOR / self.vix_anchor
+                    } else {
+                        0.0
+                    };
+                    crate::mathx::max(crate::mathx::exp(d * l), floor)
+                }
+            }
+            _ => 1.0,
+        }
+    }
+
+    /// The factor `fair_value_market_vol_cap`'s ceiling is scaled by:
+    /// `exp(p l)` while the cycle multiplier is over one (`l > 0`), `p`
+    /// being `market_vol_cycle_cap_relative`, so a stormier phase's own
+    /// normal volatility is not read as a fear regime. Exactly 1.0 with
+    /// `market_vol_cycle_ratio` or the power at 0.0, in a calmer phase and
+    /// before the first close.
+    pub fn market_vol_cycle_cap_scale(&self) -> f64 {
+        let p = self.params.market_vol_cycle_cap_relative;
+        match self.market_vol_cycle_log {
+            Some(l) if self.params.market_vol_cycle_ratio != 0.0 && p != 0.0 && l > 0.0 => {
+                crate::mathx::exp(p * l)
             }
             _ => 1.0,
         }
@@ -7526,12 +7571,20 @@ mod tests {
             )
         }
 
+        /// The four dials, with `relative` as the power on both sides of
+        /// one (`market_vol_cycle_relative` and
+        /// `market_vol_cycle_relative_calm` alike).
         fn on(ratio: f64, expansion: f64, half_life: f64, relative: f64) -> Engine {
+            on_split(ratio, expansion, half_life, relative, relative)
+        }
+
+        fn on_split(ratio: f64, expansion: f64, half_life: f64, relative: f64, calm: f64) -> Engine {
             with(|p| {
                 p.market_vol_cycle_ratio = ratio;
                 p.market_vol_cycle_expansion = expansion;
                 p.market_vol_cycle_half_life = half_life;
                 p.market_vol_cycle_relative = relative;
+                p.market_vol_cycle_relative_calm = calm;
             })
         }
 
@@ -7645,6 +7698,70 @@ mod tests {
             assert_eq!(z.market_vol_cycle_vix_scale(), 1.0);
         }
 
+        /// The power on each side of one: `relative` at or over it, and
+        /// `relative_calm` under it.
+        #[test]
+        fn the_vix_scale_takes_the_calm_power_under_one() {
+            let mut e = on_split(2.0, 0.75, 21.0, 0.8, 0.3);
+            e.set_market_vol_cycle_log(Some(0.4));
+            assert_eq!(e.market_vol_cycle_vix_scale(), crate::mathx::exp(0.8 * 0.4));
+            e.set_market_vol_cycle_log(Some(-0.25));
+            assert_eq!(e.market_vol_cycle_vix_scale(), crate::mathx::exp(0.3 * -0.25));
+            e.set_market_vol_cycle_log(Some(0.0));
+            assert_eq!(e.market_vol_cycle_vix_scale(), 1.0);
+            // A calm power of 0 leaves a calm phase's fear on the
+            // unconditional level, and a stormy one still scaled.
+            let mut c = on_split(2.0, 0.75, 21.0, 1.0, 0.0);
+            c.set_market_vol_cycle_log(Some(-0.25));
+            assert_eq!(c.market_vol_cycle_vix_scale(), 1.0);
+            c.set_market_vol_cycle_log(Some(0.4));
+            assert_eq!(c.market_vol_cycle_vix_scale(), crate::mathx::exp(0.4));
+        }
+
+        /// The fair-value cap's ceiling is scaled by the multiplier to the
+        /// power `market_vol_cycle_cap_relative` over one only, and the
+        /// permanent share reads the scaled ceiling.
+        #[test]
+        fn the_cap_scale_reads_a_stormy_phase_only() {
+            let mut e = with(|p| {
+                p.market_vol_cycle_ratio = 2.0;
+                p.market_vol_cycle_expansion = 0.75;
+                p.market_vol_cycle_cap_relative = 0.5;
+            });
+            assert_eq!(e.market_vol_cycle_cap_scale(), 1.0, "before the first close");
+            e.set_market_vol_cycle_log(Some(0.4));
+            assert_eq!(e.market_vol_cycle_cap_scale(), crate::mathx::exp(0.2));
+            e.set_market_vol_cycle_log(Some(-0.3));
+            assert_eq!(e.market_vol_cycle_cap_scale(), 1.0);
+            let mut z = on(2.0, 0.75, 21.0, 1.0);
+            z.set_market_vol_cycle_log(Some(0.4));
+            assert_eq!(z.market_vol_cycle_cap_scale(), 1.0, "power 0");
+            let p = e.params().clone();
+            let base = p.fair_value_market_vol_cap * p.market_factor_sigma;
+            let sigma = 1.5 * base;
+            let unscaled = crate::market::tick::market_permanent_share(&p, sigma, 1.0);
+            assert!((unscaled - p.fair_value_market_share / 1.5).abs() < 1e-15);
+            // A ceiling scaled past the sigma leaves the whole share.
+            assert_eq!(crate::market::tick::market_permanent_share(&p, sigma, 1.6),
+                       p.fair_value_market_share);
+        }
+
+        /// The scale never takes the denominator or the anchor under the
+        /// VIX's own floor.
+        #[test]
+        fn the_vix_scale_is_floored_at_the_vix_floor_over_the_anchor() {
+            let mut e = on(0.05, 1.0, 0.0, 1.0);
+            // A close derives the anchor and sets the multiplier.
+            e.close_day(1);
+            assert!(e.vix_anchor > 0.0);
+            let floor = crate::params::VIX_STATE_FLOOR / e.vix_anchor;
+            e.set_market_vol_cycle_log(Some(crate::mathx::log(0.05)));
+            assert_eq!(e.market_vol_cycle_vix_scale(), floor);
+            // Above the floor it is the power, untouched.
+            e.set_market_vol_cycle_log(Some(-0.1));
+            assert_eq!(e.market_vol_cycle_vix_scale(), crate::mathx::exp(-0.1));
+        }
+
         /// A free close scales the variance baseline by the multiplier
         /// squared: at `relative` 0 the coupling reads the same ratio, so
         /// the fast target is the off engine's times `m^2`. The first
@@ -7672,6 +7789,62 @@ mod tests {
             session_and_close(&mut d1);
             let (t_d1, _) = d1.market_variance_target().unwrap();
             assert_ne!(t_d1, t_on);
+        }
+
+        /// The anchor's slow memory reads the day's fear against the
+        /// SCALED anchor. A forced close writes the same variance on both
+        /// engines, so the read-back is the same, and the memory of an
+        /// engine at power 1 then differs from one at power 0 by exactly
+        /// `-h ln(scale)`, `h` being `vix_anchor_memory`.
+        #[test]
+        fn the_anchor_memory_reads_fear_against_the_scaled_anchor() {
+            let mut a = on(2.0, 0.75, 0.0, 1.0);
+            let mut b = on(2.0, 0.75, 0.0, 0.0);
+            assert!(a.params().vix_anchor_memory > 0.0);
+            for e in [&mut a, &mut b] {
+                e.set_vix_sets_variance_pending(true);
+                session_and_close(e);
+            }
+            assert_eq!(a.market_variance_state(), b.market_variance_state());
+            assert_eq!(a.vix_anchor_slow(), b.vix_anchor_slow());
+            let scale = a.market_vol_cycle_vix_scale();
+            assert_ne!(scale, 1.0);
+            assert_eq!(b.market_vol_cycle_vix_scale(), 1.0);
+            a.advance_macro_day(1);
+            b.advance_macro_day(1);
+            let want = -a.params().vix_anchor_memory * crate::mathx::log(scale);
+            let got = a.vix_anchor_slow() - b.vix_anchor_slow();
+            assert!((got - want).abs() < 1e-12, "{got} against {want}");
+        }
+
+        /// The level the VIX reverts to is the scaled anchor. Without the
+        /// slow memory the VIX's target is the geometric blend of the
+        /// read-back and the anchor level, so after a forced close (the
+        /// same read-back on both engines) a scale under one gives a lower
+        /// VIX and a scale over one a higher one.
+        #[test]
+        fn the_vix_reverts_toward_the_scaled_anchor_level() {
+            let mk = |d: f64| {
+                with(|p| {
+                    p.market_vol_cycle_ratio = 2.0;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_relative = d;
+                    p.market_vol_cycle_relative_calm = d;
+                    p.vix_anchor_memory = 0.0;
+                })
+            };
+            let (mut a, mut b) = (mk(1.0), mk(0.0));
+            for e in [&mut a, &mut b] {
+                e.set_vix_sets_variance_pending(true);
+                session_and_close(e);
+            }
+            assert_eq!(a.market_variance_state(), b.market_variance_state());
+            let scale = a.market_vol_cycle_vix_scale();
+            assert_ne!(scale, 1.0);
+            a.advance_macro_day(1);
+            b.advance_macro_day(1);
+            assert_ne!(a.economy().vix, b.economy().vix);
+            assert_eq!(a.economy().vix < b.economy().vix, scale < 1.0);
         }
 
         /// A forced close (a VIX a scenario pinned) moves the multiplier

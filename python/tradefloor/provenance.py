@@ -433,6 +433,10 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_cycle_ratio` is 0.0",
     "market_vol_cycle_relative":
         "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_relative_calm":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_cap_relative":
+        "unread while `market_vol_cycle_ratio` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "
