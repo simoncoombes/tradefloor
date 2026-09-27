@@ -1581,7 +1581,21 @@ pub struct ModelParams {
     /// rate indices' live projection of the close. A VIX pin does not stop
     /// it; a pinned corporate yield or spread does, as it stops the VIX
     /// term. No draw. The snapshot and the state hash carry the gap only
-    /// while this is non-zero. In [0, 10].
+    /// while this is non-zero.
+    ///
+    /// Measured on the r14 screen's N4 arm with `corporate_spread_vix_cut`
+    /// 1.0, this at 2.0, `corporate_spread_equity_half_life` 126 and
+    /// `treasury_10y_noise` 0.025 (box r15bondcorr3, held-out seeds
+    /// 201-230, 501-530 and 801-830): the daily stock-IG correlation on held
+    /// closes reads 0.378 (N4 0.434), the monthly 0.279 (N4 0.151), graded
+    /// row R4 on the last print +0.165 (N4 +0.181), the spread's daily sd
+    /// 3.0 bp (N4 4.3) and the share of the same-close covariance reversed
+    /// within 20 sessions 0.29 (N4 0.71); all 40 registered rows pass. The
+    /// held close still reads about 0.21 above the last print, because the
+    /// close's re-mark carries the corporate yield's change into the
+    /// equities, and most of that change on a meeting day is the 10-year's
+    /// jump (27 bp sd on meeting sessions against 4 bp on the rest). In
+    /// [0, 10].
     pub corporate_spread_equity_gain: f64,
     /// Half-life, in sessions, of the index's slow average that
     /// `corporate_spread_equity_gain` measures the fall against: how long a
