@@ -53,10 +53,17 @@ def test_both_switches_are_off_on_every_shipped_preset(preset):
     assert dials["pinned_vix_feedback"] == 0.0
 
 
-def test_the_switches_refuse_anything_but_zero_or_one():
-    for name in ("macro_pins_hold", "pinned_vix_feedback"):
+def test_the_hold_refuses_anything_but_zero_or_one():
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v20", macro_pins_hold=0.5)
+
+
+def test_the_priced_share_is_refused_outside_zero_to_one():
+    # A share since r15: 1.0 is the switch as it stood.
+    tf.ModelParams.from_preset("pt-v20", pinned_vix_feedback=0.5)
+    for bad in (-0.1, 1.5):
         with pytest.raises(Exception):
-            tf.ModelParams.from_preset("pt-v20", **{name: 0.5})
+            tf.ModelParams.from_preset("pt-v20", pinned_vix_feedback=bad)
 
 
 @pytest.mark.parametrize("dials", [

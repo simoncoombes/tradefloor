@@ -4111,6 +4111,11 @@ impl PyEngine {
         if let Some(marks) = self.inner.rate_live_marks() {
             out.set_item("rate_live_marks", marks.to_vec())?;
         }
+        // Today's priced VIX move (`pinned_vix_variance_share`), a key only
+        // while a pin has made one: the session's market draws read it.
+        if self.inner.pinned_vix_jump() != 0.0 {
+            out.set_item("pinned_vix_jump", self.inner.pinned_vix_jump())?;
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.inner.pinned_corporate_spread() {
@@ -4952,6 +4957,16 @@ impl PyEngine {
             None => None,
         };
         self.inner.set_rate_live_marks(live).map_err(ValidationError::new_err)?;
+        // Absent means no pin had priced a VIX move that session.
+        let jump: f64 = match snapshot.get_item("pinned_vix_jump")? {
+            Some(v) => v.extract()?,
+            None => 0.0,
+        };
+        if !jump.is_finite() {
+            return Err(ValidationError::new_err(format!(
+                "this snapshot's pinned_vix_jump is {jump}; the engine writes a finite move.")));
+        }
+        self.inner.set_pinned_vix_jump(jump);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

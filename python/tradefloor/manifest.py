@@ -489,6 +489,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "fed_stress_vix_max", "rate_live_marks",
          # and the spread a spread pin holds tonight, only with its mark.
          "pinned_corporate_spread",
+         # Today's priced VIX move, only while a pin has made one.
+         "pinned_vix_jump",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -747,6 +749,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, 9.0)
         for value in marks:
             _f64(buf, float(value))
+    if snapshot.get("pinned_vix_jump"):
+        _f64(buf, 10.0)
+        _f64(buf, float(snapshot["pinned_vix_jump"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

@@ -932,24 +932,46 @@ pub struct ModelParams {
     /// snapshot and the state hash carry the exposure only while this and
     /// the gain are both set. In [0, 252].
     pub fair_value_vix_half_life: f64,
-    /// Whether a pinned VIX is priced the moment it is published. 0.0, which
-    /// every preset carries, leaves the smoothed exposure the discount reads
+    /// How much of a pinned VIX is priced the moment it is published: the
+    /// share of the gap between the smoothed exposure and the pinned VIX's
+    /// own excess that the pin closes. 0.0, which every preset carries,
+    /// leaves the smoothed exposure the discount reads
     /// (`EconomyState::vix_feedback`) to the close's pull at
     /// `fair_value_vix_half_life`, so a VIX a scenario forces is published
     /// at the open and reaches the price over weeks: under a VIX held at
     /// x3.5 for 25 sessions the paired index falls a further 22 per cent
     /// (log) after the published jump, and an agent that reads the VIX
-    /// front-runs it. 1.0 sets the exposure to the pinned VIX's own excess
-    /// in the pin's re-mark and holds it there through that session's
-    /// close, so the discount lands with the published VIX; the pull
-    /// resumes on the first session nobody pins. With `macro_pins_hold` and
+    /// front-runs it. Above zero the pin moves the exposure this share of
+    /// the way to the pinned VIX's excess in the pin's re-mark and holds it
+    /// there through that session's close, so the discount lands with the
+    /// published VIX; the pull resumes on the first session nobody pins.
+    /// 1.0 closes the whole gap. 0.8 gives the real same-day slope: on the
+    /// 2008 and 2020 replays the index's log return on the day's log VIX
+    /// change, sessions above a VIX of 40, reads -0.335 / -0.341 against the
+    /// S&P 500's -0.345 / -0.307 (1.0 reads -0.42 / -0.44, the smoothed
+    /// exposure alone -0.04 / -0.06). With `macro_pins_hold` and
     /// `corporate_yield_daily` also on, and no corporate level or spread
     /// pinned that session, the pin also charges the corporate yield the
     /// close's own VIX term on the pin's change, which the close skips
     /// under a VIX pin, so a pinned rise reaches credit as the fall after
     /// the release does. Read only with the gain and the half-life set.
-    /// A switch.
+    /// In [0, 1].
     pub pinned_vix_feedback: f64,
+    /// How much of a session's market-factor variance a pinned VIX's priced
+    /// move may take (`pinned_vix_feedback`). 0.0, which every preset
+    /// carries, draws the session's market factor at the state's full
+    /// variance on top of the discount the pin priced, so on a replay that
+    /// pins the real VIX every session the priced move and the draw add
+    /// and the month's volatility counts the VIX twice. Above zero the
+    /// priced move `J` (the discount's change today, at a beta of one) is
+    /// part of the day's variance `v`: the session draws at
+    /// `v * max(1 - J^2 / v, 1 - share)`, so a small priced move leaves the
+    /// day's total at `v` and a large one keeps at least `1 - share` of the
+    /// draw. Real: above a VIX of 40 the daily log VIX change explains 0.61
+    /// (2020) to 0.72 (2007-09) of the S&P 500's daily variance (corr -0.78
+    /// / -0.85, slope -0.31 / -0.35 on the log change). Read only with
+    /// `pinned_vix_feedback` on. In [0, 1].
+    pub pinned_vix_variance_share: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
     /// which every preset through pt-v19 carries, is none; pt-v20 sets
@@ -6257,6 +6279,7 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             pinned_vix_feedback: 0.0,
+            pinned_vix_variance_share: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -8648,6 +8671,7 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
+            "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -8955,6 +8979,7 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
+            "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -9445,7 +9470,6 @@ impl ModelParams {
                           ("flight_to_quality_day", self.flight_to_quality_day),
                           ("corporate_yield_daily", self.corporate_yield_daily),
                           ("macro_pins_hold", self.macro_pins_hold),
-                          ("pinned_vix_feedback", self.pinned_vix_feedback),
                           ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting),
@@ -9579,6 +9603,17 @@ impl ModelParams {
                  is realised at the reaction session's opening print, which only a \
                  split prices; set overnight_idio_share (or overnight_market_share) too.",
                 self.earnings_surprise_sigma));
+        }
+        if !(self.pinned_vix_feedback >= 0.0 && self.pinned_vix_feedback <= 1.0) {
+            return Err(format!(
+                "pinned_vix_feedback is {}. It is the share of the gap to the pinned VIX's excess \
+                 a VIX pin prices, in [0, 1]: 0 is off, 1 the whole gap.",
+                self.pinned_vix_feedback));
+        }
+        if !(self.pinned_vix_variance_share >= 0.0 && self.pinned_vix_variance_share <= 1.0) {
+            return Err(format!(
+                "pinned_vix_variance_share is {}. It is the most of a session's market-factor variance a pinned VIX's priced move may take, in [0, 1].",
+                self.pinned_vix_variance_share));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -10323,6 +10358,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "pinned_vix_feedback",
+        "pinned_vix_variance_share",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

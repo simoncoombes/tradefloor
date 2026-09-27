@@ -1012,7 +1012,15 @@ OUT_OF_SCOPE = {
         "scenario-frontrun: a VIX held at x3.5 for 25 sessions moved the "
         "paired index 0.00 on the morning it was published and -21.7 per "
         "cent over the next 24 sessions, which an agent reading the VIX "
-        "front-ran)",
+        "front-ran). A share since r15: 1.0 is the switch as it stood",
+    "pinned_vix_variance_share":
+        "inert at 0.0 as shipped: no pin records a priced move, so "
+        "`Engine::market_sigma_today` is the state's sigma bit for bit. Read "
+        "only with `pinned_vix_feedback` on and a VIX pinned that session "
+        "(0.8.5, r15 scenario: with the pinned VIX priced when published, "
+        "the 2008 replay's worst month read 131.8 against the real 84.3 on "
+        "seed 201, because the session drew the market factor at its full "
+        "variance on top of the priced move)",
 }
 
 #: The provenance of each shipped dial value.

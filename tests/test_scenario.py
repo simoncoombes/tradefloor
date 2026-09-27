@@ -829,23 +829,26 @@ def test_an_undefined_percentage_move_is_refused_rather_than_sorted():
 
 
 def test_the_packaged_recession_ends():
-    """The recession holds contraction for fifteen months, writes a trough,
-    then a recovery on the NBER's trough date, and lets the cycle go on
-    (audit major 4: it used to pin contraction, growth and credit for good,
-    so the index never recovered). Nothing in it is permanent, its last word
-    on the cycle is a recovery written once on day 428 (June 2009), and the
-    model's own cycle then carries the economy on. The recovery is written
-    rather than left to the trough's hazards, which on one seed in thirty
-    held the economy in trough for thirteen months."""
+    """The recession holds the peak, then contraction to March 2009, writes a
+    trough, then a recovery on the NBER's trough date, and lets the cycle go
+    on (audit major 4: it used to pin contraction, growth and credit for
+    good, so the index never recovered). Nothing in it is permanent, its
+    last word on the cycle is a recovery written once on day 428 (June
+    2009), and the model's own cycle then carries the economy on. The
+    recovery is written rather than left to the trough's hazards, which on
+    one seed in thirty held the economy in trough for thirteen months. Since
+    r15 the file is dated on the NBER's phases (peak from day 50,
+    contraction from day 71)."""
     scenario = Scenario.load("recession")
     assert all(item.shape != "permanent" for item in scenario.interventions)
     cycle = sorted((item for item in scenario.interventions
                     if item.target == "macro.cycle"), key=lambda item: item.at)
     assert [(item.value, item.shape) for item in cycle] == [
-        ("contraction", "hold"), ("trough", "impulse"),
+        ("peak", "hold"), ("contraction", "hold"), ("trough", "impulse"),
         ("recovery", "impulse")]
     assert cycle[1].at == cycle[0].last_day + 1
-    assert cycle[2].at == 428
+    assert cycle[2].at == cycle[1].last_day + 1
+    assert cycle[3].at == 428
 
     engine = tradefloor.Engine(
         seed=2, universe=list(tradefloor.Universe.random(8, seed=1)))
@@ -857,6 +860,6 @@ def test_the_packaged_recession_ends():
         # sessions late since its graded arm (2026-09-26), and the scenario
         # sets the phase the economy is in. Was macro_fields["cycle"].
         phases.append(engine.state_snapshot()["economy"]["cycle_phase"])
-    assert phases[cycle[1].at] == "trough"
-    assert phases[cycle[2].at] == "recovery"
+    assert phases[cycle[2].at] == "trough"
+    assert phases[cycle[3].at] == "recovery"
     assert phases[-1] in ("recovery", "expansion")
