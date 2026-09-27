@@ -121,6 +121,10 @@ pub const PIN_SPREAD: u16 = 0x4000;
 /// calendar pt-v20 runs, so one stressed month calls at most one.
 pub const FED_PUT_EMERGENCY_GAP_MINUTES: i64 = 21 * 24 * 60;
 
+/// The stress hold's clock before any stressed close (`fed_stress_hold`):
+/// longer than any hold the dial allows, and the ceiling the clock ages to.
+pub const STRESS_HOLD_NEVER: f64 = 1.0e9;
+
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
 ///
@@ -773,6 +777,17 @@ pub struct Engine {
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
     stress_vix_max: f64,
+    /// `fed_stress_hold`: sessions since the last close whose published VIX
+    /// was at or over `fed_stress_vix`, [`STRESS_HOLD_NEVER`] before the
+    /// first. Never touched with the dial off; carried in the snapshot and
+    /// the state hash only while it is set.
+    stress_hold_age: f64,
+    /// `treasury_path_pricing`: the market's forecast of the policy rate's
+    /// further change, `M`, percentage points: each change decayed at
+    /// `treasury_path_half_life` sessions. 0.0 and never touched with the
+    /// dial off; carried in the snapshot and the state hash only while it is
+    /// set.
+    policy_path: f64,
     /// The rate instruments, if the embedder listed any
     /// ([`Engine::set_rate_instruments`]). Empty on every engine built
     /// without them, and an empty book is never touched: no hook runs, no
@@ -1549,6 +1564,8 @@ impl Engine {
             last_market_targets: None,
             rate_live: None,
             stress_vix_max: 0.0,
+            stress_hold_age: STRESS_HOLD_NEVER,
+            policy_path: 0.0,
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
             cycle_history: std::collections::VecDeque::new(),
@@ -7069,6 +7086,13 @@ impl Engine {
             self.economy.fed_put *= crate::mathx::pow(0.5, 1.0 / self.params.fed_put_half_life);
         }
 
+        // THE PRICED PATH'S CLOCK (`treasury_path_pricing`): one session's
+        // decay of the market's forecast, before tonight's curve reads it.
+        // Nothing runs with the dial at 0.0, and no draw at any setting.
+        if self.params.treasury_path_pricing != 0.0 {
+            self.policy_path *= crate::mathx::pow(0.5, 1.0 / self.params.treasury_path_half_life);
+        }
+
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
         // non-zero, so the shipped path is untouched. `previous_close` is
@@ -7236,6 +7260,16 @@ impl Engine {
         if self.params.fed_stress_cut != 0.0 {
             self.stress_vix_max = crate::mathx::max(self.stress_vix_max, self.economy.vix);
         }
+        // THE STRESS HOLD'S CLOCK (`fed_stress_hold`): this close's published
+        // VIX restarts it at 0 when it is at or over `fed_stress_vix`, and
+        // any other close ages it a session. Nothing runs with the dial off.
+        if self.params.fed_stress_hold != 0.0 {
+            self.stress_hold_age = if self.published_vix() >= self.params.fed_stress_vix {
+                0.0
+            } else {
+                crate::mathx::min(self.stress_hold_age + 1.0, STRESS_HOLD_NEVER)
+            };
+        }
         let policy = crate::economy::PolicyOptions {
             calendar: self.macro_calendar(),
             liftoff: self.params.fed_liftoff_rule,
@@ -7257,6 +7291,10 @@ impl Engine {
             put_threshold: self.params.fed_put_threshold,
             put_pricing: self.params.treasury_put_pricing,
             haven_gain: self.params.treasury_haven_gain,
+            stress_hold: self.params.fed_stress_hold != 0.0
+                && self.stress_hold_age < self.params.fed_stress_hold,
+            path_gain: self.params.treasury_path_pricing,
+            path_before: self.priced_policy_path(),
         };
         // THE INTERMEETING MEETING (`fed_put_emergency_vix`): a VIX close at
         // or above the dial, with inflation under the put's ceiling and room
@@ -7286,6 +7324,12 @@ impl Engine {
         let meeting_held = meeting.decision.is_some();
         if meeting_held && self.params.fed_stress_cut != 0.0 {
             self.stress_vix_max = 0.0;
+        }
+        // The rate change the market has just seen moves its forecast by its
+        // own size (`treasury_path_pricing`).
+        if meeting_held && self.params.treasury_path_pricing != 0.0 {
+            self.policy_path +=
+                meeting.economy.federal_funds_rate - self.economy.federal_funds_rate;
         }
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -7504,6 +7548,7 @@ impl Engine {
                 // 0.0 unless their dials are set; the live mark's projection
                 // reads them as the close does.
                 priced_put: self.priced_fed_put(),
+                priced_path: self.priced_policy_path(),
                 haven_gain: self.params.treasury_haven_gain,
             },
             volatility: request.volatility,
@@ -8209,6 +8254,77 @@ impl Engine {
             None
         } else {
             Some(self.stress_vix_max)
+        }
+    }
+
+    /// The stress hold's clock (`fed_stress_hold`), for the snapshot:
+    /// `Some` only while the dial is set.
+    pub fn stress_hold_age(&self) -> Option<f64> {
+        if self.params.fed_stress_hold == 0.0 {
+            None
+        } else {
+            Some(self.stress_hold_age)
+        }
+    }
+
+    /// For a restore. Refused with the dial off, where no engine writes it.
+    pub fn set_stress_hold_age(&mut self, age: Option<f64>) -> Result<(), String> {
+        match age {
+            Some(_) if self.params.fed_stress_hold == 0.0 => Err(
+                "this snapshot carries the central bank's stress-hold clock \
+                 (fed_stress_hold_age), which only an engine with fed_stress_hold on writes, \
+                 and this engine's model has it off. Restore it into the model it was taken \
+                 from."
+                    .to_string()),
+            Some(v) => {
+                self.stress_hold_age = v;
+                Ok(())
+            }
+            None => {
+                self.stress_hold_age = STRESS_HOLD_NEVER;
+                Ok(())
+            }
+        }
+    }
+
+    /// The market's forecast of the policy path (`treasury_path_pricing`),
+    /// for the snapshot: `Some` only while the dial is set.
+    pub fn policy_path(&self) -> Option<f64> {
+        if self.params.treasury_path_pricing == 0.0 {
+            None
+        } else {
+            Some(self.policy_path)
+        }
+    }
+
+    /// For a restore. Refused with the dial off, where no engine writes it.
+    pub fn set_policy_path(&mut self, path: Option<f64>) -> Result<(), String> {
+        match path {
+            Some(_) if self.params.treasury_path_pricing == 0.0 => Err(
+                "this snapshot carries the market's forecast of the policy path \
+                 (treasury_policy_path), which only an engine with treasury_path_pricing on \
+                 writes, and this engine's model has it off. Restore it into the model it was \
+                 taken from."
+                    .to_string()),
+            Some(v) => {
+                self.policy_path = v;
+                Ok(())
+            }
+            None => {
+                self.policy_path = 0.0;
+                Ok(())
+            }
+        }
+    }
+
+    /// The policy path the curve prices tonight (`treasury_path_pricing`),
+    /// percentage points, signed: the dial times the market's forecast.
+    /// 0.0 with the dial off.
+    fn priced_policy_path(&self) -> f64 {
+        if self.params.treasury_path_pricing == 0.0 {
+            0.0
+        } else {
+            self.params.treasury_path_pricing * self.policy_path
         }
     }
 
@@ -9570,6 +9686,16 @@ impl Engine {
         if let Some(level) = self.stress_vix_max() {
             hash_f64(&mut buf, 8.0);
             hash_f64(&mut buf, level);
+        }
+        // The stress hold's clock and the priced path's forecast, each only
+        // while its dial is set, behind its own tag.
+        if let Some(age) = self.stress_hold_age() {
+            hash_f64(&mut buf, 10.0);
+            hash_f64(&mut buf, age);
+        }
+        if let Some(path) = self.policy_path() {
+            hash_f64(&mut buf, 11.0);
+            hash_f64(&mut buf, path);
         }
         // The rate indices' live mark, only while `rate_intraday_live` is set
         // and a session holds one, behind its own tag.

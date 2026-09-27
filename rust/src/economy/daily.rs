@@ -341,6 +341,11 @@ pub struct YieldDials {
     /// `fed_put_gain` and `treasury_put_pricing` are both set. See
     /// [`crate::params::ModelParams::treasury_put_pricing`].
     pub priced_put: f64,
+    /// The policy path the curve prices tonight, percentage points, signed:
+    /// `treasury_path_pricing` times the market's forecast of the rate's
+    /// further change. 0.0 unless the dial is set. See
+    /// [`crate::params::ModelParams::treasury_path_pricing`].
+    pub priced_path: f64,
     /// Percentage points off the 10-year's term premium per VIX point above
     /// 20 while inflation is under 4. See
     /// [`crate::params::ModelParams::treasury_haven_gain`].
@@ -386,6 +391,7 @@ impl Default for YieldDials {
             treasury_10y_pinned: false,
             treasury_2y_pinned: false,
             priced_put: 0.0,
+            priced_path: 0.0,
             haven_gain: 0.0,
         }
     }
@@ -1018,6 +1024,14 @@ pub fn vix_and_yields(
         new_state.federal_funds_rate - inputs.yields.priced_put
     } else {
         new_state.federal_funds_rate
+    };
+    // THE PRICED PATH (`treasury_path_pricing`): the anchor, and the 2-year's
+    // formula, read the rate the market expects the cycle to reach. Guarded,
+    // as above.
+    let fed_rate_for_10y = if inputs.yields.priced_path != 0.0 {
+        fed_rate_for_10y + inputs.yields.priced_path
+    } else {
+        fed_rate_for_10y
     };
     let current_10y = new_state.treasury_yield_10y;
 
