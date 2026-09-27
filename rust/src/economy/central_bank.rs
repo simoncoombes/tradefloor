@@ -875,3 +875,74 @@ mod stress_cut {
         assert_eq!(meet(&slump, &with(35.0)), deep);
     }
 }
+
+#[cfg(test)]
+mod spread_dials {
+    use super::*;
+    use crate::economy::state::{
+        create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
+    };
+
+    struct Silent;
+    impl Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            0.5
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    fn meet(economy: &EconomyState, options: &PolicyOptions) -> MeetingOutcome {
+        let mut cb = create_initial_central_bank_state(0);
+        cb.next_meeting_date = -1;
+        update_central_bank_with(&cb, economy, 1000, &mut Silent, options)
+    }
+
+    #[test]
+    fn the_formula_with_nothing_set_is_the_formula_bit_for_bit() {
+        for vix in [9.0, 12.0, 17.3, 31.0, 80.0] {
+            for m in [1.0, 1.1, 1.4, 2.8, 3.5] {
+                assert_eq!(spread_formula_with(vix, m, 0.0, 0.0).to_bits(),
+                           spread_formula(vix, m).to_bits());
+            }
+        }
+    }
+
+    #[test]
+    fn the_cut_scales_the_slope_and_the_equity_term_joins_the_base() {
+        // Whole cut: the VIX reads nothing.
+        assert_eq!(spread_formula_with(45.0, 2.8, 1.0, 0.25), (1.25f64 * 2.8).min(6.0));
+        // Half cut at a VIX of 32: 1 + 0.01 * 20 = 1.2, plus 0.1, times 1.4.
+        assert!((spread_formula_with(32.0, 1.4, 0.5, 0.1) - 1.3 * 1.4).abs() < 1e-12);
+        // The clamp holds either way.
+        assert_eq!(spread_formula_with(12.0, 1.0, 0.0, -0.9), CORPORATE_SPREAD_FLOOR);
+        assert_eq!(spread_formula_with(80.0, 3.5, 0.0, 2.0), 6.0);
+    }
+
+    #[test]
+    fn the_meeting_re_anchors_to_the_gap_and_off_it_reads_nothing() {
+        let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+        e.inflation_rate = 2.0;
+        e.unemployment_rate = 4.0;
+        e.federal_funds_rate = 2.0;
+        e.vix = 30.0;
+        e.spread_equity_gap = 0.2;
+        let shipped = meet(&e, &PolicyOptions::shipped());
+        // A gap in the state with both dials off moves nothing it writes.
+        let mut no_gap = e.clone();
+        no_gap.spread_equity_gap = 0.0;
+        let mut off = meet(&no_gap, &PolicyOptions::shipped());
+        off.economy.spread_equity_gap = 0.2;
+        assert_eq!(off, shipped);
+        let on = PolicyOptions { spread_vix_cut: 1.0, spread_equity_gain: 2.0, ..PolicyOptions::shipped() };
+        let out = meet(&e, &on);
+        let m = spread_multiplier_of(e.cycle_phase);
+        let want = clamp((1.0 + 2.0 * 0.2) * m, CORPORATE_SPREAD_FLOOR, 6.0);
+        let got = out.economy.corporate_bond_yield - out.economy.treasury_yield_10y;
+        assert!((got - want).abs() < 1e-12, "spread {got} against {want}");
+        // Everything but the corporate yield is the shipped meeting's.
+        assert_eq!(out.economy.treasury_yield_10y, shipped.economy.treasury_yield_10y);
+        assert_eq!(out.economy.federal_funds_rate, shipped.economy.federal_funds_rate);
+    }
+}
