@@ -1528,6 +1528,20 @@ pub struct ModelParams {
     /// Matacz and Potters 2001; Corsi and Reno 2012), which is the slow
     /// component's timescale.
     ///
+    /// # Measured (held-out seeds 201-230, 501-530, 801-830; boxes cvsg1, cvsg2)
+    ///
+    /// On pt-v20, 90 histories of 21 years, the leverage sum reads -0.51,
+    /// -0.62, -0.68, -0.76, -0.78, -0.82 and -0.87 at 0, 0.1, 0.15, 0.2,
+    /// 0.3, 0.45 and 0.6, and monthly skew -0.26, -0.37, -0.42, -0.43,
+    /// -0.47, -0.60 and -0.57 (the tape -1.35 and -0.80). Two registered
+    /// rows bind: B5, the sessions under -5 per cent a decade (ceiling
+    /// 12.4), reads 11.5 at 0, 11.7 at 0.2, 12.3 at 0.3 and 12.7 and 12.9 at
+    /// 0.45 and 0.6; and D1's excess kurtosis in the held-out-seeds cell
+    /// (ceiling 24.0) reads 18.8 at 0, 23.4 at 0.2 and 24.1 to 24.9 from
+    /// 0.3. So 0.2 is the largest value tried that keeps every row graded
+    /// on those seeds; see the crash-vol-state calibration (design
+    /// repository) for the rows that were not.
+    ///
     /// Read only with `market_vol_slow_weight` non-zero: the single-component
     /// close has no slow component. In [0, 1], with
     /// `(1 - market_vol_slow_gain) * market_vol_slow_persistence - gamma/2`
@@ -1571,7 +1585,17 @@ pub struct ModelParams {
     /// This is a return-path memory (Black 1976; Christie 1982; the
     /// exponential leverage kernel of Bouchaud, Matacz and Potters 2001),
     /// which a GARCH recursion on squared shocks cannot express: a GJR term
-    /// remembers the size of a fall, not the fall. In [0, 50].
+    /// remembers the size of a fall, not the fall.
+    ///
+    /// Measured (held-out seeds 201-230, 501-530, 801-830, box cvsg1): at a
+    /// gain of 3 on a 40-session half-life with `market_vol_slow_gamma` 0.3
+    /// and `market_factor_sigma` cut 10 per cent, the leverage sum reads
+    /// -0.96 against pt-v20's -0.51, but B5 reads 15.3 against a ceiling of
+    /// 12.4 and C10 fails (a rule on the corporate yield's 99.9th-percentile
+    /// rise runs ahead in 0.70 of histories), so it is not ready for a
+    /// preset while the corporate yield's one-session steps and the
+    /// roster's concentration supply most of the index's -5 per cent days.
+    /// In [0, 50].
     pub market_vol_leverage: f64,
     /// Half-life of the return memory, in sessions. Unread at
     /// `market_vol_leverage` 0.0; must be positive off it. In [0, 2520].
