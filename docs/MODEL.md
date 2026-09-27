@@ -469,6 +469,25 @@ the put reads as $\delta$. A policy rate pinned through the close
 alike, and the put neither cuts nor returns anything at that meeting. The
 three overlays have not been fitted together.
 
+**The stress hold** (`fed_stress_hold`, 0 on every preset) keeps a count of
+sessions since the last close whose published VIX was at or over
+`fed_stress_vix`. At a meeting within that many sessions of it, with $\pi$
+under target plus `fed_stress_inflation_gap`, a rise the ladder chose is
+held ($H$ does not move) and the put returns nothing; a cut stands. It runs
+after the stress cut and before a pinned rate's hold. No draw; the count is
+carried in the snapshot and the state hash while the dial is set.
+
+**The priced path** (`treasury_path_pricing` $k$, `treasury_path_half_life`
+$h$, 0 on every preset) is the market's forecast of the policy rate's
+further change, $M$: each change the bank makes is added to $M$, and $M$
+decays by $2^{-1/h}$ a session. The 10-year's daily anchor and the 2-year's
+formula read $r^{p} + kM$ in place of $r^{p}$, the meeting's 10-year target
+adds $kM'$ (the forecast after the decision) and its surprise adds
+$k(M' - M)$, so a change the ladder's own serial correlation makes
+forecastable is priced on the day it is published rather than in the weeks
+after. No draw; $M$ is carried in the snapshot and the state hash while $k$
+is set.
+
 **Quantitative easing** starts when the policy rate is at or below 0.25 in a
 contraction, with purchases of USD 120bn a month, and tapers by 15 a meeting
 in expansion (`economy/central_bank.rs:484-517`). On pt-v20 it reaches
@@ -2609,6 +2628,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
+- **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work

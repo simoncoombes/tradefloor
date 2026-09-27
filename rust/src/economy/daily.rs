@@ -346,6 +346,10 @@ pub struct YieldDials {
     /// further change. 0.0 unless the dial is set. See
     /// [`crate::params::ModelParams::treasury_path_pricing`].
     pub priced_path: f64,
+    /// `treasury_policy_damping`: the share of the priced policy rate's
+    /// distance from [`TREASURY_NEUTRAL_RATE`] the 10-year's anchor leaves
+    /// out. 0.0 unless the dial is set.
+    pub rate_damping: f64,
     /// Percentage points off the 10-year's term premium per VIX point above
     /// 20 while inflation is under 4. See
     /// [`crate::params::ModelParams::treasury_haven_gain`].
@@ -370,6 +374,12 @@ pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
 /// sessions above it, and most on the stressed ones.
 pub const TREASURY_HAVEN_VIX: f64 = 20.0;
 
+/// The policy rate the 10-year's damped pass-through pulls toward
+/// (`treasury_policy_damping`), in per cent: about the long-run mean policy
+/// rate, 2.9 on FRED DFF 1990-2025 and 2.6 on pt-v19's long run. Read only
+/// with the dial set.
+pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
+
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
 /// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
 /// the meeting's 10-year target, only with `treasury_haven_gain` set.
@@ -392,6 +402,7 @@ impl Default for YieldDials {
             treasury_2y_pinned: false,
             priced_put: 0.0,
             priced_path: 0.0,
+            rate_damping: 0.0,
             haven_gain: 0.0,
         }
     }
@@ -1034,6 +1045,14 @@ pub fn vix_and_yields(
         fed_rate_for_10y
     };
     let current_10y = new_state.treasury_yield_10y;
+    // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
+    // anchor reads the priced rate pulled toward the neutral rate; the
+    // 2-year's formula below reads it undamped. Guarded, as above.
+    let rate_for_10y_anchor = if inputs.yields.rate_damping != 0.0 {
+        fed_rate_for_10y - inputs.yields.rate_damping * (fed_rate_for_10y - TREASURY_NEUTRAL_RATE)
+    } else {
+        fed_rate_for_10y
+    };
 
     // D5, decided: KEEP the draw. In production `wasm10Y ?? (…)` short-
     // circuits and this normal is never taken — a consequence of `??`, not a
@@ -1041,7 +1060,7 @@ pub fn vix_and_yields(
     // parity for every later normal in the engine.
     new_state.treasury_yield_10y = clamp(
         current_10y
-            + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
+            + (rate_for_10y_anchor + term_premium_10y - current_10y) * 0.05
             + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
         0.5,
         12.0,

@@ -1595,6 +1595,17 @@ pub struct ModelParams {
     /// market's forecast `M` (`treasury_path_pricing`). Read only with the
     /// pricing on, which needs it above 0. In [0, 504].
     pub treasury_path_half_life: f64,
+    /// The share of the priced policy rate's distance from a neutral 2.5
+    /// per cent that the 10-year's anchor and the meeting's 10-year target
+    /// leave out. 0.0, which every preset carries, is off: the 10-year reads
+    /// the policy rate one for one, and a meeting's surprise moves it by the
+    /// whole change. The 2-year's formula reads the rate undamped.
+    ///
+    /// With `treasury_path_pricing` on, a change moves the 10-year by
+    /// `(1 - d)(1 + k)` of itself on the day, so this keeps the day's move
+    /// what it was while the forecast takes the drift out of the weeks
+    /// after. No draw, no state. In [0, 0.9].
+    pub treasury_policy_damping: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -6348,6 +6359,7 @@ impl ModelParams {
             fed_stress_hold: 0.0,
             treasury_path_pricing: 0.0,
             treasury_path_half_life: 0.0,
+            treasury_policy_damping: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -8742,6 +8754,7 @@ impl ModelParams {
             "fed_stress_hold" => self.fed_stress_hold,
             "treasury_path_pricing" => self.treasury_path_pricing,
             "treasury_path_half_life" => self.treasury_path_half_life,
+            "treasury_policy_damping" => self.treasury_policy_damping,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9052,6 +9065,7 @@ impl ModelParams {
             "fed_stress_hold" => out.fed_stress_hold = value,
             "treasury_path_pricing" => out.treasury_path_pricing = value,
             "treasury_path_half_life" => out.treasury_path_half_life = value,
+            "treasury_policy_damping" => out.treasury_policy_damping = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -9831,6 +9845,12 @@ impl ModelParams {
                 "treasury_path_half_life is {}. It is a half-life in sessions, in [0, 504].",
                 self.treasury_path_half_life));
         }
+        if !(self.treasury_policy_damping >= 0.0 && self.treasury_policy_damping <= 0.9) {
+            return Err(format!(
+                "treasury_policy_damping is {}. It is the share of the policy rate's \
+                 distance from neutral the 10-year leaves out, in [0, 0.9].",
+                self.treasury_policy_damping));
+        }
         if self.treasury_path_pricing != 0.0 && self.treasury_path_half_life == 0.0 {
             return Err(format!(
                 "treasury_path_pricing is {} but treasury_path_half_life is 0. The \
@@ -10250,7 +10270,7 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 /// known answer's state hash (which carries a custom model's fingerprint)
 /// stay what they were. Off their default each enters the digest as every
 /// other dial does.
-pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 8] = [
+pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 9] = [
     ("rate_close_remark", 0.0),
     ("rate_intraday_live", 0.0),
     ("fed_stress_cut", 0.0),
@@ -10259,6 +10279,7 @@ pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 8] = [
     ("fed_stress_hold", 0.0),
     ("treasury_path_pricing", 0.0),
     ("treasury_path_half_life", 0.0),
+    ("treasury_policy_damping", 0.0),
 ];
 
 pub fn settable_names() -> Vec<&'static str> {
@@ -10451,6 +10472,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_stress_hold",
         "treasury_path_pricing",
         "treasury_path_half_life",
+        "treasury_policy_damping",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

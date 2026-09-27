@@ -7295,6 +7295,7 @@ impl Engine {
                 && self.stress_hold_age < self.params.fed_stress_hold,
             path_gain: self.params.treasury_path_pricing,
             path_before: self.priced_policy_path(),
+            rate_damping: self.params.treasury_policy_damping,
         };
         // THE INTERMEETING MEETING (`fed_put_emergency_vix`): a VIX close at
         // or above the dial, with inflation under the put's ceiling and room
@@ -7328,8 +7329,13 @@ impl Engine {
         // The rate change the market has just seen moves its forecast by its
         // own size (`treasury_path_pricing`).
         if meeting_held && self.params.treasury_path_pricing != 0.0 {
+            let owed = if self.params.fed_put_gain != 0.0 {
+                meeting.economy.fed_put_owed - self.economy.fed_put_owed
+            } else {
+                0.0
+            };
             self.policy_path +=
-                meeting.economy.federal_funds_rate - self.economy.federal_funds_rate;
+                meeting.economy.federal_funds_rate - self.economy.federal_funds_rate + owed;
         }
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -7549,6 +7555,7 @@ impl Engine {
                 // reads them as the close does.
                 priced_put: self.priced_fed_put(),
                 priced_path: self.priced_policy_path(),
+                rate_damping: self.params.treasury_policy_damping,
                 haven_gain: self.params.treasury_haven_gain,
             },
             volatility: request.volatility,
