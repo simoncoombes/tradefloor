@@ -1081,7 +1081,10 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # Two switches read only under a macro pin (r13).
+                   macro_pins_hold=1.0,
+                   pinned_vix_feedback=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

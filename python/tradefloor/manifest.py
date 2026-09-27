@@ -465,7 +465,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
-         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # and the spread a spread pin holds tonight, only with its mark.
+         "pinned_corporate_spread"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -624,6 +626,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("macro_pins_today"):
         _f64(buf, 7.0)
         _f64(buf, float(snapshot["macro_pins_today"]))
+        # The pinned corporate spread, only while its mark (0x4000) stands.
+        if int(snapshot["macro_pins_today"]) & 0x4000:
+            _f64(buf, float(snapshot["pinned_corporate_spread"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

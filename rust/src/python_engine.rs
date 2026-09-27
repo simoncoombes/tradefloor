@@ -2914,7 +2914,7 @@ impl PyEngine {
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
         oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false,
-        treasury_yield_2y = None, treasury_yield_10y = None
+        treasury_yield_2y = None, treasury_yield_10y = None, corporate_spread = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2935,7 +2935,21 @@ impl PyEngine {
         vix_sets_variance: bool,
         treasury_yield_2y: Option<f64>,
         treasury_yield_10y: Option<f64>,
+        corporate_spread: Option<f64>,
     ) -> PyResult<()> {
+        if let Some(v) = corporate_spread {
+            if !v.is_finite() || !(0.0..=0.2).contains(&v) {
+                return Err(ValidationError::new_err(format!(
+                    "corporate_spread must be a fraction in [0, 0.2], got {v}"
+                )));
+            }
+            if corporate_bond_yield.is_some() {
+                return Err(ValidationError::new_err(
+                    "pin the corporate yield's level or its spread over the \
+                     10-year, not both in one call",
+                ));
+            }
+        }
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
         // scenario half-applied, and the run would continue on a macro state
@@ -3030,6 +3044,7 @@ impl PyEngine {
             ("oil_price", oil_price),
             ("treasury_yield_2y", treasury_yield_2y),
             ("treasury_yield_10y", treasury_yield_10y),
+            ("corporate_spread", corporate_spread),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -3046,6 +3061,7 @@ impl PyEngine {
         // below; `None` with `macro_publication_repricing` off.
         let marks = self.inner.published_macro_marks();
         let e = self.inner.economy_mut();
+        let vix_before = e.vix;
         if let Some(v) = vix {
             e.vix = v;
         }
@@ -3086,12 +3102,23 @@ impl PyEngine {
             e.treasury_yield_10y = crate::units::fraction_to_percent(v);
         }
         if let Some(p) = phase {
-            e.cycle_phase = p;
+            self.inner.pin_cycle_phase(p);
+        }
+        // After the 10-year, so the spread sits over the pinned curve.
+        if let Some(v) = corporate_spread {
+            self.inner
+                .pin_corporate_spread(crate::units::fraction_to_percent(v));
+        }
+        // A pinned corporate yield holds through tonight's close. Marked
+        // before the VIX's credit leg below, which never moves a level or a
+        // spread pinned today.
+        if corporate_bond_yield.is_some() {
+            self.inner.pin_corporate_level();
         }
         // A pinned corporate yield is the corporate index's yield, including
         // when the pin repeats yesterday's value. Nothing without rate
         // instruments.
-        if corporate_bond_yield.is_some() {
+        if corporate_bond_yield.is_some() || corporate_spread.is_some() {
             self.inner.remark_credit_spread();
         }
         if let Some(pin) = epicentre_pin {
@@ -3113,13 +3140,43 @@ impl PyEngine {
         // A pinned corporate yield holds through tonight's close.
         if vix.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
+            // `pinned_vix_feedback`: the discount lands in this pin's
+            // re-mark, and the credit leg, where it applies, in the corporate
+            // index's.
+            if self.inner.price_pinned_vix(vix_before) {
+                self.inner.remark_credit_spread();
+            }
+        }
+        // `macro_pins_hold`: every other field written here holds through
+        // tonight's close. The marks are kept only under the dial.
+        {
+            use crate::engine::*;
+            let mut bits = 0u16;
+            for (bit, set) in [
+                (PIN_CYCLE, phase.is_some()),
+                (PIN_T10, treasury_yield_10y.is_some()),
+                (PIN_T2, treasury_yield_2y.is_some()),
+                (PIN_POLICY, federal_funds_rate.is_some()),
+                (PIN_INFLATION, inflation_rate.is_some()),
+                (PIN_GROWTH, gdp_growth.is_some()),
+                (PIN_UNEMPLOYMENT, unemployment_rate.is_some()),
+                (PIN_FEAR_GREED, fear_greed_index.is_some()),
+                (PIN_OIL, oil_price.is_some()),
+                (PIN_QE_PE, qe_pe_boost.is_some()),
+                (PIN_QE_ASSETS, qe_assets_ratio.is_some()),
+                (PIN_TARIFF, tariff_rate.is_some()),
+            ] {
+                if set {
+                    bits |= bit;
+                }
+            }
+            if bits != 0 {
+                self.inner.mark_macro_pins_today(bits);
+            }
         }
         // A pinned phase is news of a turn, which the anticipated earnings
         // price at once (`earnings_anticipation_half_life`).
         self.inner.refresh_earnings_anticipation();
-        if corporate_bond_yield.is_some() {
-            self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
-        }
         // A pin is published the moment it is written, so with
         // `macro_publication_repricing` on the price takes it now rather
         // than at the next tick (`Engine::reprice_to_published_macro`).
@@ -3773,6 +3830,11 @@ impl PyEngine {
         if self.inner.macro_pins_today() != 0 {
             out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
         }
+        // The spread a `corporate_spread` pin holds tonight, only while its
+        // mark stands.
+        if let Some(spread) = self.inner.pinned_corporate_spread() {
+            out.set_item("pinned_corporate_spread", spread)?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -4400,11 +4462,23 @@ impl PyEngine {
         };
         self.inner.set_vix_sets_variance_pending(pending);
         // Absent means no pin was standing today when it was taken.
-        let pins: u8 = match snapshot.get_item("macro_pins_today")? {
+        let pins: u16 = match snapshot.get_item("macro_pins_today")? {
             Some(v) => v.extract()?,
             None => 0,
         };
-        self.inner.set_macro_pins_today(pins);
+        // The spread a spread pin holds, present exactly while its mark is.
+        let spread: Option<f64> = match snapshot.get_item("pinned_corporate_spread")? {
+            Some(v) => Some(v.extract()?),
+            None => None,
+        };
+        if spread.is_some() != (pins & crate::engine::PIN_SPREAD != 0) {
+            return Err(ValidationError::new_err(
+                "this snapshot carries pinned_corporate_spread without its \
+                 mark in macro_pins_today, or the mark without the spread. \
+                 The engine writes both or neither.",
+            ));
+        }
+        self.inner.set_macro_pins_today(pins, spread.unwrap_or(0.0));
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

@@ -43,6 +43,19 @@ const ANNOUNCEMENT_VARIANTS: f64 = 6.0;
 /// moved underneath it since.
 pub const CORPORATE_SPREAD_FLOOR: f64 = 0.8;
 
+/// The cycle phase's multiplier on the corporate spread: the meeting
+/// formula's (below) and the daily step's (`economy::daily`), which spell it
+/// out where they read it. `Engine::price_pinned_vix` reads it here.
+pub fn cycle_spread_multiplier(phase: CyclePhase) -> f64 {
+    match phase {
+        CyclePhase::Contraction => 2.8,
+        CyclePhase::Trough => 3.5,
+        CyclePhase::Recovery => 1.4,
+        CyclePhase::Peak => 1.1,
+        CyclePhase::Expansion => 1.0,
+    }
+}
+
 /// The mortgage spread's floor, on the same footing.
 ///
 /// Structurally identical to the corporate one, and it survived on margin
@@ -103,11 +116,17 @@ pub struct PolicyOptions {
     /// `fed_liftoff_rule`: 0.0 is the shipped ladder. See
     /// [`crate::params::ModelParams::fed_liftoff_rule`].
     pub liftoff: f64,
+    /// A caller pinned the policy rate for this session and it holds
+    /// through the close (`macro_pins_hold`): the meeting still reads the
+    /// economy and takes every draw its ladder takes, but the decision is a
+    /// hold, the rate stays where the pin put it, and the curve is
+    /// re-anchored to that rate. False on every preset.
+    pub hold_rate: bool,
 }
 
 impl PolicyOptions {
     pub const fn shipped() -> Self {
-        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0 }
+        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0, hold_rate: false }
     }
 }
 
@@ -282,6 +301,14 @@ pub fn update_central_bank_with(
         rate_change = 0.25;
         decision = Decision::Hike;
         new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score + 0.2, -1.0, 1.0);
+    }
+
+    // A PINNED RATE HOLDS (`PolicyOptions::hold_rate`). After the ladder,
+    // so its draws are taken as they would be.
+    if options.hold_rate {
+        rate_change = 0.0;
+        decision = Decision::Hold;
+        new_cb.hawkish_dovish_score = central_bank.hawkish_dovish_score;
     }
 
     // Urgency amplifies HIKES only. Amplifying cuts by an inflation gap would

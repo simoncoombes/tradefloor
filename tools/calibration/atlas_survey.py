@@ -376,6 +376,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "fair_value_vix_discount": (0.0, 0.3),
     # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
     "fair_value_vix_half_life": (0.0, 63.0),
+    # Switches read only on a session a caller pinned a macro field: a
+    # pinned field holds through the close, and a pinned VIX is priced the
+    # moment it is published.
+    "macro_pins_hold": (0.0, 1.0),
+    "pinned_vix_feedback": (0.0, 1.0),
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),

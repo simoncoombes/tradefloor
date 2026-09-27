@@ -396,6 +396,7 @@ class Engine:
         vix_sets_variance: bool = ...,
         treasury_yield_2y: float | None = ...,
         treasury_yield_10y: float | None = ...,
+        corporate_spread: float | None = ...,
     ) -> None: ...
     @property
     def vix_sets_variance_pending(self) -> bool: ...

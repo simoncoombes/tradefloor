@@ -322,6 +322,13 @@ pub struct YieldDials {
     /// level then holds through the close, as it does on every preset
     /// without `corporate_yield_daily`: the daily move is not applied.
     pub corporate_pinned: bool,
+    /// A caller pinned the 10-year and it holds through the close
+    /// (`macro_pins_hold`): its step is taken, draw included, and
+    /// discarded, so the 2-year's formula, the flight to quality and the
+    /// corporate yield's daily move read the pinned level.
+    pub treasury_10y_pinned: bool,
+    /// The same for the 2-year.
+    pub treasury_2y_pinned: bool,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -345,6 +352,8 @@ impl Default for YieldDials {
             corporate_yield_daily: 0.0,
             vix_pinned: false,
             corporate_pinned: false,
+            treasury_10y_pinned: false,
+            treasury_2y_pinned: false,
         }
     }
 }
@@ -1562,6 +1571,9 @@ pub fn update_economy_daily(
         0.5,
         12.0,
     );
+    if inputs.yields.treasury_10y_pinned {
+        new_state.treasury_yield_10y = current_10y;
+    }
     // THE 2-YEAR. The formula has no noise of its own: between meetings the
     // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
     // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
@@ -1581,6 +1593,9 @@ pub fn update_economy_daily(
     } else {
         target_2y
     };
+    if inputs.yields.treasury_2y_pinned {
+        new_state.treasury_yield_2y = economy.treasury_yield_2y;
+    }
 
     // Bond-stock correlation regime: inflation sets the sign.
     //
@@ -1607,16 +1622,20 @@ pub fn update_economy_daily(
         } else {
             0.0
         };
-        new_state.treasury_yield_10y = clamp(
-            new_state.treasury_yield_10y + bond_stock_yield_shift,
-            0.5,
-            12.0,
-        );
-        new_state.treasury_yield_2y = if own_2y {
-            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
-        } else {
-            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
-        };
+        if !inputs.yields.treasury_10y_pinned {
+            new_state.treasury_yield_10y = clamp(
+                new_state.treasury_yield_10y + bond_stock_yield_shift,
+                0.5,
+                12.0,
+            );
+        }
+        if !inputs.yields.treasury_2y_pinned {
+            new_state.treasury_yield_2y = if own_2y {
+                clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
+            } else {
+                new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+            };
+        }
     }
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a

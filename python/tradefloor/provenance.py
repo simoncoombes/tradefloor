@@ -666,6 +666,24 @@ OUT_OF_SCOPE = {
         "there and stays inert",
     "volume_idio_sigma":
         "unread while `volume_idio_persistence` is 0.0",
+    "macro_pins_hold":
+        "inert at 0.0 as shipped: `Engine::mark_macro_pins_today` keeps no "
+        "mark beyond the VIX and corporate ones `corporate_yield_daily` "
+        "reads, so `advance_day_with` clones nothing and restores nothing, "
+        "`PolicyOptions::hold_rate` is false and `YieldDials` pins neither "
+        "treasury. Read only on a session a caller pinned a macro field "
+        "(0.8.5, r13 scenario-frontrun: a held contraction flipped to "
+        "trough at the close 2-3 times a seed under recession.yml, and a "
+        "permanent 10-year moved 0.66-1.03 pp close to close)",
+    "pinned_vix_feedback":
+        "inert at 0.0 as shipped: `Engine::price_pinned_vix` returns at "
+        "once and the close pulls `vix_feedback` on every session. Read "
+        "only with `fair_value_vix_discount` and `fair_value_vix_half_life` "
+        "both set and a VIX pinned that session (0.8.5, r13 "
+        "scenario-frontrun: a VIX held at x3.5 for 25 sessions moved the "
+        "paired index 0.00 on the morning it was published and -21.7 per "
+        "cent over the next 24 sessions, which an agent reading the VIX "
+        "front-ran)",
 }
 
 #: The provenance of each shipped dial value.
