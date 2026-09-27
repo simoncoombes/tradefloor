@@ -1081,7 +1081,10 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # A switch. It moves only a World cohort's order, which an
+                   # untraded market does not have.
+                   book_arrival_shuffle=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
