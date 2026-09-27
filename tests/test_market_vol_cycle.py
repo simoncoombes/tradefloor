@@ -31,7 +31,9 @@ from tradefloor.manifest import state_hash
 UNIVERSE = list(tf.Universe.random(12, seed=3))
 DIALS = ("market_vol_cycle_ratio", "market_vol_cycle_expansion",
          "market_vol_cycle_half_life", "market_vol_cycle_relative",
-         "market_vol_cycle_relative_calm", "market_vol_cycle_cap_relative")
+         "market_vol_cycle_relative_calm", "market_vol_cycle_cap_relative",
+         "market_vol_cycle_pin_neutral", "market_vol_cycle_pin_phase",
+         "market_vol_cycle_trough_release", "market_vol_cycle_release_half_life")
 # The setting the bear-dynamics fix recommends for pt-v20.
 CYCLE = {"market_vol_cycle_ratio": 2.5, "market_vol_cycle_expansion": 0.8,
          "market_vol_cycle_half_life": 21.0, "market_vol_cycle_relative": 0.75,
@@ -67,7 +69,92 @@ def test_the_companions_are_unread_without_the_ratio():
     assert prices(market_vol_cycle_expansion=0.75, market_vol_cycle_half_life=21.0,
                   market_vol_cycle_relative=1.0,
                   market_vol_cycle_relative_calm=1.0,
-                  market_vol_cycle_cap_relative=1.0) == prices()
+                  market_vol_cycle_cap_relative=1.0,
+                  market_vol_cycle_pin_neutral=1.0,
+                  market_vol_cycle_pin_phase=1.0,
+                  market_vol_cycle_trough_release=1.0,
+                  market_vol_cycle_release_half_life=5.0) == prices()
+
+
+# The bearcycle fix's switches and release (sim/r15-bearcycle).
+PINS = {"market_vol_cycle_pin_neutral": 1.0, "market_vol_cycle_pin_phase": 1.0}
+
+
+def test_the_pin_switches_change_nothing_on_a_run_nothing_pins():
+    assert prices(days=30, **CYCLE) == prices(days=30, **CYCLE, **PINS)
+
+
+def pinned_prices(days=30, vix=None, cycle=None, **dials):
+    e = engine(**dials)
+    for day in range(days):
+        pins = {}
+        if vix is not None:
+            pins["vix"] = vix
+        if cycle is not None:
+            pins["cycle"] = cycle
+        e.pin_macro(**pins)
+        e.run_days(1, record=False, first_day=day)
+    return floats(e.prices()), e.state_snapshot().get("market_vol_cycle_log")
+
+
+def test_a_run_whose_every_vix_is_pinned_prices_as_the_model_without_the_cycle():
+    # The first close's step lands on the target, which a pin makes one,
+    # and nothing the multiplier scales reads anything but one after it:
+    # the prices are the cycle-off engine's to the bit. Without the switch
+    # the cycle's expansion multiplier moves them.
+    off, _ = pinned_prices(vix=35.0)
+    on, log = pinned_prices(vix=35.0, **CYCLE, market_vol_cycle_pin_neutral=1.0)
+    assert on == off and log == 0.0
+    plain, plain_log = pinned_prices(vix=35.0, **CYCLE)
+    assert plain != off and plain_log != 0.0
+
+
+def test_a_run_whose_every_phase_is_pinned_prices_as_the_model_without_the_cycle():
+    off, _ = pinned_prices(cycle="contraction")
+    on, log = pinned_prices(cycle="contraction", **CYCLE, market_vol_cycle_pin_phase=1.0)
+    assert on == off and log == 0.0
+    # A phase pin does not trigger the VIX switch, nor a VIX pin the phase's.
+    assert pinned_prices(cycle="contraction", **CYCLE,
+                         market_vol_cycle_pin_neutral=1.0)[0] != off
+    off_v, _ = pinned_prices(vix=35.0)
+    assert pinned_prices(vix=35.0, **CYCLE, market_vol_cycle_pin_phase=1.0)[0] != off_v
+
+
+def test_a_released_multiplier_steps_from_one_toward_its_phase():
+    # Ten pinned sessions, then free: the multiplier leaves one at its
+    # half-life rather than jumping to the phase's value.
+    e = engine(**CYCLE, **PINS)
+    for day in range(10):
+        e.pin_macro(vix=30.0)
+        e.run_days(1, record=False, first_day=day)
+    assert e.state_snapshot()["market_vol_cycle_log"] == 0.0
+    e.run_days(1, record=False, first_day=10)
+    l = e.state_snapshot()["market_vol_cycle_log"]
+    phase = e.state_snapshot()["economy"]["cycle_phase"]
+    import math
+    k = CYCLE["market_vol_cycle_expansion"] * (
+        CYCLE["market_vol_cycle_ratio"] if phase in ("contraction", "trough") else 1.0)
+    a = 1.0 - math.exp(-math.log(2.0) / CYCLE["market_vol_cycle_half_life"])
+    assert abs(l - a * math.log(k)) < 1e-12
+
+
+def test_the_trough_release_and_the_release_half_life_move_a_turning_market():
+    # Pinned into a contraction for 15 sessions and then into a trough and
+    # a recovery: the multiplier falls, so the release half-life moves the
+    # market, and the trough's target is read, so its release does.
+    def run(**dials):
+        e = engine(**CYCLE, **dials)
+        e.run_days(3, record=False)
+        e.pin_macro(cycle="contraction")
+        e.run_days(15, record=False, first_day=3)
+        e.pin_macro(cycle="trough")
+        e.run_days(10, record=False, first_day=18)
+        e.pin_macro(cycle="recovery")
+        e.run_days(10, record=False, first_day=28)
+        return floats(e.prices())
+    base = run()
+    assert run(market_vol_cycle_release_half_life=5.0) != base
+    assert run(market_vol_cycle_trough_release=1.0) != base
 
 
 @pytest.mark.parametrize("dials", [
@@ -221,6 +308,14 @@ def test_the_state_hash_is_unchanged_while_off():
     {"market_vol_cycle_relative_calm": 1.5},
     {"market_vol_cycle_cap_relative": -0.1},
     {"market_vol_cycle_cap_relative": 1.5},
+    {"market_vol_cycle_pin_neutral": 0.5},
+    {"market_vol_cycle_pin_neutral": -1.0},
+    {"market_vol_cycle_pin_phase": 0.5},
+    {"market_vol_cycle_pin_phase": 2.0},
+    {"market_vol_cycle_trough_release": -0.1},
+    {"market_vol_cycle_trough_release": 1.5},
+    {"market_vol_cycle_release_half_life": -1.0},
+    {"market_vol_cycle_release_half_life": 3000.0},
 ])
 def test_the_ranges(dials):
     with pytest.raises(Exception):

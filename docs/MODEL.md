@@ -1679,6 +1679,10 @@ outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
 | $d_{+}$ | `market_vol_cycle_relative` | 0 | | a power in [0, 1], read at $\ell \ge 0$; read only with $R$ set |
 | $d_{-}$ | `market_vol_cycle_relative_calm` | 0 | | a power in [0, 1], read at $\ell < 0$; read only with $R$ set |
 | $p$ | `market_vol_cycle_cap_relative` | 0 | | a power in [0, 1], read at $\ell > 0$; read only with $R$ set |
+| | `market_vol_cycle_pin_neutral` | 0 | switch | 0 or 1; read only with $R$ set |
+| | `market_vol_cycle_pin_phase` | 0 | switch | 0 or 1; read only with $R$ set |
+| $g$ | `market_vol_cycle_trough_release` | 0 | | a share in [0, 1]; read only with $R$ set |
+| $h_{r}$ | `market_vol_cycle_release_half_life` | 0 | | sessions, 0 is $h$; read only with $R$ set |
 
 `fair_value_market_vol_cap`'s ceiling is in multiples of the unscaled
 `market_factor_sigma`, so a contraction's higher baseline counts as fear
@@ -1689,6 +1693,26 @@ $e^{p\ell}$ while $\ell > 0$ (`market/tick.rs`, `market_permanent_share`),
 so only volatility above the phase's own normal counts; see
 `ModelParams::market_vol_cycle_ratio` and
 `ModelParams::market_vol_cycle_cap_relative`.
+
+**Pins, the trough and the release.** Under `market_vol_cycle_pin_neutral`
+a session whose VIX a caller pinned (a replay, a scenario's VIX
+transmission) applies no multiplier: the level, the denominator, $c$ and the
+cap's scale all read $\ell = 0$, and $\ell$ steps toward 0 rather than
+$\ell^{*}$, so when the pins stop it moves from there at the half-life.
+`market_vol_cycle_pin_phase` does the same on a session whose cycle phase a
+caller pinned. A pinned VIX or phase is the caller's statement of the state:
+the long run's 2020 replay pins the real VIX over an engine whose own cycle
+is in an expansion, and a multiplier under one there cut the replay's worst
+month from 69 to 59 per cent (A1); the packaged recession pins the phase and
+brings its own VIX, credit and earnings path, and the contraction's doubled
+volatility on top of it moved S2 from +64 to +102 per cent. With
+$g$ = `market_vol_cycle_trough_release` the trough's target is
+$\ln k_e + (1 - g)\ln R$ (at $g = 0$ the contraction's), and while $\ell$
+falls toward a lower target it steps at $h_{r}$ =
+`market_vol_cycle_release_half_life` instead of $h$ (at 0, $h$): the VIX and
+realised volatility peak at the market's low and fall within a quarter of
+it (at the 1990, 2002, 2009 and 2020 lows the VIX read 34, 42, 50 and 62,
+and 27, 26, 30 and 32 sixty-three sessions later).
 
 ### Company variance (GJR-GARCH)
 

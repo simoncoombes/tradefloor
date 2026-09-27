@@ -10879,6 +10879,151 @@ mod tests {
             assert!(e.market_vol_cycle_log().is_some());
         }
 
+        /// The trough gives back the share `market_vol_cycle_trough_release`
+        /// of the contraction's excess, in logs; at 0.0 it is the
+        /// contraction's, and the contraction's own is untouched.
+        #[test]
+        fn the_trough_gives_back_its_share_of_the_contraction() {
+            for g in [0.0, 0.25, 1.0] {
+                let mut e = with(|p| {
+                    p.market_vol_cycle_ratio = 2.0;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_trough_release = g;
+                });
+                e.economy_mut().cycle_phase = CyclePhase::Trough;
+                let got = e.market_vol_cycle_target_log();
+                let want = crate::mathx::log(0.75) + (1.0 - g) * crate::mathx::log(2.0);
+                assert!((got - want).abs() < 1e-14, "g {g}: {got} against {want}");
+                e.economy_mut().cycle_phase = CyclePhase::Contraction;
+                assert_eq!(e.market_vol_cycle_target_log(), crate::mathx::log(1.5));
+            }
+            // At 0.0 the trough's target is the contraction's to the bit.
+            let mut z = on(2.0, 0.75, 21.0, 1.0);
+            z.economy_mut().cycle_phase = CyclePhase::Trough;
+            assert_eq!(z.market_vol_cycle_target_log(), crate::mathx::log(1.5));
+        }
+
+        /// The release half-life is read only while the multiplier falls;
+        /// a rising multiplier, and every step at 0.0, takes the one
+        /// half-life.
+        #[test]
+        fn the_release_half_life_is_read_only_on_the_way_down() {
+            let mk = |release: f64| {
+                with(|p| {
+                    p.market_vol_cycle_ratio = 2.0;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_half_life = 20.0;
+                    p.market_vol_cycle_release_half_life = release;
+                })
+            };
+            let step = |h: f64, from: f64, to: f64| {
+                from + (1.0 - crate::mathx::exp(-std::f64::consts::LN_2 / h)) * (to - from)
+            };
+            let (up, down) = (crate::mathx::log(1.5), crate::mathx::log(0.75));
+            // Down: from the contraction's level to the expansion's.
+            let mut e = mk(5.0);
+            e.economy_mut().cycle_phase = CyclePhase::Expansion;
+            e.set_market_vol_cycle_log(Some(up));
+            assert_eq!(e.step_market_vol_cycle(), step(5.0, up, down));
+            // Up: the one half-life.
+            e.economy_mut().cycle_phase = CyclePhase::Contraction;
+            e.set_market_vol_cycle_log(Some(down));
+            assert_eq!(e.step_market_vol_cycle(), step(20.0, down, up));
+            // Off: the one half-life both ways.
+            let mut o = mk(0.0);
+            o.economy_mut().cycle_phase = CyclePhase::Expansion;
+            o.set_market_vol_cycle_log(Some(up));
+            assert_eq!(o.step_market_vol_cycle(), step(20.0, up, down));
+        }
+
+        /// `market_vol_cycle_pin_neutral`: on a session whose VIX a caller
+        /// pinned, the close writes the variance target an engine without
+        /// the multiplier writes, and the multiplier lands on one (its
+        /// first step lands on its target, which a pin makes one). Without
+        /// the switch the same pinned session applies it.
+        #[test]
+        fn a_pinned_vix_session_does_not_apply_the_multiplier_under_the_switch() {
+            let run = |ratio: f64, switch: f64| {
+                let mut e = with(|p| {
+                    p.market_vol_cycle_ratio = ratio;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_half_life = 21.0;
+                    p.market_vol_cycle_relative = 1.0;
+                    p.market_vol_cycle_relative_calm = 1.0;
+                    p.market_vol_cycle_cap_relative = 1.0;
+                    p.market_vol_cycle_pin_neutral = switch;
+                });
+                e.mark_macro_pins_today(PIN_VIX);
+                assert_ne!(e.macro_pins_today() & PIN_VIX, 0, "the pin is kept");
+                session_and_close(&mut e);
+                e
+            };
+            let off = run(0.0, 0.0);
+            let on = run(2.0, 1.0);
+            assert_eq!(on.market_variance_target(), off.market_variance_target());
+            assert_eq!(on.market_variance_state(), off.market_variance_state());
+            assert_eq!(on.market_vol_cycle_log(), Some(0.0));
+            assert_eq!(on.market_vol_cycle_vix_scale(), 1.0);
+            assert_eq!(on.market_vol_cycle_cap_scale(), 1.0);
+            let unswitched = run(2.0, 0.0);
+            assert_ne!(unswitched.market_variance_target(), off.market_variance_target());
+            assert_ne!(unswitched.market_vol_cycle_log(), Some(0.0));
+            // An unpinned session under the switch applies the multiplier.
+            let mut free = with(|p| {
+                p.market_vol_cycle_ratio = 2.0;
+                p.market_vol_cycle_expansion = 0.75;
+                p.market_vol_cycle_pin_neutral = 1.0;
+            });
+            let mut plain = with(|p| {
+                p.market_vol_cycle_ratio = 2.0;
+                p.market_vol_cycle_expansion = 0.75;
+            });
+            session_and_close(&mut free);
+            session_and_close(&mut plain);
+            assert_eq!(free.market_variance_target(), plain.market_variance_target());
+            assert_eq!(free.market_vol_cycle_log(), plain.market_vol_cycle_log());
+        }
+
+        /// `market_vol_cycle_pin_phase`: the same rule on a session whose
+        /// phase a caller pinned; a pinned VIX alone does not trigger it.
+        #[test]
+        fn a_pinned_phase_session_does_not_apply_the_multiplier_under_its_switch() {
+            let run = |ratio: f64, bits: u16| {
+                let mut e = with(|p| {
+                    p.market_vol_cycle_ratio = ratio;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_pin_phase = 1.0;
+                });
+                e.mark_macro_pins_today(bits);
+                session_and_close(&mut e);
+                e
+            };
+            let off = run(0.0, PIN_CYCLE);
+            let on = run(2.0, PIN_CYCLE);
+            assert_eq!(on.market_variance_target(), off.market_variance_target());
+            assert_eq!(on.market_vol_cycle_log(), Some(0.0));
+            let vix_only = run(2.0, PIN_VIX);
+            assert_ne!(vix_only.market_variance_target(), off.market_variance_target());
+        }
+
+        /// Under a pin the multiplier relaxes toward one at its half-life,
+        /// so a released run steps from there rather than jumping to its
+        /// phase's value.
+        #[test]
+        fn a_pinned_session_relaxes_the_multiplier_toward_one() {
+            let mut e = with(|p| {
+                p.market_vol_cycle_ratio = 2.0;
+                p.market_vol_cycle_expansion = 0.75;
+                p.market_vol_cycle_half_life = 10.0;
+                p.market_vol_cycle_pin_neutral = 1.0;
+            });
+            e.economy_mut().cycle_phase = CyclePhase::Contraction;
+            e.set_market_vol_cycle_log(Some(0.4));
+            e.mark_macro_pins_today(PIN_VIX);
+            let a = 1.0 - crate::mathx::exp(-std::f64::consts::LN_2 / 10.0);
+            assert_eq!(e.step_market_vol_cycle(), 0.4 + a * (0.0 - 0.4));
+        }
+
         #[test]
         fn the_state_hash_carries_the_multiplier_only_while_set() {
             let mut e = on(2.0, 0.75, 21.0, 1.0);

@@ -459,6 +459,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_cycle_relative_calm": (0.0, 1.0),
     # The power on the fair-value cap's ceiling, in [0, 1].
     "market_vol_cycle_cap_relative": (0.0, 1.0),
+    # Switches: the multiplier is not applied on a session whose VIX, or
+    # whose phase, a caller pinned (bearcycle).
+    "market_vol_cycle_pin_neutral": (0.0, 1.0),
+    "market_vol_cycle_pin_phase": (0.0, 1.0),
+    # The trough's share of the contraction's excess given back, in [0, 1],
+    # and the half-life the multiplier falls at, in sessions (0 is the one
+    # half-life).
+    "market_vol_cycle_trough_release": (0.0, 1.0),
+    "market_vol_cycle_release_half_life": (0.0, 126.0),
     # The published VIX's stress premium: a gain per unit of the anchor
     # memory above the knee. 2 takes a memory 0.2 above the knee to about
     # the cap; the premium moves only the published quote.
