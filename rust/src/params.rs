@@ -1551,13 +1551,14 @@ pub struct ModelParams {
     /// The VIX reverts within days of a sell-off while the index stays down,
     /// so a spread that is the VIX's formula widens with the session and
     /// then narrows back through the month. On the r14 screen's N4 arm
-    /// (sim/r14 e2e2d21, 8 held-out histories of 3000 sessions) 78 per cent
-    /// of the same-close covariance between the index and minus the
-    /// corporate yield's change is reversed over the next 20 sessions, the
-    /// spread change's variance ratio at 21 sessions is 0.44, and its daily
-    /// sd is 5.3 bp against 3.1 on FRED BAA10Y (1990-2026). The daily
-    /// stock-IG correlation on held closes reads 0.43 and the monthly 0.15,
-    /// against +0.27 and +0.47 for SPY and LQD, 2015-2025. See
+    /// (sim/r14 e2e2d21, ten held-out histories of 3000 sessions) 76 per
+    /// cent of the same-close covariance between the index and minus the
+    /// corporate yield's change is reversed over the next 20 sessions and
+    /// the spread change's variance ratio at 21 sessions is 0.55; on the
+    /// screen's 90 histories the spread's daily sd is 4.4 bp against 3.1 on
+    /// FRED BAA10Y (1990-2026), and the daily stock-IG correlation on held
+    /// closes reads 0.43 and the monthly 0.15, against +0.27 and +0.47 for
+    /// SPY and LQD, 2015-2025. See
     /// `corporate_spread_equity_gain`, which puts the credit's link to the
     /// index on the index itself. No draw. No state. In [0, 1].
     pub corporate_spread_vix_cut: f64,
