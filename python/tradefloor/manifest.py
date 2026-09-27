@@ -818,6 +818,16 @@ _RATE_STATE_FIELDS = (
 _BOOK_KEYS = ("sequence", "fill_sequence", "taken", "orders", "flow",
               "fills", "impacts")
 
+#: The book's optional entries: the metaorder memory, present only while
+#: ``impact_memory_coefficient`` is set and the memory holds something, and
+#: hashed after everything else when it is.
+_BOOK_OPTIONAL_KEYS = ("memory",)
+
+#: Values per company in the book's ``memory`` buffer: the fast and slow
+#: memories of agents' net flow, the displacement booked into ``s``, and
+#: what the flow waiting for the next tick paid.
+_MEMORY_WIDTH = 4
+
 #: Values per company in the book's ``taken`` buffer: the maker's bid and
 #: ask consumed, the latent depth's bid and ask consumed, and the maker's
 #: inventory change waiting for its next quote.
@@ -826,11 +836,11 @@ _TAKEN_WIDTH = 5
 
 def _book(buf: bytearray, book: dict[str, Any]) -> None:
     """The agent-facing book's entry, as the engine hashes it."""
-    if set(book) != set(_BOOK_KEYS):
+    if not set(_BOOK_KEYS) <= set(book) <= set(_BOOK_KEYS + _BOOK_OPTIONAL_KEYS):
         raise ValidationError(
             "this snapshot's book is not the one the state hash covers: "
             f"missing {sorted(set(_BOOK_KEYS) - set(book))}, unexpected "
-            f"{sorted(set(book) - set(_BOOK_KEYS))}.")
+            f"{sorted(set(book) - set(_BOOK_KEYS + _BOOK_OPTIONAL_KEYS))}.")
     _text(buf, "book")
     _u64(buf, book["sequence"])
     _u64(buf, book["fill_sequence"])
@@ -886,7 +896,22 @@ def _book(buf: bytearray, book: dict[str, Any]) -> None:
         _f64(buf, r["bought"])
         _f64(buf, r["sold"])
         _f64(buf, r["permanent"])
+        # Only while the metaorder memory is on; see `Engine::state_hash`.
+        if "transient" in r:
+            _text(buf, "transient")
+            _f64(buf, r["transient"])
         _i64(buf, r["day"])
+    if "memory" in book:
+        raw = book["memory"]
+        if len(raw) % (8 * _MEMORY_WIDTH):
+            raise ValidationError(
+                f"the book's memory buffer carries {len(raw)} bytes, which is "
+                f"not a whole number of {_MEMORY_WIDTH}-value rows.")
+        rows = len(raw) // (8 * _MEMORY_WIDTH)
+        _text(buf, "memory")
+        _u32(buf, rows)
+        for value in _column(raw, rows * _MEMORY_WIDTH, "book.memory"):
+            _f64(buf, value)
 
 
 
@@ -1289,6 +1314,8 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     if "book" in snapshot:
         book = dict(snapshot["book"])
         book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
+        if "memory" in book:
+            book["memory"] = base64.b64encode(book["memory"]).decode("ascii")
         out["book"] = book
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
@@ -1309,6 +1336,8 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
     if "book" in payload:
         book = dict(payload["book"])
         book["taken"] = base64.b64decode(book["taken"])
+        if "memory" in book:
+            book["memory"] = base64.b64decode(book["memory"])
         out["book"] = book
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))

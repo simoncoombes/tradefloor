@@ -2535,6 +2535,31 @@ impl Engine {
                 merged_flow = Some(merge_order_volumes(request.order_volumes, &agg));
             }
         }
+        // The metaorder memory: decay, feed, and book its displacement into
+        // the order-flow slot beside the linear law's. Only with the dial
+        // on and the book used, so every other tick is the tick it was.
+        let mut memory_plan: Vec<(usize, [f64; crate::agent_book::MEMORY_WIDTH], f64)> = Vec::new();
+        if book_on && status != MarketStatus::Closed && self.params.impact_memory_coefficient > 0.0 {
+            memory_plan = self.plan_memory(&applied, open_now);
+            if !memory_plan.is_empty() && fill_impact.is_empty() {
+                fill_impact = vec![0.0; self.companies.len()];
+            }
+            let phi = self.params.s_phi_tick;
+            for (i, row, _) in &memory_plan {
+                let booked = self.book.memory[*i][crate::agent_book::MEMORY_BOOKED];
+                let target = row[crate::agent_book::MEMORY_BOOKED];
+                // `s` keeps `phi` of what was booked on an open tick, so
+                // the booking tops it back up to the target.
+                let delta = if open_now {
+                    (target - booked) + (1.0 - phi) * booked
+                } else {
+                    target - booked
+                };
+                if delta != 0.0 {
+                    fill_impact[*i] += delta;
+                }
+            }
+        }
         let resting: Vec<Vec<crate::microstructure::RestingOrder>> = if book_on
             && open_now
             && self.book.orders.iter().any(|o| o.mode == crate::agent_book::RestMode::Queue)
@@ -2761,8 +2786,29 @@ impl Engine {
             }
         }
 
+        // The memory's new state. A name the tick did not settle carries
+        // none of the booking into `s`, so its booked part stays where it
+        // was and the next tick it settles books the difference.
+        let mut memory_transient: Vec<f64> = Vec::new();
+        if !memory_plan.is_empty() {
+            memory_transient = vec![0.0; self.companies.len()];
+            for (i, row, transient) in &memory_plan {
+                let settled = outcome.active_indices.contains(i);
+                let slot = &mut self.book.memory[*i];
+                slot[crate::agent_book::MEMORY_FAST] = row[crate::agent_book::MEMORY_FAST];
+                slot[crate::agent_book::MEMORY_SLOW] = row[crate::agent_book::MEMORY_SLOW];
+                // The flow it paid for is in the memory now; a resting
+                // order's taker fill below adds the next tick's.
+                slot[crate::agent_book::MEMORY_PAID] = 0.0;
+                if settled {
+                    slot[crate::agent_book::MEMORY_BOOKED] = row[crate::agent_book::MEMORY_BOOKED];
+                    memory_transient[*i] = *transient;
+                }
+            }
+        }
+
         if book_on {
-            self.settle_book(&outcome, &applied, &prints_before, open_now);
+            self.settle_book(&outcome, &applied, &prints_before, open_now, &memory_transient);
         }
 
         TickOutcome {
@@ -2797,6 +2843,91 @@ impl Engine {
         }
     }
 
+    /// The metaorder memory's step for this tick, per name it touches:
+    /// `(slot, [fast, slow, displacement], transient)`. On an open tick
+    /// both memories decay first; then the tick's net agent flow, over the
+    /// name's daily volume, is added to both; the displacement is `D` of
+    /// the combined memory; and `transient` is what the tick's flow alone
+    /// moved it, `D(after the flow) - D(decayed)`. A name whose memory is
+    /// empty and that has no flow is left out.
+    #[allow(clippy::type_complexity)]
+    fn plan_memory(
+        &mut self,
+        applied: &[(String, String, f64, f64)],
+        open_now: bool,
+    ) -> Vec<(usize, [f64; crate::agent_book::MEMORY_WIDTH], f64)> {
+        use crate::agent_book::*;
+        let n = self.companies.len();
+        let mut net = vec![0.0; n];
+        let mut shares = vec![0.0; n];
+        let mut any_flow = false;
+        for (_, t, b, s) in applied {
+            if let Some(i) = self.companies.iter().position(|c| &c.ticker == t) {
+                let v = daily_volume(&self.companies[i]);
+                if v > 0.0 {
+                    net[i] += (b - s) / v;
+                    shares[i] += b - s;
+                    any_flow = true;
+                }
+            }
+        }
+        let (delta, _) = depth_shape(&self.params);
+        if !any_flow && self.book.memory.iter().all(|r| r.iter().all(|x| *x == 0.0)) {
+            return Vec::new();
+        }
+        if self.book.memory.len() < n {
+            self.book.memory.resize(n, [0.0; MEMORY_WIDTH]);
+        }
+        let (fast, slow) = if open_now {
+            (memory_decay(self.params.impact_memory_half_life),
+             memory_decay(self.params.impact_memory_slow_half_life))
+        } else {
+            (1.0, 1.0)
+        };
+        let snap = |x: f64| if x.abs() < 1e-12 { 0.0 } else { x };
+        let market_sigma = self.market_vol.sigma_daily();
+        let mut plan = Vec::new();
+        for i in 0..n {
+            let row = self.book.memory[i];
+            if net[i] == 0.0 && row.iter().all(|x| *x == 0.0) {
+                continue;
+            }
+            let sigma = daily_sigma(&self.companies[i], market_sigma);
+            let mut next = row;
+            next[MEMORY_FAST] = snap(row[MEMORY_FAST] * fast);
+            // The slow memory runs only with its half-life set; without it
+            // it is carried at zero.
+            next[MEMORY_SLOW] = if self.params.impact_memory_slow_half_life > 0.0 {
+                snap(row[MEMORY_SLOW] * slow)
+            } else {
+                0.0
+            };
+            let at = memory_position(&self.params, &next);
+            let decayed = memory_displacement(&self.params, at, sigma);
+            next[MEMORY_PAID] = 0.0;
+            if net[i] != 0.0 {
+                // The flow moves the displacement at most (1 + delta) times
+                // what it paid per share, so selling back along the
+                // memory's path never recovers more than the flow cost.
+                let mut add = net[i];
+                let cap = (1.0 + delta) * row[MEMORY_PAID] / shares[i].abs();
+                let uncapped = memory_displacement(&self.params, at + add, sigma);
+                if (uncapped - decayed).abs() > cap {
+                    let target = decayed + if net[i] > 0.0 { cap } else { -cap };
+                    add = memory_inverse(&self.params, target, sigma) - at;
+                }
+                next[MEMORY_FAST] += add;
+                if self.params.impact_memory_slow_half_life > 0.0 {
+                    next[MEMORY_SLOW] += add;
+                }
+            }
+            let d = memory_displacement(&self.params, memory_position(&self.params, &next), sigma);
+            next[MEMORY_BOOKED] = d;
+            plan.push((i, next, d - decayed));
+        }
+        plan
+    }
+
     /// The linear law's change to one name's `s` for a net signed size:
     /// `gamma * sigma * net / V`.
     fn fill_impact_of(&self, index: usize, net: f64) -> f64 {
@@ -2814,9 +2945,11 @@ impl Engine {
         applied: &[(String, String, f64, f64)],
         prints_before: &[f64],
         open_now: bool,
+        memory_transient: &[f64],
     ) {
         use crate::agent_book::*;
         let (day, tick) = (self.current_day, self.ticks_today());
+        let memory_on = self.params.impact_memory_coefficient > 0.0;
 
         // Permanent impact, per agent and name.
         let linear = self.params.fill_impact_coefficient != 0.0;
@@ -2842,12 +2975,27 @@ impl Engine {
                     outcome.s_components[n][4] * (b - s) / net
                 }
             };
+            // The memory's part of the tick, shared by signed net shares
+            // among the agents whose flow reached this name on it.
+            let transient = if memory_on {
+                let total = memory_transient.get(i).copied().unwrap_or(0.0);
+                let mut net = 0.0;
+                for (_, t2, b2, s2) in applied {
+                    if t2 == t {
+                        net += b2 - s2;
+                    }
+                }
+                Some(if net == 0.0 || total == 0.0 { 0.0 } else { total * (b - s) / net })
+            } else {
+                None
+            };
             self.book.impacts.push(AgentImpact {
                 agent: agent.clone(),
                 ticker: t.clone(),
                 bought: *b,
                 sold: *s,
                 permanent,
+                transient,
                 day,
                 tick,
             });
@@ -2862,6 +3010,11 @@ impl Engine {
             let ticker = self.companies[*i].ticker.clone();
             if f.taker {
                 self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
+                if self.params.impact_memory_coefficient > 0.0 {
+                    let n = self.companies.len();
+                    let reference = prints_before.get(*i).copied().unwrap_or(f64::NAN);
+                    self.book.add_paid(n, *i, f.quantity, f.price, reference);
+                }
             }
             self.reduce_order(&f.order_id, f.quantity);
             self.push_fill(AgentFill {
@@ -2940,6 +3093,13 @@ impl Engine {
                 self.companies.len()
             ));
         }
+        if !state.memory.is_empty() && state.memory.len() != self.companies.len() {
+            return Err(format!(
+                "the book's metaorder memory has {} rows and the roster {} names",
+                state.memory.len(),
+                self.companies.len()
+            ));
+        }
         self.book = state;
         Ok(())
     }
@@ -2971,12 +3131,32 @@ impl Engine {
             .get(index)
             .copied()
             .unwrap_or([0.0; crate::agent_book::TAKEN_WIDTH]);
+        let memory = self
+            .book
+            .memory
+            .get(index)
+            .copied()
+            .unwrap_or([0.0; crate::agent_book::MEMORY_WIDTH]);
+        // The flow waiting for the next tick, which the memory has not yet
+        // taken in: read only with the memory on.
+        let memory_pending = if self.params.impact_memory_coefficient > 0.0 {
+            self.book
+                .flow
+                .iter()
+                .filter(|(_, t, _, _)| *t == company.ticker)
+                .map(|(_, _, b, s)| b - s)
+                .sum()
+        } else {
+            0.0
+        };
         Some(crate::agent_book::agent_book(&crate::agent_book::AgentBookInputs {
             company,
             vix: self.economy.vix,
             params: &self.params,
             market_sigma_daily: self.market_vol.sigma_daily(),
             taken,
+            memory,
+            memory_pending,
             orders: &self.book.orders,
             exclude_agent: exclude,
         }))
@@ -3081,6 +3261,10 @@ impl Engine {
             });
             if count_flow {
                 self.book.add_flow(agent, &ticker, side, f.quantity);
+                if self.params.impact_memory_coefficient > 0.0 {
+                    let n = self.companies.len();
+                    self.book.add_paid(n, index, f.quantity, f.price, reference);
+                }
             }
             taker.push(fill);
         }
@@ -5845,6 +6029,10 @@ impl Engine {
         if !self.book.taken.is_empty() {
             self.book.taken.push([0.0; crate::agent_book::TAKEN_WIDTH]);
         }
+        // The metaorder memory's row likewise, only once it holds any.
+        if !self.book.memory.is_empty() {
+            self.book.memory.push([0.0; crate::agent_book::MEMORY_WIDTH]);
+        }
         // The per-name jump excitation follows the roster for the reason
         // `volume_idio` above does, and it was left out for the same
         // reason: it landed after this function was written. A name that
@@ -5921,6 +6109,9 @@ impl Engine {
         // market left for either to reach.
         if index < self.book.taken.len() {
             self.book.taken.remove(index);
+        }
+        if index < self.book.memory.len() {
+            self.book.memory.remove(index);
         }
         let leaving = self.companies[index].ticker.clone();
         self.book.orders.retain(|o| o.ticker != leaving);
@@ -6934,7 +7125,24 @@ fn hash_book(buf: &mut Vec<u8>, book: &crate::agent_book::BookState) {
         hash_f64(buf, r.bought);
         hash_f64(buf, r.sold);
         hash_f64(buf, r.permanent);
+        // Only while the metaorder memory is on, so every state without it
+        // hashes as it did before it existed.
+        if let Some(x) = r.transient {
+            hash_str(buf, "transient");
+            hash_f64(buf, x);
+        }
         hash_i64(buf, r.day);
+    }
+    // The metaorder memory, after everything else and only while it holds
+    // something.
+    if !book.memory.is_empty() {
+        hash_str(buf, "memory");
+        hash_u32(buf, book.memory.len() as u32);
+        for row in &book.memory {
+            for v in row {
+                hash_f64(buf, *v);
+            }
+        }
     }
 }
 

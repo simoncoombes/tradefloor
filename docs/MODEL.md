@@ -1933,6 +1933,36 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 
 (`market/factors.rs:827-833`, `market/factors.rs:1263-1276`).
 
+### The metaorder memory (off on every preset)
+
+Without it, a half-day order's displacement of the tape is linear in its
+size and does not decay within the day: on pt-v20 its peak is about
+$0.42 f^{1.04}\sigma$ for $f = Q/\bar A_i$, and 99% of it is still there at
+the close (`tools/calibration/metaorder_curve.py`). The square-root law is
+concave and about a third of the peak is gone by the close (Bucci,
+Benzaquen, Lillo and Bouchaud 2019). With $Y_M > 0$ each name keeps a
+signed memory of all agents' net taker flow in fractions of $\bar A_i$, a
+fast part and a slow part, decaying on open ticks only:
+
+```math
+M^{f}_{t+1} = M^{f}_t\,2^{-1/H_1} + \frac{b - x}{\bar A_i},\qquad
+M^{s}_{t+1} = M^{s}_t\,2^{-1/H_2} + \frac{b - x}{\bar A_i},\qquad
+M = (1 - w) M^{f} + w M^{s}
+```
+
+and $s_i$ carries $D = \mathrm{sign}(M)\,Y_M\,\sigma_i\,h(|M|)$, with
+$h(m) = m^{\delta}$ at or above $m^*$ and $m\,{m^*}^{\delta - 1}$ below it,
+booked through the order-flow slot each tick net of $s$'s own reversion.
+The print follows $s$, so $D$ is on the tape and in the closing cross.
+On the side the memory leans the latent depth continues from the memory's
+point on its own curve, $x_M = (|D|/(Y\sigma_i))^{1/\delta}$; against the
+lean, no house share is priced better than the memory's own path,
+$P\,e^{D(M - q) - D}$ for a sell; with $M = 0$ the book is the book above.
+This is the book of Alfonsi, Fruth and Schied (2010) with a book linear in
+distance. The linear $\gamma$ stays as the long-lived part.
+(`agent_book.rs`, `MemoryBound` and `append_latent_depth`;
+`engine.rs`, `plan_memory`.)
+
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.487 and coefficient 0.468 |
@@ -1942,6 +1972,11 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 | $H_B$ | `book_refill_half_life` | 27 ticks (0) | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
 | | `book_resting` | 1 (0) | derived | a switch: limit orders rest with queue priority |
 | $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
+| $Y_M$ | `impact_memory_coefficient` | 0 (off) | for a new registration | the square-root law on the tape for agents' metaorders; at most $Y$; Tóth et al. (2011), Zarinelli et al. (2015), Bucci et al. (2019) |
+| $H_1$ | `impact_memory_half_life` | 0 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
+| $H_2$ | `impact_memory_slow_half_life` | 0 (none) | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
+| $w$ | `impact_memory_slow_weight` | 0 | for a new registration | the slow part's weight; refused without $H_2$ |
+| $m^*$ | `impact_memory_crossover` | 0 (pure power) | for a new registration | impact is about linear below a participation of about $10^{-3}$ (Bucci et al., PRL 122, 108302, 2019) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 

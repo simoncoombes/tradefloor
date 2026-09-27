@@ -3969,6 +3969,62 @@ pub struct ModelParams {
     /// each agent's share of a name's impact is exact. Almgren, Thum,
     /// Hauptmann and Li (2005) measure `gamma` = 0.314 on the same form.
     pub fill_impact_coefficient: f64,
+    /// The metaorder memory's `Y`: the square-root law of impact on the
+    /// TAPE, for agents' orders. 0.0, which every preset carries, is off,
+    /// and the market is the one it was to the bit.
+    ///
+    /// Without it an agent's temporary impact never reaches the print: the
+    /// maker re-quotes a full ladder around the model price every tick, so
+    /// only `fill_impact_coefficient`'s linear `gamma sigma Q/V` moves `s`.
+    /// Measured on pt-v20 (held-out seeds 2001-2008, six names), the peak
+    /// displacement of a half-day order is linear in its size, `0.42
+    /// f^1.04` sigma in the print, and 99% of it is still there at the
+    /// close. The square-root law of impact is concave, `Y sigma (Q/V)^0.5`
+    /// with `Y` about 0.4 to 0.5 (Toth et al., Physical Review X 1, 021006,
+    /// 2011; Zarinelli, Treccani, Farmer and Lillo, Market Microstructure
+    /// and Liquidity 1(2), 2015; Bucci, Benzaquen, Lillo and Bouchaud,
+    /// Physical Review Letters 122, 108302, 2019), and about a third of the
+    /// peak has gone by the close (Bucci et al., "Slow decay of impact in
+    /// equity markets", 2019).
+    ///
+    /// Off zero, each name keeps a decaying memory `M` of agents' net taker
+    /// flow in fractions of daily volume, and its `s` carries `D = sign(M)
+    /// Y sigma h(|M|)`, with `h(m) = m^delta` (`delta` the latent book's
+    /// [`ModelParams::book_depth_exponent`]) and `sigma` the name's
+    /// [`crate::agent_book::daily_sigma`]. The latent depth continues from
+    /// the memory's point on its own curve, so an order in the direction
+    /// the memory leans walks on from where the last one left the price.
+    /// This is the volume-recovery book of Alfonsi, Fruth and Schied
+    /// (Quantitative Finance 10(2), 2010) with a book linear in distance.
+    /// Needs `book_shared` on and the depth tail, and is at most
+    /// `book_depth_coefficient`, which keeps every fill no better than the
+    /// memory's own price. In [0, book_depth_coefficient].
+    pub impact_memory_coefficient: f64,
+    /// The memory's fast half-life, in OPEN ticks. Required with the
+    /// coefficient on, and read by nothing with it off (like each dial
+    /// below, and like `fair_value_vix_knee` beside its discount, it is
+    /// allowed there, unread). The memory decays only on
+    /// open ticks, so it holds overnight (Bucci et al. 2019 measure the
+    /// decay in volume time). In (0, 39000].
+    pub impact_memory_half_life: f64,
+    /// The memory's slow half-life, in open ticks. 0.0 is no slow part;
+    /// otherwise at least the fast half-life. The slow part is the
+    /// long-lived remainder of impact, about 0.3 to 0.4 of the peak after
+    /// weeks (Bucci et al. 2019) and 0.15 after 15 days once the trader's
+    /// information is removed (Brokmann et al., Market Microstructure and
+    /// Liquidity 1(2), 2015). In [0, 98280].
+    pub impact_memory_slow_half_life: f64,
+    /// The slow part's weight `w` in `M = (1 - w) M_fast + w M_slow`.
+    /// Refused off zero without the slow half-life. In [0, 1).
+    pub impact_memory_slow_weight: f64,
+    /// The crossover `m*`, in fractions of daily volume, below which the
+    /// memory's displacement is linear, `m m*^(delta - 1)`, rather than a
+    /// power: impact is about linear for metaorders below a participation
+    /// of about 1e-3 (Bucci, Benzaquen, Lillo and Bouchaud, Physical
+    /// Review Letters 122, 108302, 2019), and the cap keeps the power
+    /// law's infinite marginal impact at zero size from rewarding a stream
+    /// of tiny orders. 0.0 is a pure power law. In [0, 0.05].
+    pub impact_memory_crossover: f64,
 
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
     /// How fast VIX reverts toward its target each day.
@@ -5248,6 +5304,11 @@ impl ModelParams {
             book_refill_half_life: 0.0,
             book_resting: 0.0,
             fill_impact_coefficient: 0.0,
+            impact_memory_coefficient: 0.0,
+            impact_memory_half_life: 0.0,
+            impact_memory_slow_half_life: 0.0,
+            impact_memory_slow_weight: 0.0,
+            impact_memory_crossover: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -7583,6 +7644,11 @@ impl ModelParams {
             "book_refill_half_life" => self.book_refill_half_life,
             "book_resting" => self.book_resting,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
+            "impact_memory_coefficient" => self.impact_memory_coefficient,
+            "impact_memory_half_life" => self.impact_memory_half_life,
+            "impact_memory_slow_half_life" => self.impact_memory_slow_half_life,
+            "impact_memory_slow_weight" => self.impact_memory_slow_weight,
+            "impact_memory_crossover" => self.impact_memory_crossover,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -7834,6 +7900,11 @@ impl ModelParams {
             "book_refill_half_life" => out.book_refill_half_life = value,
             "book_resting" => out.book_resting = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
+            "impact_memory_coefficient" => out.impact_memory_coefficient = value,
+            "impact_memory_half_life" => out.impact_memory_half_life = value,
+            "impact_memory_slow_half_life" => out.impact_memory_slow_half_life = value,
+            "impact_memory_slow_weight" => out.impact_memory_slow_weight = value,
+            "impact_memory_crossover" => out.impact_memory_crossover = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -8027,6 +8098,68 @@ impl ModelParams {
                 "fill_impact_coefficient is {g}. It is gamma in gamma sigma Q/V, \
                  non-negative and of order 0.1 to 1 (Almgren et al. 2005 measure \
                  0.314); 0.0 is the order-imbalance law. Set it inside [0, 5]."));
+        }
+        self.impact_memory_invariants()
+    }
+
+    /// The metaorder memory's dials: ranges, and the companions each needs.
+    /// Part of [`ModelParams::invariants`] through `book_invariants`.
+    fn impact_memory_invariants(&self) -> Result<(), String> {
+        let y = self.impact_memory_coefficient;
+        let (h1, h2, w, m) = (self.impact_memory_half_life, self.impact_memory_slow_half_life,
+                              self.impact_memory_slow_weight, self.impact_memory_crossover);
+        if !(y >= 0.0 && y <= 10.0) {
+            return Err(format!(
+                "impact_memory_coefficient is {y}. It is the metaorder memory's Y in \
+                 Y sigma (M)^delta, in [0, book_depth_coefficient]; 0.0 is off."));
+        }
+        // The shape dials are range-checked always and read only with the
+        // coefficient on, so a vector may carry them at the coefficient's
+        // 0.0 (the perturbation table's base does).
+        if !(h1 >= 0.0 && h1 <= 39000.0) {
+            return Err(format!(
+                "impact_memory_half_life is {h1}. It is a half-life in open ticks, in \
+                 (0, 39000], and required with the memory on."));
+        }
+        if !(h2 == 0.0 || (h2 >= h1 && h2 <= 98280.0)) {
+            return Err(format!(
+                "impact_memory_slow_half_life is {h2}. It is 0.0 (no slow part) or a \
+                 half-life in open ticks from impact_memory_half_life ({h1}) to 98280."));
+        }
+        if !(w >= 0.0 && w < 1.0) {
+            return Err(format!(
+                "impact_memory_slow_weight is {w}. It is the slow part's weight, in [0, 1)."));
+        }
+        if w != 0.0 && h2 == 0.0 {
+            return Err(format!(
+                "impact_memory_slow_weight is {w} but impact_memory_slow_half_life is 0: \
+                 the weight is read by nothing without the slow part."));
+        }
+        if !(m >= 0.0 && m <= 0.05) {
+            return Err(format!(
+                "impact_memory_crossover is {m}. It is a fraction of daily volume, in \
+                 [0, 0.05]; 0.0 is a pure power law."));
+        }
+        if y == 0.0 {
+            return Ok(());
+        }
+        if self.book_shared != 1.0 || !(self.book_depth_coefficient > 0.0) {
+            return Err(format!(
+                "impact_memory_coefficient is {y} but the memory needs book_shared on \
+                 and book_depth_coefficient off zero: it continues the latent depth's \
+                 curve and is fed by the flow the shared book records."));
+        }
+        if y > self.book_depth_coefficient {
+            return Err(format!(
+                "impact_memory_coefficient is {y}, above book_depth_coefficient {}. The \
+                 memory's Y must not exceed the latent book's, or a fill could be priced \
+                 better than the displacement it leaves (Alfonsi, Fruth and Schied 2010).",
+                self.book_depth_coefficient));
+        }
+        if !(h1 > 0.0) {
+            return Err(format!(
+                "impact_memory_coefficient is {y} but impact_memory_half_life is 0: the \
+                 memory needs a half-life, in open ticks, in (0, 39000]."));
         }
         Ok(())
     }
@@ -8732,6 +8865,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_refill_half_life",
         "book_resting",
         "fill_impact_coefficient",
+        "impact_memory_coefficient",
+        "impact_memory_half_life",
+        "impact_memory_slow_half_life",
+        "impact_memory_slow_weight",
+        "impact_memory_crossover",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

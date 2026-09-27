@@ -316,6 +316,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "book_refill_half_life": (0.0, 120.0),
     "book_resting": (0.0, 1.0),
     "fill_impact_coefficient": (0.0, 1.0),
+    # The metaorder memory (sqrt-impact): read only on an agent's path, like
+    # the book above. Y_M is capped by the book's own Y (0.75 on pt-v20);
+    # the half-lives run from a quarter hour to a season of open ticks.
+    "impact_memory_coefficient": (0.0, 0.75),
+    "impact_memory_half_life": (0.0, 390.0),
+    "impact_memory_slow_half_life": (0.0, 39000.0),
+    "impact_memory_slow_weight": (0.0, 0.5),
+    "impact_memory_crossover": (0.0, 0.01),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

@@ -371,6 +371,28 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "impact_memory_coefficient":
+        "inert at 0.0 as shipped: `Engine::plan_memory` is never called and "
+        "the latent depth is not shifted, so an agent's temporary impact "
+        "stays off the tape and only `fill_impact_coefficient`'s linear "
+        "gamma reaches `s`. The square-root law of impact on the tape, "
+        "fitted on held-out seeds against the metaorder rows Q1-Q7 "
+        "(`tools/calibration/metaorder_curve.py`; 0.8.5 realism work, "
+        "sqrt-impact); for a new registration",
+    "impact_memory_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's fast half-life in open ticks",
+    "impact_memory_slow_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's slow half-life in open ticks, 0.0 none",
+    "impact_memory_slow_weight":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ", and refused off zero without "
+        "`impact_memory_slow_half_life`: the slow part's weight",
+    "impact_memory_crossover":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the linear regime below m* of daily volume (Bucci, "
+        "Benzaquen, Lillo and Bouchaud, PRL 122, 108302, 2019)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

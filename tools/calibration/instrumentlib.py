@@ -693,6 +693,17 @@ PARAM_SPECS: dict[str, dict] = {
                      "hard_range": (0.0, 1.0), "derived": False},
     "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
                                 "hard_range": (0.0, 5.0), "derived": False},
+    # The metaorder memory (sqrt-impact). Read only on an agent's path.
+    "impact_memory_coefficient": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 10.0), "derived": False},
+    "impact_memory_half_life": {"kind": "abs", "step_unit": 10.0,
+                                "hard_range": (0.0, 39000.0), "derived": False},
+    "impact_memory_slow_half_life": {"kind": "abs", "step_unit": 390.0,
+                                     "hard_range": (0.0, 98280.0), "derived": False},
+    "impact_memory_slow_weight": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 0.999), "derived": False},
+    "impact_memory_crossover": {"kind": "abs", "step_unit": 0.0005,
+                                "hard_range": (0.0, 0.05), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,
