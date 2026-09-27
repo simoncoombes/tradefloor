@@ -4108,6 +4108,14 @@ impl PyEngine {
         if let Some(level) = self.inner.stress_vix_max() {
             out.set_item("fed_stress_vix_max", level)?;
         }
+        // The stress hold's clock and the priced path's forecast, a key each
+        // only while its dial is set.
+        if let Some(age) = self.inner.stress_hold_age() {
+            out.set_item("fed_stress_hold_age", age)?;
+        }
+        if let Some(path) = self.inner.policy_path() {
+            out.set_item("treasury_policy_path", path)?;
+        }
         if let Some(marks) = self.inner.rate_live_marks() {
             out.set_item("rate_live_marks", marks.to_vec())?;
         }
@@ -4937,6 +4945,17 @@ impl PyEngine {
             None => None,
         };
         self.inner.set_stress_vix_max(stress).map_err(ValidationError::new_err)?;
+        // Absent means the dial was off, or the snapshot predates it.
+        let age: Option<f64> = match snapshot.get_item("fed_stress_hold_age")? {
+            Some(v) => Some(v.extract()?),
+            None => None,
+        };
+        self.inner.set_stress_hold_age(age).map_err(ValidationError::new_err)?;
+        let path: Option<f64> = match snapshot.get_item("treasury_policy_path")? {
+            Some(v) => Some(v.extract()?),
+            None => None,
+        };
+        self.inner.set_policy_path(path).map_err(ValidationError::new_err)?;
         // Absent means no session held a live mark when it was taken.
         let live: Option<[f64; 6]> = match snapshot.get_item("rate_live_marks")? {
             Some(v) => {

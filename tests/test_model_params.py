@@ -1173,6 +1173,19 @@ PERTURBATIONS = [
     # under 4, so the 10-year's term premium falls, and fair value reads
     # the rate. No draw: the economy stream is untouched.
     ("treasury_haven_gain", 0.015, True),
+    # sim/r15-postcut. INERT: the probe's published VIX never reaches
+    # fed_stress_vix, so the clock never starts and no rise is held.
+    # tests/test_postcut.py holds the mechanism.
+    ("fed_stress_hold", 63.0, False),
+    # LIVE: the probe's first meeting changes the rate, so the forecast the
+    # curve reads moves the 10-year, the corporate yield and every fair
+    # value. No draw.
+    ("treasury_path_pricing", 1.0, True),
+    # INERT: read only with treasury_path_pricing non-zero.
+    ("treasury_path_half_life", 63.0, False),
+    # LIVE: the 10-year's anchor reads the rate pulled toward 2.5 from the
+    # first close, and fair value reads the corporate yield on it. No draw.
+    ("treasury_policy_damping", 0.5, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1950,6 +1963,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # without one; the half-life alone is unread, so both arms are the
     # default's.
     "fed_put_gain": {"fed_put_half_life": 126.0},
+    # The priced path's forecast decays at its half-life, so the pricing is
+    # refused without one; the half-life alone is unread.
+    "treasury_path_pricing": {"treasury_path_half_life": 63.0},
 }
 
 

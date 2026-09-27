@@ -1543,6 +1543,93 @@ pub struct ModelParams {
     /// both at 0.008. So at a flight to quality of 0.016 take this to 0.010,
     /// and at 0.020 or more to 0.0 to 0.010; neither pair has been run.
     pub treasury_haven_gain: f64,
+    /// Sessions after a stressed close in which the bank does not raise the
+    /// policy rate. 0.0, which every preset carries, is off: no state, and
+    /// the ladder, the stress cut and the put decide as they stood.
+    ///
+    /// With the stress cut and the put on (r14's N4 arm, held-out seeds
+    /// 201-230, 501-530 and 801-830), 0.19 of the sessions with a published
+    /// VIX of 30 or more are followed by a hike within 42 sessions, against
+    /// 0.07 on FRED's target rate (DFEDTAR and DFEDTARU against VIXCLS,
+    /// 1990-2025) and about 0.01 with CPI under 4: the hikes are lift-off
+    /// from zero and the put giving its cut back at the first calm meeting,
+    /// a median 26 on the state VIX, weeks after the stress. The shortest
+    /// real wait from a VIX of 30 to the next hike at CPI under 4 was about
+    /// 30 sessions (February to March 2018); after 1998, 2002, 2011 and 2015
+    /// it was four months to four years.
+    ///
+    /// Off zero the engine counts the sessions since the last close whose
+    /// published VIX was at or over `fed_stress_vix`. At a meeting within
+    /// this many sessions of it, with inflation under target plus
+    /// `fed_stress_inflation_gap`, a rise the ladder chose is held (the
+    /// dovish score does not move) and the put gives nothing back. A cut
+    /// stands. No draw. The count is carried in the snapshot and the state
+    /// hash while this is set. In [0, 504].
+    ///
+    /// Measured (box r15pcfin, arm PC1: N4 with this at 42,
+    /// `fed_stress_cut` 0.10, `fed_put_gain` 4 and the priced path at
+    /// `treasury_path_pricing` 1, half-life 63, damping 0.5; held-out seeds
+    /// 201-230, 501-530 and 801-830): P(hike within 42 | VIX 30+) 0.011
+    /// against N4's 0.19, P(cut within 42 | VIX 40+) 0.49 against 0.38,
+    /// and the 63-session policy change after a VIX of 30, -0.56 against
+    /// -0.69 (-0.41 real).
+    pub fed_stress_hold: f64,
+    /// The share of the policy path it expects that the curve prices: the
+    /// 10-year's daily anchor and the meeting's 10-year target, and the
+    /// 2-year's formula, read the policy rate plus this times the market's
+    /// forecast of the rate's further change, `M`. 0.0, which every preset
+    /// carries, is off: no state, and the curve reads the rate as it stands.
+    ///
+    /// The curve and the corporate yield read the rate as it stands, and
+    /// the ladder's rate changes are serially correlated, so the rate's
+    /// next moves are forecastable from its last ones and the discount rate
+    /// every fair value reads keeps moving after a decision in a direction
+    /// known the day it is published. On r14's N4 arm (held-out seeds
+    /// 201-230), a cut that follows a cut is followed by a further -0.16pp
+    /// by 63 sessions and -0.36 by 126, and the corporate yield falls a
+    /// further 0.18pp by 63 sessions and 0.30 by 126 after a cut, which is
+    /// the index's excess drift after a cut (+0.46 and +1.08 per cent).
+    ///
+    /// Off zero `M` is the sum of the policy rate's past changes, each
+    /// decayed at `treasury_path_half_life` sessions: the market's forecast
+    /// that a cycle continues. The Fed put's own cut and give-back are left
+    /// out (a change counts with the change in `fed_put_owed` added back),
+    /// since what the put takes is given back. At a meeting the rate change moves `M` by its own
+    /// size, and the 10-year's surprise is the change in the rate plus this
+    /// times the change in `M`, so the expected path is priced the day it is
+    /// published and not in the weeks after. No draw. `M` is carried in the
+    /// snapshot and the state hash while this is set. In [0, 3]; needs
+    /// `treasury_path_half_life`.
+    pub treasury_path_pricing: f64,
+    /// The half-life, in sessions, of each policy change's weight in the
+    /// market's forecast `M` (`treasury_path_pricing`). Read only with the
+    /// pricing on, which needs it above 0. In [0, 504].
+    pub treasury_path_half_life: f64,
+    /// The share of the ladder's rate's distance from a neutral 2.5 per cent
+    /// that the 10-year's anchor and the meeting's 10-year target leave out:
+    /// the rate the ladder sets (the policy rate plus what the Fed put owes)
+    /// plus the priced path is pulled toward neutral, and the put's own
+    /// overlay (its cut, and what the curve prices of it) passes through
+    /// whole. 0.0, which every preset carries, is off: the 10-year reads
+    /// the policy rate one for one, and a meeting's surprise moves it by the
+    /// whole change. The 2-year's formula reads the rate undamped.
+    ///
+    /// With `treasury_path_pricing` on, a change moves the 10-year by
+    /// `(1 - d)(1 + k)` of itself on the day, so this keeps the day's move
+    /// what it was while the forecast takes the drift out of the weeks
+    /// after. No draw, no state. In [0, 0.9].
+    ///
+    /// Measured with the pricing at 1 and half-life 63 (box r15pcfin, arm
+    /// PC1, as under `fed_stress_hold`): the index's excess after a cut is
+    /// +0.44 per cent by 63 sessions and +0.97 by 126 against N4's +0.55 and
+    /// +1.23 (SE 0.15 at 63); C10c 21 of 384 rules against 27; in
+    /// tf.evaluate, fedcut63 over a constant 1.35x a median +0.26 pts/yr,
+    /// ahead 12 of 20. The pricing alone at 1 took the drift to +0.05 by 63
+    /// sessions but doubled the 10-year's move in months with a rate change
+    /// (monthly sd 0.60 against 0.35) and took the monthly stock-bond
+    /// correlation at inflation under 3 from -0.20 to -0.01; this keeps the
+    /// day's move and the correlation (-0.26) where they were.
+    pub treasury_policy_damping: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -6293,6 +6380,10 @@ impl ModelParams {
             fed_put_emergency_vix: 0.0,
             treasury_put_pricing: 0.0,
             treasury_haven_gain: 0.0,
+            fed_stress_hold: 0.0,
+            treasury_path_pricing: 0.0,
+            treasury_path_half_life: 0.0,
+            treasury_policy_damping: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -8684,6 +8775,10 @@ impl ModelParams {
             "fed_put_emergency_vix" => self.fed_put_emergency_vix,
             "treasury_put_pricing" => self.treasury_put_pricing,
             "treasury_haven_gain" => self.treasury_haven_gain,
+            "fed_stress_hold" => self.fed_stress_hold,
+            "treasury_path_pricing" => self.treasury_path_pricing,
+            "treasury_path_half_life" => self.treasury_path_half_life,
+            "treasury_policy_damping" => self.treasury_policy_damping,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8991,6 +9086,10 @@ impl ModelParams {
             "fed_put_emergency_vix" => out.fed_put_emergency_vix = value,
             "treasury_put_pricing" => out.treasury_put_pricing = value,
             "treasury_haven_gain" => out.treasury_haven_gain = value,
+            "fed_stress_hold" => out.fed_stress_hold = value,
+            "treasury_path_pricing" => out.treasury_path_pricing = value,
+            "treasury_path_half_life" => out.treasury_path_half_life = value,
+            "treasury_policy_damping" => out.treasury_policy_damping = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -9753,6 +9852,36 @@ impl ModelParams {
                  term premium per VIX point above 20, in [0, 0.05]; 0 is none.",
                 self.treasury_haven_gain));
         }
+        if !(self.fed_stress_hold >= 0.0 && self.fed_stress_hold <= 504.0) {
+            return Err(format!(
+                "fed_stress_hold is {}. It is sessions after a stressed close in which the \
+                 bank does not raise the rate, in [0, 504]; 0 is off.",
+                self.fed_stress_hold));
+        }
+        if !(self.treasury_path_pricing >= 0.0 && self.treasury_path_pricing <= 3.0) {
+            return Err(format!(
+                "treasury_path_pricing is {}. It is the share of the expected policy path \
+                 the curve prices, in [0, 3]; 0 is off.",
+                self.treasury_path_pricing));
+        }
+        if !(self.treasury_path_half_life >= 0.0 && self.treasury_path_half_life <= 504.0) {
+            return Err(format!(
+                "treasury_path_half_life is {}. It is a half-life in sessions, in [0, 504].",
+                self.treasury_path_half_life));
+        }
+        if !(self.treasury_policy_damping >= 0.0 && self.treasury_policy_damping <= 0.9) {
+            return Err(format!(
+                "treasury_policy_damping is {}. It is the share of the policy rate's \
+                 distance from neutral the 10-year leaves out, in [0, 0.9].",
+                self.treasury_policy_damping));
+        }
+        if self.treasury_path_pricing != 0.0 && self.treasury_path_half_life == 0.0 {
+            return Err(format!(
+                "treasury_path_pricing is {} but treasury_path_half_life is 0. The \
+                 market's forecast of the policy path decays at that half-life, so the \
+                 pricing needs one above 0.",
+                self.treasury_path_pricing));
+        }
         if self.fed_put_gain != 0.0 && self.fed_put_half_life == 0.0 {
             return Err(format!(
                 "fed_put_gain is {} but fed_put_half_life is 0. The put's stock decays \
@@ -10158,18 +10287,23 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 /// the list is derived from `to_pairs`' actual coverage in tests.
 /// Dials [`ModelParams::digest`] leaves out while they hold these values,
 /// their defaults: the rate indices' close re-mark and live mark and the
-/// central bank's stress cut (the thirteenth registration's bond timing).
+/// central bank's stress cut (the thirteenth registration's bond timing),
+/// and the stress hold and the priced policy path (sim/r15-postcut).
 /// Each is inert there, so a vector that leaves them at their default is the
 /// model it was before they existed, and its digest, fingerprint and the book
 /// known answer's state hash (which carries a custom model's fingerprint)
 /// stay what they were. Off their default each enters the digest as every
 /// other dial does.
-pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 5] = [
+pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 9] = [
     ("rate_close_remark", 0.0),
     ("rate_intraday_live", 0.0),
     ("fed_stress_cut", 0.0),
     ("fed_stress_vix", 30.0),
     ("fed_stress_inflation_gap", 1.0),
+    ("fed_stress_hold", 0.0),
+    ("treasury_path_pricing", 0.0),
+    ("treasury_path_half_life", 0.0),
+    ("treasury_policy_damping", 0.0),
 ];
 
 pub fn settable_names() -> Vec<&'static str> {
@@ -10359,6 +10493,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_put_emergency_vix",
         "treasury_put_pricing",
         "treasury_haven_gain",
+        "fed_stress_hold",
+        "treasury_path_pricing",
+        "treasury_path_half_life",
+        "treasury_policy_damping",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

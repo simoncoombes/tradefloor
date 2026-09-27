@@ -487,6 +487,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # set, and the rate indices' live mark, only while
          # `rate_intraday_live` is set and a session holds one.
          "fed_stress_vix_max", "rate_live_marks",
+         # The stress hold's clock, only while `fed_stress_hold` is set, and
+         # the market's forecast of the policy path, only while
+         # `treasury_path_pricing` is set.
+         "fed_stress_hold_age", "treasury_policy_path",
          # and the spread a spread pin holds tonight, only with its mark.
          "pinned_corporate_spread",
          # The dividend states, on a model that pays dividends, and an
@@ -738,6 +742,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "fed_stress_vix_max" in snapshot:
         _f64(buf, 8.0)
         _f64(buf, float(snapshot["fed_stress_vix_max"]))
+    # The stress hold's clock and the priced path's forecast, each behind its
+    # own tag, only while carried.
+    if "fed_stress_hold_age" in snapshot:
+        _f64(buf, 10.0)
+        _f64(buf, float(snapshot["fed_stress_hold_age"]))
+    if "treasury_policy_path" in snapshot:
+        _f64(buf, 11.0)
+        _f64(buf, float(snapshot["treasury_policy_path"]))
     if "rate_live_marks" in snapshot:
         marks = list(snapshot["rate_live_marks"])
         if len(marks) != 6:

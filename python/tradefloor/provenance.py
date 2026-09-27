@@ -647,6 +647,34 @@ OUT_OF_SCOPE = {
         "Fitted with `flight_to_quality_gain`, which also makes the monthly "
         "stock-bond correlation more negative at low inflation (0.8.5 "
         "realism work, bond-hedge-fed)",
+    "fed_stress_hold":
+        "inert at 0.0 as shipped: the bank may raise the rate at any meeting "
+        "the ladder asks. Off zero no rise, and no put give-back, for that "
+        "many sessions after a close with the published VIX at or over "
+        "`fed_stress_vix`, while inflation is under target plus "
+        "`fed_stress_inflation_gap`. Target: P(a hike within 42 sessions | "
+        "VIX 30+) 0.07 on FRED DFEDTAR/DFEDTARU against VIXCLS 1990-2025 "
+        "(about 0.01 with CPI under 4), against 0.19 on r14's N4 arm "
+        "(sim/r15-postcut)",
+    "treasury_path_pricing":
+        "inert at 0.0 as shipped: the 10-year's anchor and the 2-year read the "
+        "policy rate as it stands. Off zero they read the rate plus this "
+        "share of the market's forecast of its further change, each past "
+        "change decayed at `treasury_path_half_life`, and a meeting's 10-year "
+        "surprise carries the forecast's move. Target: no drift in the "
+        "corporate yield or the index after a published cut (r14's N4 arm: "
+        "the corporate yield falls a further 0.18pp by 63 sessions after a "
+        "cut and the index outruns its mean by 0.46 per cent) "
+        "(sim/r15-postcut)",
+    "treasury_path_half_life":
+        "unread while `treasury_path_pricing` is 0.0 (sim/r15-postcut)",
+    "treasury_policy_damping":
+        "inert at 0.0 as shipped: the 10-year reads the policy rate one for "
+        "one. Off zero its anchor and a meeting's target read the priced rate "
+        "pulled toward a neutral 2.5 by this share, and a meeting's surprise "
+        "moves it by the rest; paired with `treasury_path_pricing` so a "
+        "decision moves the 10-year on the day by what it did before while "
+        "the forecast takes out the drift after (sim/r15-postcut)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

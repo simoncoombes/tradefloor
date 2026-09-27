@@ -176,6 +176,22 @@ pub struct PolicyOptions {
     /// `treasury_haven_gain`: 0.0 is no haven in the meeting's 10-year
     /// target.
     pub haven_gain: f64,
+    /// `fed_stress_hold`: the meeting falls within the dial's sessions of a
+    /// stressed close, so a rise is held while inflation is under target
+    /// plus `stress_inflation_gap`. False with the dial off. See
+    /// [`crate::params::ModelParams::fed_stress_hold`].
+    pub stress_hold: bool,
+    /// `treasury_path_pricing`: 0.0 is off, and nothing below reads the
+    /// field after it. See
+    /// [`crate::params::ModelParams::treasury_path_pricing`].
+    pub path_gain: f64,
+    /// The expected path the curve priced before the meeting, `gain * M`,
+    /// percentage points. Read only with `path_gain` non-zero.
+    pub path_before: f64,
+    /// `treasury_policy_damping`: 0.0 is the 10-year reading the policy
+    /// rate one for one. See
+    /// [`crate::params::ModelParams::treasury_policy_damping`].
+    pub rate_damping: f64,
 }
 
 impl PolicyOptions {
@@ -194,6 +210,10 @@ impl PolicyOptions {
             put_threshold: 0.0,
             put_pricing: 0.0,
             haven_gain: 0.0,
+            stress_hold: false,
+            path_gain: 0.0,
+            path_before: 0.0,
+            rate_damping: 0.0,
         }
     }
 }
@@ -435,6 +455,20 @@ pub fn update_central_bank_with(
         }
     }
 
+    // THE STRESS HOLD (`fed_stress_hold`). Within the dial's sessions of a
+    // close whose published VIX was at or over `fed_stress_vix`, with
+    // inflation under target plus the stress gap, a rise the ladder chose
+    // is held and the dovish score stays where it was; below, the put gives
+    // nothing back. A cut stands. A branch: false with the dial off.
+    if options.stress_hold
+        && rate_change > 0.0
+        && economy.inflation_rate < central_bank.target_inflation + options.stress_inflation_gap
+    {
+        rate_change = 0.0;
+        decision = Decision::Hold;
+        new_cb.hawkish_dovish_score = central_bank.hawkish_dovish_score;
+    }
+
     // A PINNED RATE HOLDS (`PolicyOptions::hold_rate`). After the ladder,
     // so its draws are taken as they would be, and after the stress cut
     // (`fed_stress_cut`), so a pinned rate holds whatever either chose.
@@ -487,6 +521,9 @@ pub fn update_central_bank_with(
         && ladder_change >= 0.0
         && economy.vix < FED_PUT_HOLD_VIX
         && economy.fed_put_owed - economy.fed_put > 0.125
+        && !(options.stress_hold
+            && economy.inflation_rate
+                < central_bank.target_inflation + options.stress_inflation_gap)
     {
         unwind = mathx::min(0.25, economy.fed_put_owed);
         rate_change += unwind;
@@ -527,10 +564,50 @@ pub fn update_central_bank_with(
     } else {
         rate_change
     };
+    // THE PRICED PATH (`treasury_path_pricing`): the market's forecast of the
+    // rate's further change moves with the change it has just seen, so the
+    // 10-year's target reads the rate plus the forecast after the meeting,
+    // and the day's surprise carries the forecast's move as well as the
+    // rate's. A branch: with the dial off both are as they stood.
+    // The put's own cut and give-back are left out of the forecast: what the
+    // put takes is owed and given back, so the change the forecast reads is
+    // the rate's change plus the change in what is owed.
+    let path_on = options.path_gain != 0.0;
+    let owed_moved = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
+    let path_after = if path_on {
+        options.path_before
+            + options.path_gain * (new_economy.federal_funds_rate - current_rate + owed_moved)
+    } else {
+        0.0
+    };
+    let surprise = if path_on { surprise + (path_after - options.path_before) } else { surprise };
+    // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year reads
+    // the rate the ladder sets (the policy rate plus what the put owes) and
+    // the priced path, pulled toward the neutral rate by the dial; the put's
+    // own overlay passes through whole. So the target and the day's surprise
+    // carry `1 - d` of the ladder's move and the path's, and all of the
+    // put's. A branch: with the dial off both are as they stood.
+    let damp = options.rate_damping;
+    let surprise = if damp != 0.0 {
+        let ladder = (new_economy.federal_funds_rate - current_rate) + owed_moved
+            + (path_after - options.path_before);
+        surprise - damp * ladder
+    } else {
+        surprise
+    };
 
     let treasury_target_10y = new_economy.federal_funds_rate
         + 1.0
         + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3);
+    let treasury_target_10y = if path_on { treasury_target_10y + path_after } else { treasury_target_10y };
+    let treasury_target_10y = if damp != 0.0 {
+        let owed = if put_on { new_economy.fed_put_owed } else { 0.0 };
+        treasury_target_10y
+            - damp * (new_economy.federal_funds_rate + owed + path_after
+                - super::daily::TREASURY_NEUTRAL_RATE)
+    } else {
+        treasury_target_10y
+    };
     // The Treasury haven (`treasury_haven_gain`) in the target too, so the
     // meeting does not undo what the daily anchor has priced.
     let treasury_target_10y = if options.haven_gain != 0.0
@@ -549,8 +626,11 @@ pub fn update_central_bank_with(
         0.5,
         12.0,
     );
-    new_economy.treasury_yield_2y =
-        new_economy.federal_funds_rate * 0.85 + new_economy.treasury_yield_10y * 0.15;
+    new_economy.treasury_yield_2y = if path_on {
+        (new_economy.federal_funds_rate + path_after) * 0.85 + new_economy.treasury_yield_10y * 0.15
+    } else {
+        new_economy.federal_funds_rate * 0.85 + new_economy.treasury_yield_10y * 0.15
+    };
 
     // ── Mortgage rate: three floors and a cap, applied in order ───────────
     // The order matters — each step reads the result of the last.
