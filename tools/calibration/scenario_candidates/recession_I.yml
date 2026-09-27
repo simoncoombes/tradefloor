@@ -1,6 +1,8 @@
-# A CANDIDATE for python/tradefloor/scenarios/recession.yml, NOT packaged
-# (r13 scenario-frontrun, thirteenth registration candidate). Load it with
-# `tf.Scenario.from_yaml(path)`.
+# PACKAGED in r15 as python/tradefloor/scenarios/recession.yml, whose header
+# carries the measured figures; the shocks there are these, with a new
+# description (r13 scenario-frontrun, thirteenth registration candidate).
+# Kept here for the r13, r14 and r15 screens' records; only this comment
+# changed since they read it (their logs cite sha256 6f0ae653...). Load it with `tf.Scenario.from_yaml(path)`.
 #
 # Why the packaged file cannot stay as it is on the r13 arm: it fires
 # everything on day 50 (the contraction pin, whose anticipated earnings take

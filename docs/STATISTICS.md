@@ -192,6 +192,11 @@ to 0.8.1 carry the first 15, and pt-v18 met 8 of those.
 | V1 | the index's variance ratio, two and five years against one | 0.75 to 1.15; 0.55 to 1.20 | 0.82; 0.62 | 0.93; 0.87 |
 | D1 | the one-year table, in band on all four cells | every band in | all | all |
 
+S1a, S1b and S2 were graded on the 0.8.5 `recession.yml`. From r15 the
+packaged file is dated on the NBER's phases (peak from day 50, contraction
+from day 71, the VIX doubled from day 250), and on held-out seeds 201-230
+pt-v20 reads 0.68, 30 of 30 and +79.8 on it, 0.2 inside S2's band.
+
 The real figures come from the S&P 500 and the VIX (A, B, C1 to C4), the
 40-company reference roster (C5 to C8), published impact studies (C9,
 Tóth et al. 2011), FRED DGS2 and DGS10 and the SPY, IEF and LQD funds

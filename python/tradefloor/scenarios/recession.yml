@@ -33,7 +33,25 @@
 # file moved the paired index -43 per cent in one morning. This file dates
 # the legs to the NBER's months and puts the VIX leg on Lehman.
 #
-# MEASURED: see RECESSION-MEASURED below (filled from the r15 box).
+# MEASURED on the certified roster `Universe.random(40, seed=111)`, its index
+# the cap-weighted closes, paired against the same seed with no scenario,
+# held-out seeds 201-230 (the grade's own seeds were not used):
+# - The thirteenth-registration candidate (box r15scen1: pt-v20 with r13's
+#   and r14's dials, pinned_vix_feedback 0.8, pinned_vix_variance_share
+#   0.7): the index wins back 57 per cent of its fall in the 252 sessions
+#   after its low (row S1a, band 45-100, 2009: 62), rises 69.1 per cent in
+#   those sessions (S2, band 25-80, 2009: 69), and every seed is out of
+#   contraction within 24 months (S1b). The day-50 morning moves the index
+#   -4.5 per cent (log, median) and the next 24 closes -3.9 more. The VIX
+#   timer beats holding by +1.7 points (mean; ahead on 4 of 30 seeds, the
+#   twin +0.9). The corporate yield's daily sd, days 55-300, is 5.9 bp (the
+#   twin 6.2). No close leaves a held phase. The largest one-session paired
+#   fall is -4.6 per cent at the median seed and -16.8 on one (seed 205,
+#   whose own VIX was 42 on day 250, so the doubling held it at 70-83).
+# - pt-v20 as graded (r14 screen, box r14scr1): S1a 0.68, S1b 30 of 30, S2
+#   +79.8, 0.2 inside its band; VIX timer +0.7 (ahead 1 of 30); worst paired
+#   session -12.2. Without macro_pins_hold the close still rolls a held
+#   phase (78 closes over the 30 seeds).
 
 version: 1
 
