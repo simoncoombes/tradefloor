@@ -346,9 +346,10 @@ pub struct YieldDials {
 pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
 
 /// The VIX level above which the Treasury haven lowers the 10-year's term
-/// premium (`treasury_haven_gain`). 20 is about the tape's long-run median
-/// VIX (19.6 on ^VIX 1990-2025, S&P 500 and VIX tape in the design
-/// repository), so the haven acts only on a stressed session.
+/// premium (`treasury_haven_gain`). 20 is about the tape's long-run mean
+/// VIX (19.5 on ^VIX 1990-2025, S&P 500 and VIX tape in the design
+/// repository; the median is 17.6), so the haven acts on the 38 per cent of
+/// sessions above it, and most on the stressed ones.
 pub const TREASURY_HAVEN_VIX: f64 = 20.0;
 
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
@@ -1577,6 +1578,13 @@ pub fn update_economy_daily(
     // with the VIX above 20 while inflation is under 4, so the 10-year
     // rallies through a stressed month in a low-inflation regime. Guarded,
     // so at 0.0 the premium is the expression that stood.
+    //
+    // WITH THE FLIGHT TO QUALITY BELOW. `flight_to_quality_gain` moves the
+    // yield by an increment, which this anchor's 5 per cent pull erases in
+    // about 60 sessions; the haven moves the anchor, so it lasts while the
+    // VIX does. Both push the stock-bond correlation negative at low
+    // inflation (the flight to quality below 3, the haven below 4), so the
+    // two are fitted together: see `ModelParams::treasury_haven_gain`.
     let term_premium_10y = if inputs.yields.haven_gain != 0.0
         && economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
     {

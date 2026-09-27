@@ -232,10 +232,13 @@ and a VIX of 30 or more holds any hike. The cut is owed back to the ladder's
 path and returned a quarter point at calm meetings as the put's stock decays
 (`fed_put_half_life`). `fed_put_threshold` is a fall the put ignores,
 `fed_put_emergency_vix` calls a meeting between meetings on a VIX close at or
-above it, and `treasury_put_pricing` lets the curve price the expected cut
-before the meeting. `treasury_haven_gain` lowers the 10-year's term premium
-per VIX point above 20 while inflation is under 4, so Treasuries rally in a
-low-inflation sell-off. All six are 0 on every preset. The snapshot and the
+above it (an ordinary meeting, which takes a meeting's economy draws and
+re-anchors the corporate yield), and `treasury_put_pricing` lets the curve
+price the expected cut before the meeting. `treasury_haven_gain` lowers the
+10-year's term premium per VIX point above 20 while inflation is under 4, so
+Treasuries rally in a low-inflation sell-off; it is fitted together with
+`flight_to_quality_gain`, which also turns the stock-bond correlation
+negative at low inflation. All six are 0 on every preset. The snapshot and the
 state hash carry the put's four state fields only while the gain is set.
 
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read

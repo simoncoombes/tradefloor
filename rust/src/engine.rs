@@ -5176,6 +5176,9 @@ impl Engine {
         // sessions after the last and only while the next is not yet due.
         // Real ones: 2001-01-03, 2001-09-17, 2008-01-22, 2008-10-08 and
         // March 2020. The calendar the meeting then sets is the ordinary one.
+        // The meeting is an ordinary one: it takes a meeting's economy draws
+        // on a session the calendar would not, and re-anchors the corporate
+        // yield at tonight's VIX (see `ModelParams::fed_put_emergency_vix`).
         if self.params.fed_put_gain != 0.0
             && self.params.fed_put_emergency_vix != 0.0
             && self.economy.vix >= self.params.fed_put_emergency_vix

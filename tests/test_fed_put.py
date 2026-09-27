@@ -10,8 +10,10 @@ the six at 0.0 and every digest is the one it was; the close keeps the
 intermeeting return from the market cap; the snapshot and both state hashes
 carry the put's four fields only while the gain is set, and a restore
 reproduces the run; a VIX close at or above `fed_put_emergency_vix` calls a
-meeting 21 sessions after the last; and the haven lowers the 10-year under a
-stressed VIX.
+meeting 21 sessions after the last, and that meeting takes a meeting's
+economy draws; the priced put lowers the 10-year's anchor by its share of
+the cut the put asks for; and the haven lowers the 10-year under a stressed
+VIX.
 """
 
 import math
@@ -166,3 +168,48 @@ def test_the_haven_lowers_the_ten_year_under_a_stressed_vix():
     # The anchor is 0.6 lower and the daily pull closes 5 per cent of the
     # gap a session: about 0.6 * (1 - 0.95^20) = 0.38 after 20 sessions.
     assert ten[0.0] - ten[0.02] > 0.2
+
+
+def test_an_emergency_meeting_takes_a_meetings_draws():
+    # The put's arithmetic takes no draw, but a meeting the VIX calls is an
+    # ordinary meeting: it takes the announcement variant's and the next
+    # date's draws from the economy stream on a session the calendar would
+    # not. The two runs share the economy stream until the first called
+    # meeting (the close of the 14th session, dated day 14 above) and part
+    # there by a meeting's 2 or 3 draws.
+    runs = {}
+    for level in (0.0, 40.0):
+        e = engine(**PUT, fed_put_emergency_vix=level)
+        drawn = []
+        for day in range(20):
+            e.pin_macro(vix=70.0)
+            e.run_days(1, record=False, first_day=day)
+            drawn.append(dict(e.draws_by_stream())["economy"])
+        runs[level] = drawn
+    assert runs[0.0][:13] == runs[40.0][:13]
+    assert runs[40.0][13] - runs[0.0][13] in (2, 3)
+
+
+def test_the_priced_put_lowers_the_ten_year_anchor_by_its_share():
+    # One close from the same state, the put priced in full or not at all:
+    # the 10-year's anchor reads the policy rate less kappa min(E, rate), and
+    # the daily pull closes 5 per cent of the gap, so the two 10-years part
+    # by 0.05 kappa min(E, rate), with E read on the close's own
+    # intermeeting return.
+    ten = {}
+    for kappa in (0.0, 1.0):
+        e = engine(**PUT, treasury_put_pricing=kappa)
+        snap = e.state_snapshot()
+        snap["economy"]["intermeeting_return"] = -0.1
+        e.restore_state(snap)
+        last = snap["central_bank"]["last_meeting_date"]
+        rate = snap["economy"]["federal_funds_rate"]
+        e.run_days(1, record=False, first_day=0)
+        after = e.state_snapshot()
+        # No meeting that night, so the return the close summed is still
+        # there to read.
+        assert after["central_bank"]["last_meeting_date"] == last
+        ten[kappa] = after["economy"]["treasury_yield_10y"]
+        asked = 5.0 * max(0.0, -after["economy"]["intermeeting_return"])
+    assert rate > 0.0 and asked > 0.0
+    assert ten[0.0] - ten[1.0] == pytest.approx(0.05 * min(asked, rate), abs=1e-9)

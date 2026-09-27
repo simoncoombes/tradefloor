@@ -52,11 +52,19 @@ pub const MORTGAGE_SPREAD_FLOOR: f64 = 0.5;
 
 /// The inflation rate at or above which the Fed put stands aside
 /// (`fed_put_gain`), and at or above which the Treasury haven does
-/// (`treasury_haven_gain`). Real target changes at a VIX of 30 or more,
-/// 1990-2025, were all cuts (14 of 14, FRED DFEDTAR and DFEDTARU) with CPI
-/// inflation under 4; 2022, at 6.9, hiked 4.75 points through a 25 per cent
-/// fall, and the stock-bond correlation turns positive above about 3 to 4
-/// (Campbell, Sunderam and Viceira 2017).
+/// (`treasury_haven_gain`). Real target changes at a VIX close of 30 or
+/// more, 1990-2025, were all cuts (14 of 14, FRED DFEDTAR and DFEDTARU),
+/// but only 9 of the 14 came with published headline CPI inflation under 4:
+/// five came at 4.1 to 6.2 (1990-10-29, 1991-01-09, 2008-03-18, 2008-10-08
+/// and 2008-10-29), so this ceiling would have switched the put off in
+/// 1990-91 and October 2008. What the data separate is about 6.2 (1990,
+/// still cutting) from 7.6 and more (2022, hiking through a 25 per cent
+/// fall). 4 is chosen instead, for the stock-bond correlation, which turns
+/// positive above about 3 to 4 (Campbell, Sunderam and Viceira 2017), so
+/// the put and the haven share one gate. It costs little on pt-v20, whose
+/// CPI is at or above 4 on about 1.7 per cent of sessions of its held-out
+/// histories (0.3 per cent at a VIX of 30 or more), against 14 per cent of
+/// sessions on the tape (20 per cent at a VIX of 30 or more).
 pub const FED_PUT_INFLATION_CEILING: f64 = 4.0;
 
 /// The VIX at or above which the Fed put holds any hike and gives nothing

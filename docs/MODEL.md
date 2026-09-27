@@ -147,7 +147,7 @@ process in the market reads it back.
 1. **Open** (`engine.rs:3952-4069`). The crisis episode is stepped (start, end, epicentre), the day's company news is drawn, and each company's opening price $P^{o}$ is set to its last print. On the first session only, the stationary opening splits each company's day-zero premium between $s$ and $v$ (`engine.rs:4552-4591`).
 2. **390 ticks** (`market/tick.rs:823-1678`). Each tick: apply the agents' fills from the last step, once, on the first tick (`engine.rs:2545-2569`); draw the market factor and the sector factors; for each company, draw its own noise, update $s$ and $v$, compute $V$ and $P^{\ast}$, draw tick volume, and settle the print through the book. The last tick is the closing cross (`market/tick.rs:1542-1554`).
 3. **Close** (`engine.rs:4251-4532`). Each company's GJR variance is updated from the day's noise, the momentum term rolls, jumps are drawn and applied to $s$, the market-factor and sector variances are updated, and the volume state steps.
-4. **Macro step** (`engine.rs:5546-5633`, `engine.rs:4896-5224`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:5126-5189`).
+4. **Macro step** (`engine.rs:5549-5636`, `engine.rs:4896-5227`). The index's conditional variance is computed and the VIX steps, then the economy and the yield curve, the business cycle, the aggregate earnings cycle and the central bank (`engine.rs:5126-5192`).
 
 The next session reads the new VIX, rates and output.
 
@@ -189,12 +189,12 @@ depends on where the cycle opens, 2.5% to 6.7% across the same seeds.
 
 ## The macro economy
 
-The economy steps once per session, after the close (`engine.rs:5514-5524`).
+The economy steps once per session, after the close (`engine.rs:5517-5527`).
 Its day counter $d$ starts at 1 on the first close. Within one step the order
 is: the market P/E and the day's index return are read from prices, the VIX
 and the economy are updated, the business cycle may change phase, and then
-the central bank meets if a meeting is due (`engine.rs:5568-5633`,
-`engine.rs:4995-5199`). All macro draws come from the economy stream.
+the central bank meets if a meeting is due (`engine.rs:5571-5636`,
+`engine.rs:4995-5202`). All macro draws come from the economy stream.
 
 The price path reads four things from the economy: the **corporate bond
 yield**, as the discount rate in fair value; **nominal output** and the
@@ -210,7 +210,7 @@ They are **chosen**. The dials that pt-v19 and pt-v20 moved carry their own entr
 ### The calendar
 
 The macro clock runs on trading sessions. A month starts when
-$d \bmod 21 = 0$ and a quarter when $d \bmod 63 = 0$ (`economy/daily.rs:719-720`).
+$d \bmod 21 = 0$ and a quarter when $d \bmod 63 = 0$ (`economy/daily.rs:720-721`).
 Levels compound over 252 sessions a year.
 
 | Dial | Value | Kind | Source |
@@ -227,7 +227,7 @@ month. **State:** the phase $\mathcal{P} \in \lbrace E, P, C, T, R \rbrace$
 age $a$ in months.
 
 The age advances by $1/21$ each session and resets to zero on a transition
-(`economy/daily.rs:1766`, `economy/cycle.rs:258-260`). Below a minimum age
+(`economy/daily.rs:1774`, `economy/cycle.rs:258-260`). Below a minimum age
 $a_{\min}(\mathcal{P})$ no transition is possible. Above it, the phase
 ends with a Weibull hazard plus a state-dependent adjustment:
 
@@ -254,7 +254,7 @@ growth and $\mathrm{PE}$ the market's trailing P/E:
 
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
-earnings of [Fair value](#fair-value) (`engine.rs:5568-5614`).
+earnings of [Fair value](#fair-value) (`engine.rs:5571-5617`).
 
 | Phase | Min age (months) | Weibull shape $k$ | Weibull scale $\lambda$ | Mean length (months) |
 |---|---|---|---|---|
@@ -287,7 +287,7 @@ real output $Y$.
 Each phase has a growth midpoint $\bar g$: E 3.0, P 1.25, C -1.5, T -0.25,
 R 2.25 (`economy/state.rs:263-302`). On entering a phase, growth takes a
 shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
-(`economy/daily.rs:744-766`), and then growth is updated in three steps:
+(`economy/daily.rs:745-767`), and then growth is updated in three steps:
 
 ```math
 \text{quarterly: } g \leftarrow \mathrm{clip}\big(g + 0.25\,(\bar g - g) + 0.3\,Z;\ -10,\ 6\big)
@@ -302,7 +302,7 @@ shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
 \text{daily: } Y_d = Y_{d-1}\Big(1 + \frac{g_d}{100 \cdot 252}\Big)
 ```
 
-(`economy/daily.rs:786-839`, `economy/daily.rs:802`). "Wrong sign" means
+(`economy/daily.rs:787-840`, `economy/daily.rs:803`). "Wrong sign" means
 $g > 0$ in C or T, or $g < 0$ in R or E. Fiscal stimulus adds to $g$ at the
 end of the monthly step, below.
 
@@ -316,9 +316,9 @@ u_d = \mathrm{clip}\Big(u + 0.3\,\theta^{u}_{\mathcal{P}} + 0.2\,(2 - g) + 0.06\
  - 0.08\,g\,\mathbf{1}[\mathcal{P} \in \lbrace E, R\rbrace,\ g > 1] + 0.06\,Z;\ 2.5,\ 15\Big)
 ```
 
-(`economy/daily.rs:842-868`). The phase trends $\theta^{u}$ are E -0.05,
+(`economy/daily.rs:843-869`). The phase trends $\theta^{u}$ are E -0.05,
 P 0, C 0.30, T 0.04, R -0.10. The $0.2 (2 - g)$ term is Okun's law. The
-structural rate carries hysteresis (`economy/daily.rs:1051-1063`):
+structural rate carries hysteresis (`economy/daily.rs:1052-1064`):
 
 ```math
 \ell \leftarrow \begin{cases} \ell + 0.05\,(0.4\,u - \ell) & \mathcal{P} \in \lbrace C, T \rbrace \\ \max(0.5,\ 0.97\,\ell) & \text{otherwise} \end{cases}
@@ -344,19 +344,19 @@ w^{\ast} = \begin{cases} \max\big(0.7\,\pi + 0.5\,(u^{\ast} - u),\ 0.8\,\pi\big)
  - 0.2\,(u_d - u^{\ast}) + W + R^{r} + \Omega - 0.0003\,(e - 100) + 0.0003\,(\tau - 5) + 0.04\,Z;\ \pi_{\min},\ \pi_{\max}\Big)
 ```
 
-(`economy/daily.rs:925-934`, `economy/daily.rs:894-960`). Most terms read last
+(`economy/daily.rs:926-935`, `economy/daily.rs:895-961`). Most terms read last
 month's values; the Phillips term reads this month's unemployment $u_d$,
 and the terms are these:
 
 - $-0.2 (u_d - u^{\ast})$ is the Phillips curve.
-- $W = 0.08\max(0, w - 2) + 0.02 (w - 4)(\pi - 3) \cdot \mathbf{1}[w > 4, \pi > 3]$ is wage pressure (`economy/daily.rs:936-944`).
-- $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:898-904`).
-- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:906-912`).
+- $W = 0.08\max(0, w - 2) + 0.02 (w - 4)(\pi - 3) \cdot \mathbf{1}[w > 4, \pi > 3]$ is wage pressure (`economy/daily.rs:937-945`).
+- $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:899-905`).
+- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:907-913`).
 - $e$ is the dollar index and $\tau$ the tariff rate. The tariff rate stays at 5, so its term is 0, unless a scenario changes it.
 - The phase trends $\theta^{\pi}$ are E 0.015, P 0.015, C -0.02, T -0.01, R 0.01.
 
 The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
-(`economy/daily.rs:1107`).
+(`economy/daily.rs:1108`).
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
@@ -368,7 +368,7 @@ The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
 
 ### Fiscal policy
 
-**Timescale:** monthly (`economy/daily.rs:1079-1103`). In contraction and
+**Timescale:** monthly (`economy/daily.rs:1080-1104`). In contraction and
 trough the government runs a stimulus $F$ (percent of GDP a year) and debt
 $b$ rises; otherwise the stimulus decays and debt falls slowly in good times:
 
@@ -389,11 +389,11 @@ the 10-year term premium.
 **Timescale:** at meetings, which come every 29 to 38 sessions, or 14 to 21
 in an inflation crisis ($\pi > r^{p} + 2$ and $\pi > 4$). An emergency meeting
 is held at any close where $\pi - r^{p} > 4$ and $\pi > 4$
-(`economy/central_bank.rs:170-182`, `economy/central_bank.rs:540-552`). The
+(`economy/central_bank.rs:178-190`, `economy/central_bank.rs:548-560`). The
 design note measures 7.6 meetings a year against the FOMC's 8.
 
 A Taylor rate is computed, and the gap to it gates a decision ladder. The
-bank never jumps to the Taylor rate (`economy/central_bank.rs:193-208`):
+bank never jumps to the Taylor rate (`economy/central_bank.rs:201-216`):
 
 ```math
 r^{T} = 2 + 0.5\Big(\frac{\pi}{2} - 1\Big) + 0.5\,(\pi - 2) + 0.5\,(4 - u) + 0.1\,H
@@ -402,7 +402,7 @@ r^{T} = 2 + 0.5\Big(\frac{\pi}{2} - 1\Big) + 0.5\,(\pi - 2) + 0.5\,(4 - u) + 0.1
 ```
 
 $H \in [-1, 1]$ is a hawkish score the ladder moves. The first matching row
-sets the change $\delta$ in the policy rate (`economy/central_bank.rs:225-329`):
+sets the change $\delta$ in the policy rate (`economy/central_bank.rs:233-337`):
 
 | Row | Condition | Change $\delta$ (points) |
 |---|---|---|
@@ -423,7 +423,7 @@ sets the change $\delta$ in the policy rate (`economy/central_bank.rs:225-329`):
 A rise is scaled by an urgency factor $\max(1, \lvert \pi - 2 \rvert / 2)$,
 and the rate is kept in $[0, 8]$:
 $r^{p} \leftarrow \mathrm{clip}(r^{p} + \delta;\ 0,\ 8)$
-(`economy/central_bank.rs:212-217`, `economy/central_bank.rs:333-387`).
+(`economy/central_bank.rs:220-225`, `economy/central_bank.rs:341-395`).
 
 The Taylor coefficients, the ladder and the meeting spacing are chosen, from
 the reference implementation. Row 13, `fed_liftoff_rule` = 1, was added in
@@ -444,14 +444,16 @@ ladder reads $r^{T} - O$, and a calm meeting (VIX under 30, no put cut, the
 ladder not cutting) returns a quarter point while $O - P > 0.125$. With
 `fed_put_emergency_vix` set, a VIX close at or above it, with $\pi < 4$ and
 $r^{p} > 0$, brings the next meeting forward to that close once 21 sessions
-have passed since the last. The put takes no draw
-(`economy/central_bank.rs:200-205`, `economy/central_bank.rs:337-377`,
-`economy/central_bank.rs:388-402`, `engine.rs:4908-4926`,
-`engine.rs:5173-5188`).
+have passed since the last. The put's arithmetic takes no draw; a meeting
+the VIX calls is an ordinary meeting, so it takes a meeting's economy draws
+off the calendar and re-anchors the corporate yield at that close's VIX
+(`economy/central_bank.rs:208-213`, `economy/central_bank.rs:345-385`,
+`economy/central_bank.rs:396-410`, `engine.rs:4908-4926`,
+`engine.rs:5173-5191`).
 
 **Quantitative easing** starts when the policy rate is at or below 0.25 in a
 contraction, with purchases of USD 120bn a month, and tapers by 15 a meeting
-in expansion (`economy/central_bank.rs:476-509`). On pt-v20 it reaches
+in expansion (`economy/central_bank.rs:484-517`). On pt-v20 it reaches
 prices only through a small cut in the 10-year yield; its direct channels
 into valuation are switched off.
 
@@ -468,15 +470,15 @@ y^{10} \leftarrow \mathrm{clip}\big(y^{10} + 0.05\,(r^{p} + \mathrm{TP} - y^{10}
 ```
 
 The 2-year is its own process, pulled toward the formula it used to equal,
-with its own noise (`economy/daily.rs:1608-1626`):
+with its own noise (`economy/daily.rs:1616-1634`):
 
 ```math
 y^{2}_{d+1} = \mathrm{clip}\Big(y^{2}_d + 0.05\,\big(0.85\,r^{p} + 0.15\,y^{10} - y^{2}_d\big) + \sigma_{2}\,Z;\ 0,\ 12\Big)
 ```
 
-Here $y^{10}$ is the value just stepped (`economy/daily.rs:1573-1608`). At a
+Here $y^{10}$ is the value just stepped (`economy/daily.rs:1574-1616`). At a
 meeting the 2-year is reset to $0.85\,r^{p} + 0.15\,y^{10}$
-(`economy/central_bank.rs:433-434`).
+(`economy/central_bank.rs:441-442`).
 
 **The Treasury haven and the priced put** (`treasury_haven_gain`,
 `treasury_put_pricing`, 0 on every preset). With $\pi < 4$ the haven takes
@@ -485,11 +487,15 @@ the meeting's 10-year target. The priced put replaces $r^{p}$ in the
 10-year's anchor and the 2-year's formula by $r^{p} - \kappa \min(E, r^{p})$,
 and the meeting's 10-year surprise is $\delta + \kappa \min(E, r^{p})$ rather
 than $\delta$, so a priced cut is not news on the day
-(`economy/daily.rs:1576-1594`, `economy/central_bank.rs:403-431`).
+(`economy/daily.rs:1577-1602`, `economy/central_bank.rs:411-439`).
+The haven and the flight to quality below both make the stock-bond
+correlation more negative at low inflation, and they are fitted together:
+the flight to quality is an increment the 10-year's 5 per cent pull erases
+in about 60 sessions, the haven a level that lasts while the VIX does.
 
 **Flight to quality.** The session's cap-weighted index return $R_d$, in
 percent, open to close, moves both Treasury yields the same day
-(`economy/daily.rs:1628-1662`):
+(`economy/daily.rs:1636-1670`):
 
 ```math
 \Delta^{Q}_d = \begin{cases} +g_Q\,R_d & \pi < 3 \\ -g_Q\,R_d & \pi > 4 \\ 0 & \text{otherwise} \end{cases},
@@ -502,7 +508,7 @@ points off both yields, and Treasuries rally when stocks fall.
 
 **The corporate yield** moves every session by the change in the 10-year
 and by the meeting formula's own VIX term, and the meeting re-sets its level
-(`economy/daily.rs:1664-1715`):
+(`economy/daily.rs:1672-1723`):
 
 ```math
 y^{c}_{d+1} = \max\Big(y^{c}_d + \big(y^{10}_{d+1} - y^{10}_d\big) + 0.02\,m_{\mathcal{P}}\,\big(X_{d+1} - X_d\big),\ \ y^{10}_{d+1} + 0.8\Big)
@@ -510,7 +516,7 @@ y^{c}_{d+1} = \max\Big(y^{c}_d + \big(y^{10}_{d+1} - y^{10}_d\big) + 0.02\,m_{\m
 
 At a meeting the 10-year is pulled halfway to $r^{p} + 1 + \max(0, 0.3(\pi - 2))$
 plus the rate change, and the corporate yield is set
-(`economy/central_bank.rs:412-473`):
+(`economy/central_bank.rs:420-481`):
 
 ```math
 y^{c} = y^{10} + \mathrm{clip}\Big(\big(1 + 0.02\,(X - 12)\big)\,m_{\mathcal{P}};\ 0.8,\ 6\Big),
@@ -518,7 +524,7 @@ y^{c} = y^{10} + \mathrm{clip}\Big(\big(1 + 0.02\,(X - 12)\big)\,m_{\mathcal{P}}
 ```
 
 A daily floor, $y^{c} \ge y^{10} + 0.8$, also applies
-(`economy/daily.rs:1807-1817`). So the discount rate that fair value reads
+(`economy/daily.rs:1815-1825`). So the discount rate that fair value reads
 moves every session with the 10-year and the VIX, and is re-anchored at
 meetings.
 
@@ -529,13 +535,13 @@ meetings.
 | $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
 | | `flight_to_quality_day` | 1 (0) | derived | a switch: the step reads the session's own return |
 | | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
-| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4916-4931`) |
+| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4953-4968`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
 the 0.8 floor are chosen. One limit: the model's inflation almost never
 leaves the under-3% regime, so stocks and Treasuries are nearly always in
 flight to quality. They match the pooled 2015-24 correlation, not the
-positive one of a 2022-style inflation regime (`params.rs:7256-7259`).
+positive one of a 2022-style inflation regime (`params.rs:7293-7296`).
 
 ### The aggregate earnings cycle
 
@@ -585,19 +591,19 @@ reaches them through inflation and oil.
 o \leftarrow \mathrm{clip}\Big(o + 0.03\,\big[(75 + 3g)(1 + a_d) - o\big] + p^{I} - 0.08\,(e - 100) + \mathrm{opec} + 2Z;\ 35,\ 150\Big)
 ```
 
-(`economy/daily.rs:1207-1240`). $a_d = 0.03 \sin(2\pi (d' - 62)/252)$ is a
+(`economy/daily.rs:1208-1241`). $a_d = 0.03 \sin(2\pi (d' - 62)/252)$ is a
 seasonal term on the target, with $d'$ the day of the macro year. $p^{I}$ is
 an inventory pressure that is zero while inventory is between 40 and 60
 (inventory is a driftless random walk at `oil_supply_response` = 1,
 derived). Every 63 sessions an OPEC decision adds $\pm(2.5 + 3U)$ with
 probability 0.55 when the price is more than USD 10 from 80, or
-$3(U - 0.5)$ with probability 0.2 otherwise (`economy/daily.rs:1167-1205`).
+$3(U - 0.5)$ with probability 0.2 otherwise (`economy/daily.rs:1168-1206`).
 
 ```math
 e \leftarrow \mathrm{clip}\Big(e + 0.02\,\big(100 + 3\,(r^{p} - 2.5) - e\big) + 0.05\,(X - 25.5)^{+} + 0.3\,Z;\ 80,\ 130\Big)
 ```
 
-(`economy/daily.rs:1296-1313`). Above a VIX of 25.5 the dollar gets a
+(`economy/daily.rs:1297-1314`). Above a VIX of 25.5 the dollar gets a
 safe-haven bid (`usd_crisis_vix_threshold`, chosen).
 
 Gold, copper, housing, confidence, the fear and greed index and the trade
@@ -657,7 +663,7 @@ burn-in and the stationary opening draw, so it stays published until $L_c$
 sessions have closed (`engine.rs:1403-1408`). At the end of each close's
 macro step, after the cycle and the central bank, the engine appends the
 phase to the history and drops the oldest (`engine.rs:1455-1464`,
-`engine.rs:5211`). The burn-in runs the same step, and the construction then
+`engine.rs:5214`). The burn-in runs the same step, and the construction then
 refills the history with the opening phase (`engine.rs:1248`).
 
 A scenario or a `pin_macro` that sets the phase sets the true phase at once,
@@ -672,7 +678,7 @@ arrives on the same schedule.
 `state_snapshot()["economy"]["cycle_phase"]` stays the true phase. While
 $L_c > 0$ the economy block also carries `cycle_history`, the $L_c + 1$ phase
 names oldest first, and the state hash takes the history after the phase, as
-a `u32` length then each name (`engine.rs:6693-6698`,
+a `u32` length then each name (`engine.rs:6696-6701`,
 `manifest.state_hash`). A restore refuses a history of the wrong length, or
 any history on an engine whose lag is 0. A snapshot without one, restored
 under the dial, refills the history with the restored phase, so that phase is
@@ -703,7 +709,7 @@ last day:
 ```
 
 (`engine.rs:1292-1297`, `engine.rs:1361-1388`). The step runs at the end of
-each close's macro step, after the phase is recorded (`engine.rs:5215`):
+each close's macro step, after the phase is recorded (`engine.rs:5218`):
 the close's growth joins its quarter, the first close of a new quarter queues
 the last one's mean, and every figure due by that close is released. The
 construction seeds the figure with the opening growth after the burn-in
@@ -722,7 +728,7 @@ keys `published`, `quarter`, `count`, `sum`, `pending_days` and
 `pending_values`, in the economy's percent. The state hash takes it after the
 unemployment impulse below: the published figure, the quarter, the count, the
 sum, then a `u32` count of pending releases and each one's day and figure
-(`engine.rs:6707-6718`). A restore refuses the block on an engine whose lag
+(`engine.rs:6710-6721`). A restore refuses the block on an engine whose lag
 is 0, a quarter with no close in it, a non-finite figure and releases out of
 order. A snapshot without it, restored under the dial, publishes the
 restored growth and averages its quarter from the restore day on.
@@ -743,12 +749,12 @@ the noise and its cyclical drive in full,
 D = 0.3\,\theta^{u}_{\mathcal{P}} + 0.2\,(2 - g) - 0.08\,g\,\mathbf{1}[\mathcal{P} \in \lbrace E, R\rbrace,\ g > 1]
 ```
 
-(`economy/daily.rs:687-697`), where $g$ is the month's growth after its
+(`economy/daily.rs:688-698`), where $g$ is the month's growth after its
 monthly step. So the first monthly step of a contraction carried a rise of
 about 1.2 points, four times the spread of a monthly change otherwise, and
 announced the turn within a month (desk seeds 201 to 212, 2026-09-25). With
 `unemployment_adjustment_half_life` $H_u$ in sessions, the drive reaches the
-rate through a partial adjustment (`economy/daily.rs:858-882`):
+rate through a partial adjustment (`economy/daily.rs:859-883`):
 
 ```math
 m_d = m + a\,(D - m),
@@ -771,7 +777,7 @@ This dial moves the true unemployment rate, not a published copy of it, and
 so moves everything that reads the rate: inflation, confidence, the central
 bank and the phase hazards. While $H_u > 0$ the snapshot's economy block
 carries `unemployment_impulse`, and the state hash takes it after the phase
-history and before the GDP figure (`engine.rs:6701-6703`). A restore refuses
+history and before the GDP figure (`engine.rs:6704-6706`). A restore refuses
 it on an engine whose half-life is 0, and re-seeds it from the restored
 economy when a snapshot has none.
 
@@ -789,10 +795,10 @@ F_d = \mathrm{clip}\big(F + 0.25\,(B - F) + 2\,Z;\ 0,\ 100\big),
 B = 50 + 3\,g' - 0.8\,(X - 15) + b(\mathcal{P}') + 5\,r_d
 ```
 
-(`economy/daily.rs:1717-1742`). $r_d$ is the day's index return in percent,
+(`economy/daily.rs:1725-1750`). $r_d$ is the day's index return in percent,
 and the phase bonus $b$ is E +15, P +5, C -25, T -20, R +10. The index feeds
-consumer confidence and gold (`economy/daily.rs:977`,
-`economy/daily.rs:1277`), and through confidence the housing figures and
+consumer confidence and gold (`economy/daily.rs:978`,
+`economy/daily.rs:1278`), and through confidence the housing figures and
 copper. Nothing a price, the central bank, the cycle or a draw reads is
 downstream of it. It is reported as `macro_fields["fear_greed_index"]` and
 `macro_state.fear_greed_index`.
@@ -829,8 +835,8 @@ an FOMC statement inside a 30-minute window (Gurkaynak, Sack and Swanson
 2005; Bernanke and Kuttner 2005).
 
 With `macro_publication_repricing` on, each public, solvent name that has
-traded is re-marked as the step ends (`engine.rs:5623-5631`,
-`engine.rs:5641-5745`). With $P$ its last print, $V_0$ its fair value before
+traded is re-marked as the step ends (`engine.rs:5626-5634`,
+`engine.rs:5644-5748`). With $P$ its last print, $V_0$ its fair value before
 the step and $V_1$ after it, both computed as the tick computes them on the
 same day (`market/tick.rs:1764-1797`), the new price solves
 
@@ -929,7 +935,7 @@ What follows from this:
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
-| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2944-2986`); see [Known gaps](#known-gaps) |
+| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2981-3023`); see [Known gaps](#known-gaps) |
 | $\eta$ | `earnings_nominal_growth` | 1.0 | derived | holds the earnings share of nominal output constant |
 | $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
 | $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | guard | keeps the buyback term finite for a company near the price floor |
@@ -1041,7 +1047,7 @@ is applied in the tick (`market/tick.rs:1128`), the overnight opening print
 (`market/tick.rs:1755`, `market/tick.rs:1796`). It has no permanent part: it
 deepens a fall while fear is high and is given back as the VIX comes down.
 While $g > 0$ and $H_x > 0$ the snapshot's economy block carries
-`vix_feedback`, and the state hash takes it (`engine.rs:6575-6585`).
+`vix_feedback`, and the state hash takes it (`engine.rs:6578-6588`).
 
 Why pt-v20 takes it. With the market's plain shocks permanent, the driven
 2020 path fell 0.192 in 41 sessions against the S&P 500's 0.339 in 23 (long-run
@@ -1663,7 +1669,7 @@ stream at the close. **State:** $X_d$, a slow log level $q_d$, and the
 anchor's slow memory $M_d$.
 
 A slow level wanders around the anchor (`engine.rs:4371-4384`,
-`engine.rs:5464-5487`), and a slow memory tracks the read-back
+`engine.rs:5467-5490`), and a slow memory tracks the read-back
 (`engine.rs:4976-4993`):
 
 ```math
@@ -1674,7 +1680,7 @@ q_d = \phi_q\,q_{d-1} + \frac{\sigma_\ell}{G_\ell}\,Z,
 M_d = (1 - h_M)\,M_{d-1} + h_M \ln\frac{I_d}{A\,e^{-c_A}}
 ```
 
-The target (`economy/daily.rs:1361-1456`):
+The target (`economy/daily.rs:1362-1457`):
 
 ```math
 T_d = \Xi_d\,I_d\,e^{-a(X_d)\,M_d}
@@ -1694,12 +1700,12 @@ G_{\downarrow}\,\lvert r \rvert^{e_\downarrow}\,X^{-(e_\downarrow - 1)} & r < 0 
 A fall raises the VIX, by less when the VIX is already high; a rise lowers
 it. $\bar\Phi_d$ is the mean of $\Phi$ under a normal return with the index's
 own variance, subtracted so the fear response adds no drift
-(`economy/daily.rs:657-679`). The weight on the slow memory falls as the VIX
+(`economy/daily.rs:658-680`). The weight on the slow memory falls as the VIX
 rises: $a(X) = 1 - (1 - a_0) X_d^{\ast} / \mathrm{clip}(X;\ X_d^{\ast},\ 2.216 X_d^{\ast})$ with
 $X_d^{\ast} = A \Xi_d e^{-0.3888}$, so $a$ runs from 0.375 to 0.718
-(`economy/daily.rs:608-616`).
+(`economy/daily.rs:609-617`).
 
-The step (`economy/daily.rs:1498-1570`):
+The step (`economy/daily.rs:1499-1571`):
 
 ```math
 X_{d+1} = \mathrm{clip}\Big(X_d + \kappa_X\,(T_d - X_d) + \sigma^{X}_d\,Z + J_d;\ 10,\ X_{\max}\Big),
@@ -2380,7 +2386,7 @@ equation. They are listed so a reader can judge them.
 
 **Macro.**
 
-- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs:741-766`). Whether that is intended is not recorded.
+- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs:742-767`). Whether that is intended is not recorded.
 - Unemployment sits on its 2.5% floor for much of an expansion. Its long-run mean is 3.6% against 5.7% in the US.
 - The cycle's monthly hazard is turned into a daily probability as $h/21$, an approximation to $1 - (1 - h)^{1/21}$ that runs 4% to 15% high. The opening draw uses the hazard alone, without the ladder, so it is close to stationary but not exactly so.
 - Row 6 of the central bank's ladder can never fire, because inflation is capped at 6%. While the emergency condition holds, a meeting is held at every close.

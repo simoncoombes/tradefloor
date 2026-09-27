@@ -382,9 +382,10 @@ OUT_OF_SCOPE = {
         "(rate at least 0.5, CPI inflation under 4), -0.41pp on the S&P 500 "
         "and VIX tape with FRED DFF 1990-2025 (calendar-year bootstrap SE "
         "0.14), against pt-v20's -0.03 on held-out seeds; no FOMC target "
-        "change at a VIX of 30 or more was a hike (0 of 14, FRED DFEDTAR "
-        "and DFEDTARU) against 52 per cent on pt-v20 (0.8.5 realism work, "
-        "bond-hedge-fed)",
+        "change at a VIX of 30 or more with CPI inflation under 4 was a hike "
+        "(0 of 9, FRED DFEDTAR and DFEDTARU; 0 of 14 at any inflation) "
+        "against 52 per cent on pt-v20 on the same filter (0.8.5 realism "
+        "work, bond-hedge-fed)",
     "fed_put_threshold":
         "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
         "bond-hedge-fed)",
@@ -403,8 +404,10 @@ OUT_OF_SCOPE = {
         "inflation is under 4, daily and at a meeting. Target: the 10-year's "
         "change over 63-session windows with the index down more than 10 per "
         "cent and CPI inflation under 4, -0.62pp on FRED DGS10 against the "
-        "tape 1990-2025 (SE 0.11), against pt-v20's 0.00 on held-out seeds "
-        "(0.8.5 realism work, bond-hedge-fed)",
+        "tape 1990-2025 (SE 0.11), against pt-v20's 0.00 on held-out seeds. "
+        "Fitted with `flight_to_quality_gain`, which also makes the monthly "
+        "stock-bond correlation more negative at low inflation (0.8.5 "
+        "realism work, bond-hedge-fed)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

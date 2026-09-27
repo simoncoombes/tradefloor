@@ -828,10 +828,17 @@ pub struct ModelParams {
     /// over the 63 sessions after a VIX close at or above 30 (inflation
     /// under 4, rate at least 0.5), against -0.41 (calendar-year bootstrap
     /// SE 0.14) on the S&P 500 and VIX tape with FRED DFF, 1990-2025, and
-    /// 52 per cent of its rate changes at a VIX of 30 or more are hikes
-    /// against none of the 14 FOMC target changes there (FRED DFEDTAR and
-    /// DFEDTARU). Cieslak and Vissing-Jorgensen (2021, RFS) find about 30bp
-    /// of cut per 10 per cent intermeeting fall.
+    /// 52 per cent of its rate changes at a VIX close of 30 or more with
+    /// inflation under 4 are hikes (n 108), against none of the 9 FOMC
+    /// target changes on the same filter (FRED DFEDTAR and DFEDTARU; none of
+    /// the 14 at a VIX of 30 or more at any inflation, the other 5 cuts
+    /// coming at CPI 4.1 to 6.2). Cieslak and Vissing-Jorgensen (2021, RFS)
+    /// find about 30bp of cut per 10 per cent intermeeting fall, a gain of
+    /// about 3. At 5, the value screened for pt-v20, with the threshold at
+    /// 0.0, any intermeeting fall of 2.5 per cent or more rounds to a
+    /// quarter-point cut: rate changes double (4.9 a year against 2.35
+    /// without the put and 3.0 real) and the mean policy rate falls from
+    /// about 2.6 to 1.9, against 2.88 real (review, held-out seeds 801-830).
     ///
     /// Off zero, each close adds the log change of total public market cap
     /// to `EconomyState::intermeeting_return`. At a meeting with inflation
@@ -844,7 +851,11 @@ pub struct ModelParams {
     /// quarter point at a calm meeting (VIX under 30, no put cut, the ladder
     /// not cutting) once the put's own decaying stock (`EconomyState::fed_put`,
     /// half-life `fed_put_half_life`) is an eighth of a point under it. The
-    /// intermeeting return restarts at every meeting. No draw. The snapshot
+    /// intermeeting return restarts at every meeting. The put's arithmetic
+    /// takes no draw and leaves the meeting's draw table as it stands; the
+    /// rate path it moves can change which of the economy's state-dependent
+    /// draw sites fire later, as any macro dial's does, and a meeting
+    /// `fed_put_emergency_vix` calls takes a meeting's draws. The snapshot
     /// and the state hash carry the four fields only while this is non-zero.
     /// In [0, 10].
     pub fed_put_gain: f64,
@@ -864,6 +875,17 @@ pub struct ModelParams {
     /// next meeting is brought forward to tonight. 0.0 is never. Read only
     /// with `fed_put_gain` non-zero. In [0, 90]; a level under about 25 calls
     /// a meeting every 21 sessions in an ordinary market.
+    ///
+    /// The meeting it calls is an ordinary meeting, with two costs. It
+    /// takes a meeting's draws from the economy stream (the announcement
+    /// variant and the next meeting's date) on a session the calendar would
+    /// not, so from the first one on an arm with this set no longer shares
+    /// the control's economy draws. And it re-anchors the corporate yield
+    /// to the meeting's formula at the session's VIX: on the prototype
+    /// screened for the design (box bhf1, held-out seeds 201-230), meetings
+    /// called at a VIX of 40 widened the spread by 2.3 to 3.75 points at
+    /// once, and the 10th percentile of each history's worst session went
+    /// from -12.3 to -14.7 per cent. 0.0 avoids both.
     pub fed_put_emergency_vix: f64,
     /// The share of the Fed put's expected cut the curve prices before the
     /// meeting. 0.0 prices none, so the 10-year and 2-year move only when the
@@ -886,6 +908,21 @@ pub struct ModelParams {
     /// +0.02 on pt-v20 (Connolly, Stivers and Sun 2005; Baele, Bekaert and
     /// Inghelbrecht 2010; Campbell, Sunderam and Viceira 2017). No draw.
     /// No state. In [0, 0.05].
+    ///
+    /// Fit it with `flight_to_quality_gain`. That dial moves the 10-year by
+    /// an increment on the session's return, which the anchor's 5 per cent
+    /// daily pull erases in about 60 sessions, so it sets the daily
+    /// stock-bond correlation and barely moves the 63-session one; this
+    /// moves the anchor, so it lasts while the VIX stays up. Both make the
+    /// monthly correlation more negative at low inflation, and the flight
+    /// to quality does more of it. With the put at 5 (box bhf1, held-out
+    /// seeds 201-230), the correlation in months starting with inflation
+    /// under 3 read -0.20 with this at 0.0, -0.24 at 0.015, and -0.32 at
+    /// 0.015 with the flight to quality raised from pt-v20's 0.008 to
+    /// 0.016, against -0.19 real and a proposed band of [-0.35, -0.02]; on
+    /// seeds 501-530 (box bhf2) 0.010 read -0.21 against 0.015's -0.22,
+    /// both at 0.008. So at a flight to quality of 0.016 take this to 0.010,
+    /// and at 0.020 or more to 0.0 to 0.010; neither pair has been run.
     pub treasury_haven_gain: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
