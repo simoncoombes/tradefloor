@@ -449,8 +449,15 @@ class PortfolioView:
 
     @property
     def dividends(self) -> float:
-        """Net cash dividends received so far (paid, on a short)."""
+        """Net dividends received so far (paid, on a short), reinvested or
+        as cash."""
         return self.__portfolio.dividends
+
+    @property
+    def reinvest_dividends(self) -> bool:
+        """Whether a long position's dividends buy more of the paying name
+        (the portfolio's dividend reinvestment plan)."""
+        return self.__portfolio.reinvest_dividends
 
     @property
     def owner(self) -> str:
@@ -561,7 +568,8 @@ def _portfolio_state(portfolio: Any) -> tuple:
     return (portfolio.cash, portfolio.starting_cash, portfolio.interest,
             portfolio.max_leverage, portfolio.cash_interest, portfolio.owner,
             len(portfolio.fills), positions, flow, portfolio._in_book,
-            portfolio.dividends, len(portfolio.distributions))
+            portfolio.dividends, len(portfolio.distributions),
+            portfolio.reinvest_dividends)
 
 
 class TamperGuard:

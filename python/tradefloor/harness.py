@@ -318,8 +318,8 @@ class Scorecard:
         #: order path. ``errors`` names the step. The score is of a market
         #: the agent rewrote and ranks nothing.
         self.tampered = tampered
-        #: Net cash dividends the portfolio received (paid, on a short)
-        #: over the run, already inside ``pnl``. 0.0 on every model without
+        #: Net dividends the portfolio received (paid, on a short) over
+        #: the run, reinvested or as cash, already inside ``pnl``. 0.0 on every model without
         #: dividends (``dividend_payout_share``).
         self.dividends = dividends
 
@@ -405,6 +405,7 @@ def evaluate(
     model: str | ModelParams | None = None,
     cash_interest: bool = False,
     trusted_agents: bool = False,
+    reinvest_dividends: bool = True,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -439,6 +440,13 @@ def evaluate(
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
     default: cash earns nothing, as it always has here.
+
+    ``reinvest_dividends`` (on by default) is each portfolio's dividend
+    reinvestment plan, on a model that pays dividends: a long position's
+    dividend buys more of the paying name at the ex-date open, so an agent
+    that buys and never trades earns the total return. Off, dividends are
+    credited as cash. Nothing changes on a model without dividends. See
+    :meth:`Portfolio.collect_dividends`.
 
     Agents are sandboxed. ``obs.engine`` is a read-only
     :class:`~tradefloor.sandbox.MarketView` and ``obs.portfolio`` a read-only
@@ -487,7 +495,7 @@ def evaluate(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
-            cash_interest, bool(trusted_agents),
+            cash_interest, bool(trusted_agents), bool(reinvest_dividends),
         )
     return results
 
@@ -517,11 +525,12 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
-                  trusted=False) -> Scorecard:
+                  trusted=False, reinvest_dividends=True) -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
-                          cash_interest=cash_interest)
+                          cash_interest=cash_interest,
+                          reinvest_dividends=reinvest_dividends)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
     # What the agent is handed. Built once: every view reads the live
@@ -554,9 +563,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
         engine.open_market()
-        # The cash dividends this open made payable, before the agent acts:
-        # the price already carries the ex-date drop. Nothing on a model
-        # without dividends.
+        # The dividends this open made payable, before the agent acts: the
+        # price already carries the ex-date drop. Reinvested in the paying
+        # name under the portfolio's plan, cash otherwise. Nothing on a
+        # model without dividends.
         portfolio.collect_dividends(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or

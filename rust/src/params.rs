@@ -847,8 +847,11 @@ pub struct ModelParams {
     /// The dividend's annual Lintner adjustment speed toward its target:
     /// the declared amount moves `1 - (1 - this)^(1/4)` of the way each
     /// quarter. 0.4, which every preset carries, is read only with
-    /// `dividend_payout_share` set; Lintner fits on the S&P 500 give 0.1 to
-    /// 0.4 a year. In (0, 1].
+    /// `dividend_payout_share` set. It is calibrated to the sd of the
+    /// index's annual dividend growth (5.2 per cent against a real 7.1,
+    /// Shiller 1990-2023), not measured: Lintner fits of the S&P 500's
+    /// dividend give 0.11 to 0.13 a year on earnings and about 0 on the
+    /// price, the rule's input. In (0, 1].
     pub dividend_adjustment_speed: f64,
     /// A ceiling on a declared quarterly dividend, as a multiple of the
     /// name's target yield at the declaring close: the amount is at most

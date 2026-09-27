@@ -82,8 +82,11 @@ pub struct Sector {
     /// tape (Yahoo close and adjusted close, 2015-2025, payers only) for
     /// the sectors it covers and on Damodaran's sector yields (January 2026)
     /// for materials, utilities and real estate, where the tape has one
-    /// name or none. Real estate is capped at 1.0, since a REIT pays out
-    /// its taxable income.
+    /// name or none. Those yields were scaled up by about 1.2 to the tape's
+    /// level before use (materials 1.78 to 2.1 per cent, utilities 2.71 to
+    /// 3.3), which gives 0.29 and 0.53 where the unscaled yields give 0.25
+    /// and 0.43. Real estate is capped at 1.0, since a REIT pays out its
+    /// taxable income.
     ///
     /// Read only when [`crate::params::ModelParams::dividend_payout_share`]
     /// is non-zero, which no preset sets.

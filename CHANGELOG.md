@@ -261,13 +261,20 @@ dividend and `Engine.dividends_today()` gives the day's amounts. The prints
 table gains a `distribution` column, and `truth()` and `attribution()` gain
 a `dividend` column (zero on every preset). `Portfolio.collect_dividends`
 credits holders and charges shorts, and `evaluate`, the gym, `World` and
-`tca` all call it, and `Scorecard.dividends` reports the net cash each agent
-received.
+`tca` all call it, and `Scorecard.dividends` reports the net dividends each
+agent received.
 
-With dividends on, `BuyAndHold` reinvests each dividend in the company that
-paid it, so `versus_buy_and_hold` compares against the market's total
-return. A holder that kept the cash would trail any strategy that re-targets
-its net worth by 0.5 to 0.7 points a year over ten years.
+Every portfolio has a dividend reinvestment plan, on by default
+(`Portfolio(reinvest_dividends=True)`, `evaluate(reinvest_dividends=...)`):
+a long position's dividend buys more of the company that paid it at the
+ex-date open, so an agent that buys once and never trades, `BuyAndHold`
+included, earns the market's total return. A short pays its dividend in
+cash. Without the plan a holder keeps its dividends as cash, which earns
+nothing unless `cash_interest` is set, and it trails any strategy that
+re-targets its net worth: on pt-v20 with dividends on, the registered
+rate-news agent went from behind such a holder to ahead of it in 21 to 22
+of 30 held-out histories from that alone. `reinvest_dividends=False` keeps
+the cash. Nothing changes on a model without dividends.
 
 ### No capture ratio on pt-v20
 

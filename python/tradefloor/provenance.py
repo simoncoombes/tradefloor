@@ -393,11 +393,19 @@ OUT_OF_SCOPE = {
         "names are on the tape",
     "dividend_adjustment_speed":
         "unread while `dividend_payout_share` is 0.0: the annual Lintner "
-        "speed of the declared amount toward its target. Lintner fits of "
-        "the S&P 500's dividend on its earnings (Shiller, 1946-2023 and "
-        "1990-2023) give 0.11 to 0.13 a year; 0.4 is set against the "
-        "rule's own input, the name's price EMA, which is noisier than "
-        "earnings",
+        "speed of the declared amount toward its target. 0.4 is CALIBRATED "
+        "to the dividend-growth row, not measured: it puts the sd of the "
+        "index's annual dividend growth at 5.2 per cent against a real 7.1 "
+        "(Shiller D, 1990-2023), with cuts in 14 per cent of years against "
+        "a real 9 (dvgrid1, held-out seeds); 0.25 gives 4.0, near the "
+        "band's floor. No real fit supplies it: Lintner fits of the S&P "
+        "500's dividend on its earnings (Shiller, 1946-2023 and 1990-2023) "
+        "give 0.11 to 0.13 a year (R2 0.25 to 0.30), and on its price the "
+        "speed is about 0 (R2 0.00 to 0.01). The rule reads the price "
+        "because the model's earnings are hidden state, and prices are far "
+        "smoother than S&P earnings (EPS growth sd 42 to 50 per cent a year "
+        "over 1990-2023), so a faster speed on the smoother input is what "
+        "gives dividends their real variability",
     "dividend_yield_ceiling":
         "unread while `dividend_payout_share` is 0.0: a forced cut once a "
         "name's yield on its declaring close is this many times its target. "

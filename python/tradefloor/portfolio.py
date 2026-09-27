@@ -141,13 +141,24 @@ class Portfolio:
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
                  "max_leverage", "_stamp", "cash_interest", "interest",
                  "owner", "_in_book", "dividends", "distributions",
-                 "_collected")
+                 "_collected", "reinvest_dividends")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
                  cash_interest: bool = False,
-                 owner: str = "agent") -> None:
+                 owner: str = "agent",
+                 reinvest_dividends: bool = True) -> None:
         """
+        ``reinvest_dividends`` is a dividend reinvestment plan: on a model
+        that pays dividends, a long position's dividend buys more of the
+        paying name at the ex-date open, fractional shares, so a holder that
+        never trades earns the total return, as a total-return index and
+        every fund comparison assume. On by default. Off, the dividend is
+        credited as cash, which earns nothing unless ``cash_interest`` is
+        set. A short pays its dividend in cash either way. Nothing is read
+        or changed on a model without dividends. See
+        :meth:`collect_dividends`.
+
         ``cash_interest`` makes cash earn the policy rate, one day at a time,
         when :meth:`accrue` is called; the harness calls it once a day, before
         the close. Off by default, and with it off cash earns nothing, which
@@ -174,6 +185,7 @@ class Portfolio:
             )
         self.max_leverage = max_leverage
         self.cash_interest = bool(cash_interest)
+        self.reinvest_dividends = bool(reinvest_dividends)
         # Interest credited so far, net of any charged on a negative balance.
         self.interest = 0.0
         #: Cash dividends received so far, net of any paid on a short.
@@ -561,18 +573,35 @@ class Portfolio:
         return amount
 
     def collect_dividends(self, engine: Engine) -> float:
-        """Credit the cash dividends this session's open made payable.
+        """Credit the dividends this session's open made payable.
 
         On a model that pays dividends (``dividend_payout_share``), a name
         going ex opens lower by the amount per share; a holder of record is
-        owed ``quantity * amount`` in cash and a short owes it, as a stock
-        loan makes the borrower pay the lender. Call it once per session,
-        right after ``open_market`` and before trading; the harness, the gym,
-        a World and the TCA path all do. Returns the net cash credited,
-        added to :attr:`cash` and :attr:`dividends`, with one entry per
-        position in :attr:`distributions`. 0.0 on every model without
-        dividends, where nothing is read. A second call on the same open
-        credits nothing.
+        owed ``quantity * amount`` and a short owes it in cash, as a stock
+        loan makes the borrower pay the lender. With ``reinvest_dividends``
+        (the default) a long position's dividend buys ``quantity * amount /
+        open`` more shares of the paying name at the ex-date open, where the
+        price already carries the drop, and its cost goes into
+        ``avg_cost``; the purchase sends no flow to the market, as a plan's
+        pooled purchase is a rounding error on the name's volume. Without
+        it the long's dividend is credited as cash.
+
+        Why reinvestment is the default: a holder that buys once and keeps
+        its dividends as cash holds less of the market every quarter, and
+        with cash earning nothing any strategy that re-targets its net worth
+        beats it by reinvesting them. On pt-v20 with dividends on, the
+        registered rate-news agent (R7b) went from 0.3 points a year behind
+        such a holder to 0.3 ahead, 21 to 22 of 30 histories, from that
+        alone.
+
+        Call it once per session, right after ``open_market`` and before
+        trading; the harness, the gym, a World and the TCA path all do.
+        Returns the dividends received, net of those paid on shorts, all of
+        which are added to :attr:`dividends`; :attr:`cash` gains the part
+        not reinvested. One entry per position goes to
+        :attr:`distributions`, with ``reinvested`` the shares bought (0.0
+        for cash). 0.0 on every model without dividends, where nothing is
+        read. A second call on the same open credits nothing.
         """
         amounts = struct.unpack("<%dd" % len(engine.tickers),
                                 engine.column("dividend"))
@@ -583,7 +612,9 @@ class Portfolio:
             return 0.0
         self._collected = key
         index = {t: i for i, t in enumerate(engine.tickers)}
+        prices = None
         total = 0.0
+        credited = 0.0
         for ticker, position in self.positions.items():
             i = index.get(ticker)
             if i is None or not position.quantity:
@@ -591,13 +622,28 @@ class Portfolio:
             amount = amounts[i]
             if amount == 0.0:
                 continue
-            cash = position.quantity * amount
+            quantity = position.quantity
+            cash = quantity * amount
             total += cash
+            shares = 0.0
+            if self.reinvest_dividends and quantity > 0.0:
+                if prices is None:
+                    raw = engine.prices()
+                    prices = struct.unpack("<%dd" % (len(raw) // 8), raw)
+                price = prices[i]
+                if price > 0.0:
+                    shares = cash / price
+                    held = quantity + shares
+                    position.avg_cost = (position.avg_cost * quantity + cash) / held
+                    position.quantity = held
+            if shares == 0.0:
+                credited += cash
             self.distributions.append({
                 "day": int(engine.day_count), "ticker": ticker,
-                "quantity": position.quantity, "amount": amount, "cash": cash,
+                "quantity": quantity, "amount": amount, "cash": cash,
+                "reinvested": shares,
             })
-        self.cash += total
+        self.cash += credited
         self.dividends += total
         return total
 

@@ -200,6 +200,18 @@ def test_the_dial_changes_the_market_and_its_state_hash():
         day(a)
         day(b)
     assert a.prices() != b.prices()
+    assert a.state_hash() != b.state_hash()
+
+
+def test_the_python_state_hash_matches_the_engine_with_dividends_on():
+    """manifest.state_hash is the replay verifier's twin of the engine's:
+    with dividends on it must walk the dividend states in the engine's
+    order, before and after ex-dates and while an amount is pending."""
+    from tradefloor import manifest
+    e = engine()
+    for _ in range(70):
+        day(e)
+        assert manifest.state_hash(e.state_snapshot()) == e.state_hash()
 
 
 @pytest.mark.parametrize("name,value", [
@@ -230,9 +242,9 @@ def _payer_and_ex_day():
     raise AssertionError("no payer went ex")
 
 
-def test_buy_and_hold_earns_price_plus_the_dividends_exactly():
+def _hold_through(reinvest):
     e = engine()
-    p = tf.Portfolio(cash=1e7, max_leverage=None)
+    p = tf.Portfolio(cash=1e7, max_leverage=None, reinvest_dividends=reinvest)
     e.open_market()
     for inst in UNIVERSE:
         p.execute(e, inst.ticker, 1000)
@@ -241,19 +253,49 @@ def test_buy_and_hold_earns_price_plus_the_dividends_exactly():
     e.run_session(9, 30, 3, TICKS)
     e.close_market()
     owed = 0.0
+    # The total-return index of each name, from its bought quantity:
+    # reinvesting D at the ex-date open multiplies the holding by 1 + D/open.
+    grown = dict(held)
     for _ in range(69):
         e.open_market()
         paid = e.dividends_today()
-        owed += sum(held[inst.ticker] * paid[i] for i, inst in enumerate(UNIVERSE))
+        opens = f64(e.prices())
+        for i, inst in enumerate(UNIVERSE):
+            owed += (grown[inst.ticker] if reinvest else held[inst.ticker]) * paid[i]
+            grown[inst.ticker] *= 1.0 + paid[i] / opens[i]
         p.collect_dividends(e)
         p.collect_dividends(e)  # a second call on one open credits nothing
         e.run_session(9, 30, 3, TICKS)
         e.close_market()
+    return e, p, held, grown, cash0, owed
+
+
+def test_buy_and_hold_with_cash_dividends_earns_price_plus_the_dividends():
+    e, p, held, _, cash0, owed = _hold_through(reinvest=False)
     prices = f64(e.prices())
     total = cash0 + sum(held[inst.ticker] * prices[i] for i, inst in enumerate(UNIVERSE)) + owed
     assert owed > 0
     assert p.dividends == pytest.approx(owed, rel=1e-12)
+    assert p.cash == pytest.approx(cash0 + owed, rel=1e-12)
     assert p.net_worth(e) == pytest.approx(total, rel=1e-9)
+    assert all(d["reinvested"] == 0.0 for d in p.distributions)
+
+
+def test_buy_and_hold_under_the_plan_earns_the_total_return_index():
+    """The default: each dividend buys more of the paying name at the
+    ex-date open, so the holding is the total-return index and cash does
+    not move."""
+    e, p, held, grown, cash0, owed = _hold_through(reinvest=True)
+    prices = f64(e.prices())
+    assert owed > 0
+    assert p.cash == cash0
+    assert p.dividends == pytest.approx(owed, rel=1e-12)
+    for i, inst in enumerate(UNIVERSE):
+        assert p.positions[inst.ticker].quantity == pytest.approx(grown[inst.ticker], rel=1e-12)
+    total = cash0 + sum(grown[inst.ticker] * prices[i] for i, inst in enumerate(UNIVERSE))
+    assert p.net_worth(e) == pytest.approx(total, rel=1e-9)
+    assert any(grown[t] > held[t] for t in held)
+    assert all(d["reinvested"] > 0.0 for d in p.distributions)
 
 
 def test_a_short_pays_and_a_pair_nets_zero():
@@ -273,10 +315,20 @@ def test_a_short_pays_and_a_pair_nets_zero():
             short.execute(e, ticker, -500)
         e.run_session(9, 30, 3, TICKS)
         e.close_market()
+        worth = {"long": long_.net_worth(e), "short": short.net_worth(e)}
     assert amount > 0
     assert short.dividends == pytest.approx(-500 * amount)
     assert long_.dividends + short.dividends == pytest.approx(0.0, abs=1e-9)
     assert short.distributions[-1]["cash"] == pytest.approx(-500 * amount)
+    # A short pays in cash whatever the plan says; the long's dividend buys
+    # shares at the ex-date open, so the pair's value is still unchanged.
+    assert short.distributions[-1]["reinvested"] == 0.0
+    opened = f64(e.prices())[i]
+    assert long_.positions[ticker].quantity == pytest.approx(500 + 500 * amount / opened)
+    # pt-v20 has no overnight move, so the ex-date open is the close less
+    # the amount and neither side's net worth moved across the drop.
+    assert long_.net_worth(e) == pytest.approx(worth["long"], rel=1e-12)
+    assert short.net_worth(e) == pytest.approx(worth["short"], rel=1e-12)
 
 
 def test_a_resting_buy_limit_is_lowered_by_the_amount():
@@ -337,15 +389,19 @@ def test_the_gym_collects_them():
     assert env._portfolio.dividends > 0
 
 
-def test_buy_and_hold_reinvests_its_dividends():
-    """The baseline earns the total return: each dividend buys whole shares
-    of the name that paid it, so its cash stays near what the first trade
-    left and its share count grows; with `reinvest_dividends=False` the
-    dividends stay as cash."""
+def test_evaluate_reinvests_by_default_and_keeps_cash_when_asked():
+    """BuyAndHold trades once either way: under the plan (the default) its
+    dividends became shares, off it they stayed as cash."""
     from tradefloor.baselines import BuyAndHold
     kw = dict(seed=SEED, universe=UNIVERSE, days=70, steps_per_day=2,
               ticks_per_step=TICKS, model=model(**ON), max_leverage=None)
     drip = tf.evaluate({"bh": BuyAndHold()}, **kw)["bh"]
-    cash = tf.evaluate({"bh": BuyAndHold(reinvest_dividends=False)}, **kw)["bh"]
-    assert drip.dividends > cash.dividends > 0
-    assert drip.trades > cash.trades
+    cash = tf.evaluate({"bh": BuyAndHold()}, reinvest_dividends=False, **kw)["bh"]
+    assert drip.dividends > 0 and cash.dividends > 0
+    assert drip.trades == cash.trades
+    assert drip.final_net_worth != cash.final_net_worth
+    off = tf.evaluate({"bh": BuyAndHold()}, **dict(kw, model=model(), days=10))["bh"]
+    off_cash = tf.evaluate({"bh": BuyAndHold()}, reinvest_dividends=False,
+                           **dict(kw, model=model(), days=10))["bh"]
+    assert off.final_net_worth == off_cash.final_net_worth
+    assert off.dividends == 0.0
