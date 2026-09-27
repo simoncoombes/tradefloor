@@ -478,6 +478,34 @@ OUT_OF_SCOPE = {
         "never read it (0.8.5, arrival-order work: the later of two "
         "identical 10%-of-ADV buyers paid about 23 bp more on 30 of 30 "
         "held-out seeds on pt-v20)",
+    "impact_memory_coefficient":
+        "inert at 0.0 as shipped: `Engine::plan_memory` is never called and "
+        "the latent depth is not shifted, so an agent's temporary impact "
+        "stays off the tape and only `fill_impact_coefficient`'s linear "
+        "gamma reaches `s`. The square-root law of impact on the tape, "
+        "fitted on held-out seeds against the metaorder rows Q1-Q9 "
+        "(`tools/calibration/metaorder_curve.py`; 0.8.5 realism work, "
+        "sqrt-impact); for a new registration. After the house-flow fix, "
+        "confirmed on seeds 2401-2430 x 12 names (box sqfix2): 0.65 with "
+        "half-life 12, slow half-life 780, slow weight 0.1, crossover "
+        "0.001 and fill_impact_coefficient 0.15, where Q1-Q7 pass, a day "
+        "TWAP costs 0.82 of a block at 10% and 0.83 at 3% (Q8, Q9 read "
+        "0.8 as their ceiling), C9 is unchanged and no round trip, wash "
+        "included, pays",
+    "impact_memory_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's fast half-life in open ticks",
+    "impact_memory_slow_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's slow half-life in open ticks, 0.0 none",
+    "impact_memory_slow_weight":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ", and refused off zero without "
+        "`impact_memory_slow_half_life`: the slow part's weight",
+    "impact_memory_crossover":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the linear regime below m* of daily volume (Bucci, "
+        "Benzaquen, Lillo and Bouchaud, PRL 122, 108302, 2019)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

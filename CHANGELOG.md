@@ -254,6 +254,20 @@ The term reads the yield at today's price, so a company near the 0.01 floor
 read a yield in the hundreds, and on one held-out history the index rose
 86-fold in one close. pt-v20 sets 0.15.
 
+`impact_memory_coefficient`, with `impact_memory_half_life`,
+`impact_memory_slow_half_life`, `impact_memory_slow_weight` and
+`impact_memory_crossover`, puts an agent's metaorder on the tape as the
+square-root law of impact. Each name keeps a decaying memory of all agents'
+net taker flow against the house, and its model price carries `Y sigma
+sqrt(M)`; with it on, a fill between two agents is not flow to the market
+at all, so a wash (one agent rests an ask, another lifts it) moves nothing.
+The memory decays on open ticks, so a third of the displacement is gone by
+the close and the rest fades over days. Selling against the memory walks its path
+back down, and a tick's flow moves it at most 1.5 times what the flow paid,
+so no round trip earns the displacement. Every preset, pt-v20 included,
+carries 0.0, and every known-answer digest is unchanged; the values are for
+a new registration (`tools/calibration/metaorder_curve.py` measures them).
+
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
 the earnings cycle's expected path from the cycle's own hazards, so a turn
 of phase moves prices at once and a price trough leads the earnings trough;

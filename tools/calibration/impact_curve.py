@@ -33,8 +33,16 @@ The literature it is compared with, stated as the script prints it:
   it, [0.33, 0.67].
 - Almgren, Thum, Hauptmann and Li (Risk 18(7), 2005), US equity program
   trades: temporary cost `0.142 sigma (X / (V T))^0.6` and permanent
-  impact `0.314 sigma X / V`, of which the trader pays half. Evaluated
-  here at one step of six a day, T = 1/6.
+  impact `0.314 sigma X / V (Theta / V)^(1/4)`, of which the trader pays
+  half. `Theta` is shares outstanding; the turnover factor `(Theta/V)^(1/4)`
+  is part of their fit (restated in Kocinski, Quantitative Methods in
+  Economics). Evaluated here at one step of six a day, T = 1/6, and, as
+  this tool has always printed it, WITHOUT the factor, which understates
+  the permanent term 3.0 times at the sim roster's median Theta/V of 81
+  and 3.87 times at the real forty's 223 (EDGAR shares outstanding over
+  daily volume, 2019 and 2023). With it, the cost at 10% of daily volume is
+  0.152 to 0.165 sigma rather than 0.120; pass `turnover` to
+  `almgren_cost` for that reading.
 - Frazzini, Israel and Moskowitz ("Trading Costs", 2018, AQR's own
   executions 1998-2016) find impact concave in size and well below earlier
   academic estimates for patient institutional execution; no coefficient
@@ -177,12 +185,15 @@ def refill(seed: int, universe, coefficient: float, exponent: float,
             "permanent": {k: statistics.median(v) for k, v in perm.items() if v}}
 
 
-def almgren_cost(f: float, steps_per_day: int = 6) -> float:
+def almgren_cost(f: float, steps_per_day: int = 6, turnover: float = 1.0) -> float:
     """Almgren et al. (2005) cost in units of sigma for X/V = f executed
     over one step: temporary 0.142 (X/(V T))^0.6 plus half the permanent
-    0.314 X/V."""
+    0.314 X/V (Theta/V)^(1/4). `turnover` is Theta/V; the default 1.0 drops
+    the factor, as this tool's printed figures always have (see the module
+    note: 81 for the sim roster and 223 for the real forty are the
+    measured medians)."""
     t = 1.0 / steps_per_day
-    return 0.142 * (f / t) ** 0.6 + 0.5 * 0.314 * f
+    return 0.142 * (f / t) ** 0.6 + 0.5 * 0.314 * f * turnover ** 0.25
 
 
 def fit(rows: list[dict], key: str) -> tuple[float, float]:

@@ -928,6 +928,16 @@ PERTURBATIONS = [
     # probe runs none. tests/test_arrival_order.py moves it with a cohort.
     ("book_arrival_shuffle", 1.0, False),
     ("fill_impact_coefficient", 0.5, False),
+    # The metaorder memory (sqrt-impact). INERT on this probe by the same
+    # construction: it is fed only by agents' taker flow, and the probe
+    # sends none. The four shape dials are read only with the coefficient
+    # on; the coefficient's companion is the half-life it is refused
+    # without. `test_impact_memory.py` moves them with agents trading.
+    ("impact_memory_coefficient", 0.5, False),
+    ("impact_memory_half_life", 120.0, False),
+    ("impact_memory_slow_half_life", 15600.0, False),
+    ("impact_memory_slow_weight", 0.1, False),
+    ("impact_memory_crossover", 0.001, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -1745,6 +1755,14 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # refused without it, so the refill is off in both arms: 0.0 against
     # pt-v20's 27, as the depth companions above carry 0.5 against its 0.75.
     "book_shared": {"book_refill_half_life": 0.0},
+    # The metaorder memory is refused without its fast half-life, and its
+    # slow weight without the slow half-life (sqrt-impact). It also needs
+    # the shared book and its depth, which pt-v20 ships and a base before
+    # it does not (the earnings derivation sweeps on pt-v18).
+    "impact_memory_coefficient": {"impact_memory_half_life": 120.0,
+                                  "book_shared": 1.0,
+                                  "book_depth_coefficient": 0.75},
+    "impact_memory_slow_weight": {"impact_memory_slow_half_life": 15600.0},
     # The excursion reads the VIX's distance above the identity's read-back,
     # so it is refused off the identity; a no-op on the default.
     "market_vol_vix_excursion": {"vix_level_identity": 1.0},

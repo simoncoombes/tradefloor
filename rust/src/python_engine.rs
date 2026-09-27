@@ -1471,11 +1471,20 @@ fn book_to_py(py: Python<'_>, book: &crate::agent_book::BookState) -> PyResult<P
         x.set_item("bought", r.bought)?;
         x.set_item("sold", r.sold)?;
         x.set_item("permanent", r.permanent)?;
+        if let Some(v) = r.transient {
+            x.set_item("transient", v)?;
+        }
         x.set_item("day", r.day)?;
         x.set_item("tick", r.tick)?;
         impacts.append(x)?;
     }
     d.set_item("impacts", impacts)?;
+    // The metaorder memory, only while it holds something: an entry absent
+    // is a book without one, as every snapshot before it was.
+    if !book.memory.is_empty() {
+        let flat: Vec<f64> = book.memory.iter().flat_map(|row| row.iter().copied()).collect();
+        d.set_item("memory", f64_bytes(py, &flat))?;
+    }
     Ok(d.into())
 }
 
@@ -1568,9 +1577,28 @@ fn book_from_py(d: &Bound<'_, PyDict>) -> PyResult<crate::agent_book::BookState>
             bought: g("bought")?.extract()?,
             sold: g("sold")?.extract()?,
             permanent: g("permanent")?.extract()?,
+            transient: match r.get_item("transient")? {
+                Some(v) => Some(v.extract()?),
+                None => None,
+            },
             day: g("day")?.extract()?,
             tick: g("tick")?.extract()?,
         });
+    }
+    if let Some(raw) = d.get_item("memory")? {
+        let raw: Vec<u8> = raw.extract()?;
+        if raw.len() % (8 * MEMORY_WIDTH) != 0 {
+            return Err(ValidationError::new_err("the snapshot's book `memory` is not whole rows"));
+        }
+        for row in raw.chunks(8 * MEMORY_WIDTH) {
+            let mut r = [0.0; MEMORY_WIDTH];
+            for (k, bytes) in row.chunks(8).enumerate() {
+                let mut b = [0u8; 8];
+                b.copy_from_slice(bytes);
+                r[k] = f64::from_le_bytes(b);
+            }
+            state.memory.push(r);
+        }
     }
     Ok(state)
 }
@@ -5682,7 +5710,11 @@ impl PyEngine {
     /// ``permanent`` is the change to the name's ``s`` the agent's fills
     /// made, in log units: exact under ``fill_impact_coefficient``, whose
     /// law is linear and additive, and the tick's flow impact shared pro
-    /// rata by signed shares under the imbalance law. Recorded in the log.
+    /// rata by signed shares under the imbalance law. With
+    /// ``impact_memory_coefficient`` set, ``transient`` is the metaorder
+    /// memory's part of the tick: what the tick's flow moved the name's
+    /// displacement, shared by signed net shares; the key is absent
+    /// otherwise. Recorded in the log.
     #[pyo3(signature = (agent = None))]
     fn take_impacts(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
         self.log.push(crate::python_log::LogEntry::TakeImpacts { agent: agent.clone() });
@@ -5696,6 +5728,9 @@ impl PyEngine {
                 d.set_item("bought", r.bought)?;
                 d.set_item("sold", r.sold)?;
                 d.set_item("permanent", r.permanent)?;
+                if let Some(v) = r.transient {
+                    d.set_item("transient", v)?;
+                }
                 d.set_item("day", r.day)?;
                 d.set_item("tick", r.tick)?;
                 Ok(d.into())
