@@ -1127,7 +1127,10 @@ def _nothing_dormant():
                    market_vol_cycle_ratio=2.25,
                    market_vol_cycle_expansion=0.75,
                    market_vol_cycle_half_life=21.0,
-                   market_vol_cycle_relative=1.0)
+                   market_vol_cycle_relative=1.0,
+                   # Its two pin switches are 0.0 or 1.0 (r15 bearcycle).
+                   market_vol_cycle_pin_neutral=1.0,
+                   market_vol_cycle_pin_phase=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1288,6 +1291,26 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "fed_stress_hold_age":
+        "sessions since the last stressed close (`fed_stress_hold`, r15 "
+        "postcut). `CRISIS` publishes a VIX of 45 at every close, so each "
+        "close restarts the clock at zero whatever it held, and at this "
+        "model's blanket 0.05 sessions the hold covers only the stressed "
+        "session itself, where the clock is zero either way. What it takes "
+        "to see it is a VIX that spikes and falls back, then a meeting that "
+        "would raise inside the hold. tests/test_postcut.py::test_the_hold_"
+        "clock_restarts_on_a_stressed_close_and_ages_otherwise and ::test_the_"
+        "hashes_agree_and_a_restore_reproduces_the_run hold it in the state "
+        "hash and across a restore.",
+    "treasury_policy_path":
+        "the market's forecast of the policy path (`treasury_path_pricing`, "
+        "r15 postcut). It moves only with a meeting's rate change and decays "
+        "at `treasury_path_half_life`, here the blanket 0.05 sessions, so it "
+        "is gone within a session. `CRISIS` starts the policy rate at 0.05, "
+        "where a contraction's ladder has no cut left and no reason to hike. "
+        "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
+        "reproduces_the_run cuts, carries a non-zero path across a restore "
+        "and asserts the state hash reads it.",
     "fed_stress_vix_max":
         "the central bank's stress level, the highest VIX published since "
         "the last meeting (`fed_stress_cut`). `CRISIS` holds the VIX at 45 "
