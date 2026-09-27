@@ -264,6 +264,11 @@ credits holders and charges shorts, and `evaluate`, the gym, `World` and
 `tca` all call it, and `Scorecard.dividends` reports the net cash each agent
 received.
 
+With dividends on, `BuyAndHold` reinvests each dividend in the company that
+paid it, so `versus_buy_and_hold` compares against the market's total
+return. A holder that kept the cash would trail any strategy that re-targets
+its net worth by 0.5 to 0.7 points a year over ten years.
+
 ### No capture ratio on pt-v20
 
 On pt-v20 market moves mostly stick: each shock moves fair value for good,

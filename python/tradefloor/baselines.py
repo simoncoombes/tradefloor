@@ -229,20 +229,53 @@ class BuyAndHold:
     It trades on the first observation only. Not rebalanced, deliberately: a
     rebalanced equal-weight portfolio is a mean-reversion strategy wearing a
     passive label, and it would stop being the null hypothesis.
+
+    On a model that pays dividends (``dividend_payout_share``) it reinvests
+    each name's dividend in that name at the first observation of the
+    ex-date, whole shares, as a dividend reinvestment plan does, so what it
+    earns is the market's total return. Without that its dividends pile up
+    as idle cash and any strategy that re-targets its net worth beats it by
+    reinvesting them: 0.5 to 0.7 points a year over ten years on pt-v20
+    with dividends on (``reinvest_dividends=False`` keeps the cash). On a
+    model without dividends nothing is paid and nothing changes.
     """
 
-    def __init__(self, *, leverage: float = 1.0, max_participation: float = 0.05):
+    def __init__(self, *, leverage: float = 1.0, max_participation: float = 0.05,
+                 reinvest_dividends: bool = True):
         self.leverage = float(leverage)
         self.max_participation = float(max_participation)
+        self.reinvest_dividends = bool(reinvest_dividends)
         self._done = False
 
     def act(self, obs: Observation) -> dict[str, float]:
         if self._done:
-            return {}
+            return self._reinvest(obs) if self.reinvest_dividends else {}
         self._done = True
         weight = self.leverage / len(obs.tickers)
         return rebalance(obs, {t: weight for t in obs.tickers},
                          max_participation=self.max_participation)
+
+    def _reinvest(self, obs: Observation) -> dict[str, float]:
+        """Whole shares bought with today's dividends, at the session's first
+        step (the ex-date drop and the cash both land at the open)."""
+        if not getattr(obs, "is_first_step_of_day", True):
+            return {}
+        paid = getattr(obs.engine, "dividends_today", None)
+        if paid is None:
+            return {}
+        amounts = paid()
+        if not any(amounts):
+            return {}
+        orders: dict[str, float] = {}
+        for i, ticker in enumerate(obs.tickers):
+            amount = amounts[i] if i < len(amounts) else 0.0
+            held = obs.position(ticker)
+            price = obs.price(ticker)
+            if amount > 0.0 and held > 0.0 and price > 0.0:
+                shares = math.floor(held * amount / price)
+                if shares > 0:
+                    orders[ticker] = float(shares)
+        return orders
 
 
 class RandomTrader:

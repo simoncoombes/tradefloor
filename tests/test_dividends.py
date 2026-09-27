@@ -335,3 +335,17 @@ def test_the_gym_collects_them():
     for _ in range(69):
         env.step(action)
     assert env._portfolio.dividends > 0
+
+
+def test_buy_and_hold_reinvests_its_dividends():
+    """The baseline earns the total return: each dividend buys whole shares
+    of the name that paid it, so its cash stays near what the first trade
+    left and its share count grows; with `reinvest_dividends=False` the
+    dividends stay as cash."""
+    from tradefloor.baselines import BuyAndHold
+    kw = dict(seed=SEED, universe=UNIVERSE, days=70, steps_per_day=2,
+              ticks_per_step=TICKS, model=model(**ON), max_leverage=None)
+    drip = tf.evaluate({"bh": BuyAndHold()}, **kw)["bh"]
+    cash = tf.evaluate({"bh": BuyAndHold(reinvest_dividends=False)}, **kw)["bh"]
+    assert drip.dividends > cash.dividends > 0
+    assert drip.trades > cash.trades
