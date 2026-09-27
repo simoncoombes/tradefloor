@@ -859,7 +859,9 @@ pub struct ModelParams {
     /// in recessions are what make real bears rarer (Schwert 1989; Hamilton
     /// and Lin 1996).
     ///
-    /// In [0.5, 5]; 0 is off.
+    /// In [0, 5]; 0 is off. A small ratio is a quiet contraction, which no
+    /// tape shows; the variance floor (`market_vol_floor_multiple`) bounds
+    /// it.
     pub market_vol_cycle_ratio: f64,
     /// The market factor's volatility multiplier outside a contraction or a
     /// trough (`k_e` in `market_vol_cycle_ratio`'s formula). 0.0 derives it
@@ -870,8 +872,7 @@ pub struct ModelParams {
     /// is about 72 per cent of the index's variance, and so leaves the
     /// index's expansion volatility nearly where it was (bear-dynamics
     /// design: B3 2.17-2.38 on the derived arms), which is why an explicit
-    /// value exists. Unread at `market_vol_cycle_ratio` 0.0. 0 or in
-    /// [0.25, 2].
+    /// value exists. Unread at `market_vol_cycle_ratio` 0.0. In [0, 2].
     pub market_vol_cycle_expansion: f64,
     /// Half-life, in sessions, of the cycle multiplier's move (in logs)
     /// toward its phase's value. 0.0 is instant. Unread at
@@ -8284,20 +8285,16 @@ impl ModelParams {
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
                 self.buyback_yield_cap));
         }
-        if !(self.market_vol_cycle_ratio == 0.0
-            || (self.market_vol_cycle_ratio >= 0.5 && self.market_vol_cycle_ratio <= 5.0))
-        {
+        if !(self.market_vol_cycle_ratio >= 0.0 && self.market_vol_cycle_ratio <= 5.0) {
             return Err(format!(
                 "market_vol_cycle_ratio is {}. It is the market factor's volatility in a contraction \
-                 or a trough over its volatility in every other phase: 0 (off) or in [0.5, 5].",
+                 or a trough over its volatility in every other phase, in [0, 5]; 0 is off.",
                 self.market_vol_cycle_ratio));
         }
-        if !(self.market_vol_cycle_expansion == 0.0
-            || (self.market_vol_cycle_expansion >= 0.25 && self.market_vol_cycle_expansion <= 2.0))
-        {
+        if !(self.market_vol_cycle_expansion >= 0.0 && self.market_vol_cycle_expansion <= 2.0) {
             return Err(format!(
                 "market_vol_cycle_expansion is {}. It is the market factor's volatility multiplier \
-                 outside a contraction or a trough: 0 (derived from the phase shares) or in [0.25, 2].",
+                 outside a contraction or a trough, in [0, 2]; 0 derives it from the phase shares.",
                 self.market_vol_cycle_expansion));
         }
         if !(self.market_vol_cycle_half_life >= 0.0 && self.market_vol_cycle_half_life <= 2520.0) {

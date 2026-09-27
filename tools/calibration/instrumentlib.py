@@ -167,9 +167,7 @@ PARAM_SPECS: dict[str, dict] = {
     "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The business cycle in the market factor's volatility (bear-dynamics).
     # All ship at 0.0, so the hard range is what a search gets; each is the
-    # dial's own domain in `params.rs`. The ratio and the expansion
-    # multiplier are 0 (off / derived) or inside their range, which a
-    # continuous step from 0 cannot express, so their steps start in range.
+    # dial's own domain in `params.rs`.
     "market_vol_cycle_ratio": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
     "market_vol_cycle_expansion": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
     "market_vol_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
@@ -1080,16 +1078,6 @@ def feasibility_violation(vector: dict[str, float],
     if ma + mb + mg / 2.0 >= 1.0:
         return ("factor-variance GJR stationarity: alpha+beta+gamma/2 = "
                 f"{ma + mb + mg / 2.0:.4f} >= 1")
-    # The cycle's volatility ratio and expansion multiplier are 0 (off,
-    # derived) or inside their ranges, the refusals `ModelParams` makes
-    # (bear-dynamics); a plan records such a vector as infeasible instead of
-    # erroring on it.
-    cr = val("market_vol_cycle_ratio")
-    if cr != 0.0 and not 0.5 <= cr <= 5.0:
-        return f"market_vol_cycle_ratio {cr:.4f} is neither 0 nor in [0.5, 5]"
-    ce = val("market_vol_cycle_expansion")
-    if ce != 0.0 and not 0.25 <= ce <= 2.0:
-        return f"market_vol_cycle_expansion {ce:.4f} is neither 0 nor in [0.25, 2]"
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",

@@ -134,6 +134,28 @@ def test_a_snapshot_without_the_multiplier_restores_it_unset():
     assert "market_vol_cycle_log" in twin.state_snapshot()
 
 
+def test_a_snapshot_without_the_multiplier_diverges_after_a_turn():
+    # Off its target only after the true phase turns: pinned into a
+    # contraction, the multiplier is part way to it after three closes at a
+    # 21-session half-life, and an engine restored without it restarts on
+    # the target instead.
+    e = engine(**CYCLE)
+    e.run_days(3, record=False)
+    e.pin_macro(cycle="contraction")
+    e.run_days(3, record=False, first_day=3)
+    snap = e.state_snapshot()
+    assert snap["economy"]["cycle_phase"] == "contraction"
+    whole = engine(**CYCLE)
+    whole.restore_state(snap)
+    stripped = engine(**CYCLE)
+    stripped.restore_state({k: v for k, v in snap.items() if k != "market_vol_cycle_log"})
+    for x in (whole, stripped):
+        x.run_days(3, record=False, first_day=6)
+    assert floats(whole.prices()) != floats(stripped.prices())
+    e.run_days(3, record=False, first_day=6)
+    assert floats(whole.prices()) == floats(e.prices())
+
+
 def test_the_state_hash_is_unchanged_while_off():
     e = engine()
     e.run_days(3, record=False)
@@ -142,9 +164,7 @@ def test_the_state_hash_is_unchanged_while_off():
 
 @pytest.mark.parametrize("dials", [
     {"market_vol_cycle_ratio": -1.0},
-    {"market_vol_cycle_ratio": 0.3},
     {"market_vol_cycle_ratio": 6.0},
-    {"market_vol_cycle_expansion": 0.1},
     {"market_vol_cycle_expansion": 2.5},
     {"market_vol_cycle_expansion": -0.5},
     {"market_vol_cycle_half_life": -1.0},

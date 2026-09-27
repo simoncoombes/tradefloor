@@ -1081,7 +1081,15 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # The cycle's volatility multiplier at the design's
+                   # centre (bear-dynamics): at a blanket 0.05 the ratio and
+                   # the expansion multiplier put the factor on its variance
+                   # floor in every phase.
+                   market_vol_cycle_ratio=2.25,
+                   market_vol_cycle_expansion=0.75,
+                   market_vol_cycle_half_life=21.0,
+                   market_vol_cycle_relative=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1242,6 +1250,15 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "market_vol_cycle_log":
+        "the cycle's volatility multiplier (market_vol_cycle_ratio). It "
+        "leaves its phase's target only after the true phase turns, and an "
+        "engine restored without it restarts ON that target at its next "
+        "close. `CRISIS` fixes the phase in a contraction for every session "
+        "both engines run, so the multiplier sits on its target from the "
+        "first close and a restore without it lands on the same value. "
+        "tests/test_market_vol_cycle.py::test_a_snapshot_without_the_"
+        "multiplier_diverges_after_a_turn turns the phase and sees it.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "
