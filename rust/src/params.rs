@@ -5914,6 +5914,22 @@ pub struct ModelParams {
     /// shipped). A guard: settable, never searched.
     pub price_breaker_fraction: f64,
     /// Absolute cap on any model price (50,000 shipped). A guard.
+    ///
+    /// A name that reaches it stops moving, and over a century that is not
+    /// harmless: the winners reach it first, they are the index's largest
+    /// weights, and a frozen name adds no variance to the index's read-back,
+    /// so the VIX falls and, through the factor's VIX coupling, every other
+    /// name's volatility with it. Measured on the r14 candidate (N4, 12
+    /// held-out seeds x 100 years, sim/r15-volstate): capped names carried 35
+    /// per cent of the cap weight by years 90-100, the VIX averaged 13.8
+    /// against 20.3 in years 0-10, and name volatility below the cap read
+    /// 0.64x of the first decade. With the cap at 1e9 on the same seeds the
+    /// VIX read 15.9 and the ratio 0.68x; started with its five largest names
+    /// at 45,000, the roster's other 35 names lose a tenth of their index
+    /// volatility over five years (0.153 to 0.138), and lifting the cap
+    /// restores the uncapped run to the bit, since prices are scale-free
+    /// (a roster at 50 times the price runs the same market). A long run
+    /// should set it far above any price it can reach.
     pub price_hard_cap: f64,
 
     // ── Derived, computed once at construction (§5.3) ───────────────────

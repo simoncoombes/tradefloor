@@ -278,6 +278,14 @@ move; every price, every other macro series and
 `state_snapshot()["economy"]["vix"]` stay as they are. All three are 0 on
 every preset.
 
+`market_vol_leverage_standardise` sets the unit the market factor's return
+memory (`market_vol_leverage`) counts a day in: 0 is the baseline sd, as
+before, and 1 is the day's own z-score, so the memory's multiplier averages one
+in a storm as in a calm. It is 0 on every preset and every known-answer digest
+is unchanged. `price_hard_cap` now documents why a century-long run should lift
+it: a name at the cap stops moving, and the frozen winners drag the index's
+VIX and every other name's volatility down with them.
+
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
 meeting, in quarter points, where the ladder would cut less, hold or hike,
