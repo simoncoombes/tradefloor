@@ -647,6 +647,20 @@ phase as a panic. The snapshot and the state hash carry the multiplier only
 while the ratio is set. `ModelParams::market_vol_cycle_ratio` documents the
 measurements and how the mechanism meets `fair_value_market_vol_cap`.
 
+Four more dials, 0.0 on every preset, leave pinned states and scenarios to
+the caller. With `market_vol_cycle_pin_neutral` a session whose VIX a caller
+pinned applies no multiplier, and with `market_vol_cycle_pin_phase` a session
+whose cycle phase a caller pinned applies none; under either the multiplier
+relaxes toward one, so a released run steps back to its phase's value at the
+half-life. Without them the long run's 2020 replay read its worst month at
+59 per cent against 69 (the engine's own expansion multiplier scaled the
+pinned VIX's variance down), and the packaged recession's rise from its low
+read +102 per cent against +64 (the contraction's volatility on top of the
+scenario's own). `market_vol_cycle_trough_release` lets the trough give back
+a share of the contraction's multiplier, and
+`market_vol_cycle_release_half_life` sets the half-life while the
+multiplier falls.
+
 ### Found and fixed on the way to the default
 
 Making pt-v20 the default exposed defects the suite could not see while it

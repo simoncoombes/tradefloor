@@ -1147,6 +1147,19 @@ PERTURBATIONS = [
     # Measured; tests/test_market_vol_cycle.py sees it move over 15
     # sessions.
     ("market_vol_cycle_cap_relative", 1.0, False),
+    # INERT with the ratio on (its companion): the switch acts only on a
+    # session whose VIX a caller pinned, and the probe pins nothing.
+    # tests/test_market_vol_cycle.py pins one.
+    ("market_vol_cycle_pin_neutral", 1.0, False),
+    # INERT for the same reason: nothing pins the probe's phase.
+    ("market_vol_cycle_pin_phase", 1.0, False),
+    # INERT with the ratio on (its companion): the probe's engine is not in
+    # a trough, where alone the share is read. Measured.
+    ("market_vol_cycle_trough_release", 0.5, False),
+    # INERT with the ratio on (its companion): the first close lands the
+    # multiplier on its target and the probe's phase does not change in
+    # three sessions, so it never falls. Measured.
+    ("market_vol_cycle_release_half_life", 5.0, False),
     # INERT on every column this probe reads, at any value: the premium
     # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
     # inside the engine reads the quote, and on this probe's three calm days
@@ -1917,6 +1930,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "market_vol_cycle_relative_calm": {"market_vol_cycle_ratio": 2.0},
     "market_vol_cycle_cap_relative": {"market_vol_cycle_ratio": 2.0,
                                       "market_vol_cycle_expansion": 2.0},
+    # The bearcycle fix's pin switches, the trough's release and the
+    # release half-life are read only with the ratio on.
+    "market_vol_cycle_pin_neutral": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_pin_phase": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_trough_release": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_release_half_life": {"market_vol_cycle_ratio": 2.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
