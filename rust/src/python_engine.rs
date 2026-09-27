@@ -3747,6 +3747,12 @@ impl PyEngine {
         if self.inner.params().vix_anchor_memory != 0.0 {
             out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
         }
+        // The market factor's return memory, on the same rule: carried, and
+        // hashed, only with `market_vol_leverage` set.
+        if self.inner.carries_market_vol_leverage() {
+            out.set_item("market_vol_leverage_memory",
+                         self.inner.market_vol_leverage_memory())?;
+        }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
         // epicentre was drawn at (`-1` for `none`, a crisis with no
@@ -4442,6 +4448,14 @@ impl PyEngine {
                 _ => self.inner.set_market_variance_state(vals[0], vals[1]),
             }
         }
+        // The market factor's return memory, after the variance state
+        // (whose restore resets it). Absent means a model without it, or a
+        // build before it, where it was 0.0 and never moved.
+        let leverage_memory = match snapshot.get_item("market_vol_leverage_memory")? {
+            Some(raw) => raw.extract()?,
+            None => 0.0,
+        };
+        self.inner.set_market_vol_leverage_memory(leverage_memory);
 
         // The macro chain's state. Optional for the same reason as the
         // per-day accumulators above: a snapshot written before the chain

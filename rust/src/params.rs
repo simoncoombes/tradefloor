@@ -1479,10 +1479,109 @@ pub struct ModelParams {
     /// against a real +0.015 with nothing measured able to move it
     /// (rounds 93/95). This is the wire for exactly that statistic.
     ///
-    /// Applies to the FAST component only: the leverage effect is a
-    /// same-week phenomenon, and the slow component carries long-horizon
-    /// clustering, not asymmetry.
+    /// Applies to the FAST component only. The slow component's own
+    /// asymmetry is `market_vol_slow_gamma`, 0.0 on every shipped preset.
     pub market_vol_gamma: f64,
+    /// GJR asymmetry on the SLOW component of the market factor's variance.
+    /// 0.0, which every shipped preset carries, is the symmetric slow step:
+    /// the close takes a branch that makes the call it always made.
+    ///
+    /// Off zero, a down day loads `a_s + gamma` on the squared factor where
+    /// an up day loads `a_s`, and the carried share gives back `gamma/2`:
+    ///
+    /// ```text
+    /// v_s' = (1 - a_s - b_s) * target_s + (a_s + gamma * 1[F < 0]) * F^2
+    ///        + (b_s - gamma/2) * v_s,     (a_s, b_s) = (gain * p_s, (1 - gain) * p_s)
+    /// ```
+    ///
+    /// so the slow component's own persistence `p_s` and its resting level
+    /// are unchanged (over a symmetric factor the down arm loads `gamma/2`
+    /// on average, which is what the carried share gives back).
+    ///
+    /// # What it does to the mixture
+    ///
+    /// The slow component is fed the day factor, whose variance is the
+    /// MIXTURE's, so moving `gamma/2` from its own level onto the shock
+    /// makes it follow the faster mixture more closely. On pt-v20's
+    /// coefficients the joint mean recursion's slow pole goes from 0.9855
+    /// (a 47-session half-life) to 0.9814 at 0.3 and 0.9805 at 0.6 (35
+    /// sessions), and its fast pole from 0.923 to 0.733. The unclamped
+    /// fourth moment of the joint recursion (spectral radius of
+    /// `E[A (x) A]` over a normal factor) is finite on pt-v20 at 0.0
+    /// (0.984) and stops being so at 0.129 (1.016 at 0.3, 1.039 at 0.6):
+    /// past that the `market_vol_ceiling_multiple` clamp bounds the tail,
+    /// as it does on pt-v1, whose single component violates the condition
+    /// knowingly (`factor_vol.rs`,
+    /// `the_recursion_reverts_and_the_clamp_carries_the_fourth_moment`).
+    ///
+    /// # Why
+    ///
+    /// `market_vol_gamma` (the tape's GJR, 0.1556) acts on the fast 65 per
+    /// cent of the factor's variance, and the factor is about three
+    /// quarters of the index's, so the index's response to a fall is about
+    /// a third of the tape's and it is gone within a month. Measured on
+    /// held-out pt-v20 histories (crash-vol-state design, design
+    /// repository): the sum over lags 1-20 of corr(r_t, |r_t+k|) reads
+    /// -0.53 against the S&P 500's -1.35 (1990-2025; every 20-year US
+    /// window since 1926 lies in -0.79 to -1.75), and monthly skew -0.24
+    /// against -0.80. Index leverage decays over weeks to months (Bouchaud,
+    /// Matacz and Potters 2001; Corsi and Reno 2012), which is the slow
+    /// component's timescale.
+    ///
+    /// Read only with `market_vol_slow_weight` non-zero: the single-component
+    /// close has no slow component. In [0, 1], with
+    /// `(1 - market_vol_slow_gain) * market_vol_slow_persistence - gamma/2`
+    /// at or above zero so the carried share cannot go negative.
+    pub market_vol_slow_gamma: f64,
+    /// Gain of the market factor's variance on its RETURN MEMORY, in log
+    /// variance per unit of the memory. 0.0, which every shipped preset
+    /// carries, is off: the memory never moves, the snapshot and state hash
+    /// do not carry it, and the variance is the component mixture bit for
+    /// bit.
+    ///
+    /// Off zero the engine keeps `l`, an exponentially weighted memory of
+    /// the day factor in baseline sd units, sign flipped so a fall adds:
+    ///
+    /// ```text
+    /// u  = -F / sigma_b             (a fall)
+    ///    = -(1 - down) * F / sigma_b  (a rise)
+    ///      - down * sqrt(v / b) / sqrt(2 pi)   (re-centred)
+    /// l' = phi * l + (1 - phi) * u,   phi = 0.5^(1 / half_life)
+    /// ```
+    ///
+    /// where `b = sigma_b^2 = market_factor_sigma^2` and `v` is the variance
+    /// the day was drawn at. The variance the next session draws with --
+    /// and the index-variance identity, and so the VIX, reads -- is
+    ///
+    /// ```text
+    /// clamp(mixture * exp(k * l - k^2 * s^2 / 2)),
+    /// s^2 = (1 - phi) / (1 + phi) * ((1 + (1 - down)^2) / 2 - down^2 / (2 pi))
+    /// ```
+    ///
+    /// `s^2` is the memory's stationary variance at the baseline, so the
+    /// multiplier's mean is about one. The GJR components are fed the day
+    /// factor over the square root of the multiplier the day was drawn at
+    /// (the variance over the mixture), so a fall is not counted twice.
+    ///
+    /// A FORCED close (a scenario's `vix_sets_variance`) moves the memory
+    /// with the day's factor but sets the variance to the law's level
+    /// without the multiplier, so a scenario's asserted fear is the fear the
+    /// session draws at; the first free close after it applies the memory.
+    ///
+    /// This is a return-path memory (Black 1976; Christie 1982; the
+    /// exponential leverage kernel of Bouchaud, Matacz and Potters 2001),
+    /// which a GARCH recursion on squared shocks cannot express: a GJR term
+    /// remembers the size of a fall, not the fall. In [0, 50].
+    pub market_vol_leverage: f64,
+    /// Half-life of the return memory, in sessions. Unread at
+    /// `market_vol_leverage` 0.0; must be positive off it. In [0, 2520].
+    pub market_vol_leverage_half_life: f64,
+    /// How much of an UP day the return memory ignores. 0.0 counts up and
+    /// down days alike, so the memory is linear in the return path; 1.0
+    /// counts falls only, and the memory is re-centred on the mean that
+    /// asymmetry adds at the variance the day was drawn at. Unread at
+    /// `market_vol_leverage` 0.0. In [0, 1].
+    pub market_vol_leverage_down: f64,
 
     /// How far the common factor's shock share moves with the factor's own
     /// variance excursion. 0.0 is a constant share, which is every preset
@@ -5064,6 +5163,10 @@ impl ModelParams {
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
             market_vol_gamma: 0.0,
+            market_vol_slow_gamma: 0.0,
+            market_vol_leverage: 0.0,
+            market_vol_leverage_half_life: 0.0,
+            market_vol_leverage_down: 0.0,
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
@@ -7419,6 +7522,10 @@ impl ModelParams {
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
             "market_vol_gamma" => self.market_vol_gamma,
+            "market_vol_slow_gamma" => self.market_vol_slow_gamma,
+            "market_vol_leverage" => self.market_vol_leverage,
+            "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
+            "market_vol_leverage_down" => self.market_vol_leverage_down,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
@@ -7670,6 +7777,10 @@ impl ModelParams {
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
             "market_vol_gamma" => out.market_vol_gamma = value,
+            "market_vol_slow_gamma" => out.market_vol_slow_gamma = value,
+            "market_vol_leverage" => out.market_vol_leverage = value,
+            "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
+            "market_vol_leverage_down" => out.market_vol_leverage_down = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
@@ -8198,6 +8309,44 @@ impl ModelParams {
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
         }
+        if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
+            return Err(format!(
+                "market_vol_slow_gamma is {}. It is a GJR loading on the slow component's squared shock, in [0, 1].",
+                self.market_vol_slow_gamma));
+        }
+        if self.market_vol_slow_gamma != 0.0
+            && (1.0 - self.market_vol_slow_gain) * self.market_vol_slow_persistence
+                - 0.5 * self.market_vol_slow_gamma < 0.0
+        {
+            return Err(format!(
+                "market_vol_slow_gamma is {}, and the slow component carries only {} of its \
+                 persistence on its own level ((1 - market_vol_slow_gain) * \
+                 market_vol_slow_persistence). The dial gives back half of itself from that \
+                 share, so it may be at most twice it.",
+                self.market_vol_slow_gamma,
+                (1.0 - self.market_vol_slow_gain) * self.market_vol_slow_persistence));
+        }
+        if !(self.market_vol_leverage >= 0.0 && self.market_vol_leverage <= 50.0) {
+            return Err(format!(
+                "market_vol_leverage is {}. It is a gain on log variance per unit of the return memory, in [0, 50]; 0 is off.",
+                self.market_vol_leverage));
+        }
+        if !(self.market_vol_leverage_half_life >= 0.0 && self.market_vol_leverage_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_leverage_half_life is {}. It is a half-life in sessions, in [0, 2520].",
+                self.market_vol_leverage_half_life));
+        }
+        if self.market_vol_leverage != 0.0 && self.market_vol_leverage_half_life == 0.0 {
+            return Err(format!(
+                "market_vol_leverage is {} but market_vol_leverage_half_life is 0. The return \
+                 memory needs a half-life in sessions.",
+                self.market_vol_leverage));
+        }
+        if !(self.market_vol_leverage_down >= 0.0 && self.market_vol_leverage_down <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_down is {}. It is the share of an up day the return memory ignores, in [0, 1].",
+                self.market_vol_leverage_down));
+        }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
@@ -8641,6 +8790,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_alpha",
         "market_vol_beta",
         "market_vol_gamma",
+        "market_vol_slow_gamma",
+        "market_vol_leverage",
+        "market_vol_leverage_half_life",
+        "market_vol_leverage_down",
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",

@@ -267,6 +267,19 @@ PERTURBATIONS = [
     # the perturbation has to be TO a non-zero value; measured to move the
     # probe at 0.05 and at every larger value tried, and to move no draw.
     ("market_vol_gamma", 0.3, True),
+    # The slow component's GJR loading (crash-vol-state). Ships at 0.0, so
+    # the perturbation is TO the design's stage-1 value; the default runs a
+    # slow component, so a down day loads it from the first close.
+    ("market_vol_slow_gamma", 0.6, True),
+    # The return memory's gain, read with its half-life as the companion
+    # (refused without one). LIVE: the first close moves the memory and the
+    # next session draws at the multiplied variance.
+    ("market_vol_leverage", 3.0, True),
+    # INERT: unread at `market_vol_leverage` 0.0, the default's value.
+    ("market_vol_leverage_half_life", 40.0, False),
+    # LIVE with the memory on (its companions): counting falls only moves
+    # the memory on every up day.
+    ("market_vol_leverage_down", 1.0, True),
     # The shock share's rotation with the factor's own excursion, added at
     # 0.8.0. Ships at 0.0, so the perturbation is TO a non-zero value.
     # MEASURED to move the probe at 0.20 and to move no draw, on either
@@ -1653,6 +1666,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                       "vix_anchor_weight_level_knee": 0.0},
     "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                            "vix_anchor_weight_level": 1.0},
+    # The return memory's gain is refused without a half-life, and the
+    # down share is read only with the memory on (crash-vol-state).
+    "market_vol_leverage": {"market_vol_leverage_half_life": 40.0},
+    "market_vol_leverage_down": {"market_vol_leverage": 3.0,
+                                 "market_vol_leverage_half_life": 40.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},

@@ -419,6 +419,23 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    "market_vol_slow_gamma":
+        "inert at 0.0 as shipped: `market::factor_vol::slow_step` branches "
+        "on `== 0.0` and makes the symmetric call the close always made. "
+        "GJR asymmetry on the slow variance component, persistence kept "
+        "(0.8.5 realism work, crash-vol-state design: the index leverage "
+        "sum reads -0.53 against the tape's -1.35 on held-out pt-v20 "
+        "histories)",
+    "market_vol_leverage":
+        "inert at 0.0 as shipped: `MarketVarianceState::close_day_scaled` "
+        "branches on `!= 0.0` before its return-memory path, the memory is "
+        "never written, and the snapshot and state hash omit it. A return "
+        "memory on the market factor's variance (0.8.5 realism work, "
+        "crash-vol-state design, stage 2)",
+    "market_vol_leverage_half_life":
+        "unread while `market_vol_leverage` is 0.0",
+    "market_vol_leverage_down":
+        "unread while `market_vol_leverage` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "

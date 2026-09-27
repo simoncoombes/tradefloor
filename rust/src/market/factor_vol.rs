@@ -332,9 +332,11 @@ fn component_step(
 ) -> f64 {
     // The GJR term, spelled exactly as `update_toward_with` spells it: a
     // down day loads `alpha + gamma`, omega gives back `gamma/2`. The slow
-    // component always passes 0.0 -- the leverage effect is a same-week
-    // phenomenon and the slow timescale carries clustering, not asymmetry
-    // -- and 0.0 makes every term bit-identical to the symmetric step.
+    // component passes 0.0 on every shipped preset, and 0.0 makes every
+    // term bit-identical to the symmetric step; `market_vol_slow_gamma`
+    // off zero passes its own gamma with `beta` reduced by half of it (see
+    // `slow_step`), because the index's leverage lasts weeks to months and
+    // not only the fast component's same week.
     let leverage = if day_factor < 0.0 { gamma } else { 0.0 };
     (1.0 - alpha - beta - 0.5 * gamma) * target
         + (alpha + leverage) * day_factor * day_factor
@@ -352,6 +354,38 @@ fn slow_alpha_beta(params: &crate::params::ModelParams) -> (f64, f64) {
     let rho = params.market_vol_slow_persistence;
     let share = params.market_vol_slow_gain;
     (share * rho, (1.0 - share) * rho)
+}
+
+/// The slow component's step, clamped.
+///
+/// At `market_vol_slow_gamma` 0.0 -- every shipped preset -- this is a
+/// BRANCH that makes the call the close always made, symmetric, with
+/// gamma 0.0. Off zero, a down day loads `a_s + gamma` on the squared shock
+/// and the carried share gives back `gamma/2`: `component_step` with
+/// `(a_s, b_s - gamma/2, gamma)`, whose omega term is
+/// `1 - a_s - (b_s - gamma/2) - gamma/2 = 1 - a_s - b_s`, so the resting
+/// level and the persistence `a_s + b_s` are unchanged. See
+/// `ModelParams::market_vol_slow_gamma`.
+fn slow_step(
+    params: &crate::params::ModelParams,
+    current: f64,
+    day_factor: f64,
+    target: f64,
+) -> f64 {
+    let (sa, sb) = slow_alpha_beta(params);
+    let g = params.market_vol_slow_gamma;
+    if g == 0.0 {
+        clamp_variance(params, component_step(current, day_factor, target, sa, sb, 0.0))
+    } else {
+        clamp_variance(params, component_step(current, day_factor, target, sa, sb - 0.5 * g, g))
+    }
+}
+
+/// The return memory's per-session carry, `0.5^(1 / half_life)`. Read only
+/// while `market_vol_leverage` is set, where validation holds the half-life
+/// positive.
+fn leverage_phi(params: &crate::params::ModelParams) -> f64 {
+    mathx::pow(0.5, 1.0 / params.market_vol_leverage_half_life)
 }
 
 /// The shared clamp: a variance stays inside its floor and ceiling
@@ -523,6 +557,11 @@ pub struct MarketVarianceState {
     /// lagged transmission wire. Purely observational: nothing in the
     /// variance process reads it.
     prev_day_factor: f64,
+    /// The return memory `market_vol_leverage` reads: an exponentially
+    /// weighted memory of the day factor in baseline sd units, a fall
+    /// counted positive. Exactly 0.0, and never written, while the dial is
+    /// 0.0; the snapshot and the state hash carry it only while it is set.
+    leverage_memory: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -553,6 +592,7 @@ impl MarketVarianceState {
             slow_variance: base,
             smoothed_vix: None,
             prev_day_factor: 0.0,
+            leverage_memory: 0.0,
         }
     }
 
@@ -579,6 +619,92 @@ impl MarketVarianceState {
     /// `snapshot()`; this is an accessor, not new state.
     pub fn day_factor(&self) -> f64 {
         self.day_factor
+    }
+
+    /// The return memory `market_vol_leverage` reads. 0.0 on every model
+    /// with the dial off.
+    pub fn leverage_memory(&self) -> f64 {
+        self.leverage_memory
+    }
+
+    /// Put the return memory back, for checkpoints. See
+    /// [`crate::params::ModelParams::market_vol_leverage`].
+    pub fn set_leverage_memory(&mut self, value: f64) {
+        self.leverage_memory = value;
+    }
+
+    /// The return memory's variance multiplier at memory `l`,
+    /// `exp(k * l - k^2 * s^2 / 2)`, with `s^2` the memory's stationary
+    /// variance at the baseline. See
+    /// [`crate::params::ModelParams::market_vol_leverage`]. Read only while
+    /// the dial is set.
+    fn leverage_multiplier(params: &crate::params::ModelParams, l: f64) -> f64 {
+        let k = params.market_vol_leverage;
+        let phi = leverage_phi(params);
+        let a = params.market_vol_leverage_down;
+        let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a))
+            - a * a / (2.0 * std::f64::consts::PI);
+        let s2 = (1.0 - phi) / (1.0 + phi) * var_u;
+        mathx::exp(k * l - 0.5 * k * k * s2)
+    }
+
+    /// The component mixture the variance is built from: the clamped
+    /// weighted sum of the two components, or the one component on a
+    /// single-component model. Equal to `variance` whenever the return
+    /// memory is off; with it on, `variance` is this times the memory's
+    /// multiplier (clamped), and on the session after a forced close it is
+    /// this exactly.
+    fn mixture(&self, params: &crate::params::ModelParams) -> f64 {
+        let w = params.market_vol_slow_weight;
+        if w == 0.0 {
+            self.fast_variance
+        } else {
+            clamp_variance(params, (1.0 - w) * self.fast_variance + w * self.slow_variance)
+        }
+    }
+
+    /// The day factor in the components' own units: the day was drawn at
+    /// `variance`, the components are a mixture of `mixture`, so the shock
+    /// they are fed is `F * sqrt(mixture / variance)`. That is `F / sqrt(m)`
+    /// for the multiplier `m` the day was drawn at, and exactly `F` on the
+    /// session after a forced close, which draws at the mixture itself.
+    /// Read only while the return memory is on.
+    fn component_shock(&self, params: &crate::params::ModelParams) -> f64 {
+        let mix = self.mixture(params);
+        if self.variance > 0.0 && mix > 0.0 {
+            self.day_factor * mathx::sqrt(mix / self.variance)
+        } else {
+            self.day_factor
+        }
+    }
+
+    /// [`Self::component_shock`] for a given day factor, for the tests.
+    #[cfg(test)]
+    fn day_factor_scaled_for_test(&self, params: &crate::params::ModelParams, f: f64) -> f64 {
+        let mut s = *self;
+        s.day_factor = f;
+        s.component_shock(params)
+    }
+
+    /// One step of the return memory on the day's factor, at the variance
+    /// the day was drawn at. See
+    /// [`crate::params::ModelParams::market_vol_leverage`]. Called only
+    /// while the dial is set.
+    fn step_leverage_memory(&mut self, params: &crate::params::ModelParams) {
+        let b = params.market_factor_sigma * params.market_factor_sigma;
+        let sd_b = mathx::sqrt(b);
+        let a = params.market_vol_leverage_down;
+        let f = self.day_factor;
+        let u = if f < 0.0 { -f / sd_b } else { -(1.0 - a) * f / sd_b };
+        // The mean the asymmetry adds at the variance the day was drawn at:
+        // `E[u] = a * sqrt(v / b) / sqrt(2 pi)` for `F ~ N(0, v)`.
+        let centre = if a == 0.0 {
+            0.0
+        } else {
+            a * mathx::sqrt(self.variance / b) / mathx::sqrt(2.0 * std::f64::consts::PI)
+        };
+        let phi = leverage_phi(params);
+        self.leverage_memory = phi * self.leverage_memory + (1.0 - phi) * (u - centre);
     }
 
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
@@ -735,6 +861,13 @@ impl MarketVarianceState {
         // Every preset before pt-v4 must reproduce the single-component
         // update to the bit, and this is the only spelling that owes
         // nothing to an argument about how floats behave.
+        // THE RETURN MEMORY. A branch, so at `market_vol_leverage` 0.0 --
+        // every shipped preset -- nothing below it moves and no field it
+        // owns is written. See `ModelParams::market_vol_leverage`.
+        if params.market_vol_leverage != 0.0 {
+            return self.close_with_leverage_memory(params, target, base, vix_ratio);
+        }
+
         if w == 0.0 {
             // `update_market_variance_at` recomputes the baseline from the
             // dials and so cannot see the level; at 1.0 it is called, so
@@ -803,11 +936,7 @@ impl MarketVarianceState {
                 * (1.0 - params.market_vol_slow_vix_damp);
             base * (1.0 - c + c * vix_response(params, vix_ratio))
         };
-        let (sa, sb) = slow_alpha_beta(params);
-        let slow = clamp_variance(
-            params,
-            component_step(self.slow_variance, self.day_factor, slow_target, sa, sb, 0.0),
-        );
+        let slow = slow_step(params, self.slow_variance, self.day_factor, slow_target);
 
         self.fast_variance = fast;
         self.slow_variance = slow;
@@ -818,6 +947,57 @@ impl MarketVarianceState {
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
         (target, Some(slow_target))
+    }
+
+    /// [`Self::close_day_scaled`] with the return memory on
+    /// (`market_vol_leverage` non-zero). Separate so the path every shipped
+    /// preset takes is the code that stood there, untouched.
+    ///
+    /// The same steps as the free close, with three differences: the
+    /// components are fed the day factor in their own units
+    /// ([`Self::component_shock`]); the memory takes one step on the day's
+    /// factor at the variance the day was drawn at; and the variance the
+    /// next session draws with is the mixture times the memory's
+    /// multiplier, clamped. The single-component branch steps its one
+    /// component through `update_toward_with` against the target the
+    /// caller computed, which at level 1.0 is the target
+    /// `update_market_variance_at` would compute.
+    fn close_with_leverage_memory(
+        &mut self,
+        params: &crate::params::ModelParams,
+        target: f64,
+        base: f64,
+        vix_ratio: f64,
+    ) -> (f64, Option<f64>) {
+        let shock = self.component_shock(params);
+        let w = params.market_vol_slow_weight;
+        let slow_target = if w == 0.0 {
+            None
+        } else if params.market_vol_slow_vix_damp == 0.0 {
+            Some(target)
+        } else {
+            let c = params.market_vol_vix_coupling * (1.0 - params.market_vol_slow_vix_damp);
+            Some(base * (1.0 - c + c * vix_response(params, vix_ratio)))
+        };
+        if w == 0.0 {
+            self.fast_variance = update_toward_with(params, self.fast_variance, shock, target);
+        } else {
+            let (fast_alpha, fast_beta) = alpha_beta_at(params, self.fast_variance, target);
+            self.fast_variance = clamp_variance(
+                params,
+                component_step(self.fast_variance, shock, target,
+                               fast_alpha, fast_beta, params.market_vol_gamma),
+            );
+            self.slow_variance = slow_step(
+                params, self.slow_variance, shock, slow_target.unwrap_or(target));
+        }
+        self.step_leverage_memory(params);
+        let mix = self.mixture(params);
+        self.variance = clamp_variance(
+            params, mix * Self::leverage_multiplier(params, self.leverage_memory));
+        self.prev_day_factor = self.day_factor;
+        self.day_factor = 0.0;
+        (target, slow_target)
     }
 
     /// The two targets a close at this VIX reverts toward, `(fast, slow)`,
@@ -910,7 +1090,10 @@ impl MarketVarianceState {
     ///
     /// # What it gives up while forced
     ///
-    /// The day's squared factor does not feed the state on a forced close.
+    /// The day's squared factor does not feed the variance components on a
+    /// forced close. The return memory (`market_vol_leverage`, when set)
+    /// does take the day's factor, because the returns happened; the
+    /// variance written here carries no multiplier from it.
     /// The forced VIX is the fear the scenario asserts, and letting the
     /// model's own shocks move the variance off it would mean the scenario
     /// did not set it. The per-name GARCH, the sector state and the jumps
@@ -938,6 +1121,14 @@ impl MarketVarianceState {
         let (target, slow_target) =
             Self::forced_targets(params, vix_ratio_denominator, vix, level);
         let w = params.market_vol_slow_weight;
+        // The return memory remembers a forced session's factor like any
+        // other -- the returns happened -- but the variance below is the
+        // law's level at the forced VIX, without the memory's multiplier:
+        // the scenario asserted that fear. A branch, so nothing moves at
+        // `market_vol_leverage` 0.0.
+        if params.market_vol_leverage != 0.0 {
+            self.step_leverage_memory(params);
+        }
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
         if w == 0.0 {
@@ -1074,6 +1265,13 @@ impl MarketVarianceState {
             self.slow_variance = slow;
             self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
         }
+        // With the return memory on, the session draws at the mixture times
+        // the memory's multiplier, which is what a close would leave. A
+        // branch: nothing moves at `market_vol_leverage` 0.0.
+        if params.market_vol_leverage != 0.0 {
+            self.variance = clamp_variance(
+                params, self.variance * Self::leverage_multiplier(params, self.leverage_memory));
+        }
     }
 
     /// The state numbers, for checkpoints: `(variance, day_factor,
@@ -1103,6 +1301,7 @@ impl MarketVarianceState {
             // re-seeds from the first smoothed close after restore.
             smoothed_vix: None,
             prev_day_factor: 0.0,
+            leverage_memory: 0.0,
         }
     }
 
@@ -1126,6 +1325,9 @@ impl MarketVarianceState {
             variance, day_factor, fast_variance, slow_variance,
             smoothed_vix: if smoothed_vix < 0.0 { None } else { Some(smoothed_vix) },
             prev_day_factor,
+            // Carried under its own snapshot key, only while the return
+            // memory is on; the engine puts it back after this.
+            leverage_memory: 0.0,
         }
     }
 }
@@ -1858,5 +2060,221 @@ mod close_day_targets {
         assert_eq!(s.variance, clamp_variance(&p, t));
         assert_eq!(s.fast_variance, s.variance);
         assert_eq!(s.slow_variance, slow_before);
+    }
+}
+
+/// The crash-vol-state dials: `market_vol_slow_gamma` (GJR on the slow
+/// component) and the return memory (`market_vol_leverage`, its half-life
+/// and its down share). See their entries in `ModelParams`.
+#[cfg(test)]
+mod crash_vol_state {
+    use super::*;
+    use crate::params::ModelParams;
+
+    fn pt_v20() -> ModelParams {
+        crate::params::PT_V20
+    }
+
+    fn with_memory(k: f64, h: f64, down: f64) -> ModelParams {
+        let mut p = pt_v20();
+        p.market_vol_leverage = k;
+        p.market_vol_leverage_half_life = h;
+        p.market_vol_leverage_down = down;
+        p
+    }
+
+    fn close_after(p: &ModelParams, state: &MarketVarianceState, f: f64) -> MarketVarianceState {
+        let mut s = *state;
+        s.accumulate(f);
+        s.close_day_scaled(p, p.market_vol_vix_anchor, 19.0, 1.0);
+        s
+    }
+
+    #[test]
+    fn slow_gamma_zero_is_the_symmetric_call() {
+        let p = pt_v20();
+        assert_eq!(p.market_vol_slow_gamma, 0.0);
+        let (sa, sb) = slow_alpha_beta(&p);
+        for &f in &[-0.03, -0.004, 0.0, 0.004, 0.03] {
+            let direct = clamp_variance(&p, component_step(4e-5, f, 5e-5, sa, sb, 0.0));
+            assert_eq!(slow_step(&p, 4e-5, f, 5e-5).to_bits(), direct.to_bits());
+        }
+    }
+
+    #[test]
+    fn slow_gamma_loads_only_down_days_and_keeps_persistence() {
+        let mut p = pt_v20();
+        p.market_vol_slow_gamma = 0.6;
+        let q = pt_v20();
+        let (v, t) = (4e-5, 5e-5);
+        let d = 0.009;
+        // A fall loads the slow component more than a rise of the same size.
+        let down = slow_step(&p, v, -d, t);
+        let up = slow_step(&p, v, d, t);
+        assert!(down > up, "a fall must load the slow component: {down} vs {up}");
+        // The rise loads LESS than the symmetric step: the rebate is taken
+        // from the carried share on every day.
+        assert!(up < slow_step(&q, v, d, t));
+        // With the shock at the component's own level, the two-sided mean is
+        // the symmetric step: the resting level and the persistence are
+        // unchanged, `E[v'] = (1 - p) t + p v`.
+        let at_level = crate::mathx::sqrt(v);
+        let two_sided = 0.5 * (slow_step(&p, v, -at_level, t) + slow_step(&p, v, at_level, t));
+        let (sa, sb) = slow_alpha_beta(&p);
+        let persistence = sa + sb;
+        let expected = (1.0 - persistence) * t + persistence * v;
+        assert!((two_sided - expected).abs() < 1e-18, "{two_sided} vs {expected}");
+        // The whole mixture: the next session's variance after a fall is
+        // higher with the dial than without, after a rise lower.
+        let s0 = MarketVarianceState::new_with(&p);
+        assert!(close_after(&p, &s0, -0.02).variance() > close_after(&q, &s0, -0.02).variance());
+        assert!(close_after(&p, &s0, 0.02).variance() < close_after(&q, &s0, 0.02).variance());
+    }
+
+    #[test]
+    fn slow_gamma_is_unread_on_a_single_component_model() {
+        let mut q = pt_v20();
+        q.market_vol_slow_weight = 0.0;
+        let mut p = q.clone();
+        p.market_vol_slow_gamma = 0.6;
+        let s0 = MarketVarianceState::new_with(&q);
+        for &f in &[-0.02, 0.02] {
+            assert_eq!(close_after(&p, &s0, f), close_after(&q, &s0, f));
+        }
+    }
+
+    #[test]
+    fn the_memory_is_never_written_while_off() {
+        let p = pt_v20();
+        let mut s = MarketVarianceState::new_with(&p);
+        for &f in &[-0.05, 0.03, -0.02] {
+            s = close_after(&p, &s, f);
+            assert_eq!(s.leverage_memory().to_bits(), 0.0_f64.to_bits());
+        }
+    }
+
+    #[test]
+    fn a_fall_raises_and_a_rise_lowers_the_next_session_variance() {
+        let p = with_memory(3.0, 40.0, 0.0);
+        let s0 = MarketVarianceState::new_with(&p);
+        let quiet = close_after(&p, &s0, 0.0);
+        let fell = close_after(&p, &s0, -0.01);
+        let rose = close_after(&p, &s0, 0.01);
+        assert!(fell.leverage_memory() > 0.0 && rose.leverage_memory() < 0.0);
+        assert!(fell.variance() > quiet.variance(), "{} vs {}", fell.variance(), quiet.variance());
+        // The GJR components raise the variance after a rise too; the
+        // memory keeps it below the fall's.
+        assert!(rose.variance() < fell.variance());
+        // Linear in the path at down 0.0: a rise and a fall of the same size
+        // leave memories of opposite sign and equal size.
+        assert!((fell.leverage_memory() + rose.leverage_memory()).abs() < 1e-15);
+    }
+
+    #[test]
+    fn the_memory_decays_at_its_half_life_with_zero_shocks() {
+        for &h in &[10.0, 40.0] {
+            let p = with_memory(3.0, h, 0.0);
+            let mut s = close_after(&p, &MarketVarianceState::new_with(&p), -0.02);
+            let l0 = s.leverage_memory();
+            for _ in 0..(h as usize) {
+                s = close_after(&p, &s, 0.0);
+            }
+            let ratio = s.leverage_memory() / l0;
+            assert!((ratio - 0.5).abs() < 1e-12, "half-life {h}: ratio {ratio}");
+        }
+    }
+
+    #[test]
+    fn down_one_counts_falls_only_and_is_centred() {
+        let p = with_memory(3.0, 40.0, 1.0);
+        let s0 = MarketVarianceState::new_with(&p);
+        let fell = close_after(&p, &s0, -0.01);
+        let rose = close_after(&p, &s0, 0.01);
+        let quiet = close_after(&p, &s0, 0.0);
+        // A rise and a quiet day are the same to the memory: both only
+        // subtract the centre.
+        assert_eq!(rose.leverage_memory().to_bits(), quiet.leverage_memory().to_bits());
+        assert!(quiet.leverage_memory() < 0.0 && fell.leverage_memory() > 0.0);
+    }
+
+    /// A small deterministic normal stream for the moment checks.
+    struct Normals(u64);
+    impl Normals {
+        fn uniform(&mut self) -> f64 {
+            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            ((self.0 >> 11) as f64 + 0.5) / (1u64 << 53) as f64
+        }
+        fn next(&mut self) -> f64 {
+            let (u1, u2) = (self.uniform(), self.uniform());
+            crate::mathx::sqrt(-2.0 * u1.ln()) * (2.0 * std::f64::consts::PI * u2).cos()
+        }
+    }
+
+    #[test]
+    fn the_multiplier_averages_about_one_under_its_own_shocks() {
+        for &(k, h, down) in &[(3.0, 40.0, 0.0), (4.0, 10.0, 1.0), (2.0, 20.0, 0.5)] {
+            let p = with_memory(k, h, down);
+            let b = p.market_factor_sigma * p.market_factor_sigma;
+            let mut s = MarketVarianceState::new_with(&p);
+            s.variance = b;
+            let mut z = Normals(20260926);
+            let (mut sum, mut n) = (0.0, 0u32);
+            for i in 0..400_000 {
+                s.day_factor = crate::mathx::sqrt(b) * z.next();
+                s.step_leverage_memory(&p);
+                if i >= 2_000 {
+                    sum += MarketVarianceState::leverage_multiplier(&p, s.leverage_memory);
+                    n += 1;
+                }
+            }
+            let mean = sum / n as f64;
+            assert!((mean - 1.0).abs() < 0.02, "k {k}, H {h}, down {down}: E[m] {mean}");
+        }
+    }
+
+    #[test]
+    fn the_components_are_fed_the_shock_in_their_own_units() {
+        // A state whose variance is exactly twice its mixture was drawn at a
+        // multiplier of 2, so the components must see the day factor over
+        // sqrt(2): the same step a memory-off state at the mixture takes on
+        // that smaller shock.
+        let p = with_memory(3.0, 40.0, 0.0);
+        let mut s = MarketVarianceState::new_with(&p);
+        let mix = s.mixture(&p);
+        s.variance = 2.0 * mix;
+        let f = -0.02;
+        let fed = s.day_factor_scaled_for_test(&p, f);
+        assert!((fed - f / crate::mathx::sqrt(2.0)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn a_forced_close_moves_the_memory_but_not_the_forced_level() {
+        let p = with_memory(3.0, 40.0, 0.0);
+        let anchor = p.market_vol_vix_anchor;
+        let mut forced = MarketVarianceState::new_with(&p);
+        forced.accumulate(-0.03);
+        forced.close_day_forced(&p, anchor, 30.0, 1.0);
+        assert!(forced.leverage_memory() > 0.0);
+        let level = MarketVarianceState::forced_level(&p, anchor, 30.0, 1.0);
+        assert_eq!(forced.variance().to_bits(), level.to_bits());
+        // Off, the forced close is the one that stood.
+        let q = pt_v20();
+        let mut plain = MarketVarianceState::new_with(&q);
+        plain.accumulate(-0.03);
+        plain.close_day_forced(&q, anchor, 30.0, 1.0);
+        assert_eq!(plain.leverage_memory(), 0.0);
+        assert_eq!(plain.variance().to_bits(),
+                   MarketVarianceState::forced_level(&q, anchor, 30.0, 1.0).to_bits());
+    }
+
+    #[test]
+    fn the_single_component_model_runs_the_memory_too() {
+        let mut p = with_memory(3.0, 40.0, 0.0);
+        p.market_vol_slow_weight = 0.0;
+        let s0 = MarketVarianceState::new_with(&p);
+        let fell = close_after(&p, &s0, -0.01);
+        let rose = close_after(&p, &s0, 0.01);
+        assert!(fell.leverage_memory() > 0.0);
+        assert!(fell.variance() > rose.variance());
     }
 }
