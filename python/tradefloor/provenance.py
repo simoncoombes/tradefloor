@@ -675,6 +675,27 @@ OUT_OF_SCOPE = {
         "moves it by the rest; paired with `treasury_path_pricing` so a "
         "decision moves the 10-year on the day by what it did before while "
         "the forecast takes out the drift after (sim/r15-postcut)",
+    "corporate_spread_vix_cut":
+        "inert at 0.0 as shipped: the corporate spread is the meeting "
+        "formula's 2 bp a VIX point times the cycle multiplier, which the "
+        "close's daily move tracks. Off zero the slope is cut by this share "
+        "at the meeting, the close and a pinned VIX's credit leg. Target: "
+        "the stock-IG correlation, +0.27 daily and +0.47 monthly for SPY "
+        "and LQD 2015-2025, and the Baa spread's daily change sd, 3.1 bp on "
+        "FRED BAA10Y 1990-2026; the spread's VIX-borne move reverses as the "
+        "VIX reverts, so the daily reading runs high and the monthly low "
+        "(0.8.5 realism work, bondcorr)",
+    "corporate_spread_equity_gain":
+        "inert at 0.0 as shipped: no leverage gap is written and the spread "
+        "reads the VIX alone. Off zero the spread's base gains the gain times "
+        "the index's log fall below its own slow average (a structural "
+        "credit model's leverage), times the cycle multiplier, at the close, "
+        "the meeting and the live mark. Target: the monthly stock-IG "
+        "correlation, +0.47 for SPY and LQD 2015-2025, against 0.15 on the "
+        "r14 screen's N4 arm (0.8.5 realism work, bondcorr)",
+    "corporate_spread_equity_half_life":
+        "unread while `corporate_spread_equity_gain` is 0.0 (0.8.5 realism "
+        "work, bondcorr)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

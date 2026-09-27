@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v12",
   "fingerprint": "pt-v12",
-  "coefficient_digest": "1d9a0928224df767ef4b34deadbb6e88e8a626394e527021969f6f3ec8e9a8bf",
+  "coefficient_digest": "a3e97e40e30d6a90f40f122405729f2d9182d1f625ee41758a3caaee272d1fb4",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
@@ -19,6 +19,9 @@
     "cascade_symmetry": 0.0,
     "closing_auction": 0.0,
     "corporate_spread_cycle": 0.0,
+    "corporate_spread_equity_gain": 0.0,
+    "corporate_spread_equity_half_life": 0.0,
+    "corporate_spread_vix_cut": 0.0,
     "corporate_yield_daily": 0.0,
     "crash_amplifier_conditional_sigma": 0.0,
     "crash_amplifier_slope": 0.2,

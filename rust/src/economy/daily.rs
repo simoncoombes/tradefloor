@@ -354,6 +354,17 @@ pub struct YieldDials {
     /// 20 while inflation is under 4. See
     /// [`crate::params::ModelParams::treasury_haven_gain`].
     pub haven_gain: f64,
+    /// The share of the VIX slope taken out of the corporate spread's
+    /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
+    pub spread_vix_cut: f64,
+    /// Percentage points of spread (times the multiplier) per unit of the
+    /// index's log fall below its slow average. See
+    /// [`crate::params::ModelParams::corporate_spread_equity_gain`].
+    pub spread_equity_gain: f64,
+    /// The slow average's one-session decay, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
+    /// Read only with `spread_equity_gain` set.
+    pub spread_equity_decay: f64,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -404,6 +415,9 @@ impl Default for YieldDials {
             priced_path: 0.0,
             rate_damping: 0.0,
             haven_gain: 0.0,
+            spread_vix_cut: 0.0,
+            spread_equity_gain: 0.0,
+            spread_equity_decay: 0.0,
         }
     }
 }
@@ -1136,6 +1150,20 @@ pub fn vix_and_yields(
         }
     }
 
+    // CREDIT'S LEVERAGE TERM (`corporate_spread_equity_gain`): the index's
+    // log fall below its own slow average, stepped on the session's return
+    // from the last close. Written whatever the pins, so the meeting's
+    // re-anchor reads it too; nothing runs with the gain at 0.0.
+    let equity_gain = inputs.yields.spread_equity_gain;
+    let (gap_before, gap_after) = if equity_gain != 0.0 {
+        let r = mathx::log(mathx::max(1.0 + inputs.market_day_return_pct / 100.0, 1e-6));
+        let g = inputs.yields.spread_equity_decay * (economy.spread_equity_gap - r);
+        new_state.spread_equity_gap = g;
+        (economy.spread_equity_gap, g)
+    } else {
+        (0.0, 0.0)
+    };
+
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
     // central-bank meeting, so fair value's discount rate, and an IG bond
     // priced off it, sat still for six weeks at a time. Off zero it moves
@@ -1173,10 +1201,34 @@ pub fn vix_and_yields(
         // level stays on the formula and the next meeting finds it there.
         // A pinned VIX still takes no VIX term; the multiplier's change
         // passes through at the VIX written.
+        //
+        // THE VIX SLOPE'S CUT AND CREDIT'S LEVERAGE TERM
+        // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`): the
+        // formula's slope scaled and its base carrying `gain * gap`, on both
+        // sides of the change. A VIX pin takes the VIX out, not the index.
+        // Guarded, so with both at 0.0 the expressions are the ones that
+        // stood.
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
         let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
             let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
-            crate::economy::central_bank::spread_formula(vix_close, m1)
-                - crate::economy::central_bank::spread_formula(economy.vix, m0)
+            if spread_dials {
+                let cut = inputs.yields.spread_vix_cut;
+                crate::economy::central_bank::spread_formula_with(
+                    vix_close, m1, cut, equity_gain * gap_after)
+                    - crate::economy::central_bank::spread_formula_with(
+                        economy.vix, m0, cut, equity_gain * gap_before)
+            } else {
+                crate::economy::central_bank::spread_formula(vix_close, m1)
+                    - crate::economy::central_bank::spread_formula(economy.vix, m0)
+            }
+        } else if spread_dials {
+            let vix_part = if inputs.yields.vix_pinned {
+                0.0
+            } else {
+                0.02 * (1.0 - inputs.yields.spread_vix_cut)
+                    * cycle_spread_multiplier * (new_state.vix - economy.vix)
+            };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
         } else if inputs.yields.vix_pinned {
             0.0
         } else {

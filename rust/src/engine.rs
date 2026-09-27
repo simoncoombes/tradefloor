@@ -1301,6 +1301,14 @@ impl Engine {
         self.params.fed_put_gain != 0.0
     }
 
+    /// Whether this engine's model carries credit's leverage gap
+    /// (`EconomyState::spread_equity_gap`), which is when the snapshot and
+    /// the state hash carry it: `corporate_spread_equity_gain` set. Off on
+    /// every preset.
+    pub fn carries_spread_equity_gap(&self) -> bool {
+        self.params.corporate_spread_equity_gain != 0.0
+    }
+
     /// The Fed put's cut the curve prices tonight (`treasury_put_pricing`),
     /// percentage points: the share of the cut the put would ask for at a
     /// meeting now, no more than the policy rate, and 0.0 with inflation at
@@ -5047,9 +5055,16 @@ impl Engine {
         } else {
             crate::economy::central_bank::cycle_spread_multiplier(self.economy.cycle_phase)
         };
+        // The slope less `corporate_spread_vix_cut`, as the close charges
+        // it; a branch, so at 0.0 the slope is the literal that stood.
+        let slope = if self.params.corporate_spread_vix_cut != 0.0 {
+            0.02 * (1.0 - self.params.corporate_spread_vix_cut)
+        } else {
+            0.02
+        };
         let e = &mut self.economy;
         e.corporate_bond_yield = crate::mathx::max(
-            e.corporate_bond_yield + 0.02 * m * (e.vix - vix_before),
+            e.corporate_bond_yield + slope * m * (e.vix - vix_before),
             e.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
         );
         true
@@ -7101,6 +7116,7 @@ impl Engine {
         let market_day_return_pct = if self.params.vix_return_source == 0.0
             && self.params.vix_level_identity == 0.0
             && self.params.flight_to_quality_day == 0.0
+            && self.params.corporate_spread_equity_gain == 0.0
         {
             0.0
         } else {
@@ -7296,6 +7312,8 @@ impl Engine {
             path_gain: self.params.treasury_path_pricing,
             path_before: self.priced_policy_path(),
             rate_damping: self.params.treasury_policy_damping,
+            spread_vix_cut: self.params.corporate_spread_vix_cut,
+            spread_equity_gain: self.params.corporate_spread_equity_gain,
         };
         // THE INTERMEETING MEETING (`fed_put_emergency_vix`): a VIX close at
         // or above the dial, with inflation under the put's ceiling and room
@@ -7557,6 +7575,16 @@ impl Engine {
                 priced_path: self.priced_policy_path(),
                 rate_damping: self.params.treasury_policy_damping,
                 haven_gain: self.params.treasury_haven_gain,
+                // Credit's VIX slope and leverage term
+                // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`),
+                // 0.0 unless set; the projection reads them as the close does.
+                spread_vix_cut: self.params.corporate_spread_vix_cut,
+                spread_equity_gain: self.params.corporate_spread_equity_gain,
+                spread_equity_decay: if self.params.corporate_spread_equity_gain != 0.0 {
+                    crate::mathx::pow(0.5, 1.0 / self.params.corporate_spread_equity_half_life)
+                } else {
+                    0.0
+                },
             },
             volatility: request.volatility,
             active_shocks: request.active_shocks,
@@ -9633,6 +9661,11 @@ impl Engine {
             hash_f64(&mut buf, self.economy.fed_put);
             hash_f64(&mut buf, self.economy.fed_put_owed);
             hash_f64(&mut buf, self.economy.fed_put_mcap_prev);
+        }
+        // Credit's leverage gap, on the same rule: only with
+        // `corporate_spread_equity_gain` set.
+        if self.carries_spread_equity_gap() {
+            hash_f64(&mut buf, self.economy.spread_equity_gap);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

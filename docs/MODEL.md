@@ -570,6 +570,32 @@ A daily floor, $y^{c} \ge y^{10} + 0.8$, also applies
 moves every session with the 10-year and the VIX, and is re-anchored at
 meetings.
 
+**Credit's VIX slope and leverage term** (`corporate_spread_vix_cut` $c$,
+`corporate_spread_equity_gain` $g_L$, `corporate_spread_equity_half_life`
+$H_L$, 0 on every preset). The VIX reverts within days of a sell-off while
+the index stays down, so a spread that is the VIX's formula gives most of a
+down day's widening back within the month. With $g_L$ set, each close steps
+the index's log fall below its own slow average on the session's return from
+the last close, $R_d$ in percent:
+
+```math
+D_{d+1} = 2^{-1/H_L}\,\big(D_d - \ln(1 + R_d/100)\big)
+```
+
+and the spread formula, at the meeting, in the close's daily move and in the
+rate indices' live projection, becomes
+
+```math
+\mathrm{clip}\Big(\big(1 + 0.02\,(1 - c)\,(X - 12) + g_L\,D\big)\,m_{\mathcal{P}};\ 0.8,\ 6\Big)
+```
+
+so the daily move carries $g_L\,m_{\mathcal{P}}\,(D_{d+1} - D_d)$ beside the
+cut VIX term, and a spread widened by a fall stays wide while the index stays
+below its average (a structural credit model's leverage: Merton 1974;
+Collin-Dufresne, Goldstein and Martin 2001). A VIX pin removes the VIX term
+only. The gap is `EconomyState::spread_equity_gap`, carried by the snapshot
+and the state hash only while $g_L$ is set. No draw.
+
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
@@ -2634,6 +2660,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
+- **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work

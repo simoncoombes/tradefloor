@@ -493,6 +493,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The share of the policy rate's distance from neutral the 10-year
     # leaves out.
     "treasury_policy_damping": (0.0, 0.8),
+    # The share of the VIX slope out of the corporate spread's formula.
+    "corporate_spread_vix_cut": (0.0, 1.0),
+    # pp of spread (times the cycle multiplier) per unit of the index's log
+    # fall below its slow average; 3 widens 0.9 points on a 30 per cent fall.
+    "corporate_spread_equity_gain": (0.0, 3.0),
+    # The slow average's half-life in sessions; 252 is a year.
+    "corporate_spread_equity_half_life": (0.0, 504.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

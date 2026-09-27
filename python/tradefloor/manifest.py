@@ -684,6 +684,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for name in ("intermeeting_return", "fed_put", "fed_put_owed",
                      "fed_put_mcap_prev"):
             _f64(buf, snapshot["economy"][name])
+    # Credit's leverage gap, only on a model with `corporate_spread_equity_gain` set.
+    if "spread_equity_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["spread_equity_gap"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -811,6 +814,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `vix_feedback` only with the volatility feedback smoothed; hashed
     # after `earnings_cycle`. The Fed put's four fields only with
     # `fed_put_gain` set, together; hashed after the night's market draw.
+    # `spread_equity_gap` only with `corporate_spread_equity_gain` set;
+    # hashed after the Fed put's fields.
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
@@ -821,7 +826,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "cycle_nowcast",
-         "cycle_publication", "anticipation_drift", "anticipation_raw"}
+         "cycle_publication", "anticipation_drift", "anticipation_raw",
+         "spread_equity_gap"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",

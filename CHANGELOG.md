@@ -294,6 +294,16 @@ Treasuries rally in a low-inflation sell-off; it is fitted together with
 negative at low inflation. All six are 0 on every preset. The snapshot and the
 state hash carry the put's four state fields only while the gain is set.
 
+`corporate_spread_vix_cut` takes a share of the VIX slope out of the
+corporate spread's formula, at the meeting, the close and a pinned VIX's
+credit leg. `corporate_spread_equity_gain` adds a leverage term to the
+formula's base: the gain times the index's log fall below its own slow
+average (half-life `corporate_spread_equity_half_life`), times the cycle
+multiplier, so credit widens with a fall and stays wide while the index
+stays down rather than narrowing as the VIX reverts. All three are 0 on
+every preset. The snapshot and the state hash carry the gap only while the
+gain is set.
+
 Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
 the earnings cycle's expected path from the cycle's own hazards, so a turn
 of phase moves prices at once and a price trough leads the earnings trough;

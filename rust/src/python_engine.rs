@@ -4357,6 +4357,11 @@ impl PyEngine {
             econ.set_item("fed_put_owed", economy.fed_put_owed)?;
             econ.set_item("fed_put_mcap_prev", economy.fed_put_mcap_prev)?;
         }
+        // Credit's leverage gap, on the same rule: only with
+        // `corporate_spread_equity_gain` set.
+        if self.inner.carries_spread_equity_gap() {
+            econ.set_item("spread_equity_gap", economy.spread_equity_gap)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -5069,6 +5074,11 @@ impl PyEngine {
             }
             if let Some(v) = d.get_item("fed_put_mcap_prev")? {
                 economy.fed_put_mcap_prev = v.extract()?;
+            }
+            // Credit's leverage gap. Absent means a model without
+            // `corporate_spread_equity_gain`, where it is 0.0 and unread.
+            if let Some(v) = d.get_item("spread_equity_gap")? {
+                economy.spread_equity_gap = v.extract()?;
             }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
