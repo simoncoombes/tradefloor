@@ -379,6 +379,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # The rate indices' close re-mark and live mark (r13): switches, whole
+    # meaning. The engine refuses the live mark without the re-mark, and the
+    # survey records a draw there as the model's refusal.
+    "rate_close_remark": (0.0, 1.0),
+    "rate_intraday_live": (0.0, 1.0),
+    # The central bank's stress cut, points per step: 0.5 is a half-point
+    # step, two steps a point, which is 2001's and 2008's emergency size.
+    "fed_stress_cut": (0.0, 0.5),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

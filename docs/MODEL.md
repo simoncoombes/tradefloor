@@ -431,6 +431,18 @@ pt-v19: it mirrors the ladder's cut rows, and it moved the long-run mean
 policy rate from 1.7% to 2.6%, against 2.9% in the US 1990 to 2025 (design
 note results/macro-cycle §4).
 
+The ladder has no market-stress term: on pt-v20 a meeting within 42
+sessions of a VIX of 30 to 40 cuts 0.29 of the time and hikes 0.25, against
+0.53 and 0.01 on FRED's target rate over 1990-2025. `fed_stress_cut`, 0.0 on
+every preset (thirteenth registration, r13 audit), adds one after row 13: at
+a meeting where the highest VIX published since the last meeting, $V$, is at
+or over `fed_stress_vix` ($V_0$), with $\pi$ under target plus
+`fed_stress_inflation_gap` and $r^{p} > 0$, the bank cuts
+$\min\big(r^{p},\ c \cdot \min(4,\ 1 + \lfloor (V - V_0)/10 \rfloor)\big)$,
+replacing a smaller cut or any rise, with $H$ moved by $-0.2$
+(`economy/central_bank.rs`, "The stress cut"). The level resets at each
+meeting and is carried in the snapshot while the cut is on.
+
 **Quantitative easing** starts when the policy rate is at or below 0.25 in a
 contraction, with purchases of USD 120bn a month, and tapers by 15 a meeting
 in expansion (`economy/central_bank.rs:358-391`). On pt-v20 it reaches
@@ -2097,6 +2109,23 @@ L \leftarrow L\,\Big(1 + \frac{y^{\mathrm{prev}}}{252} - D\,\Delta y' + \tfrac12
 
 The carry is added once a session. The cap stops the quadratic from
 pricing a large rise as a gain.
+
+Each close's curve therefore reaches the indices one session after it
+reaches the equities: an index's close-to-close return is the formula on
+the previous close's move (to 0.000 bp on pt-v20; 4.7, 33.6 and 34.9 bp off
+the same close's), so corr(the equity index on day $d$, IGCORP on day $d$)
+is +0.002 and with day $d+1$ +0.490. Two dials, both 0.0 on every preset
+(thirteenth registration, r13 audit), change that. `rate_close_remark`
+re-marks every index to the curve the close's macro step publishes at that
+close, and to a pin's curve when it is written (`RateBook::remark_now`); the
+next open then adds the night's carry alone, so the return is the formula on
+the same close's move. `rate_intraday_live` (which needs it) prints each
+index during the session at the published yield plus $E[y_{\text{close}}
+\mid \text{the session so far}] - E[y_{\text{close}} \mid \text{the open}]$,
+the close's own step (`economy::daily::vix_and_yields`) at its means with no
+meeting, the rest of the session integrated on the index's conditional
+variance; the mark refreshes every five minutes and commits nothing, so the
+closes are the re-mark's to the bit.
 
 | Index | Duration $D$ (years) | Convexity $C$ | Quoted spread | Kind | Source |
 |---|---|---|---|---|---|

@@ -371,6 +371,40 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # The thirteenth registration's bond timing (r13), inert on every
+    # preset. When pt-v20 takes them they leave this table: the two switches
+    # derived, the cut and its start and gap fitted to FRED's target rate
+    # after VIX closes over 30 (1990-2025).
+    "rate_close_remark":
+        "inert at 0.0 as shipped: `Engine::advance_macro_day` and the pin "
+        "path do not call `RateBook::remark_now`, so the rate indices take "
+        "each close's curve at the next open (`RateBook::open`), and nothing "
+        "is booked to their `repriced` column; an engine without rate "
+        "instruments has nothing to re-mark at any value. Off zero they "
+        "reprice to the published curve at the close (0.8.5, r13 audit: "
+        "IGCORP's close-to-close return matched the previous close's curve "
+        "move to 0.000 bp and missed the same close's by 35 bp)",
+    "rate_intraday_live":
+        "inert at 0.0 as shipped: `Engine::tick` passes no live curve to "
+        "`RateBook::tick_live`, `refresh_rate_live` never runs, and nothing "
+        "is snapshotted or hashed; requires `rate_close_remark`. Off zero "
+        "the rate indices print around the published curve plus E[tonight's "
+        "curve | the session] - E[tonight's curve | the open] (0.8.5, r13 "
+        "audit: with the close re-mark alone a sign-timing agent on IGCORP "
+        "still earned 13 per cent a year)",
+    "fed_stress_cut":
+        "inert at 0.0 as shipped: `update_central_bank_with` skips the "
+        "stress branch and `Engine::advance_day_with` never updates the "
+        "stress level, which is neither snapshotted nor hashed. Off zero a "
+        "meeting after a VIX at or over `fed_stress_vix` cuts (0.8.5, r13 "
+        "audit: P(cut within 42 sessions | VIX 30-40) 0.29 with P(hike) "
+        "0.25, against 0.53 and 0.01 on FRED's target rate 1990-2025)",
+    "fed_stress_vix":
+        "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
+        "stress branch that reads it does not run",
+    "fed_stress_inflation_gap":
+        "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
+        "stress branch that reads it does not run",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

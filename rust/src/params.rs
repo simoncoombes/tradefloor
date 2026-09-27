@@ -817,6 +817,69 @@ pub struct ModelParams {
     /// stays under one. Read only with `buyback_payout_share` non-zero.
     /// In [0, 1].
     pub buyback_yield_cap: f64,
+    /// Whether the rate indices (`UST2Y`, `UST10Y`, `IGCORP`) re-mark to the
+    /// curve the close's macro step publishes at that close, beside the
+    /// equities' re-mark (`macro_publication_repricing`), and to a
+    /// `pin_macro`'s curve when it is written. 0.0, which every preset
+    /// carries, leaves them on the curve they were marked at until the next
+    /// open's repricing, so each index prices each close's curve one session
+    /// late: on pt-v20 its close-to-close return matches `carry - D dy + C
+    /// dy^2 / 2` to 0.000 bp on the PREVIOUS close's curve move and misses
+    /// the same close's by 4.7, 33.6 and 34.9 bp (median), corr(equity index
+    /// on day d, IGCORP on day d) is +0.002 against +0.490 with day d+1, and
+    /// an after-close fill trades at the stale level (r13 audit).
+    ///
+    /// Off zero the close's step is followed by `RateBook::remark_now`: every
+    /// level reprices to the published curve, without carry, and prints
+    /// there. The night's carry still accrues at the next open, at the yield
+    /// marked here. The tape's `repriced` column books the re-mark and the
+    /// open's move for rate rows as it does for equities. A switch.
+    pub rate_close_remark: f64,
+    /// Whether the rate indices mark intraday to the curve the session so
+    /// far implies for tonight's close. 0.0, which every preset carries,
+    /// holds them at the published curve all session, and on pt-v20 the
+    /// close's move is then readable from the session (the 10-year's flight
+    /// to quality reads the session return, the corporate yield reads the
+    /// VIX the return moves): with `rate_close_remark` alone a sign-timing
+    /// agent on IGCORP still earns +13.2 per cent a year at 1x net worth.
+    ///
+    /// Off zero, while the market is open, each index marks to the published
+    /// yield plus `E[tonight's yield | the session so far] - E[tonight's
+    /// yield | the open]`, where `E` is the close's own daily step
+    /// (`economy::daily::vix_and_yields`) run with its draws at their means
+    /// and no meeting, and the rest of the session's market move is
+    /// integrated by an eight-point equal-probability rule on the index's
+    /// conditional variance times the share of the intraday variance
+    /// profile still to come. The mark refreshes on a five-minute grid and
+    /// commits nothing: the level and its yield move only at the open, a pin
+    /// and the close, so the close-to-close return is the one-step formula
+    /// on the same close's curve. The two expectations are carried in the
+    /// snapshot and the state hash while this is set. A switch; requires
+    /// `rate_close_remark`.
+    pub rate_intraday_live: f64,
+    /// A market-stress cut at a meeting, in points per step. 0.0, which
+    /// every preset carries, is the ladder as it stood, which has no stress
+    /// term: on pt-v20 P(a cut within 42 sessions | VIX 30-40) is 0.29 with
+    /// P(hike) 0.25, against 0.53 and 0.01 on FRED's target rate over
+    /// 1990-2025 (r13 audit).
+    ///
+    /// Off zero the engine keeps the highest published VIX since the last
+    /// meeting; at a meeting where it is at or over `fed_stress_vix`,
+    /// inflation is under target plus `fed_stress_inflation_gap` and the
+    /// rate is over zero, the bank cuts `min(rate, cut * min(4, 1 +
+    /// floor((level - fed_stress_vix) / 10)))`, replacing any smaller cut or
+    /// any hike the ladder chose (an emergency cut over 0.25), and the
+    /// dovish score moves -0.2. No draw. The level is carried in the
+    /// snapshot and the state hash while this is set. In [0, 1].
+    pub fed_stress_cut: f64,
+    /// The VIX at which `fed_stress_cut` starts. Read only with the cut on.
+    /// In [10, 200].
+    pub fed_stress_vix: f64,
+    /// How far over target inflation may be for `fed_stress_cut` to fire, in
+    /// points. Read only with the cut on. 1.0 as defined; about 80 per cent
+    /// of sim stress days carry inflation of 3 or more, so at 1.0 the gate
+    /// binds and the bank still hikes in stress. In [0, 10].
+    pub fed_stress_inflation_gap: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5239,6 +5302,11 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             buyback_yield_cap: 0.0,
+            rate_close_remark: 0.0,
+            rate_intraday_live: 0.0,
+            fed_stress_cut: 0.0,
+            fed_stress_vix: 30.0,
+            fed_stress_inflation_gap: 1.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7574,6 +7642,11 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
+            "rate_close_remark" => self.rate_close_remark,
+            "rate_intraday_live" => self.rate_intraday_live,
+            "fed_stress_cut" => self.fed_stress_cut,
+            "fed_stress_vix" => self.fed_stress_vix,
+            "fed_stress_inflation_gap" => self.fed_stress_inflation_gap,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7825,6 +7898,11 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
+            "rate_close_remark" => out.rate_close_remark = value,
+            "rate_intraday_live" => out.rate_intraday_live = value,
+            "fed_stress_cut" => out.fed_stress_cut = value,
+            "fed_stress_vix" => out.fed_stress_vix = value,
+            "fed_stress_inflation_gap" => out.fed_stress_inflation_gap = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -7905,6 +7983,16 @@ impl ModelParams {
     pub fn digest(&self) -> String {
         let mut hasher = Sha256::new();
         for (name, value) in self.to_pairs() {
+            // Dials added after the book known answer's last re-base enter
+            // the digest only off their default, so every vector that leaves
+            // them there keeps the digest (and the custom fingerprint) it had
+            // before they existed. See `DIGEST_AT_DEFAULT_OMITTED`.
+            if DIGEST_AT_DEFAULT_OMITTED
+                .iter()
+                .any(|(n, d)| *n == name.as_str() && value.to_bits() == d.to_bits())
+            {
+                continue;
+            }
             hasher.update(name.as_bytes());
             hasher.update(b"=");
             hasher.update(value.to_bits().to_be_bytes());
@@ -8197,6 +8285,38 @@ impl ModelParams {
             return Err(format!(
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
+        }
+        if !(self.rate_close_remark == 0.0 || self.rate_close_remark == 1.0) {
+            return Err(format!(
+                "rate_close_remark is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                self.rate_close_remark));
+        }
+        if !(self.rate_intraday_live == 0.0 || self.rate_intraday_live == 1.0) {
+            return Err(format!(
+                "rate_intraday_live is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                self.rate_intraday_live));
+        }
+        if self.rate_intraday_live != 0.0 && self.rate_close_remark == 0.0 {
+            return Err(
+                "rate_intraday_live is on and rate_close_remark is off. The live mark commits \
+                 nothing, so without the close's re-mark the curve it anticipated would reach \
+                 the rate indices only at the next open: set rate_close_remark to 1.0 too."
+                    .to_string());
+        }
+        if !(self.fed_stress_cut >= 0.0 && self.fed_stress_cut <= 1.0) {
+            return Err(format!(
+                "fed_stress_cut is {}. It is a cut in points per step, in [0, 1]; 0 is off.",
+                self.fed_stress_cut));
+        }
+        if !(self.fed_stress_vix >= 10.0 && self.fed_stress_vix <= 200.0) {
+            return Err(format!(
+                "fed_stress_vix is {}. It is a VIX level, in [10, 200].",
+                self.fed_stress_vix));
+        }
+        if !(self.fed_stress_inflation_gap >= 0.0 && self.fed_stress_inflation_gap <= 10.0) {
+            return Err(format!(
+                "fed_stress_inflation_gap is {}. It is points of inflation over target, in [0, 10].",
+                self.fed_stress_inflation_gap));
         }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
@@ -8583,6 +8703,22 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 
 /// The settable names, sorted. A function rather than the const above so
 /// the list is derived from `to_pairs`' actual coverage in tests.
+/// Dials [`ModelParams::digest`] leaves out while they hold these values,
+/// their defaults: the rate indices' close re-mark and live mark and the
+/// central bank's stress cut (the thirteenth registration's bond timing).
+/// Each is inert there, so a vector that leaves them at their default is the
+/// model it was before they existed, and its digest, fingerprint and the book
+/// known answer's state hash (which carries a custom model's fingerprint)
+/// stay what they were. Off their default each enters the digest as every
+/// other dial does.
+pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 5] = [
+    ("rate_close_remark", 0.0),
+    ("rate_intraday_live", 0.0),
+    ("fed_stress_cut", 0.0),
+    ("fed_stress_vix", 30.0),
+    ("fed_stress_inflation_gap", 1.0),
+];
+
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
@@ -8723,6 +8859,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "buyback_yield_cap",
+        "rate_close_remark",
+        "rate_intraday_live",
+        "fed_stress_cut",
+        "fed_stress_vix",
+        "fed_stress_inflation_gap",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

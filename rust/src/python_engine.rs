@@ -3124,6 +3124,9 @@ impl PyEngine {
         // `macro_publication_repricing` on the price takes it now rather
         // than at the next tick (`Engine::reprice_to_published_macro`).
         self.inner.reprice_to_published_macro(marks);
+        // And the rate indices, to the curve as pinned
+        // (`rate_close_remark`); nothing with the switch off.
+        self.inner.remark_rates_after_pin();
         Ok(())
     }
 
@@ -3408,11 +3411,41 @@ impl PyEngine {
     /// in the day it lands on.
     fn rate_attribution(&self, py: Python<'_>, component: &str) -> PyResult<Py<PyBytes>> {
         let rates = &self.inner.rates().instruments;
+        // Under `rate_intraday_live` a session's print is around the live
+        // mark, which commits nothing: its repricing from the committed
+        // yield joins the day's terms, and the flow is the premium over it.
+        let live: Vec<crate::rates::Repricing> = match self.inner.rate_live_curve() {
+            Some(c) => rates
+                .iter()
+                .map(|i| crate::rates::Repricing::new(
+                    i.spec.duration, i.spec.convexity, c.dy(i.spec.point), 0.0))
+                .collect(),
+            None => Vec::new(),
+        };
+        let marks = self.inner.rate_marks();
         let values: Vec<f64> = match component {
             "carry" => rates.iter().map(|i| i.day_carry).collect(),
-            "duration" => rates.iter().map(|i| i.day_duration).collect(),
-            "convexity" => rates.iter().map(|i| i.day_convexity).collect(),
-            "flow" => rates.iter().map(|i| i.price / i.level - 1.0).collect(),
+            "duration" => rates
+                .iter()
+                .enumerate()
+                .map(|(j, i)| match live.get(j) {
+                    Some(r) => i.day_duration + r.duration,
+                    None => i.day_duration,
+                })
+                .collect(),
+            "convexity" => rates
+                .iter()
+                .enumerate()
+                .map(|(j, i)| match live.get(j) {
+                    Some(r) => i.day_convexity + r.convexity,
+                    None => i.day_convexity,
+                })
+                .collect(),
+            "flow" => rates
+                .iter()
+                .zip(marks.iter())
+                .map(|(i, m)| i.price / m.0 - 1.0)
+                .collect(),
             other => {
                 return Err(ValidationError::new_err(format!(
                     "unknown rate component {other:?}. Valid: {}",
@@ -3439,7 +3472,8 @@ impl PyEngine {
     #[getter]
     fn rate_instruments<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         let mut out = Vec::new();
-        for inst in &self.inner.rates().instruments {
+        let marks = self.inner.rate_marks();
+        for (inst, mark) in self.inner.rates().instruments.iter().zip(marks.iter()) {
             let d = PyDict::new_bound(py);
             d.set_item("ticker", inst.spec.ticker)?;
             d.set_item("name", inst.spec.name)?;
@@ -3447,8 +3481,9 @@ impl PyEngine {
             d.set_item("duration", inst.spec.duration)?;
             d.set_item("convexity", inst.spec.convexity)?;
             d.set_item("spread_bps", inst.spec.spread_bps)?;
-            d.set_item("level", inst.level)?;
-            d.set_item("yield", inst.marked_yield)?;
+            // The live mark's during a session under `rate_intraday_live`.
+            d.set_item("level", mark.0)?;
+            d.set_item("yield", mark.1)?;
             d.set_item("price", inst.price)?;
             d.set_item("avg_volume", inst.avg_volume)?;
             out.push(d);
@@ -3772,6 +3807,15 @@ impl PyEngine {
         }
         if self.inner.macro_pins_today() != 0 {
             out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
+        }
+        // The central bank's stress level, a key only while `fed_stress_cut`
+        // is set, and the rate indices' live mark, only while
+        // `rate_intraday_live` is set and a session holds one.
+        if let Some(level) = self.inner.stress_vix_max() {
+            out.set_item("fed_stress_vix_max", level)?;
+        }
+        if let Some(marks) = self.inner.rate_live_marks() {
+            out.set_item("rate_live_marks", marks.to_vec())?;
         }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
@@ -4405,6 +4449,27 @@ impl PyEngine {
             None => 0,
         };
         self.inner.set_macro_pins_today(pins);
+        // Absent means the cut was off, or the snapshot predates it.
+        let stress: Option<f64> = match snapshot.get_item("fed_stress_vix_max")? {
+            Some(v) => Some(v.extract()?),
+            None => None,
+        };
+        self.inner.set_stress_vix_max(stress).map_err(ValidationError::new_err)?;
+        // Absent means no session held a live mark when it was taken.
+        let live: Option<[f64; 6]> = match snapshot.get_item("rate_live_marks")? {
+            Some(v) => {
+                let values: Vec<f64> = v.extract()?;
+                let arr: [f64; 6] = values.as_slice().try_into().map_err(|_| {
+                    ValidationError::new_err(format!(
+                        "this snapshot's rate_live_marks carries {} values; the live mark \
+                         is six: the open's projection and the session's, three yields each.",
+                        values.len()))
+                })?;
+                Some(arr)
+            }
+            None => None,
+        };
+        self.inner.set_rate_live_marks(live).map_err(ValidationError::new_err)?;
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

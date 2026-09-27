@@ -1010,6 +1010,27 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # The thirteenth registration's bond timing (r13). INERT: the probe's
+    # universe holds no rate instruments, so there is no rate book to
+    # re-mark, and the equities never read one; with rate indices listed the
+    # close re-marks them to the published curve (tests/test_bond_timing.py).
+    ("rate_close_remark", 1.0, False),
+    # INERT for the same reason: the live mark is computed only for an
+    # engine holding rate indices and only ever moves their prints. Carries
+    # the close's re-mark as its companion, which it requires.
+    ("rate_intraday_live", 1.0, False),
+    # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
+    # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
+    # row at 0.25 alone is inert), and at 15 the first meeting cuts a
+    # quarter point and the macro path moves (+34 economy draws).
+    ("fed_stress_cut", 0.25, True),
+    # LIVE: with the cut on (the companion), a start of 15 in place of 30
+    # fires it in the burn-in, as above.
+    ("fed_stress_vix", 15.0, True),
+    # LIVE: with the cut on and starting at 15 (the companions), a gap of
+    # 0.5 in place of 1.0 closes the gate at a meeting the base cuts at
+    # (measured; 2.0 and 5.0 move nothing on this probe).
+    ("fed_stress_inflation_gap", 0.5, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1447,6 +1468,10 @@ PERTURBATIONS = [
 #: more sites and would find more dials here, which is why the assertion
 #: below names the site rather than asserting a count.
 ECONOMY_STREAM_MOVERS = frozenset({
+    # The central bank's stress cut (r13): the cut its companion start fires
+    # in the burn-in moves the policy rate, and with it which
+    # state-dependent macro sites fire (+34 draws, measured).
+    "fed_stress_cut", "fed_stress_vix",
     # pt-v20's 2-year takes its own normal each session when its noise is
     # on: the draw IS the mechanism, as for the VIX jump below.
     "treasury_2y_noise",
@@ -1581,6 +1606,13 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The live mark requires the close's re-mark (`ModelParams::invariants`).
+    "rate_intraday_live": {"rate_close_remark": 1.0},
+    # The stress cut's start at 15, where the probe's burn-in reads it (see
+    # the rows), and the cut on for the two dials read only with it.
+    "fed_stress_cut": {"fed_stress_vix": 15.0},
+    "fed_stress_vix": {"fed_stress_cut": 0.25},
+    "fed_stress_inflation_gap": {"fed_stress_cut": 0.25, "fed_stress_vix": 15.0},
     # `market_vol_vix_excursion` reads the VIX's distance above the level the
     # index's own variance implies, and off `vix_level_identity` there is no
     # such level, so `ModelParams.from_preset` refuses the pair -- with no
