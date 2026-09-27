@@ -555,14 +555,14 @@ the index's log fall below its own slow average on the session's return from
 the last close, $R_d$ in percent:
 
 ```math
-D_{d+1} = 2^{-1/H_L}\,ig(D_d - \ln(1 + R_d/100)ig)
+D_{d+1} = 2^{-1/H_L}\,\big(D_d - \ln(1 + R_d/100)\big)
 ```
 
 and the spread formula, at the meeting, in the close's daily move and in the
 rate indices' live projection, becomes
 
 ```math
-\mathrm{clip}\Big(ig(1 + 0.02\,(1 - c)\,(X - 12) + g_L\,Dig)\,m_{\mathcal{P}};\ 0.8,\ 6\Big)
+\mathrm{clip}\Big(\big(1 + 0.02\,(1 - c)\,(X - 12) + g_L\,D\big)\,m_{\mathcal{P}};\ 0.8,\ 6\Big)
 ```
 
 so the daily move carries $g_L\,m_{\mathcal{P}}\,(D_{d+1} - D_d)$ beside the
