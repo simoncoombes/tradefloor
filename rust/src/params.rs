@@ -1565,6 +1565,14 @@ pub struct ModelParams {
     /// dovish score does not move) and the put gives nothing back. A cut
     /// stands. No draw. The count is carried in the snapshot and the state
     /// hash while this is set. In [0, 504].
+    ///
+    /// Measured (box r15pcfin, arm PC1: N4 with this at 42,
+    /// `fed_stress_cut` 0.10, `fed_put_gain` 4 and the priced path at
+    /// `treasury_path_pricing` 1, half-life 63, damping 0.5; held-out seeds
+    /// 201-230, 501-530 and 801-830): P(hike within 42 | VIX 30+) 0.011
+    /// against N4's 0.19, P(cut within 42 | VIX 40+) 0.49 against 0.38,
+    /// and the 63-session policy change after a VIX of 30, -0.56 against
+    /// -0.69 (-0.41 real).
     pub fed_stress_hold: f64,
     /// The share of the policy path it expects that the curve prices: the
     /// 10-year's daily anchor and the meeting's 10-year target, and the
@@ -1610,6 +1618,17 @@ pub struct ModelParams {
     /// `(1 - d)(1 + k)` of itself on the day, so this keeps the day's move
     /// what it was while the forecast takes the drift out of the weeks
     /// after. No draw, no state. In [0, 0.9].
+    ///
+    /// Measured with the pricing at 1 and half-life 63 (box r15pcfin, arm
+    /// PC1, as under `fed_stress_hold`): the index's excess after a cut is
+    /// +0.44 per cent by 63 sessions and +0.97 by 126 against N4's +0.55 and
+    /// +1.23 (SE 0.15 at 63); C10c 21 of 384 rules against 27; in
+    /// tf.evaluate, fedcut63 over a constant 1.35x a median +0.26 pts/yr,
+    /// ahead 12 of 20. The pricing alone at 1 took the drift to +0.05 by 63
+    /// sessions but doubled the 10-year's move in months with a rate change
+    /// (monthly sd 0.60 against 0.35) and took the monthly stock-bond
+    /// correlation at inflation under 3 from -0.20 to -0.01; this keeps the
+    /// day's move and the correlation (-0.26) where they were.
     pub treasury_policy_damping: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
