@@ -567,7 +567,10 @@ _register(Target(
         "move's transmission reach the discount rate, which a hold on "
         "macro.corporate_yield freezes. Released, the chain "
         "resumes from where it stands and the next meeting re-anchors it, "
-        "so end a window with a ramp back."
+        "so end a window with a ramp back. Measured, +200bp on pt-v19, "
+        "the ruler of the notes here: +0.00% as an impulse, -3.79% as a "
+        "permanent (macro.corporate_yield's is -4.02%). On pt-v20: -0.00% "
+        "and -7.60% (macro.corporate_yield's -6.13%)."
     ),
     read=_spread_read, write=_spread_write,
     check=_rate_check(0.0, 0.2), format=_pp, domain=_domain_spread,
