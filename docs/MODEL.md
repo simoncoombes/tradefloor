@@ -1525,6 +1525,43 @@ ceiling caps the market factor at 4.3% a day.
 | $e_-$ | `market_vol_vix_exponent_below` | 2.5 | chosen | inside the measured range: shared variance on the reference roster rises as the VIX to the power 2.25 (1.95 to 2.57) |
 | | floor, ceiling multiples | 0.05, 32 | guard | a record VIX of 82.7 against 15 is about 30 times the variance |
 
+#### The business cycle in the market's volatility
+
+Off on every shipped preset (`market_vol_cycle_ratio` 0.0, where the close
+takes a branch that reads and moves nothing). Off zero, the close keeps $\ell$,
+the log of a multiplier on the market factor's volatility, and moves it toward
+the TRUE phase's value (`engine.rs:4464-4483`, `engine.rs:5438-5478`):
+
+```math
+\ell^{*} = \begin{cases} \ln(R\,k_e) & \text{contraction, trough} \\ \ln k_e & \text{otherwise} \end{cases}
+\qquad
+\ell_{d} = \ell_{d-1} + \big(1 - 2^{-1/h}\big)\big(\ell^{*} - \ell_{d-1}\big)
+```
+
+The first close, and every close at $h = 0$, sets $\ell = \ell^{*}$. The level
+the baseline $b_m$ is scaled by is multiplied by $e^{2\ell}$, and the VIX
+ratio's denominator by $e^{d\ell}$; the VIX anchor's slow memory and the anchor
+level the VIX reverts to are scaled by the same $e^{d\ell}$
+(`engine.rs:4958`, `engine.rs:4990`), so at $d = 1$ fear is read against the
+phase's normal level. A forced close (a VIX a scenario pinned) moves $\ell$
+but writes the level that VIX implies, unscaled. At $k_e = 0$ the expansion
+multiplier is derived, $k_e = 1/\sqrt{1 - s + R^{2}s}$ with $s$ the
+contraction-and-trough share of the cycle's days, which keeps the
+share-weighted factor variance. The snapshot and both state hashes carry
+$\ell$ only while $R$ is set.
+
+Real index volatility is countercyclical: S&P 500 daily volatility on NBER
+recession months over the rest is 1.66 (1950 to 2025), 1.87 (1928 to 2025) and
+2.24 (1990 to 2025), and the VIX's median is 27.5 in a recession against 17.0
+outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $R$ | `market_vol_cycle_ratio` | 0 (off) | | bear-dynamics design; recession over expansion index volatility |
+| $k_e$ | `market_vol_cycle_expansion` | 0 (derived) | | read only with $R$ set |
+| $h$ | `market_vol_cycle_half_life` | 0 | | sessions; read only with $R$ set |
+| $d$ | `market_vol_cycle_relative` | 0 | | a power in [0, 1]; read only with $R$ set |
+
 ### Company variance (GJR-GARCH)
 
 **Timescale:** daily, at the close, before the jumps. **State:** $h_{i,d}$,

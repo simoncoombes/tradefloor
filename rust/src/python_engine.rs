@@ -3747,6 +3747,14 @@ impl PyEngine {
         if self.inner.params().vix_anchor_memory != 0.0 {
             out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
         }
+        // The cycle's volatility multiplier, on the same rule: carried, and
+        // hashed, only with `market_vol_cycle_ratio` set and once a close
+        // has set it.
+        if self.inner.carries_market_vol_cycle() {
+            if let Some(l) = self.inner.market_vol_cycle_log() {
+                out.set_item("market_vol_cycle_log", l)?;
+            }
+        }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
         // epicentre was drawn at (`-1` for `none`, a crisis with no
@@ -4367,6 +4375,14 @@ impl PyEngine {
         if let Some(raw) = snapshot.get_item("vix_anchor_slow")? {
             self.inner.set_vix_anchor_slow(raw.extract()?);
         }
+        // The cycle's volatility multiplier. Absent means a model without
+        // it, a build before it, or a snapshot taken before the first close,
+        // where it had not been set; each restores to unset.
+        let cycle_log = match snapshot.get_item("market_vol_cycle_log")? {
+            Some(raw) => Some(raw.extract::<f64>()?),
+            None => None,
+        };
+        self.inner.set_market_vol_cycle_log(cycle_log);
         // The crisis episode. Absent means a snapshot from a build without
         // it, and every such run shipped `crisis_epicentre_extra` at 0.0,
         // where no episode is ever entered -- which is what the defaults

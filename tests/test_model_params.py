@@ -1010,6 +1010,23 @@ PERTURBATIONS = [
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # The business cycle in the market factor's volatility (bear-dynamics).
+    # Ships at 0.0, so the perturbation is TO the design's measured ratio:
+    # LIVE, the first close sets the multiplier at its phase's value (the
+    # derived expansion multiplier, since the default carries 0.0 there)
+    # and the next session draws at the scaled variance.
+    ("market_vol_cycle_ratio", 2.0, True),
+    # LIVE with the ratio on (its companion): an explicit expansion
+    # multiplier replaces the derived one from the first close.
+    ("market_vol_cycle_expansion", 0.75, True),
+    # INERT even with the ratio on (its companion): the first close puts
+    # the multiplier on its target whatever the half-life, and the probe's
+    # phase does not change in three sessions, so there is nothing to
+    # smooth. Measured.
+    ("market_vol_cycle_half_life", 21.0, False),
+    # LIVE with the ratio on (its companion): the VIX coupling's
+    # denominator is scaled from the first close.
+    ("market_vol_cycle_relative", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1653,6 +1670,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                       "vix_anchor_weight_level_knee": 0.0},
     "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                            "vix_anchor_weight_level": 1.0},
+    # The cycle's expansion multiplier, half-life and VIX power are read
+    # only with its ratio on (bear-dynamics).
+    "market_vol_cycle_expansion": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_half_life": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_relative": {"market_vol_cycle_ratio": 2.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},

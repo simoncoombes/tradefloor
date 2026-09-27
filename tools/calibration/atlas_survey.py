@@ -379,6 +379,19 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # The cycle's volatility ratio (bear-dynamics): 0 is off, and the real
+    # recession-over-expansion index volatility runs 1.66 to 2.24 (S&P 500
+    # by NBER month), so 3 is past any measured. A draw between 0 and 0.5
+    # is refused by `ModelParams`, and `feasibility_violation` records it.
+    "market_vol_cycle_ratio": (0.0, 3.0),
+    # The expansion-side multiplier: 0 derives it from the phase shares,
+    # and the design's arms ran 0.70 to 0.80; 1.5 is past any of them. A
+    # draw between 0 and 0.25 is refused and recorded infeasible likewise.
+    "market_vol_cycle_expansion": (0.0, 1.5),
+    # Sessions; 0 is instant, 126 half a year.
+    "market_vol_cycle_half_life": (0.0, 126.0),
+    # A power in [0, 1].
+    "market_vol_cycle_relative": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

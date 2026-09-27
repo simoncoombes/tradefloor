@@ -817,6 +817,75 @@ pub struct ModelParams {
     /// stays under one. Read only with `buyback_payout_share` non-zero.
     /// In [0, 1].
     pub buyback_yield_cap: f64,
+    /// THE BUSINESS CYCLE IN THE MARKET'S VOLATILITY: the market factor's
+    /// volatility in a contraction or a trough over its volatility in every
+    /// other phase, read on the TRUE phase (`EconomyState::cycle_phase`,
+    /// not the published one). 0.0, which every shipped preset carries, is
+    /// off: the close takes a branch that reads nothing and moves nothing,
+    /// and the snapshot and state hash do not carry the multiplier.
+    ///
+    /// Off zero the close keeps `l`, the log of a multiplier on the market
+    /// factor's volatility, and moves it toward its phase's value:
+    ///
+    /// ```text
+    /// l*  = ln(k_e)            expansion, peak, recovery
+    ///     = ln(R * k_e)        contraction, trough
+    /// l  <- l + (1 - 2^(-1/h)) * (l* - l)      (h = market_vol_cycle_half_life;
+    ///                                           h = 0, and the first close, set l = l*)
+    /// ```
+    ///
+    /// `k_e` is `market_vol_cycle_expansion`. The level the factor's
+    /// variance baseline is scaled by is multiplied by `exp(2 l)`, and the
+    /// VIX-coupling denominator passed to the factor's close by
+    /// `exp(d l)`, `d` being `market_vol_cycle_relative`; the VIX anchor's
+    /// slow memory and the anchor level the VIX reverts to are scaled by the
+    /// same `exp(d l)`, so at `d = 1` fear is read against the phase's
+    /// normal level. A FORCED close (a VIX a scenario pinned) moves `l`
+    /// but does not apply it: the pinned VIX already carries the phase.
+    ///
+    /// # Why
+    ///
+    /// Real index volatility is countercyclical. S&P 500 daily realised
+    /// volatility on NBER recession months over the rest is 1.66 (1950-2025,
+    /// 23.8 against 14.3 per cent), 1.87 (1928-2025) and 2.24 (1990-2025);
+    /// the VIX's median is 27.5 in a recession against 17.0 outside one
+    /// (FRED VIXCLS and USREC, 1990-2025). pt-v20 reads 1.27 and 17.2
+    /// against 17.0 on held-out histories: under `vix_level_identity` the
+    /// phase table is not read, and nothing else puts the cycle into the
+    /// market variance, so its bears fall anywhere (35 per cent overlap a
+    /// contraction against 7 of 11 post-war S&P bears) and its index moves
+    /// like a random walk at its own moments (2.1-2.4 bears a decade against
+    /// 1.45 post-war). Calm expansions with strong drift and bears gathered
+    /// in recessions are what make real bears rarer (Schwert 1989; Hamilton
+    /// and Lin 1996).
+    ///
+    /// In [0.5, 5]; 0 is off.
+    pub market_vol_cycle_ratio: f64,
+    /// The market factor's volatility multiplier outside a contraction or a
+    /// trough (`k_e` in `market_vol_cycle_ratio`'s formula). 0.0 derives it
+    /// from the cycle's stationary phase shares, `1 / sqrt(1 - s + R^2 s)`
+    /// with `s` the contraction-and-trough share of days
+    /// (`economy::cycle::stationary_phase_shares_for`), so the share-weighted
+    /// factor variance is unchanged. That form scales the factor alone, which
+    /// is about 72 per cent of the index's variance, and so leaves the
+    /// index's expansion volatility nearly where it was (bear-dynamics
+    /// design: B3 2.17-2.38 on the derived arms), which is why an explicit
+    /// value exists. Unread at `market_vol_cycle_ratio` 0.0. 0 or in
+    /// [0.25, 2].
+    pub market_vol_cycle_expansion: f64,
+    /// Half-life, in sessions, of the cycle multiplier's move (in logs)
+    /// toward its phase's value. 0.0 is instant. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 2520].
+    pub market_vol_cycle_half_life: f64,
+    /// The power of the cycle multiplier by which the VIX-coupling
+    /// denominator, the VIX anchor's slow memory and the anchor level are
+    /// scaled (`d` in `market_vol_cycle_ratio`'s formula). 1.0 reads fear
+    /// against the phase's normal level; 0.0 against the unconditional
+    /// level, where the variance's VIX coupling reads a contraction's higher
+    /// VIX as fear and amplifies the multiplier (sessions under -5 per cent
+    /// 16.6-19.9 a decade against a band ceiling of 12.4 on the design's
+    /// d = 0 arms). Unread at `market_vol_cycle_ratio` 0.0. In [0, 1].
+    pub market_vol_cycle_relative: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5239,6 +5308,10 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             buyback_yield_cap: 0.0,
+            market_vol_cycle_ratio: 0.0,
+            market_vol_cycle_expansion: 0.0,
+            market_vol_cycle_half_life: 0.0,
+            market_vol_cycle_relative: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7574,6 +7647,10 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
+            "market_vol_cycle_ratio" => self.market_vol_cycle_ratio,
+            "market_vol_cycle_expansion" => self.market_vol_cycle_expansion,
+            "market_vol_cycle_half_life" => self.market_vol_cycle_half_life,
+            "market_vol_cycle_relative" => self.market_vol_cycle_relative,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -7825,6 +7902,10 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
+            "market_vol_cycle_ratio" => out.market_vol_cycle_ratio = value,
+            "market_vol_cycle_expansion" => out.market_vol_cycle_expansion = value,
+            "market_vol_cycle_half_life" => out.market_vol_cycle_half_life = value,
+            "market_vol_cycle_relative" => out.market_vol_cycle_relative = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8202,6 +8283,33 @@ impl ModelParams {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
                 self.buyback_yield_cap));
+        }
+        if !(self.market_vol_cycle_ratio == 0.0
+            || (self.market_vol_cycle_ratio >= 0.5 && self.market_vol_cycle_ratio <= 5.0))
+        {
+            return Err(format!(
+                "market_vol_cycle_ratio is {}. It is the market factor's volatility in a contraction \
+                 or a trough over its volatility in every other phase: 0 (off) or in [0.5, 5].",
+                self.market_vol_cycle_ratio));
+        }
+        if !(self.market_vol_cycle_expansion == 0.0
+            || (self.market_vol_cycle_expansion >= 0.25 && self.market_vol_cycle_expansion <= 2.0))
+        {
+            return Err(format!(
+                "market_vol_cycle_expansion is {}. It is the market factor's volatility multiplier \
+                 outside a contraction or a trough: 0 (derived from the phase shares) or in [0.25, 2].",
+                self.market_vol_cycle_expansion));
+        }
+        if !(self.market_vol_cycle_half_life >= 0.0 && self.market_vol_cycle_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 is instant.",
+                self.market_vol_cycle_half_life));
+        }
+        if !(self.market_vol_cycle_relative >= 0.0 && self.market_vol_cycle_relative <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_relative is {}. It is the power of the cycle multiplier the VIX's \
+                 reading of fear is scaled by, in [0, 1].",
+                self.market_vol_cycle_relative));
         }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
@@ -8723,6 +8831,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "buyback_yield_cap",
+        "market_vol_cycle_ratio",
+        "market_vol_cycle_expansion",
+        "market_vol_cycle_half_life",
+        "market_vol_cycle_relative",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

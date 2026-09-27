@@ -419,6 +419,20 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    "market_vol_cycle_ratio":
+        "inert at 0.0 as shipped: `Engine::close_market` branches on "
+        "`== 0.0` before the cycle multiplier, which is never stepped, and "
+        "the snapshot and state hash omit it. The business cycle in the "
+        "market factor's volatility (0.8.5 realism work, bear-dynamics "
+        "design: index volatility in a true contraction over the rest reads "
+        "1.27 on held-out pt-v20 histories against the S&P 500's 1.66 to "
+        "2.24 by NBER recession month)",
+    "market_vol_cycle_expansion":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_half_life":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_relative":
+        "unread while `market_vol_cycle_ratio` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "
