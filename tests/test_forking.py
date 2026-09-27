@@ -1081,7 +1081,19 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # The night split and the earnings calendar (earnings-
+                   # gaps). The split SPLITS the day where the ratio ADDS a
+                   # night, and the two are refused together, so the ratio
+                   # stays at zero here and the split carries the overnight
+                   # stream; the degrees of freedom are integers from 3; the
+                   # calendar reports from the fifth session at a real size,
+                   # holding back half the cycle for each report.
+                   overnight_variance_ratio=0.0,
+                   overnight_idio_df=3.0,
+                   earnings_surprise_sigma=3.0,
+                   earnings_surprise_df=4.0,
+                   earnings_cycle_report_share=0.5)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1242,6 +1254,20 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "earnings_key":
+        "the earnings calendar's key. It is derived from the seed the engine "
+        "was built with, and this guard restores into an engine built from "
+        "the same seed, so a restore without it derives the same key. "
+        "tests/test_earnings_calendar.py::test_the_key_is_carried_only_while_"
+        "the_calendar_runs restores into an engine built from another seed, "
+        "where a snapshot without it reports on other dates.",
+    "jump_move":
+        "the jump waiting to be traded in, read by the volume scale only off "
+        "`volume_move_jump_share` 1.0 and without a night split. This model "
+        "splits the day (earnings-gaps), and under a split the volume scale "
+        "reads the day's move from the last close, jumps included, so "
+        "nothing reads it; tests/test_forking.py reached it through the "
+        "volume scale before the split was in this model.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "

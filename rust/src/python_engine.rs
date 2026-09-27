@@ -3393,6 +3393,43 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.padded(self.inner.attribution_column(index), 0.0)))
     }
 
+    /// The earnings reports ahead, as a real calendar lists them: one dict
+    /// per report with `ticker`, `session` (the engine's session number of
+    /// the reaction session, the first to trade the report) and
+    /// `sessions_ahead` (0 is the session now open, or the next to open when
+    /// the market is closed), for every reaction session in the next
+    /// `horizon` sessions, ordered by session. Dates only: the surprise is
+    /// realised at the reaction session's opening print and nothing here
+    /// reads it. Empty unless the model runs the calendar
+    /// (`earnings_surprise_sigma` non-zero).
+    #[pyo3(signature = (horizon = 63))]
+    fn earnings_calendar(&self, py: Python<'_>, horizon: i64) -> PyResult<Vec<Py<PyDict>>> {
+        if !(0..=2520).contains(&horizon) {
+            return Err(ValidationError::new_err(format!(
+                "horizon is {horizon}. It is a number of sessions, in [0, 2520]."
+            )));
+        }
+        let from = i64::from(self.day_count);
+        let mut out = Vec::new();
+        for (i, day) in self.inner.earnings_calendar(from, horizon) {
+            let d = PyDict::new_bound(py);
+            d.set_item("ticker", self.inner.companies()[i].ticker.clone())?;
+            d.set_item("session", day)?;
+            d.set_item("sessions_ahead", day - from)?;
+            out.push(d.unbind());
+        }
+        Ok(out)
+    }
+
+    /// The earnings surprise each name's opening print realised at the last
+    /// open, in `tickers` order, as f64 bytes (a log move of fair value);
+    /// 0.0 where no report was realised, and in every rate instrument's slot.
+    fn earnings_surprises(&self, py: Python<'_>) -> Py<PyBytes> {
+        let mut moves = self.inner.earnings_moves().to_vec();
+        moves.resize(self.inner.companies().len(), 0.0);
+        f64_bytes(py, &self.padded(moves, 0.0))
+    }
+
     /// The rate components of today's move, one value per instrument in
     /// `tickers` order, as f64 bytes. Zero for every equity.
     ///
@@ -3808,6 +3845,18 @@ impl PyEngine {
             // The opening draws the hash covers beside the levels: empty once
             // the market has opened, the roster's plus one before it.
             out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
+        }
+        // The earnings calendar's key, only with the calendar on: every
+        // report's date and draws derive from it, so a restore into an
+        // engine built from another seed must carry it or report on other
+        // dates.
+        if self.inner.carries_earnings() {
+            out.set_item("earnings_key", self.inner.earnings_key())?;
+        }
+        // What names hold back of the earnings cycle for their reports, only
+        // while `earnings_cycle_report_share` runs.
+        if self.inner.carries_earnings_withheld() {
+            out.set_item("earnings_withheld", f64_bytes(py, self.inner.earnings_withheld()))?;
         }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
@@ -4293,6 +4342,20 @@ impl PyEngine {
                 .collect();
             self.inner
                 .set_fair_value_offsets(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(v) = snapshot.get_item("earnings_key")? {
+            let key: u64 = v.extract()?;
+            self.inner.set_earnings_key(key);
+        }
+        if let Some(raw) = snapshot.get_item("earnings_withheld")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_earnings_withheld(&values)
                 .map_err(ValidationError::new_err)?;
         }
         if let Some(raw) = snapshot.get_item("opening_z")? {

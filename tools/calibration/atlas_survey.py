@@ -449,6 +449,29 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # large as a session, above anything the real panel reads; past it the
     # night would carry more than the day, which no window has shown.
     "overnight_variance_ratio": (0.0, 1.0),
+    # The night's SHARE of the day's variance, split rather than added:
+    # 0.0 is no night; the real forty read 0.46 of the index's variance and
+    # a median 0.31 of a name's own overnight, and past 0.9 the session
+    # would carry almost nothing of the day.
+    "overnight_market_share": (0.0, 0.9),
+    "overnight_idio_share": (0.0, 0.9),
+    # Student-t degrees of freedom: 0.0 is a normal night, 3 the fattest
+    # with a variance; the box is the integers the validation takes.
+    "overnight_idio_df": (0.0, 30.0),
+    # The earnings surprise in own-sigma units: 0.0 is no calendar and 6 is
+    # past the real reaction day's 3.5 sd.
+    "earnings_surprise_sigma": (0.0, 6.0),
+    "earnings_surprise_df": (0.0, 30.0),
+    # The reaction session's own discovery and the next session's, in the
+    # same units, both well under the surprise the real days carry.
+    "earnings_session_sigma": (0.0, 4.0),
+    "earnings_followthrough_sigma": (0.0, 4.0),
+    # A volume multiple: 0.0 and 1.0 are none, and 4 is well past the real
+    # reaction session's 2.16.
+    "earnings_volume_multiple": (0.0, 4.0),
+    # A SHARE of the cycle's move held for the report: 0.0 is none and 1.0
+    # holds the whole of it, past which a name would unlearn the cycle.
+    "earnings_cycle_report_share": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.

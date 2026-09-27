@@ -465,7 +465,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
-         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # The earnings calendar's key, only with the calendar on, and what
+         # names hold back of the cycle for their reports, only while that
+         # share runs.
+         "earnings_key", "earnings_withheld"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -593,6 +597,15 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
     if "vix_feedback" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["vix_feedback"])
+    # The earnings calendar's key, only with `earnings_surprise_sigma` set.
+    if "earnings_key" in snapshot:
+        _u64(buf, snapshot["earnings_key"])
+    if "earnings_withheld" in snapshot:
+        raw = snapshot["earnings_withheld"]
+        values = _column(raw, len(raw) // 8, "earnings_withheld")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -1008,7 +1021,8 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: unapplied opening draws on a model that can move a level (pt-v20 on), and
 #: the agent-facing book's consumed depth once an agent has used it. Encoded
 #: where present and left out where not.
-_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value")
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
+                            "earnings_withheld")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

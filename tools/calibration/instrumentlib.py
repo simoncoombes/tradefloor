@@ -252,6 +252,18 @@ PARAM_SPECS: dict[str, dict] = {
     # even with the jump realised at the open.
     "overnight_variance_ratio": {"kind": "abs", "step_unit": 0.05,
                                  "hard_range": (0.0, 2.0)},
+    # The night's shares of the day, split rather than added, so a unit
+    # box less the session's minimum; the degrees of freedom are integers.
+    "overnight_market_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "overnight_idio_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "overnight_idio_df": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
+    # The earnings calendar's sizes, in own-sigma units, and its volume.
+    "earnings_surprise_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_surprise_df": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
+    "earnings_session_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_followthrough_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_volume_multiple": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0)},
+    "earnings_cycle_report_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

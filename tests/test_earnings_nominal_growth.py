@@ -635,7 +635,10 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
         # that is still asserted, so the next thing to move a price at the
         # open for some other reason is caught here rather than as a
         # millionth-level difference in a later gate.
-        if model.to_dict().get("overnight_variance_ratio", 0.0) == 0.0:
+        d = model.to_dict()
+        if (d.get("overnight_variance_ratio", 0.0) == 0.0
+                and d.get("overnight_market_share", 0.0) == 0.0
+                and d.get("overnight_idio_share", 0.0) == 0.0):
             assert after == before, (
                 "the price column moved at the open with no overnight "
                 "process to move it, so the number below is not the one "

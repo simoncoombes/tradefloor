@@ -135,6 +135,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 volume_state: 0.0,
                 volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                 economy: &economy,
                 market_status: MarketStatus::Open,
                 // Held mid-session so the intraday volume curve is flat and

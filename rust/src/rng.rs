@@ -214,6 +214,12 @@ pub enum Site {
     /// draw per episode, not per session, and none at all when the scenario
     /// has pinned the epicentre.
     CrisisEpicentreU = 22,
+    /// The night's student-t scale for the idiosyncratic draw: `nu` normals
+    /// per company (the tag is the company index), squared and summed into
+    /// a chi-square, on [`stream::OVERNIGHT`] after the three sites above.
+    /// Taken only while `overnight_idio_df` is set on a model with a night
+    /// share, so every other model's overnight schedule is the one it was.
+    OvernightIdioChi2 = 23,
 }
 
 impl Site {
@@ -242,6 +248,7 @@ impl Site {
             Site::OvernightIdioZ => "overnight_idio_z",
             Site::MarketVolLevelZ => "market_vol_level_z",
             Site::CrisisEpicentreU => "crisis_epicentre_u",
+            Site::OvernightIdioChi2 => "overnight_idio_chi2",
         }
     }
 }
@@ -506,6 +513,20 @@ pub mod stream {
     /// for bit.
     pub const OPENING: u32 = 10;
 
+    /// The earnings calendar's key: two raw outputs, taken once when the
+    /// engine is built, form the 64-bit key every earnings draw is derived
+    /// from ([`GameRng::keyed`]). A ONE-SHOT stream like [`OPENING`], outside
+    /// [`COUNT`]: nothing holds a position on it, and every other stream is
+    /// untouched at every setting.
+    ///
+    /// The calendar's draws are KEYED rather than streamed: the name's
+    /// offset into the quarter, each quarter's jitter and each report's
+    /// surprise are functions of (key, company id, quarter, slot), so the
+    /// dates ahead can be listed without drawing anything, a report's draws
+    /// do not depend on how many names reported before it, and a roster
+    /// change does not reshuffle any other name's calendar.
+    pub const EARNINGS: u32 = 11;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
@@ -536,6 +557,9 @@ pub mod stream {
     pub const SEED64_SURGERY_SEQUENCE_BASE: u32 = 1024;
     /// The tag in a wide root's per-stream key, ASCII "SD64".
     pub const SEED64_TAG: u32 = 0x5344_3634;
+    /// The sequence of every keyed generator ([`GameRng::keyed`]): clear of
+    /// the stream, surgery and wide-root sequences above.
+    pub const KEYED_SEQUENCE: u32 = 1280;
 }
 
 /// The SplitMix64 output finalizer. Integer-only, exact on every platform.
@@ -904,6 +928,31 @@ impl GameRng {
                 stream::SEED64_SEQUENCE_BASE + stream_id,
             )
         }
+    }
+
+    /// The earnings calendar's key for `root_seed`: the first two raw
+    /// outputs of the one-shot [`stream::EARNINGS`], high word first.
+    pub fn earnings_key(root_seed: u64) -> u64 {
+        let mut g = Self::substream(root_seed, stream::EARNINGS);
+        let hi = g.pcg.next_u32() as u64;
+        let lo = g.pcg.next_u32() as u64;
+        (hi << 32) | lo
+    }
+
+    /// A KEYED generator: a fresh generator for one (key, a, b), where the
+    /// earnings calendar passes its key, a company id's hash and a
+    /// (quarter, slot) word. Integer-only, like every derivation here:
+    ///
+    /// ```text
+    /// seed  = splitmix64_mix(key ^ splitmix64_mix(a ^ splitmix64_mix(b)))
+    /// keyed = GameRng::new(seed, KEYED_SEQUENCE)            // = 1280
+    /// ```
+    ///
+    /// No position, no log and no overlay: nothing holds it beyond the one
+    /// report it prices, so there is nothing to snapshot but the key.
+    pub fn keyed(key: u64, a: u64, b: u64) -> Self {
+        let seed = splitmix64_mix(key ^ splitmix64_mix(a ^ splitmix64_mix(b)));
+        Self::new(seed, stream::KEYED_SEQUENCE)
     }
 
     /// A surgery generator: the source of a re-randomised window of one
