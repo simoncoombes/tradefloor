@@ -152,6 +152,7 @@ pub fn build_company(c: &Json) -> TickCompany {
             mispricing_s_prev_close: maybe(&s["mispricingSPrevClose"]),
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             fair_value_offset: None,
+            buyback_log_shares: None,
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],

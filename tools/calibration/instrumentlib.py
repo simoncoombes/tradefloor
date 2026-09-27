@@ -174,6 +174,7 @@ PARAM_SPECS: dict[str, dict] = {
     "fed_growth_cut": {"kind": "abs", "step_unit": 0.1, "hard_range": (-5.0, 5.0)},
     "cycle_publication_lag_draw": {"kind": "abs", "step_unit": 1.0,
                                    "hard_range": (0.0, 1.0), "derived": False},
+    "buyback_accrual": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

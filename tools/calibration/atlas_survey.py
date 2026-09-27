@@ -401,6 +401,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "fed_growth_cut": (0.0, 3.0),
     # A switch: a drawn publication lag for each turn.
     "cycle_publication_lag_draw": (0.0, 1.0),
+    # A switch: 0.0 is the term that stood, 1.0 accrues the share count.
+    "buyback_accrual": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

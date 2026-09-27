@@ -423,6 +423,19 @@ OUT_OF_SCOPE = {
         "1.0 each turn draws its own lag, statelessly off the root seed "
         "(0.8.5, r13 macro-clock audit: a fixed 252-session lag made the "
         "published phase the true phase shifted, a clock)",
+    "buyback_accrual":
+        "inert at 0.0 as shipped: `market::tick::buyback_factor` returns "
+        "`buyback_scale`, the term that stood, and the close accrues "
+        "nothing. At 1.0 each name carries a log share-count reduction the "
+        "close adds `min(payout * E * exp(L) / P, cap) / 252` to, and fair "
+        "value reads exp(L), so it no longer moves against today's price "
+        "with a gain that grows with the elapsed years (d ln FV / d ln P "
+        "-0.29 by year 10 and -0.49 by year 40 on pt-v20; a period-2 "
+        "oscillation from about year 30 of a 100-year run) and relabelling "
+        "the calendar origin no longer moves prices. Snapshotted and hashed "
+        "only while it and `buyback_payout_share` are both set (0.8.5, "
+        "thirteenth registration work: the long-run audit, boxes "
+        "r13bb2-r13bb3)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

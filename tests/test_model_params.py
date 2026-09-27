@@ -1037,6 +1037,10 @@ PERTURBATIONS = [
     # phase is the opening phase, as the fixed 252-session lag's is.
     # tests/test_macro_clock.py holds the schedule.
     ("cycle_publication_lag_draw", 1.0, False),
+    # LIVE: the default carries buyback_payout_share, and the accrued
+    # share count replaces the term that compounds today's yield over the
+    # elapsed days from the first session.
+    ("buyback_accrual", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

@@ -1089,7 +1089,10 @@ def _nothing_dormant():
                    # lag's history, which `cycle_publication_lag` 5 above keeps
                    # lively here; tests/test_macro_clock.py carries the
                    # schedule across a restore.
-                   cycle_publication_lag_draw=0.0)
+                   cycle_publication_lag_draw=0.0,
+                   # A switch as well: the accrued buyback share counts,
+                   # which the snapshot carries only while it is on.
+                   buyback_accrual=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
