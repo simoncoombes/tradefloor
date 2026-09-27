@@ -109,11 +109,20 @@ pub struct PolicyOptions {
     /// it is the multiplier the market prices. See
     /// [`crate::params::ModelParams::cycle_nowcast_accuracy`].
     pub spread_multiplier: Option<f64>,
+    /// `fed_growth_cut`: the growth rate, in per cent a year, below which
+    /// the bank takes a risk-management cut; 0.0 is off. See
+    /// [`crate::params::ModelParams::fed_growth_cut`].
+    pub growth_cut: f64,
 }
 
 impl PolicyOptions {
     pub const fn shipped() -> Self {
-        PolicyOptions { calendar: MacroCalendar::shipped(), liftoff: 0.0, spread_multiplier: None }
+        PolicyOptions {
+            calendar: MacroCalendar::shipped(),
+            liftoff: 0.0,
+            spread_multiplier: None,
+            growth_cut: 0.0,
+        }
     }
 }
 
@@ -285,6 +294,21 @@ pub fn update_central_bank_with(
         rate_change = if rate_deficit > 3.0 { 0.50 } else { 0.25 };
         decision = Decision::StagflationHike;
         new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score + 0.15, -1.0, 1.0);
+    } else if options.growth_cut != 0.0
+        && economy.gdp_growth < options.growth_cut
+        && economy.inflation_rate < central_bank.target_inflation + 1.5
+        && current_rate > 0.0
+    {
+        // RISK MANAGEMENT (`fed_growth_cut`). The cut branches above read
+        // unemployment, which turns over months, so without this the first
+        // cut of an easing comes at the trough. This cuts a quarter point
+        // when growth has slowed under the dial and inflation allows it,
+        // whatever unemployment has done yet, as the Fed's first cuts came
+        // at or before the NBER peak. After the stagflation guard, so high
+        // inflation still wins; before lift-off, so the two never meet.
+        rate_change = -0.25;
+        decision = Decision::Cut;
+        new_cb.hawkish_dovish_score = clamp(central_bank.hawkish_dovish_score - 0.2, -1.0, 1.0);
     } else if options.liftoff != 0.0
         && rate_diff > 0.5
         && economy.unemployment_rate <= central_bank.target_unemployment + 1.0
@@ -459,5 +483,69 @@ pub fn update_central_bank_with(
         economy: new_economy,
         decision: Some(decision),
         announcement_variant: Some(announcement_variant),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rng::GameRng;
+
+    /// A meeting day on a calm economy: inflation and unemployment at
+    /// target, so the Taylor rate is 2.0 and at a policy rate of 2.0 the
+    /// ladder holds.
+    fn meeting(growth: f64, rate: f64, inflation: f64, options: &PolicyOptions) -> Option<Decision> {
+        let bank = create_initial_central_bank_state(0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.cycle_phase = CyclePhase::Expansion;
+        economy.gdp_growth = growth;
+        economy.federal_funds_rate = rate;
+        economy.inflation_rate = inflation;
+        economy.unemployment_rate = bank.target_unemployment;
+        let mut rng = GameRng::new(1, 1);
+        update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut rng, options).decision
+    }
+
+    /// `fed_growth_cut`: off, the calm meeting holds whatever growth does;
+    /// on, it cuts a quarter point when growth is under the dial, inflation
+    /// under target plus 1.5 and the rate above zero, and not otherwise;
+    /// and it sits before the lift-off branch, which a rate 60 bp under the
+    /// Taylor rate would otherwise take.
+    #[test]
+    fn the_growth_cut_fires_under_its_dial_and_before_lift_off() {
+        let off = PolicyOptions::shipped();
+        let on = PolicyOptions { growth_cut: 2.0, ..PolicyOptions::shipped() };
+        assert_eq!(meeting(1.0, 2.0, 2.0, &off), Some(Decision::Hold));
+        assert_eq!(meeting(1.0, 2.0, 2.0, &on), Some(Decision::Cut));
+        // The cut is a quarter point and moves the score by -0.2.
+        {
+            let bank = create_initial_central_bank_state(0);
+            let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+            economy.cycle_phase = CyclePhase::Expansion;
+            economy.gdp_growth = 1.0;
+            economy.federal_funds_rate = 2.0;
+            economy.inflation_rate = 2.0;
+            economy.unemployment_rate = bank.target_unemployment;
+            let mut rng = GameRng::new(1, 1);
+            let out = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut rng, &on);
+            assert!((out.economy.federal_funds_rate - 1.75).abs() < 1e-12);
+            assert!((out.central_bank.hawkish_dovish_score + 0.2).abs() < 1e-12);
+        }
+        // Growth at or above the dial, inflation too high, or no room: no cut.
+        assert_eq!(meeting(2.0, 2.0, 2.0, &on), Some(Decision::Hold));
+        assert_eq!(meeting(2.5, 2.0, 2.0, &on), Some(Decision::Hold));
+        assert_eq!(meeting(1.0, 0.0, 2.0, &on), Some(Decision::Hold));
+        assert_ne!(meeting(1.0, 2.0, 3.6, &on), Some(Decision::Cut));
+        // A negative dial waits for output to fall.
+        let deep = PolicyOptions { growth_cut: -0.5, ..PolicyOptions::shipped() };
+        assert_eq!(meeting(0.0, 2.0, 2.0, &deep), Some(Decision::Hold));
+        assert_eq!(meeting(-1.0, 2.0, 2.0, &deep), Some(Decision::Cut));
+        // Before lift-off: at a rate 60 bp under the Taylor rate the lift-off
+        // branch hikes, unless growth is under the dial.
+        let liftoff = PolicyOptions { liftoff: 1.0, ..PolicyOptions::shipped() };
+        let both = PolicyOptions { liftoff: 1.0, growth_cut: 2.0, ..PolicyOptions::shipped() };
+        assert_eq!(meeting(1.0, 1.4, 2.0, &liftoff), Some(Decision::Hike));
+        assert_eq!(meeting(1.0, 1.4, 2.0, &both), Some(Decision::Cut));
+        assert_eq!(meeting(3.0, 1.4, 2.0, &both), Some(Decision::Hike));
     }
 }

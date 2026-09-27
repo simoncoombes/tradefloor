@@ -651,6 +651,75 @@ pub struct Engine {
     /// unhashed while the dial is 0.0, which every preset through pt-v19
     /// carries.
     gdp_publication: GdpPublication,
+
+    /// `D`, the accumulated expected drift of the anticipated earnings level
+    /// the valuation leaves out (`earnings_anticipation_drift_share`), and
+    /// `A - e` as the last refresh left it, which the next close adds to
+    /// `D`. Zero, never touched, unsnapshotted and unhashed while the share
+    /// is 0.0, which every preset carries.
+    anticipation_drift: f64,
+    anticipation_raw: f64,
+
+    /// The business cycle's publication schedule under
+    /// `cycle_publication_lag_draw`. Default, never touched, unsnapshotted
+    /// and unhashed while the switch is 0.0, which every preset carries;
+    /// only its key is set at construction.
+    cycle_publication: CyclePublication,
+}
+
+/// The state behind the published cycle phase under
+/// `cycle_publication_lag_draw`: each true turn is published at its own
+/// close, `pi_k = max(pi_(k-1), tau_k + L_k)`, `L_k` a stateless draw on the
+/// turn's index (`rng::publication_uniform`).
+///
+/// Closes are counted from the opening (the construction, or a seeding),
+/// and a turn is a close whose true phase differs from the last close's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CyclePublication {
+    /// The key of the draws, from the root seed (`rng::publication_key`).
+    pub key: u64,
+    /// The phase an observer reads: the latest turn published, or the
+    /// opening phase before the first.
+    pub published: crate::economy::CyclePhase,
+    /// The true phase at the last close (or the opening), against which the
+    /// next close's phase is a turn.
+    pub last_true: crate::economy::CyclePhase,
+    /// Closes since the opening.
+    pub closes: i64,
+    /// True turns since the opening: the next turn's draw index.
+    pub turns: u64,
+    /// Turns not yet published, oldest first: the close each is published
+    /// on (non-decreasing), and the phase it turned into.
+    pub pending: std::collections::VecDeque<(i64, crate::economy::CyclePhase)>,
+}
+
+impl Default for CyclePublication {
+    fn default() -> Self {
+        CyclePublication {
+            key: 0,
+            published: crate::economy::CyclePhase::Expansion,
+            last_true: crate::economy::CyclePhase::Expansion,
+            closes: 0,
+            turns: 0,
+            pending: std::collections::VecDeque::new(),
+        }
+    }
+}
+
+/// The publication lag of a turn into `phase` under
+/// `cycle_publication_lag_draw`, from its uniform `u` in [0, 1): whole
+/// sessions uniform in [84, 252] into a peak or a contraction (the NBER's
+/// peak announcements, 4 to 12 months) and [168, 441] into a trough, a
+/// recovery or an expansion (its trough announcements, 8 to 21 months).
+pub fn cycle_publication_lag_of(phase: crate::economy::CyclePhase, u: f64) -> i64 {
+    use crate::economy::CyclePhase;
+    let (lo, hi) = match phase {
+        CyclePhase::Peak | CyclePhase::Contraction => (84i64, 252i64),
+        CyclePhase::Trough | CyclePhase::Recovery | CyclePhase::Expansion => (168i64, 441i64),
+    };
+    let span = (hi - lo + 1) as f64;
+    let step = (u * span).floor() as i64;
+    lo + if step > hi - lo { hi - lo } else if step < 0 { 0 } else { step }
 }
 
 /// The state behind the published GDP growth figure
@@ -1207,6 +1276,12 @@ impl Engine {
             cycle_nowcast: [0.0; 5],
             cycle_nowcast_terms: ([0.0; 5], 0.0),
             gdp_publication: GdpPublication::default(),
+            anticipation_drift: 0.0,
+            anticipation_raw: 0.0,
+            cycle_publication: CyclePublication {
+                key: crate::rng::publication_key(seed),
+                ..CyclePublication::default()
+            },
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
@@ -1236,6 +1311,9 @@ impl Engine {
         }
         // The market opens knowing the phase it opens in.
         engine.seed_cycle_nowcast();
+        // The burn-in's accumulated drift is not the run's: `D` opens at
+        // zero (`earnings_anticipation_drift_share`).
+        engine.anticipation_drift = 0.0;
         engine.refresh_earnings_anticipation();
         // After the burn-in and the stationary opening, so the phase the
         // run opens in is the one published until the lag has elapsed.
@@ -1381,9 +1459,90 @@ impl Engine {
         }
     }
 
-    /// `cycle_publication_lag` in sessions; 0 is off.
+    /// `cycle_publication_lag` in sessions; 0 is off, and so is a lag under
+    /// `cycle_publication_lag_draw`, which keeps no history.
     pub fn cycle_publication_lag(&self) -> usize {
+        if self.params.cycle_publication_lag_draw != 0.0 {
+            return 0;
+        }
         self.params.cycle_publication_lag as usize
+    }
+
+    /// Whether the engine keeps the fixed lag's phase history: the snapshot
+    /// and the state hash carry it exactly then.
+    pub fn carries_cycle_history(&self) -> bool {
+        self.cycle_publication_lag() != 0
+    }
+
+    /// The publication schedule under `cycle_publication_lag_draw`.
+    pub fn cycle_publication(&self) -> &CyclePublication {
+        &self.cycle_publication
+    }
+
+    /// Put a publication schedule back (a restore). Refused with the switch
+    /// at 0.0, which keeps none, and for pending turns out of order.
+    pub fn set_cycle_publication(&mut self, state: CyclePublication) -> Result<(), String> {
+        if self.params.cycle_publication_lag_draw == 0.0 {
+            return Err("this snapshot carries a cycle publication schedule, and this \
+                        engine's cycle_publication_lag_draw is 0, so it keeps none"
+                .to_string());
+        }
+        let mut last = i64::MIN;
+        for &(close, _) in &state.pending {
+            if close < last {
+                return Err(format!(
+                    "a cycle publication schedule's pending closes are in order, got {:?}",
+                    state.pending));
+            }
+            last = close;
+        }
+        if state.closes < 0 {
+            return Err(format!("a cycle publication schedule's closes are {}", state.closes));
+        }
+        self.cycle_publication = state;
+        Ok(())
+    }
+
+    /// Open the publication schedule on the phase the economy is in: the
+    /// opening, or a restore from a snapshot that carried none. The key is
+    /// kept. Nothing with `cycle_publication_lag_draw` at 0.0.
+    pub fn seed_cycle_publication(&mut self) {
+        if self.params.cycle_publication_lag_draw == 0.0 {
+            return;
+        }
+        let phase = self.economy.cycle_phase;
+        self.cycle_publication = CyclePublication {
+            key: self.cycle_publication.key,
+            published: phase,
+            last_true: phase,
+            closes: 0,
+            turns: 0,
+            pending: std::collections::VecDeque::new(),
+        };
+    }
+
+    /// One close of the schedule: a turn draws its lag and joins the queue,
+    /// and every turn whose close has come is published, the latest last.
+    fn record_cycle_publication(&mut self) {
+        let now = self.economy.cycle_phase;
+        let p = &mut self.cycle_publication;
+        p.closes += 1;
+        if now != p.last_true {
+            let u = crate::rng::publication_uniform(p.key, p.turns);
+            let lag = cycle_publication_lag_of(now, u);
+            p.turns += 1;
+            let earliest = p.pending.back().map(|&(c, _)| c).unwrap_or(i64::MIN);
+            let at = p.closes + lag;
+            p.pending.push_back((if at > earliest { at } else { earliest }, now));
+            p.last_true = now;
+        }
+        while let Some(&(close, phase)) = p.pending.front() {
+            if close > p.closes {
+                break;
+            }
+            p.published = phase;
+            p.pending.pop_front();
+        }
     }
 
     /// The business-cycle phase as published: the phase the economy held at
@@ -1395,6 +1554,11 @@ impl Engine {
     /// or MOVES on it (the earnings cycle and its anticipation, the cycle's
     /// hazards, the stress intensity, the central bank) reads the true phase.
     pub fn published_cycle_phase(&self) -> crate::economy::CyclePhase {
+        // Under `cycle_publication_lag_draw` the phase of the latest turn
+        // published, and the fixed lag is not read.
+        if self.params.cycle_publication_lag_draw != 0.0 {
+            return self.cycle_publication.published;
+        }
         if self.params.cycle_publication_lag == 0.0 {
             return self.economy.cycle_phase;
         }
@@ -1437,6 +1601,8 @@ impl Engine {
     /// Fill the history with the current phase: the opening, or a restore
     /// from a snapshot that carried none. Nothing with the dial at 0.0.
     pub fn seed_cycle_history(&mut self) {
+        // The drawn schedule opens where the fixed history does.
+        self.seed_cycle_publication();
         let lag = self.cycle_publication_lag();
         self.cycle_history.clear();
         if lag > 0 {
@@ -1447,6 +1613,10 @@ impl Engine {
     /// Record the phase the close has left the economy in, and drop the
     /// oldest. Nothing with the dial at 0.0.
     fn record_cycle_phase(&mut self) {
+        if self.params.cycle_publication_lag_draw != 0.0 {
+            self.record_cycle_publication();
+            return;
+        }
         let lag = self.cycle_publication_lag();
         if lag == 0 {
             return;
@@ -1528,7 +1698,7 @@ impl Engine {
     /// Under `cycle_nowcast_accuracy` the phase term is the belief's
     /// `pi . g`, not the true phase's `g`.
     pub fn refresh_earnings_anticipation(&mut self) {
-        self.economy.earnings_anticipation = match self.earnings_anticipation_terms() {
+        let raw = match self.earnings_anticipation_terms() {
             None => 0.0,
             Some((g, c)) => {
                 let gk = if self.params.cycle_nowcast_accuracy != 0.0 {
@@ -1547,6 +1717,78 @@ impl Engine {
                 gk + c * self.economy.earnings_cycle - self.economy.earnings_cycle
             }
         };
+        // `earnings_anticipation_drift_share`: the valuation reads `A - e`
+        // less the expected drift accumulated in `D`. A branch, so with the
+        // share at 0.0 this is the assignment that stood.
+        if self.params.earnings_anticipation_drift_share == 0.0 {
+            self.economy.earnings_anticipation = raw;
+        } else {
+            self.anticipation_raw = raw;
+            self.economy.earnings_anticipation = raw - self.anticipation_drift;
+        }
+    }
+
+    /// Whether the engine keeps `D` (`earnings_anticipation_drift_share`):
+    /// the snapshot and the state hash carry it, and the last `A - e`,
+    /// exactly then.
+    pub fn carries_anticipation_drift(&self) -> bool {
+        self.params.earnings_anticipation_drift_share != 0.0
+    }
+
+    /// `(D, A - e at the last refresh)`; zeros with the share at 0.0.
+    pub fn anticipation_drift(&self) -> (f64, f64) {
+        (self.anticipation_drift, self.anticipation_raw)
+    }
+
+    /// Put `D` and the last `A - e` back (a restore), and the anticipation
+    /// the valuation reads with them. Refused with the share at 0.0, which
+    /// keeps neither, and for a value that is not finite.
+    pub fn set_anticipation_drift(&mut self, drift: f64, raw: f64) -> Result<(), String> {
+        if !self.carries_anticipation_drift() {
+            return Err("this snapshot carries an anticipation drift, and this engine's \
+                        earnings_anticipation_drift_share is 0, so it keeps none"
+                .to_string());
+        }
+        if !drift.is_finite() || !raw.is_finite() {
+            return Err(format!(
+                "an anticipation drift and its last A - e are finite, got {drift} and {raw}"));
+        }
+        self.anticipation_drift = drift;
+        self.anticipation_raw = raw;
+        self.economy.earnings_anticipation = raw - drift;
+        Ok(())
+    }
+
+    /// Zero `D`: the opening, or a restore from a snapshot that carried
+    /// none. The anticipation is refreshed on it. Nothing with the share at
+    /// 0.0.
+    pub fn seed_anticipation_drift(&mut self) {
+        if !self.carries_anticipation_drift() {
+            return;
+        }
+        self.anticipation_drift = 0.0;
+        self.refresh_earnings_anticipation();
+    }
+
+    /// `earnings_anticipation_drift_share`: at a close, decay `D` with its
+    /// half-life and add the share of the session's expected drift of `A`,
+    /// `rho (A - e)` as the last refresh left it. Nothing with the share at
+    /// 0.0 or the anticipation off.
+    fn advance_anticipation_drift(&mut self) {
+        let m = self.params.earnings_anticipation_drift_share;
+        let h = self.params.earnings_anticipation_half_life;
+        if m == 0.0 || h <= 0.0 || self.params.earnings_cycle_depth == 0.0 {
+            return;
+        }
+        let rho = std::f64::consts::LN_2 / h;
+        let hd = if self.params.earnings_anticipation_drift_half_life == 0.0 {
+            1260.0
+        } else {
+            self.params.earnings_anticipation_drift_half_life
+        };
+        self.anticipation_drift =
+            self.anticipation_drift * crate::mathx::exp(-std::f64::consts::LN_2 / hd)
+                + m * rho * self.anticipation_raw;
     }
 
     /// The market's belief over the phases, `phase_cycle` order; zeros with
@@ -5330,6 +5572,7 @@ impl Engine {
             } else {
                 None
             },
+            growth_cut: self.params.fed_growth_cut,
         };
         let meeting =
             {
@@ -5350,6 +5593,7 @@ impl Engine {
             self.economy.corporate_bond_yield = corporate_pinned_at;
         }
         self.macro_pins_today = 0;
+        self.advance_anticipation_drift();
         self.refresh_earnings_anticipation();
         // The close's phase into the published history. The burn-in runs
         // this too, and the construction's seeding overwrites what it left.
@@ -6841,7 +7085,7 @@ impl Engine {
         }
         // The published-phase history, only while `cycle_publication_lag`
         // keeps one, so every other engine's hash is the one it was.
-        if self.params.cycle_publication_lag != 0.0 {
+        if self.carries_cycle_history() {
             hash_u32(&mut buf, self.cycle_history.len() as u32);
             for phase in &self.cycle_history {
                 hash_str(&mut buf, phase.as_str());
@@ -6866,6 +7110,29 @@ impl Engine {
                 hash_i64(&mut buf, release);
                 hash_f64(&mut buf, value);
             }
+        }
+        // The drawn publication schedule, only while
+        // `cycle_publication_lag_draw` is set: the key, the published and
+        // last true phases, the two counters, and the pending turns
+        // LENGTH-PREFIXED, each its close then its phase.
+        if self.params.cycle_publication_lag_draw != 0.0 {
+            let p = &self.cycle_publication;
+            hash_u64(&mut buf, p.key);
+            hash_str(&mut buf, p.published.as_str());
+            hash_str(&mut buf, p.last_true.as_str());
+            hash_i64(&mut buf, p.closes);
+            hash_u64(&mut buf, p.turns);
+            hash_u32(&mut buf, p.pending.len() as u32);
+            for &(close, phase) in &p.pending {
+                hash_i64(&mut buf, close);
+                hash_str(&mut buf, phase.as_str());
+            }
+        }
+        // The anticipation's left-out drift `D` and the last `A - e`, only
+        // while `earnings_anticipation_drift_share` is set.
+        if self.carries_anticipation_drift() {
+            hash_f64(&mut buf, self.anticipation_drift);
+            hash_f64(&mut buf, self.anticipation_raw);
         }
 
         // The central bank.
@@ -7783,6 +8050,223 @@ mod tests {
             assert!((mean[j] - occupancy[j]).abs() < 0.05, "{mean:?} against {occupancy:?}");
         }
         assert_eq!(e.draws.economy, control.draws.economy);
+    }
+
+    /// The engine the macro-clock tests read: the default, pt-v20, with the
+    /// dials given.
+    fn engine_macro_clock(seed: u64, dials: &[(&str, f64)]) -> Engine {
+        let mut params = Engine::default_model();
+        for (name, value) in dials {
+            params = params.with_override(name, *value).unwrap();
+        }
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        )
+    }
+
+    /// `earnings_anticipation_drift_share`: off, no `D` is kept or hashed and
+    /// the valuation reads `A - e`; on, `D` opens at zero after the burn-in,
+    /// each close takes `D <- D 2^(-1/h_D) + share rho (A - e)` with `A - e`
+    /// as the last refresh left it, the valuation reads `(A - e) - D`, the
+    /// half-life 0.0 reads 1260, and the state hash covers `D`.
+    #[test]
+    fn the_anticipation_drift_is_left_out_only_under_the_share() {
+        let off = engine(7);
+        assert!(!off.carries_anticipation_drift());
+        assert_eq!(off.anticipation_drift(), (0.0, 0.0));
+        assert!(off.clone().set_anticipation_drift(0.1, 0.0).is_err());
+
+        for (share, hd, h_read) in [(1.0, 252.0, 252.0), (0.5, 0.0, 1260.0)] {
+            let mut e = engine_macro_clock(
+                7,
+                &[("earnings_anticipation_drift_share", share),
+                  ("earnings_anticipation_drift_half_life", hd)],
+            );
+            assert!(e.params().macro_burn_in_days > 0.0);
+            let rho = std::f64::consts::LN_2 / e.params().earnings_anticipation_half_life;
+            let decay = crate::mathx::exp(-std::f64::consts::LN_2 / h_read);
+            // Zeroed after the burn-in, so the opening prices `A - e`.
+            let (d0, raw0) = e.anticipation_drift();
+            assert_eq!(d0, 0.0);
+            assert_ne!(raw0, 0.0);
+            assert_eq!(e.economy().earnings_anticipation, raw0);
+            let (mut d, mut raw) = (d0, raw0);
+            for day in 1..=60i64 {
+                e.advance_macro_day(day);
+                let (d1, raw1) = e.anticipation_drift();
+                assert_eq!(d1, d * decay + share * rho * raw, "day {day}");
+                assert_eq!(e.economy().earnings_anticipation, raw1 - d1, "day {day}");
+                d = d1;
+                raw = raw1;
+            }
+            assert!(d.abs() > 1e-4, "{d}");
+            // Hashed while set; a restore puts back both and the anticipation.
+            let before = e.state_hash(60, false);
+            let mut other = e.clone();
+            other.set_anticipation_drift(d + 0.01, raw).unwrap();
+            assert_ne!(other.state_hash(60, false), before);
+            assert_eq!(other.economy().earnings_anticipation, raw - (d + 0.01));
+            other.set_anticipation_drift(d, raw).unwrap();
+            assert_eq!(other.state_hash(60, false), before);
+            assert!(other.set_anticipation_drift(f64::NAN, raw).is_err());
+            // The seeding zeroes D and prices A - e again.
+            other.seed_anticipation_drift();
+            assert_eq!(other.anticipation_drift().0, 0.0);
+            assert_eq!(other.economy().earnings_anticipation, other.anticipation_drift().1);
+        }
+    }
+
+    /// `corporate_spread_cycle` at 1.0 without the nowcast: the multiplier
+    /// the meeting and the daily path price is the occupancy mean in every
+    /// phase, and at 0.0 it is the phase's own.
+    #[test]
+    fn the_full_spread_blend_prices_the_occupancy_mean_in_every_phase() {
+        let e = engine_macro_clock(7, &[("corporate_spread_cycle", 1.0)]);
+        let off = engine(7);
+        let mbar = e.cycle_nowcast_terms.1;
+        let (mean, cycle) = crate::economy::cycle::stationary_phase_shares_for(&e.cycle_spec());
+        let phases = crate::economy::cycle::phase_cycle();
+        let mut direct = 0.0;
+        for k in 0..5 {
+            direct += mean[k] / cycle * crate::economy::central_bank::spread_multiplier_of(phases[k]);
+        }
+        assert!((mbar - direct).abs() < 1e-12);
+        assert!(mbar > 1.0 && mbar < 3.5, "{mbar}");
+        for phase in phases {
+            assert!((e.priced_spread_multiplier(phase) - mbar).abs() < 1e-12);
+            assert_eq!(off.priced_spread_multiplier(phase),
+                       crate::economy::central_bank::spread_multiplier_of(phase));
+        }
+    }
+
+    /// The lag of one turn: whole sessions, the whole range reachable, the
+    /// peak and contraction range for those two phases and the trough range
+    /// for the other three.
+    #[test]
+    fn a_publication_lag_spans_its_range() {
+        use crate::economy::CyclePhase;
+        let top = 1.0 - f64::EPSILON / 2.0;
+        for (phase, lo, hi) in [(CyclePhase::Peak, 84, 252), (CyclePhase::Contraction, 84, 252),
+                                (CyclePhase::Trough, 168, 441), (CyclePhase::Recovery, 168, 441),
+                                (CyclePhase::Expansion, 168, 441)] {
+            assert_eq!(cycle_publication_lag_of(phase, 0.0), lo);
+            assert_eq!(cycle_publication_lag_of(phase, top), hi);
+            let mut seen = std::collections::BTreeSet::new();
+            for k in 0..20_000u64 {
+                let lag = cycle_publication_lag_of(phase, crate::rng::publication_uniform(99, k));
+                assert!((lo..=hi).contains(&lag));
+                seen.insert(lag);
+            }
+            assert_eq!(seen.len() as i64, hi - lo + 1);
+        }
+    }
+
+    /// `cycle_publication_lag_draw`: off, no schedule is kept or hashed; on,
+    /// the fixed history is not kept, each true turn is published at
+    /// `max(pi_prev, tau + L)` with `L` in [84, 252] into a peak or a
+    /// contraction and [168, 441] otherwise, announcements come in the
+    /// true turns' order, the schedule is a function of the seed, and it
+    /// takes no draw from any stream.
+    #[test]
+    fn the_drawn_publication_schedule_publishes_each_turn_in_order() {
+        use crate::economy::CyclePhase;
+        let off = engine(7);
+        assert!(off.carries_cycle_history());
+        assert!(off.clone().set_cycle_publication(off.cycle_publication().clone()).is_err());
+
+        let days = 5040i64;
+        let run = |seed: u64| {
+            let mut e = engine_macro_clock(seed, &[("cycle_publication_lag_draw", 1.0)]);
+            let mut control = engine(seed);
+            assert!(!e.carries_cycle_history());
+            assert!(e.cycle_history().is_empty());
+            assert!(e.clone().set_cycle_history(vec![e.economy().cycle_phase; 253]).is_err());
+            let opening = e.economy().cycle_phase;
+            assert_eq!(e.published_cycle_phase(), opening);
+            let mut truth = vec![opening];
+            let mut published = vec![opening];
+            for day in 1..=days {
+                e.advance_macro_day(day);
+                control.advance_macro_day(day);
+                truth.push(e.economy().cycle_phase);
+                published.push(e.published_cycle_phase());
+                assert_eq!(e.economy().cycle_phase, control.economy().cycle_phase, "day {day}");
+            }
+            // No stream moved: the schedule's draws are stateless.
+            assert_eq!(e.draws.economy, control.draws.economy);
+            (e, truth, published)
+        };
+        let (e, truth, published) = run(7);
+
+        // The true turns, and each one's publication close from the formula.
+        let mut turns: Vec<(i64, CyclePhase)> = Vec::new();
+        for c in 1..truth.len() {
+            if truth[c] != truth[c - 1] {
+                turns.push((c as i64, truth[c]));
+            }
+        }
+        assert!(turns.len() >= 10, "only {} turns", turns.len());
+        let key = e.cycle_publication().key;
+        assert_eq!(key, crate::rng::publication_key(7));
+        let mut last = i64::MIN;
+        let mut expected = vec![truth[0]; truth.len()];
+        let mut schedule = Vec::new();
+        for (k, &(tau, phase)) in turns.iter().enumerate() {
+            let lag = cycle_publication_lag_of(phase, crate::rng::publication_uniform(key, k as u64));
+            match phase {
+                CyclePhase::Peak | CyclePhase::Contraction => assert!((84..=252).contains(&lag)),
+                _ => assert!((168..=441).contains(&lag)),
+            }
+            let pi = if tau + lag > last { tau + lag } else { last };
+            assert!(pi >= last);
+            last = pi;
+            schedule.push((pi, phase));
+        }
+        for c in 0..truth.len() {
+            if let Some(&(_, phase)) = schedule.iter().rev().find(|&&(pi, _)| pi <= c as i64) {
+                expected[c] = phase;
+            }
+        }
+        assert_eq!(published, expected);
+        // Announcements follow the true turns' order: the published path's
+        // changes are a subsequence of the true turns' phases.
+        let announced: Vec<CyclePhase> = published.windows(2)
+            .filter(|w| w[0] != w[1]).map(|w| w[1]).collect();
+        let mut it = turns.iter().map(|&(_, p)| p);
+        for phase in &announced {
+            assert!(it.any(|p| p == *phase), "{phase:?} out of order");
+        }
+        assert!(announced.len() >= 8);
+        // The state carried agrees with the formula.
+        let state = e.cycle_publication();
+        assert_eq!(state.closes, days);
+        assert_eq!(state.turns, turns.len() as u64);
+        assert_eq!(state.last_true, *truth.last().unwrap());
+        let pending: Vec<(i64, CyclePhase)> = schedule.iter().copied()
+            .filter(|&(pi, _)| pi > days).collect();
+        assert_eq!(state.pending.iter().copied().collect::<Vec<_>>(), pending);
+
+        // Reproducible from the seed, and another seed draws other lags.
+        let (_, _, again) = run(7);
+        assert_eq!(again, published);
+        let (other, _, _) = run(8);
+        assert_ne!(other.cycle_publication().key, key);
+
+        // Hashed while set, and a restore refuses a schedule out of order.
+        let before = e.state_hash(days as u32, false);
+        let mut changed = e.clone();
+        let mut state = e.cycle_publication().clone();
+        state.turns += 1;
+        changed.set_cycle_publication(state).unwrap();
+        assert_ne!(changed.state_hash(days as u32, false), before);
+        let mut bad = e.cycle_publication().clone();
+        bad.pending = vec![(10, CyclePhase::Peak), (5, CyclePhase::Contraction)].into();
+        assert!(changed.set_cycle_publication(bad).is_err());
     }
 
     /// `gdp_publication_lag`: off, the published growth is the true one and

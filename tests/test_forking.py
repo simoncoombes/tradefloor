@@ -1081,7 +1081,15 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # The market's cycle nowcast is 0.0 or in (0.2, 1]; 0.4 is
+                   # the value proposed for pt-v20 (r13 phase re-anchor).
+                   cycle_nowcast_accuracy=0.4,
+                   # A switch. At 1.0 the drawn schedule replaces the fixed
+                   # lag's history, which `cycle_publication_lag` 5 above keeps
+                   # lively here; tests/test_macro_clock.py carries the
+                   # schedule across a restore.
+                   cycle_publication_lag_draw=0.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

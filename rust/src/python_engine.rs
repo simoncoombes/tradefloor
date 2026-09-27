@@ -306,6 +306,43 @@ fn gdp_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::GdpPubl
     })
 }
 
+/// A snapshot's `economy["cycle_publication"]` block
+/// (`cycle_publication_lag_draw`), every key required.
+fn cycle_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::CyclePublication> {
+    let d = v.downcast::<PyDict>().map_err(|_| {
+        ValidationError::new_err("snapshot economy.cycle_publication is not a dict")
+    })?;
+    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
+        d.get_item(key)?.ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "snapshot economy.cycle_publication has no {key:?} (cycle_publication_lag_draw)"))
+        })
+    };
+    let phase = |name: String| -> PyResult<CyclePhase> {
+        CyclePhase::from_name(&name)
+            .ok_or_else(|| ValidationError::new_err(format!("unknown cycle phase {name:?}")))
+    };
+    let closes: Vec<i64> = need("pending_closes")?.extract()?;
+    let names: Vec<String> = need("pending_phases")?.extract()?;
+    if closes.len() != names.len() {
+        return Err(ValidationError::new_err(format!(
+            "snapshot economy.cycle_publication has {} pending closes and {} pending \
+             phases (cycle_publication_lag_draw)", closes.len(), names.len())));
+    }
+    let mut pending = std::collections::VecDeque::with_capacity(closes.len());
+    for (close, name) in closes.into_iter().zip(names) {
+        pending.push_back((close, phase(name)?));
+    }
+    Ok(crate::engine::CyclePublication {
+        key: need("key")?.extract()?,
+        published: phase(need("published")?.extract()?)?,
+        last_true: phase(need("last_true")?.extract()?)?,
+        closes: need("closes")?.extract()?,
+        turns: need("turns")?.extract()?,
+        pending,
+    })
+}
+
 #[pymethods]
 impl PyMacro {
     #[new]
@@ -3914,7 +3951,7 @@ impl PyEngine {
         // The published-phase history, oldest first, only while
         // `cycle_publication_lag` keeps one, so every other snapshot is the
         // dict it was. A restore without it re-seeds from the true phase.
-        if self.inner.params().cycle_publication_lag != 0.0 {
+        if self.inner.carries_cycle_history() {
             let history: Vec<&str> =
                 self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
             econ.set_item("cycle_history", history)?;
@@ -3941,6 +3978,32 @@ impl PyEngine {
             block.set_item("pending_days", days)?;
             block.set_item("pending_values", values)?;
             econ.set_item("gdp_publication", block)?;
+        }
+        // The drawn publication schedule, only while
+        // `cycle_publication_lag_draw` is set (the fixed lag's history is
+        // then not kept). A restore without it re-seeds from the phase
+        // restored.
+        if self.inner.params().cycle_publication_lag_draw != 0.0 {
+            let p = self.inner.cycle_publication();
+            let block = PyDict::new_bound(py);
+            block.set_item("key", p.key)?;
+            block.set_item("published", p.published.as_str())?;
+            block.set_item("last_true", p.last_true.as_str())?;
+            block.set_item("closes", p.closes)?;
+            block.set_item("turns", p.turns)?;
+            let closes: Vec<i64> = p.pending.iter().map(|&(c, _)| c).collect();
+            let phases: Vec<&str> = p.pending.iter().map(|&(_, ph)| ph.as_str()).collect();
+            block.set_item("pending_closes", closes)?;
+            block.set_item("pending_phases", phases)?;
+            econ.set_item("cycle_publication", block)?;
+        }
+        // The anticipation's left-out drift `D` and the last `A - e`, only
+        // while `earnings_anticipation_drift_share` is set. A restore
+        // without them opens `D` at zero.
+        if self.inner.carries_anticipation_drift() {
+            let (drift, raw) = self.inner.anticipation_drift();
+            econ.set_item("anticipation_drift", drift)?;
+            econ.set_item("anticipation_raw", raw)?;
         }
         // The aggregate earnings cycle, only when the model moves it, so
         // every earlier preset's snapshot is the dict it was.
@@ -4578,6 +4641,31 @@ impl PyEngine {
                     self.inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
                 }
                 None => self.inner.seed_cycle_history(),
+            }
+            // The drawn publication schedule (`cycle_publication_lag_draw`),
+            // refused where the switch is off; the seeding above opened it
+            // on the phase restored where the snapshot carries none.
+            if let Some(v) = d.get_item("cycle_publication")? {
+                let state = cycle_publication_from(&v)?;
+                self.inner.set_cycle_publication(state).map_err(ValidationError::new_err)?;
+            }
+            // `D` and the last `A - e` (`earnings_anticipation_drift_share`),
+            // both or neither, refused where the share is 0; `D` opens at
+            // zero where the snapshot carries neither.
+            match (d.get_item("anticipation_drift")?, d.get_item("anticipation_raw")?) {
+                (Some(drift), Some(raw)) => {
+                    let drift: f64 = drift.extract()?;
+                    let raw: f64 = raw.extract()?;
+                    self.inner
+                        .set_anticipation_drift(drift, raw)
+                        .map_err(ValidationError::new_err)?;
+                }
+                (None, None) => self.inner.seed_anticipation_drift(),
+                _ => {
+                    return Err(ValidationError::new_err(
+                        "this snapshot carries one of the economy's anticipation_drift and \
+                         anticipation_raw without the other; the engine writes both or neither"));
+                }
             }
             // Unemployment's impulse (`unemployment_adjustment_half_life`).
             // Refused where the dial is off; re-seeded from the economy just

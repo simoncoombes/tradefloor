@@ -1020,6 +1020,23 @@ PERTURBATIONS = [
     # formula's change on the daily path, so the corporate yield and the
     # rate term of every fair value move from the first meeting.
     ("corporate_spread_cycle", 0.75, True),
+    # The anticipation's left-out drift (r13 macro-clock). LIVE: the default
+    # runs the anticipation, so the first close adds rho (A - e) to D, the
+    # valuation reads (A - e) - D, and the default reprices at the close
+    # (`macro_publication_repricing`).
+    ("earnings_anticipation_drift_share", 1.0, True),
+    # INERT: D's half-life is read only with the share above set.
+    ("earnings_anticipation_drift_half_life", 252.0, False),
+    # LIVE: the probe's first meeting finds true growth under 2 per cent,
+    # inflation under target plus 1.5 and the rate above zero, so the bank
+    # cuts a quarter point where the ladder held, and the rate term of every
+    # fair value moves.
+    ("fed_growth_cut", 2.0, True),
+    # INERT on this probe: the drawn schedule publishes a turn no sooner than
+    # 84 sessions after it, so over the probe's three days the published
+    # phase is the opening phase, as the fixed 252-session lag's is.
+    # tests/test_macro_clock.py holds the schedule.
+    ("cycle_publication_lag_draw", 1.0, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1511,6 +1528,13 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # follow the path the two dials move. Both were here at 0.8.0 and left
     # with pt-v20's first composition.
     "oil_supply_response", "oil_opec_symmetry",
+    # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
+    # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
+    # (9172 to 9206), the market stream by 0. It acts on the 755-day
+    # burn-in's meetings, where it cuts earlier than the ladder, so the rate
+    # path, the cycle's transition roll and the state-dependent sites that
+    # read them follow.
+    "fed_growth_cut",
     # THREE ARRIVED WITH THE FIFTH COMPOSITION (2026-09-23), and all three
     # through the drawn opening it switched on: at seed 42 the burn-in now
     # runs from an expansion past its minimum duration, where the cycle's

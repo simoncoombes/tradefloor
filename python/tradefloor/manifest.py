@@ -674,10 +674,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
+    # `cycle_publication` only on a model with `cycle_publication_lag_draw`
+    # set, and `anticipation_drift` with `anticipation_raw` only on a model
+    # with `earnings_anticipation_drift_share` set; both hashed after
+    # `gdp_publication`, in that order.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
-         "unemployment_impulse", "vix_feedback", "cycle_nowcast"}
+         "unemployment_impulse", "vix_feedback", "cycle_nowcast",
+         "cycle_publication", "anticipation_drift", "anticipation_raw"}
         & set(economy))
+    if ("anticipation_drift" in economy) != ("anticipation_raw" in economy):
+        raise ValidationError(
+            "this snapshot carries one of the economy's anticipation_drift "
+            "and anticipation_raw without the other. The engine writes both "
+            "or neither.")
     if ("cycle_nowcast" in economy) != ("cycle_nowcast_rng" in snapshot):
         raise ValidationError(
             "this snapshot carries one of the economy's cycle_nowcast and "
@@ -760,6 +770,38 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for day, value in zip(days, values):
             _i64(buf, day)
             _f64(buf, value)
+    # The drawn publication schedule, only while `cycle_publication_lag_draw`
+    # is set: `Engine::state_hash`'s order and rule, the pending turns
+    # LENGTH-PREFIXED, each its close then its phase.
+    if "cycle_publication" in economy:
+        pub = economy["cycle_publication"]
+        keys = {"key", "published", "last_true", "closes", "turns",
+                "pending_closes", "pending_phases"}
+        if set(pub) != keys:
+            raise ValidationError(
+                "this snapshot's cycle_publication is not the one the state "
+                f"hash covers: missing {sorted(keys - set(pub))}, "
+                f"unexpected {sorted(set(pub) - keys)}.")
+        closes = list(pub["pending_closes"])
+        phases = list(pub["pending_phases"])
+        if len(closes) != len(phases):
+            raise ValidationError(
+                f"this snapshot's cycle_publication has {len(closes)} pending "
+                f"closes and {len(phases)} pending phases.")
+        _u64(buf, pub["key"])
+        _text(buf, pub["published"])
+        _text(buf, pub["last_true"])
+        _i64(buf, pub["closes"])
+        _u64(buf, pub["turns"])
+        _u32(buf, len(closes))
+        for close, phase in zip(closes, phases):
+            _i64(buf, close)
+            _text(buf, phase)
+    # The anticipation's left-out drift and the last `A - e`, only while
+    # `earnings_anticipation_drift_share` is set.
+    if "anticipation_drift" in economy:
+        _f64(buf, economy["anticipation_drift"])
+        _f64(buf, economy["anticipation_raw"])
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):

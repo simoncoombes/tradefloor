@@ -168,6 +168,12 @@ PARAM_SPECS: dict[str, dict] = {
     # Refused in (0, 0.2] by the engine; see atlas_survey's range.
     "cycle_nowcast_accuracy": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "corporate_spread_cycle": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The r13 macro-clock dials.
+    "earnings_anticipation_drift_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "earnings_anticipation_drift_half_life": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 5040.0)},
+    "fed_growth_cut": {"kind": "abs", "step_unit": 0.1, "hard_range": (-5.0, 5.0)},
+    "cycle_publication_lag_draw": {"kind": "abs", "step_unit": 1.0,
+                                   "hard_range": (0.0, 1.0), "derived": False},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

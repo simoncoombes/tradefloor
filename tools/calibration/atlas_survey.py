@@ -389,6 +389,18 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The share of the spread's cycle multiplier replaced by its occupancy
     # mean: its whole meaning, from the table as it stood to none of it.
     "corporate_spread_cycle": (0.0, 1.0),
+    # The r13 macro-clock dials. The share of the anticipated level's
+    # expected drift the valuation leaves out: its whole meaning.
+    "earnings_anticipation_drift_share": (0.0, 1.0),
+    # D's half-life in sessions; 0.0 reads 1260, so the box runs from the
+    # shipped 0.0 through a quarter to five years.
+    "earnings_anticipation_drift_half_life": (0.0, 1260.0),
+    # A growth rate in per cent a year; 0.0 is off. The box stops at 3,
+    # where the cut would fire at about trend growth; below zero it waits
+    # for output to fall, the ladder's own timing, so the box leaves it out.
+    "fed_growth_cut": (0.0, 3.0),
+    # A switch: a drawn publication lag for each turn.
+    "cycle_publication_lag_draw": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

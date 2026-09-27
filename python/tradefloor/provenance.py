@@ -394,6 +394,35 @@ OUT_OF_SCOPE = {
         "daily move carries the formula's whole change (0.8.5, r13 audit: "
         "the first meeting after a turn re-anchored the spread by 111 bp "
         "on average)",
+    # The thirteenth registration's macro-clock dials (r13), inert on every
+    # preset. When pt-v20 takes them they leave this table with the value's
+    # kind and source.
+    "earnings_anticipation_drift_share":
+        "inert at 0.0 as shipped: `Engine::refresh_earnings_anticipation` "
+        "writes `A - e` as it did, `advance_anticipation_drift` returns "
+        "without reading anything, and `D` is neither snapshotted nor "
+        "hashed. Off zero the valuation leaves out that share of the "
+        "anticipated level's expected drift `rho (A - e)`, accumulated in "
+        "`D` (0.8.5, r13 macro-clock audit: the drift made the published "
+        "phase a timing signal, 2x in peak or contraction beating holding "
+        "in 0.97 of 90 histories)",
+    "earnings_anticipation_drift_half_life":
+        "unread while `earnings_anticipation_drift_share` is 0.0, as every "
+        "preset ships it (0.8.5, r13 macro-clock)",
+    "fed_growth_cut":
+        "inert at 0.0 as shipped: the risk-management branch of "
+        "`update_central_bank_with` is guarded on the dial being non-zero, "
+        "so the ladder is the one that stood. Off zero the bank cuts 25 bp "
+        "when true growth is under the dial (0.8.5, r13 macro-clock audit: "
+        "the first cut came a median 105 sessions after a contraction began, "
+        "at the trough)",
+    "cycle_publication_lag_draw":
+        "inert at 0.0 as shipped: `Engine::published_cycle_phase` and "
+        "`record_cycle_phase` read the fixed `cycle_publication_lag` as they "
+        "did, and the schedule is neither kept, snapshotted nor hashed. At "
+        "1.0 each turn draws its own lag, statelessly off the root seed "
+        "(0.8.5, r13 macro-clock audit: a fixed 252-session lag made the "
+        "published phase the true phase shifted, a clock)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

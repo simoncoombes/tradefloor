@@ -588,6 +588,28 @@ pub struct ModelParams {
     /// engine keeps the last `lag + 1` phases (`Engine::published_cycle_phase`),
     /// and its snapshot and state hash carry them only while this is set.
     pub cycle_publication_lag: f64,
+    /// Draws each turn's publication lag instead of using the fixed
+    /// `cycle_publication_lag`. 0.0, which every preset carries, is the
+    /// fixed lag, under which the published phase is the true phase shifted
+    /// by exactly that many sessions: a clock, since a recession's length
+    /// has an sd of 2.2 months on the US table, so a peak published 252
+    /// sessions late lands a median 1.9 months before the recovery.
+    ///
+    /// At 1.0 each true turn `k`, at close `tau_k`, draws its own lag `L_k`,
+    /// uniform in whole sessions: [84, 252] for a turn into a peak or a
+    /// contraction (the NBER announced peaks 4 to 12 months after them,
+    /// 1980-2020) and [168, 441] for a turn into a trough, a recovery or an
+    /// expansion (troughs 8 to 21 months). It is published at the close
+    /// `pi_k = max(pi_(k-1), tau_k + L_k)`, so announcements stay in order,
+    /// and the published phase is that of the latest turn with `pi_k` at or
+    /// before the close. The draw is stateless and takes nothing from any
+    /// stream: `u_k = splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG <<
+    /// 32 | k))`, the key derived from the root seed
+    /// (`rng::publication_key`), so every other draw is untouched. Turns are
+    /// counted from the opening. `cycle_publication_lag` is not read while
+    /// this is set. The snapshot and the state hash carry the schedule
+    /// (`Engine::cycle_publication`) only while this is set. A switch.
+    pub cycle_publication_lag_draw: f64,
     /// Sessions between the end of a quarter and the publication of its GDP
     /// growth, as the BEA's advance estimate comes about a month after the
     /// quarter. 0.0, which every preset through pt-v19 carries, is off
@@ -750,6 +772,46 @@ pub struct ModelParams {
     /// (belief moves times the full multiplier); 0.75 gives 3.8. Proposed
     /// for pt-v20 at 0.75. In [0, 1].
     pub corporate_spread_cycle: f64,
+    /// The share of the anticipated earnings level's EXPECTED drift the
+    /// valuation leaves out. 0.0, which every preset carries, prices `A - e`
+    /// as `earnings_anticipation_half_life` defines it: `A = c e + g_phase`
+    /// is the discounted mean of the level's expected path, so its expected
+    /// change is `rho (A - e)` a session (`rho = ln 2 / half-life`), a drift
+    /// the phase alone predicts. On pt-v20 that drift is -2.9 points over
+    /// the 63 sessions after a contraction begins and +4.5 after a recovery
+    /// begins, and the price inherits it as excess return a timing rule can
+    /// harvest (r13 macro-clock audit: 2x while the published phase is peak
+    /// or contraction beat holding in 0.97 of 90 histories).
+    ///
+    /// Off zero the engine keeps `D`: at each close `D <- D * 2^(-1/h_D) +
+    /// share * rho * (A - e)`, with `A - e` as the last refresh left it and
+    /// `h_D` from `earnings_anticipation_drift_half_life`, and the valuation
+    /// reads `(A - e) - D`. The price then moves with the news about `A`
+    /// (the turns, the level's noise) and not with its expected catch-up,
+    /// and `h_D` lets the left-out share return slowly. `D` is zeroed after
+    /// the burn-in. The snapshot and the state hash carry `D` and the last
+    /// `A - e` only while this is set. Read only with
+    /// `earnings_anticipation_half_life` and `earnings_cycle_depth` set.
+    /// In [0, 1].
+    pub earnings_anticipation_drift_share: f64,
+    /// The half-life, in sessions, of `D` under
+    /// `earnings_anticipation_drift_share`. 0.0 is 1260. Read only with the
+    /// share set. In [0, 5040].
+    pub earnings_anticipation_drift_half_life: f64,
+    /// A risk-management cut: the TRUE growth rate, in per cent a year,
+    /// below which the central bank cuts 25 bp at a meeting when inflation
+    /// is under target plus 1.5 and the rate is above zero. The branch sits
+    /// after the stagflation guard and before the lift-off branch, and moves
+    /// `hawkish_dovish_score` by -0.2. 0.0, which every preset carries, is
+    /// off (a threshold of exactly zero is not offered). The ladder's other
+    /// cut branches read unemployment, which under
+    /// `unemployment_adjustment_half_life` 84 rises over months, so on
+    /// pt-v20 the first cut of an easing comes a median 105 sessions after a
+    /// contraction begins, at the trough, and "after the first cut" means
+    /// "the recovery rally"; the Fed's first cut came 0 to 13 months BEFORE
+    /// the NBER peak in 1989, 1990, 2001, 2007 and 2019 (FRED DFEDTAR and
+    /// DFEDTARU). In [-5, 5].
+    pub fed_growth_cut: f64,
     /// The share of each IDIOSYNCRATIC shock that moves the name's fair
     /// value for good rather than its mispricing. 0.0, which every preset
     /// through pt-v19 carries, sends the whole shock to `s`, so every
@@ -5276,6 +5338,7 @@ impl ModelParams {
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
             cycle_publication_lag: 0.0,
+            cycle_publication_lag_draw: 0.0,
             gdp_publication_lag: 0.0,
             unemployment_adjustment_half_life: 0.0,
             fear_greed_published_inputs: 0.0,
@@ -5287,6 +5350,9 @@ impl ModelParams {
             corporate_yield_daily: 0.0,
             cycle_nowcast_accuracy: 0.0,
             corporate_spread_cycle: 0.0,
+            earnings_anticipation_drift_share: 0.0,
+            earnings_anticipation_drift_half_life: 0.0,
+            fed_growth_cut: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
@@ -7613,6 +7679,7 @@ impl ModelParams {
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
             "cycle_publication_lag" => self.cycle_publication_lag,
+            "cycle_publication_lag_draw" => self.cycle_publication_lag_draw,
             "gdp_publication_lag" => self.gdp_publication_lag,
             "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
@@ -7624,6 +7691,9 @@ impl ModelParams {
             "corporate_yield_daily" => self.corporate_yield_daily,
             "cycle_nowcast_accuracy" => self.cycle_nowcast_accuracy,
             "corporate_spread_cycle" => self.corporate_spread_cycle,
+            "earnings_anticipation_drift_share" => self.earnings_anticipation_drift_share,
+            "earnings_anticipation_drift_half_life" => self.earnings_anticipation_drift_half_life,
+            "fed_growth_cut" => self.fed_growth_cut,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
@@ -7866,6 +7936,7 @@ impl ModelParams {
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
             "cycle_publication_lag" => out.cycle_publication_lag = value,
+            "cycle_publication_lag_draw" => out.cycle_publication_lag_draw = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
             "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
@@ -7877,6 +7948,9 @@ impl ModelParams {
             "corporate_yield_daily" => out.corporate_yield_daily = value,
             "cycle_nowcast_accuracy" => out.cycle_nowcast_accuracy = value,
             "corporate_spread_cycle" => out.corporate_spread_cycle = value,
+            "earnings_anticipation_drift_share" => out.earnings_anticipation_drift_share = value,
+            "earnings_anticipation_drift_half_life" => out.earnings_anticipation_drift_half_life = value,
+            "fed_growth_cut" => out.fed_growth_cut = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
@@ -8225,6 +8299,32 @@ impl ModelParams {
             return Err(format!(
                 "corporate_spread_cycle is {}. It is a share, in [0, 1].",
                 self.corporate_spread_cycle));
+        }
+        if !(self.earnings_anticipation_drift_share >= 0.0
+            && self.earnings_anticipation_drift_share <= 1.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_drift_share is {}. It is a share, in [0, 1]; 0 prices the \
+                 anticipated level as it stood.",
+                self.earnings_anticipation_drift_share));
+        }
+        if !(self.earnings_anticipation_drift_half_life >= 0.0
+            && self.earnings_anticipation_drift_half_life <= 5040.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_drift_half_life is {}. It is sessions, in [0, 5040]; 0 is 1260.",
+                self.earnings_anticipation_drift_half_life));
+        }
+        if !(self.fed_growth_cut >= -5.0 && self.fed_growth_cut <= 5.0) {
+            return Err(format!(
+                "fed_growth_cut is {}. It is a growth rate in per cent a year, in [-5, 5]; 0 is off.",
+                self.fed_growth_cut));
+        }
+        if !(self.cycle_publication_lag_draw == 0.0 || self.cycle_publication_lag_draw == 1.0) {
+            return Err(format!(
+                "cycle_publication_lag_draw is {}. It is a switch: 0 (the fixed \
+                 cycle_publication_lag) or 1 (a lag drawn for each turn).",
+                self.cycle_publication_lag_draw));
         }
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
@@ -8779,6 +8879,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
         "cycle_publication_lag",
+        "cycle_publication_lag_draw",
         "gdp_publication_lag",
         "unemployment_adjustment_half_life",
         "fear_greed_published_inputs",
@@ -8790,6 +8891,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_yield_daily",
         "cycle_nowcast_accuracy",
         "corporate_spread_cycle",
+        "earnings_anticipation_drift_share",
+        "earnings_anticipation_drift_half_life",
+        "fed_growth_cut",
         "fair_value_news_share",
         "fair_value_market_share",
         "fair_value_market_linear",

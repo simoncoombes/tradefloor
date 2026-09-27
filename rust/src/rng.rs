@@ -563,6 +563,28 @@ fn splitmix64_mix(input: u64) -> u64 {
     z ^ (z >> 31)
 }
 
+/// The tag in the business cycle's publication draws, ASCII "PUBL"
+/// (`cycle_publication_lag_draw`).
+pub const PUBLICATION_TAG: u32 = 0x5055_424C;
+
+/// The key of a root seed's publication draws (`cycle_publication_lag_draw`):
+/// `splitmix64_mix(root ^ (PUBLICATION_TAG << 32 | 0xFFFF_FFFF))`. A
+/// bijection on `u64` for a fixed tag, and its input is never the input of a
+/// draw below (whose low half is a turn index, never all ones in practice).
+/// The engine keeps the key rather than the root.
+pub fn publication_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The `k`-th publication uniform in [0, 1) of a key:
+/// `splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG << 32 | k)) >> 11`
+/// times `2^-53`. Stateless and integer-only up to the one exact scaling:
+/// it takes nothing from any stream, so drawing it moves no other draw.
+pub fn publication_uniform(key: u64, k: u64) -> f64 {
+    let z = splitmix64_mix(key ^ splitmix64_mix(((PUBLICATION_TAG as u64) << 32) | (k & 0xFFFF_FFFF)));
+    (z >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
+}
+
 /// The input the stream derivation mixes, for a root seed of either width.
 ///
 /// Below `2^32` it is `s << 32 | k`, the 32-bit contract's input, bit for
@@ -1106,6 +1128,26 @@ impl GameRng {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The publication draws (`cycle_publication_lag_draw`): the documented
+    /// formula, in [0, 1), reproducible, distinct over turns and seeds.
+    #[test]
+    fn publication_draws_are_the_documented_stateless_formula() {
+        let key = publication_key(7);
+        assert_eq!(key, splitmix64_mix(7 ^ ((0x5055_424Cu64 << 32) | 0xFFFF_FFFF)));
+        for k in 0..2000u64 {
+            let u = publication_uniform(key, k);
+            assert!((0.0..1.0).contains(&u), "{u}");
+            let z = splitmix64_mix(key ^ splitmix64_mix((0x5055_424Cu64 << 32) | k));
+            assert_eq!(u, (z >> 11) as f64 / (1u64 << 53) as f64);
+            assert_eq!(u, publication_uniform(key, k));
+        }
+        assert_ne!(publication_uniform(key, 0), publication_uniform(key, 1));
+        assert_ne!(publication_key(7), publication_key(8));
+        assert_ne!(publication_key(7), publication_key(7 | (1 << 40)));
+        let mean: f64 = (0..10_000u64).map(|k| publication_uniform(key, k)).sum::<f64>() / 10_000.0;
+        assert!((mean - 0.5).abs() < 0.01, "{mean}");
+    }
 
     /// The state after construction is not something the reference implementation exposes,
     /// so this pins the internal sequence instead: the first outputs must be
