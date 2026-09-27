@@ -1106,6 +1106,131 @@ pub struct ModelParams {
     /// every preset carries, leaves the buyback term as it stands; read only
     /// with `dividend_payout_share` set. 0 or 1.
     pub dividend_buyback_substitution: f64,
+    /// The night's share of the day's MARKET-factor variance. 0.0, which
+    /// every preset carries, is no split: the session carries the whole day
+    /// and nothing moves a price between the close and the open unless
+    /// `overnight_variance_ratio` adds a night of its own.
+    ///
+    /// Off zero the day's variance is SPLIT, not added to. At each open
+    /// `Engine::apply_overnight` draws the market factor's night at
+    /// `sqrt(w)` times its conditional daily sigma, and every tick of the
+    /// session draws it at `sqrt(1 - w)` times its usual scale, so the
+    /// night and the session sum to the day the market GJR was fitted to.
+    /// The night's draw joins the GJR's day innovation, so the variance
+    /// process sees the whole day. The split has to stay exact: the GJR's
+    /// persistence is 0.8946 + 0.0844 k^2 at an innovation scale k, and a
+    /// night plus session of 1.17 days (k^2 = 1.17) took the index's
+    /// volatility from 17.4 to 33 per cent in the earnings-gaps prototype.
+    ///
+    /// The night's market draw takes the session's down tilt and lagged
+    /// wire, with the tilt's mean given back and ALL of the mean the lagged
+    /// wire's multiple adds (whatever `market_beta_down_asym_lag_recentre`
+    /// says), but not the crash amplifier: one draw carrying half the day's
+    /// variance crosses the amplifier's threshold far more often than 390
+    /// tick draws do. The session's live lagged-wire condition
+    /// (`market_beta_down_asym_lag_live`) reads the day's factor less the
+    /// night's draw. Both keep the session from following the gap: with the
+    /// night on pt-v20's un-recentred wire and in its live condition, the
+    /// equal-weight session return's slope on the night's was +0.099
+    /// against a real +0.022 (the review of 50dfeed). Under
+    /// `fair_value_market_linear` only its plain loading is permanent, as
+    /// the tick's is. Real large caps carry about 0.46 of the forty names'
+    /// equal-weighted market variance overnight (2015-2025, the mean of the
+    /// names' log returns). Refused beside `overnight_variance_ratio`. In
+    /// [0, 0.9].
+    pub overnight_market_share: f64,
+    /// The night's share of the day's SECTOR and IDIOSYNCRATIC variance, as
+    /// `overnight_market_share` is of the market's: drawn at `sqrt(w)` at
+    /// the open and at `sqrt(1 - w)` through the session. 0.0, which every
+    /// preset carries, is no split.
+    ///
+    /// The night's own draw joins the name's `random_noise` slot, so the
+    /// name's GJR steps on the whole day, and it moves the name's fair-value
+    /// level at `fair_value_news_share`, as the session's own noise does.
+    /// Real large caps carry a median 0.31 of their idiosyncratic variance
+    /// overnight, event nights included (the forty names 2015-2025, EDGAR
+    /// 8-K Item 2.02 dates). In [0, 0.9].
+    pub overnight_idio_share: f64,
+    /// Degrees of freedom of the night's idiosyncratic draw. 0.0, which
+    /// every preset carries, is a normal. Off zero, an integer in [3, 30]:
+    /// the draw becomes a unit-variance student t, the normal times
+    /// `sqrt((nu - 2) / chi2_nu)`, the chi-square the sum of `nu` squared
+    /// normals taken on the overnight stream at a site of its own
+    /// (`Site::OvernightIdioChi2`), and only while the dial is set and a
+    /// split is on, so the stream's schedule moves only on a model that
+    /// reads it. Real nights have a kurtosis of about 33 against a
+    /// session's 4.5 (the forty names 2015-2025).
+    pub overnight_idio_df: f64,
+    /// The earnings calendar's master switch and the surprise's size, in
+    /// units of the name's current idiosyncratic daily sigma. 0.0, which
+    /// every preset carries, is no calendar.
+    ///
+    /// Off zero every public company reports once a quarter: on session
+    /// `63 q + o + j`, where `o` is the name's own offset into the quarter,
+    /// drawn once from the forty real names' median offsets (EDGAR 8-K Item
+    /// 2.02 acceptance times, 2015-2025: the reaction session falls a median
+    /// 18 sessions after the quarter's first), and `j` a jitter in [-3, 3]
+    /// drawn each quarter, the session held inside the quarter. The draws are
+    /// keyed on the engine's seed, the company's id and the quarter
+    /// (`rng::stream::EARNINGS`), so the calendar is a function of the run
+    /// and takes no draw from any stream; `Engine.earnings_calendar()` lists
+    /// the dates ahead, as a real calendar does, and nothing about the
+    /// surprise.
+    ///
+    /// The surprise is realised at the reaction session's OPENING PRINT: `x
+    /// = s * sigma * t / sd(t) - (s sigma)^2 / 2`, mean one in level, joins
+    /// the name's fair-value level, and the open prints it. `sigma` is the
+    /// name's NON-MARKET daily sigma: its GJR sigma at its idiosyncratic
+    /// scale and size multiplier and its sector loading on the sector's
+    /// sigma, in quadrature: the part of the name's draws a residual on the
+    /// market reads as idiosyncratic. On the forty-name roster at 3.7, with
+    /// `earnings_session_sigma` 1.9, the reaction session reads 3.45 of the
+    /// name's realised non-event idiosyncratic sd, against a real 3.47
+    /// (held-out seeds 2001-2016). Needs a split (`overnight_idio_share` or
+    /// `overnight_market_share`) so the opening print realises it. Real
+    /// reaction days carry 10.2 times a normal day's idiosyncratic variance
+    /// (bootstrap 7.3 to 12.6) and 76 per cent of it in the night. In [0, 20].
+    pub earnings_surprise_sigma: f64,
+    /// Degrees of freedom of the earnings surprise. 0.0 is a normal; off
+    /// zero an integer in [3, 30], a unit-variance student t. Read only with
+    /// `earnings_surprise_sigma` non-zero.
+    pub earnings_surprise_df: f64,
+    /// The reaction session's own discovery, in the surprise's units: a
+    /// normal part, mean one in level, walked into the name's fair-value
+    /// level one open minute at a time through the reaction session, at the
+    /// intraday volatility profile's weights, so the session trades it in as
+    /// it arrives: no drift, and the first tick carries about 1/390 of it
+    /// (`Engine::walk_earnings_sessions`; the draws keyed on the minute).
+    /// Until the review of 50dfeed it joined fair value in one piece after
+    /// the opening print and printed on the first tick. 0.0 is none. Read
+    /// only with `earnings_surprise_sigma` non-zero. In [0, 20].
+    pub earnings_session_sigma: f64,
+    /// The same on the session after the reaction session, walked in the
+    /// same way: the real day-after idiosyncratic variance is 1.71 times a
+    /// normal day's
+    /// (bootstrap 1.34 to 2.14). 0.0 is none. Read only with
+    /// `earnings_surprise_sigma` non-zero. In [0, 20].
+    pub earnings_followthrough_sigma: f64,
+    /// The reaction session's volume scale: every tick of a name's reaction
+    /// session trades this multiple of what it otherwise would. 0.0, like
+    /// 1.0, is no multiple. Real reaction sessions trade 2.16 times a normal
+    /// session (bootstrap 2.06 to 2.25). Read only with
+    /// `earnings_surprise_sigma` non-zero. In [0, 10].
+    pub earnings_volume_multiple: f64,
+    /// The share of the aggregate earnings cycle's move that a name's fair
+    /// value holds back until its next report. 0.0, which every preset
+    /// carries, is none: the cycle (`earnings_cycle_depth`) reaches every
+    /// name's valuation the session it moves, through the common multiplier.
+    ///
+    /// Off zero, at each close's macro step this share of the change in the
+    /// cycle's level (and its anticipation) is taken out of every traded
+    /// name's fair-value level and kept aside for it, and the name's next
+    /// report gives the whole kept amount back at its opening print, with
+    /// the surprise: the market learns a company's part of the cycle from
+    /// the company's own report. Read only with `earnings_surprise_sigma`
+    /// and `earnings_cycle_depth` non-zero; the amounts kept are carried by
+    /// the snapshot and the state hash only then. In [0, 1].
+    pub earnings_cycle_report_share: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5639,6 +5764,15 @@ impl ModelParams {
             dividend_adjustment_speed: 0.4,
             dividend_yield_ceiling: 2.0,
             dividend_buyback_substitution: 0.0,
+            overnight_market_share: 0.0,
+            overnight_idio_share: 0.0,
+            overnight_idio_df: 0.0,
+            earnings_surprise_sigma: 0.0,
+            earnings_surprise_df: 0.0,
+            earnings_session_sigma: 0.0,
+            earnings_followthrough_sigma: 0.0,
+            earnings_volume_multiple: 0.0,
+            earnings_cycle_report_share: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7999,6 +8133,15 @@ impl ModelParams {
             "dividend_adjustment_speed" => self.dividend_adjustment_speed,
             "dividend_yield_ceiling" => self.dividend_yield_ceiling,
             "dividend_buyback_substitution" => self.dividend_buyback_substitution,
+            "overnight_market_share" => self.overnight_market_share,
+            "overnight_idio_share" => self.overnight_idio_share,
+            "overnight_idio_df" => self.overnight_idio_df,
+            "earnings_surprise_sigma" => self.earnings_surprise_sigma,
+            "earnings_surprise_df" => self.earnings_surprise_df,
+            "earnings_session_sigma" => self.earnings_session_sigma,
+            "earnings_followthrough_sigma" => self.earnings_followthrough_sigma,
+            "earnings_volume_multiple" => self.earnings_volume_multiple,
+            "earnings_cycle_report_share" => self.earnings_cycle_report_share,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8275,6 +8418,15 @@ impl ModelParams {
             "dividend_adjustment_speed" => out.dividend_adjustment_speed = value,
             "dividend_yield_ceiling" => out.dividend_yield_ceiling = value,
             "dividend_buyback_substitution" => out.dividend_buyback_substitution = value,
+            "overnight_market_share" => out.overnight_market_share = value,
+            "overnight_idio_share" => out.overnight_idio_share = value,
+            "overnight_idio_df" => out.overnight_idio_df = value,
+            "earnings_surprise_sigma" => out.earnings_surprise_sigma = value,
+            "earnings_surprise_df" => out.earnings_surprise_df = value,
+            "earnings_session_sigma" => out.earnings_session_sigma = value,
+            "earnings_followthrough_sigma" => out.earnings_followthrough_sigma = value,
+            "earnings_volume_multiple" => out.earnings_volume_multiple = value,
+            "earnings_cycle_report_share" => out.earnings_cycle_report_share = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8805,6 +8957,64 @@ impl ModelParams {
             return Err(format!(
                 "fed_stress_inflation_gap is {}. It is points of inflation over target, in [0, 10].",
                 self.fed_stress_inflation_gap));
+        }
+        for (name, v) in [("overnight_market_share", self.overnight_market_share),
+                          ("overnight_idio_share", self.overnight_idio_share)] {
+            if !(v >= 0.0 && v <= 0.9) {
+                return Err(format!(
+                    "{name} is {v}. It is the night's share of the day's variance, in \
+                     [0, 0.9]; 0 is no split."));
+            }
+        }
+        if self.overnight_variance_ratio != 0.0
+            && (self.overnight_market_share != 0.0 || self.overnight_idio_share != 0.0)
+        {
+            return Err(format!(
+                "overnight_variance_ratio is {} and a night share is set \
+                 (overnight_market_share {}, overnight_idio_share {}). The ratio ADDS a \
+                 night to the day and the shares SPLIT the day between the night and \
+                 the session; set one or the other.",
+                self.overnight_variance_ratio, self.overnight_market_share,
+                self.overnight_idio_share));
+        }
+        for (name, v) in [("overnight_idio_df", self.overnight_idio_df),
+                          ("earnings_surprise_df", self.earnings_surprise_df)] {
+            if !(v == 0.0 || (v >= 3.0 && v <= 30.0 && v == v.floor())) {
+                return Err(format!(
+                    "{name} is {v}. It is a student t's degrees of freedom, an integer \
+                     in [3, 30], or 0 for a normal."));
+            }
+        }
+        for (name, v, hi) in [("earnings_surprise_sigma", self.earnings_surprise_sigma, 20.0),
+                              ("earnings_session_sigma", self.earnings_session_sigma, 20.0),
+                              ("earnings_followthrough_sigma", self.earnings_followthrough_sigma, 20.0),
+                              ("earnings_volume_multiple", self.earnings_volume_multiple, 10.0)] {
+            if !(v >= 0.0 && v <= hi) {
+                return Err(format!(
+                    "{name} is {v}. It is in [0, {hi}]; 0 is off."));
+            }
+        }
+        if !(self.earnings_cycle_report_share >= 0.0 && self.earnings_cycle_report_share <= 1.0) {
+            return Err(format!(
+                "earnings_cycle_report_share is {}. It is a share of the cycle's move, in [0, 1].",
+                self.earnings_cycle_report_share));
+        }
+        if self.earnings_cycle_report_share != 0.0 && self.earnings_surprise_sigma == 0.0 {
+            return Err(format!(
+                "earnings_cycle_report_share is {} and earnings_surprise_sigma is 0.0. The \
+                 share is given back at a name's report, and without the calendar no \
+                 name reports; set the calendar too.",
+                self.earnings_cycle_report_share));
+        }
+        if self.earnings_surprise_sigma != 0.0
+            && self.overnight_market_share == 0.0
+            && self.overnight_idio_share == 0.0
+        {
+            return Err(format!(
+                "earnings_surprise_sigma is {} and no night share is set. The surprise \
+                 is realised at the reaction session's opening print, which only a \
+                 split prices; set overnight_idio_share (or overnight_market_share) too.",
+                self.earnings_surprise_sigma));
         }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
@@ -9391,6 +9601,15 @@ pub fn settable_names() -> Vec<&'static str> {
         "dividend_adjustment_speed",
         "dividend_yield_ceiling",
         "dividend_buyback_substitution",
+        "overnight_market_share",
+        "overnight_idio_share",
+        "overnight_idio_df",
+        "earnings_surprise_sigma",
+        "earnings_surprise_df",
+        "earnings_session_sigma",
+        "earnings_followthrough_sigma",
+        "earnings_volume_multiple",
+        "earnings_cycle_report_share",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

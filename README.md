@@ -257,7 +257,7 @@ held-out test. pt-v20's own dials were chosen against the long-run
 criteria. The held-out checks are the fresh seeds and the fresh set of
 companies.
 
-Five limits are measured and written down:
+Six limits are measured and written down:
 
 | limit | what it means |
 |---|---|
@@ -266,6 +266,7 @@ Five limits are measured and written down:
 | scenario size | the response has the right sign, but one run cannot size it |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
 | roster | certification used a sector-balanced roster. Four concentrated sector mixes are also measured, on the shape rows only and for up to two years |
+| overnight | pt-v20 opens every session at the last close: nothing gaps overnight, no company reports earnings, and a stop held overnight never opens through its level (3.3% of real nights do, for a stop two median days below the close). The night split and the earnings calendar exist behind dials and are off |
 
 `tf.envelope.check()` refuses a question that falls outside a limit, and
 [the realism envelope](https://tradefloor.dev/realism-envelope.html) says

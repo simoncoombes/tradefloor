@@ -1848,8 +1848,11 @@ The maker's inventory takes the other side of every fill and never decays
 
 The print is then clamped to the same ±25% session band as the model price:
 $P_{i,t} = \mathrm{clip}(P_{i,t}^{\mathrm{set}};\ 0.75 P_{i,d}^{o},\ 1.25 P_{i,d}^{o})$
-(`market/tick.rs:1445-1453`). The overnight gap is not clamped, and there is
-no overnight move: each session opens at the last print.
+(`market/tick.rs:1445-1453`). The overnight gap is not clamped. On pt-v20
+each session opens at the last print. Under a night split
+(`overnight_market_share`, `overnight_idio_share`, below under Off in pt-v20)
+the open prints the model price after the night's draw and any earnings
+report, and the session band anchors on that open.
 
 **The closing cross.** On the last tick of the session the print is the
 model price, clamped to the same band, and the maker's inventory change
@@ -2396,6 +2399,8 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 
 - **Noise in the earnings cycle** (`earnings_cycle_sigma`): the cycle follows the phase path alone.
 - **Overnight move** (`overnight_variance_ratio`): the draws are taken and nothing is applied, so each session opens at the last print.
+- **The night as a share of the day** (`overnight_market_share`, `overnight_idio_share`, `overnight_idio_df`): off, so each session opens at the last print and nothing gaps through a stop. On, the day's variance is split, not added to: the open draws the market factor at $\sqrt{w_m}$ and the sector and own draws at $\sqrt{w_i}$ of their daily sigmas (the own draw a unit-variance student t under the df), and every tick draws at $\sqrt{1-w}$. The night joins both GJRs' day innovations and the fair-value level as the session's draws do; its market draw carries the lagged down-wire's variance but none of its mean, and the session's live wire keys on the session's own draws, so the session does not follow the market's gap. The day's return is read from the last close (`previous_close` keeps it), and the open prints the tick's model price with the buyback term's fixed point (`market/tick.rs`, `opening_print`). The real forty (2015-2025) carry 0.39 of a name's variance overnight and 0.46 of the index's.
+- **Earnings calendar** (`earnings_surprise_sigma` and `earnings_surprise_df`, `earnings_session_sigma`, `earnings_followthrough_sigma`, `earnings_volume_multiple`, `earnings_cycle_report_share`; needs a night split): off, so no company reports. On, each public company reports once a quarter, on session $63q + o_i + j$, with $o_i$ drawn from the forty real names' offsets into the quarter (EDGAR 8-K Item 2.02, median 18 sessions) and $j$ uniform on $[-3, 3]$, keyed on the seed, the company id and the quarter (`src/earnings.rs`). The surprise $x = s_e \sigma_i t/\mathrm{sd}(t) - (s_e\sigma_i)^2/2$ joins $v$ before the reaction session's opening print, so the open prints it; $\sigma_i$ is the company's non-market draw sigma (own and sector in quadrature). A normal part is walked into $v$ one open minute at a time through the reaction session, and another through the next session, so each session trades its part in with no drift and no first-tick jump, and the reaction session trades a multiple of its volume. `Engine.earnings_calendar()` lists the dates ahead and nothing about a surprise, and the agents' market view (`tradefloor.sandbox.MarketView`) and the framework adapters' payload serve them.
 - **Crisis correlation blend** (`crisis_blend_gain`, `crisis_blend_variance_damp`): no extra market loading in a crisis.
 - **Forced selling** (`forced_flow_gain` and its four partner dials): no correlated selling above a VIX threshold.
 - **Remembered stress** (`universe_stress_weight`, `universe_stress_decay`, `regime_stress_points`): the crisis spike reads today's VIX only, and the business cycle has no direct path to prices.

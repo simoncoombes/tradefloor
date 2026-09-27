@@ -673,6 +673,10 @@ pub struct TickInputs<'a> {
     /// whole of the day's move, which is every preset: see
     /// [`crate::params::ModelParams::volume_move_jump_share`].
     pub jump_move: &'a [f64],
+    /// Each name's volume multiple on an earnings reaction session
+    /// (`earnings_volume_multiple`), in roster order; EMPTY off the
+    /// calendar, which every preset is, and then nothing is read.
+    pub earnings_volume: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -949,6 +953,21 @@ pub fn simulate_market_tick(
     let economy = inputs.economy;
     let open = inputs.market_status == MarketStatus::Open;
     let p = inputs.params;
+    // THE SESSION'S SHARE OF THE DAY under a night split
+    // (`overnight_market_share`, `overnight_idio_share`): the open drew the
+    // night at `sqrt(w)`, so the session draws at `sqrt(1 - w)` and the two
+    // sum to the day. Branches, so at 0.0 every scale is the one that stood.
+    let tick_scale_market = if p.overnight_market_share == 0.0 {
+        tick_scale
+    } else {
+        tick_scale * mathx::sqrt(1.0 - p.overnight_market_share)
+    };
+    let (tick_scale_own, volatility_multiplier) = if p.overnight_idio_share == 0.0 {
+        (tick_scale, inputs.volatility_multiplier)
+    } else {
+        let k = mathx::sqrt(1.0 - p.overnight_idio_share);
+        (tick_scale * k, inputs.volatility_multiplier * k)
+    };
 
     // ── Shared factors: 1 normal, then one per sector ─────────────────────
     // Drawn at PER-TICK scale directly, so the noise is not divided by 390
@@ -957,7 +976,7 @@ pub fn simulate_market_tick(
     // baseline (`MARKET_FACTOR_SIGMA`) this line is bit-identical to the
     // constant-sigma era's spelling, association included.
     rng.site(crate::rng::Site::MarketFactorZ, 0);
-    let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale;
+    let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale_market;
 
     // Crisis correlation: above the crisis threshold, sector factors blend
     // toward the market factor, so diversification stops working exactly
@@ -990,7 +1009,7 @@ pub fn simulate_market_tick(
             Some(s) => *s,
             None => sector_sigma,
         };
-        let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
+        let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale_own;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the
         // reference behaviour. At 1.0 the draw is kept whole and the same
@@ -1041,7 +1060,7 @@ pub fn simulate_market_tick(
         // The same expression the draw above multiplied the normal by, so
         // the recentring reads the sigma that was actually used rather
         // than one recomputed from the constant.
-        market_sigma_tick: inputs.market_sigma_daily * tick_scale,
+        market_sigma_tick: inputs.market_sigma_daily * tick_scale_market,
         // Resolved once at `open_market` and carried, not recomputed: the
         // episode's epicentre is a property of the SESSION, and a tick that
         // re-read the engine's state mid-day would let an episode start
@@ -1085,7 +1104,7 @@ pub fn simulate_market_tick(
             &company.factor_view(),
             inputs.news,
             imbalance,
-            inputs.volatility_multiplier,
+            volatility_multiplier,
             &shared,
             p,
             rng,
@@ -1465,7 +1484,18 @@ pub fn simulate_market_tick(
             // the price before it, so at share 1.0 a gap counts as a day the
             // name travelled that far. See
             // `ModelParams::volume_move_jump_share`.
-            if inputs.params.volume_move_jump_share == 1.0 {
+            //
+            // Under a night split the day is measured from the last close
+            // (`previous_close`, which the open then leaves at the close):
+            // the session carries only part of the day's move, and a real
+            // day's volume answers the whole of it.
+            if p.overnight_market_share != 0.0 || p.overnight_idio_share != 0.0 {
+                if stock.previous_close > 0.0 {
+                    ((new_prices[i] - stock.previous_close) / stock.previous_close).abs()
+                } else {
+                    move_from_open.abs()
+                }
+            } else if inputs.params.volume_move_jump_share == 1.0 {
                 move_from_open.abs()
             } else {
                 match inputs.jump_move.get(idx) {
@@ -1498,6 +1528,13 @@ pub fn simulate_market_tick(
             * intraday_volume_mult
             * all_news_vol_mults[i])
             .floor();
+        // A reaction session's multiple (`earnings_volume_multiple`), read
+        // only where the engine passed one: empty off the calendar.
+        if let Some(&m) = inputs.earnings_volume.get(idx) {
+            if m != 1.0 {
+                volumes[i] = (volumes[i] * m).floor();
+            }
+        }
     }
 
     // ── Phase 4: settlement ───────────────────────────────────────────────
@@ -1889,6 +1926,42 @@ pub fn tick_fair_value(
     .fair_value;
     let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
     crate::market::dividends::with_accrual(fv, company)
+}
+
+/// The opening print of a name whose mispricing stands at `s`: the price
+/// `P = fv(P) exp(s)`, fair value read as the tick reads it
+/// ([`tick_fair_value`]). Fair value reads the price through the buyback
+/// term (the yield is earnings over price), so the first step, at the last
+/// price, is exact only with `buyback_payout_share` at 0.0; with it on the
+/// fixed point is iterated as the close's re-mark iterates it
+/// (`Engine::reprice_to_published_macro`), a contraction because the term's
+/// elasticity is the buyback yield times the years elapsed, well under one
+/// (and capped by `buyback_yield_cap`). Stops when a step moves nothing, or
+/// at sixteen, and takes no draw.
+pub fn opening_print(
+    p: &ModelParams,
+    economy: &EconomyState,
+    nominal_output_base: f64,
+    elapsed_days: i64,
+    company: &TickCompany,
+    s: f64,
+) -> f64 {
+    let clamp = |x: f64| mathx::min(mathx::max(x, 0.01), p.price_hard_cap);
+    let level = mathx::exp(s);
+    let last = company.stock.price;
+    let mut price = clamp(
+        tick_fair_value(p, economy, nominal_output_base, elapsed_days, company, last) * level);
+    if p.buyback_payout_share != 0.0 {
+        for _ in 0..16 {
+            let fv = tick_fair_value(p, economy, nominal_output_base, elapsed_days, company, price);
+            let next = clamp(fv * level);
+            if next == price {
+                break;
+            }
+            price = next;
+        }
+    }
+    price
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {

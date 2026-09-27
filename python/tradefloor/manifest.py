@@ -480,7 +480,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "pinned_corporate_spread",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
-         "dividend", "pending_dividend"}
+         "dividend", "pending_dividend",
+         # The earnings calendar's key, only with the calendar on, and what
+         # names hold back of the cycle for their reports, only while that
+         # share runs.
+         "earnings_key", "earnings_withheld",
+         # Tonight's market draw under a night split, only while the
+         # session's live lagged wire reads it.
+         "night_market_factor"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -623,6 +630,18 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         raw = snapshot["buyback_log_shares"]
         for value in _column(raw, n, "buyback_log_shares"):
             _f64(buf, value)
+    # The earnings calendar's key, only with `earnings_surprise_sigma` set.
+    if "earnings_key" in snapshot:
+        _u64(buf, snapshot["earnings_key"])
+    if "earnings_withheld" in snapshot:
+        raw = snapshot["earnings_withheld"]
+        values = _column(raw, len(raw) // 8, "earnings_withheld")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # Tonight's market draw, only while the live lagged wire reads it.
+    if "night_market_factor" in snapshot:
+        _f64(buf, snapshot["night_market_factor"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -1161,11 +1180,12 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 
 #: Byte buffers only some snapshots carry: the fair-value levels and the
 #: unapplied opening draws on a model that can move a level (pt-v20 on), the
-#: agent-facing book's consumed depth once an agent has used it, and the
-#: accrued buyback share-count reductions under `buyback_accrual`. Encoded
+#: agent-facing book's consumed depth once an agent has used it, the
+#: accrued buyback share-count reductions under `buyback_accrual`, and what
+#: names hold back of the earnings cycle for their reports. Encoded
 #: where present and left out where not.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
-                            "buyback_log_shares")
+                            "buyback_log_shares", "earnings_withheld")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,

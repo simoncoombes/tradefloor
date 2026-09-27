@@ -553,6 +553,46 @@ OUT_OF_SCOPE = {
         "57(4)); without it dividends on top of buybacks gave a D/P-quintile "
         "total-return spread of +4.1 to +4.4 points a year against a real "
         "+0.9 (Ken French D/P portfolios, 1927-2025)",
+    "overnight_market_share":
+        "inert at 0.0 as shipped: `Engine::night_split_on` is false and "
+        "`apply_overnight` takes the shipped branch, and `market::tick` "
+        "branches on `== 0.0` and draws the session's market factor at the "
+        "whole day's scale. Splits the day's market variance between the "
+        "night and the session rather than adding to it (0.8.5, "
+        "earnings-gaps: real forty-name index night share 0.461)",
+    "overnight_idio_share":
+        "inert at 0.0 as shipped: the same gate as "
+        "`overnight_market_share`, and `market::tick` branches on `== 0.0` "
+        "for the session's sector and own draws. The real forty's median "
+        "idiosyncratic night share is 0.31 (0.8.5, earnings-gaps)",
+    "overnight_idio_df":
+        "unread while neither night share is set: the chi-square draws "
+        "(`Site::OvernightIdioChi2`) are taken only under a split with this "
+        "dial off zero, and 0.0 is a normal night",
+    "earnings_surprise_sigma":
+        "inert at 0.0 as shipped: the calendar's master switch. "
+        "`Engine::carries_earnings` is false, no report is priced, "
+        "`earnings_calendar()` lists nothing, and the key is neither "
+        "snapshotted nor hashed. Refused without a night share, since the "
+        "opening print that realises the surprise is the split's",
+    "earnings_surprise_df":
+        "unread while `earnings_surprise_sigma` is 0.0; 0.0 is a normal "
+        "surprise",
+    "earnings_session_sigma":
+        "unread while `earnings_surprise_sigma` is 0.0 (no reaction "
+        "session exists)",
+    "earnings_followthrough_sigma":
+        "unread while `earnings_surprise_sigma` is 0.0 (no reaction "
+        "session exists)",
+    "earnings_cycle_report_share":
+        "inert at 0.0 as shipped: `Engine::carries_earnings_withheld` is "
+        "false and `advance_macro_day` takes no share of the cycle's move "
+        "out of any fair-value level. Refused without the calendar, since "
+        "the share is given back at a name's report",
+    "earnings_volume_multiple":
+        "unread while `earnings_surprise_sigma` is 0.0: "
+        "`Engine::earnings_volume_column` is empty and the tick reads no "
+        "multiple; 0.0 and 1.0 are both no multiple",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

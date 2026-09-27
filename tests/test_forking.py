@@ -1107,7 +1107,19 @@ def _nothing_dormant():
                    # A switch as well; the dividend at 0.05 of the sector
                    # payouts is small but pays, so a restore that lost a
                    # name's dividend state would move its next amount.
-                   dividend_buyback_substitution=1.0)
+                   dividend_buyback_substitution=1.0,
+                   # The night split and the earnings calendar (earnings-
+                   # gaps). The split SPLITS the day where the ratio ADDS a
+                   # night, and the two are refused together, so the ratio
+                   # stays at zero here and the split carries the overnight
+                   # stream; the degrees of freedom are integers from 3; the
+                   # calendar reports from the fifth session at a real size,
+                   # holding back half the cycle for each report.
+                   overnight_variance_ratio=0.0,
+                   overnight_idio_df=3.0,
+                   earnings_surprise_sigma=3.0,
+                   earnings_surprise_df=4.0,
+                   earnings_cycle_report_share=0.5)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1278,6 +1290,28 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "test_bond_timing.py::test_a_restore_without_the_stress_level_loses_"
         "the_cut is that scenario: without the key the meeting holds where "
         "the parent cut.",
+    "earnings_key":
+        "the earnings calendar's key. It is derived from the seed the engine "
+        "was built with, and this guard restores into an engine built from "
+        "the same seed, so a restore without it derives the same key. "
+        "tests/test_earnings_calendar.py::test_the_key_is_carried_only_while_"
+        "the_calendar_runs restores into an engine built from another seed, "
+        "where a snapshot without it reports on other dates.",
+    "night_market_factor":
+        "tonight's market draw, which the session's live lagged wire takes "
+        "off the day's factor. Dropped, the wire reads the whole day's "
+        "factor, and only a tick where the two have opposite signs prices "
+        "differently; at this model's wire (tilt 0.025, lag 0.46) and night "
+        "the rest of this session holds none. tests/test_overnight_split.py::"
+        "test_a_restore_mid_session_keys_the_live_wire_on_the_session "
+        "exaggerates the wire and restores without it, and diverges.",
+    "jump_move":
+        "the jump waiting to be traded in, read by the volume scale only off "
+        "`volume_move_jump_share` 1.0 and without a night split. This model "
+        "splits the day (earnings-gaps), and under a split the volume scale "
+        "reads the day's move from the last close, jumps included, so "
+        "nothing reads it; tests/test_forking.py reached it through the "
+        "volume scale before the split was in this model.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "

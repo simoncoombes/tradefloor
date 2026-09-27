@@ -283,6 +283,7 @@ fn check_scenario(file: &str) {
                 volume_state: 0.0,
                 volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),

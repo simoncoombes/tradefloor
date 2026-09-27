@@ -1273,6 +1273,30 @@ PERTURBATIONS = [
     # first tick, so the first session opens where it always did, and every
     # open after it carries a gap.
     ("overnight_variance_ratio", 0.5, True),
+    # The night as a SHARE of the day. Each moves the market from the
+    # second day's open, as the ratio does, and the session's draws from
+    # the first tick, which are scaled by sqrt(1 - share).
+    ("overnight_market_share", 0.5, True),
+    ("overnight_idio_share", 0.2, True),
+    # The night's student t, read under its companion share: the scale
+    # multiplies the night's own draw from the second open on.
+    ("overnight_idio_df", 4.0, True),
+    # THE EARNINGS CALENDAR, each read under its companions (the calendar
+    # needs a split, and its sizes the calendar). INERT over a probe this
+    # short: the earliest reaction session is the fifth (the smallest real
+    # offset, 8, less the jitter's 3), so the probe's three sessions carry
+    # no report. `tests/test_earnings_calendar.py` holds the mechanism.
+    ("earnings_surprise_sigma", 3.0, False),
+    ("earnings_surprise_df", 4.0, False),
+    ("earnings_session_sigma", 1.5, False),
+    ("earnings_followthrough_sigma", 1.1, False),
+    ("earnings_volume_multiple", 1.3, False),
+    # The cycle a name holds back for its report. INERT over the probe:
+    # the share is of the cycle's MOVE, and at seed 42 the cycle sits at its
+    # phase's target through the probe's three closes, so there is nothing
+    # to hold back (it moves on a phase change, measured in
+    # `tests/test_earnings_calendar.py`).
+    ("earnings_cycle_report_share", 1.0, False),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.
@@ -1797,6 +1821,17 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The fixed opening the row's decomposition was measured on, where the
     # probe's first two days are phase-change days (see the row).
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
+    # The night's t is read under a split, and the calendar needs one; the
+    # calendar's sizes are read under the calendar (earnings-gaps).
+    "overnight_idio_df": {"overnight_idio_share": 0.2},
+    "earnings_surprise_sigma": {"overnight_idio_share": 0.2},
+    "earnings_surprise_df": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_session_sigma": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_followthrough_sigma": {"overnight_idio_share": 0.2,
+                                     "earnings_surprise_sigma": 3.0},
+    "earnings_volume_multiple": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_cycle_report_share": {"overnight_idio_share": 0.2,
+                                    "earnings_surprise_sigma": 3.0},
 }
 
 

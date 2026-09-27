@@ -409,6 +409,32 @@ pub struct Engine {
     /// the reader, like the tape: not state, not hashed, not in the
     /// snapshot. Empty on every preset.
     distribution_log: Vec<Distribution>,
+    /// The earnings calendar's key (`rng::GameRng::earnings_key` of the
+    /// seed the engine was built with): every report's date and draws are
+    /// functions of it, the company's id and the quarter (`crate::earnings`).
+    /// Derived at construction on every engine and read only with
+    /// `earnings_surprise_sigma` set, which is also when the snapshot and
+    /// the state hash carry it.
+    earnings_key: u64,
+    /// The earnings surprise each name's opening print realised at the last
+    /// open, in roster order, 0.0 where none did. Per-day output like
+    /// `overnight_moves`, recomputed at every open and read by nothing.
+    earnings_moves: Vec<f64>,
+    /// The part of the aggregate earnings cycle's move each name's fair
+    /// value is holding back until its next report
+    /// (`earnings_cycle_report_share`), in roster order, as a log level.
+    /// Zeros, and neither snapshotted nor hashed, unless that share, the
+    /// calendar and the cycle are all on.
+    earnings_withheld: Vec<f64>,
+    /// Tonight's market-factor draw under a night split
+    /// (`overnight_market_share`), per unit of beta, before the tilt: the
+    /// part of `market_vol`'s day factor the night put there. The session's
+    /// live lagged-wire condition (`market_beta_down_asym_lag_live`) reads
+    /// the day factor LESS this, so the wire keys on the session's own draws
+    /// and the night's gap does not set the session's drift. Zero at every
+    /// close; snapshotted and hashed only while that wire reads it
+    /// ([`Engine::carries_night_market_factor`]).
+    night_market_factor: f64,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -1163,6 +1189,7 @@ impl Engine {
             || self.params.fair_value_market_share != 0.0
             || self.params.opening_mispricing_sigma != 0.0
             || self.params.opening_market_sigma != 0.0
+            || self.params.earnings_surprise_sigma != 0.0
     }
 
     /// Put the per-name jump excitation back. See
@@ -1328,6 +1355,10 @@ impl Engine {
             jump_fair_value_moves: vec![0.0; companies_len],
             dividend_moves: vec![0.0; companies_len],
             distribution_log: Vec::new(),
+            earnings_key: GameRng::earnings_key(seed),
+            earnings_moves: vec![0.0; companies_len],
+            earnings_withheld: vec![0.0; companies_len],
+            night_market_factor: 0.0,
             companies,
             economy,
             central_bank,
@@ -3180,6 +3211,16 @@ impl Engine {
             Some(flow) => flow.as_slice(),
             None => request.order_volumes,
         };
+        // The reaction session's discovery and the follow-through, this
+        // minute's step into fair value, before the tick prices it. Off the
+        // calendar nothing runs.
+        if open_now && self.carries_earnings() {
+            self.walk_earnings_sessions(request.time);
+        }
+        // Recomputed from the calendar every tick rather than kept, so a
+        // fork taken mid-session needs nothing beyond the key. Empty off the
+        // calendar.
+        let earnings_volume = self.earnings_volume_column();
 
         let outcome = simulate_market_tick(
             &mut self.companies,
@@ -3191,7 +3232,15 @@ impl Engine {
                 // `day_factor()` is today's accumulator BEFORE the
                 // `accumulate` below, which is the point.
                 prev_day_factor: self.market_vol.prev_day_factor(),
-                day_factor: self.market_vol.day_factor(),
+                // Less tonight's draw under a night split with the live wire
+                // on (`night_market_factor`), so the condition keys on the
+                // session's own draws; a branch, so at 0.0 this is the read
+                // that stood.
+                day_factor: if self.night_market_factor == 0.0 {
+                    self.market_vol.day_factor()
+                } else {
+                    self.market_vol.day_factor() - self.night_market_factor
+                },
                 forced_flow_eff: if self.params.forced_flow_reservoir > 0.0 {
                     crate::mathx::max(
                         0.0,
@@ -3204,6 +3253,7 @@ impl Engine {
                 volume_state: self.volume_state,
                 volume_idio: &self.volume_idio,
                 jump_move: &self.jump_move,
+                earnings_volume: &earnings_volume,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -4948,6 +4998,14 @@ impl Engine {
             }
         }
 
+        // The last close, kept only under a night split: the day's return
+        // is then read from it, not from the open the night moved.
+        let last_closes: Vec<f64> = if self.night_split_on() {
+            self.companies.iter().map(|c| c.stock.price).collect()
+        } else {
+            Vec::new()
+        };
+
         // The night, before the day's marks are set, so the session band
         // anchors on the post-gap open and the gap sits outside it.
         self.apply_overnight();
@@ -4958,6 +5016,17 @@ impl Engine {
         self.apply_dividends();
 
         reset_daily_prices(&mut self.companies);
+        // UNDER A NIGHT SPLIT THE DAY RUNS FROM THE LAST CLOSE. The session
+        // carries only part of the day's variance, so a day read from the
+        // open would hand the VIX (`vix_return_source`), the forced flow
+        // (`last_daily_return`), the per-name close and the volume scale a
+        // fraction of the move the day made. `previous_close` is what each
+        // of them reads, so it keeps the last close; the open, high and low
+        // are the session's. No preset splits the day, and without a split
+        // this writes nothing.
+        for (c, last) in self.companies.iter_mut().zip(last_closes.iter()) {
+            c.stock.previous_close = *last;
+        }
 
         // The rate indices' open: a day's carry if a close came before, then
         // the curve as it now stands, after the close's macro step and any
@@ -5067,6 +5136,32 @@ impl Engine {
         }
         self.overnight_moves.clear();
         self.overnight_moves.resize(self.companies.len(), 0.0);
+        self.earnings_moves.clear();
+        self.earnings_moves.resize(self.companies.len(), 0.0);
+        if self.night_split_on() {
+            // The night's student-t scales, on a site of their own after the
+            // three above, and only while the dial is set: every other
+            // model's overnight schedule is the one it was.
+            let df = self.params.overnight_idio_df;
+            let t_scales: Vec<f64> = if df == 0.0 {
+                Vec::new()
+            } else {
+                let k = df as usize;
+                (0..self.companies.len())
+                    .map(|i| {
+                        self.overnight_rng.site(Site::OvernightIdioChi2, i as u32);
+                        let mut chi2 = 0.0;
+                        for _ in 0..k {
+                            let n = self.overnight_rng.next_normal();
+                            chi2 += n * n;
+                        }
+                        if chi2 > 0.0 { crate::mathx::sqrt((df - 2.0) / chi2) } else { 1.0 }
+                    })
+                    .collect()
+            };
+            self.apply_night_split(z_market, &z_sector, &z_idio, &t_scales);
+            return;
+        }
         let ratio = self.params.overnight_variance_ratio;
         if ratio == 0.0 {
             return;
@@ -5076,15 +5171,6 @@ impl Engine {
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
-        let night_vix = crate::market::tick::vix_feedback_exposure(&self.params, &self.economy);
-        let econ_view = crate::fair_value::EconomyValuationInputs {
-            corporate_bond_yield: Some(self.economy.corporate_bond_yield),
-            federal_funds_rate: self.economy.federal_funds_rate,
-            qe_pe_boost: Some(self.economy.qe_pe_boost),
-            qe_assets_ratio: Some(self.economy.qe_assets_ratio),
-        };
-        let nominal =
-            crate::market::tick::nominal_scale(p, &self.economy, self.nominal_output_base);
         for (index, company) in self.companies.iter_mut().enumerate() {
             if company.is_bankrupt || !company.is_public {
                 continue;
@@ -5122,34 +5208,16 @@ impl Engine {
             self.overnight_moves[index] = moved;
             // The opening print: fair value as of the open times exp(s),
             // the same valuation the first tick would otherwise have
-            // settled the print toward over the session.
-            let valuation = if nominal == 1.0 {
-                company.valuation()
-            } else {
-                crate::market::tick::scale_valuation(company.valuation(), nominal)
-            };
-            let valuation = match company.stock.fair_value_offset {
-                Some(v) if v != 0.0 => {
-                    crate::market::tick::scale_valuation(valuation, crate::mathx::exp(v))
-                }
-                _ => valuation,
-            };
-            let fv = crate::fair_value::compute_fair_value_at(
-                &valuation, &econ_view, p.fair_value_book_floor,
-                p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
-                p.rate_pe_sensitivity,
-            )
-            .fair_value;
-            let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
-            // The dividend accrued since the last ex-date, as the tick reads
-            // it. (This print leaves out the buyback term the tick carries;
-            // latent while `overnight_variance_ratio` is 0.0 on every preset
-            // with buybacks.)
-            let fv = crate::market::dividends::with_accrual(fv, company);
-            let price = crate::mathx::min(
-                crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
-                p.price_hard_cap,
-            );
+            // settled the print toward over the session, through the
+            // tick's own fair value and the buyback term's fixed point
+            // (`market::tick::opening_print`). Until 0.8.5's earnings-gaps
+            // work this read fair value without the buyback term, so under
+            // `buyback_payout_share` the open sat below the tick's model
+            // price by the compounded buyback yield and the first tick undid
+            // it; no preset ran this block, and at a payout share of 0.0 the
+            // two are the same arithmetic.
+            let price = crate::market::tick::opening_print(
+                p, &self.economy, self.nominal_output_base, self.current_day, company, after);
             // For the tape, as at the re-mark: the first print's `repriced`
             // books the opening print's move from the last close.
             if let Some(v) = self.repriced_pending.get_mut(index) {
@@ -5157,6 +5225,473 @@ impl Engine {
             }
             company.stock.price = price;
             company.stock.market_cap = price * company.stock.shares_outstanding;
+        }
+    }
+
+    /// Whether the day is split between the night and the session
+    /// (`overnight_market_share` or `overnight_idio_share` set). Off on
+    /// every preset.
+    pub fn night_split_on(&self) -> bool {
+        self.params.overnight_market_share != 0.0 || self.params.overnight_idio_share != 0.0
+    }
+
+    /// Whether the earnings calendar runs (`earnings_surprise_sigma` set),
+    /// which is when the snapshot and the state hash carry its key. Off on
+    /// every preset.
+    pub fn carries_earnings(&self) -> bool {
+        self.params.earnings_surprise_sigma != 0.0
+    }
+
+    /// Whether names hold back part of the earnings cycle for their reports
+    /// (`earnings_cycle_report_share`, with the calendar and the cycle on),
+    /// which is when the snapshot and the state hash carry the amounts.
+    pub fn carries_earnings_withheld(&self) -> bool {
+        self.carries_earnings()
+            && self.params.earnings_cycle_report_share != 0.0
+            && self.params.earnings_cycle_depth != 0.0
+    }
+
+    /// What each name holds back of the earnings cycle for its next report.
+    pub fn earnings_withheld(&self) -> &[f64] {
+        &self.earnings_withheld
+    }
+
+    /// Put the held-back amounts back, for a restore. A width mismatch is
+    /// refused: the amounts are positional against the roster.
+    pub fn set_earnings_withheld(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} held-back earnings-cycle amounts and the roster \
+                 holds {} companies. They are positional against the roster, so this \
+                 restore is refused rather than padded or truncated.",
+                values.len(), self.companies.len()));
+        }
+        self.earnings_withheld = values.to_vec();
+        Ok(())
+    }
+
+    /// The earnings calendar's key. See [`Engine::carries_earnings`].
+    pub fn earnings_key(&self) -> u64 {
+        self.earnings_key
+    }
+
+    /// Put the earnings calendar's key back, for a restore.
+    pub fn set_earnings_key(&mut self, key: u64) {
+        self.earnings_key = key;
+    }
+
+    /// The earnings surprise each name's opening print realised at the last
+    /// open, in roster order; 0.0 where none did.
+    pub fn earnings_moves(&self) -> &[f64] {
+        &self.earnings_moves
+    }
+
+    /// The reports ahead: `(roster index, session)` for every public,
+    /// solvent name's reaction sessions in `[from_day, from_day + horizon)`,
+    /// ordered by session and then roster. Dates only: the surprise is a
+    /// draw nobody reads before the opening print realises it. Empty with
+    /// the calendar off.
+    pub fn earnings_calendar(&self, from_day: i64, horizon: i64) -> Vec<(usize, i64)> {
+        let mut out = Vec::new();
+        if !self.carries_earnings() || horizon <= 0 {
+            return out;
+        }
+        let q = crate::earnings::QUARTER_SESSIONS;
+        let first_q = std::cmp::max(from_day, 0).div_euclid(q);
+        let last_q = std::cmp::max(from_day + horizon - 1, 0).div_euclid(q);
+        for (i, c) in self.companies.iter().enumerate() {
+            if !c.is_public || c.is_bankrupt {
+                continue;
+            }
+            let h = crate::earnings::id_hash(&c.id);
+            for quarter in first_q..=last_q {
+                let d = crate::earnings::reaction_session(self.earnings_key, h, quarter);
+                if d >= from_day && d < from_day + horizon {
+                    out.push((i, d));
+                }
+            }
+        }
+        out.sort_by_key(|&(i, d)| (d, i));
+        out
+    }
+
+    /// Whether roster name `index` reacts to a report on `day`, and the
+    /// multiple its volume trades at if so (`earnings_volume_multiple`).
+    /// EMPTY with the calendar off or no multiple set, which the tick reads
+    /// as no multiple.
+    fn earnings_volume_column(&self) -> Vec<f64> {
+        let m = self.params.earnings_volume_multiple;
+        if !self.carries_earnings() || m == 0.0 || m == 1.0 {
+            return Vec::new();
+        }
+        self.companies
+            .iter()
+            .map(|c| {
+                let h = crate::earnings::id_hash(&c.id);
+                match crate::earnings::reacts_on(self.earnings_key, h, self.current_day) {
+                    Some(_) => m,
+                    None => 1.0,
+                }
+            })
+            .collect()
+    }
+
+    /// Whether the night's market draw is kept for the session's live
+    /// lagged-wire condition: a night split on the market
+    /// (`overnight_market_share`) with the lagged wire read live
+    /// (`market_beta_down_asym_lag` and `market_beta_down_asym_lag_live`
+    /// set). Also when the snapshot and the state hash carry it. Off on
+    /// every preset.
+    pub fn carries_night_market_factor(&self) -> bool {
+        self.params.overnight_market_share != 0.0
+            && self.params.market_beta_down_asym_lag != 0.0
+            && self.params.market_beta_down_asym_lag_live != 0.0
+    }
+
+    /// Tonight's market-factor draw, per unit of beta. See the field.
+    pub fn night_market_factor(&self) -> f64 {
+        self.night_market_factor
+    }
+
+    /// Put tonight's market-factor draw back, for a restore.
+    pub fn set_night_market_factor(&mut self, value: f64) {
+        self.night_market_factor = value;
+    }
+
+    /// Each name's earnings unit: its NON-MARKET daily sigma, the own GJR
+    /// sigma at its idiosyncratic scale and size multiplier and its sector
+    /// loading on the sector's sigma (the sector state's own where it runs),
+    /// in quadrature. What a residual on the market reads as the name's
+    /// idiosyncratic sd, the unit the real reaction days are measured in.
+    /// The same arithmetic `apply_night_split` prices the surprise in, read
+    /// on the state now standing; it takes no draw.
+    fn earnings_unit_sigma(&self, company: &TickCompany) -> f64 {
+        let p = &self.params;
+        let beta = company.stock.beta.unwrap_or(1.0);
+        let shared_sigma =
+            crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let sector_on = p.sector_vol_alpha != 0.0 || p.sector_vol_beta != 0.0;
+        let sector_sigma = match self.sector_keys.iter().position(|k| *k == company.sector) {
+            Some(k) => {
+                let sigma = if sector_on {
+                    match self.sector_variance.get(k) {
+                        Some(v) if *v > 0.0 => shared_sigma * crate::mathx::sqrt(*v),
+                        _ => shared_sigma,
+                    }
+                } else {
+                    shared_sigma
+                };
+                crate::market::factors::sector_loading_for(p, beta) * sigma
+            }
+            None => 0.0,
+        };
+        let daily_sigma = crate::mathx::sqrt(
+            crate::mathx::max(company.stock.garch_variance, p.idio_sigma_floor));
+        let own = daily_sigma
+            * crate::market::factors::idio_scale_for(p, beta)
+            * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap);
+        crate::mathx::sqrt(own * own + sector_sigma * sector_sigma)
+    }
+
+    /// THE REACTION SESSION'S OWN DISCOVERY AND THE FOLLOW-THROUGH, walked
+    /// into fair value one open minute at a time (`earnings_session_sigma`
+    /// on a name's reaction session, `earnings_followthrough_sigma` on the
+    /// session after). Each minute `m` moves the name's fair-value level by
+    /// `dv = sigma u tick_scale intraday_vol(m / 390) / sqrt(K)` with the
+    /// Ito term (`dv - dv^2 / 2`), `u` a standard normal KEYED on (the
+    /// calendar's key, the name, the quarter, the part, the minute), `sigma`
+    /// the part's size times the name's earnings unit and `K` the session's
+    /// intraday variance factor, so a full session carries `sigma^2` and
+    /// `exp(v)` is a martingale. The price follows through `fv exp(s)`: the
+    /// session trades the information in as it arrives, with no drift and
+    /// no first-tick jump.
+    ///
+    /// Until the review of 50dfeed each part joined fair value in one piece
+    /// straight after the opening print, so it printed on the session's
+    /// first tick: that tick carried 1.15 times the reaction session's
+    /// idiosyncratic variance, and the night's share of the reaction day
+    /// (G3) passed only because a 9:30:01 jump counted as session.
+    ///
+    /// Keyed, so it takes no draw from any stream, a fork taken mid-session
+    /// walks the same minutes, and nothing beyond the key and the
+    /// fair-value levels (both already carried with the calendar on) is
+    /// state. Called only on an open minute with the calendar on and a part
+    /// set.
+    fn walk_earnings_sessions(&mut self, time: GameTime) {
+        let p = &self.params;
+        let (ss, sf) = (p.earnings_session_sigma, p.earnings_followthrough_sigma);
+        if ss == 0.0 && sf == 0.0 {
+            return;
+        }
+        let minute = (time.hour as i64 - 9) * 60 + (time.minute as i64 - 30);
+        // The session's 390 open minutes, as the tick draws them.
+        const MINUTES: i64 = 390;
+        if !(0..MINUTES).contains(&minute) {
+            return;
+        }
+        let per_minute = crate::market::hours::intraday_vol(minute as f64 / MINUTES as f64)
+            / crate::mathx::sqrt(
+                MINUTES as f64 * crate::market::index_var::intraday_variance_factor());
+        let key = self.earnings_key;
+        let day = self.current_day;
+        let mut moves: Vec<(usize, f64)> = Vec::new();
+        for (i, c) in self.companies.iter().enumerate() {
+            if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none() {
+                continue;
+            }
+            let name = crate::earnings::id_hash(&c.id);
+            let mut sd2 = 0.0;
+            let mut u = 0.0;
+            if ss != 0.0 {
+                if let Some(q) = crate::earnings::reacts_on(key, name, day) {
+                    u += ss * crate::earnings::session_unit(key, name, q, minute);
+                    sd2 += ss * ss;
+                }
+            }
+            if sf != 0.0 {
+                if let Some(q) = crate::earnings::reacts_on(key, name, day - 1) {
+                    u += sf * crate::earnings::followthrough_unit(key, name, q, minute);
+                    sd2 += sf * sf;
+                }
+            }
+            if sd2 == 0.0 {
+                continue;
+            }
+            let dv = u * self.earnings_unit_sigma(c) * per_minute;
+            moves.push((i, dv));
+        }
+        for (i, dv) in moves {
+            let c = &mut self.companies[i];
+            let v = c.stock.fair_value_offset.unwrap_or(0.0);
+            c.stock.fair_value_offset = Some(v + (dv - 0.5 * dv * dv));
+        }
+    }
+
+    /// The night as a share of the day (`overnight_market_share`,
+    /// `overnight_idio_share`), and the earnings reports it realises.
+    ///
+    /// The market factor's night is `sqrt(wm)` of its conditional daily
+    /// sigma and joins the day's factor innovation, so the market GJR steps
+    /// on the whole day; each sector's is `sqrt(wi)` of the sector's sigma
+    /// (the sector state's own where it runs, and then it joins the
+    /// sector's day factor too); each name's own is `sqrt(wi)` of its GARCH
+    /// sigma at its idiosyncratic scale and size multiplier, a student t
+    /// under `overnight_idio_df`. The session draws the rest
+    /// (`market::tick`), so the night and the session sum to the day.
+    ///
+    /// The market draw takes the session's down tilt and lagged wire, with
+    /// their mean given back as the tick gives it, but not the crash
+    /// amplifier or the crisis injection. The whole night joins the name's
+    /// `random_noise` slot (its GJR's innovation) and the noise split; the
+    /// own part moves the fair-value level at `fair_value_news_share` and
+    /// the market part at the market's permanent share, only its plain
+    /// loading under `fair_value_market_linear`, as the tick does. The move
+    /// lands on `s` and is kept out of the momentum roll.
+    ///
+    /// Then the earnings report, on a name's reaction session: the surprise
+    /// joins the fair-value level before the print, so the open prints it.
+    /// The reaction session's own part and the session after's are walked
+    /// in through those sessions by [`Engine::walk_earnings_sessions`]. The
+    /// opening print
+    /// is priced through the tick's fair value with the buyback fixed point
+    /// (`market::tick::opening_print`).
+    fn apply_night_split(
+        &mut self,
+        z_market: f64,
+        z_sector: &[f64],
+        z_idio: &[f64],
+        t_scales: &[f64],
+    ) {
+        let p = &self.params;
+        let sm = crate::mathx::sqrt(p.overnight_market_share);
+        let si = crate::mathx::sqrt(p.overnight_idio_share);
+        let market_sigma_daily = self.market_vol.sigma_daily();
+        let prev_down = self.market_vol.prev_day_down();
+        // The night's market factor, per unit of beta, before the tilt.
+        let f = sm * market_sigma_daily * z_market;
+        self.market_vol.accumulate(f);
+        // Kept for the session's live lagged-wire condition, which reads the
+        // day factor less it (see the field). Written only where that wire
+        // reads it, so the state carried is the state read.
+        if self.carries_night_market_factor() {
+            self.night_market_factor = f;
+        }
+        // The sector draws, at the sector state's sigma where it runs.
+        let shared_sigma =
+            crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let sector_on = p.sector_vol_alpha != 0.0 || p.sector_vol_beta != 0.0;
+        let sector_draws: Vec<(f64, f64)> = z_sector
+            .iter()
+            .enumerate()
+            .map(|(k, z)| {
+                let sigma = if sector_on {
+                    match self.sector_variance.get(k) {
+                        Some(v) if *v > 0.0 => shared_sigma * crate::mathx::sqrt(*v),
+                        _ => shared_sigma,
+                    }
+                } else {
+                    shared_sigma
+                };
+                (sigma, si * sigma * z)
+            })
+            .collect();
+        let (sector_sigmas, sector_draws): (Vec<f64>, Vec<f64>) = sector_draws.into_iter().unzip();
+        if sector_on {
+            for (k, g) in sector_draws.iter().enumerate() {
+                if let Some(acc) = self.sector_day_factor.get_mut(k) {
+                    *acc += *g;
+                }
+            }
+        }
+        let tilt = if p.market_beta_down_asym != 0.0 && f < 0.0 {
+            1.0 + p.market_beta_down_asym
+        } else {
+            1.0
+        };
+        let lag = if p.market_beta_down_asym_lag != 0.0 && prev_down {
+            1.0 + p.market_beta_down_asym_lag
+        } else {
+            1.0
+        };
+        // The tilt's mean given back, as `market::factors` gives it back at
+        // the draw's own sigma, and the WHOLE of the mean the lagged wire's
+        // multiple adds to it, whatever `market_beta_down_asym_lag_recentre`
+        // says. The session may carry an un-recentred wire (pt-v20 does:
+        // lag 0.46, lag recentre 0.0), a drift of about -10 bp a day keyed
+        // on yesterday's sign; applied to the night on the same condition,
+        // the night and the session drifted together and the equal-weight
+        // session return followed the market's gap (slope +0.099 against a
+        // real +0.022, the forty 2015-2025). The night keeps the wire's
+        // variance, which is what carries the lagged correlation asymmetry
+        // into the day, and injects no mean from it.
+        let recentre_unit = if p.market_beta_down_asym == 0.0 {
+            0.0
+        } else {
+            let unit = p.market_beta_down_asym * (sm * market_sigma_daily)
+                / crate::mathx::sqrt(2.0 * std::f64::consts::PI);
+            p.market_beta_down_asym_recentre * unit + (lag - 1.0) * unit
+        };
+        let permanent = p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0;
+        let psi = p.fair_value_news_share;
+        let psim = crate::market::tick::market_permanent_share(p, market_sigma_daily);
+        let earnings = p.earnings_surprise_sigma != 0.0;
+        let withhold = earnings
+            && p.earnings_cycle_report_share != 0.0
+            && p.earnings_cycle_depth != 0.0;
+        if withhold && self.earnings_withheld.len() != self.companies.len() {
+            self.earnings_withheld.resize(self.companies.len(), 0.0);
+        }
+        let key = self.earnings_key;
+        let day = self.current_day;
+        let noise_slot = random_noise_index();
+        for (index, company) in self.companies.iter_mut().enumerate() {
+            if company.is_bankrupt || !company.is_public {
+                continue;
+            }
+            let Some(s) = company.stock.mispricing_s else {
+                continue;
+            };
+            let beta = company.stock.beta.unwrap_or(1.0);
+            let market = beta * f * tilt * lag + beta * recentre_unit;
+            let (sector, sector_sigma) =
+                match self.sector_keys.iter().position(|k| *k == company.sector) {
+                    Some(k) => {
+                        let loading = crate::market::factors::sector_loading_for(p, beta);
+                        (loading * sector_draws[k], loading * sector_sigmas[k])
+                    }
+                    None => (0.0, 0.0),
+                };
+            let daily_sigma = crate::mathx::sqrt(
+                crate::mathx::max(company.stock.garch_variance, p.idio_sigma_floor));
+            let own_unit = crate::market::factors::idio_scale_for(p, beta)
+                * crate::market::factors::cap_size_multiplier_with(p, company.stock.market_cap);
+            let t = t_scales.get(index).copied().unwrap_or(1.0);
+            let idio = si * daily_sigma * own_unit * z_idio[index] * t;
+            let own = sector + idio;
+            let night = market + own;
+            let after = crate::market::tick::clamp_s(p, s + night);
+            let moved = after - s;
+            if let Some(prev) = company.stock.mispricing_s_prev_close {
+                company.stock.mispricing_s_prev_close = Some(prev + moved);
+            }
+            if let Some(acc) = self.attribution.get_mut(index) {
+                acc[crate::market::factors::OVERNIGHT_SLOT] += moved;
+                acc[noise_slot] += night;
+            }
+            if let Some(parts) = self.noise_parts.get_mut(index) {
+                parts[0] += market;
+                parts[1] += sector;
+                parts[2] += idio;
+            }
+            if let Some(k2) = self.noise_own_scale2.get_mut(index) {
+                *k2 += (si * own_unit) * (si * own_unit);
+            }
+            self.overnight_moves[index] = moved;
+            let mut s_now = after;
+            // THE PERMANENT SHARE, as the tick's: the own part at
+            // `fair_value_news_share`, the market's plain loading (or the
+            // whole market part off `fair_value_market_linear`) at the
+            // market's permanent share.
+            if permanent {
+                let market_perm = if p.fair_value_market_linear == 0.0 { market } else { beta * f };
+                let dv = if p.fair_value_market_share == 0.0 {
+                    psi * own
+                } else {
+                    psi * own + psim * market_perm
+                };
+                if dv != 0.0 {
+                    let s_new = crate::market::tick::clamp_s(p, after - dv);
+                    if let Some(prev) = company.stock.mispricing_s_prev_close {
+                        company.stock.mispricing_s_prev_close = Some(prev - dv);
+                    }
+                    if let Some(acc) = self.attribution.get_mut(index) {
+                        acc[crate::market::factors::FAIR_VALUE_SLOT] += s_new - after;
+                    }
+                    let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                    company.stock.fair_value_offset = Some(v + (dv - 0.5 * dv * dv));
+                    s_now = s_new;
+                }
+            }
+            company.stock.mispricing_s = Some(s_now);
+            // THE REPORT. The surprise joins the fair-value level before
+            // the print, so the open prints it. Its unit is the name's
+            // NON-MARKET daily sigma, its own and its sector's draws
+            // together: what a residual on the market reads as the name's
+            // idiosyncratic sd, the unit the real reaction days are
+            // measured in (3.47 sd, the forty names 2015-2025).
+            let own_sigma = crate::mathx::sqrt(
+                (daily_sigma * own_unit) * (daily_sigma * own_unit) + sector_sigma * sector_sigma);
+            let name = if earnings { crate::earnings::id_hash(&company.id) } else { 0 };
+            let quarter = if earnings { crate::earnings::reacts_on(key, name, day) } else { None };
+            if quarter.is_some() && withhold {
+                // The cycle this name has held back since its last report.
+                let w = std::mem::take(&mut self.earnings_withheld[index]);
+                if w != 0.0 {
+                    let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                    company.stock.fair_value_offset = Some(v + w);
+                }
+            }
+            if let Some(q) = quarter {
+                let x = crate::earnings::mean_one(
+                    p.earnings_surprise_sigma * own_sigma,
+                    crate::earnings::surprise_unit(key, name, q, p.earnings_surprise_df));
+                let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                company.stock.fair_value_offset = Some(v + x);
+                self.earnings_moves[index] = x;
+            }
+            let last = company.stock.price;
+            let price = crate::market::tick::opening_print(
+                p, &self.economy, self.nominal_output_base, day, company, s_now);
+            if let Some(v) = self.repriced_pending.get_mut(index) {
+                *v += crate::mathx::log(price / last);
+            }
+            company.stock.price = price;
+            company.stock.market_cap = price * company.stock.shares_outstanding;
+            // The reaction session's own discovery and the follow-through on
+            // the session after are NOT set here: they are walked into fair
+            // value tick by tick through those sessions
+            // (`Engine::walk_earnings_sessions`), so the session trades them
+            // in rather than printing them on its first tick.
         }
     }
 
@@ -5650,6 +6185,8 @@ impl Engine {
             )
         });
         self.close_sector_state();
+        // Tonight's market draw was part of the day now closed.
+        self.night_market_factor = 0.0;
         // The forced-flow reservoir drains on stress days and rebuilds in
         // calm. Updated only while the mechanism is live: at gain 0 or
         // reservoir 0 the state stays exactly 0.0 and nothing changes.
@@ -6947,6 +7484,8 @@ impl Engine {
         // with `macro_publication_repricing` on: the step's decision is
         // readable the moment it ends, so the price takes it then.
         let marks = self.published_macro_marks();
+        let hold = self.carries_earnings_withheld();
+        let level_before = self.economy.earnings_cycle + self.economy.earnings_anticipation;
         let outcome = self.advance_day(&DayAdvanceRequest {
             volatility: 1.0,
             active_shocks: &[],
@@ -6954,6 +7493,16 @@ impl Engine {
             game_day,
             timestamp: game_day * 24 * 60,
         });
+        // THE CYCLE A NAME LEARNS FROM ITS OWN REPORT
+        // (`earnings_cycle_report_share`): the share of the step's move in
+        // the cycle's level that each traded name's fair value holds back
+        // until its next report. Before the re-mark below, so tonight's
+        // price takes only the rest. A branch: off, nothing runs.
+        if hold {
+            let delta = self.economy.earnings_cycle + self.economy.earnings_anticipation
+                - level_before;
+            self.withhold_cycle(delta);
+        }
         self.reprice_to_published_macro(marks);
         // THE RATE INDICES AT THE SAME CLOSE (`rate_close_remark`): the curve
         // the step just published reaches their levels now, beside the
@@ -7247,6 +7796,27 @@ impl Engine {
         let now = self.expected_close_yields(
             self.session_return_pct(), self.market_vol.day_factor(), false, remaining);
         self.rate_live = Some([base.0, base.1, base.2, now.0, now.1, now.2]);
+    }
+
+    /// Take `earnings_cycle_report_share` of a move `delta` in the earnings
+    /// cycle's log level out of every traded name's fair-value level and
+    /// keep it for the name's next report. See [`Engine::advance_macro_day`].
+    fn withhold_cycle(&mut self, delta: f64) {
+        let held = self.params.earnings_cycle_report_share * delta;
+        if held == 0.0 {
+            return;
+        }
+        if self.earnings_withheld.len() != self.companies.len() {
+            self.earnings_withheld.resize(self.companies.len(), 0.0);
+        }
+        for (i, c) in self.companies.iter_mut().enumerate() {
+            if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none() {
+                continue;
+            }
+            let v = c.stock.fair_value_offset.unwrap_or(0.0);
+            c.stock.fair_value_offset = Some(v - held);
+            self.earnings_withheld[i] += held;
+        }
     }
 
     /// Every name's fair value as the tick would read it on the state now
@@ -7547,6 +8117,10 @@ impl Engine {
         // reason: it landed after this function was written. A name that
         // joins has never jumped, so its excitation is 0.0.
         self.jump_excitation.push(0.0);
+        // The earnings calendar's per-name columns: a name that joins has
+        // realised no report and holds back nothing.
+        self.earnings_moves.push(0.0);
+        self.earnings_withheld.push(0.0);
         // The print decomposition, on the same argument as everything above
         // it: these are per-SLOT columns, and a roster edit that grew
         // `companies` without growing them would leave the new name reading
@@ -7630,6 +8204,12 @@ impl Engine {
         // name keeps its own excitation.
         if index < self.jump_excitation.len() {
             self.jump_excitation.remove(index);
+        }
+        if index < self.earnings_moves.len() {
+            self.earnings_moves.remove(index);
+        }
+        if index < self.earnings_withheld.len() {
+            self.earnings_withheld.remove(index);
         }
         // Removed rather than left behind, because the tail shifts down by
         // one and a column that did not shift with it would report every
@@ -8224,6 +8804,25 @@ impl Engine {
             for c in &self.companies {
                 hash_f64(&mut buf, c.stock.buyback_log_shares.unwrap_or(0.0));
             }
+        }
+        // The earnings calendar's key, on the same rule: only with the
+        // calendar on, so every other engine hashes as it did.
+        if self.carries_earnings() {
+            hash_u64(&mut buf, self.earnings_key);
+        }
+        // What names hold back of the earnings cycle, on the same rule,
+        // LENGTH-PREFIXED like the other per-name states added after the
+        // roster columns.
+        if self.carries_earnings_withheld() {
+            hash_u32(&mut buf, self.earnings_withheld.len() as u32);
+            for value in &self.earnings_withheld {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        // Tonight's market draw, on the same rule: only while the session's
+        // live lagged wire reads it.
+        if self.carries_night_market_factor() {
+            hash_f64(&mut buf, self.night_market_factor);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

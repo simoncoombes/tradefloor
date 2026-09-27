@@ -31,6 +31,7 @@
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
 pub mod agent_book;
+pub mod earnings;
 pub mod economy;
 pub mod engine;
 pub mod fair_value;

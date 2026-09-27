@@ -1006,6 +1006,12 @@ def serialize_observation(obs: Any, *,
     # opened lower. Absent otherwise, so every other payload is the one it
     # was.
     paid = _dividends_paid(obs.engine)
+    # The earnings calendar, where the model runs one: a real company
+    # announces its report date, so the payload says how many sessions away
+    # each name's next report is. Dates only (see `MarketView.
+    # earnings_calendar`). Absent, and the payload the bytes it was, on a
+    # model without the calendar, which is every shipped preset.
+    reports = _next_reports(obs.engine)
     assets = []
     for i, ticker in enumerate(obs.tickers):
         book = obs.book(ticker)
@@ -1025,6 +1031,8 @@ def serialize_observation(obs: Any, *,
             "fundamentals": dict(facts.get(ticker, {})),
             **extra,
         })
+        if reports:
+            assets[-1]["next_earnings_in_sessions"] = reports.get(ticker)
 
     portfolio = obs.portfolio
     equity = portfolio.net_worth(obs.engine)
@@ -1057,6 +1065,26 @@ def serialize_observation(obs: Any, *,
             "buying_power": headroom,
         },
     }
+
+
+def _next_reports(engine: Any) -> dict[str, int]:
+    """Each name's next report, in sessions ahead, off the engine's public
+    earnings calendar; empty where the model runs none (or the engine, a
+    test proxy say, has no calendar to read).
+
+    ``sessions_ahead`` 0 is the session now open, or the next to open when
+    the market is closed: a report on it has printed, or prints at that
+    open. The dates are the calendar's and nothing else is read.
+    """
+    calendar = getattr(engine, "earnings_calendar", None)
+    if calendar is None:
+        return {}
+    out: dict[str, int] = {}
+    for row in calendar(63):
+        ticker, ahead = row["ticker"], int(row["sessions_ahead"])
+        if ticker not in out or ahead < out[ticker]:
+            out[ticker] = ahead
+    return out
 
 
 def _window_return(rows: Sequence[Sequence[float]], i: int,
