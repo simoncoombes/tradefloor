@@ -2490,6 +2490,28 @@ pub struct ModelParams {
     /// asymmetry adds at the variance the day was drawn at. Unread at
     /// `market_vol_leverage` 0.0. In [0, 1].
     pub market_vol_leverage_down: f64,
+    /// The unit the return memory counts a day in, as a power `s` on the
+    /// day's own sd: `u = -F / (sigma_b^(1-s) * sqrt(v)^s)`, `v` the variance
+    /// the day was drawn at. 0.0, which every preset carries, is the
+    /// baseline sd `sigma_b`, the form that stood; 1.0 is the day's z-score.
+    /// Unread at `market_vol_leverage` 0.0. In [0, 1].
+    ///
+    /// Why. In baseline units a day drawn at twice the baseline sd moves the
+    /// memory twice as far, so the memory's spread -- and the multiplier's
+    /// spread `exp(k l)` -- grows with the variance it drives: a fall in a
+    /// storm raises the next session's variance by more than the same
+    /// z-score in a calm, which is a crash amplifier rather than a leverage
+    /// effect. Measured on pt-v20 (box cvsg1) that form bought its leverage
+    /// sum with B5 (15.3 against 12.4) and needed `market_factor_sigma` cut
+    /// by a tenth to hold the level, because `E[u^2] = E[v / b] > 1` puts the
+    /// multiplier's mean over one. Counted in z-scores the memory's
+    /// stationary variance is `s^2` at every level, so the multiplier's mean
+    /// is one without a level cut and the response to a fall is the
+    /// response to its surprise, which is the tape's shape: the log VIX's
+    /// response to a return scales with the return over the prevailing
+    /// volatility (Bouchaud, Matacz and Potters 2001 normalise the index
+    /// kernel the same way).
+    pub market_vol_leverage_standardise: f64,
 
     /// How far the common factor's shock share moves with the factor's own
     /// variance excursion. 0.0 is a constant share, which is every preset
@@ -6067,6 +6089,22 @@ pub struct ModelParams {
     /// shipped). A guard: settable, never searched.
     pub price_breaker_fraction: f64,
     /// Absolute cap on any model price (50,000 shipped). A guard.
+    ///
+    /// A name that reaches it stops moving, and over a century that is not
+    /// harmless: the winners reach it first, they are the index's largest
+    /// weights, and a frozen name adds no variance to the index's read-back,
+    /// so the VIX falls and, through the factor's VIX coupling, every other
+    /// name's volatility with it. Measured on the r14 candidate (N4, 12
+    /// held-out seeds x 100 years, sim/r15-volstate): capped names carried 35
+    /// per cent of the cap weight by years 90-100, the VIX averaged 13.8
+    /// against 20.3 in years 0-10, and name volatility below the cap read
+    /// 0.64x of the first decade. With the cap at 1e9 on the same seeds the
+    /// VIX read 15.9 and the ratio 0.68x; started with its five largest names
+    /// at 45,000, the roster's other 35 names lose a tenth of their index
+    /// volatility over five years (0.153 to 0.138), and lifting the cap
+    /// restores the uncapped run to the bit, since prices are scale-free
+    /// (a roster at 50 times the price runs the same market). A long run
+    /// should set it far above any price it can reach.
     pub price_hard_cap: f64,
 
     // ── Derived, computed once at construction (§5.3) ───────────────────
@@ -6247,6 +6285,7 @@ impl ModelParams {
             market_vol_leverage: 0.0,
             market_vol_leverage_half_life: 0.0,
             market_vol_leverage_down: 0.0,
+            market_vol_leverage_standardise: 0.0,
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
@@ -8666,6 +8705,7 @@ impl ModelParams {
             "market_vol_leverage" => self.market_vol_leverage,
             "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
             "market_vol_leverage_down" => self.market_vol_leverage_down,
+            "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
@@ -8981,6 +9021,7 @@ impl ModelParams {
             "market_vol_leverage" => out.market_vol_leverage = value,
             "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
             "market_vol_leverage_down" => out.market_vol_leverage_down = value,
+            "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
@@ -9826,6 +9867,11 @@ impl ModelParams {
                 "market_vol_leverage_down is {}. It is the share of an up day the return memory ignores, in [0, 1].",
                 self.market_vol_leverage_down));
         }
+        if !(self.market_vol_leverage_standardise >= 0.0 && self.market_vol_leverage_standardise <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
+                self.market_vol_leverage_standardise));
+        }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
@@ -10505,6 +10551,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_leverage",
         "market_vol_leverage_half_life",
         "market_vol_leverage_down",
+        "market_vol_leverage_standardise",
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",

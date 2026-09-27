@@ -1676,6 +1676,40 @@ the state hash carry $\ell$ only while $k$ is set.
 | $k$ | `market_vol_leverage` | 0 (off) | | in $[0, 50]$ |
 | $H$ | `market_vol_leverage_half_life` | 0 | | sessions; positive when $k$ is set |
 | $a$ | `market_vol_leverage_down` | 0 | | 0 counts rises and falls alike, 1 falls only |
+| $\varsigma$ | `market_vol_leverage_standardise` | 0 | | the unit a day is counted in: $\sqrt{b_m}^{\,1-\varsigma}\sqrt{v_d}^{\,\varsigma}$ in place of $\sqrt{b_m}$ above; 1 is the day's z-score |
+
+With $\varsigma = 1$ the memory's spread is the same at every variance, so the
+multiplier's mean is one in a storm as in a calm and a fall raises the next
+session's variance by its surprise, not by its size. In baseline units
+($\varsigma = 0$) a fall drawn at twice the baseline sd moves $\ell$ twice as
+far, which amplifies crashes: on pt-v20 that form bought its leverage sum
+with B5 (15.3 against a ceiling of 12.4).
+
+Why the memory could not be turned on by itself, and what it takes
+(sim/r15-volstate, held-out seeds 201-230, 501-530 and 801-830). The memory
+multiplies the variance the index read-back sees, so the VIX rises with it and
+the factor's VIX coupling (0.8, exponent 4 above the anchor) feeds that back
+into the variance target: the loop turns a mean-one multiplier into a higher
+volatility level and more clustering. On the r14 candidate N4 (45 histories)
+a gain of 1.5 on a 15-session half-life moved the leverage sum from -0.63 to
+-0.94, but index volatility (B7) from 20.5 to 23.5, sessions under -5% (B5)
+from 11.6 to 19.0 and the index |r| lag-1 ACF from 0.31 to 0.38. The memory
+works when it replaces return-blind volatility of volatility rather than adding
+to it: the VIX's slow level halved (`vix_level_sigma` 0.0181 to 0.009), the
+fast component's shock loading moved into its carry at unchanged persistence
+(`market_vol_gamma` 0.1556 to 0.06, `market_vol_beta` 0.8946 to 0.9446, so
+$\alpha + \beta + \gamma/2$ stays 0.979), and the VIX the variance target
+reads smoothed over 3 sessions (`market_vol_vix_smooth`). With $k = 2.5$,
+$H = 15$ and $\varsigma = 1$ on those, 90 histories read a leverage sum of
+-0.97 (tape -1.35, band [-1.75, -0.80]), B5 9.8, B7 21.2, and the 2020
+replay's worst month 72 against N4's 69. The cost is the 60-session
+volatility persistence the slow level carried: the seam correlation of log
+RV60 falls from 0.627 to 0.559 (tape 0.712).
+
+Measured against baseline units at the same level cut, the z-score count was
+not the more efficient form: per unit of leverage sum it cost about as much B5
+and B7 (45 histories each). It is kept for the mean-one multiplier in a storm,
+not for a better trade.
 
 #### The business cycle in the market's volatility
 

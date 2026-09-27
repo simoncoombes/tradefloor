@@ -794,6 +794,10 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_leverage` is 0.0",
     "market_vol_leverage_down":
         "unread while `market_vol_leverage` is 0.0",
+    "market_vol_leverage_standardise":
+        "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
+        "memory counts a day in the baseline sd, the form that stood "
+        "(0.8.5 thirteenth-registration work, sim/r15-volstate)",
     "market_vol_cycle_ratio":
         "inert at 0.0 as shipped: `Engine::close_market` branches on "
         "`== 0.0` before the cycle multiplier, which is never stepped, and "

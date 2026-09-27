@@ -280,6 +280,9 @@ PERTURBATIONS = [
     # LIVE with the memory on (its companions): counting falls only moves
     # the memory on every up day.
     ("market_vol_leverage_down", 1.0, True),
+    # LIVE with the memory on (its companions): counting a day in its own
+    # sd moves the memory on every session drawn off the baseline.
+    ("market_vol_leverage_standardise", 1.0, True),
     # The shock share's rotation with the factor's own excursion, added at
     # 0.8.0. Ships at 0.0, so the perturbation is TO a non-zero value.
     # MEASURED to move the probe at 0.20 and to move no draw, on either
@@ -1900,6 +1903,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "market_vol_leverage": {"market_vol_leverage_half_life": 40.0},
     "market_vol_leverage_down": {"market_vol_leverage": 3.0,
                                  "market_vol_leverage_half_life": 40.0},
+    "market_vol_leverage_standardise": {"market_vol_leverage": 3.0,
+                                        "market_vol_leverage_half_life": 40.0},
     # The cycle's expansion multiplier, half-life and VIX powers are read
     # only with its ratio on (bear-dynamics). The stormy-side power is read
     # only while the multiplier is at or over one, so its probe carries an

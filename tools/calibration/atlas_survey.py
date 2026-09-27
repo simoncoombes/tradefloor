@@ -446,6 +446,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_leverage_half_life": (0.0, 126.0),
     # A share: 0 counts up and down days alike, 1 counts falls only.
     "market_vol_leverage_down": (0.0, 1.0),
+    # The power on the day's own sd the memory counts a day in: 0 the
+    # baseline sd (as shipped), 1 the day's z-score.
+    "market_vol_leverage_standardise": (0.0, 1.0),
     # The cycle's volatility ratio (bear-dynamics): 0 is off, and the real
     # recession-over-expansion index volatility runs 1.66 to 2.24 (S&P 500
     # by NBER month), so 3 is past any measured.
