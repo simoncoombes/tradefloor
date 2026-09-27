@@ -445,6 +445,20 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_leverage_half_life": (0.0, 126.0),
     # A share: 0 counts up and down days alike, 1 counts falls only.
     "market_vol_leverage_down": (0.0, 1.0),
+    # The cycle's volatility ratio (bear-dynamics): 0 is off, and the real
+    # recession-over-expansion index volatility runs 1.66 to 2.24 (S&P 500
+    # by NBER month), so 3 is past any measured.
+    "market_vol_cycle_ratio": (0.0, 3.0),
+    # The expansion-side multiplier: 0 derives it from the phase shares,
+    # and the design's arms ran 0.70 to 0.80; 1.5 is past any of them.
+    "market_vol_cycle_expansion": (0.0, 1.5),
+    # Sessions; 0 is instant, 126 half a year.
+    "market_vol_cycle_half_life": (0.0, 126.0),
+    # Powers in [0, 1], at or over one and under one.
+    "market_vol_cycle_relative": (0.0, 1.0),
+    "market_vol_cycle_relative_calm": (0.0, 1.0),
+    # The power on the fair-value cap's ceiling, in [0, 1].
+    "market_vol_cycle_cap_relative": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

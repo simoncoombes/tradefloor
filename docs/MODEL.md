@@ -1586,6 +1586,69 @@ the state hash carry $\ell$ only while $k$ is set.
 | $H$ | `market_vol_leverage_half_life` | 0 | | sessions; positive when $k$ is set |
 | $a$ | `market_vol_leverage_down` | 0 | | 0 counts rises and falls alike, 1 falls only |
 
+#### The business cycle in the market's volatility
+
+Off on every shipped preset (`market_vol_cycle_ratio` 0.0, where the close
+takes a branch that reads and moves nothing). Off zero, the close keeps $\ell$,
+the log of a multiplier on the market factor's volatility, and moves it toward
+the TRUE phase's value (`engine.rs:4464-4482`, `engine.rs:5438-5477`):
+
+```math
+\ell^{*} = \begin{cases} \ln(R\,k_e) & \text{contraction, trough} \\ \ln k_e & \text{otherwise} \end{cases}
+\qquad
+\ell_{d} = \ell_{d-1} + \big(1 - 2^{-1/h}\big)\big(\ell^{*} - \ell_{d-1}\big)
+```
+
+The first close, and every close at $h = 0$, sets $\ell = \ell^{*}$. The level
+the baseline $b_m$ is scaled by is multiplied by $e^{2\ell}$, and the VIX
+ratio's denominator by the scale $c$; the VIX anchor's slow memory and the
+anchor level the VIX reverts to are scaled by the same $c$
+(`engine.rs:4958`, `engine.rs:4990-4991`, `engine.rs:5496-5517`):
+
+```math
+c = \max\!\big(e^{d\,\ell},\ 10 / A\big), \qquad
+d = \begin{cases} d_{+} & \ell \ge 0 \\ d_{-} & \ell < 0 \end{cases}
+```
+
+with $A$ the VIX anchor and 10 the VIX's floor. At $d = 1$ fear is read
+against the phase's normal level. The calm-side power $d_{-}$ is separate
+because the tape's calm phase keeps the unconditional fear level (the VIX's
+median is 17.0 in an expansion against 17.6 over all sessions): at
+$d_{-} = 0$ the anchor and the coupling's reference stay put while the
+variance falls, so the fear loop deepens the calm and the VIX falls less per
+unit of variance. The floor binds only below a scale of about 0.48, where an
+unfloored denominator under the VIX's floor read a quiet phase as a panic. A
+forced close (a VIX a scenario pinned) moves $\ell$ but writes the level that
+VIX implies, unscaled. At $k_e = 0$ the expansion
+multiplier is derived, $k_e = 1/\sqrt{1 - s + R^{2}s}$ with $s$ the
+contraction-and-trough share of the cycle's days, which keeps the
+share-weighted factor variance. The snapshot and both state hashes carry
+$\ell$ only while $R$ is set.
+
+Real index volatility is countercyclical: S&P 500 daily volatility on NBER
+recession months over the rest is 1.66 (1950 to 2025), 1.87 (1928 to 2025) and
+2.24 (1990 to 2025), and the VIX's median is 27.5 in a recession against 17.0
+outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $R$ | `market_vol_cycle_ratio` | 0 (off) | | bear-dynamics design; recession over expansion index volatility |
+| $k_e$ | `market_vol_cycle_expansion` | 0 (derived) | | read only with $R$ set |
+| $h$ | `market_vol_cycle_half_life` | 0 | | sessions; read only with $R$ set |
+| $d_{+}$ | `market_vol_cycle_relative` | 0 | | a power in [0, 1], read at $\ell \ge 0$; read only with $R$ set |
+| $d_{-}$ | `market_vol_cycle_relative_calm` | 0 | | a power in [0, 1], read at $\ell < 0$; read only with $R$ set |
+| $p$ | `market_vol_cycle_cap_relative` | 0 | | a power in [0, 1], read at $\ell > 0$; read only with $R$ set |
+
+`fair_value_market_vol_cap`'s ceiling is in multiples of the unscaled
+`market_factor_sigma`, so a contraction's higher baseline counts as fear
+there and more of a contraction's market moves is transient and reverts
+(the permanent share in a contraction 0.93 against 0.96 on the
+bear-dynamics review's regrade). With $p$ set the ceiling is multiplied by
+$e^{p\ell}$ while $\ell > 0$ (`market/tick.rs`, `market_permanent_share`),
+so only volatility above the phase's own normal counts; see
+`ModelParams::market_vol_cycle_ratio` and
+`ModelParams::market_vol_cycle_cap_relative`.
+
 ### Company variance (GJR-GARCH)
 
 **Timescale:** daily, at the close, before the jumps. **State:** $h_{i,d}$,

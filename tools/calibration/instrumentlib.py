@@ -194,6 +194,15 @@ PARAM_SPECS: dict[str, dict] = {
     "dividend_adjustment_speed": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.01, 1.0)},
     "dividend_yield_ceiling": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 100.0)},
     "dividend_buyback_substitution": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # The business cycle in the market factor's volatility (bear-dynamics).
+    # All ship at 0.0, so the hard range is what a search gets; each is the
+    # dial's own domain in `params.rs`.
+    "market_vol_cycle_ratio": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
+    "market_vol_cycle_expansion": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
+    "market_vol_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
+    "market_vol_cycle_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_relative_calm": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_cap_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

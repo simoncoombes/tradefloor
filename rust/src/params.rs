@@ -1231,6 +1231,173 @@ pub struct ModelParams {
     /// and `earnings_cycle_depth` non-zero; the amounts kept are carried by
     /// the snapshot and the state hash only then. In [0, 1].
     pub earnings_cycle_report_share: f64,
+    /// THE BUSINESS CYCLE IN THE MARKET'S VOLATILITY: the market factor's
+    /// volatility in a contraction or a trough over its volatility in every
+    /// other phase, read on the TRUE phase (`EconomyState::cycle_phase`,
+    /// not the published one). 0.0, which every shipped preset carries, is
+    /// off: the close takes a branch that reads nothing and moves nothing,
+    /// and the snapshot and state hash do not carry the multiplier.
+    ///
+    /// Off zero the close keeps `l`, the log of a multiplier on the market
+    /// factor's volatility, and moves it toward its phase's value:
+    ///
+    /// ```text
+    /// l*  = ln(k_e)            expansion, peak, recovery
+    ///     = ln(R * k_e)        contraction, trough
+    /// l  <- l + (1 - 2^(-1/h)) * (l* - l)      (h = market_vol_cycle_half_life;
+    ///                                           h = 0, and the first close, set l = l*)
+    /// ```
+    ///
+    /// `k_e` is `market_vol_cycle_expansion`. The level the factor's
+    /// variance baseline is scaled by is multiplied by `exp(2 l)`, and the
+    /// VIX-coupling denominator passed to the factor's close by
+    /// `exp(d l)`; the VIX anchor's slow memory and the anchor level the
+    /// VIX reverts to are scaled by the same `exp(d l)`, so at `d = 1` fear
+    /// is read against the phase's normal level. `d` is
+    /// `market_vol_cycle_relative` while `l >= 0` (a stormier phase than
+    /// normal) and `market_vol_cycle_relative_calm` while `l < 0` (a calmer
+    /// one), and `exp(d l)` is floored at `VIX_STATE_FLOOR / vix_anchor`
+    /// (below). A FORCED close (a VIX a scenario pinned) moves `l` but does
+    /// not apply it: the pinned VIX already carries the phase.
+    ///
+    /// # Why
+    ///
+    /// Real index volatility is countercyclical. S&P 500 daily realised
+    /// volatility on NBER recession months over the rest is 1.66 (1950-2025,
+    /// 23.8 against 14.3 per cent), 1.87 (1928-2025) and 2.24 (1990-2025);
+    /// the VIX's median is 27.5 in a recession against 17.0 outside one
+    /// (the tape's VIX, Yahoo ^VIX, which agrees with FRED VIXCLS, by
+    /// NBER USREC month, 1990-2025). pt-v20 reads 1.27 and 17.2
+    /// against 17.0 on held-out histories: under `vix_level_identity` the
+    /// phase table is not read, and nothing else puts the cycle into the
+    /// market variance, so its bears fall anywhere (35 to 38 per cent,
+    /// by window, overlap a contraction against 7 of 11 post-war S&P
+    /// bears) and its index moves
+    /// like a random walk at its own moments (2.1-2.4 bears a decade against
+    /// 1.45 post-war). Calm expansions with strong drift and bears gathered
+    /// in recessions are what make real bears rarer (Schwert 1989; Hamilton
+    /// and Lin 1996).
+    ///
+    /// # Small multipliers
+    ///
+    /// A multiplier under one scales the VIX's denominator and anchor DOWN
+    /// by `exp(d l)`, while the VIX itself is floored at 10
+    /// (`VIX_STATE_FLOOR`). Unfloored, a multiplier under about 0.5 at a
+    /// power of 1 put the denominator under the VIX's floor: the VIX over
+    /// its denominator ran away and the factor variance went to its 32x
+    /// ceiling, so a quiet phase read as a panic (bear-dynamics review: a
+    /// contraction multiplier of 0.05 at power 1 gave index volatility of
+    /// 64 per cent; an expansion multiplier of 0.05, 65 per cent; and the
+    /// response turned non-monotone below about 0.5). The variance floor
+    /// (`market_vol_floor_multiple`) does NOT bound that, which is what this
+    /// line said until the review. The scale is therefore floored at
+    /// `VIX_STATE_FLOOR / vix_anchor` (about 0.48 on the certified roster),
+    /// which binds only in that region; the shipped candidates' scales are
+    /// 0.8 or more. A small ratio is a quiet contraction, which no tape
+    /// shows.
+    ///
+    /// # The fair-value market-volatility cap
+    ///
+    /// `fair_value_market_vol_cap` (1.5 on pt-v20) splits the market
+    /// factor's move into a permanent fair-value part and a transient one
+    /// once the factor's conditional sigma exceeds the cap times
+    /// `market_factor_sigma` (market/tick.rs, `fair_value_market_vol_cap`).
+    /// It reads the UNSCALED `market_factor_sigma`, not the phase's
+    /// `exp(l)` times it. So a contraction's higher baseline counts as
+    /// fear there and more of a contraction's moves are transient, while at
+    /// `d = 1` the VIX coupling reads fear against the phase's own level.
+    /// On the bear-dynamics review's regrade of the 90 held-out histories
+    /// the mean permanent share in a contraction goes from 0.96 to 0.93
+    /// (arm E75R250d75) and in an expansion from 0.96 to 0.97. Small per
+    /// session, but it is the contraction's sessions that carry the large
+    /// moves, and their transient part reverts: that is a faster recovery
+    /// and more long-horizon mean reversion (V1b, the five-year variance
+    /// ratio, read 0.58-0.60 on the cycle arms against 0.66 unscaled, on
+    /// fresh seeds 2001-2090). `market_vol_cycle_cap_relative` scales the
+    /// ceiling by `exp(p l)` in a stormier phase, so the cap reads fear
+    /// against the phase's normal volatility as the VIX does; at 0.0 the
+    /// ceiling is the unscaled one, as it was.
+    ///
+    /// # Measured settings (bear-dynamics fix, fresh held-out seeds)
+    ///
+    /// On 180 fresh histories (seeds 2001-2180, 21 years, years 2-21, the
+    /// certified roster), pt-v20 with ratio 2.5, expansion 0.8, half-life
+    /// 21, `market_vol_cycle_relative` 0.75, `market_vol_cycle_relative_calm`
+    /// 0 and `market_vol_cycle_cap_relative` 1 reads 1.71 bears a decade
+    /// against 1.94 off, time with the VIX above 30 of 5.88 per cent against
+    /// 6.12 off (floor 4.1), index volatility in a contraction over the rest
+    /// of 1.87 (real 1.87, 1928-2025), the VIX's median in a contraction
+    /// over the rest of 1.46 (real 1.62) and 54 per cent of bears touching
+    /// a contraction (real 64). The first arm recommended (expansion 0.75,
+    /// ratio 2.5, one power of 0.75 on both sides) read 4.02 per cent above
+    /// 30 on seeds 2001-2090 and 2.82 on 2001-2011.
+    ///
+    /// In [0, 5]; 0 is off.
+    pub market_vol_cycle_ratio: f64,
+    /// The market factor's volatility multiplier outside a contraction or a
+    /// trough (`k_e` in `market_vol_cycle_ratio`'s formula). 0.0 derives it
+    /// from the cycle's stationary phase shares, `1 / sqrt(1 - s + R^2 s)`
+    /// with `s` the contraction-and-trough share of days
+    /// (`economy::cycle::stationary_phase_shares_for`), so the share-weighted
+    /// factor variance is unchanged. That form scales the factor alone, which
+    /// is about 72 per cent of the index's variance, and so leaves the
+    /// index's expansion volatility nearly where it was (bear-dynamics
+    /// design: B3 2.17-2.38 on the derived arms), which is why an explicit
+    /// value exists. Unread at `market_vol_cycle_ratio` 0.0. In [0, 2].
+    pub market_vol_cycle_expansion: f64,
+    /// Half-life, in sessions, of the cycle multiplier's move (in logs)
+    /// toward its phase's value. 0.0 is instant. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 2520].
+    pub market_vol_cycle_half_life: f64,
+    /// The power of the cycle multiplier by which the VIX-coupling
+    /// denominator, the VIX anchor's slow memory and the anchor level are
+    /// scaled (`d` in `market_vol_cycle_ratio`'s formula). 1.0 reads fear
+    /// against the phase's normal level; 0.0 against the unconditional
+    /// level, where the variance's VIX coupling reads a contraction's higher
+    /// VIX as fear and amplifies the multiplier (sessions under -5 per cent
+    /// 16.6-19.9 a decade against a band ceiling of 12.4 on the design's
+    /// d = 0 arms). Read while the multiplier is at or over one;
+    /// `market_vol_cycle_relative_calm` is the power under one. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 1].
+    pub market_vol_cycle_relative: f64,
+    /// The power `d` of `market_vol_cycle_ratio`'s formula while the
+    /// multiplier is UNDER one (`l < 0`: an expansion, peak or recovery at
+    /// `market_vol_cycle_expansion` under one). 0.0 reads a calm phase's
+    /// fear against the unconditional level: the VIX anchor and the
+    /// coupling's denominator stay where they are while the variance
+    /// baseline falls.
+    ///
+    /// Why a second power. On the tape the VIX's median in an expansion
+    /// is 17.0 against 17.6 over all sessions (1990-2025): the calm phase's
+    /// normal fear is the unconditional one, while a recession's is 27.5.
+    /// One power on both sides lowered the expansion's anchor with its
+    /// variance (the anchor times `0.75^d`), and the VIX fell with the
+    /// variance it reads: on the bear-dynamics grid the arm E75R250d75's
+    /// expansion VIX median was 14.2 and time above 30 in an expansion 3.0
+    /// per cent (tape 5.2), so B1 (time above 30, floor 4.1) read 4.9 on
+    /// the 90 held-out histories and 2.8 on fresh seeds 2001-2011. At 0.0
+    /// the calm side keeps the coupling's reference too, so the fear loop
+    /// deepens the calm (the variance falls further for a given
+    /// multiplier) while the VIX falls less per unit of variance.
+    /// Unread at `market_vol_cycle_ratio` 0.0. In [0, 1].
+    pub market_vol_cycle_relative_calm: f64,
+    /// The power `p` by which the cycle multiplier scales the ceiling of
+    /// `fair_value_market_vol_cap` while the multiplier is over one: the
+    /// ceiling is `cap * market_factor_sigma * exp(p l)` for `l > 0`, and
+    /// unscaled otherwise. 0.0 leaves it unscaled.
+    ///
+    /// Why. The cap makes the part of the market's moves above a ceiling
+    /// on the factor's sigma transient, as mean reversion in real index
+    /// returns concentrates in turbulent periods. The ceiling is in
+    /// multiples of the UNSCALED sigma, so with the cycle multiplier on, a
+    /// contraction's normal volatility (twice an expansion's on the
+    /// candidate arms) counts as turbulence, and much of a contraction's
+    /// fall reverts: the index recovers faster and its five-year variance
+    /// ratio falls (see `market_vol_cycle_ratio`, # The fair-value
+    /// market-volatility cap). At `p = 1` only volatility above the
+    /// phase's own normal counts. Unread at `market_vol_cycle_ratio` 0.0.
+    /// In [0, 1].
+    pub market_vol_cycle_cap_relative: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -5966,6 +6133,12 @@ impl ModelParams {
             earnings_followthrough_sigma: 0.0,
             earnings_volume_multiple: 0.0,
             earnings_cycle_report_share: 0.0,
+            market_vol_cycle_ratio: 0.0,
+            market_vol_cycle_expansion: 0.0,
+            market_vol_cycle_half_life: 0.0,
+            market_vol_cycle_relative: 0.0,
+            market_vol_cycle_relative_calm: 0.0,
+            market_vol_cycle_cap_relative: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -8342,6 +8515,12 @@ impl ModelParams {
             "earnings_followthrough_sigma" => self.earnings_followthrough_sigma,
             "earnings_volume_multiple" => self.earnings_volume_multiple,
             "earnings_cycle_report_share" => self.earnings_cycle_report_share,
+            "market_vol_cycle_ratio" => self.market_vol_cycle_ratio,
+            "market_vol_cycle_expansion" => self.market_vol_cycle_expansion,
+            "market_vol_cycle_half_life" => self.market_vol_cycle_half_life,
+            "market_vol_cycle_relative" => self.market_vol_cycle_relative,
+            "market_vol_cycle_relative_calm" => self.market_vol_cycle_relative_calm,
+            "market_vol_cycle_cap_relative" => self.market_vol_cycle_cap_relative,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8634,6 +8813,12 @@ impl ModelParams {
             "earnings_followthrough_sigma" => out.earnings_followthrough_sigma = value,
             "earnings_volume_multiple" => out.earnings_volume_multiple = value,
             "earnings_cycle_report_share" => out.earnings_cycle_report_share = value,
+            "market_vol_cycle_ratio" => out.market_vol_cycle_ratio = value,
+            "market_vol_cycle_expansion" => out.market_vol_cycle_expansion = value,
+            "market_vol_cycle_half_life" => out.market_vol_cycle_half_life = value,
+            "market_vol_cycle_relative" => out.market_vol_cycle_relative = value,
+            "market_vol_cycle_relative_calm" => out.market_vol_cycle_relative_calm = value,
+            "market_vol_cycle_cap_relative" => out.market_vol_cycle_cap_relative = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -9291,6 +9476,41 @@ impl ModelParams {
                 "dividend_buyback_substitution is {}. It is a switch, 0 or 1.",
                 self.dividend_buyback_substitution));
         }
+        if !(self.market_vol_cycle_ratio >= 0.0 && self.market_vol_cycle_ratio <= 5.0) {
+            return Err(format!(
+                "market_vol_cycle_ratio is {}. It is the market factor's volatility in a contraction \
+                 or a trough over its volatility in every other phase, in [0, 5]; 0 is off.",
+                self.market_vol_cycle_ratio));
+        }
+        if !(self.market_vol_cycle_expansion >= 0.0 && self.market_vol_cycle_expansion <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_expansion is {}. It is the market factor's volatility multiplier \
+                 outside a contraction or a trough, in [0, 2]; 0 derives it from the phase shares.",
+                self.market_vol_cycle_expansion));
+        }
+        if !(self.market_vol_cycle_half_life >= 0.0 && self.market_vol_cycle_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 is instant.",
+                self.market_vol_cycle_half_life));
+        }
+        if !(self.market_vol_cycle_relative >= 0.0 && self.market_vol_cycle_relative <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_relative is {}. It is the power of the cycle multiplier the VIX's \
+                 reading of fear is scaled by, in [0, 1].",
+                self.market_vol_cycle_relative));
+        }
+        if !(self.market_vol_cycle_relative_calm >= 0.0 && self.market_vol_cycle_relative_calm <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_relative_calm is {}. It is the power of the cycle multiplier the \
+                 VIX's reading of fear is scaled by while the multiplier is under one, in [0, 1].",
+                self.market_vol_cycle_relative_calm));
+        }
+        if !(self.market_vol_cycle_cap_relative >= 0.0 && self.market_vol_cycle_cap_relative <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_cap_relative is {}. It is the power of the cycle multiplier the \
+                 fair-value volatility cap's ceiling is scaled by in a stormier phase, in [0, 1].",
+                self.market_vol_cycle_cap_relative));
+        }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
@@ -9875,6 +10095,12 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_followthrough_sigma",
         "earnings_volume_multiple",
         "earnings_cycle_report_share",
+        "market_vol_cycle_ratio",
+        "market_vol_cycle_expansion",
+        "market_vol_cycle_half_life",
+        "market_vol_cycle_relative",
+        "market_vol_cycle_relative_calm",
+        "market_vol_cycle_cap_relative",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

@@ -566,6 +566,30 @@ under pt-v20. A run that worked before gives the same result: the change only
 lets through runs that used to fail. `tests/test_suite_markets.py` runs all
 twenty markets on pt-v19 and pt-v20.
 
+### The business cycle in the market's volatility
+
+Six `ModelParams` dials, 0.0 on every preset, where the close takes a branch
+that reads and moves nothing and every digest is unchanged. Real index
+volatility is countercyclical: S&P 500 daily volatility in NBER recession
+months is 1.66 to 2.24 times the rest, and the VIX's median is 27.5 in a
+recession against 17.0 outside one. pt-v20 reads 1.27 and about 1.0 on
+held-out histories, so its bears fall anywhere.
+
+`market_vol_cycle_ratio` scales the market factor's volatility in a true
+contraction or trough by that ratio over the rest, and
+`market_vol_cycle_expansion` sets the multiplier outside them.
+`market_vol_cycle_half_life` smooths the multiplier's move between phases.
+`market_vol_cycle_relative` and `market_vol_cycle_relative_calm` are the
+powers of the multiplier the VIX's reading of fear is scaled by, while the
+multiplier is at or over one and while it is under one.
+`market_vol_cycle_cap_relative` scales `fair_value_market_vol_cap`'s ceiling
+by the multiplier in a stormier phase, so a contraction's normal volatility
+is not read as a fear regime. The scale is floored
+at the VIX's floor over its anchor, so a small multiplier cannot read a quiet
+phase as a panic. The snapshot and the state hash carry the multiplier only
+while the ratio is set. `ModelParams::market_vol_cycle_ratio` documents the
+measurements and how the mechanism meets `fair_value_market_vol_cap`.
+
 ### Found and fixed on the way to the default
 
 Making pt-v20 the default exposed defects the suite could not see while it

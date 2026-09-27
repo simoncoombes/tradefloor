@@ -1112,6 +1112,37 @@ PERTURBATIONS = [
     # LIVE: pt-v20 carries buyback_payout_share 0.75, and substitution takes
     # each payer's dividend payout out of its buyback term.
     ("dividend_buyback_substitution", 1.0, True),
+    # The business cycle in the market factor's volatility (bear-dynamics).
+    # Ships at 0.0, so the perturbation is TO the design's measured ratio:
+    # LIVE, the first close sets the multiplier at its phase's value (the
+    # derived expansion multiplier, since the default carries 0.0 there)
+    # and the next session draws at the scaled variance.
+    ("market_vol_cycle_ratio", 2.0, True),
+    # LIVE with the ratio on (its companion): an explicit expansion
+    # multiplier replaces the derived one from the first close.
+    ("market_vol_cycle_expansion", 0.75, True),
+    # INERT even with the ratio on (its companion): the first close puts
+    # the multiplier on its target whatever the half-life, and the probe's
+    # phase does not change in three sessions, so there is nothing to
+    # smooth. Measured.
+    ("market_vol_cycle_half_life", 21.0, False),
+    # LIVE with the ratio on and an expansion multiplier over one (its
+    # companions): the power is read while the multiplier is at or over
+    # one, and the VIX coupling's denominator is scaled from the first
+    # close.
+    ("market_vol_cycle_relative", 1.0, True),
+    # LIVE with the ratio on (its companion): the derived expansion
+    # multiplier is under one, where this power is read, and the VIX
+    # coupling's denominator is scaled from the first close.
+    ("market_vol_cycle_relative_calm", 1.0, True),
+    # INERT even with the ratio on and an expansion multiplier of 2 (its
+    # companions): the multiplier is over one from the first close, but
+    # the factor's variance moves toward the scaled baseline at its own
+    # rate and its sigma does not cross `fair_value_market_vol_cap`'s
+    # ceiling within the probe, so the scaled ceiling changes nothing yet.
+    # Measured; tests/test_market_vol_cycle.py sees it move over 15
+    # sessions.
+    ("market_vol_cycle_cap_relative", 1.0, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1814,6 +1845,18 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "market_vol_leverage": {"market_vol_leverage_half_life": 40.0},
     "market_vol_leverage_down": {"market_vol_leverage": 3.0,
                                  "market_vol_leverage_half_life": 40.0},
+    # The cycle's expansion multiplier, half-life and VIX powers are read
+    # only with its ratio on (bear-dynamics). The stormy-side power is read
+    # only while the multiplier is at or over one, so its probe carries an
+    # expansion multiplier over one; the calm-side power's probe keeps the
+    # derived multiplier, which is under one outside a contraction.
+    "market_vol_cycle_expansion": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_half_life": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_relative": {"market_vol_cycle_ratio": 2.0,
+                                  "market_vol_cycle_expansion": 1.25},
+    "market_vol_cycle_relative_calm": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_cap_relative": {"market_vol_cycle_ratio": 2.0,
+                                      "market_vol_cycle_expansion": 2.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
