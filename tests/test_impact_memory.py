@@ -38,8 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "calibrat
 DIALS = ("impact_memory_coefficient", "impact_memory_half_life",
          "impact_memory_slow_half_life", "impact_memory_slow_weight",
          "impact_memory_crossover")
-ON = dict(impact_memory_coefficient=0.5, impact_memory_half_life=45.0,
-          impact_memory_slow_half_life=15600.0, impact_memory_slow_weight=0.1,
+ON = dict(impact_memory_coefficient=0.65, impact_memory_half_life=12.0,
+          impact_memory_slow_half_life=780.0, impact_memory_slow_weight=0.1,
           impact_memory_crossover=0.001)
 SHAPE_ONLY = {k: v for k, v in ON.items() if k != "impact_memory_coefficient"}
 UNIVERSE = tf.Universe.random(8, seed=93001)

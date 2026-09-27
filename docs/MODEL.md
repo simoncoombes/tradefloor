@@ -1972,6 +1972,18 @@ to zero, so counting the taker's side would let one agent rest an ask a
 cent inside the spread and another lift it to walk the tape at no cost.
 Off, every share an agent takes is flow, as before.
 
+Measured with `metaorder_curve.py` on held-out seeds 2401-2430 (12 names,
+box sqfix2), the arm $Y_M = 0.65$, $H_1 = 12$, $H_2 = 780$, $w = 0.1$,
+$m^* = 0.001$ with $\gamma = 0.15$ (the memory carries the transient part
+Almgren et al.'s 0.314 was fitted beside, so the permanent part is halved
+with it on): the half-day print peak is $0.44 f^{0.66}\sigma$, 0.71 of a
+day TWAP's displacement is reached halfway, 0.66 of the peak is left at the
+close, 0.57 at the next close and 0.33 five closes later, and a day TWAP at
+10% of volume costs $0.116\sigma$, 0.82 of a block's cost (0.83 at 3%;
+0.53 with the memory off). Below 3% a block fits inside the maker's ladder
+and pays only the half-spread, so a sliced order, which pays the memory,
+costs 1.1 to 1.3 times as much there.
+
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.487 and coefficient 0.468 |
