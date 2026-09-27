@@ -434,6 +434,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # A switch: 1 reads buyback_payout_share as the total payout, so a
     # dividend substitutes for buybacks.
     "dividend_buyback_substitution": (0.0, 1.0),
+    # The return memory's gain in log variance per unit of memory. At 4 on
+    # a 10-session half-life the index's leverage sum reaches the tape's
+    # and its crash rate is two and a half times it (crash-vol-state
+    # design), so 5 is past anything plausible.
+    "market_vol_leverage": (0.0, 5.0),
+    # Sessions; 126 is half a year (Bouchaud, Matacz and Potters 2001 put
+    # the index kernel near 10 to 20 sessions). 0 is the shipped value, so
+    # the box starts there; a gain drawn with it is recorded infeasible.
+    "market_vol_leverage_half_life": (0.0, 126.0),
+    # A share: 0 counts up and down days alike, 1 counts falls only.
+    "market_vol_leverage_down": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
@@ -938,7 +949,7 @@ def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
 #: it in (the "swap": alpha down, alpha + gamma/2 preserved).
 REPARAMETERISED = ("garch_alpha", "garch_beta", "garch_gamma",
                    "market_vol_alpha", "market_vol_beta",
-                   "market_vol_gamma")
+                   "market_vol_gamma", "market_vol_slow_gamma")
 
 #: The replacement axes. Ships (pt-v3): garch persistence 0.8364 with
 #: alpha fraction 0.0711 and gamma/2 fraction 0.1095; market-vol
@@ -966,7 +977,25 @@ TRANSFORMED_AXES = (
     # non-alpha budget in the leverage term (beta exactly zero), which is
     # a boundary worth sampling rather than an arbitrary cap.
     atlas.Axis("market_vol_gamma_frac", 0.0, 1.0),
+    # The slow component's GJR loading as a share of the most it may take:
+    # it gives back half of itself from the slow carried share
+    # `(1 - gain) * persistence`, so it may be at most twice that, and at
+    # most 1.0 (its own range). A raw box cannot be sampled against the
+    # slow gain and persistence the survey draws beside it -- a third of a
+    # 64-vector plan fell outside -- and the share can (crash-vol-state).
+    atlas.Axis("market_vol_slow_gamma_frac", 0.0, 1.0),
 )
+
+
+def _slow_gamma_ceiling(params: dict[str, float]) -> float:
+    """The most `market_vol_slow_gamma` may be at these slow dials: twice
+    the slow carried share, and never past 1.0. Dials the vector does not
+    carry read the base preset's values."""
+    base = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
+    gain = float(params.get("market_vol_slow_gain", base["market_vol_slow_gain"]))
+    pers = float(params.get("market_vol_slow_persistence",
+                            base["market_vol_slow_persistence"]))
+    return max(0.0, min(1.0, 2.0 * (1.0 - gain) * pers))
 
 
 def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
@@ -1000,6 +1029,8 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     p["market_vol_alpha"] = ms * mp
     p["market_vol_gamma"] = 2.0 * mg * rest
     p["market_vol_beta"] = (1.0 - mg) * rest
+    sgf = p.pop("market_vol_slow_gamma_frac")
+    p["market_vol_slow_gamma"] = sgf * _slow_gamma_ceiling(p)
     return p
 
 
@@ -1024,6 +1055,9 @@ def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     # wrong -- 0.0 is the reading that round-trips.
     rest = mpers - ma
     v["market_vol_gamma_frac"] = (mg / 2.0) / rest if rest > 0.0 else 0.0
+    ceiling = _slow_gamma_ceiling(params)
+    sg = float(params["market_vol_slow_gamma"])
+    v["market_vol_slow_gamma_frac"] = sg / ceiling if ceiling > 0.0 else 0.0
     return v
 
 

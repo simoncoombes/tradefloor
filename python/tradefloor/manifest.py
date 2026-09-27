@@ -461,7 +461,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         )
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
-    # `vix_anchor_memory` off zero; every other snapshot omits it.
+    # `vix_anchor_memory` off zero; every other snapshot omits it. So is
+    # the market factor's return memory, only with `market_vol_leverage` set.
     # So are the rate instruments, only on an engine that holds them, and
     # the agent-facing book, only once an agent has used it.
     # From pt-v20 the fair-value levels and the unapplied opening draws are
@@ -469,8 +470,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # buyback share-count reductions are carried only with
     # `buyback_accrual` and `buyback_payout_share` both set.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z",
-         "buyback_log_shares",
+        {"vix_anchor_slow", "market_vol_leverage_memory", "rates", "book",
+         "fair_value_offset", "opening_z", "buyback_log_shares",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -630,6 +631,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot.get("vix_log_level", 0.0))
     if "vix_anchor_slow" in snapshot:
         _f64(buf, snapshot["vix_anchor_slow"])
+    # The market factor's return memory, only on a model with
+    # `market_vol_leverage` set: `Engine::state_hash`'s order and rule.
+    if "market_vol_leverage_memory" in snapshot:
+        _f64(buf, snapshot["market_vol_leverage_memory"])
     # The aggregate earnings cycle, only on a model with the cycle on, and
     # then the fair-value levels and the unapplied opening draws, only on a
     # model that can move a level: `Engine::state_hash`'s order and rule.

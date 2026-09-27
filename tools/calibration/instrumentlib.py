@@ -582,6 +582,18 @@ PARAM_SPECS: dict[str, dict] = {
     # for leaving a range narrower than the sampler.
     "market_vol_gamma":         {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 2.0)},
+    # The slow component's GJR loading and the factor's return memory
+    # (crash-vol-state). All ship at 0.0, so the hard range is what a
+    # search gets. Each top is the dial's own domain in `params.rs`; the
+    # slow gamma is further bounded there by twice the slow carried share.
+    "market_vol_slow_gamma":    {"kind": "abs", "step_unit": 0.05,
+                                 "hard_range": (0.0, 1.0)},
+    "market_vol_leverage":      {"kind": "abs", "step_unit": 0.5,
+                                 "hard_range": (0.0, 50.0)},
+    "market_vol_leverage_half_life": {"kind": "abs", "step_unit": 5.0,
+                                      "hard_range": (0.0, 2520.0)},
+    "market_vol_leverage_down": {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 1.0)},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     # How far the factor's shock share rotates with its own variance
@@ -1132,6 +1144,17 @@ def feasibility_violation(vector: dict[str, float],
     if ma + mb + mg / 2.0 >= 1.0:
         return ("factor-variance GJR stationarity: alpha+beta+gamma/2 = "
                 f"{ma + mb + mg / 2.0:.4f} >= 1")
+    # The slow component's GJR loading gives back half of itself from the
+    # slow carried share, and the return memory needs a half-life: the two
+    # cross-dial refusals `ModelParams` makes (crash-vol-state), here so a
+    # plan records such a vector as infeasible instead of erroring on it.
+    sg = val("market_vol_slow_gamma")
+    carried = (1.0 - val("market_vol_slow_gain")) * val("market_vol_slow_persistence")
+    if sg != 0.0 and carried - sg / 2.0 < 0.0:
+        return (f"market_vol_slow_gamma {sg:.4f} exceeds twice the slow "
+                f"carried share {carried:.4f}")
+    if val("market_vol_leverage") != 0.0 and val("market_vol_leverage_half_life") == 0.0:
+        return "market_vol_leverage is set with a half-life of 0"
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",

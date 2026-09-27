@@ -1239,6 +1239,26 @@ impl Engine {
         self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0
     }
 
+    /// Whether this engine's model carries the market factor's return
+    /// memory, which is when the snapshot and the state hash carry it: only
+    /// with `market_vol_leverage` set. Off on every shipped preset.
+    pub fn carries_market_vol_leverage(&self) -> bool {
+        self.params.market_vol_leverage != 0.0
+    }
+
+    /// The market factor's return memory. See
+    /// [`crate::params::ModelParams::market_vol_leverage`].
+    pub fn market_vol_leverage_memory(&self) -> f64 {
+        self.market_vol.leverage_memory()
+    }
+
+    /// Put the market factor's return memory back. Call after
+    /// [`Engine::set_market_variance_state_with_components`], which resets
+    /// it to 0.0.
+    pub fn set_market_vol_leverage_memory(&mut self, value: f64) {
+        self.market_vol.set_leverage_memory(value);
+    }
+
     /// Whether this engine's model can move a fair-value level, which is
     /// when the snapshot and the state hash carry them. Off on every preset
     /// through pt-v19, so their snapshots and hashes are the ones they were.
@@ -9066,6 +9086,10 @@ impl Engine {
         // was before the field existed.
         if self.params.vix_anchor_memory != 0.0 {
             hash_f64(&mut buf, self.vix_anchor_slow);
+        }
+        // The market factor's return memory, on the same rule.
+        if self.carries_market_vol_leverage() {
+            hash_f64(&mut buf, self.market_vol.leverage_memory());
         }
         // The aggregate earnings cycle, on the same rule.
         if self.params.earnings_cycle_depth != 0.0 {

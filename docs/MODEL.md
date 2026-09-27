@@ -1538,6 +1538,54 @@ ceiling caps the market factor at 4.3% a day.
 | $e_-$ | `market_vol_vix_exponent_below` | 2.5 | chosen | inside the measured range: shared variance on the reference roster rises as the VIX to the power 2.25 (1.95 to 2.57) |
 | | floor, ceiling multiples | 0.05, 32 | guard | a record VIX of 82.7 against 15 is about 30 times the variance |
 
+Two further mechanisms act on this state. Both are off on every shipped
+preset, where the recursions above are the whole of it.
+
+**Slow-component asymmetry** (`market_vol_slow_gamma`, $\gamma_s$). The slow
+component takes a GJR term, and its carried share gives back half of it, so
+its persistence $p_s$ and its resting level do not change
+(`slow_step` in `market/factor_vol.rs`):
+
+```math
+v^{s}_{d+1} = \mathrm{clip}\Big((1 - p_s)\,\bar v^{s}_d + \big(g_s\,p_s + \gamma_s\,\mathbf{1}[F_d < 0]\big)\,F_d^{2}
+ + \big((1 - g_s)\,p_s - \tfrac{\gamma_s}{2}\big)\,v^{s}_d\Big)
+```
+
+$\gamma_f$ acts only on the fast 65% of the factor variance, and the factor
+is about three quarters of the index variance, so without $\gamma_s$ the
+index remembers a fall for weeks where the S&P 500 remembers it for months.
+
+**Return memory** (`market_vol_leverage` $k$, `market_vol_leverage_half_life`
+$H$, `market_vol_leverage_down` $a$). The engine keeps $\ell$, an
+exponentially weighted memory of the day factor in baseline sd units, and the
+variance the next session draws with is the mixture times a lognormal
+multiplier (`close_with_leverage_memory` in `market/factor_vol.rs`):
+
+```math
+u_d = -\frac{F_d}{\sqrt{b_m}}\big(1 - a\,\mathbf{1}[F_d > 0]\big) - \frac{a}{\sqrt{2\pi}}\sqrt{\frac{v_d}{b_m}},
+\qquad
+\ell_{d+1} = \phi\,\ell_d + (1 - \phi)\,u_d,\quad \phi = 2^{-1/H}
+```
+
+```math
+v_{d+1} = \mathrm{clip}\Big(\bar v_{d+1}\,\exp\big(k\,\ell_{d+1} - \tfrac{k^{2} s^{2}}{2}\big)\Big),
+\qquad
+s^{2} = \frac{1 - \phi}{1 + \phi}\Big(\frac{1 + (1 - a)^{2}}{2} - \frac{a^{2}}{2\pi}\Big)
+```
+
+$\bar v_{d+1}$ is the component mixture above, and the components are fed
+$F_d\sqrt{\bar v_d / v_d}$, the day factor in their own units, so a fall is
+not counted twice. A forced close (a scenario's `vix_sets_variance`) steps
+$\ell$ but writes the forced level without the multiplier. The snapshot and
+the state hash carry $\ell$ only while $k$ is set.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $\gamma_s$ | `market_vol_slow_gamma` | 0 (off) | | crash-vol-state design; in $[0, 1]$ and at most $2(1 - g_s)p_s$ |
+| $k$ | `market_vol_leverage` | 0 (off) | | in $[0, 50]$ |
+| $H$ | `market_vol_leverage_half_life` | 0 | | sessions; positive when $k$ is set |
+| $a$ | `market_vol_leverage_down` | 0 | | 0 counts rises and falls alike, 1 falls only |
+
 ### Company variance (GJR-GARCH)
 
 **Timescale:** daily, at the close, before the jumps. **State:** $h_{i,d}$,
