@@ -77,6 +77,7 @@ fn company(id: &str, price: f64, avg_volume: f64, shares: f64) -> TickCompany {
             mispricing_momentum: None,
             fair_value_offset: None,
             buyback_log_shares: None,
+            dividend: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],

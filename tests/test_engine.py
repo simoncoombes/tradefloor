@@ -510,6 +510,9 @@ def test_attribution_reports_every_component_that_moves_a_price():
         # fair-value level under the permanent share, which the ten report
         # as the whole shock. Zero on every earlier preset.
         "fair_value_shift",
+        # The twelfth: the change in `s` at an ex-date open, zero on every
+        # model without dividends (`dividend_payout_share`).
+        "dividend",
     ]
 
 

@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from .spec import StrategySpec
 
 
-# The eleven components, as literals a checker can match against
+# The twelve components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #
@@ -86,16 +86,19 @@ if TYPE_CHECKING:
 # `fair_value_shift`, arrived with pt-v20 (0.8.5): the part of the day's news
 # and noise that changed the name's fair value for good, entered as a negative
 # because it left the mispricing. The ten above report the whole shock, which
-# is what moved the price; zero on every preset through pt-v19.
+# is what moved the price; zero on every preset through pt-v19. The twelfth,
+# `dividend`, is the change in `s` at an ex-date open, where the price drops
+# by the amount and fair value gives up its accrued dividend; zero on every
+# model without dividends (`dividend_payout_share`).
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
     Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
-    Literal["fair_value_shift"],
+    Literal["fair_value_shift"], Literal["dividend"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
      "order_flow_impact", "short_squeeze_effect", "random_noise",
-     "circuit_breaker", "jump", "overnight", "fair_value_shift")
+     "circuit_breaker", "jump", "overnight", "fair_value_shift", "dividend")
 
 
 def _f64(buf: bytes) -> list[float]:
@@ -267,7 +270,8 @@ class Scorecard:
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
                  "strategy_fingerprint", "model_fingerprint", "trusted",
-                 "uses_hidden_state", "tampered", "history_days")
+                 "uses_hidden_state", "tampered", "history_days",
+                 "dividends")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -278,6 +282,7 @@ class Scorecard:
         model_fingerprint: str = "", trusted: bool = False,
         uses_hidden_state: bool = False, tampered: bool = False,
         history_days: int = 0,
+        dividends: float = 0.0,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -328,6 +333,10 @@ class Scorecard:
         #: history is not a peer of one without: :func:`leaderboard` and
         #: :func:`tradefloor.rank` refuse to mix them.
         self.history_days = history_days
+        #: Net dividends the portfolio received (paid, on a short) over
+        #: the run, reinvested or as cash, already inside ``pnl``. 0.0 on every model without
+        #: dividends (``dividend_payout_share``).
+        self.dividends = dividends
 
     def as_dict(self) -> dict[str, Any]:
         # history_days only when set, so a card from a run without a
@@ -417,6 +426,7 @@ def evaluate(
     cash_interest: bool = False,
     trusted_agents: bool = False,
     history_days: int = 0,
+    reinvest_dividends: bool = True,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -451,6 +461,13 @@ def evaluate(
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
     default: cash earns nothing, as it always has here.
+
+    ``reinvest_dividends`` (on by default) is each portfolio's dividend
+    reinvestment plan, on a model that pays dividends: a long position's
+    dividend buys more of the paying name at the ex-date open, so an agent
+    that buys and never trades earns the total return. Off, dividends are
+    credited as cash. Nothing changes on a model without dividends. See
+    :meth:`Portfolio.collect_dividends`.
 
     Agents are sandboxed. ``obs.engine`` is a read-only
     :class:`~tradefloor.sandbox.MarketView` and ``obs.portfolio`` a read-only
@@ -547,6 +564,7 @@ def evaluate(
             cash_interest, bool(trusted_agents), engine=engine,
             history=None if history is None else history.copy(),
             history_days=history_days,
+            reinvest_dividends=bool(reinvest_dividends),
         )
     return results
 
@@ -583,14 +601,15 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
                   trusted=False, engine=None, history=None,
-                  history_days=0) -> Scorecard:
+                  history_days=0, reinvest_dividends=True) -> Scorecard:
     # `engine` is this agent's fork of the pre-history when the run has one,
     # and `history` the agent's own copy of its bars; both None otherwise.
     if engine is None:
         engine = Engine(seed=seed, universe=universe, macro_state=macro,
                         model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
-                          cash_interest=cash_interest)
+                          cash_interest=cash_interest,
+                          reinvest_dividends=reinvest_dividends)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
     # What the agent is handed. Built once: every view reads the live
@@ -625,6 +644,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
         engine.open_market()
+        # The dividends this open made payable, before the agent acts: the
+        # price already carries the ex-date drop. Reinvested in the paying
+        # name under the portfolio's plan, cash otherwise. Nothing on a
+        # model without dividends.
+        portfolio.collect_dividends(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
@@ -750,6 +774,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         uses_hidden_state=privileged,
         tampered=tampered,
         history_days=history_days,
+        dividends=portfolio.dividends,
     )
 
 

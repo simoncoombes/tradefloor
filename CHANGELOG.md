@@ -275,14 +275,51 @@ pt-v20 sets 126 sessions. `rate_pe_sensitivity`, the constant 1.5 until
 now, is the P/E compression per unit of yield; pt-v20 sets 3. Both cost the
 index about 1.5 points a year of drift, and pt-v20's `buyback_payout_share`
 goes from a third to 0.75 to restore it. That value is calibrated to the
-drift, not measured: it is a buyback yield of about 4.2 per cent against a
-real 1.5 to 2.0. `treasury_10y_noise` goes from 0.025 to 0.038.
+drift, not measured. At the median company's earnings yield it would be a
+buyback yield of 4.2 per cent, but the index's delivered buyback yield is
+2.0 per cent a year on held-out seeds. `treasury_10y_noise` goes from 0.025
+to 0.038.
 
 pt-v20's values are the twelfth registration's graded arm (design
 repository, `programme/ptv20-registration.md`), chosen on held-out seeds,
 where it passes all 40 registered rows. `python/tradefloor/provenance.py`
 gives each value's kind and source. Every preset before pt-v20 replays and
 hashes as it did.
+
+### Cash dividends (off by default)
+
+`dividend_payout_share` turns on quarterly cash dividends. A profitable
+company growing its revenue slower than `dividend_growth_cutoff` pays a
+share of its earnings set by its sector. Ex-dates come every 63 sessions,
+and each amount is declared 21 sessions ahead by a Lintner rule on the
+company's own past closes (`dividend_adjustment_speed`, capped by
+`dividend_yield_ceiling`). Fair value accrues the amount between ex-dates
+and the price drops by it exactly at the ex-date open.
+`dividend_buyback_substitution` makes `buyback_payout_share` the total
+payout, so dividends replace buybacks. No preset sets any of them, and
+every known-answer digest is unchanged.
+
+When dividends are on, `Engine.distributions()` lists every declared
+dividend and `Engine.dividends_today()` gives the day's amounts. The prints
+table gains a `distribution` column, and `truth()` and `attribution()` gain
+a `dividend` column (zero on every preset). `Portfolio.collect_dividends`
+credits holders and charges shorts, and `evaluate`, the gym, `World` and
+`tca` all call it, and `Scorecard.dividends` reports the net dividends each
+agent received.
+
+Every portfolio has a dividend reinvestment plan, on by default
+(`Portfolio(reinvest_dividends=True)`, `evaluate(reinvest_dividends=...)`):
+a long position's dividend buys more of the company that paid it at the
+ex-date open, so an agent that buys once and never trades, `BuyAndHold`
+included, earns the market's total return. A short pays its dividend in
+cash. Without the plan a holder keeps its dividends as cash, which earns
+nothing unless `cash_interest` is set, and it trails any strategy that
+re-targets its net worth: on pt-v20 with dividends on, the registered
+rate-news agent beat such a holder by 0.25 to 0.29 points a year in 21 to
+24 of 30 held-out histories, and under the plan trails it by 0.48 to 0.49
+(4 or 5 of 30 ahead; 0.34 behind and 5 of 30 without dividends).
+`reinvest_dividends=False` keeps the cash. Nothing changes on a model
+without dividends.
 
 ### No capture ratio on pt-v20
 

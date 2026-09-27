@@ -436,6 +436,9 @@ def analyse(
         if scenario is not None:
             scenario.apply(engine, day)
         engine.open_market()
+        # The cash dividends this open made payable, as `evaluate` collects
+        # them. Nothing on a model without dividends.
+        portfolio.collect_dividends(engine)
         for _ in range(steps_per_day):
             prices = _f64(engine.prices())
             actual_path.append(prices)

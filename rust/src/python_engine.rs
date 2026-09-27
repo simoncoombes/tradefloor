@@ -709,6 +709,18 @@ impl PyEngine {
             }
             self.pending_overnight.clear();
         }
+        // The twelfth is the ex-date's move in `s`, which happens at the
+        // open like the overnight move and is booked the same way.
+        let before = self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].len();
+        self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_dividend.is_empty() {
+            for (i, v) in self.pending_dividend.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].get_mut(before + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_dividend.clear();
+        }
     }
 
     /// Write the day's jump into the eighth component series, on the last
@@ -754,6 +766,22 @@ impl PyEngine {
     fn padded(&self, mut values: Vec<f64>, fill: f64) -> Vec<f64> {
         values.resize(values.len() + self.inner.rates().len(), fill);
         values
+    }
+
+    /// Today's ex-date amounts across every instrument, zero on a rate
+    /// index and on every model without dividends.
+    fn dividends_padded(&self) -> Vec<f64> {
+        self.padded(self.inner.dividends_today(), 0.0)
+    }
+
+    /// [`Self::dividends_padded`] for the tape: EMPTY on a model without
+    /// dividends, whose `prints` carry no `distribution` column.
+    fn distribution_row(&self) -> Vec<f64> {
+        if self.inner.carries_dividends() {
+            self.dividends_padded()
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -1130,6 +1158,9 @@ pub struct PyEngine {
     /// jump is observed, as `pending_jump` waits. Empty unless the preset
     /// carries fair-value offsets and a name's jump moved one.
     pending_fair_value: Vec<f64>,
+    /// The ex-date's move in `s` at the last open, waiting for the day's
+    /// first tape row; empty unless a name went ex (`dividend_payout_share`).
+    pending_dividend: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -1258,6 +1289,13 @@ impl PyEngine {
         let nights: Vec<f64> = self.inner.overnight_moves().to_vec();
         if nights.iter().any(|v| *v != 0.0) {
             self.pending_overnight = nights;
+        }
+        // The ex-date's move in `s`, booked onto the same row.
+        if self.inner.carries_dividends() {
+            let moves: Vec<f64> = self.inner.dividend_moves().to_vec();
+            if moves.iter().any(|v| *v != 0.0) {
+                self.pending_dividend = moves;
+            }
         }
     }
 
@@ -1664,6 +1702,7 @@ impl PyEngine {
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),
             pending_fair_value: Vec::new(),
+            pending_dividend: Vec::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
             day_count: 0,
@@ -2235,8 +2274,49 @@ impl PyEngine {
     /// `last_daily_return`, `previous_tick_price`); the mispricing fields read
     /// zero, because an index level is its own fair value.
     fn column(&self, py: Python<'_>, field: &str) -> PyResult<Py<PyBytes>> {
+        // The cash dividend per share each instrument went ex for at this
+        // session's open: zero on every other session, on a rate index and
+        // on every model without dividends.
+        if field == "dividend" {
+            return Ok(f64_bytes(py, &self.dividends_padded()));
+        }
         let f = parse_field(field)?;
         Ok(f64_bytes(py, &self.all_column(f)))
+    }
+
+    /// The cash dividend per share each instrument went ex for at this
+    /// session's open, in `tickers` order: 0.0 on any other session, on a
+    /// rate index, and on every model without dividends
+    /// (`dividend_payout_share`). The price already carries the drop; a
+    /// holder is owed `quantity * amount` (`Portfolio.collect_dividends`).
+    fn dividends_today(&self) -> Vec<f64> {
+        self.dividends_padded()
+    }
+
+    /// The `distributions` table: one row per declared cash dividend, in
+    /// declaration order. `day` is the ex-date, so the table joins `bars`
+    /// on `(day, instrument_id)` at the session whose open carries the
+    /// drop; `declared_day` is when the amount became public, 21 sessions
+    /// before (or the run's first session, for a first ex-date closer than
+    /// that), and a row exists only from that session on. `kind` is `"cash"`. Pass
+    /// `day` for the rows going ex that session. Empty on every model
+    /// without dividends. A record, like the tape: a restored engine starts
+    /// it afresh.
+    #[pyo3(signature = (day = None))]
+    fn distributions(&self, day: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows: Vec<&crate::engine::Distribution> = self
+            .inner
+            .distributions()
+            .iter()
+            .filter(|d| day.map_or(true, |x| d.ex_day == x))
+            .collect();
+        let batch = crate::python_arrow::distributions_batch(&rows)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "distributions",
+            crate::python_arrow::distributions_schema(),
+            vec![batch],
+        ))
     }
 
     /// Current price per instrument, as little-endian f64 bytes.
@@ -2347,6 +2427,13 @@ impl PyEngine {
     /// Index of a ticker, or None. Indices shift after a delisting.
     fn index_of(&self, ticker: &str) -> Option<usize> {
         self.tickers.iter().position(|t| t == ticker)
+    }
+
+    /// The number of sessions this engine has closed: the day the current
+    /// (or next) session is numbered, as `open_market` numbers it.
+    #[getter]
+    fn day_count(&self) -> u32 {
+        self.day_count
     }
 
     /// Instrument tickers, in roster order.
@@ -3748,7 +3835,8 @@ impl PyEngine {
     fn state_hash(&self) -> String {
         let bytes = self.inner.state_hash_with_pending(
             self.day_count, self.market_open,
-            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value);
+            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value,
+            &self.pending_dividend);
         let mut hex = String::with_capacity(64);
         for byte in bytes {
             hex.push_str(&format!("{byte:02x}"));
@@ -4005,6 +4093,12 @@ impl PyEngine {
             // the market has opened, the roster's plus one before it.
             out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
         }
+        // The dividend states, only on a model that pays dividends, so every
+        // other snapshot is the one it was. Seven f64s a name
+        // (`market::dividends::STATE_WIDTH`), NaN for a name without one.
+        if self.inner.carries_dividends() {
+            out.set_item("dividend", f64_bytes(py, &self.inner.dividend_states()))?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -4035,6 +4129,9 @@ impl PyEngine {
         // fair-value offsets is the one it was.
         if !self.pending_fair_value.is_empty() {
             out.set_item("pending_fair_value", f64_bytes(py, &self.pending_fair_value))?;
+        }
+        if !self.pending_dividend.is_empty() {
+            out.set_item("pending_dividend", f64_bytes(py, &self.pending_dividend))?;
         }
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
@@ -4462,6 +4559,28 @@ impl PyEngine {
                     self.pending_overnight = values;
                 }
             }
+        }
+        // Absent means no ex-date move was waiting.
+        self.pending_dividend = match snapshot.get_item("pending_dividend")? {
+            Some(raw) => {
+                let bytes: &[u8] = raw.extract()?;
+                bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect()
+            }
+            None => Vec::new(),
+        };
+        // Absent means a model without dividends, whose names carry none.
+        if let Some(raw) = snapshot.get_item("dividend")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_dividend_states(&values)
+                .map_err(ValidationError::new_err)?;
         }
         // Absent means no jump's fair-value shift was waiting.
         self.pending_fair_value = match snapshot.get_item("pending_fair_value")? {
@@ -5062,6 +5181,7 @@ impl PyEngine {
             repriced: self.day_buffer.repriced.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
+            distribution: self.distribution_row(),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
@@ -5146,6 +5266,7 @@ impl PyEngine {
                 repriced: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
+                distribution: Vec::new(),
             }]
         } else {
             self.select_recorded(day)?
@@ -5373,6 +5494,14 @@ impl PyEngine {
             DepthColumns::PartialDay => "part way through",
         };
 
+        // The `distribution` column, on a model that pays dividends only.
+        let distribution_now: Option<Vec<f64>> =
+            if self.inner.carries_dividends() { Some(self.distribution_row()) } else { None };
+        let with_distribution = if self.recorded.is_empty() {
+            distribution_now.is_some()
+        } else {
+            self.recorded.iter().any(|d| !d.distribution.is_empty())
+        };
         let (batches, depth) = if self.recorded.is_empty() {
             let ticks = self.buffer.ticks_written;
             let instruments = self.buffer.companies;
@@ -5381,7 +5510,7 @@ impl PyEngine {
                 ticks * instruments,
             );
             (
-                vec![crate::python_arrow::prints_batch(
+                vec![crate::python_arrow::prints_batch_with(
                     // Nothing is recorded, so there is no day to select and
                     // the argument is the label on the rows, as it is on the
                     // same path in `bars` and `truth`.
@@ -5397,6 +5526,7 @@ impl PyEngine {
                     self.written(&self.buffer.unbounded_print),
                     self.written(&self.buffer.liquidity_share),
                     depth,
+                    distribution_now.as_deref(),
                 )
                 .map_err(crate::python_arrow::arrow_err)?],
                 depth,
@@ -5428,8 +5558,16 @@ impl PyEngine {
             }
             let mut out = Vec::with_capacity(selected.len());
             for d in &selected {
+                let zeros = vec![0.0; d.instruments];
+                let amounts: Option<&[f64]> = if !with_distribution {
+                    None
+                } else if d.distribution.is_empty() {
+                    Some(&zeros)
+                } else {
+                    Some(&d.distribution)
+                };
                 out.push(
-                    crate::python_arrow::prints_batch(
+                    crate::python_arrow::prints_batch_with(
                         d.day,
                         d.ticks,
                         d.instruments,
@@ -5442,6 +5580,7 @@ impl PyEngine {
                         &d.unbounded_print,
                         &d.liquidity_share,
                         depth,
+                        amounts,
                     )
                     .map_err(crate::python_arrow::arrow_err)?,
                 );
@@ -5450,7 +5589,7 @@ impl PyEngine {
         };
         Ok(crate::python_arrow::PyArrowStream::new(
             "prints",
-            crate::python_arrow::prints_schema(depth),
+            crate::python_arrow::prints_schema_with(depth, with_distribution),
             batches,
         ))
     }
@@ -6036,6 +6175,7 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::JUMP_COMPONENT_KEY,
     crate::market::factors::OVERNIGHT_COMPONENT_KEY,
     crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
+    crate::market::factors::DIVIDEND_COMPONENT_KEY,
 ];
 
 /// Every field `column()` accepts, in one place.

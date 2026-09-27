@@ -170,6 +170,10 @@ pub struct TickStock {
     /// `exp(L)`. None is 0.0, which every name holds while the switch or
     /// `buyback_payout_share` is off, and which a new listing starts at.
     pub buyback_log_shares: Option<f64>,
+    /// The name's dividend state (`ModelParams::dividend_payout_share`).
+    /// `None` on every preset, which pays no dividend; see
+    /// [`crate::market::dividends`].
+    pub dividend: Option<crate::market::dividends::DividendState>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
     /// The variance cascade's components, when one is running.
@@ -262,7 +266,20 @@ pub const MARKET_DAYS_PER_YEAR: f64 = 252.0;
 /// roster once rather than branching on a zero-mean quantity every day. On
 /// `Universe.random(40, seed=111)` it is 3 names of 40.
 pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64) -> f64 {
-    if p.buyback_payout_share == 0.0 {
+    buyback_scale_at(p, p.buyback_payout_share, eps, price, elapsed_days)
+}
+
+/// [`buyback_scale`] at an explicit share of earnings: the name's own under
+/// `dividend_buyback_substitution` (`market::dividends::buyback_share`),
+/// `buyback_payout_share` otherwise, where the two are the same arithmetic.
+pub fn buyback_scale_at(
+    p: &ModelParams,
+    share: f64,
+    eps: Option<f64>,
+    price: f64,
+    elapsed_days: i64,
+) -> f64 {
+    if p.buyback_payout_share == 0.0 || share == 0.0 {
         return 1.0;
     }
     let eps = match eps {
@@ -272,7 +289,7 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
     if !(price > 0.0) || !price.is_finite() || elapsed_days <= 0 {
         return 1.0;
     }
-    let b = p.buyback_payout_share * eps / price;
+    let b = share * eps / price;
     // The yield is read at TODAY's price and applied over every elapsed
     // year, so a name whose price collapses toward the 0.01 floor reads a
     // yield of hundreds and a fair value of exp(hundreds): the re-mark's
@@ -287,7 +304,10 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
 /// reduction (`TickStock::buyback_log_shares`), which does not read today's
 /// price or the elapsed time; otherwise it is [`buyback_scale`], the term
 /// that stood. A branch at 0.0, so every preset's arithmetic is the one it
-/// was.
+/// was. `share` is the name's share of earnings spent on buybacks
+/// (`market::dividends::buyback_share`): `buyback_payout_share` itself, or
+/// under `dividend_buyback_substitution` that less the name's dividend
+/// payout, in both the term that stood and the accrual.
 ///
 /// [`buyback_scale`] reads the yield at today's price and applies it to
 /// every elapsed year, so `d ln FV / d ln P_today = -b t`: fair value is
@@ -297,21 +317,24 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
 /// about year 30 on pt-v20), and relabelling the calendar origin moves
 /// prices. The accrued factor is fixed within a session, so the elasticity
 /// is zero at every horizon and the origin does not matter.
-pub fn buyback_factor(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64,
-                      log_shares: Option<f64>) -> f64 {
+pub fn buyback_factor(p: &ModelParams, share: f64, eps: Option<f64>, price: f64,
+                      elapsed_days: i64, log_shares: Option<f64>) -> f64 {
     if p.buyback_accrual != 0.0 {
         return match log_shares {
             Some(l) if l != 0.0 => mathx::exp(l),
             _ => 1.0,
         };
     }
-    buyback_scale(p, eps, price, elapsed_days)
+    buyback_scale_at(p, share, eps, price, elapsed_days)
 }
 
 /// One session's increment to the log share-count reduction `L` under
-/// `buyback_accrual`: `min(buyback_payout_share * eps * exp(L) / price,
-/// buyback_yield_cap) / 252`, where `eps` is the earnings the valuation
-/// holds before the buyback factor and `price` is the close.
+/// `buyback_accrual`: `min(share * eps * exp(L) / price,
+/// buyback_yield_cap) / 252`, where `share` is the name's buyback share of
+/// earnings (`market::dividends::buyback_share`: `buyback_payout_share`, less
+/// the name's dividend payout under `dividend_buyback_substitution`), `eps`
+/// is the earnings the valuation holds before the buyback factor and `price`
+/// is the close.
 ///
 /// This is the exact form [`buyback_scale`]'s own docstring names: a buyback
 /// retires shares at the price paid, so `dN/N = -payout * EPS_now / P dt`,
@@ -319,8 +342,9 @@ pub fn buyback_factor(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_day
 /// share count falls. The cap, when set, bounds one session's increment. A
 /// loss-maker (`eps <= 0`) neither retires nor issues, as in
 /// [`buyback_scale`]. Zero when the switch or the payout share is off.
-pub fn buyback_accrual_step(p: &ModelParams, eps: Option<f64>, price: f64, log_shares: f64) -> f64 {
-    if p.buyback_accrual == 0.0 || p.buyback_payout_share == 0.0 {
+pub fn buyback_accrual_step(p: &ModelParams, share: f64, eps: Option<f64>, price: f64,
+                            log_shares: f64) -> f64 {
+    if p.buyback_accrual == 0.0 || p.buyback_payout_share == 0.0 || share == 0.0 {
         return 0.0;
     }
     let eps = match eps {
@@ -331,7 +355,7 @@ pub fn buyback_accrual_step(p: &ModelParams, eps: Option<f64>, price: f64, log_s
         return 0.0;
     }
     let per_share = if log_shares == 0.0 { eps } else { eps * mathx::exp(log_shares) };
-    let b = p.buyback_payout_share * per_share / price;
+    let b = share * per_share / price;
     let b = if p.buyback_yield_cap == 0.0 { b } else { mathx::min(b, p.buyback_yield_cap) };
     b / MARKET_DAYS_PER_YEAR
 }
@@ -1175,7 +1199,9 @@ pub fn simulate_market_tick(
         // Per NAME, unlike the growth term above: the yield is this
         // company's own earnings over its own price. A BRANCH at 1.0 for
         // the same reason as the one above.
-        let buyback = buyback_factor(p, grown.eps, current_prices[i], inputs.elapsed_days,
+        let buyback = buyback_factor(
+            p, crate::market::dividends::buyback_share(p, &companies[idx]),
+            grown.eps, current_prices[i], inputs.elapsed_days,
             companies[idx].stock.buyback_log_shares);
         let valuation = if buyback == 1.0 {
             grown
@@ -1186,6 +1212,9 @@ pub fn simulate_market_tick(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
         let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
+        // The dividend accrued since the last ex-date, in price units. A
+        // branch inside: no state, or no accrual, is `fv` bit for bit.
+        let fv = crate::market::dividends::with_accrual(fv, &companies[idx]);
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
         // so enabling the model — or loading an old save — causes no level
@@ -1800,8 +1829,9 @@ pub fn published_fair_value(
     } else {
         scale_valuation(company.valuation(), nominal)
     };
-    let buyback = buyback_factor(p, grown.eps, company.stock.price, elapsed_days,
-        company.stock.buyback_log_shares);
+    let buyback = buyback_factor(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps,
+        company.stock.price, elapsed_days, company.stock.buyback_log_shares);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1813,7 +1843,8 @@ pub fn published_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
 }
 
 /// A name's fair value as the tick's phase 2 computes it: the nominal
@@ -1842,7 +1873,9 @@ pub fn tick_fair_value(
     } else {
         scale_valuation(grown, mathx::exp(v_level))
     };
-    let buyback = buyback_factor(p, grown.eps, price, elapsed_days, company.stock.buyback_log_shares);
+    let buyback = buyback_factor(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps, price, elapsed_days,
+        company.stock.buyback_log_shares);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1854,7 +1887,8 @@ pub fn tick_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {
@@ -1915,16 +1949,16 @@ mod tests {
         let mut p = crate::params::PT_V1;
         p.buyback_payout_share = 0.75;
         // Off: the factor is the term that stood, and the step is zero.
-        assert_eq!(buyback_factor(&p, Some(2.0), 40.0, 500, Some(0.3)),
+        assert_eq!(buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, Some(0.3)),
                    buyback_scale(&p, Some(2.0), 40.0, 500));
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), 40.0, 0.0), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, 0.0), 0.0);
         // On: exp(L), whatever the price and the day.
         p.buyback_accrual = 1.0;
-        let a = buyback_factor(&p, Some(2.0), 40.0, 500, Some(0.3));
-        let b = buyback_factor(&p, Some(2.0), 20.0, 9000, Some(0.3));
+        let a = buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, Some(0.3));
+        let b = buyback_factor(&p, p.buyback_payout_share, Some(2.0), 20.0, 9000, Some(0.3));
         assert_eq!(a, b);
         assert_eq!(a, mathx::exp(0.3));
-        assert_eq!(buyback_factor(&p, Some(2.0), 40.0, 500, None), 1.0);
+        assert_eq!(buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, None), 1.0);
     }
 
     #[test]
@@ -1934,18 +1968,18 @@ mod tests {
         p.buyback_accrual = 1.0;
         let l = 0.2;
         let want = 0.5 * 2.0 * mathx::exp(l) / 40.0 / MARKET_DAYS_PER_YEAR;
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), 40.0, l), want);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), want);
         // The cap bounds one session's increment.
         p.buyback_yield_cap = 0.01;
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), 40.0, l), 0.01 / MARKET_DAYS_PER_YEAR);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), 0.01 / MARKET_DAYS_PER_YEAR);
         // A loss-maker, a missing figure and a bad price accrue nothing.
-        assert_eq!(buyback_accrual_step(&p, Some(-1.0), 40.0, l), 0.0);
-        assert_eq!(buyback_accrual_step(&p, None, 40.0, l), 0.0);
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), 0.0, l), 0.0);
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), f64::NAN, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(-1.0), 40.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, None, 40.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 0.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), f64::NAN, l), 0.0);
         // No payouts, nothing to accrue.
         p.buyback_payout_share = 0.0;
-        assert_eq!(buyback_accrual_step(&p, Some(2.0), 40.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), 0.0);
     }
 
     #[test]

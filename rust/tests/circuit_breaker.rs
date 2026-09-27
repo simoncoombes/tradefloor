@@ -84,6 +84,7 @@ fn company(price: f64, previous_close: f64, eps: f64, s: Option<f64>) -> TickCom
             mispricing_momentum: Some(0.0),
             fair_value_offset: None,
             buyback_log_shares: None,
+            dividend: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],

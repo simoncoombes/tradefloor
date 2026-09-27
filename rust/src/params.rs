@@ -1056,6 +1056,56 @@ pub struct ModelParams {
     /// of sim stress days carry inflation of 3 or more, so at 1.0 the gate
     /// binds and the bank still hikes in stress. In [0, 10].
     pub fed_stress_inflation_gap: f64,
+    /// A market-wide scale on each sector's dividend payout
+    /// (`crate::sectors::Sector::dividend_payout`, the share of earnings a
+    /// paying name distributes at its sector's anchor multiple). 0.0, which
+    /// every preset carries, is no dividend: a branch, no state, no draw.
+    ///
+    /// Off zero, a name pays a cash dividend each quarter. Its payout is
+    /// `min(1, this * sector payout)` when its earnings are positive and its
+    /// revenue growth is under `dividend_growth_cutoff`, and 0 otherwise; its
+    /// target yield is that payout times its earnings over its price at
+    /// construction, both public. Ex-dates fall every 63 sessions from a
+    /// per-name phase (a hash of the ticker, no draw); the amount is
+    /// declared 21 sessions before each ex-date by a Lintner partial
+    /// adjustment toward the target yield times an EMA of the name's own
+    /// closes (`dividend_adjustment_speed`, capped by
+    /// `dividend_yield_ceiling`). Fair value accrues the declared amount
+    /// between ex-dates, and at the ex-date open the price drops by the
+    /// amount exactly, so a holder's total return is the price return plus
+    /// the yield. The rule reads the name's own past closes and nothing the
+    /// engine hides. US large caps paid about 1.8 per cent a year over
+    /// 2001-2025 (Damodaran, S&P 500), with dividends smooth against
+    /// earnings (Lintner 1956). The snapshot and the state hash carry the
+    /// per-name state only while this is set. In [0, 2].
+    pub dividend_payout_share: f64,
+    /// Revenue growth at or above which a profitable name pays no dividend.
+    /// 0.30, which every preset carries, is read only with
+    /// `dividend_payout_share` set. In [0, 10].
+    pub dividend_growth_cutoff: f64,
+    /// The dividend's annual Lintner adjustment speed toward its target:
+    /// the declared amount moves `1 - (1 - this)^(1/4)` of the way each
+    /// quarter. 0.4, which every preset carries, is read only with
+    /// `dividend_payout_share` set. It is calibrated to the sd of the
+    /// index's annual dividend growth (5.2 per cent against a real 7.1,
+    /// Shiller 1990-2023), not measured: Lintner fits of the S&P 500's
+    /// dividend give 0.11 to 0.13 a year on earnings and about 0 on the
+    /// price, the rule's input. In (0, 1].
+    pub dividend_adjustment_speed: f64,
+    /// A ceiling on a declared quarterly dividend, as a multiple of the
+    /// name's target yield at the declaring close: the amount is at most
+    /// `this * target yield * close / 4`. A forced cut once the yield has
+    /// doubled, so a collapsed name does not pay tens of per cent a year.
+    /// 2.0, which every preset carries, is read only with
+    /// `dividend_payout_share` set. In [1, 100].
+    pub dividend_yield_ceiling: f64,
+    /// Switch. At 1, a name's buyback share is `max(0,
+    /// buyback_payout_share - its dividend payout)`, so
+    /// `buyback_payout_share` reads as the TOTAL payout and a dividend
+    /// substitutes for buybacks (Grullon and Michaely 2002). 0.0, which
+    /// every preset carries, leaves the buyback term as it stands; read only
+    /// with `dividend_payout_share` set. 0 or 1.
+    pub dividend_buyback_substitution: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -3339,11 +3389,15 @@ pub struct ModelParams {
     /// the index its one-year drift, no arm at a third held the level
     /// band's floor, and 0.75 restores it (design repository, tenth and
     /// eleventh registrations, grids ptv20e6-e8). At the 0.0555 earnings
-    /// yield above it is a buyback yield of about 4.2 per cent, over twice
-    /// the 1.5 to 2.0 per cent the value record shows. The model pays no
-    /// dividends, so the term carries the whole of the drift that payouts
-    /// would; that is a reading of the gap, not a measurement behind the
-    /// value.
+    /// yield above it would be a buyback yield of 4.2 per cent, but that is
+    /// the median NAME: the index's delivered yield (the cap-weighted log
+    /// rate of the buyback factor) is 2.0 per cent on held-out seeds, and
+    /// decays from 3.3 in year 2 to 0.8 in year 21. The shipped preset pays
+    /// no dividends (`dividend_payout_share`), so the term carries the whole
+    /// of the drift that payouts would; that is a reading of the gap, not a
+    /// measurement behind the value. Under `dividend_buyback_substitution`
+    /// this is the TOTAL payout, and a name's buyback share is it less the
+    /// name's dividend payout.
     pub buyback_payout_share: f64,
     /// How much of the drift the market jump's mean carries is given back.
     /// 0.0, which every preset before pt-v18 carries, is bit-identical. 1.0
@@ -5580,6 +5634,11 @@ impl ModelParams {
             fed_stress_cut: 0.0,
             fed_stress_vix: 30.0,
             fed_stress_inflation_gap: 1.0,
+            dividend_payout_share: 0.0,
+            dividend_growth_cutoff: 0.30,
+            dividend_adjustment_speed: 0.4,
+            dividend_yield_ceiling: 2.0,
+            dividend_buyback_substitution: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -7935,6 +7994,11 @@ impl ModelParams {
             "fed_stress_cut" => self.fed_stress_cut,
             "fed_stress_vix" => self.fed_stress_vix,
             "fed_stress_inflation_gap" => self.fed_stress_inflation_gap,
+            "dividend_payout_share" => self.dividend_payout_share,
+            "dividend_growth_cutoff" => self.dividend_growth_cutoff,
+            "dividend_adjustment_speed" => self.dividend_adjustment_speed,
+            "dividend_yield_ceiling" => self.dividend_yield_ceiling,
+            "dividend_buyback_substitution" => self.dividend_buyback_substitution,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -8206,6 +8270,11 @@ impl ModelParams {
             "fed_stress_cut" => out.fed_stress_cut = value,
             "fed_stress_vix" => out.fed_stress_vix = value,
             "fed_stress_inflation_gap" => out.fed_stress_inflation_gap = value,
+            "dividend_payout_share" => out.dividend_payout_share = value,
+            "dividend_growth_cutoff" => out.dividend_growth_cutoff = value,
+            "dividend_adjustment_speed" => out.dividend_adjustment_speed = value,
+            "dividend_yield_ceiling" => out.dividend_yield_ceiling = value,
+            "dividend_buyback_substitution" => out.dividend_buyback_substitution = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -8741,6 +8810,31 @@ impl ModelParams {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
                 self.buyback_yield_cap));
+        }
+        if !(self.dividend_payout_share >= 0.0 && self.dividend_payout_share <= 2.0) {
+            return Err(format!(
+                "dividend_payout_share is {}. It is a scale on the sector payout, in [0, 2]; 0 is no dividend.",
+                self.dividend_payout_share));
+        }
+        if !(self.dividend_growth_cutoff >= 0.0 && self.dividend_growth_cutoff <= 10.0) {
+            return Err(format!(
+                "dividend_growth_cutoff is {}. It is a revenue growth rate, in [0, 10].",
+                self.dividend_growth_cutoff));
+        }
+        if !(self.dividend_adjustment_speed > 0.0 && self.dividend_adjustment_speed <= 1.0) {
+            return Err(format!(
+                "dividend_adjustment_speed is {}. It is an annual adjustment speed, in (0, 1].",
+                self.dividend_adjustment_speed));
+        }
+        if !(self.dividend_yield_ceiling >= 1.0 && self.dividend_yield_ceiling <= 100.0) {
+            return Err(format!(
+                "dividend_yield_ceiling is {}. It is a multiple of the target yield, in [1, 100].",
+                self.dividend_yield_ceiling));
+        }
+        if !(self.dividend_buyback_substitution == 0.0 || self.dividend_buyback_substitution == 1.0) {
+            return Err(format!(
+                "dividend_buyback_substitution is {}. It is a switch, 0 or 1.",
+                self.dividend_buyback_substitution));
         }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
@@ -9292,6 +9386,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_stress_cut",
         "fed_stress_vix",
         "fed_stress_inflation_gap",
+        "dividend_payout_share",
+        "dividend_growth_cutoff",
+        "dividend_adjustment_speed",
+        "dividend_yield_ceiling",
+        "dividend_buyback_substitution",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

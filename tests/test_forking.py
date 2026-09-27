@@ -1103,7 +1103,11 @@ def _nothing_dormant():
                    pinned_vix_feedback=1.0,
                    # A switch. It moves only a World cohort's order, which an
                    # untraded market does not have.
-                   book_arrival_shuffle=1.0)
+                   book_arrival_shuffle=1.0,
+                   # A switch as well; the dividend at 0.05 of the sector
+                   # payouts is small but pays, so a restore that lost a
+                   # name's dividend state would move its next amount.
+                   dividend_buyback_substitution=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

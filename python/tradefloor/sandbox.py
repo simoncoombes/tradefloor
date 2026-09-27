@@ -107,6 +107,9 @@ PUBLIC_COLUMNS = frozenset({
     "price", "previous_close", "previous_tick_price", "open", "high", "low",
     "volume", "avg_volume", "market_cap", "last_daily_return", "beta",
     "short_interest", "float_shares",
+    # The cash dividend per share each name went ex for at today's open:
+    # public, like a real ex-date, and zero on a model without dividends.
+    "dividend",
 })
 
 #: Macro fields withheld from the view. ``qe_pe_boost`` is the P/E the model
@@ -303,6 +306,24 @@ class MarketView:
                  "day": e.get("day")}
                 for e in self.__engine.session_news()]
 
+    # -- dividends --------------------------------------------------------
+
+    @property
+    def pays_dividends(self) -> bool:
+        """Whether this market pays cash dividends
+        (``dividend_payout_share``), as a real market's reader knows."""
+        return self.__engine.model.dividend_payout_share != 0.0
+
+    def dividends_today(self) -> list[float]:
+        """``Engine.dividends_today``: the cash dividend per share each
+        instrument went ex for at this session's open, 0.0 elsewhere."""
+        return list(self.__engine.dividends_today())
+
+    def distributions(self, day: int | None = None):
+        """``Engine.distributions``: every dividend declared so far, from
+        its declaration session on, as a real one is announced."""
+        return self.__engine.distributions(day)
+
     # -- identity and the clock -------------------------------------------
 
     @property
@@ -368,6 +389,12 @@ class HiddenState(MarketView):
         the whole snapshot carries the generator state."""
         return dict(self.__raw.state_snapshot()["economy"])
 
+    def dividend_states(self) -> bytes | None:
+        """The ``dividend`` block of ``Engine.state_snapshot``: seven f64s a
+        name (payout, target yield, price EMA, amount, declared, accrual,
+        paid today), or None on a model without dividends."""
+        return self.__raw.state_snapshot().get("dividend")
+
     def fundamentals(self) -> tuple[list[float], list[float], list[float]]:
         eps, bv, growth = self.__raw.fundamentals()
         return list(eps), list(bv), list(growth)
@@ -419,6 +446,18 @@ class PortfolioView:
     @property
     def interest(self) -> float:
         return self.__portfolio.interest
+
+    @property
+    def dividends(self) -> float:
+        """Net dividends received so far (paid, on a short), reinvested or
+        as cash."""
+        return self.__portfolio.dividends
+
+    @property
+    def reinvest_dividends(self) -> bool:
+        """Whether a long position's dividends buy more of the paying name
+        (the portfolio's dividend reinvestment plan)."""
+        return self.__portfolio.reinvest_dividends
 
     @property
     def owner(self) -> str:
@@ -507,6 +546,13 @@ def hidden_state(obs: Any) -> Any:
         "scorecard records as uses_hidden_state.")
 
 
+def dividend_states_of(source: Any) -> bytes | None:
+    """The dividend block, from a :class:`HiddenState` or a live engine."""
+    if isinstance(source, HiddenState):
+        return source.dividend_states()
+    return source.state_snapshot().get("dividend")
+
+
 def economy_of(source: Any) -> dict[str, Any]:
     """The economy block, from a :class:`HiddenState` or a live engine."""
     if isinstance(source, HiddenState):
@@ -521,7 +567,9 @@ def _portfolio_state(portfolio: Any) -> tuple:
     flow = tuple(sorted((t, tuple(v)) for t, v in portfolio._flow.items()))
     return (portfolio.cash, portfolio.starting_cash, portfolio.interest,
             portfolio.max_leverage, portfolio.cash_interest, portfolio.owner,
-            len(portfolio.fills), positions, flow, portfolio._in_book)
+            len(portfolio.fills), positions, flow, portfolio._in_book,
+            portfolio.dividends, len(portfolio.distributions),
+            portfolio.reinvest_dividends)
 
 
 class TamperGuard:

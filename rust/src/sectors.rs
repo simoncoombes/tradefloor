@@ -76,6 +76,21 @@ pub struct Sector {
     /// is non-zero, which pt-v19 sets (1.93) and every preset before it
     /// does not.
     pub crisis_weight: f64,
+    /// The share of earnings a dividend-paying name in this sector
+    /// distributes as cash dividends, at the sector's anchor multiple: the
+    /// payers' dividend yield times `avg_pe`. Measured on the forty-name
+    /// tape (Yahoo close and adjusted close, 2015-2025, payers only) for
+    /// the sectors it covers and on Damodaran's sector yields (January 2026)
+    /// for materials, utilities and real estate, where the tape has one
+    /// name or none. Those yields were scaled up by about 1.2 to the tape's
+    /// level before use (materials 1.78 to 2.1 per cent, utilities 2.71 to
+    /// 3.3), which gives 0.29 and 0.53 where the unscaled yields give 0.25
+    /// and 0.43. Real estate is capped at 1.0, since a REIT pays out its
+    /// taxable income.
+    ///
+    /// Read only when [`crate::params::ModelParams::dividend_payout_share`]
+    /// is non-zero, which no preset sets.
+    pub dividend_payout: f64,
 }
 
 impl Sector {
@@ -91,18 +106,18 @@ impl Sector {
 
 /// The twelve sectors, in contractual declaration order.
 pub const SECTORS: [Sector; 12] = [
-    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 , daily_sigma: 0.025, crisis_weight: 0.0 },
-    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.6 },
-    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 , daily_sigma: 0.018, crisis_weight: 0.0 },
-    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 , daily_sigma: 0.015, crisis_weight: 0.0 },
-    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 , daily_sigma: 0.018, crisis_weight: 0.0 },
-    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 , daily_sigma: 0.008, crisis_weight: 0.0 },
-    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 , daily_sigma: 0.015, crisis_weight: 0.0 },
-    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 , daily_sigma: 0.015, crisis_weight: 0.0 },
-    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 , daily_sigma: 0.008, crisis_weight: 0.0 },
-    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 , daily_sigma: 0.008, crisis_weight: 0.0 },
-    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 , daily_sigma: 0.01, crisis_weight: 0.0 },
-    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.0 },
+    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 , daily_sigma: 0.025, crisis_weight: 0.0, dividend_payout: 0.32 },
+    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.6, dividend_payout: 0.24 },
+    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 , daily_sigma: 0.018, crisis_weight: 0.0, dividend_payout: 0.58 },
+    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 , daily_sigma: 0.015, crisis_weight: 0.0, dividend_payout: 0.4 },
+    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 , daily_sigma: 0.018, crisis_weight: 0.0, dividend_payout: 0.4 },
+    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 , daily_sigma: 0.008, crisis_weight: 0.0, dividend_payout: 0.52 },
+    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 , daily_sigma: 0.015, crisis_weight: 0.0, dividend_payout: 0.32 },
+    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 , daily_sigma: 0.015, crisis_weight: 0.0, dividend_payout: 0.29 },
+    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 , daily_sigma: 0.008, crisis_weight: 0.0, dividend_payout: 1.0 },
+    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 , daily_sigma: 0.008, crisis_weight: 0.0, dividend_payout: 0.53 },
+    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 , daily_sigma: 0.01, crisis_weight: 0.0, dividend_payout: 0.63 },
+    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 , daily_sigma: 0.015, crisis_weight: 0.0, dividend_payout: 0.42 },
 ];
 
 /// Look up a sector by key.

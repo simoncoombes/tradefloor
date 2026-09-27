@@ -427,6 +427,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),
+    # A scale on each sector's dividend payout; 0.0 is no dividend, 1.0 is
+    # the sector payouts as measured, and 2.0 doubles them (each name's
+    # payout is capped at the whole of its earnings).
+    "dividend_payout_share": (0.0, 2.0),
+    # A switch: 1 reads buyback_payout_share as the total payout, so a
+    # dividend substitutes for buybacks.
+    "dividend_buyback_substitution": (0.0, 1.0),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
@@ -490,8 +497,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # era declares, and 1.0 returns the whole of earnings every year. Past
     # that a company returns more than it earns, which is a claim about
     # leverage this model does not carry, so the box is the closed unit
-    # interval and its top is where the earnings run out.
-    "buyback_payout_share": (0.0, 1.0),
+    # interval and its top is where the earnings run out -- except under
+    # `dividend_buyback_substitution`, where this is the TOTAL payout
+    # (dividends and buybacks, about 0.8 of earnings on the S&P 500 over
+    # 2001-2025) and a name's buyback share is it less the name's own
+    # dividend payout, so the box reaches 1.5.
+    "buyback_payout_share": (0.0, 1.5),
     # The overnight move's variance as a fraction of a session's. 0.0 is no
     # overnight process, which is every earlier preset; 1.0 is a night as
     # large as a session, above anything the real panel reads; past it the
@@ -731,6 +742,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The dividend's companions, read only with `dividend_payout_share`
+    # set. The ceiling is a multiple of the target yield and 1.0 is its
+    # floor (a cut whenever the yield rises at all); the cutoff a revenue
+    # growth rate; the speed an annual Lintner speed, of which S&P 500 fits
+    # on earnings give 0.1 to 0.4.
+    "dividend_yield_ceiling": (1.0, 4.0),
+    "dividend_growth_cutoff": (0.1, 1.0),
+    "dividend_adjustment_speed": (0.1, 1.0),
     # The stop and squeeze ladders' scale: 1.0 on every preset through
     # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
     # The whole unit range, off to full.

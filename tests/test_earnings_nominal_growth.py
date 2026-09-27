@@ -181,7 +181,8 @@ def _buyback_scale(share: float, grown_eps: float, price: float,
 
 def _derived(instrument, economy, scale: float, model, *,
              price: float | None = None, day: int | None = None,
-             log_shares: float = 0.0) -> float:
+             log_shares: float = 0.0,
+             dividend: tuple[float, float] | None = None) -> float:
     """Fair value rebuilt from the coefficients the engine under test runs.
 
     NOT through ``tradefloor.fair_value``. That helper delegates to the
@@ -229,6 +230,16 @@ def _derived(instrument, economy, scale: float, model, *,
         * p["rate_pe_sensitivity"] * duration)
     qe_adjustment = 1.0 + p["qe_pe_gain"] * economy["qe_pe_boost"]
 
+    # The dividend (`dividend_payout_share`): the name's payout and the
+    # accrual fair value carries today, read from the engine's dividend
+    # state. Under `dividend_buyback_substitution` the buyback term reads
+    # the payout share less the name's dividend payout, in the term that
+    # stood and in the accrual alike.
+    payout, accrual = dividend if dividend is not None else (0.0, 0.0)
+    share = p["buyback_payout_share"]
+    if (p["dividend_payout_share"] != 0.0
+            and p["dividend_buyback_substitution"] != 0.0):
+        share = max(0.0, share - payout)
     if price is None:
         buyback = 1.0
     elif p["buyback_accrual"] != 0.0:
@@ -238,10 +249,15 @@ def _derived(instrument, economy, scale: float, model, *,
         buyback = math.exp(log_shares) if log_shares != 0.0 else 1.0
     else:
         buyback = _buyback_scale(
-            p["buyback_payout_share"], instrument.eps * scale, price, day,
+            share, instrument.eps * scale, price, day,
             p["buyback_yield_cap"])
     total = scale * buyback
+    value = _valued(instrument, p, total, rate_adjustment, qe_adjustment)
+    return value + accrual if accrual != 0.0 else value
 
+
+def _valued(instrument, p, total, rate_adjustment, qe_adjustment):
+    """The valuation on earnings and book scaled by `total`."""
     eps = instrument.eps * total
     if eps > 0.0:
         target_pe = _anchor(instrument.sector) * rate_adjustment * qe_adjustment
@@ -656,6 +672,10 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
                 "process to move it, so the number below is not the one "
                 "the tick read")
         opening = struct.unpack("<%dd" % names, after)
+        # The dividend states the open set: each name's payout and the
+        # accrual its fair value carries today. Absent without dividends.
+        raw = engine.state_snapshot().get("dividend")
+        states = struct.unpack("<%dd" % (len(raw) // 8), raw) if raw else None
         engine.run_session(9, 30, 3, probe_ticks)
         engine.record(1)
         path = struct.unpack("<%dd" % (probe_ticks * names),
@@ -670,9 +690,12 @@ def test_the_derivation_tracks_every_parameter_that_reaches_the_valuation():
             # terms. At a payout share of zero the factor is exactly 1.0 by
             # its own branch, which makes the first pass below identical to
             # deriving the nominal term alone.
+            dividend = None
+            if states is not None and states[7 * slot] == states[7 * slot]:
+                dividend = (states[7 * slot], states[7 * slot + 5])
             want = _derived(universe[slot], economy, scale, model,
                             price=price, day=1,
-                            log_shares=log_shares[slot])
+                            log_shares=log_shares[slot], dividend=dividend)
             if got != pytest.approx(want, rel=1e-9):
                 return False, (slot, got, want)
         return True, None

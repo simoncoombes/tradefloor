@@ -339,7 +339,7 @@ class World:
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
-                 "trusted_agents", "tampered")
+                 "trusted_agents", "tampered", "_dividends_today")
 
     def __init__(
         self,
@@ -421,6 +421,10 @@ class World:
                            owner=key or "agent")
             for key in self._agents}
         self.trace: list[dict[str, Any]] = []
+        # The cash dividends each portfolio collected at today's open,
+        # carried to the day's first trace row and cleared there; None when
+        # nothing went ex, which is every day on a model without dividends.
+        self._dividends_today: dict[str, float] | None = None
         self.rejected: list[str] = []
         # The step this world was forked at, or None for a root. It is
         # what lets a comparison quote the window the intervention acted
@@ -659,6 +663,12 @@ class World:
             self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
             self.engine.open_market()
+            # The cash dividends this open made payable, into each
+            # portfolio in label order before any agent is asked, as
+            # `evaluate` collects them. Nothing on a model without dividends.
+            paid = {label: self._portfolios[label].collect_dividends(self.engine)
+                    for label in self._agents}
+            self._dividends_today = paid if any(paid.values()) else None
 
             for _ in range(self.steps_per_day):
                 prices = _f64(self.engine.prices())
@@ -801,6 +811,10 @@ class World:
             {k: f[k] for k in ("ticker", "order_id", "side", "quantity",
                                "price", "liquidity", "counterparty", "tick")}
             for f in fills] for label, fills in (synced or {}).items() if fills}
+        # The cash dividends collected at the day's open, on the day's first
+        # row only, and only when any were: a row of a model without
+        # dividends is the row it always was.
+        paid, self._dividends_today = self._dividends_today, None
         if not self._single:
             row["prices"] = prices
             row["agents"] = {label: self._fields(label, asked, done)
@@ -809,6 +823,9 @@ class World:
                 row["agents"][label]["book_fills"] = fills
             if arrival is not None:
                 row["arrival"] = list(arrival)
+            if paid:
+                for label, amount in paid.items():
+                    row["agents"][label]["dividends"] = amount
             return row
         fields = self._fields(SOLO, asked, done)
         for name in ("decision", "orders", "fills", "refused", "unusable"):
@@ -818,6 +835,8 @@ class World:
             row[name] = fields[name]
         if SOLO in book_fills:
             row["book_fills"] = book_fills[SOLO]
+        if paid:
+            row["dividends"] = paid[SOLO]
         return row
 
     def _fields(self, label: str, asked: dict, done: dict) -> dict[str, Any]:
@@ -1228,6 +1247,8 @@ class World:
             child._expected = copy.deepcopy(self._expected)
             child._day = self._day
             child._step = self._step
+            child._dividends_today = (dict(self._dividends_today)
+                                      if self._dividends_today else None)
             child.fork_step = self._step
             child._fork_worth = dict(worth_at_fork)
             out.append(child)

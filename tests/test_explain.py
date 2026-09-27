@@ -72,11 +72,11 @@ def test_the_contributions_are_the_declared_eleven_and_nothing_else():
     _, result = one()
     names = [child.name for child in result.root.children]
     assert names == list(ex.CONTRIBUTIONS)
-    assert list(ex.CONTRIBUTIONS)[:11] == list(tf.Engine.FACTORS)
+    assert list(ex.CONTRIBUTIONS)[:12] == list(tf.Engine.FACTORS)
     # pt-v20's close re-marks the price after the last print
     # (`macro_publication_repricing`), and `repricing` is that re-mark's
-    # change over the day, so the fourteen reach the price the engine holds.
-    assert list(ex.CONTRIBUTIONS)[11:] == ["fair_value", "book", "repricing"]
+    # change over the day, so the fifteen reach the price the engine holds.
+    assert list(ex.CONTRIBUTIONS)[12:] == ["fair_value", "book", "repricing"]
     assert all(child.kind == "factor" for child in result.root.children)
     assert result.root.kind == "move"
 
@@ -934,8 +934,10 @@ HAS_PRINTS = hasattr(tf.Engine, "prints")
 #:
 #: The two threes are pt-v20's: the fair-value shift's factor, mechanism
 #: and state nodes, then the close's re-mark's (`repricing`), the same
-#: three. Neither takes a draw, so neither adds a replay overlay.
-WALK_NODES = (55 + 8 + 3 + 3) if HAS_PRINTS else (53 + 8 + 3 + 3)
+#: three. Neither takes a draw, so neither adds a replay overlay. The five
+#: after them are the dividend's (`dividend_payout_share`): its factor,
+#: mechanism and three state nodes, no draw, so no overlay either.
+WALK_NODES = (55 + 8 + 3 + 3 + 5) if HAS_PRINTS else (53 + 8 + 3 + 3 + 5)
 needs_prints = pytest.mark.skipif(
     not HAS_PRINTS, reason="Engine.prints() is not on this build")
 
@@ -1530,8 +1532,9 @@ def test_the_table_covers_every_contribution_once():
     # Twelve since the overnight move joined the ten tape columns.
     # Thirteen since pt-v20's fair-value shift joined them.
     # Fourteen since pt-v20's close's re-mark joined them.
-    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 14
-    assert len({m.factor for m in ex.MECHANISMS}) == 14
+    # Fifteen since the dividend's ex-date move joined them.
+    assert len(ex.MECHANISMS) == len(ex.CONTRIBUTIONS) == 15
+    assert len({m.factor for m in ex.MECHANISMS}) == 15
 
 
 def test_every_mechanism_names_a_rust_function_that_exists():
@@ -1580,6 +1583,9 @@ EXPECTED = {
                   ("mispricing_s", "mispricing_s_prev_close", "price")),
     "fair_value_shift": (("fair_value_news_share", "fair_value_market_share"),
                          ("mispricing_s",)),
+    "dividend": (("dividend_payout_share", "dividend_adjustment_speed",
+                  "dividend_yield_ceiling"),
+                 ("mispricing_s", "mispricing_s_prev_close", "price")),
     "fair_value": (("fair_value_book_floor", "qe_pe_gain",
                     "qe_pe_stock_gain", "earnings_nominal_growth"), ()),
     "book": ((), ("price",)),
@@ -1631,8 +1637,9 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # 45 and eleven since the fair-value shift's two joined.
     # 48 and twelve since the close's re-mark joined with its three: the
     # switch, and the buyback share and hard cap its fixed point reads.
-    assert declared == 48
-    assert sum(1 for m in ex.MECHANISMS if m.dials) == 12
+    # 51 and thirteen since the dividend joined with its three.
+    assert declared == 51
+    assert sum(1 for m in ex.MECHANISMS if m.dials) == 13
 
 
 def test_every_declared_state_field_is_a_column_that_its_rust_reads():
@@ -1647,8 +1654,9 @@ def test_every_declared_state_field_is_a_column_that_its_rust_reads():
     # 18 since the overnight move's three state fields joined.
     # 19 and eleven since the fair-value shift's one joined.
     # 20 and twelve since the close's re-mark joined with the price.
-    assert declared == 20
-    assert sum(1 for m in ex.MECHANISMS if m.state) == 12
+    # 23 and thirteen since the dividend joined with its three.
+    assert declared == 23
+    assert sum(1 for m in ex.MECHANISMS if m.state) == 13
 
 
 def test_every_declared_macro_field_is_a_macro_field_that_its_rust_reads():
