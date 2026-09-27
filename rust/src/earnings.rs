@@ -127,14 +127,24 @@ pub fn surprise_unit(key: u64, name: u64, quarter: i64, df: f64) -> f64 {
     unit_t(&mut keyed(key, name, quarter, SLOT_SURPRISE), df)
 }
 
-/// The reaction session's own discovery, a standard normal.
-pub fn session_unit(key: u64, name: u64, quarter: i64) -> f64 {
-    keyed(key, name, quarter, SLOT_SESSION).next_normal()
+/// A (quarter, slot) word with an open minute in bits 40 and up: the
+/// quarter sits below bit 40 for any run shorter than 2^31 quarters, so no
+/// minute's word is another slot's.
+fn minute_word(quarter: i64, slot: u64, minute: i64) -> u64 {
+    word(quarter, slot) ^ (((minute as u64) + 1) << 40)
 }
 
-/// The session after's follow-through, a standard normal.
-pub fn followthrough_unit(key: u64, name: u64, quarter: i64) -> f64 {
-    keyed(key, name, quarter, SLOT_FOLLOWTHROUGH).next_normal()
+/// The reaction session's own discovery at open minute `minute` (0 at
+/// 9:30), a standard normal: the session walks it into fair value one
+/// minute at a time (`Engine::walk_earnings_sessions`).
+pub fn session_unit(key: u64, name: u64, quarter: i64, minute: i64) -> f64 {
+    GameRng::keyed(key, name, minute_word(quarter, SLOT_SESSION, minute)).next_normal()
+}
+
+/// The session after's follow-through at open minute `minute`, a standard
+/// normal, walked in the same way.
+pub fn followthrough_unit(key: u64, name: u64, quarter: i64, minute: i64) -> f64 {
+    GameRng::keyed(key, name, minute_word(quarter, SLOT_FOLLOWTHROUGH, minute)).next_normal()
 }
 
 #[allow(dead_code)]
@@ -183,6 +193,24 @@ mod tests {
             assert!(m.abs() < 0.03, "mean {m}");
             assert!((v - 1.0).abs() < 0.08, "df {df} variance {v}");
         }
+    }
+
+    #[test]
+    fn the_minute_walks_are_independent_unit_normals() {
+        // Distinct minutes, parts and quarters give distinct draws, and a
+        // session's 390 minutes sum to about one sd of 390^0.5.
+        let h = id_hash("X");
+        assert_ne!(session_unit(7, h, 3, 0), session_unit(7, h, 3, 1));
+        assert_ne!(session_unit(7, h, 3, 5), followthrough_unit(7, h, 3, 5));
+        assert_ne!(session_unit(7, h, 3, 5), session_unit(7, h, 4, 5));
+        let n = 400;
+        let mut s2 = 0.0;
+        for q in 0..n {
+            let day: f64 = (0..390).map(|m| session_unit(11, h, q, m)).sum();
+            s2 += day * day / 390.0;
+        }
+        let v = s2 / n as f64;
+        assert!((v - 1.0).abs() < 0.2, "variance of a session's walk {v}");
     }
 
     #[test]

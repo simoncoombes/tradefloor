@@ -4,9 +4,11 @@ Each public company reports once a quarter, on a reaction session drawn from
 the forty real names' offsets into the quarter (EDGAR 8-K Item 2.02, 2015-2025)
 with a jitter of up to three sessions. The report's surprise is realised at
 that session's OPENING PRINT, the reaction session's own discovery and the
-next session's follow-through join fair value after the print, and the
-reaction session trades a multiple of its volume. The calendar is public, as a
-real one is: `Engine.earnings_calendar()` lists the dates ahead, and nothing
+next session's follow-through are walked into fair value minute by minute
+through those sessions, and the reaction session trades a multiple of its
+volume. The calendar is public, as a real one is: `Engine.earnings_calendar()`
+lists the dates ahead, every harness's market view serves them and the
+framework adapters' payload carries each name's next report, and nothing
 about a surprise is readable before the open that prints it.
 
 These tests hold that it is off on every preset, that the calendar is one
@@ -28,6 +30,9 @@ from tradefloor import manifest
 UNIVERSE = tf.Universe.random(8, seed=11)
 ARM = {"overnight_market_share": 0.55, "overnight_idio_share": 0.2,
        "earnings_surprise_sigma": 3.1, "earnings_surprise_df": 4.0}
+
+
+UNIVERSE_TICKERS = [i.ticker for i in UNIVERSE]
 
 
 def floats(raw):
@@ -137,24 +142,152 @@ def test_every_surprise_is_realised_at_the_opening_print_and_only_there():
         assert abs(g - x) < 0.015 + 0.05 * abs(x)
 
 
-def test_the_session_and_the_day_after_trade_their_parts_in():
-    # On the same seed the calendar and every draw before the first report
-    # agree; the reaction session's own part and the follow-through leave
-    # the open alone and move the session.
-    arms = [engine(), engine(earnings_session_sigma=1.5, earnings_followthrough_sigma=1.1)]
-    cal = arms[0].earnings_calendar(horizon=63)
+def _lockstep(dials, days, ticks=390):
+    """A base arm and an arm with `dials`, run together: per day, per arm,
+    the open and every tick's prices."""
+    arms = [engine(), engine(**dials)]
+    cal = arms[0].earnings_calendar(horizon=days)
+    n = len(UNIVERSE)
+    tape = []
+    for _ in range(days):
+        row = []
+        for x in arms:
+            x.open_market()
+            opens = floats(x.column("open"))[:n]
+            x.run_session(9, 30, 3, ticks)
+            ticks_ = floats(x.session_prices())
+            k = len(ticks_) // ticks
+            row.append((opens, [ticks_[t * k:t * k + n] for t in range(ticks)]))
+            x.close_market()
+        tape.append(row)
+    return cal, tape
+
+
+def test_the_reaction_session_walks_its_part_in():
+    # `earnings_session_sigma` is the reaction session's own discovery. It
+    # leaves the open alone and is walked into fair value minute by minute,
+    # so the session trades it in: the first tick carries 1/390 of it at the
+    # open's intraday weight, not the whole of it. The review of 50dfeed
+    # measured the first tick carrying 1.15 times the reaction session's
+    # idiosyncratic variance when the part joined fair value in one piece.
+    cal, tape = _lockstep({"earnings_session_sigma": 1.5}, days=12)
+    tickers = list(UNIVERSE_TICKERS)
     first = min(r["session"] for r in cal)
-    names = [list(arms[0].tickers).index(r["ticker"]) for r in cal if r["session"] == first]
-    for x in arms:
-        x.run_days(first, record=False, ticks_per_day=30)
-        x.open_market()
-    a, b = (floats(x.column("open")) for x in arms)
-    assert a == b
-    for x in arms:
-        x.run_session(9, 30, 3, 30)
-    a, b = (floats(x.prices()) for x in arms)
-    for i in names:
-        assert a[i] != b[i]
+    names = [tickers.index(r["ticker"]) for r in cal if r["session"] == first]
+    assert names
+    for day in range(first + 1):
+        (oa, ta), (ob, tb) = tape[day]
+        assert oa == ob
+        if day < first:
+            assert ta == tb
+    (_, ta), (_, tb) = tape[first]
+    for i in range(len(UNIVERSE)):
+        d = [math.log(b[i] / a[i]) for a, b in zip(ta, tb)]
+        if i not in names:
+            assert d == [0.0] * len(d)
+            continue
+        steps = [d[0]] + [y - x for x, y in zip(d, d[1:])]
+        walked = sum(x * x for x in steps)
+        # About 1/390 of the walk's variance at the open's weight of 1.2^2
+        # over the session's mean of about 1.03; a first-tick jump is 1.
+        assert d[0] * d[0] / walked < 0.03
+        # A walk, not a drift: the steps' own sizes carry the variance.
+        assert max(abs(x) for x in steps) < 0.25 * math.sqrt(walked)
+
+
+def test_the_follow_through_moves_the_session_after_and_not_the_reaction_session():
+    # `earnings_followthrough_sigma` is walked in on the session AFTER the
+    # reaction session: the reaction session is the base arm's to the tick
+    # and the session after is not. The review of 50dfeed found no test that
+    # would fail if the follow-through never ran.
+    cal, tape = _lockstep({"earnings_followthrough_sigma": 1.1}, days=12)
+    tickers = list(UNIVERSE_TICKERS)
+    first = min(r["session"] for r in cal)
+    names = {tickers.index(r["ticker"]) for r in cal if r["session"] == first}
+    for day in range(first + 1):
+        assert tape[day][0] == tape[day][1]
+    (oa, ta), (ob, tb) = tape[first + 1]
+    assert oa == ob
+    for i in range(len(UNIVERSE)):
+        moved = [a[i] != b[i] for a, b in zip(ta, tb)]
+        if i in names:
+            # Prints are in cents, so a minute's step can leave one alone.
+            assert sum(moved) > 0.9 * len(moved)
+        else:
+            assert not any(moved)
+
+
+def test_the_calendar_is_public_to_agents_and_the_surprise_is_not():
+    # The calendar is what a real company announces, so every harness's
+    # read-only market view serves it and the framework adapters' payload
+    # says how far off each name's next report is. What the open realised
+    # of the surprise is refused. On a model without the calendar the
+    # payload is the one it was.
+    from tradefloor import sandbox
+    from tradefloor.integrations import common
+
+    e = engine()
+    e.run_days(3, record=False, ticks_per_day=30)
+    view = sandbox.MarketView(e)
+    assert view.earnings_calendar(40) == e.earnings_calendar(40) != []
+    with pytest.raises(sandbox.SandboxError):
+        view.earnings_surprises()
+    assert "earnings_surprises" in sandbox.HIDDEN_STATE
+
+    seen = {}
+
+    class Reader:
+        def act(self, obs):
+            seen.setdefault("calendar", obs.engine.earnings_calendar())
+            seen.setdefault("payload", common.serialize_observation(obs))
+            return {}
+
+    arm = tf.ModelParams.from_preset("pt-v20", **ARM)
+    card = tf.evaluate({"reader": Reader()}, seed=7, universe=UNIVERSE, model=arm, days=1)
+    assert not card["reader"].errors
+    nxt = {}
+    for r in seen["calendar"]:
+        nxt.setdefault(r["ticker"], r["sessions_ahead"])
+    assert nxt
+    for asset in seen["payload"]["assets"]:
+        assert asset["next_earnings_in_sessions"] == nxt.get(asset["symbol"])
+
+    seen.clear()
+    tf.evaluate({"reader": Reader()}, seed=7, universe=UNIVERSE, model="pt-v20", days=1)
+    assert seen["calendar"] == []
+    assert all("next_earnings_in_sessions" not in a for a in seen["payload"]["assets"])
+
+
+def test_the_public_calendar_carries_no_return_signal():
+    # The calendar is public, so it must not tell a trader which way a
+    # report goes: the surprise, the session's part and the follow-through
+    # are each mean one in level. Over many reports, the mean log move of a
+    # reaction session's open against the last close is its Ito term and
+    # nothing more, well inside its standard error of zero, and the session
+    # before a report does not drift.
+    cal_e = engine(earnings_session_sigma=1.9, earnings_followthrough_sigma=1.1)
+    tickers = list(cal_e.tickers)
+    n = len(tickers)
+    days = 252
+    cal = {(tickers.index(r["ticker"]), r["session"])
+           for r in cal_e.earnings_calendar(horizon=days)}
+    gaps, before = [], []
+    for day in range(days):
+        closes = floats(cal_e.prices())[:n]
+        cal_e.open_market()
+        opens = floats(cal_e.column("open"))[:n]
+        cal_e.run_session(9, 30, 3, 30)
+        ends = floats(cal_e.prices())[:n]
+        cal_e.close_market()
+        for i in range(n):
+            if (i, day) in cal:
+                gaps.append(math.log(opens[i] / closes[i]))
+            if (i, day + 1) in cal:
+                before.append(math.log(ends[i] / opens[i]))
+    for xs in (gaps, before):
+        m = sum(xs) / len(xs)
+        sd = math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1))
+        assert abs(m) < 3.0 * sd / math.sqrt(len(xs)), (m, sd, len(xs))
 
 
 def test_the_reaction_session_trades_its_volume_multiple():

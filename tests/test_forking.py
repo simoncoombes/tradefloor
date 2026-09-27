@@ -1261,6 +1261,14 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_earnings_calendar.py::test_the_key_is_carried_only_while_"
         "the_calendar_runs restores into an engine built from another seed, "
         "where a snapshot without it reports on other dates.",
+    "night_market_factor":
+        "tonight's market draw, which the session's live lagged wire takes "
+        "off the day's factor. Dropped, the wire reads the whole day's "
+        "factor, and only a tick where the two have opposite signs prices "
+        "differently; at this model's wire (tilt 0.025, lag 0.46) and night "
+        "the rest of this session holds none. tests/test_overnight_split.py::"
+        "test_a_restore_mid_session_keys_the_live_wire_on_the_session "
+        "exaggerates the wire and restores without it, and diverges.",
     "jump_move":
         "the jump waiting to be traded in, read by the volume scale only off "
         "`volume_move_jump_share` 1.0 and without a night split. This model "

@@ -3858,6 +3858,12 @@ impl PyEngine {
         if self.inner.carries_earnings_withheld() {
             out.set_item("earnings_withheld", f64_bytes(py, self.inner.earnings_withheld()))?;
         }
+        // Tonight's market draw under a night split, only while the
+        // session's live lagged wire reads it: a fork taken mid-session
+        // needs it to key the wire on the session's own draws.
+        if self.inner.carries_night_market_factor() {
+            out.set_item("night_market_factor", self.inner.night_market_factor())?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -4347,6 +4353,10 @@ impl PyEngine {
         if let Some(v) = snapshot.get_item("earnings_key")? {
             let key: u64 = v.extract()?;
             self.inner.set_earnings_key(key);
+        }
+        if let Some(v) = snapshot.get_item("night_market_factor")? {
+            let value: f64 = v.extract()?;
+            self.inner.set_night_market_factor(value);
         }
         if let Some(raw) = snapshot.get_item("earnings_withheld")? {
             let bytes: &[u8] = raw.extract()?;

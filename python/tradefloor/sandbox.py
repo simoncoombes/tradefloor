@@ -20,6 +20,10 @@ and nothing else:
 - which names and sectors have news today, without the size or direction of
   the move, because the engine's own field is the move the story will have
   made by the close
+- the earnings calendar (``earnings_calendar``): which names report and on
+  which session, as a real company announces its date. Dates only: the
+  surprise is realised at the reaction session's opening print, and what it
+  was (``earnings_surprises``) is not served
 - the agent's own portfolio, through :class:`PortfolioView`, which reads and
   cannot trade or write
 
@@ -152,6 +156,9 @@ HIDDEN_STATE = {
     "model_params": "the model's dials, the cycle's hazards among them",
     "macro_table": "the full macro path, the true phase included",
     "fork": "a copy of the market that can be run ahead: look-ahead",
+    "earnings_surprises": "each report's surprise as the opening print "
+                          "realised it, split from the night's own move: "
+                          "the price shows the gap, not what caused it",
 }
 
 _OPT_IN = ("Agents see a read-only market view. An agent that needs hidden "
@@ -303,6 +310,21 @@ class MarketView:
                  "day": e.get("day")}
                 for e in self.__engine.session_news()]
 
+    def earnings_calendar(self, horizon: int = 63) -> list[dict[str, Any]]:
+        """``Engine.earnings_calendar``: the reports ahead, dates only.
+
+        One dict per report in the next ``horizon`` sessions, with
+        ``ticker``, ``session`` (the reaction session, the first to trade the
+        report) and ``sessions_ahead`` (0 is the session now open, or the
+        next to open when the market is closed), ordered by session. A real
+        company announces its date weeks ahead, so a trader deciding whether
+        to hold a name through its report can read it here. The surprise is
+        a draw nobody reads before the reaction session's opening print
+        realises it, and nothing here reads it. Empty on a model without the
+        calendar (``earnings_surprise_sigma`` 0.0, every shipped preset).
+        """
+        return [dict(row) for row in self.__engine.earnings_calendar(horizon)]
+
     # -- identity and the clock -------------------------------------------
 
     @property
@@ -377,6 +399,11 @@ class HiddenState(MarketView):
 
     def truth(self, **kwargs: Any):
         return self.__raw.truth(**kwargs)
+
+    def earnings_surprises(self) -> bytes:
+        """``Engine.earnings_surprises``: the surprise each name's opening
+        print realised at the last open."""
+        return self.__raw.earnings_surprises()
 
     def __getattr__(self, name: str) -> Any:
         raise _refuse("hidden state", name)

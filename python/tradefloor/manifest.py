@@ -469,7 +469,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The earnings calendar's key, only with the calendar on, and what
          # names hold back of the cycle for their reports, only while that
          # share runs.
-         "earnings_key", "earnings_withheld"}
+         "earnings_key", "earnings_withheld",
+         # Tonight's market draw under a night split, only while the
+         # session's live lagged wire reads it.
+         "night_market_factor"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -606,6 +609,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # Tonight's market draw, only while the live lagged wire reads it.
+    if "night_market_factor" in snapshot:
+        _f64(buf, snapshot["night_market_factor"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:

@@ -834,13 +834,21 @@ pub struct ModelParams {
     /// volatility from 17.4 to 33 per cent in the earnings-gaps prototype.
     ///
     /// The night's market draw takes the session's down tilt and lagged
-    /// wire, with the tilt's mean given back, but not the crash amplifier:
-    /// one draw carrying half the day's variance crosses the amplifier's
-    /// threshold far more often than 390 tick draws do. Under
+    /// wire, with the tilt's mean given back and ALL of the mean the lagged
+    /// wire's multiple adds (whatever `market_beta_down_asym_lag_recentre`
+    /// says), but not the crash amplifier: one draw carrying half the day's
+    /// variance crosses the amplifier's threshold far more often than 390
+    /// tick draws do. The session's live lagged-wire condition
+    /// (`market_beta_down_asym_lag_live`) reads the day's factor less the
+    /// night's draw. Both keep the session from following the gap: with the
+    /// night on pt-v20's un-recentred wire and in its live condition, the
+    /// equal-weight session return's slope on the night's was +0.099
+    /// against a real +0.022 (the review of 50dfeed). Under
     /// `fair_value_market_linear` only its plain loading is permanent, as
-    /// the tick's is. Real large caps carry about 0.46 of the forty-name
-    /// index's variance overnight (2015-2025, cap-weighted). Refused beside
-    /// `overnight_variance_ratio`. In [0, 0.9].
+    /// the tick's is. Real large caps carry about 0.46 of the forty names'
+    /// equal-weighted market variance overnight (2015-2025, the mean of the
+    /// names' log returns). Refused beside `overnight_variance_ratio`. In
+    /// [0, 0.9].
     pub overnight_market_share: f64,
     /// The night's share of the day's SECTOR and IDIOSYNCRATIC variance, as
     /// `overnight_market_share` is of the market's: drawn at `sqrt(w)` at
@@ -899,13 +907,18 @@ pub struct ModelParams {
     /// `earnings_surprise_sigma` non-zero.
     pub earnings_surprise_df: f64,
     /// The reaction session's own discovery, in the surprise's units: a
-    /// normal part, mean one in level, joins the name's fair-value level
-    /// right after the reaction session's opening print, so the session
-    /// trades it in rather than the open printing it. 0.0 is none. Read only
-    /// with `earnings_surprise_sigma` non-zero. In [0, 20].
+    /// normal part, mean one in level, walked into the name's fair-value
+    /// level one open minute at a time through the reaction session, at the
+    /// intraday volatility profile's weights, so the session trades it in as
+    /// it arrives: no drift, and the first tick carries about 1/390 of it
+    /// (`Engine::walk_earnings_sessions`; the draws keyed on the minute).
+    /// Until the review of 50dfeed it joined fair value in one piece after
+    /// the opening print and printed on the first tick. 0.0 is none. Read
+    /// only with `earnings_surprise_sigma` non-zero. In [0, 20].
     pub earnings_session_sigma: f64,
-    /// The same on the session after the reaction session: the real
-    /// day-after idiosyncratic variance is 1.71 times a normal day's
+    /// The same on the session after the reaction session, walked in the
+    /// same way: the real day-after idiosyncratic variance is 1.71 times a
+    /// normal day's
     /// (bootstrap 1.34 to 2.14). 0.0 is none. Read only with
     /// `earnings_surprise_sigma` non-zero. In [0, 20].
     pub earnings_followthrough_sigma: f64,
