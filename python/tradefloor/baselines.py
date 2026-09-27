@@ -310,6 +310,13 @@ class _Trend:
     ``obs.steps_per_day`` on the first observation, so it holds whatever the
     harness is configured to do.
 
+    Under ``evaluate(history_days=...)`` the window is filled from
+    ``obs.history`` on each run's first observation, so the agent trades from
+    the first step instead of holding cash for ``lookback`` steps. Without a
+    pre-history the window is the agent's own memory and is never reset: an
+    agent object reused across evaluations starts the second with the
+    first's prices, as it always has. Build a fresh agent per evaluation.
+
     ## Rebalancing more often costs more than the signal is worth
 
     Measured on this build, via ``evaluate({'m': Momentum(lookback_days=1.0)},
@@ -361,6 +368,15 @@ class _Trend:
             steps = self.lookback_days * getattr(obs, "steps_per_day", 1)
             self.lookback = max(1, int(round(steps)))
             self.lookback_days = None
+        past = getattr(obs, "history", None)
+        if past is not None and (obs.step == 0 or not self._history):
+            # A run with a pre-history: the window starts full, with the
+            # prices this agent would have been shown had it been trading
+            # then, so the first scored step already has a signal. Refilled
+            # on every run's first step, so an agent object reused across
+            # evaluations does not carry the last run's window into this one.
+            self._history = past.window(self.lookback,
+                                        getattr(obs, "steps_per_day", 1))
         self._history.append(list(obs.prices))
         if len(self._history) <= self.lookback:
             # No signal yet. Holding cash is the honest answer; guessing would
