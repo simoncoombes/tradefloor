@@ -770,6 +770,8 @@ PARAM_SPECS: dict[str, dict] = {
                             "hard_range": (0.0, 1.0), "derived": False},
     "book_depth_reach": {"kind": "abs", "step_unit": 0.25,
                          "hard_range": (0.0, 10.0), "derived": False},
+    "book_depth_nesting": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": False},
     "book_shared": {"kind": "abs", "step_unit": 1.0,
                     "hard_range": (0.0, 1.0), "derived": False},
     "book_refill_half_life": {"kind": "abs", "step_unit": 1.0,

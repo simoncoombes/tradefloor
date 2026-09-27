@@ -268,6 +268,19 @@ so no round trip earns the displacement. Every preset, pt-v20 included,
 carries 0.0, and every known-answer digest is unchanged; the values are for
 a new registration (`tools/calibration/metaorder_curve.py` measures them).
 
+`book_depth_nesting` counts the maker's ladder as the front of the latent
+book. At 0.0, which every preset carries, the latent pool sits beside the
+ladder and the two books' depth adds up, so a block of 3% of daily volume
+fills mostly from the ladder and pays little beyond the half-spread; with
+the memory on, a day TWAP then costs 0.83 of such a block, where the
+literature puts 0.5 to 0.8. At 1.0 the depth within any distance of the
+touch is the larger of the ladder's and the law's: a block past the ladder
+pays the law, and a slice inside the ladder's first level pays what it did.
+On the r14 screen's closest candidate the day TWAP then costs 0.68 of a
+block at 3% and 0.64 at 10%, and the cost of size fits 0.469 sigma
+(Q/V)^0.456. Every known-answer digest is unchanged; the value is for a new
+registration.
+
 `vix_stress_premium`, `vix_stress_premium_knee` and `vix_stress_premium_cap`
 lift the published VIX in stress, where the damped VIX state reads too low
 against realised volatility. The quote is the state times
