@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v4",
   "fingerprint": "pt-v4",
-  "coefficient_digest": "469037e6773560ac781953419dc67c45039c56d0b301d652156181991bc188cb",
+  "coefficient_digest": "c4ebbf7cc823469c072a44534dafe830d564379bc39bb20982c3176aff778f9a",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
@@ -171,6 +171,7 @@
     "market_vol_leverage": 0.0,
     "market_vol_leverage_down": 0.0,
     "market_vol_leverage_half_life": 0.0,
+    "market_vol_leverage_standardise": 0.0,
     "market_vol_slow_gain": 0.0,
     "market_vol_slow_gamma": 0.0,
     "market_vol_slow_persistence": 0.0,
