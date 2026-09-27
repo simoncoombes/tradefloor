@@ -1941,8 +1941,9 @@ $0.42 f^{1.04}\sigma$ for $f = Q/\bar A_i$, and 99% of it is still there at
 the close (`tools/calibration/metaorder_curve.py`). The square-root law is
 concave and about a third of the peak is gone by the close (Bucci,
 Benzaquen, Lillo and Bouchaud 2019). With $Y_M > 0$ each name keeps a
-signed memory of all agents' net taker flow in fractions of $\bar A_i$, a
-fast part and a slow part, decaying on open ticks only:
+signed memory of all agents' net taker flow against the house (the maker
+and the latent depth) in fractions of $\bar A_i$, a fast part and a slow
+part, decaying on open ticks only:
 
 ```math
 M^{f}_{t+1} = M^{f}_t\,2^{-1/H_1} + \frac{b - x}{\bar A_i},\qquad
@@ -1963,6 +1964,14 @@ distance. The linear $\gamma$ stays as the long-lived part.
 (`agent_book.rs`, `MemoryBound` and `append_latent_depth`;
 `engine.rs`, `plan_memory`.)
 
+With the memory on, a fill between two agents (one lifts the other's
+resting order) is not flow to the market: it feeds neither the memory nor
+$\gamma$ (nor the imbalance law). It took no liquidity from the house,
+the resting order had just added what it took, and the pair's cash nets
+to zero, so counting the taker's side would let one agent rest an ask a
+cent inside the spread and another lift it to walk the tape at no cost.
+Off, every share an agent takes is flow, as before.
+
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
 | $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.487 and coefficient 0.468 |
@@ -1976,7 +1985,7 @@ distance. The linear $\gamma$ stays as the long-lived part.
 | $H_1$ | `impact_memory_half_life` | 0 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
 | $H_2$ | `impact_memory_slow_half_life` | 0 (none) | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
 | $w$ | `impact_memory_slow_weight` | 0 | for a new registration | the slow part's weight; refused without $H_2$ |
-| $m^*$ | `impact_memory_crossover` | 0 (pure power) | for a new registration | impact is about linear below a participation of about $10^{-3}$ (Bucci et al., PRL 122, 108302, 2019) |
+| $m^*$ | `impact_memory_crossover` | 0 (pure power) | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 

@@ -2539,8 +2539,14 @@ impl Engine {
         // the order-flow slot beside the linear law's. Only with the dial
         // on and the book used, so every other tick is the tick it was.
         let mut memory_plan: Vec<(usize, [f64; crate::agent_book::MEMORY_WIDTH], f64)> = Vec::new();
+        // What this tick books into each name's `s` for the memory; read
+        // back below if the breaker cut the tick.
+        let mut memory_delta: Vec<f64> = Vec::new();
         if book_on && status != MarketStatus::Closed && self.params.impact_memory_coefficient > 0.0 {
-            memory_plan = self.plan_memory(&applied, open_now);
+            memory_delta = vec![0.0; self.companies.len()];
+        }
+        if book_on && status != MarketStatus::Closed && self.params.impact_memory_coefficient > 0.0 {
+            memory_plan = self.plan_memory(open_now);
             if !memory_plan.is_empty() && fill_impact.is_empty() {
                 fill_impact = vec![0.0; self.companies.len()];
             }
@@ -2555,6 +2561,7 @@ impl Engine {
                 } else {
                     target - booked
                 };
+                memory_delta[*i] = delta;
                 if delta != 0.0 {
                     fill_impact[*i] += delta;
                 }
@@ -2793,15 +2800,31 @@ impl Engine {
         if !memory_plan.is_empty() {
             memory_transient = vec![0.0; self.companies.len()];
             for (i, row, transient) in &memory_plan {
-                let settled = outcome.active_indices.contains(i);
+                let settled = outcome.active_indices.iter().position(|x| x == i);
                 let slot = &mut self.book.memory[*i];
                 slot[crate::agent_book::MEMORY_FAST] = row[crate::agent_book::MEMORY_FAST];
                 slot[crate::agent_book::MEMORY_SLOW] = row[crate::agent_book::MEMORY_SLOW];
                 // The flow it paid for is in the memory now; a resting
                 // order's taker fill below adds the next tick's.
                 slot[crate::agent_book::MEMORY_PAID] = 0.0;
-                if settled {
-                    slot[crate::agent_book::MEMORY_BOOKED] = row[crate::agent_book::MEMORY_BOOKED];
+                slot[crate::agent_book::MEMORY_FLOW] = 0.0;
+                if let Some(n) = settled {
+                    // What landed in `s`: the booking less whatever part of
+                    // it the model-price breaker took back this tick (its
+                    // slot, 7, is the cut). Booking the target regardless
+                    // would record a displacement `s` never received, and
+                    // unbooking it as the memory decays would push `s` the
+                    // other way by the amount cut.
+                    let target = row[crate::agent_book::MEMORY_BOOKED];
+                    let delta = memory_delta.get(*i).copied().unwrap_or(0.0);
+                    let cut = outcome.s_components.get(n).map(|c| c[7]).unwrap_or(0.0);
+                    slot[crate::agent_book::MEMORY_BOOKED] = if delta > 0.0 && cut < 0.0 {
+                        target - delta + crate::mathx::max(0.0, delta + cut)
+                    } else if delta < 0.0 && cut > 0.0 {
+                        target - delta + crate::mathx::min(0.0, delta + cut)
+                    } else {
+                        target
+                    };
                     memory_transient[*i] = *transient;
                 }
             }
@@ -2844,40 +2867,30 @@ impl Engine {
     }
 
     /// The metaorder memory's step for this tick, per name it touches:
-    /// `(slot, [fast, slow, displacement], transient)`. On an open tick
-    /// both memories decay first; then the tick's net agent flow, over the
-    /// name's daily volume, is added to both; the displacement is `D` of
-    /// the combined memory; and `transient` is what the tick's flow alone
-    /// moved it, `D(after the flow) - D(decayed)`. A name whose memory is
-    /// empty and that has no flow is left out.
+    /// `(slot, [fast, slow, displacement, 0, 0], transient)`. On an open
+    /// tick both memories decay first; then the name's net flow against the
+    /// house since the last step ([`crate::agent_book::MEMORY_FLOW`]), over
+    /// its daily volume, is added to both; the displacement is `D` of the
+    /// combined memory; and `transient` is what that flow alone moved it,
+    /// `D(after the flow) - D(decayed)`. A name whose memory is empty is
+    /// left out.
+    ///
+    /// Only flow the house took the other side of feeds the memory: a fill
+    /// between two agents moves no liquidity the book has to refill, and
+    /// the pair's cash nets to zero, so counting the taker's side would let
+    /// two agents walk the tape for nothing (a wash: one rests an ask, the
+    /// other lifts it).
     #[allow(clippy::type_complexity)]
-    fn plan_memory(
-        &mut self,
-        applied: &[(String, String, f64, f64)],
-        open_now: bool,
-    ) -> Vec<(usize, [f64; crate::agent_book::MEMORY_WIDTH], f64)> {
+    fn plan_memory(&mut self, open_now: bool) -> Vec<(usize, [f64; crate::agent_book::MEMORY_WIDTH], f64)> {
         use crate::agent_book::*;
         let n = self.companies.len();
-        let mut net = vec![0.0; n];
-        let mut shares = vec![0.0; n];
-        let mut any_flow = false;
-        for (_, t, b, s) in applied {
-            if let Some(i) = self.companies.iter().position(|c| &c.ticker == t) {
-                let v = daily_volume(&self.companies[i]);
-                if v > 0.0 {
-                    net[i] += (b - s) / v;
-                    shares[i] += b - s;
-                    any_flow = true;
-                }
-            }
-        }
-        let (delta, _) = depth_shape(&self.params);
-        if !any_flow && self.book.memory.iter().all(|r| r.iter().all(|x| *x == 0.0)) {
+        if self.book.memory.iter().all(|r| r.iter().all(|x| *x == 0.0)) {
             return Vec::new();
         }
         if self.book.memory.len() < n {
             self.book.memory.resize(n, [0.0; MEMORY_WIDTH]);
         }
+        let (delta, _) = depth_shape(&self.params);
         let (fast, slow) = if open_now {
             (memory_decay(self.params.impact_memory_half_life),
              memory_decay(self.params.impact_memory_slow_half_life))
@@ -2889,9 +2902,12 @@ impl Engine {
         let mut plan = Vec::new();
         for i in 0..n {
             let row = self.book.memory[i];
-            if net[i] == 0.0 && row.iter().all(|x| *x == 0.0) {
+            if row.iter().all(|x| *x == 0.0) {
                 continue;
             }
+            let v = daily_volume(&self.companies[i]);
+            let shares = row[MEMORY_FLOW];
+            let net = if v > 0.0 { shares / v } else { 0.0 };
             let sigma = daily_sigma(&self.companies[i], market_sigma);
             let mut next = row;
             next[MEMORY_FAST] = snap(row[MEMORY_FAST] * fast);
@@ -2905,15 +2921,16 @@ impl Engine {
             let at = memory_position(&self.params, &next);
             let decayed = memory_displacement(&self.params, at, sigma);
             next[MEMORY_PAID] = 0.0;
-            if net[i] != 0.0 {
+            next[MEMORY_FLOW] = 0.0;
+            if net != 0.0 {
                 // The flow moves the displacement at most (1 + delta) times
                 // what it paid per share, so selling back along the
                 // memory's path never recovers more than the flow cost.
-                let mut add = net[i];
-                let cap = (1.0 + delta) * row[MEMORY_PAID] / shares[i].abs();
+                let mut add = net;
+                let cap = (1.0 + delta) * row[MEMORY_PAID] / shares.abs();
                 let uncapped = memory_displacement(&self.params, at + add, sigma);
                 if (uncapped - decayed).abs() > cap {
-                    let target = decayed + if net[i] > 0.0 { cap } else { -cap };
+                    let target = decayed + if net > 0.0 { cap } else { -cap };
                     add = memory_inverse(&self.params, target, sigma) - at;
                 }
                 next[MEMORY_FAST] += add;
@@ -3009,11 +3026,16 @@ impl Engine {
         for (i, f) in &outcome.agent_fills {
             let ticker = self.companies[*i].ticker.clone();
             if f.taker {
-                self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
-                if self.params.impact_memory_coefficient > 0.0 {
+                // With the metaorder memory on, only what the house took the
+                // other side of is flow to the market: a resting order can
+                // also cross another agent's (see `meet_book`).
+                if !memory_on {
+                    self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
+                } else if is_house(&f.counterparty) {
+                    self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
                     let n = self.companies.len();
                     let reference = prints_before.get(*i).copied().unwrap_or(f64::NAN);
-                    self.book.add_paid(n, *i, f.quantity, f.price, reference);
+                    self.book.add_house_flow(n, *i, f.side, f.quantity, f.price, reference);
                 }
             }
             self.reduce_order(&f.order_id, f.quantity);
@@ -3137,18 +3159,6 @@ impl Engine {
             .get(index)
             .copied()
             .unwrap_or([0.0; crate::agent_book::MEMORY_WIDTH]);
-        // The flow waiting for the next tick, which the memory has not yet
-        // taken in: read only with the memory on.
-        let memory_pending = if self.params.impact_memory_coefficient > 0.0 {
-            self.book
-                .flow
-                .iter()
-                .filter(|(_, t, _, _)| *t == company.ticker)
-                .map(|(_, _, b, s)| b - s)
-                .sum()
-        } else {
-            0.0
-        };
         Some(crate::agent_book::agent_book(&crate::agent_book::AgentBookInputs {
             company,
             vix: self.economy.vix,
@@ -3156,7 +3166,6 @@ impl Engine {
             market_sigma_daily: self.market_vol.sigma_daily(),
             taken,
             memory,
-            memory_pending,
             orders: &self.book.orders,
             exclude_agent: exclude,
         }))
@@ -3260,10 +3269,20 @@ impl Engine {
                 sequence: 0,
             });
             if count_flow {
-                self.book.add_flow(agent, &ticker, side, f.quantity);
-                if self.params.impact_memory_coefficient > 0.0 {
+                // With the metaorder memory on, a fill against another
+                // agent's resting order is not flow to the market: it took
+                // no liquidity from the house (the maker, the latent depth),
+                // the resting order had just added what it took, and the
+                // pair's cash nets to zero. Counted, one agent resting an
+                // ask and another lifting it would walk the tape, through
+                // the memory and the linear law alike, at no cost (a wash).
+                // Off, every share taken is flow, as it always was.
+                if self.params.impact_memory_coefficient == 0.0 {
+                    self.book.add_flow(agent, &ticker, side, f.quantity);
+                } else if ab::is_house(owner) {
+                    self.book.add_flow(agent, &ticker, side, f.quantity);
                     let n = self.companies.len();
-                    self.book.add_paid(n, index, f.quantity, f.price, reference);
+                    self.book.add_house_flow(n, index, side, f.quantity, f.price, reference);
                 }
             }
             taker.push(fill);
@@ -3345,7 +3364,9 @@ impl Engine {
     /// book holds at its limit or better, and its remainder waits: resting
     /// in the queue with `book_resting` on, outside the book for the traded
     /// range with it off. Every share taken is taker flow, applied to the
-    /// market once, on the next open tick.
+    /// market once, on the next open tick; with `impact_memory_coefficient`
+    /// set, every share taken from the house (a fill against another
+    /// agent's resting order is not, see `meet_book`).
     ///
     /// Orders are processed in the order they arrive. A caller submitting
     /// for several agents in one step decides that order, and

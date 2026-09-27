@@ -152,8 +152,14 @@
 //!
 //! # The metaorder memory (`impact_memory_coefficient`)
 //!
-//! Off zero, each name keeps a signed memory of agents' net taker flow, in
-//! fractions of its daily volume: a fast part `Mf` decaying at
+//! Off zero, each name keeps a signed memory of agents' net taker flow
+//! against the house (the maker and the latent depth), in fractions of its
+//! daily volume. A fill between two agents is left out: it consumed no
+//! liquidity the house must refill, and the pair's cash nets to zero, so
+//! counting the taker's side would let one agent rest an ask and another
+//! lift it to walk the tape at no cost. Fills passed in from outside the
+//! engine (`queue_external_fills`) are left out too; they have no price
+//! the book set. The memory has a fast part `Mf` decaying at
 //! `impact_memory_half_life` and a slow part `Ms` at
 //! `impact_memory_slow_half_life`, combined as `M = (1 - w) Mf + w Ms`,
 //! decaying on open ticks only, so it holds overnight. The name's `s`
@@ -245,15 +251,19 @@ pub const TAKEN_MAKER_INVENTORY: usize = 4;
 pub const TAKEN_WIDTH: usize = 5;
 
 /// Indices into [`BookState::memory`], per company slot: the fast and slow
-/// memories of agents' net flow, in fractions of daily volume; the
-/// displacement already booked into `s`, in log units; and what the taker
-/// flow waiting for the next tick paid, `sum shares * |log(price /
-/// reference)|`, which caps how far that flow may move the displacement.
+/// memories of agents' net flow against the house, in fractions of daily
+/// volume; the displacement already booked into `s`, in log units; what
+/// the taker flow waiting for the next tick paid the house, `sum shares *
+/// |log(price / reference)|`, which caps how far that flow may move the
+/// displacement; and that flow itself, signed shares (bought less sold)
+/// that the house took the other side of. A fill between two agents is in
+/// neither of the last two: it moved no house liquidity.
 pub const MEMORY_FAST: usize = 0;
 pub const MEMORY_SLOW: usize = 1;
 pub const MEMORY_BOOKED: usize = 2;
 pub const MEMORY_PAID: usize = 3;
-pub const MEMORY_WIDTH: usize = 4;
+pub const MEMORY_FLOW: usize = 4;
+pub const MEMORY_WIDTH: usize = 5;
 
 /// How an order that did not fill in full waits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -428,18 +438,34 @@ impl BookState {
         }
     }
 
-    /// Record what a taker fill paid against its reference, for the
-    /// metaorder memory's cap: `quantity * |log(price / reference)|` on the
-    /// name's [`MEMORY_PAID`]. Called only with the memory on.
-    pub fn add_paid(&mut self, companies: usize, index: usize, quantity: f64, price: f64, reference: f64) {
-        if !(price > 0.0) || !(reference > 0.0) || !(quantity > 0.0) {
+    /// Record an agent's taker fill against the house (the maker or the
+    /// latent depth, never another agent) for the metaorder memory: its
+    /// signed shares on the name's [`MEMORY_FLOW`], and what it paid
+    /// against its reference, `quantity * |log(price / reference)|`, on
+    /// [`MEMORY_PAID`] for the cap. Called only with the memory on.
+    pub fn add_house_flow(
+        &mut self,
+        companies: usize,
+        index: usize,
+        side: Side,
+        quantity: f64,
+        price: f64,
+        reference: f64,
+    ) {
+        if !(quantity > 0.0) {
             return;
         }
         if self.memory.len() < companies {
             self.memory.resize(companies, [0.0; MEMORY_WIDTH]);
         }
         if let Some(row) = self.memory.get_mut(index) {
-            row[MEMORY_PAID] += quantity * mathx::log(price / reference).abs();
+            row[MEMORY_FLOW] += match side {
+                Side::Buy => quantity,
+                Side::Sell => -quantity,
+            };
+            if price > 0.0 && reference > 0.0 {
+                row[MEMORY_PAID] += quantity * mathx::log(price / reference).abs();
+            }
         }
     }
 
@@ -810,11 +836,9 @@ pub struct AgentBookInputs<'a> {
     pub market_sigma_daily: f64,
     /// This company's row of [`BookState::taken`], or zeros.
     pub taken: [f64; TAKEN_WIDTH],
-    /// This name's row of [`BookState::memory`], or zeros.
+    /// This name's row of [`BookState::memory`], or zeros. Its
+    /// [`MEMORY_FLOW`] is the flow against the house the next tick adds.
     pub memory: [f64; MEMORY_WIDTH],
-    /// Agents' net taker flow in this name not yet applied to the market
-    /// (bought minus sold, shares): what the next tick adds to the memory.
-    pub memory_pending: f64,
     /// Waiting orders; only this name's [`RestMode::Queue`] orders are used.
     pub orders: &'a [AgentOrder],
     /// Leave this agent's own orders out: the book an agent's order meets.
@@ -896,7 +920,7 @@ pub fn agent_book(inputs: &AgentBookInputs<'_>) -> OrderBook {
         let volume = daily_volume(company);
         let reference = company.stock.price;
         if volume > 0.0 && sigma > 0.0 && reference > 0.0 {
-            let m = memory_position(params, &inputs.memory) + inputs.memory_pending / volume;
+            let m = memory_position(params, &inputs.memory) + inputs.memory[MEMORY_FLOW] / volume;
             let bound = MemoryBound {
                 params,
                 sigma,
@@ -1026,7 +1050,6 @@ mod tests {
             market_sigma_daily: 0.01,
             taken: [0.0; TAKEN_WIDTH],
             memory: [0.0; MEMORY_WIDTH],
-            memory_pending: 0.0,
             orders,
             exclude_agent: None,
         }
@@ -1090,7 +1113,7 @@ mod tests {
         let m = 0.05;
         let booked = memory_displacement(&p, m, sigma);
         let mut inp = inputs(&c, &p, &[]);
-        inp.memory = [m, 0.0, booked, 0.0];
+        inp.memory = [m, 0.0, booked, 0.0, 0.0];
         let book = agent_book(&inp);
         let mut plain = p.clone();
         plain.impact_memory_coefficient = 0.0;

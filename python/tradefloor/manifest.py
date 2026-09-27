@@ -824,9 +824,10 @@ _BOOK_KEYS = ("sequence", "fill_sequence", "taken", "orders", "flow",
 _BOOK_OPTIONAL_KEYS = ("memory",)
 
 #: Values per company in the book's ``memory`` buffer: the fast and slow
-#: memories of agents' net flow, the displacement booked into ``s``, and
-#: what the flow waiting for the next tick paid.
-_MEMORY_WIDTH = 4
+#: memories of agents' net flow against the house, the displacement booked
+#: into ``s``, what the flow waiting for the next tick paid, and that flow
+#: (signed shares the house took the other side of).
+_MEMORY_WIDTH = 5
 
 #: Values per company in the book's ``taken`` buffer: the maker's bid and
 #: ask consumed, the latent depth's bid and ask consumed, and the maker's

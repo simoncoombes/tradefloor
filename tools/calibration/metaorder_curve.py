@@ -63,11 +63,19 @@ to close returns, and the bands below are in close-to-close sigma.
   execution of the same size costs less, about T^-0.25 (Bacry, Iuga,
   Lasnier and Lehalle, 2015), 0.63 for a day against an hour. Band
   [0.5, 0.9].
+- Q8 and Q9 the cost of a day TWAP over a block's, at 10% and 3%: slicing
+  is cheaper than a block. Row C9 reads this book's block as Almgren et
+  al.'s execution over a sixth of a day (the horizon its cost matches),
+  and their law puts a day at 0.55 to 0.58 of that at 10% (permanent
+  term with the turnover factor, plus eta (X/VT)^(3/5)); Bacry et al.'s
+  T^-0.25 puts it at 0.64. Band [0.5, 0.8]. Without it an agent learns to
+  trade in blocks, the opposite of execution practice.
 
-`trips` is the round-trip guard: on a warmed market, for every name, five
+`trips` is the round-trip guard: on a warmed market, for every name, six
 strategies (pump then dump, a pump by one agent name and a dump by
-another, block then slice back, a next-day unwind, alternating 1% orders),
-each closed flat; the guard is that the most profitable one, against the
+another, block then slice back, a next-day unwind, alternating 1% orders,
+and a wash: one agent rests an ask inside the spread and another lifts it
+while a third sells a holding into the tape), each closed flat; the guard is that the most profitable one, against the
 same orders priced at the twin's mid, stays below zero. `mark` reports what
 an agent holding 10% of daily volume gains on its mark at the close for
 the cost of buying 0.01% to 1% of daily volume two ticks before it.
@@ -99,6 +107,7 @@ ROSTER_SEED = 111
 BANDS = {
     "Q1": (0.4, 0.7), "Q2": (0.3, 1.0), "Q3": (0.62, 0.82), "Q4": (0.55, 0.80),
     "Q5": (0.40, 0.70), "Q6": (0.10, 0.21), "Q7": (0.5, 0.9),
+    "Q8": (0.5, 0.8), "Q9": (0.5, 0.8),
 }
 LABELS = {
     "Q1": "print peak exponent in f, half-day, 1-30%",
@@ -108,6 +117,8 @@ LABELS = {
     "Q5": "next close / peak of s, half-day, f >= 3%",
     "Q6": "IS of a day TWAP at 10%",
     "Q7": "IS day TWAP / IS one-hour TWAP at 10%",
+    "Q8": "IS day TWAP / IS block at 10%",
+    "Q9": "IS day TWAP / IS block at 3%",
 }
 
 
@@ -150,7 +161,7 @@ def pick_names(universe, k: int) -> list[int]:
     return [int(order[int(round(r))]) for r in np.linspace(0, n - 1, k)]
 
 
-def run_seed(seed: int, params, names_k: int) -> list[dict]:
+def run_seed(seed: int, params, names_k: int, quick: bool = False) -> list[dict]:
     u = tf.Universe.random(40, seed=ROSTER_SEED)
     adv = np.array([x.avg_volume for x in u])
     mcap = np.array([x.market_cap for x in u])
@@ -171,8 +182,12 @@ def run_seed(seed: int, params, names_k: int) -> list[dict]:
                     (f64(a.column("mispricing_s"))[i] - f64(b.column("mispricing_s"))[i]) / sig[i])
 
         for f in SIZES:
+            if quick and f < 0.01:
+                continue
             q_total = f * adv[i]
             for sname, (dur, gap) in SCHEDULES.items():
+                if quick and sname == "day1":
+                    continue
                 e, ctl = base.fork(2)
                 n = 1 if dur == 0 else dur // gap
                 num = den = filled = 0.0
@@ -273,6 +288,8 @@ def rows_statistics(rows: list[dict]) -> dict:
     q["Q5"] = _med([r.get("nclose_s", float("nan")) / r["peak_s"] for r in big])
     q["Q6"] = curves["is_"]["day"]["by_f"].get("0.1", float("nan"))
     q["Q7"] = per_trial_ratio("day", "step", 0.1)
+    q["Q8"] = per_trial_ratio("day", "block", 0.1)
+    q["Q9"] = per_trial_ratio("day", "block", 0.03)
     out["Q"] = q
     out["decay"] = {
         s: {k: _med([r[f"{k}_s"] / r["peak_s"] for r in rows
@@ -325,16 +342,26 @@ def warmed(params, seed: int, universe, start: int = 65):
     return e
 
 
-def play(base, i: int, plan: list[tuple[int, str, float]], start: int = 65):
+def play(base, i: int, plan: list[tuple], start: int = 65):
     """Run `plan` (tick after the open, possibly past 390 into the next
-    session; agent; signed shares) on a fork, and price the same orders on
-    a twin that does not trade. Returns (fed cash, twin cash) or None when
-    an order did not fill in full."""
+    session; agent; signed shares; and optionally "inside", a limit order
+    resting a cent inside the spread) on a fork, and price the same orders
+    on a twin that does not trade. Returns (fed cash, twin cash) or None
+    when an order did not fill in full.
+
+    The fed cash is every agent's, read from the fills (a resting order's
+    maker fills included), so a strategy run by several agent names is
+    scored as one book: two agents trading with each other net to zero.
+    The twin prices each order at its own mid when the order is sent."""
     t = base.tickers[i]
     fed, bare = base.fork(2)
-    fed_cash = bare_cash = 0.0
+    fed.take_fills()
+    bare_cash = 0.0
+    wanted: dict[str, float] = {}
     now = start  # ticks since the first session's open, across sessions
-    for when, agent, q in sorted(plan):
+    for step_plan in sorted(plan, key=lambda x: x[:3]):
+        when, agent, q = step_plan[:3]
+        kind = step_plan[3] if len(step_plan) > 3 else "market"
         while when > now:
             into = now % 390
             step = min(when - now, 390 - into)
@@ -346,20 +373,38 @@ def play(base, i: int, plan: list[tuple[int, str, float]], start: int = 65):
                 for x in (fed, bare):
                     x.close_market()
                     x.open_market()
-        r = fed.submit(agent, t, q)
-        if r["filled"]:
-            fed_cash -= math.copysign(1, q) * r["filled"] * r["average_price"]
         book = bare.book(t)
-        c = book.sweep_cost("buy" if q > 0 else "sell", abs(q))
-        bare_cash -= math.copysign(1, q) * c.filled * book.mid_price
-        if abs(r["filled"] - c.filled) > 1e-6:
-            return None
+        if kind == "inside":
+            fb = fed.book(t)
+            px = round(fb.best_ask - 0.01, 2) if q < 0 else round(fb.best_bid + 0.01, 2)
+            if (q < 0 and px <= fb.best_bid) or (q > 0 and px >= fb.best_ask):
+                px = fb.best_ask if q < 0 else fb.best_bid
+            r = fed.submit(agent, t, q, limit_price=px)
+            got = abs(q)
+        else:
+            r = fed.submit(agent, t, q)
+            c = book.sweep_cost("buy" if q > 0 else "sell", abs(q))
+            got = c.filled
+            if abs(r["filled"] - c.filled) > 1e-6:
+                return None
+        wanted[r["order_id"]] = abs(q)
+        bare_cash -= math.copysign(1, q) * got * book.mid_price
+    fills = fed.take_fills()
+    done: dict[str, float] = {}
+    fed_cash = 0.0
+    for f in fills:
+        if f["ticker"] != t:
+            continue
+        done[f["order_id"]] = done.get(f["order_id"], 0.0) + f["quantity"]
+        fed_cash -= (1 if f["side"] == "buy" else -1) * f["quantity"] * f["price"]
+    if any(abs(done.get(k, 0.0) - v) > 1e-6 for k, v in wanted.items()):
+        return None
     return fed_cash, bare_cash
 
 
-def strategies(volume: float) -> dict[str, list[tuple[int, str, float]]]:
-    """The round trips, each flat at the end; ticks after the open, 65 the
-    first."""
+def strategies(volume: float) -> dict[str, list[tuple]]:
+    """The round trips, each flat at the end (every agent, or the agents
+    of a strategy taken together); ticks after the open, 65 the first."""
     out = {}
     for f in (0.03, 0.1, 0.3):
         big = round(f * volume)
@@ -371,6 +416,16 @@ def strategies(volume: float) -> dict[str, list[tuple[int, str, float]]]:
         out[f"nextday{f}"] = [(65, "a", big), (390 + 65, "a", -big)]
     q = round(0.01 * volume)
     out["alt0.01"] = [(65 + k, "a", q if k % 2 == 0 else -q) for k in range(10)]
+    # Wash: c buys, then a rests an ask a cent inside the spread and b lifts
+    # it, twenty times at 0.5% of volume; c then sells into whatever the
+    # wash left on the tape. a and b end flat together, c flat alone.
+    w = round(0.005 * volume)
+    for f in (0.02, 0.1):
+        hold = round(f * volume)
+        out[f"wash{f}"] = ([(65, "c", hold)]
+                           + [(66 + k, "a", -w, "inside") for k in range(20)]
+                           + [(66 + k, "b", w) for k in range(20)]
+                           + [(87, "c", -hold)])
     return out
 
 
@@ -387,7 +442,7 @@ def round_trips(seed: int, params, n_names: int = 20, roster_seed: int = 93001) 
             if r is None:
                 continue
             fed, bare = r
-            notional = sum(abs(q) for _, _, q in plan) / 2 * prices[i]
+            notional = sum(abs(x[2]) for x in plan) / 2 * prices[i]
             rows.append(dict(seed=seed, name=i, strategy=name,
                              edge_bp=(fed - bare) / notional * 1e4, pnl_bp=fed / notional * 1e4))
     return rows
@@ -437,6 +492,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--preset", default="pt-v20")
     r.add_argument("--over", default="")
     r.add_argument("--out", default=None)
+    r.add_argument("--quick", action="store_true",
+                   help="a screen: leave out 0.3%% of volume and the one-tick day schedule")
     p = sub.add_parser("report")
     p.add_argument("files", nargs="+")
     p.add_argument("--json", default=None)
@@ -458,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
 
     params = model(args.preset, parse_over(args.over))
     if args.cmd == "run":
-        rows = [row for s in args.seeds for row in run_seed(s, params, args.names)]
+        rows = [row for s in args.seeds for row in run_seed(s, params, args.names, args.quick)]
         if args.out:
             json.dump(rows, open(args.out, "w"))
         print(report(rows_statistics(rows)))

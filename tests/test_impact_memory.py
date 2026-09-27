@@ -1,7 +1,8 @@
 """The metaorder memory (`impact_memory_coefficient` and its four shape dials).
 
-Off zero, each name keeps a decaying memory of agents' net taker flow and
-its model price carries the square-root displacement of it, so a
+Off zero, each name keeps a decaying memory of agents' net taker flow
+against the house and its model price carries the square-root displacement
+of it, so a
 metaorder's impact reaches the tape, is concave in size and decays within
 the day (`agent_book.rs`, "The metaorder memory"; measured by
 `tools/calibration/metaorder_curve.py`). These tests hold:
@@ -13,8 +14,11 @@ the day (`agent_book.rs`, "The metaorder memory"; measured by
   while it holds something;
 - with agents trading it moves the tape, concavely in size;
 - a single block on a fresh book costs exactly what it did (row C9);
-- no round trip of `metaorder_curve.py`'s five strategies makes money
+- no round trip of `metaorder_curve.py`'s six strategies makes money
   against a twin that does not trade;
+- a fill between two agents is not flow to the market with the memory on:
+  a wash (one rests an ask inside the spread, the other lifts it) moves
+  neither the memory nor the price;
 - the invariants refuse bad values and missing companions;
 - the memory survives a snapshot and restore, and forks carry it.
 """
@@ -39,6 +43,9 @@ ON = dict(impact_memory_coefficient=0.5, impact_memory_half_life=45.0,
           impact_memory_crossover=0.001)
 SHAPE_ONLY = {k: v for k, v in ON.items() if k != "impact_memory_coefficient"}
 UNIVERSE = tf.Universe.random(8, seed=93001)
+#: f64 per name in the snapshot's book "memory": fast, slow, booked, paid,
+#: and the flow against the house waiting for the next tick.
+WIDTH = 5
 
 
 def f64(raw):
@@ -129,8 +136,8 @@ def test_the_memory_decays_and_is_carried_by_the_snapshot():
     assert "memory" in snap["book"]
     assert manifest.state_hash(snap) == e.state_hash()
     rows = f64(snap["book"]["memory"])
-    assert len(rows) == 4 * len(UNIVERSE)
-    fast = rows[4 * 2]
+    assert len(rows) == WIDTH * len(UNIVERSE)
+    fast = rows[WIDTH * 2]
     assert fast > 0.0
     assert any("transient" in r for r in e.take_impacts())
     # Restore into a fresh engine: the same state, and the same future.
@@ -141,7 +148,7 @@ def test_the_memory_decays_and_is_carried_by_the_snapshot():
     for x in (e, twin):
         x.run_session(10, 30, 3, 120)
     assert twin.prices() == e.prices()
-    after = f64(e.state_snapshot()["book"]["memory"])[4 * 2]
+    after = f64(e.state_snapshot()["book"]["memory"])[WIDTH * 2]
     assert 0.0 < after < fast
 
 
@@ -174,6 +181,66 @@ def test_no_round_trip_makes_money():
     rows = mc.round_trips(2012, params, n_names=4)
     assert len(rows) > 40
     assert max(r["edge_bp"] for r in rows) < 0.0
+
+
+def wash(e, i, times=20, share=0.005):
+    """Agent a rests an ask a cent inside the spread and agent b lifts it,
+    `times` times, one tick apart; returns the pair's cash."""
+    t = e.tickers[i]
+    q = round(share * UNIVERSE[i].avg_volume)
+    cash = 0.0
+    now = 30
+    for _ in range(times):
+        book = e.book(t)
+        px = round(book.best_ask - 0.01, 2)
+        if px <= book.best_bid:
+            px = book.best_ask
+        e.submit("a", t, -q, limit_price=px)
+        r = e.submit("b", t, q)
+        assert r["filled"] == q and all(f["counterparty"] == "a" for f in r["fills"])
+        cash += q * px - r["filled"] * r["average_price"]
+        m = 9 * 60 + 30 + now
+        e.run_session(m // 60, m % 60, 3, 1)
+        now += 1
+    return cash
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_a_wash_between_two_agents_moves_nothing_with_the_memory_on(on):
+    """Off, the taker's side of a fill between two agents is flow as it
+    always was, and the linear law moves the price on it. On, it is not
+    flow to the market: the memory stays empty and the price is the price
+    of a twin nobody traded on, so the pair walks nothing for its zero."""
+    base = warmed(ON if on else None)
+    i = 3
+    x, ctl = base.fork(2)
+    assert wash(x, i) == pytest.approx(0.0, abs=1e-6)
+    ctl.run_session(10, 0, 3, 20)
+    moved = f64(x.prices())[i] != f64(ctl.prices())[i]
+    if on:
+        assert not moved
+        assert x.prices() == ctl.prices()
+        book = x.state_snapshot()["book"]
+        assert "memory" not in book or not any(f64(book["memory"]))
+        assert all(r["transient"] == 0.0 for r in x.take_impacts() if "transient" in r)
+    else:
+        assert moved
+
+
+def test_a_fill_against_the_house_still_feeds_the_memory():
+    """The same buys taken from the house (no resting ask to lift) do move
+    the memory and the price."""
+    e = warmed(ON)
+    x, ctl = e.fork(2)
+    t = x.tickers[3]
+    q = round(0.005 * UNIVERSE[3].avg_volume)
+    for k in range(20):
+        x.submit("b", t, q)
+        for y in (x, ctl):
+            m = 9 * 60 + 30 + 30 + k
+            y.run_session(m // 60, m % 60, 3, 1)
+    assert f64(x.prices())[3] > f64(ctl.prices())[3]
+    assert f64(x.state_snapshot()["book"]["memory"])[WIDTH * 3] > 0.0
 
 
 @pytest.mark.parametrize("over", [

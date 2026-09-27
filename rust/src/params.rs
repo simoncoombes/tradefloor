@@ -3988,7 +3988,9 @@ pub struct ModelParams {
     /// equity markets", 2019).
     ///
     /// Off zero, each name keeps a decaying memory `M` of agents' net taker
-    /// flow in fractions of daily volume, and its `s` carries `D = sign(M)
+    /// flow against the house (the maker and the latent depth; a fill
+    /// between two agents is not flow to the market at all with the memory
+    /// on) in fractions of daily volume, and its `s` carries `D = sign(M)
     /// Y sigma h(|M|)`, with `h(m) = m^delta` (`delta` the latent book's
     /// [`ModelParams::book_depth_exponent`]) and `sigma` the name's
     /// [`crate::agent_book::daily_sigma`]. The latent depth continues from
@@ -4017,13 +4019,18 @@ pub struct ModelParams {
     /// The slow part's weight `w` in `M = (1 - w) M_fast + w M_slow`.
     /// Refused off zero without the slow half-life. In [0, 1).
     pub impact_memory_slow_weight: f64,
-    /// The crossover `m*`, in fractions of daily volume, below which the
-    /// memory's displacement is linear, `m m*^(delta - 1)`, rather than a
-    /// power: impact is about linear for metaorders below a participation
-    /// of about 1e-3 (Bucci, Benzaquen, Lillo and Bouchaud, Physical
-    /// Review Letters 122, 108302, 2019), and the cap keeps the power
-    /// law's infinite marginal impact at zero size from rewarding a stream
-    /// of tiny orders. 0.0 is a pure power law. In [0, 0.05].
+    /// The crossover `m*`, in fractions of daily volume (a size, not a
+    /// participation rate), below which the memory's displacement is
+    /// linear, `m m*^(delta - 1)`, rather than a power: on ANcerno
+    /// metaorders impact is close to a square root for volume fractions
+    /// from about 1e-3 to 1e-1 and about linear below 1e-3 (Zarinelli,
+    /// Treccani, Farmer and Lillo 2015; Bucci, Mastromatteo, Eisler, Lillo,
+    /// Bouchaud and Lehalle 2018; both as reported by Bucci, Benzaquen,
+    /// Lillo and Bouchaud, Physical Review Letters 122, 108302, 2019, whose
+    /// own crossover, about 3e-3, is in the participation rate). The linear
+    /// foot also keeps the power law's infinite marginal impact at zero
+    /// size from rewarding a stream of tiny orders. 0.0 is a pure power
+    /// law. In [0, 0.05].
     pub impact_memory_crossover: f64,
 
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
@@ -8111,7 +8118,8 @@ impl ModelParams {
         if !(y >= 0.0 && y <= 10.0) {
             return Err(format!(
                 "impact_memory_coefficient is {y}. It is the metaorder memory's Y in \
-                 Y sigma (M)^delta, in [0, book_depth_coefficient]; 0.0 is off."));
+                 Y sigma (M)^delta, in [0, 10] and at most book_depth_coefficient; 0.0 \
+                 is off."));
         }
         // The shape dials are range-checked always and read only with the
         // coefficient on, so a vector may carry them at the coefficient's
