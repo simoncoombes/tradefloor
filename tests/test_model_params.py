@@ -1007,6 +1007,11 @@ PERTURBATIONS = [
     # the knee, which is zero on this probe (above), so it stays 0.0 at
     # any half-life. Was inert because the default carried no discount.
     ("fair_value_vix_half_life", 10.0, False),
+    # INERT: both read only on a session a caller pinned a macro field, and
+    # the probe pins nothing. tests/test_macro_pins_hold.py holds the
+    # mechanisms.
+    ("macro_pins_hold", 1.0, False),
+    ("pinned_vix_feedback", 1.0, False),
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),

@@ -1097,7 +1097,10 @@ def _nothing_dormant():
                    # switches, and the live mark needs the re-mark (r13 bond
                    # timing); the stress cut takes the blanket 0.05.
                    rate_close_remark=1.0,
-                   rate_intraday_live=1.0)
+                   rate_intraday_live=1.0,
+                   # Two switches read only under a macro pin (r13).
+                   macro_pins_hold=1.0,
+                   pinned_vix_feedback=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

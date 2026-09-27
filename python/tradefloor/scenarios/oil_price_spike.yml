@@ -22,6 +22,17 @@
 # What you must NOT read into this file: that a 40% oil shock causes
 # inflation to rise 1.5 percentage points. It does not say that. It says
 # this scenario assumes it.
+#
+# CREDIT AS A SPREAD (r13). The credit response is written on
+# `macro.corporate_spread`, the corporate yield's spread over the 10-year,
+# rather than on the yield's level. A permanent write to the level froze the
+# corporate yield at one value for the rest of the run: its daily sd over
+# the 245 sessions from day 55 read 0.00 bp, and the corporate index did not
+# move. As a spread it reads 5.7 bp against 5.3 for the unshocked world
+# (medians, certified roster `Universe.random(40, seed=111).with_bonds()`,
+# pt-v20, desk seeds 201-212, the same with `macro_pins_hold` and
+# `pinned_vix_feedback` on), and the index's largest one-session fall
+# against its twin is -2.5 per cent (log, median).
 
 version: 1
 
@@ -53,8 +64,11 @@ scenario:
       duration: 20
       shape: ramp
 
-    # Assumed credit response: 50 basis points wider, held.
-    - target: macro.corporate_yield
+    # Assumed credit response: the spread over the 10-year 50 basis points
+    # wider, held. Written as a spread, so the corporate yield keeps the
+    # 10-year's daily moves and a meeting's transmission; a held LEVEL
+    # froze it.
+    - target: macro.corporate_spread
       operation: add
       value: 0.005
       at: 55

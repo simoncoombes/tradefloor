@@ -81,14 +81,39 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 pub const MAIN_STREAM: u32 = 99;
 
 /// `Engine::macro_pins_today`: the VIX was pinned today.
-pub const PIN_VIX: u8 = 1;
+pub const PIN_VIX: u16 = 1;
 /// `Engine::macro_pins_today`: the corporate yield was pinned today.
-pub const PIN_CORPORATE: u8 = 2;
-/// `Engine::macro_pins_today`: the cycle phase was pinned today, under
-/// `cycle_nowcast_accuracy`. The market's belief was put on the pinned phase
-/// (a pin is public news) and tonight's close takes no report, so the belief
-/// holds on the pin through the close. Kept only while the dial is set.
-pub const PIN_CYCLE: u8 = 4;
+pub const PIN_CORPORATE: u16 = 2;
+/// `Engine::macro_pins_today`: the cycle phase was pinned today. Kept only
+/// under `macro_pins_hold`, where the close holds the phase, or
+/// `cycle_nowcast_accuracy`, where the market's belief was put on the pinned
+/// phase (a pin is public news) and tonight's close takes no report, so the
+/// belief holds on the pin through the close.
+pub const PIN_CYCLE: u16 = 4;
+/// The 10-year was pinned today (`macro_pins_hold`).
+pub const PIN_T10: u16 = 8;
+/// The 2-year was pinned today (`macro_pins_hold`).
+pub const PIN_T2: u16 = 16;
+/// The policy rate was pinned today (`macro_pins_hold`).
+pub const PIN_POLICY: u16 = 32;
+/// Any of the other fields `pin_macro` writes was pinned today
+/// (`macro_pins_hold`); which ones is read off the economy's own copy of
+/// them at the start of the close, since nothing between a pin and the
+/// close writes any of them.
+pub const PIN_INFLATION: u16 = 64;
+pub const PIN_GROWTH: u16 = 128;
+pub const PIN_UNEMPLOYMENT: u16 = 256;
+pub const PIN_FEAR_GREED: u16 = 512;
+pub const PIN_OIL: u16 = 1024;
+pub const PIN_QE_PE: u16 = 2048;
+pub const PIN_QE_ASSETS: u16 = 4096;
+pub const PIN_TARIFF: u16 = 8192;
+/// Every mark `macro_pins_hold` keeps.
+pub const PIN_ALL: u16 = 0x3fff;
+/// The corporate SPREAD over the 10-year was pinned today
+/// (`pin_macro(corporate_spread=...)`): kept whatever the dials, since only
+/// that pin sets it.
+pub const PIN_SPREAD: u16 = 0x4000;
 
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
@@ -556,7 +581,10 @@ pub struct Engine {
     /// the snapshot and the state hash only while non-zero, as
     /// `vix_sets_variance_pending` is, so no engine that never pins, and no
     /// preset through pt-v19, hashes or snapshots differently.
-    macro_pins_today: u8,
+    macro_pins_today: u16,
+    /// The corporate spread over the 10-year a caller pinned today, in
+    /// percent; read only while `PIN_SPREAD` is marked.
+    pinned_corporate_spread: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -1309,6 +1337,7 @@ impl Engine {
             crisis_epicentre_pin: None,
             vix_sets_variance_pending: false,
             macro_pins_today: 0,
+            pinned_corporate_spread: 0.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -4372,20 +4401,111 @@ impl Engine {
 
     /// Today's pins that tonight's corporate yield reads, as bits
     /// ([`PIN_VIX`], [`PIN_CORPORATE`]). See `macro_pins_today`.
-    pub fn macro_pins_today(&self) -> u8 {
+    pub fn macro_pins_today(&self) -> u16 {
         self.macro_pins_today
     }
 
-    /// Add today's pins (an OR; the close clears them). The VIX and
-    /// corporate bits are kept only while `corporate_yield_daily` is on, their
-    /// one reader; the cycle bit only while `cycle_nowcast_accuracy` is set,
-    /// its one reader.
-    pub fn mark_macro_pins_today(&mut self, bits: u8) {
+    /// Add today's pins (an OR; the close clears them). A spread pin is
+    /// always kept; the VIX and corporate bits while `corporate_yield_daily`
+    /// is on, the VIX bit also under `pinned_vix_feedback`; every bit under
+    /// `macro_pins_hold`; the cycle bit also while `cycle_nowcast_accuracy` is
+    /// set. Each is kept only while something reads it.
+    pub fn mark_macro_pins_today(&mut self, bits: u16) {
+        let mut keep = PIN_SPREAD;
         if self.params.corporate_yield_daily != 0.0 {
-            self.macro_pins_today |= bits & (PIN_VIX | PIN_CORPORATE);
+            keep |= PIN_VIX | PIN_CORPORATE;
+        }
+        if self.params.pinned_vix_feedback != 0.0 && self.carries_vix_feedback() {
+            keep |= PIN_VIX;
+        }
+        if self.params.macro_pins_hold != 0.0 {
+            keep |= PIN_ALL;
         }
         if self.params.cycle_nowcast_accuracy != 0.0 {
-            self.macro_pins_today |= bits & PIN_CYCLE;
+            keep |= PIN_CYCLE;
+        }
+        self.macro_pins_today |= bits & keep;
+    }
+
+    /// A PINNED VIX IS PRICED WHEN IT IS PUBLISHED (`pinned_vix_feedback`):
+    /// the volatility feedback's smoothed exposure is set to the VIX's own
+    /// excess over the knee as the pin writes it, before the pin's re-mark,
+    /// and the close holds it there (`advance_day_with`). Nothing with the
+    /// dial off, or without the gain and the half-life.
+    ///
+    /// Returns whether the credit leg moved the corporate yield, so the
+    /// caller re-marks the corporate index.
+    pub fn price_pinned_vix(&mut self, vix_before: f64) -> bool {
+        if self.params.pinned_vix_feedback == 0.0 || !self.carries_vix_feedback() {
+            return false;
+        }
+        self.economy.vix_feedback =
+            crate::market::tick::vix_excess(&self.params, self.economy.vix);
+        // THE CREDIT LEG: the chain's own VIX slope (the meeting formula's
+        // 2 bp a point times the phase's multiplier) on the pin's change, at
+        // the pin, where the close would have charged it had the VIX moved
+        // there. With a VIX pin the close charges the credit spread nothing
+        // (`YieldDials::vix_pinned`), so a pinned rise never reached the
+        // corporate yield while the fall after the release did. Only under
+        // `macro_pins_hold`, which holds the VIX through the close, so the
+        // next morning's pin starts from the pinned level and nothing
+        // ratchets; only with `corporate_yield_daily`, whose daily term this
+        // is; and never over a level or a spread a caller pinned today.
+        if self.params.macro_pins_hold == 0.0
+            || self.params.corporate_yield_daily == 0.0
+            || self.macro_pins_today & (PIN_CORPORATE | PIN_SPREAD) != 0
+        {
+            return false;
+        }
+        // The multiplier the market prices (`cycle_nowcast_accuracy`,
+        // `corporate_spread_cycle`), as the close's daily term reads it;
+        // the true phase's with both at 0.0.
+        let m = if self.params.cycle_nowcast_accuracy != 0.0 || self.params.corporate_spread_cycle != 0.0 {
+            self.priced_spread_multiplier(self.economy.cycle_phase)
+        } else {
+            crate::economy::central_bank::cycle_spread_multiplier(self.economy.cycle_phase)
+        };
+        let e = &mut self.economy;
+        e.corporate_bond_yield = crate::mathx::max(
+            e.corporate_bond_yield + 0.02 * m * (e.vix - vix_before),
+            e.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
+        );
+        true
+    }
+
+    /// PIN THE CORPORATE SPREAD over the 10-year, in percent: the level is
+    /// the 10-year plus it now, and tonight's close holds the spread (the
+    /// meeting's re-anchoring included) while the 10-year moves the level.
+    /// Held within the meeting formula's own range, 0.8 to 6 per cent. The
+    /// later of a level pin and a spread pin on one session is the one the
+    /// close holds.
+    pub fn pin_corporate_spread(&mut self, spread: f64) {
+        let s = crate::mathx::clamp(
+            spread,
+            crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
+            6.0,
+        );
+        self.pinned_corporate_spread = s;
+        self.economy.corporate_bond_yield = self.economy.treasury_yield_10y + s;
+        self.macro_pins_today &= !PIN_CORPORATE;
+        self.mark_macro_pins_today(PIN_SPREAD);
+    }
+
+    /// A LEVEL PIN on the corporate yield: marked for tonight's close under
+    /// the dials that read the mark, and it replaces a spread pinned earlier
+    /// today.
+    pub fn pin_corporate_level(&mut self) {
+        self.macro_pins_today &= !PIN_SPREAD;
+        self.mark_macro_pins_today(PIN_CORPORATE);
+    }
+
+    /// The spread a caller pinned today, in percent, while `PIN_SPREAD` is
+    /// marked; `None` otherwise. The snapshot carries it on that rule.
+    pub fn pinned_corporate_spread(&self) -> Option<f64> {
+        if self.macro_pins_today & PIN_SPREAD != 0 {
+            Some(self.pinned_corporate_spread)
+        } else {
+            None
         }
     }
 
@@ -4402,9 +4522,22 @@ impl Engine {
         self.refresh_earnings_anticipation();
     }
 
-    /// Restore the marks from a snapshot, as they were.
-    pub fn set_macro_pins_today(&mut self, bits: u8) {
+    /// A pin that CHANGES the cycle phase starts the new phase's clock, as
+    /// the model's own transition does, under `macro_pins_hold`; without
+    /// it the new phase inherits the old one's age and the hazard reads
+    /// it. Nothing with the dial off or when the phase is unchanged.
+    pub fn pin_cycle_phase(&mut self, phase: crate::economy::CyclePhase) {
+        if self.params.macro_pins_hold != 0.0 && self.economy.cycle_phase != phase {
+            self.economy.months_in_current_phase = 0.0;
+        }
+        self.economy.cycle_phase = phase;
+    }
+
+    /// Restore the marks from a snapshot, as they were, with the spread a
+    /// `PIN_SPREAD` mark holds (`pinned_corporate_spread`; 0.0 without it).
+    pub fn set_macro_pins_today(&mut self, bits: u16, spread: f64) {
         self.macro_pins_today = 0;
+        self.pinned_corporate_spread = if bits & PIN_SPREAD != 0 { spread } else { 0.0 };
         self.mark_macro_pins_today(bits);
     }
 
@@ -5513,6 +5646,16 @@ impl Engine {
         // a meeting's re-anchoring included (`macro_pins_today`).
         let pins_today = self.macro_pins_today;
         let corporate_pinned_at = self.economy.corporate_bond_yield;
+        // EVERY PINNED FIELD HOLDS THROUGH THE CLOSE (`macro_pins_hold`):
+        // the fields as the pins left them, which nothing between a pin and
+        // the close writes. `None`, copying nothing, with the dial off or no
+        // pin today.
+        let held = if self.params.macro_pins_hold != 0.0 && pins_today != 0 {
+            Some(self.economy.clone())
+        } else {
+            None
+        };
+        let holds = |bit: u16| held.is_some() && pins_today & bit != 0;
 
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
@@ -5591,9 +5734,31 @@ impl Engine {
             inputs.yields.spread_multiplier = Some((spread_before, spread_after_report));
         }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
+        if let Some(h) = &held {
+            let e = &mut self.economy;
+            if pins_today & PIN_VIX != 0 { e.vix = h.vix; }
+            if pins_today & PIN_POLICY != 0 { e.federal_funds_rate = h.federal_funds_rate; }
+            if pins_today & PIN_INFLATION != 0 { e.inflation_rate = h.inflation_rate; }
+            if pins_today & PIN_GROWTH != 0 { e.gdp_growth = h.gdp_growth; }
+            if pins_today & PIN_UNEMPLOYMENT != 0 { e.unemployment_rate = h.unemployment_rate; }
+            if pins_today & PIN_FEAR_GREED != 0 { e.fear_greed_index = h.fear_greed_index; }
+            if pins_today & PIN_OIL != 0 { e.oil_price = h.oil_price; }
+            if pins_today & PIN_QE_PE != 0 { e.qe_pe_boost = h.qe_pe_boost; }
+            if pins_today & PIN_QE_ASSETS != 0 { e.qe_assets_ratio = h.qe_assets_ratio; }
+            if pins_today & PIN_TARIFF != 0 { e.tariff_rate = h.tariff_rate; }
+        }
         rng.site(Site::EconomyCycle, 0);
         let spec = self.cycle_spec();
+        let aged = self.economy.months_in_current_phase;
         self.economy = check_cycle_transition_for(&self.economy, rng, &spec);
+        // A pinned phase holds: the roll is taken and its outcome dropped,
+        // and the phase keeps ageing.
+        if holds(PIN_CYCLE) {
+            if let Some(h) = &held {
+                self.economy.cycle_phase = h.cycle_phase;
+                self.economy.months_in_current_phase = aged;
+            }
+        }
 
         // THE AGGREGATE EARNINGS CYCLE, one step a session after the phase
         // has moved: every company's earnings, beyond what nominal output
@@ -5624,7 +5789,12 @@ impl Engine {
         // Nothing runs unless both the gain and the half-life are set, so
         // every preset through pt-v19 leaves the field at 0.0. It takes no
         // draw at any setting.
-        if self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0 {
+        // A pinned VIX's exposure was set by its pin and holds through the
+        // close (`pinned_vix_feedback`).
+        let exposure_pinned = self.params.pinned_vix_feedback != 0.0 && pins_today & PIN_VIX != 0;
+        if self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0
+            && !exposure_pinned
+        {
             let target = crate::market::tick::vix_excess(&self.params, self.economy.vix);
             let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_vix_half_life);
             self.economy.vix_feedback += pull * (target - self.economy.vix_feedback);
@@ -5652,6 +5822,7 @@ impl Engine {
             stress_vix: self.params.fed_stress_vix,
             stress_inflation_gap: self.params.fed_stress_inflation_gap,
             stress_level: self.stress_vix_max,
+            hold_rate: holds(PIN_POLICY),
         };
         let meeting =
             {
@@ -5667,12 +5838,37 @@ impl Engine {
         let announcement_variant = meeting.announcement_variant;
         self.central_bank = meeting.central_bank;
         self.economy = meeting.economy;
+        // The meeting's writes to a pinned field are undone. A held 10-year
+        // takes the corporate yield (and the 2-year's formula share) with
+        // it, since the meeting set both off the 10-year it re-anchored.
+        if let Some(h) = &held {
+            let e = &mut self.economy;
+            if pins_today & PIN_T10 != 0 && meeting_held {
+                let d = h.treasury_yield_10y - e.treasury_yield_10y;
+                e.treasury_yield_10y = h.treasury_yield_10y;
+                e.corporate_bond_yield += d;
+                e.mortgage_rate_30y += d;
+                if pins_today & PIN_T2 == 0 {
+                    e.treasury_yield_2y += 0.15 * d;
+                }
+            }
+            if pins_today & PIN_T2 != 0 { e.treasury_yield_2y = h.treasury_yield_2y; }
+            if pins_today & PIN_POLICY != 0 { e.federal_funds_rate = h.federal_funds_rate; }
+            if pins_today & PIN_QE_PE != 0 { e.qe_pe_boost = h.qe_pe_boost; }
+            if pins_today & PIN_QE_ASSETS != 0 { e.qe_assets_ratio = h.qe_assets_ratio; }
+        }
         // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE, the meeting's
         // re-anchoring to the formula included, on a preset that moves it
         // daily (the mark is kept only there). The close has read today's
         // pins; tomorrow's are their own.
         if pins_today & PIN_CORPORATE != 0 {
             self.economy.corporate_bond_yield = corporate_pinned_at;
+        }
+        // A PINNED SPREAD HOLDS THROUGH THE CLOSE, the meeting included; the
+        // 10-year, as the close left it, moves the level.
+        if pins_today & PIN_SPREAD != 0 {
+            self.economy.corporate_bond_yield =
+                self.economy.treasury_yield_10y + self.pinned_corporate_spread;
         }
         self.macro_pins_today = 0;
         self.advance_anticipation_drift();
@@ -5825,6 +6021,13 @@ impl Engine {
                 corporate_yield_daily: self.params.corporate_yield_daily,
                 vix_pinned: self.macro_pins_today & PIN_VIX != 0,
                 corporate_pinned: self.macro_pins_today & PIN_CORPORATE != 0,
+                // A pinned 10-year or 2-year holds through the close
+                // (`macro_pins_hold`), so the close's step and its projection
+                // read the pinned level.
+                treasury_10y_pinned: self.params.macro_pins_hold != 0.0
+                    && self.macro_pins_today & PIN_T10 != 0,
+                treasury_2y_pinned: self.params.macro_pins_hold != 0.0
+                    && self.macro_pins_today & PIN_T2 != 0,
                 // The multiplier the market prices now, held through the
                 // session: a projection of the close runs before tonight's
                 // report moves it. `advance_day_with` replaces it with the
@@ -7537,6 +7740,9 @@ impl Engine {
         if self.macro_pins_today != 0 {
             hash_f64(&mut buf, 7.0);
             hash_f64(&mut buf, self.macro_pins_today as f64);
+            if self.macro_pins_today & PIN_SPREAD != 0 {
+                hash_f64(&mut buf, self.pinned_corporate_spread);
+            }
         }
         // The central bank's stress level, only while `fed_stress_cut` is
         // set, behind its own tag.

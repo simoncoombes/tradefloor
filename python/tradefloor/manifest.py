@@ -475,7 +475,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The central bank's stress level, only while `fed_stress_cut` is
          # set, and the rate indices' live mark, only while
          # `rate_intraday_live` is set and a session holds one.
-         "fed_stress_vix_max", "rate_live_marks"}
+         "fed_stress_vix_max", "rate_live_marks",
+         # and the spread a spread pin holds tonight, only with its mark.
+         "pinned_corporate_spread"}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -641,6 +643,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("macro_pins_today"):
         _f64(buf, 7.0)
         _f64(buf, float(snapshot["macro_pins_today"]))
+        # The pinned corporate spread, only while its mark (0x4000) stands.
+        if int(snapshot["macro_pins_today"]) & 0x4000:
+            _f64(buf, float(snapshot["pinned_corporate_spread"]))
     # The stress level and the live mark, each behind its own tag, only
     # while carried: `Engine::state_hash`'s order and rule.
     if "fed_stress_vix_max" in snapshot:

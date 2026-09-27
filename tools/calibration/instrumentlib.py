@@ -164,6 +164,11 @@ PARAM_SPECS: dict[str, dict] = {
     "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
     "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    # Switches whose identity is the value, read only under a macro pin.
+    "macro_pins_hold": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                        "derived": True},
+    "pinned_vix_feedback": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                            "derived": True},
     "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # Refused in (0, 0.2] by the engine; see atlas_survey's range.
     "cycle_nowcast_accuracy": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},

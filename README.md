@@ -163,7 +163,7 @@ Exogenous shocks
 
 Assumed transmission
   day 55..74 ramp    macro.inflation          +1.50pp
-  day 55+            macro.corporate_yield    +0.50pp
+  day 55+            macro.corporate_spread   +0.50pp
 ```
 
 tradefloor does not predict what a war, an election, an oil shock or a

@@ -158,7 +158,7 @@ def test_the_registry_docstring_counts_the_registry():
     from tradefloor import interventions
 
     words = {"ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-             "fourteen": 14, "fifteen": 15}
+             "fourteen": 14, "fifteen": 15, "sixteen": 16}
     source = pathlib.Path(interventions.__file__).read_text(encoding="utf-8")
     claims = re.findall(r"of the (\w+) targets|list of (\w+) names", source)
     found = [w for pair in claims for w in pair if w]
@@ -823,10 +823,13 @@ def test_the_manifest_records_the_resolved_scenario_not_the_filename():
     # From 0.8.5 the packaged file carries an earnings shock in two
     # contiguous windows (0.8.1: market.liquidity and macro.vix only), and
     # the manifest's reproduce() below rebuilds it through the logged
-    # set_fundamentals writes.
+    # set_fundamentals writes. From r13 the VIX is a path of four windows
+    # and credit is a spread, widened and ramped back.
     assert [s["target"] for s in doc["shocks"]] == [
-        "market.liquidity", "macro.vix", "market.earnings", "market.earnings"]
-    assert doc["transmission"][0]["target"] == "macro.corporate_yield"
+        "market.liquidity", "macro.vix", "macro.vix", "macro.vix", "macro.vix",
+        "market.earnings", "market.earnings"]
+    assert [s["target"] for s in doc["transmission"]] == [
+        "macro.corporate_spread", "macro.corporate_spread"]
 
     # It survives the round trip, and it reproduces.
     back = tf.RunManifest.from_json(manifest.to_json())

@@ -812,6 +812,22 @@ pub struct ModelParams {
     /// the NBER peak in 1989, 1990, 2001, 2007 and 2019 (FRED DFEDTAR and
     /// DFEDTARU). In [-5, 5].
     pub fed_growth_cut: f64,
+    /// Whether a field a caller pins holds through that night's close.
+    /// 0.0, which every preset carries, lets the close's own step move a
+    /// pinned field (the VIX's law, the cycle's hazard roll, the 10-year's
+    /// and the 2-year's daily step, a meeting's decision and its
+    /// re-anchoring of the curve) and the next morning's pin write it back,
+    /// so a held field is never the pinned value overnight: a held
+    /// contraction flips to trough at the close about three times in 315
+    /// sessions, the earnings anticipation re-marks every name about +4 per
+    /// cent at that close and -4 the next morning, and the published phase
+    /// shows a one-day trough a year later. 1.0 holds every field pinned
+    /// today at its pinned value through the close, the meeting included
+    /// (the corporate yield already does under `corporate_yield_daily`);
+    /// the close's draws are all still taken, so the economy stream's
+    /// schedule does not move. A pin that changes the phase starts the new
+    /// phase's clock, as the model's own transition does. A switch.
+    pub macro_pins_hold: f64,
     /// The share of each IDIOSYNCRATIC shock that moves the name's fair
     /// value for good rather than its mispricing. 0.0, which every preset
     /// through pt-v19 carries, sends the whole shock to `s`, so every
@@ -916,6 +932,24 @@ pub struct ModelParams {
     /// snapshot and the state hash carry the exposure only while this and
     /// the gain are both set. In [0, 252].
     pub fair_value_vix_half_life: f64,
+    /// Whether a pinned VIX is priced the moment it is published. 0.0, which
+    /// every preset carries, leaves the smoothed exposure the discount reads
+    /// (`EconomyState::vix_feedback`) to the close's pull at
+    /// `fair_value_vix_half_life`, so a VIX a scenario forces is published
+    /// at the open and reaches the price over weeks: under a VIX held at
+    /// x3.5 for 25 sessions the paired index falls a further 22 per cent
+    /// (log) after the published jump, and an agent that reads the VIX
+    /// front-runs it. 1.0 sets the exposure to the pinned VIX's own excess
+    /// in the pin's re-mark and holds it there through that session's
+    /// close, so the discount lands with the published VIX; the pull
+    /// resumes on the first session nobody pins. With `macro_pins_hold` and
+    /// `corporate_yield_daily` also on, and no corporate level or spread
+    /// pinned that session, the pin also charges the corporate yield the
+    /// close's own VIX term on the pin's change, which the close skips
+    /// under a VIX pin, so a pinned rise reaches credit as the fall after
+    /// the release does. Read only with the gain and the half-life set.
+    /// A switch.
+    pub pinned_vix_feedback: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
     /// which every preset through pt-v19 carries, is none; pt-v20 sets
@@ -5442,6 +5476,7 @@ impl ModelParams {
             earnings_anticipation_drift_share: 0.0,
             earnings_anticipation_drift_half_life: 0.0,
             fed_growth_cut: 0.0,
+            macro_pins_hold: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
@@ -5449,6 +5484,7 @@ impl ModelParams {
             fair_value_vix_discount: 0.0,
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
+            pinned_vix_feedback: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -7789,6 +7825,7 @@ impl ModelParams {
             "earnings_anticipation_drift_share" => self.earnings_anticipation_drift_share,
             "earnings_anticipation_drift_half_life" => self.earnings_anticipation_drift_half_life,
             "fed_growth_cut" => self.fed_growth_cut,
+            "macro_pins_hold" => self.macro_pins_hold,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
@@ -7796,6 +7833,7 @@ impl ModelParams {
             "fair_value_vix_discount" => self.fair_value_vix_discount,
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
+            "pinned_vix_feedback" => self.pinned_vix_feedback,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -8052,6 +8090,7 @@ impl ModelParams {
             "earnings_anticipation_drift_share" => out.earnings_anticipation_drift_share = value,
             "earnings_anticipation_drift_half_life" => out.earnings_anticipation_drift_half_life = value,
             "fed_growth_cut" => out.fed_growth_cut = value,
+            "macro_pins_hold" => out.macro_pins_hold = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
@@ -8059,6 +8098,7 @@ impl ModelParams {
             "fair_value_vix_discount" => out.fair_value_vix_discount = value,
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
+            "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -8450,6 +8490,8 @@ impl ModelParams {
                           ("closing_auction", self.closing_auction),
                           ("flight_to_quality_day", self.flight_to_quality_day),
                           ("corporate_yield_daily", self.corporate_yield_daily),
+                          ("macro_pins_hold", self.macro_pins_hold),
+                          ("pinned_vix_feedback", self.pinned_vix_feedback),
                           ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting)] {
@@ -9064,6 +9106,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_anticipation_drift_share",
         "earnings_anticipation_drift_half_life",
         "fed_growth_cut",
+        "macro_pins_hold",
         "fair_value_news_share",
         "fair_value_market_share",
         "fair_value_market_linear",
@@ -9071,6 +9114,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_discount",
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
+        "pinned_vix_feedback",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

@@ -339,8 +339,10 @@ def _scenario_run(scenario, days, seed=3, model=None):
 @pytest.mark.parametrize("name", tf.Scenario.available())
 def test_every_packaged_scenario_moves_the_indices_the_way_it_says(name):
     scenario = tf.Scenario.load(name)
+    # A write to the corporate yield's level, or to its spread over the
+    # 10-year (r13): either moves the corporate index by the same dy.
     corporate = [i for i in scenario.interventions
-                 if i.target == "macro.corporate_yield"]
+                 if i.target in ("macro.corporate_yield", "macro.corporate_spread")]
     first = min(i.at for i in (corporate or scenario.interventions))
     shocked = _scenario_run(scenario, first + 2)
     base = _scenario_run(None, first + 2)
@@ -351,15 +353,19 @@ def test_every_packaged_scenario_moves_the_indices_the_way_it_says(name):
         return (shocked[first][t] / shocked[first - 1][t]
                 - base[first][t] / base[first - 1][t])
 
-    if name == "curve_shock":
-        assert -0.0385 < move("UST2Y") < -0.0355
+    if name in ("curve_shock", "rate_shock"):
+        # rate_shock writes the 10-year and not the 2-year (r13).
+        two = (-0.0385, -0.0355) if name == "curve_shock" else (-1e-3, 1e-3)
+        assert two[0] < move("UST2Y") < two[1]
         assert -0.1560 < move("UST10Y") < -0.1510
         assert -0.1300 < move("IGCORP") < -0.1150
     elif corporate:
         # Every other packaged scenario that writes the corporate yield
         # widens credit, and the corporate index falls by about D * dy on
         # the day it lands. Nothing else moves the treasury indices that day.
-        dy = corporate[0].value
+        # A ramp (geopolitical_conflict since r13) lands its first step.
+        first_write = corporate[0]
+        dy = first_write.value / (first_write.duration if first_write.shape == "ramp" else 1)
         expected = -7.0 * dy + 50.0 * dy * dy
         assert expected - 0.01 < move("IGCORP") < expected + 0.005, (name, move("IGCORP"))
         assert abs(move("UST10Y")) < 1e-3 and abs(move("UST2Y")) < 1e-3
@@ -382,7 +388,8 @@ def test_a_scenario_path_can_pin_the_treasury_curve():
 def test_the_rate_shock_reaches_the_2_year_at_that_evenings_close():
     """On pt-v19, whose 2-year is the formula (0.85 of the policy rate and
     0.15 of the 10-year), rewritten at every close: the shock reaches it
-    whole that evening. Measured -3.45 per cent on day 51. pt-v20 gives
+    whole that evening. Measured -3.71 per cent on day 51 since r13, when
+    the file began writing the 10-year as well (-3.45 before). pt-v20 gives
     the 2-year its own process; the test below measures that one."""
     scenario = tf.Scenario.load("rate_shock")
     shocked = _scenario_run(scenario, 53, model="pt-v19")
@@ -390,7 +397,7 @@ def test_the_rate_shock_reaches_the_2_year_at_that_evenings_close():
     day50 = shocked[50]["UST2Y"] / shocked[49]["UST2Y"] - base[50]["UST2Y"] / base[49]["UST2Y"]
     day51 = shocked[51]["UST2Y"] / shocked[50]["UST2Y"] - base[51]["UST2Y"] / base[50]["UST2Y"]
     assert abs(day50) < 1e-4
-    assert -0.035 < day51 < -0.030
+    assert -0.0385 < day51 < -0.0355
 
 
 def test_the_rate_shock_reaches_pt_v20s_2_year_over_the_following_weeks():
@@ -417,11 +424,32 @@ def test_the_rate_shock_reaches_pt_v20s_2_year_over_the_following_weeks():
     assert -0.040 < gap[55] < -0.030
 
 
+#: rate_shock.yml as it shipped before r13, which held the corporate yield's
+#: level; the packaged file now moves it with an impulse the chain carries.
+HELD_CORPORATE = """version: 1
+scenario:
+  name: held_corporate
+  description: >
+    The corporate yield held 200bp up with the policy rate.
+  shocks:
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent
+    - target: macro.policy_rate
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent
+"""
+
+
 def test_a_held_corporate_yield_holds_the_corporate_index():
-    """rate_shock.yml holds the corporate yield 200bp up while the engine's
+    """A scenario that holds the corporate yield 200bp up while the engine's
     10-year climbs toward the higher policy rate. The index must read the
     held yield, not the held yield plus the climb."""
-    scenario = tf.Scenario.load("rate_shock")
+    scenario = tf.Scenario.from_yaml(HELD_CORPORATE)
     e = tf.Engine(seed=3, universe=universe(8))
     for d in range(70):
         scenario.apply(e, d)

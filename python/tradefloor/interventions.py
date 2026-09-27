@@ -513,7 +513,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the fifteen targets are
+#: Read them before believing a scenario. Four of the sixteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -539,6 +539,40 @@ _register(_make_macro_target(
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
+
+def _spread_read(engine: Engine) -> float:
+    fields = engine.macro_fields
+    return fields["corporate_bond_yield"] - fields["treasury_yield_10y"]
+
+
+def _spread_write(engine: Engine, value: float) -> None:
+    engine.pin_macro(corporate_spread=value)
+
+
+def _domain_spread(value: float) -> str | None:
+    if value == value and 0.0 <= value <= 0.2:
+        return None
+    return f"a corporate spread of {value}"
+
+
+_register(Target(
+    "macro.corporate_spread",
+    units="fraction",
+    note=(
+        "The corporate yield's spread over the 10-year: the level is the "
+        "10-year plus the spread, and the engine holds the spread within "
+        "the meeting formula's 0.8 to 6 per cent. A pinned spread holds "
+        "through the close, the central bank's meeting included, and the "
+        "10-year moves the level, so the curve's daily noise and a policy "
+        "move's transmission reach the discount rate, which a hold on "
+        "macro.corporate_yield freezes. Released, the chain "
+        "resumes from where it stands and the next meeting re-anchors it, "
+        "so end a window with a ramp back."
+    ),
+    read=_spread_read, write=_spread_write,
+    check=_rate_check(0.0, 0.2), format=_pp, domain=_domain_spread,
+))
+
 
 _register(_make_macro_target(
     "macro.policy_rate", "federal_funds_rate",
@@ -908,7 +942,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of fifteen names is shorter
+    else gets the whole registry, because a list of sixteen names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:

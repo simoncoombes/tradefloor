@@ -2205,7 +2205,13 @@ $x^{\dagger} = \mathrm{op}(\tilde x_a, v)$:
 over the active days: $a$ alone for an impulse, $a$ to $a + D - 1$ for a hold
 or ramp of length $D$, and every day from $a$ for a permanent change. A
 permanent `add` therefore freezes the field at one level; it does not add to
-a moving value.
+a moving value. On `macro.corporate_yield` that stops credit: under
+`rate_shock`, `curve_shock`, `oil_price_spike`, `policy_regime_shift` and
+`recession` the corporate yield's daily sd reads 0.00 bp through the write,
+against 4.56 bp for the unshocked twin, and the IGCORP index's sd reads 0.
+`macro.corporate_spread` writes the spread over the 10-year instead: the
+level moves with the 10-year's daily noise and a policy move's
+transmission while the spread is held.
 
 **What a pin does to the economy underneath.** A pin writes the value each
 morning. The macro step still runs at every close, starting from the pinned
@@ -2219,6 +2225,27 @@ pinned VIX adds no VIX term to the corporate yield's daily move. Before
 them, holding the VIX at 45 walked the yield from 2.81% to 2.42% in five
 sessions.
 
+Only the corporate yield holds through the close. On pt-v20 the close's
+own step moves every other pinned field (the cycle's hazard roll, the 10-
+and 2-year's daily step, a meeting's decision and its re-anchoring of the
+curve, the VIX's law), and the next morning's pin writes it back: under
+`recession` a held contraction flips to trough at 2 to 3 closes a seed, each
+of which re-marks the index about +4% at the close and -4% the next
+morning, and a permanent 10-year moves 0.66 to 1.03 pp close to close. A
+pinned VIX is published at the open, but the volatility feedback's smoothed
+exposure (`fair_value_vix_half_life`) reaches it only through the close's
+pull, so the discount lands over the following weeks: a VIX held at x3.5
+for 25 sessions moves the paired index 0.00 on the morning it is published
+and -21.7% (log) over the next 24 sessions. Two switches, both off on
+pt-v20, change this; see [Off in pt-v20](#off-in-pt-v20).
+
+A **pinned spread** (`macro.corporate_spread`,
+`pin_macro(corporate_spread=...)`) sets the corporate yield to the 10-year
+plus the spread, held within the meeting formula's 0.8% to 6%. The close
+holds the spread, the meeting included, and sets the level to the 10-year as
+it closed plus the spread. A level pin and a spread pin in one call are
+refused; across two calls on one session the later one holds.
+
 ### Target channels
 
 On pt-v20 (`python/tradefloor/interventions.py:520-841`):
@@ -2226,6 +2253,7 @@ On pt-v20 (`python/tradefloor/interventions.py:520-841`):
 | Target | Reaches prices through | Delay |
 |---|---|---|
 | `macro.corporate_yield` | the discount rate in fair value; the IGCORP bond index | same session |
+| `macro.corporate_spread` | the same, as a spread over the 10-year, which keeps moving the level | same session |
 | `macro.treasury_2y`, `macro.treasury_10y` | the bond indices; the 10-year also moves the corporate yield at the next close | next open |
 | `market.earnings` | every company's published earnings and book value, multiplied | next tick |
 | `macro.vix` | every variance process, jump rates, the crisis episode, the spread | same session to next |
@@ -2267,15 +2295,16 @@ macro step's own clip was already -10.
 
 Seven scenarios ship: `curve_shock`, `geopolitical_conflict`,
 `liquidity_crisis`, `oil_price_spike`, `policy_regime_shift`, `rate_shock`
-and `recession`. Two were recalibrated on pt-v20, on the certified roster
-over seeds 301 to 330, and are measured again on the graded arm, paired
-against the same seed with no scenario (box ptv20g6):
+and `recession`. `recession` was recalibrated on pt-v20, on the certified
+roster over seeds 301 to 330, and is measured again on the graded arm,
+paired against the same seed with no scenario (box ptv20g6); the r13 files
+carry desk figures on the same roster:
 
 - `recession`, to 2008's path, as [The packaged recession](#the-packaged-recession) sets it out: contraction on day 50 held to March 2009, then trough, recovery on the NBER trough date and the model's own cycle; growth held at -2% to day 364; the VIX times 3 for 60 sessions; credit 150 bp wider, then easing along Baa to 2011; earnings cut to 0.65 by day 301, held to day 490 and restored by day 932. The index falls 28.1% by session 63 and 39.3% by session 120 (30.4% and 44.7% on pt-v20 before its graded arm, box ptv20g3). It wins back 49% of its fall within 252 sessions of the low (row S1a, 2009: 62%) and rises 54.6% in those sessions (row S2, 2009: 69%), and every seed is out of contraction within 24 months (S1b).
-- `liquidity_crisis`, to March 2020's speed: book depth times 0.4 and the VIX times 3.5 for 25 sessions, credit +50 bp, earnings times 0.85. The index falls 19.8% in 21 sessions and 14.0% by 63, then recovers (10.0% and 14.8% before the graded arm).
-- `curve_shock` is new: the policy rate, both Treasury yields and the corporate yield up 200 bp on day 50. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 3.9% by day 120, measured before the graded arm.
+- `liquidity_crisis`, to March 2020's speed, reshaped in r13: book depth times 0.4 for 25 sessions; the VIX times 3 over ten sessions, held to day 74, then to 0.6 of that over ten and held twenty more; credit +50 bp on the spread over the 10-year for 25 sessions, ramped back over ten; earnings times 0.9 over a month and back over two. Desk figures on seeds 201-212 (not the grade): the morning of day 50 moves the index -2.0% (log), the close 24 sessions later is -17.7% below that mark, and a VIX timer (out above 40, back in below 30) earns -3.6 points against holding (mean). Before it, the VIX went times 3.5 at once, the price reached it over the following weeks, and the same timer earned +10.4 (ahead on 10 of 12 seeds).
+- `curve_shock`: the policy rate held 200 bp higher, and both Treasury yields and the corporate yield moved up 200 bp on day 50 and carried by the chain from there. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 7.2% by day 120. `rate_shock` is the same without the 2-year.
 
-The other four files record effect sizes measured before pt-v20.
+`rate_shock`, `curve_shock`, `oil_price_spike`, `policy_regime_shift`, `geopolitical_conflict` and `liquidity_crisis` write credit on `macro.corporate_spread`, or as an impulse the chain carries, since r13; a held level had frozen the corporate yield (daily sd 0.00 bp against 5.3 unshocked). `geopolitical_conflict` ramps its VIX and credit in over ten sessions. The other files record effect sizes measured before pt-v20.
 
 ## Off in pt-v20
 
@@ -2296,6 +2325,8 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Square-root impact** (`order_flow_impact_law`): the clamped participation law above is used.
 - **Company volume state** (`volume_idio_persistence`, `volume_idio_sigma`).
 - **Down-market idiosyncratic suppression** (`market_idio_down_suppress`) and a beta-dependent idiosyncratic scale (`idio_sigma_beta_exponent`).
+- **Macro pins that hold through the close** (`macro_pins_hold`). On, every field pinned on a session holds at its pinned value through that night's close, the meeting included: the cycle's roll is taken and dropped while the phase keeps ageing, the 10- and 2-year's steps are taken and dropped, a pinned policy rate forces a hold after the ladder's draws, and a held 10-year takes its re-anchoring change off the corporate and mortgage rates. Every draw is still taken, so the economy stream does not move. A pin that changes the phase starts the new phase's clock.
+- **A pinned VIX priced when it is published** (`pinned_vix_feedback`; read only with `fair_value_vix_discount` and `fair_value_vix_half_life` set). On, a VIX pin sets the smoothed exposure to the pinned VIX's own excess over the knee before the pin's re-mark, and the close holds it; the pull resumes on the first session nobody pins. With `macro_pins_hold` and `corporate_yield_daily` also on, and no level or spread pinned that session, the pin charges the corporate yield the close's own VIX term (2 bp a point times the phase's multiplier) on the pin's change, so a pinned rise reaches credit as the fall after its release does.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work
