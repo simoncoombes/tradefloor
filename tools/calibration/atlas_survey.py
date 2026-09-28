@@ -536,6 +536,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The share of the policy rate's distance from neutral the 10-year
     # leaves out.
     "treasury_policy_damping": (0.0, 0.8),
+    # The next meeting's expected change priced ahead of it; 1 prices the
+    # whole of it by the meeting, 2 the next two as if the second repeated it.
+    "policy_anticipation": (0.0, 3.0),
+    # The share of that an expected cut takes; 0 prices rises only.
+    "policy_anticipation_cut_share": (0.0, 1.0),
     # The share of the VIX slope out of the corporate spread's formula.
     "corporate_spread_vix_cut": (0.0, 1.0),
     # pp of spread (times the cycle multiplier) per unit of the index's log

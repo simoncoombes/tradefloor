@@ -1894,6 +1894,61 @@ pub struct ModelParams {
     /// correlation at inflation under 3 from -0.20 to -0.01; this keeps the
     /// day's move and the correlation (-0.26) where they were.
     pub treasury_policy_damping: f64,
+    /// How much of the next meeting's expected policy change the curve prices
+    /// before the meeting. 0.0, which every preset carries, is off: no
+    /// state, and the curve learns a decision on the day it is published.
+    ///
+    /// On pt-v20 the curve and the corporate yield move with a decision on
+    /// the day it is published (the 10-year by the whole change on R16A, a
+    /// 30 bp hike taking the index down 1.1 per cent that session), and the
+    /// priced path's forecast then decays until the next meeting, so the
+    /// yields drift down and the index up in the weeks after a hike: on
+    /// R16A's thirteenth grade, 2x the index for 21 sessions after a
+    /// published rise in the policy rate beat the exposure-matched position
+    /// in 0.68 of the 90 exam histories (C10c, limit 2/3). On the S&P 500
+    /// and FRED's target rate 1990-2025 the 2-year rises about 0.46 points
+    /// over the 63 sessions before a hike and 0.01 on the day, the 10-year
+    /// and Baa do not move on the day, and the index's excess return over
+    /// the 21 sessions after a hike is -0.5 per cent (se 0.5).
+    ///
+    /// Off zero, at each close the engine takes the change the next meeting
+    /// would make if it were held tonight on the published economy (the
+    /// published phase, growth and VIX; inflation, unemployment and the rate
+    /// as they stand), a shadow meeting on a silent draw source that takes
+    /// no draw from any stream, and the curve prices `a` times it times the
+    /// fraction of the meeting interval already elapsed: `P = a w S`.
+    /// The 10-year's anchor and the 2-year's formula read the rate plus `P`
+    /// (damped as the priced path is, under `treasury_policy_damping`), and
+    /// the close moves the 10-year, the 2-year and the corporate yield by
+    /// the change in what they price, so a decision the market saw coming
+    /// is in the curve before the meeting and the meeting moves it by the
+    /// surprise alone. A cut is priced at `policy_anticipation_cut_share`
+    /// times that. Above 1 the curve prices more than the next meeting:
+    /// the ladder's changes come in runs, so 2 prices the next two meetings
+    /// as if the second repeated the first (the 2-year rose 0.46 points
+    /// before real hikes that averaged 0.33). `P` is carried in the snapshot
+    /// and the state hash while this is set. In [0, 3].
+    ///
+    /// Measured on R16A with this at 2 and `treasury_haven_gain` taken from
+    /// 0.015 to 0.010 (boxes c10c1 to c10c3; held-out sets A, 201-230,
+    /// 501-530 and 801-830, and B, the same plus 20000; 90 histories each):
+    /// the index's excess on a hike's day -0.04 per cent on both sets
+    /// against R16A's -1.08 and -1.06, and -0.12 and -0.07 by 21 sessions
+    /// (R16A -0.75 and -0.70, so +0.33 and +0.36 of rebound after the day);
+    /// the 2-year +0.59 points over the 63 sessions before a hike and -0.09
+    /// on the day (set A). The rule 2x for 21 sessions after a published
+    /// rise reads -0.19/0.41 and -0.16/0.44 (median/ahead) against R16A's
+    /// +0.36/0.62 and +0.41/0.64; C10c breaches 0 and 0 against 0 and 3.
+    /// The haven cut keeps H5 (-0.318 and -0.317, floor -0.35) where R16A
+    /// had it: at 2 with the haven at 0.015 it read -0.336 and -0.333.
+    pub policy_anticipation: f64,
+    /// The share of `policy_anticipation` a shadow meeting's cut is priced
+    /// at: 0.0 prices rises only, 1.0 cuts as rises. Read only with
+    /// `policy_anticipation` set. The priced put (`treasury_put_pricing`)
+    /// and the priced path already price the put's cut and a cycle's next
+    /// cut, and a stress cut is news, so the rises are priced first.
+    /// In [0, 1].
+    pub policy_anticipation_cut_share: f64,
     /// The share of the VIX slope taken out of the corporate spread's
     /// formula, `(1 + 0.02 (1 - cut) (VIX - 12) + ...) * multiplier`, in the
     /// meeting's re-anchor, the close's daily move and a pinned VIX's credit
@@ -6893,6 +6948,8 @@ impl ModelParams {
             treasury_path_pricing: 0.0,
             treasury_path_half_life: 0.0,
             treasury_policy_damping: 0.0,
+            policy_anticipation: 0.0,
+            policy_anticipation_cut_share: 0.0,
             corporate_spread_vix_cut: 0.0,
             corporate_spread_equity_gain: 0.0,
             corporate_spread_equity_half_life: 0.0,
@@ -9309,6 +9366,8 @@ impl ModelParams {
             "treasury_path_pricing" => self.treasury_path_pricing,
             "treasury_path_half_life" => self.treasury_path_half_life,
             "treasury_policy_damping" => self.treasury_policy_damping,
+            "policy_anticipation" => self.policy_anticipation,
+            "policy_anticipation_cut_share" => self.policy_anticipation_cut_share,
             "corporate_spread_vix_cut" => self.corporate_spread_vix_cut,
             "corporate_spread_equity_gain" => self.corporate_spread_equity_gain,
             "corporate_spread_equity_half_life" => self.corporate_spread_equity_half_life,
@@ -9641,6 +9700,8 @@ impl ModelParams {
             "treasury_path_pricing" => out.treasury_path_pricing = value,
             "treasury_path_half_life" => out.treasury_path_half_life = value,
             "treasury_policy_damping" => out.treasury_policy_damping = value,
+            "policy_anticipation" => out.policy_anticipation = value,
+            "policy_anticipation_cut_share" => out.policy_anticipation_cut_share = value,
             "corporate_spread_vix_cut" => out.corporate_spread_vix_cut = value,
             "corporate_spread_equity_gain" => out.corporate_spread_equity_gain = value,
             "corporate_spread_equity_half_life" => out.corporate_spread_equity_half_life = value,
@@ -10514,6 +10575,19 @@ impl ModelParams {
                  distance from neutral the 10-year leaves out, in [0, 0.9].",
                 self.treasury_policy_damping));
         }
+        if !(self.policy_anticipation >= 0.0 && self.policy_anticipation <= 3.0) {
+            return Err(format!(
+                "policy_anticipation is {}. It is how much of the next meeting's expected \
+                 change the curve prices before the meeting, in multiples of it, in [0, 3]; \
+                 0 is off.",
+                self.policy_anticipation));
+        }
+        if !(self.policy_anticipation_cut_share >= 0.0 && self.policy_anticipation_cut_share <= 1.0) {
+            return Err(format!(
+                "policy_anticipation_cut_share is {}. It is the share of policy_anticipation \
+                 an expected cut is priced at, in [0, 1]; 0 prices rises only.",
+                self.policy_anticipation_cut_share));
+        }
         if self.treasury_path_pricing != 0.0 && self.treasury_path_half_life == 0.0 {
             return Err(format!(
                 "treasury_path_pricing is {} but treasury_path_half_life is 0. The \
@@ -10980,13 +11054,14 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
 /// Dials [`ModelParams::digest`] leaves out while they hold these values,
 /// their defaults: the rate indices' close re-mark and live mark and the
 /// central bank's stress cut (the thirteenth registration's bond timing),
-/// and the stress hold and the priced policy path (sim/r15-postcut).
+/// and the stress hold and the priced policy path (sim/r15-postcut), and
+/// the curve's anticipation of the next meeting (sim/r17-c10c).
 /// Each is inert there, so a vector that leaves them at their default is the
 /// model it was before they existed, and its digest, fingerprint and the book
 /// known answer's state hash (which carries a custom model's fingerprint)
 /// stay what they were. Off their default each enters the digest as every
 /// other dial does.
-pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 9] = [
+pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 11] = [
     ("rate_close_remark", 0.0),
     ("rate_intraday_live", 0.0),
     ("fed_stress_cut", 0.0),
@@ -10996,6 +11071,8 @@ pub const DIGEST_AT_DEFAULT_OMITTED: [(&str, f64); 9] = [
     ("treasury_path_pricing", 0.0),
     ("treasury_path_half_life", 0.0),
     ("treasury_policy_damping", 0.0),
+    ("policy_anticipation", 0.0),
+    ("policy_anticipation_cut_share", 0.0),
 ];
 
 pub fn settable_names() -> Vec<&'static str> {
@@ -11204,6 +11281,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_path_pricing",
         "treasury_path_half_life",
         "treasury_policy_damping",
+        "policy_anticipation",
+        "policy_anticipation_cut_share",
         "corporate_spread_vix_cut",
         "corporate_spread_equity_gain",
         "corporate_spread_equity_half_life",

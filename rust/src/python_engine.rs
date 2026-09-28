@@ -4116,6 +4116,11 @@ impl PyEngine {
         if let Some(path) = self.inner.policy_path() {
             out.set_item("treasury_policy_path", path)?;
         }
+        // What the curve prices of the next meeting, a key only while
+        // `policy_anticipation` is set.
+        if let Some(priced) = self.inner.policy_anticipation_priced() {
+            out.set_item("policy_anticipation_priced", priced)?;
+        }
         if let Some(marks) = self.inner.rate_live_marks() {
             out.set_item("rate_live_marks", marks.to_vec())?;
         }
@@ -4972,6 +4977,11 @@ impl PyEngine {
             None => None,
         };
         self.inner.set_policy_path(path).map_err(ValidationError::new_err)?;
+        let priced: Option<f64> = match snapshot.get_item("policy_anticipation_priced")? {
+            Some(v) => Some(v.extract()?),
+            None => None,
+        };
+        self.inner.set_policy_anticipation_priced(priced).map_err(ValidationError::new_err)?;
         // Absent means no session held a live mark when it was taken.
         let live: Option<[f64; 6]> = match snapshot.get_item("rate_live_marks")? {
             Some(v) => {

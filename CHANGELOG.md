@@ -310,6 +310,21 @@ excess kurtosis moved from 0.8 to 1.6 (the tape's median is 1.46), but the
 certification's -3 per cent session rate only from 0.64 to 0.76, so no preset
 or candidate sets it.
 
+`policy_anticipation` has the curve price the next central-bank decision
+before the meeting. At each close the engine holds the meeting on the economy
+as the market sees it, with a silent draw source, and the 10-year, the 2-year
+and the corporate yield price the change it gives in proportion to the share
+of the meeting interval elapsed, so the meeting moves them by the surprise
+alone. `policy_anticipation_cut_share` prices an expected cut at a share of
+that (0, rises only). Both are 0 on every preset and every known-answer
+digest is unchanged. They target the index's rebound after a published hike:
+on the candidate R16A a hike took the index down 1.1 per cent on the day and
+it won back a third of that in 21 sessions, and 2x the index for 21 sessions
+after a rise beat the exposure-matched position in 0.68 of the thirteenth
+grade's histories. Around real hikes (1990-2025) the 2-year rose 0.46 points
+in the 63 sessions before and 0.01 on the day, and the S&P 500 did not
+rebound.
+
 `fair_value_market_excess_share` puts a floor under the market's permanent
 share above the volatility ceiling (`fair_value_market_vol_cap`): that share of
 what the ceiling takes off stays permanent, so a crash in a fear regime no

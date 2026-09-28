@@ -493,6 +493,50 @@ read toward a neutral 2.5 by the share $d$, and scales the meeting's
 surprise by $1 - d$, so with both on a decision moves the 10-year by
 $(1-d)(1+k)$ of itself on the day; the 2-year reads the rate undamped.
 
+**The anticipated meeting** (`policy_anticipation` $a$,
+`policy_anticipation_cut_share` $c_a$, 0 on every preset). At each close the
+engine holds the next meeting now, on the economy as the market sees it (the
+published phase, growth and VIX; inflation, unemployment and the rate as they
+stand), with tonight's overlays and a silent draw source, so no stream moves.
+Its change $S$ (a cut times $c_a$) is priced in proportion to the share $w$ of
+the interval from the last meeting to the next already elapsed:
+$P = a\,w\,S$. The 10-year's anchor and the 2-year's formula read
+$r^{p} + kM + P$, damped as the priced path is, and the close moves the
+10-year and the corporate yield by $(1-d)\,\Delta P$ and the 2-year by
+$(0.85 + 0.15(1-d))\,\Delta P$. A meeting starts $w$ again at 0, so what was
+priced leaves the curve on the day the decision lands and the day's move is
+the surprise. $a$ above 1 prices more than the next meeting, as the curve does
+through a run of decisions. No draw; $P$ is carried in the snapshot and the
+state hash while $a$ is set.
+
+Why. With the curve learning each decision on the day, a hike moved the
+10-year and the corporate yield by the whole change that session (R16A, 90
+held-out histories: the index fell 1.08 per cent on a hike's day), and the
+priced path's forecast then decayed until the next meeting, so the yields
+drifted down and the index up for weeks: 2x the index for 21 sessions after a
+published rise beat the exposure-matched position in 0.62 and 0.64 of the
+histories on the two held-out sets and 0.68 on the thirteenth grade's exam
+(C10c's bound is 2/3). Around the 51 FOMC target hikes of 1990-2025 the
+2-year rose 0.46 points over the 63 sessions before and 0.01 on the day, the
+10-year and Baa did not move on the day, and the S&P 500's excess return was
+-0.13 per cent on the day (se 0.18) and -0.64 by 21 sessions (se 0.49).
+
+Measured on a candidate (no preset sets it). On R16A with $a = 2$ and
+`treasury_haven_gain` at 0.010 instead of 0.015 (boxes c10c1 to c10c3, two
+held-out sets of 90 histories: A, seeds 201-230, 501-530 and 801-830, and B,
+the same plus 20000), around a hike the 2-year rises 0.59 points over the 63
+sessions before and moves -0.09 on the day, the 10-year and the corporate
+yield +0.03, and the index's excess is -0.04 per cent on the day and -0.12
+and -0.07 by 21 sessions on the two sets, against R16A's -1.08/-0.75 and
+-1.06/-0.70. The C10c rule 2x for 21 sessions after a published rise reads
+median -0.19 and -0.16 points a year, ahead in 0.41 and 0.44 of histories
+(R16A +0.36/0.62 and +0.41/0.64), and no mirrored rule breaches on either set
+(R16A: none and three, all 2x after a rise in the 10-year or the corporate
+yield). The haven's cut keeps the monthly stock-bond correlation H5 at -0.318
+and -0.317 against a floor of -0.35 (at $a = 2$ alone -0.336 and -0.333),
+since the curve no longer jumps with the index on a hike's day. R4 on the
+held close reads 0.374 and 0.356 (R16A 0.388 and 0.372, ceiling 0.39).
+
 **Quantitative easing** starts when the policy rate is at or below 0.25 in a
 contraction, with purchases of USD 120bn a month, and tapers by 15 a meeting
 in expansion (`economy/central_bank.rs:484-517`). On pt-v20 it reaches
@@ -2956,6 +3000,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
+- **The anticipated meeting** (`policy_anticipation`, `policy_anticipation_cut_share`): the curve learns a decision on the day it is published.
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
