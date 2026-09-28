@@ -299,6 +299,19 @@ is unchanged. `price_hard_cap` now documents why a century-long run should lift
 it: a name at the cap stops moving, and the frozen winners drag the index's
 VIX and every other name's volatility down with them.
 
+`fair_value_market_excess_share` puts a floor under the market's permanent
+share above the volatility ceiling (`fair_value_market_vol_cap`): that share of
+what the ceiling takes off stays permanent, so a crash in a fear regime no
+longer sits almost wholly in the mispricing and comes back on its 60-session
+half-life. `fair_value_vix_release_half_life` gives the volatility feedback's
+discount back at its own half-life once the VIX falls, so the discount
+outlasts the VIX's fall instead of following it down at 5 sessions. Both are 0
+on every preset and every known-answer digest is unchanged. They target the
+index's rise after a VIX spike, which on the r15 screen's leading arm ran
++1.96, +4.81 and +7.61 per cent over the drift 21, 63 and 126 sessions after a
+one-day VIX rise in a history's top 1 per cent, against -1.44, -0.50 and
++2.75 on the S&P 500 1990-2025.
+
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
 meeting, in quarter points, where the ladder would cut less, hold or hike,

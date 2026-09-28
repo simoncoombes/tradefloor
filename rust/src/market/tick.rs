@@ -2057,6 +2057,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_excess_share_is_a_floor_under_the_share_above_the_ceiling() {
+        let mut p = crate::params::PT_V20;
+        let base = p.fair_value_market_vol_cap * p.market_factor_sigma;
+        // Off: the ceiling as it stood, bit for bit, above and below it.
+        assert_eq!(p.fair_value_market_excess_share, 0.0);
+        assert_eq!(market_permanent_share(&p, 0.5 * base, 1.0), p.fair_value_market_share);
+        assert_eq!(market_permanent_share(&p, 4.0 * base, 1.0), p.fair_value_market_share / 4.0);
+        // On: below the ceiling nothing moves; above it, capped + e (share - capped).
+        p.fair_value_market_excess_share = 0.5;
+        assert_eq!(market_permanent_share(&p, 0.5 * base, 1.0), p.fair_value_market_share);
+        let capped = p.fair_value_market_share / 4.0;
+        let want = capped + 0.5 * (p.fair_value_market_share - capped);
+        assert!((market_permanent_share(&p, 4.0 * base, 1.0) - want).abs() < 1e-15);
+        // However turbulent the market, at least e of the share stays.
+        assert!(market_permanent_share(&p, 1e6 * base, 1.0) >= 0.5 * p.fair_value_market_share);
+        // At 1.0 it is no ceiling.
+        p.fair_value_market_excess_share = 1.0;
+        assert_eq!(market_permanent_share(&p, 4.0 * base, 1.0), p.fair_value_market_share);
+    }
+
+    #[test]
     fn buyback_accrual_is_inert_off_and_does_not_read_the_price_on() {
         let mut p = crate::params::PT_V1;
         p.buyback_payout_share = 0.75;

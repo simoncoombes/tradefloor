@@ -1090,6 +1090,29 @@ from 0.10 to 0.001, since little of the market's variance stays in $s$.
 | $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
 | | `fair_value_market_linear` | 1 (0, off); a switch | derived | the plain loading is the zero-mean part |
 | $c$ | `fair_value_market_vol_cap` | 1.5 (0, no ceiling) | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
+| $e$ | `fair_value_market_excess_share` | 0 (the ceiling as it stood) | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
+
+A floor under the share above the ceiling (`fair_value_market_excess_share`
+$e$, 0 on every preset; `market/tick.rs`, `market_permanent_share`) puts back
+$e$ of what the ceiling takes:
+
+```math
+\psi_m(\sigma) = \psi_m\,\frac{c\,\sigma_F}{\sigma} + e\,\Big(\psi_m - \psi_m\,\frac{c\,\sigma_F}{\sigma}\Big) \qquad \sigma > c\,\sigma_F
+```
+
+so even the most turbulent market move keeps at least $e\,\psi_m$ of itself
+in $v$. It applies wherever the ceiling does: the session's ticks, the night
+and the market jump. $e = 1$ is no ceiling, as $c = 0$ gives.
+
+Why. With the ceiling alone a fear regime's market moves are almost wholly
+transient, so a crash sits in $s$ and comes back on the 60-session half-life
+on a schedule the published VIX announces. On the r15 screen's leading arm
+(R15F, 90 held-out histories) the index gained 1.96, 4.81 and 7.61 per cent
+over its drift 21, 63 and 126 sessions after a one-day VIX rise in the
+history's top 1 per cent, against -1.44, -0.50 and +2.75 (se 1.14, 1.47,
+1.89) on the S&P 500 and VIX 1990-2025. A desk decomposition (six held-out
+histories) put about 40 per cent of it in $s$'s reversion, 30 per cent in the
+volatility feedback's give-back and 20 per cent in rates and earnings.
 
 ### Volatility feedback
 
@@ -1134,6 +1157,25 @@ arm tried ran past twice the tape.
 | $g$ | `fair_value_vix_discount` | 0.35 (0, off) | fitted | held-out grids ptv20vr6 to vr9 |
 | $K$ | `fair_value_vix_knee` | 40 (30, unread at $g = 0$) | fitted | held-out grids ptv20vr8 and vr9 |
 | $H_x$ | `fair_value_vix_half_life` | 5 (0, the VIX as it stands) | fitted | held-out grids ptv20vr6 to vr9 |
+| $H_r$ | `fair_value_vix_release_half_life` | 0 (the build's $H_x$ both ways) | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
+
+The give-back (`fair_value_vix_release_half_life` $H_r$, 0 on every preset;
+`engine.rs`, the close's pull): while the target is below the exposure, the
+close pulls at $H_r$ instead of $H_x$,
+
+```math
+x_{d} = x_{d-1} + \big(1 - 0.5^{1/H}\big)\big(\max(0, \ln(X_d/K)) - x_{d-1}\big),
+\qquad H = \begin{cases} H_r & H_r > 0 \ \text{and}\ \max(0, \ln(X_d/K)) < x_{d-1} \\ H_x & \text{otherwise} \end{cases}
+```
+
+so the discount is built as before and outlasts the VIX's own fall: a fear
+premium that stays after the VIX has gone, as required returns stay high
+after a crisis while risk appetite recovers. No new state: the exposure the
+snapshot and the state hash already carry. At one half-life of 5 sessions
+the give-back ran on the VIX's own schedule, and a rule that levered up
+while the smoothed exposure was above its target (the audit's xfb rule) beat
+the exposure-matched position by +0.96 points a year, ahead in 0.64 of
+histories.
 
 ### The sectors
 
