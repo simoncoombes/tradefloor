@@ -1456,7 +1456,11 @@ over 20 per cent within 0.0005 points (and never above R16A's), and the tick
 autocorrelation's decade mean within 0.003. In a 21-year history the knee is
 reached in 5, 7 and 6 of 90 (R16A's relative levels on seeds 201-230,
 501-530, 801-830 and the same plus 20000 and 30000); every other history is
-R16A's to the bit.
+R16A's to the bit. On the thirteenth registration's grade job run on both
+held-out layouts (boxes r17floorgA2 and r17floorgB), 131 and 130 of the 148
+gated rows read exactly R16A's and the rest move by less than 0.001 of their
+value, with no row's pass or band usage changing except H1-100y's, which goes
+from failing (decades 80 and 90, seeds 20201-20212) to passing.
 
 ### The factor structure
 

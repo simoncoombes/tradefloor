@@ -322,7 +322,8 @@ floor for 277 sessions). Both are 0 on every preset and every known-answer
 digest is unchanged; the book known answer moved for the fingerprint only.
 On R16A with a knee of 4 and a half-life of 63 sessions no name reaches the
 floor on 60 held-out 100-year runs, where R16A has 3,171 name-days at it on
-seeds 20201-20212.
+seeds 20201-20212, and every other gated row of the thirteenth registration
+stays where R16A has it on both held-out layouts.
 
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
