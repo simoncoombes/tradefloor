@@ -1860,6 +1860,20 @@ pub fn vix_excess(p: &ModelParams, vix: f64) -> f64 {
     mathx::log(vix / p.fair_value_vix_knee)
 }
 
+/// What a PINNED VIX moves the volatility feedback's exposure toward
+/// (`pinned_vix_feedback`): its log excess over the knee, or, with
+/// `pinned_vix_calm_knee` and `pinned_vix_calm_share` both set, the larger
+/// of that and the calm line `share * ln(vix / calm_knee)`, so a pin below
+/// the knee is priced too. The knee's excess, bit for bit, with either dial
+/// at 0.0.
+pub fn pinned_vix_excess(p: &ModelParams, vix: f64) -> f64 {
+    let excess = vix_excess(p, vix);
+    if p.pinned_vix_calm_share == 0.0 || !(p.pinned_vix_calm_knee > 0.0) || !(vix > p.pinned_vix_calm_knee) {
+        return excess;
+    }
+    mathx::max(excess, p.pinned_vix_calm_share * mathx::log(vix / p.pinned_vix_calm_knee))
+}
+
 /// What the volatility-feedback discount reads (`fair_value_vix_discount`):
 /// the VIX's log excess over the knee as it stands, or, with
 /// `fair_value_vix_half_life` set, its smoothed level the close carries
