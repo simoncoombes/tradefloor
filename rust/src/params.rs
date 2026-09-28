@@ -2712,6 +2712,16 @@ pub struct ModelParams {
     /// 6.9, a profile-likelihood 95 per cent interval of 6.0 to 8.0; the
     /// normal fit's standardised residuals have an excess kurtosis of 2.05
     /// and 1.38 per cent of days below -2.5 against a normal's 0.62.
+    ///
+    /// Measured on R16A (sim/r17-d1tail, the certification's varying-roster
+    /// protocol, 720 held-out seeds, 201-230, 501-530, 801-830, 2001-2270
+    /// and each plus 20000): at 7, with `market_day_tail_state_share` 1, the
+    /// one-year index kurtosis went from 0.8 to 1.6 and the share of seeds
+    /// with no -3 per cent session from 0.66 to 0.58, but the tail row only
+    /// from 0.64 to 0.76; at 4, 5 and 6 no higher. On the varying rosters a
+    /// -3 per cent day is near three of the index's sigmas, about where a t
+    /// and a normal of one variance cross. Not recommended on R16A for that
+    /// row; it stays inert.
     pub market_day_tail_df: f64,
     /// The share of the day's t scale the market variance state reads: the
     /// state is fed the day factor times `m^(-(1 - this) / 2)`. 0.0, which

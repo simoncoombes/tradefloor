@@ -299,6 +299,17 @@ is unchanged. `price_hard_cap` now documents why a century-long run should lift
 it: a name at the cap stops moving, and the frozen winners drag the index's
 VIX and every other name's volatility down with them.
 
+`market_day_tail_df` makes each session's market draw a Student t at the
+variance the state set: the open draws one multiplier, `(nu - 2)` over a
+chi-square with `nu` degrees of freedom, for the night's market draw and every
+tick, and the close clears it. `market_day_tail_state_share` sets how much of
+that multiplier the variance state reads. Both are 0 on every preset and every
+known-answer digest is unchanged. The S&P 500's daily GJR-GARCH-t fit
+1990-2025 reads 6.9 degrees of freedom. On R16A at 7 the index's one-year
+excess kurtosis moved from 0.8 to 1.6 (the tape's median is 1.46), but the
+certification's -3 per cent session rate only from 0.64 to 0.76, so no preset
+or candidate sets it.
+
 `fair_value_market_excess_share` puts a floor under the market's permanent
 share above the volatility ceiling (`fair_value_market_vol_cap`): that share of
 what the ceiling takes off stays permanent, so a crash in a fear regime no
