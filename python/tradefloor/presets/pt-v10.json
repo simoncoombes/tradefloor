@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v10",
   "fingerprint": "pt-v10",
-  "coefficient_digest": "883f10e4198107fd98a4e397adcd2aa5baead9739dc404d009420999334289a2",
+  "coefficient_digest": "71fcace5da8053d0856dd321fd35aa374cf231bea2629a76a661f07ce948ff56",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
@@ -225,6 +225,8 @@
     "phillips_curve_coeff": 0.2,
     "pinned_vix_feedback": 0.0,
     "pinned_vix_variance_share": 0.0,
+    "policy_anticipation": 0.0,
+    "policy_anticipation_cut_share": 0.0,
     "price_breaker_fraction": 0.25,
     "price_hard_cap": 50000.0,
     "qe_pe_gain": 1.0,
