@@ -6759,6 +6759,9 @@ impl Engine {
             self.rates.close();
         }
         self.accrue_buybacks();
+        // The day's market t scale is the session's: the factor's close
+        // above read the day it scaled, and the next open draws its own.
+        self.market_day_scale = 1.0;
     }
 
     /// `buyback_accrual`'s close step, after the rates close. Each public,
@@ -7596,7 +7599,6 @@ impl Engine {
         }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
-        self.market_day_scale = 1.0;
         self.advance_anticipation_drift();
         self.refresh_earnings_anticipation();
         // The close's phase into the published history. The burn-in runs
@@ -10938,6 +10940,100 @@ mod tests {
 
     /// The business cycle in the market factor's volatility
     /// (`market_vol_cycle_ratio` and its three companions).
+    /// `market_day_tail_df` and `market_day_tail_state_share`: off, the day
+    /// scale is never drawn, read or hashed; on, each open draws one on the
+    /// overnight stream alone, the session's market sigma carries its root,
+    /// the close clears it, and the state hash covers it while it is live.
+    mod market_day_tail {
+        use super::*;
+
+        fn with(dials: impl FnOnce(&mut crate::params::ModelParams)) -> Engine {
+            let mut params = Engine::default_model();
+            dials(&mut params);
+            Engine::with_params(
+                13,
+                vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                sectors(),
+                params,
+            )
+        }
+
+        fn session_and_close(e: &mut Engine) {
+            for m in 0..10 {
+                e.tick(&request(10, m));
+            }
+            let innovations: Vec<Option<f64>> =
+                e.daily_innovation_column().into_iter().map(Some).collect();
+            let variances = e.sector_base_variances();
+            e.close_market(&DayCloseRequest {
+                daily_innovations: &innovations,
+                sector_base_variances: &variances,
+                avg_volume: crate::market::AvgVolumePolicy::Hold,
+            });
+        }
+
+        #[test]
+        fn off_the_day_scale_is_never_drawn_or_hashed() {
+            let mut off = with(|_| {});
+            assert_eq!(off.params().market_day_tail_df, 0.0);
+            let mut twin = off.clone();
+            for _ in 0..3 {
+                off.open_market();
+                assert_eq!(off.market_day_scale(), 1.0);
+                assert_eq!(off.market_sigma_today(), off.market_sigma_before_day_scale());
+                session_and_close(&mut off);
+            }
+            // The state share alone reads nothing.
+            let mut share = with(|p| p.market_day_tail_state_share = 1.0);
+            for _ in 0..3 {
+                twin.open_market();
+                share.open_market();
+                session_and_close(&mut twin);
+                session_and_close(&mut share);
+            }
+            assert_eq!(share.prices(), twin.prices());
+        }
+
+        #[test]
+        fn on_the_open_draws_a_scale_the_session_reads_and_the_close_clears() {
+            let mut on = with(|p| p.market_day_tail_df = 6.0);
+            let mut off = with(|_| {});
+            on.open_market();
+            off.open_market();
+            let m = on.market_day_scale();
+            assert!(m > 0.0 && m != 1.0 && m.is_finite(), "{m}");
+            let sigma = on.market_sigma_before_day_scale();
+            assert!((on.market_sigma_today() - sigma * m.sqrt()).abs() <= 1e-15 * sigma.max(1.0));
+            // Only the overnight stream moved.
+            assert_eq!(on.market_rng.snapshot(), off.market_rng.snapshot());
+            assert_ne!(on.overnight_rng.snapshot(), off.overnight_rng.snapshot());
+            // Hashed while live: the same state with another scale hashes apart.
+            let mut other = on.clone();
+            other.set_market_day_scale(m * 1.5);
+            assert_ne!(other.state_hash(0, false), on.state_hash(0, false));
+            session_and_close(&mut on);
+            assert_eq!(on.market_day_scale(), 1.0);
+        }
+
+        #[test]
+        fn the_scale_has_mean_one() {
+            let nu = 10.0;
+            let mut e = with(|p| p.market_day_tail_df = nu);
+            let n = 4000;
+            let mut sum = 0.0;
+            for _ in 0..n {
+                e.draw_market_day_scale();
+                sum += e.market_day_scale();
+            }
+            let mean = sum / n as f64;
+            // Inverse gamma: variance 2 / (nu - 4).
+            let se = (2.0 / (nu - 4.0) / n as f64).sqrt();
+            assert!((mean - 1.0).abs() < 4.0 * se, "{mean}");
+        }
+    }
+
     mod market_vol_cycle {
         use super::*;
         use crate::economy::CyclePhase;
