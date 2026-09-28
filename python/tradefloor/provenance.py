@@ -701,8 +701,11 @@ OUT_OF_SCOPE = {
         "after a published hike (C10c's out_federal_funds_rate_up21 levered 2x, "
         "ahead in 0.68 of R16A's 90 exam histories against 2/3) and the curve "
         "around real hikes (FRED DGS2 +0.46 over the 63 sessions before, +0.01 "
-        "on the day, 1990-2025) (0.8.5 thirteenth-registration work, "
-        "sim/r17-c10c)",
+        "on the day, 1990-2025). Measured at 2 on R16A with the haven at "
+        "0.010 (boxes c10c1-c10c3, held-out sets A and B): that rule ahead "
+        "in 0.41 and 0.44 of histories against 0.62 and 0.64, the index's "
+        "hike-day excess -0.04 per cent against -1.08 (0.8.5 "
+        "thirteenth-registration work, sim/r17-c10c)",
     "policy_anticipation_cut_share":
         "unread while `policy_anticipation` is 0.0; at 0.0 only an expected "
         "rise is priced, at 1.0 a cut as a rise (sim/r17-c10c)",

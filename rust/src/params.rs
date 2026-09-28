@@ -1833,6 +1833,19 @@ pub struct ModelParams {
     /// as if the second repeated the first (the 2-year rose 0.46 points
     /// before real hikes that averaged 0.33). `P` is carried in the snapshot
     /// and the state hash while this is set. In [0, 3].
+    ///
+    /// Measured on R16A with this at 2 and `treasury_haven_gain` taken from
+    /// 0.015 to 0.010 (boxes c10c1 to c10c3; held-out sets A, 201-230,
+    /// 501-530 and 801-830, and B, the same plus 20000; 90 histories each):
+    /// the index's excess on a hike's day -0.04 per cent on both sets
+    /// against R16A's -1.08 and -1.06, and -0.12 and -0.07 by 21 sessions
+    /// (R16A -0.75 and -0.70, so +0.33 and +0.36 of rebound after the day);
+    /// the 2-year +0.59 points over the 63 sessions before a hike and -0.09
+    /// on the day (set A). The rule 2x for 21 sessions after a published
+    /// rise reads -0.19/0.41 and -0.16/0.44 (median/ahead) against R16A's
+    /// +0.36/0.62 and +0.41/0.64; C10c breaches 0 and 0 against 0 and 3.
+    /// The haven cut keeps H5 (-0.318 and -0.317, floor -0.35) where R16A
+    /// had it: at 2 with the haven at 0.015 it read -0.336 and -0.333.
     pub policy_anticipation: f64,
     /// The share of `policy_anticipation` a shadow meeting's cut is priced
     /// at: 0.0 prices rises only, 1.0 cuts as rises. Read only with
