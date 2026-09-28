@@ -1114,6 +1114,16 @@ history's top 1 per cent, against -1.44, -0.50 and +2.75 (se 1.14, 1.47,
 histories) put about 40 per cent of it in $s$'s reversion, 30 per cent in the
 volatility feedback's give-back and 20 per cent in rates and earnings.
 
+Measured on a candidate (no preset sets it). On R15F with $e = 0.5$ and
+`fair_value_vix_release_half_life` 504 (box r16g1, 90 held-out histories),
+the rise after the same events reads +0.41, +1.98 and +4.73 per cent (se
+0.26, 0.39, 0.44), the C10 rules that lever up after a VIX spike are ahead in
+0.61 to 0.64 of the histories (0.69 to 0.72 on R15F), and none of the 384
+mirrored rules breaches C10c. At 90 histories the 126-session rise splits as
++3.25 in $s$, -0.04 from the discount and +2.19 from rates and earnings,
+against +3.72, +1.98 and +2.08 on R15F. V1 reads 0.90 and 0.83 (R15F 0.86
+and 0.82; S&P 500 0.93 and 0.87), and all 40 registered rows pass.
+
 ### Volatility feedback
 
 **Timescale:** wherever fair value is read, and once a session for the

@@ -920,8 +920,12 @@ pub struct ModelParams {
     /// 1.14, 1.47, 1.89) on the S&P 500 and VIX 1990-2025; the C10 rules
     /// that lever up after such a rise were ahead in 0.69 to 0.72 of the
     /// histories, where on the tape's 21-year windows they are ahead in 0
-    /// to 0.35. Read only with `fair_value_market_share` and
-    /// `fair_value_market_vol_cap` non-zero. In [0, 1].
+    /// to 0.35. Measured on R15F at 0.5 with
+    /// `fair_value_vix_release_half_life` 504 (box r16g1, held-out seeds):
+    /// +0.41/+1.98/+4.73 per cent, the lever-up rules ahead in 0.61 to 0.64
+    /// of histories, no C10c breach of 384, V1 0.90/0.83 (R15F 0.86/0.82),
+    /// all 40 registered rows in. Read only with `fair_value_market_share`
+    /// and `fair_value_market_vol_cap` non-zero. In [0, 1].
     pub fair_value_market_excess_share: f64,
     /// Volatility feedback: a discount on every name's fair value while the
     /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
@@ -972,8 +976,13 @@ pub struct ModelParams {
     /// the S&P 500's whole excess return after the same events 1990-2025
     /// was -0.5 and +2.75. A fear premium that outlasts the VIX's own fall,
     /// as required returns stay high after a crisis while risk appetite
-    /// recovers, gives the same depth with a slower, smaller rebound. In
-    /// [0, 2520].
+    /// recovers, gives the same depth with a slower, smaller rebound.
+    /// Measured on R15F at 504 with `fair_value_market_excess_share` 0.5
+    /// (box r16g1, held-out seeds): the give-back's share of the 126-session
+    /// rise goes from +1.98 to -0.04 per cent, the audit's xfb lever rule
+    /// from +0.96 to +0.26 points a year over the exposure-matched position
+    /// (ahead 0.64 to 0.57), and D2's sessions back to the high from 67 to
+    /// 78 (real 126); the driven 2020 fall (F1) is unchanged. In [0, 2520].
     pub fair_value_vix_release_half_life: f64,
     /// How much of a pinned VIX is priced the moment it is published: the
     /// share of the gap between the smoothed exposure and the pinned VIX's
