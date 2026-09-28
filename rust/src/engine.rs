@@ -3870,6 +3870,43 @@ impl Engine {
         plan
     }
 
+    /// `impact_memory_refill`: a resting order filled on the side against
+    /// the memory's lean (by the market's flow, or crossed during the
+    /// session) is new depth where the lean consumed it, so its `quantity`
+    /// shares come off the memory, uncapped and never past zero. On the
+    /// side the memory leans it changes nothing. Returns the shares the
+    /// memory absorbed. The next tick books the new displacement into `s`
+    /// as it books any change of the memory.
+    fn refill_memory(&mut self, index: usize, side: crate::order_book::Side, quantity: f64) -> f64 {
+        use crate::agent_book::*;
+        use crate::order_book::Side;
+        let Some(row) = self.book.memory.get(index).copied() else {
+            return 0.0;
+        };
+        let m = memory_position(&self.params, &row);
+        let against = match side {
+            Side::Sell => m > 0.0,
+            Side::Buy => m < 0.0,
+        };
+        let v = daily_volume(&self.companies[index]);
+        if !against || !(v > 0.0) || !(quantity > 0.0) {
+            return 0.0;
+        }
+        let r = crate::mathx::min(quantity / v, m.abs());
+        let dr = if m > 0.0 { -r } else { r };
+        let slot = &mut self.book.memory[index];
+        slot[MEMORY_FAST] += dr;
+        if self.params.impact_memory_slow_half_life > 0.0 {
+            slot[MEMORY_SLOW] += dr;
+        }
+        for k in [MEMORY_FAST, MEMORY_SLOW] {
+            if slot[k].abs() < 1e-12 {
+                slot[k] = 0.0;
+            }
+        }
+        crate::mathx::min(quantity, r * v)
+    }
+
     /// The linear law's change to one name's `s` for a net signed size:
     /// `gamma * sigma * net / V`.
     fn fill_impact_of(&self, index: usize, net: f64) -> f64 {
@@ -3948,8 +3985,19 @@ impl Engine {
         // is taker flow like any other agent's, and reaches the market on
         // the next tick. Left out, a standing bid at the ask would take the
         // maker's fresh size every tick and never pay the impact of it.
+        let at_limit = self.params.book_cross_at_limit != 0.0;
+        let refill = memory_on && self.params.impact_memory_refill != 0.0;
         for (i, f) in &outcome.agent_fills {
             let ticker = self.companies[*i].ticker.clone();
+            // `book_cross_at_limit`: a resting order the maker's re-quote
+            // left crossed trades at its own limit, and the improvement is
+            // the arriving re-quote's. Between two agents the book already
+            // fills at the earlier order's price.
+            let price = if at_limit && f.taker && is_house(&f.counterparty) {
+                self.book.orders.iter().find(|o| o.id == f.order_id).map(|o| o.limit).unwrap_or(f.price)
+            } else {
+                f.price
+            };
             if f.taker {
                 // With the metaorder memory on, only what the house took the
                 // other side of is flow to the market: a resting order can
@@ -3958,10 +4006,17 @@ impl Engine {
                     self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
                 } else if is_house(&f.counterparty) {
                     self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
+                    // `impact_memory_refill`: a crossed resting order
+                    // against the memory's lean refills it first, as a
+                    // resting order the flow fills does; only what it
+                    // takes beyond zero is flow against the house.
+                    let absorbed = if refill { self.refill_memory(*i, f.side, f.quantity) } else { 0.0 };
                     let n = self.companies.len();
                     let reference = prints_before.get(*i).copied().unwrap_or(f64::NAN);
-                    self.book.add_house_flow(n, *i, f.side, f.quantity, f.price, reference);
+                    self.book.add_house_flow(n, *i, f.side, f.quantity - absorbed, price, reference);
                 }
+            } else if refill && f.counterparty == FLOW_OWNER {
+                self.refill_memory(*i, f.side, f.quantity);
             }
             self.reduce_order(&f.order_id, f.quantity);
             self.push_fill(AgentFill {
@@ -3970,7 +4025,7 @@ impl Engine {
                 ticker,
                 side: f.side,
                 quantity: f.quantity,
-                price: f.price,
+                price,
                 liquidity: if f.taker { Liquidity::Taker } else { Liquidity::Maker },
                 counterparty: f.counterparty.clone(),
                 reference: prints_before.get(*i).copied().unwrap_or(f64::NAN),
@@ -3999,6 +4054,9 @@ impl Engine {
                 let print = self.companies[i].stock.price;
                 if !range_reached(o.side, o.limit, print) {
                     continue;
+                }
+                if refill {
+                    self.refill_memory(i, o.side, o.remaining);
                 }
                 self.reduce_order(&o.id, o.remaining);
                 self.push_fill(AgentFill {
@@ -4147,6 +4205,8 @@ impl Engine {
         quantity: f64,
         limit: Option<f64>,
         count_flow: bool,
+        at_limit: bool,
+        crossing: bool,
     ) -> (Vec<crate::agent_book::AgentFill>, f64) {
         use crate::agent_book::{self as ab, AgentFill, Liquidity};
         use crate::order_book::{Side, SubmitOptions};
@@ -4169,6 +4229,12 @@ impl Engine {
         let mut taker = Vec::with_capacity(r.fills.len());
         for f in &r.fills {
             let owner = f.maker_id.as_str();
+            // `book_cross_at_limit`: a resting order crossed during the
+            // session takes the house's side at its own limit.
+            let price = match limit {
+                Some(p) if at_limit && ab::is_house(owner) => p,
+                _ => f.price,
+            };
             if shared {
                 if let Some(slot) = ab::taken_slot(side, owner) {
                     self.book.taken[index][slot] += f.quantity;
@@ -4190,7 +4256,7 @@ impl Engine {
                     ticker: ticker.clone(),
                     side: match side { Side::Buy => Side::Sell, Side::Sell => Side::Buy },
                     quantity: f.quantity,
-                    price: f.price,
+                    price,
                     liquidity: Liquidity::Maker,
                     counterparty: agent.to_string(),
                     reference,
@@ -4205,7 +4271,7 @@ impl Engine {
                 ticker: ticker.clone(),
                 side,
                 quantity: f.quantity,
-                price: f.price,
+                price,
                 liquidity: Liquidity::Taker,
                 counterparty: owner.to_string(),
                 reference,
@@ -4226,8 +4292,16 @@ impl Engine {
                     self.book.add_flow(agent, &ticker, side, f.quantity);
                 } else if ab::is_house(owner) {
                     self.book.add_flow(agent, &ticker, side, f.quantity);
+                    // `impact_memory_refill`: a resting order crossed during
+                    // the session refills the memory first (see
+                    // `settle_book`).
+                    let absorbed = if crossing && self.params.impact_memory_refill != 0.0 {
+                        self.refill_memory(index, side, f.quantity)
+                    } else {
+                        0.0
+                    };
                     let n = self.companies.len();
-                    self.book.add_house_flow(n, index, side, f.quantity, f.price, reference);
+                    self.book.add_house_flow(n, index, side, f.quantity - absorbed, price, reference);
                 }
             }
             taker.push(fill);
@@ -4245,7 +4319,7 @@ impl Engine {
     /// at a price the market left behind. Matched here it fills at the
     /// opening ladder's prices, as an opening auction would fill it, and
     /// what it takes is taker flow like any other.
-    fn cross_resting(&mut self, index: usize) {
+    fn cross_resting(&mut self, index: usize, at_open: bool) {
         use crate::agent_book::RestMode;
         use crate::order_book::Side;
         let Some(ticker) = self.companies.get(index).map(|c| c.ticker.clone()) else {
@@ -4272,7 +4346,12 @@ impl Engine {
             if !crossed {
                 continue;
             }
-            let (fills, _) = self.meet_book(index, &o.agent, &o.id, o.side, o.remaining, Some(o.limit), true);
+            // At the open the gap's orders fill at the opening ladder's
+            // prices, as an auction fills them; during the session, under
+            // `book_cross_at_limit`, at their own limit.
+            let at_limit = !at_open && self.params.book_cross_at_limit != 0.0;
+            let (fills, _) =
+                self.meet_book(index, &o.agent, &o.id, o.side, o.remaining, Some(o.limit), true, at_limit, !at_open);
             let filled: f64 = fills.iter().map(|f| f.quantity).sum();
             self.reduce_order(&o.id, filled);
         }
@@ -4298,7 +4377,7 @@ impl Engine {
             })
             .collect();
         for i in names {
-            self.cross_resting(i);
+            self.cross_resting(i, true);
         }
     }
 
@@ -4376,9 +4455,9 @@ impl Engine {
         self.book.sequence += 1;
 
         if self.book.orders.iter().any(|o| o.mode == RestMode::Queue && o.ticker == ticker) {
-            self.cross_resting(index);
+            self.cross_resting(index, false);
         }
-        let (fills, reference) = self.meet_book(index, agent, &id, side, quantity, limit, true);
+        let (fills, reference) = self.meet_book(index, agent, &id, side, quantity, limit, true, false, false);
         let mut filled = 0.0;
         let mut notional = 0.0;
         let mut worst: Option<f64> = None;

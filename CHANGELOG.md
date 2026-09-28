@@ -332,6 +332,20 @@ forced VIX priced the day it lands was a ratio of noise on half the seeds.
 rest of the gap over the sessions after. All three are 0 on every preset and
 every known-answer digest is unchanged.
 
+`book_cross_at_limit` and `impact_memory_refill` close the wash round trip on
+a name quoted a cent wide. There an ask a cent inside the spread joins the
+maker's queue at the touch, a second agent's buy takes the maker's size and
+feeds the metaorder memory, and the ask fills later at the maker's higher
+bid or against the market's own flow, which the memory did not count, so a
+third agent sold a holding into a displacement the group never paid to
+unwind: +0.51 bp on R16A's thirteenth grade, up to +18 bp on held-out
+seeds. With the first, a resting order crossed during the session trades
+at its own limit; with the second, a resting order filled against the
+memory's lean takes its size off the memory, never past zero. Both are 0 on
+every preset and every known-answer digest is unchanged; with both on, the
+best round trip on 106 held-out trip seeds is -0.86 bp and nothing a
+market order does moves.
+
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
 meeting, in quarter points, where the ladder would cut less, hold or hike,

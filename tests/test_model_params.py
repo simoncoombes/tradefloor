@@ -962,6 +962,11 @@ PERTURBATIONS = [
     ("impact_memory_slow_half_life", 15600.0, False),
     ("impact_memory_slow_weight", 0.1, False),
     ("impact_memory_crossover", 0.001, False),
+    # INERT on this probe: both read only on an agent's resting orders, and
+    # the probe sends none. tests/test_wash_round_trip.py moves them (r17
+    # wash).
+    ("impact_memory_refill", 1.0, False),
+    ("book_cross_at_limit", 1.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick

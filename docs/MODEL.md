@@ -2401,6 +2401,38 @@ to zero, so counting the taker's side would let one agent rest an ask a
 cent inside the spread and another lift it to walk the tape at no cost.
 Off, every share an agent takes is flow, as before.
 
+On a name quoted a cent wide that ask cannot go inside the spread: it joins
+the maker's queue at the touch, the other agent's buy takes the maker's
+size (flow against the house, which feeds $M$), and the ask fills later,
+crossed by the maker's re-quote at the maker's higher bid or filled by the
+market's own flow, which $M$ does not count. The pair ends flat, the price
+is still displaced by the buys, and a third agent sells a holding into it:
+row G-rt's wash paid +0.51 bp on R16A's thirteenth grade and up to +18 bp
+on held-out trip seeds. Two switches close it, both 0 on every preset.
+With `book_cross_at_limit` a resting order the book leaves crossed during
+the session trades at its own limit, the improvement going to the arriving
+re-quote as price-time priority gives it (the open is unchanged: an order
+the night's gap went through fills at the opening ladder's prices, as an
+auction fills it). With `impact_memory_refill` a resting order filled
+against the memory's lean, by the market's flow or by a crossing, takes its
+size off $M$ uncapped and never past zero: in the volume-recovery book the
+displacement is the consumed depth, and an order resting on the consumed
+side is new depth there (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied
+2010); Eisler, Bouchaud and Kockelkoren (2012) measure a limit order's
+impact with the sign opposite to a market order's on its side. A crossed
+order's shares beyond zero stay taker flow, and every crossed share still
+pays $\gamma$. Taker orders are unchanged, so no market-order statistic
+moves. (`engine.rs`, `refill_memory`, `settle_book` and `meet_book`.)
+
+Measured on R16A with both on, `metaorder_curve.py trips` on held-out trip
+seeds (2531, 2532, 2534; 22531, 22532, 22534; 42501-42600): the most
+profitable round trip on a seed is -1.46 bp on average (sd 0.18, worst
+-0.86) against -1.20 (sd 1.94, worst +18.33, three seeds above zero) with
+both off; on the cent-wide rows the wash costs 0.12 bp more on average
+than its third agent's round trip alone (61 rows), where with both off it
+paid 0.94 bp more (68 rows), and the wash legs alone gain nothing. Every other strategy, Q1-Q9, C9, MARK
+and AO1-AO4 are unchanged to the bit.
+
 Measured with `metaorder_curve.py` on held-out seeds 2401-2430 (12 names,
 box sqfix2), the arm $Y_M = 0.65$, $H_1 = 12$, $H_2 = 780$, $w = 0.1$,
 $m^* = 0.001$ with $\gamma = 0.15$ (the memory carries the transient part
@@ -2464,6 +2496,8 @@ against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 | $H_1$ | `impact_memory_half_life` | 0 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
 | $H_2$ | `impact_memory_slow_half_life` | 0 (none) | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
 | $w$ | `impact_memory_slow_weight` | 0 | for a new registration | the slow part's weight; refused without $H_2$ |
+| | `impact_memory_refill` | 0 (off) | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
+| | `book_cross_at_limit` | 0 (off) | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
 | $m^*$ | `impact_memory_crossover` | 0 (pure power) | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
