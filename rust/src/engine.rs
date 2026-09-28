@@ -6849,9 +6849,43 @@ impl Engine {
             self.rates.close();
         }
         self.accrue_buybacks();
+        self.pull_relative_levels();
         // The day's market t scale is the session's: the factor's close
         // above read the day it scaled, and the next open draws its own.
         self.market_day_scale = 1.0;
+    }
+
+    /// `fair_value_relative_knee`'s close step, after the buybacks. The
+    /// reference is the equal-weighted mean fair-value level of the public,
+    /// solvent names with a mispricing state; each such name whose level
+    /// sits more than the knee below it is pulled toward the knee at
+    /// `fair_value_relative_half_life`. A branch at 0.0, and nothing runs
+    /// unless the model carries the levels (so the snapshot and the state
+    /// hash see every change). No draws.
+    fn pull_relative_levels(&mut self) {
+        let knee = self.params.fair_value_relative_knee;
+        if knee == 0.0 || !self.carries_fair_value_offsets() {
+            return;
+        }
+        let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_relative_half_life);
+        let live = |c: &TickCompany| {
+            c.is_public && !c.is_bankrupt && c.stock.mispricing_s.is_some()
+        };
+        let (mut sum, mut n) = (0.0, 0usize);
+        for c in self.companies.iter().filter(|c| live(c)) {
+            sum += c.stock.fair_value_offset.unwrap_or(0.0);
+            n += 1;
+        }
+        if n < 2 {
+            return;
+        }
+        let floor = sum / n as f64 - knee;
+        for c in self.companies.iter_mut().filter(|c| live(c)) {
+            let v = c.stock.fair_value_offset.unwrap_or(0.0);
+            if v < floor {
+                c.stock.fair_value_offset = Some(v + pull * (floor - v));
+            }
+        }
     }
 
     /// `buyback_accrual`'s close step, after the rates close. Each public,
@@ -13119,6 +13153,41 @@ mod tests {
         // number of times, so the divergence is the valuation rather than a
         // shifted stream.
         assert_eq!(stale.draws_consumed(), fresh.draws_consumed());
+    }
+
+    #[test]
+    fn the_relative_knee_pulls_only_a_name_past_it_toward_it() {
+        // `fair_value_relative_knee`: at the close, a name whose level sits
+        // more than the knee below the equal-weighted mean moves toward the
+        // knee by `1 - 0.5^(1/h)` of the gap; every other name is untouched.
+        let mut p = crate::params::PT_V20;
+        p.fair_value_relative_knee = 2.0;
+        p.fair_value_relative_half_life = 10.0;
+        let mut e = Engine::with_params(
+            5,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            p,
+        );
+        assert!(e.carries_fair_value_offsets());
+        for c in e.companies.iter_mut() {
+            c.stock.mispricing_s = Some(0.0);
+        }
+        e.set_fair_value_offsets(&[-6.0, 0.3, -0.3]).unwrap();
+        e.pull_relative_levels();
+        let v = e.fair_value_offsets();
+        let mean = (-6.0 + 0.3 - 0.3) / 3.0;
+        let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / 10.0);
+        assert_eq!(v[0], -6.0 + pull * ((mean - 2.0) - (-6.0)));
+        assert_eq!(v[1], 0.3);
+        assert_eq!(v[2], -0.3);
+        // Off at 0.0: nothing moves, whatever the half-life.
+        e.params.fair_value_relative_knee = 0.0;
+        e.set_fair_value_offsets(&[-6.0, 0.3, -0.3]).unwrap();
+        e.pull_relative_levels();
+        assert_eq!(e.fair_value_offsets(), vec![-6.0, 0.3, -0.3]);
     }
 
     #[test]

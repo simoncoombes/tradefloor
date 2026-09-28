@@ -399,6 +399,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Sessions the discount is given back at; 0 is the build's half-life.
     # 252 is a year's fear premium after the VIX has gone.
     "fair_value_vix_release_half_life": (0.0, 252.0),
+    # Log units below the roster's mean fair-value level; 0 is no knee, and a
+    # knee under 2 reaches ordinary names within a few years.
+    "fair_value_relative_knee": (0.0, 6.0),
+    # Sessions; read only with the knee set. 504 to 2520 is two to ten years.
+    "fair_value_relative_half_life": (0.0, 2520.0),
     # Read only on a session a caller pinned a macro field: a switch that
     # holds a pinned field through the close, the share of a pinned VIX
     # priced the moment it is published, and the most of the session's

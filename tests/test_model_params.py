@@ -1059,6 +1059,13 @@ PERTURBATIONS = [
     # probe's calm days never reach. tests/test_vix_discount.py holds it
     # (r16 spike).
     ("fair_value_vix_release_half_life", 60.0, False),
+    # INERT on this probe: the knee pulls only a name whose fair-value level
+    # sits more than the knee below the roster's mean, and three calm days
+    # open no name more than about 0.9 below it. Its half-life is read only
+    # with the knee set (COMPANIONS). tests/test_relative_knee.py holds the
+    # mechanism (r17 floor).
+    ("fair_value_relative_knee", 2.0, False),
+    ("fair_value_relative_half_life", 252.0, False),
     # INERT: both read only on a session a caller pinned a macro field, and
     # the probe pins nothing. tests/test_macro_pins_hold.py holds the
     # mechanisms.
@@ -1862,6 +1869,8 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The knee pulls at its half-life, and the pair is refused without it.
+    "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The live mark requires the close's re-mark (`ModelParams::invariants`).
     "rate_intraday_live": {"rate_close_remark": 1.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
