@@ -5057,13 +5057,24 @@ impl Engine {
             return false;
         }
         let exposure_before = self.economy.vix_feedback;
-        let excess = crate::market::tick::vix_excess(&self.params, self.economy.vix);
+        // The knee's excess, or the calm line's above it (`pinned_vix_calm_knee`).
+        let excess = crate::market::tick::pinned_vix_excess(&self.params, self.economy.vix);
         // The whole gap at 1.0, bit for bit; a share of it below.
         let w = self.params.pinned_vix_feedback;
-        self.economy.vix_feedback = if w == 1.0 {
+        let stepped = if w == 1.0 {
             excess
         } else {
             exposure_before + w * (excess - exposure_before)
+        };
+        // A HELD PIN PRICES ONCE (`pinned_vix_priced_cap`): the step never
+        // lifts the exposure past the share of the target priced on the day
+        // it lands, or past the exposure already standing, so a VIX held at
+        // one level closes no more of the gap on the sessions after; a step
+        // down is left as it is. A branch, so 0.0 is the step as it stood.
+        self.economy.vix_feedback = if self.params.pinned_vix_priced_cap != 0.0 {
+            crate::mathx::min(stepped, crate::mathx::max(exposure_before, w * excess))
+        } else {
+            stepped
         };
         // THE PRICED MOVE IS PART OF THE DAY'S VARIANCE
         // (`pinned_vix_variance_share`): the discount's change is recorded

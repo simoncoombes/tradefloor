@@ -1118,6 +1118,30 @@ OUT_OF_SCOPE = {
         "the 2008 replay's worst month read 131.8 against the real 84.3 on "
         "seed 201, because the session drew the market factor at its full "
         "variance on top of the priced move)",
+    "pinned_vix_calm_knee":
+        "inert at 0.0 as shipped: `market::tick::pinned_vix_excess` returns "
+        "the knee's excess bit for bit. Read only with "
+        "`pinned_vix_calm_share` and `pinned_vix_feedback` on and a VIX "
+        "pinned that session (0.8.5, r17 sf1: SF1, a forced VIX priced the "
+        "day it is published, read 0.82 on held-out seeds and 0.33 on the "
+        "thirteenth grade's, because a x2.5 pin from a VIX under 16 stayed "
+        "under the knee of 40 and moved no price, 11 of 30 held-out seeds "
+        "and 15 of 30 on 20201-20230). Target: the real median VIX 17.6 "
+        "(1990-2025)",
+    "pinned_vix_calm_share":
+        "inert at 0.0 as shipped: `market::tick::pinned_vix_excess` returns "
+        "the knee's excess bit for bit. Read only with "
+        "`pinned_vix_calm_knee` and `pinned_vix_feedback` on and a VIX "
+        "pinned that session (0.8.5, r17 sf1). Target: the S&P 500's "
+        "same-day log return on a one-day VIX spike from under 20, -0.05 "
+        "per log point (1990-2025)",
+    "pinned_vix_priced_cap":
+        "inert at 0.0 as shipped: `Engine::price_pinned_vix` takes the "
+        "share-of-the-gap step as it stood. Read only with "
+        "`pinned_vix_feedback` on and a VIX pinned that session (0.8.5, r17 "
+        "sf1: at `pinned_vix_feedback` 0.8 a held pin closed the last fifth "
+        "of the gap over the next four sessions, which capped SF1 near 0.8 "
+        "and was a fall an agent reading the VIX could sell ahead of)",
 }
 
 #: The provenance of each shipped dial value.

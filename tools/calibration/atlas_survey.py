@@ -401,6 +401,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "macro_pins_hold": (0.0, 1.0),
     "pinned_vix_feedback": (0.0, 1.0),
     "pinned_vix_variance_share": (0.0, 1.0),
+    # A pinned VIX's calm line: the VIX level it starts at (0 is none; 25
+    # is well above the real median of 17.6), its slope as a share of the
+    # knee's, and the switch that holds a pin's priced share.
+    "pinned_vix_calm_knee": (0.0, 25.0),
+    "pinned_vix_calm_share": (0.0, 1.0),
+    "pinned_vix_priced_cap": (0.0, 1.0),
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),

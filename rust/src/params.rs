@@ -1024,6 +1024,48 @@ pub struct ModelParams {
     /// / -0.85, slope -0.31 / -0.35 on the log change). Read only with
     /// `pinned_vix_feedback` on. In [0, 1].
     pub pinned_vix_variance_share: f64,
+    /// The VIX level from which a PINNED VIX is priced below the knee
+    /// (`pinned_vix_calm_share`). 0.0, which every preset carries, is none:
+    /// a pin is priced only on its excess over `fair_value_vix_knee`, so a
+    /// scenario that forces the VIX from 12 to 30 moves no price at all.
+    /// Above zero, with the share set, the target a pin moves the smoothed
+    /// exposure toward (`pinned_vix_feedback`) is the larger of the knee's
+    /// excess `ln(vix / fair_value_vix_knee)` and
+    /// `pinned_vix_calm_share * ln(vix / this)`: a second, shallower line
+    /// that starts at this level. Only a pin reads it; the close's pull on
+    /// an unpinned session still reads the knee alone, since a VIX the
+    /// market itself reached comes with the fall that raised it.
+    ///
+    /// Why. The SF1 row (a forced VIX priced the day it is published)
+    /// read 0.82 on held-out seeds and 0.33 on the thirteenth grade's: on
+    /// every seed whose VIX was under 16 on the day a x2.5 pin landed, the
+    /// pinned VIX stayed under the knee of 40, the paired move was zero and
+    /// the statistic a ratio of noise (11 of 30 held-out seeds 201-230, 15
+    /// of 30 on 20201-20230). The S&P 500 prices a VIX rise below 40 too:
+    /// the index's same-day log return on the log VIX change is -0.110
+    /// (corr -0.73) on sessions closing under 40, -0.05 on one-day spikes
+    /// of 16 per cent or more from under 20 (1990-2025). The real median
+    /// VIX, 17.6 over 1990-2025, is the natural level for the line to start.
+    /// Read only with `pinned_vix_feedback` on. In [0, 200].
+    pub pinned_vix_calm_knee: f64,
+    /// The slope of the calm line (`pinned_vix_calm_knee`) as a share of the
+    /// knee's: log exposure per log VIX above the calm knee. 0.0, which every
+    /// preset carries, is none. Read only with `pinned_vix_feedback` on and
+    /// the calm knee set. In [0, 1].
+    pub pinned_vix_calm_share: f64,
+    /// A switch: a pin never lifts the volatility feedback's exposure past
+    /// the share of its target it prices the day it lands
+    /// (`pinned_vix_feedback`). 0.0, which every preset carries, is the
+    /// share-of-the-gap step as it stood, so a VIX held at one pinned level
+    /// closes the rest of the gap over the following pinned sessions (80
+    /// per cent on the day at 0.8, 96 by the next, and so on): a fall an
+    /// agent reading the published VIX can sell ahead of. 1.0 caps the
+    /// step at `pinned_vix_feedback * target`, or at the exposure already
+    /// standing if that is higher and the target higher still, so a held
+    /// pin prices once and holds; a pin below the exposure steps down as
+    /// before. Read only with `pinned_vix_feedback` on and below 1.0. In
+    /// [0, 1].
+    pub pinned_vix_priced_cap: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
     /// which every preset through pt-v19 carries, is none; pt-v20 sets
@@ -6643,6 +6685,9 @@ impl ModelParams {
             fair_value_vix_release_half_life: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
+            pinned_vix_calm_knee: 0.0,
+            pinned_vix_calm_share: 0.0,
+            pinned_vix_priced_cap: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -9050,6 +9095,9 @@ impl ModelParams {
             "fair_value_vix_release_half_life" => self.fair_value_vix_release_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
+            "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
+            "pinned_vix_calm_share" => self.pinned_vix_calm_share,
+            "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -9373,6 +9421,9 @@ impl ModelParams {
             "fair_value_vix_release_half_life" => out.fair_value_vix_release_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
+            "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
+            "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
+            "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -10028,6 +10079,21 @@ impl ModelParams {
             return Err(format!(
                 "pinned_vix_variance_share is {}. It is the most of a session's market-factor variance a pinned VIX's priced move may take, in [0, 1].",
                 self.pinned_vix_variance_share));
+        }
+        if !(self.pinned_vix_calm_knee >= 0.0 && self.pinned_vix_calm_knee <= 200.0) {
+            return Err(format!(
+                "pinned_vix_calm_knee is {}. It is the VIX level from which a pinned VIX is priced below the knee, in [0, 200]; 0 is none.",
+                self.pinned_vix_calm_knee));
+        }
+        if !(self.pinned_vix_calm_share >= 0.0 && self.pinned_vix_calm_share <= 1.0) {
+            return Err(format!(
+                "pinned_vix_calm_share is {}. It is the calm line's slope as a share of the knee's, in [0, 1].",
+                self.pinned_vix_calm_share));
+        }
+        if !(self.pinned_vix_priced_cap >= 0.0 && self.pinned_vix_priced_cap <= 1.0) {
+            return Err(format!(
+                "pinned_vix_priced_cap is {}. It is a switch, in [0, 1].",
+                self.pinned_vix_priced_cap));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -10879,6 +10945,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_release_half_life",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
+        "pinned_vix_calm_knee",
+        "pinned_vix_calm_share",
+        "pinned_vix_priced_cap",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",
