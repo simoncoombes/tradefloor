@@ -4124,6 +4124,12 @@ impl PyEngine {
         if self.inner.pinned_vix_jump() != 0.0 {
             out.set_item("pinned_vix_jump", self.inner.pinned_vix_jump())?;
         }
+        // The day's market t scale (`market_day_tail_df`), a key only between
+        // an open that drew one and the close: the session's market draws
+        // read it.
+        if self.inner.market_day_scale() != 1.0 {
+            out.set_item("market_day_scale", self.inner.market_day_scale())?;
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.inner.pinned_corporate_spread() {
@@ -4991,6 +4997,17 @@ impl PyEngine {
                 "this snapshot's pinned_vix_jump is {jump}; the engine writes a finite move.")));
         }
         self.inner.set_pinned_vix_jump(jump);
+        // Absent means no open had drawn a day scale (the dial off, or a
+        // snapshot at a close).
+        let day_scale: f64 = match snapshot.get_item("market_day_scale")? {
+            Some(v) => v.extract()?,
+            None => 1.0,
+        };
+        if !(day_scale.is_finite() && day_scale > 0.0) {
+            return Err(ValidationError::new_err(format!(
+                "this snapshot's market_day_scale is {day_scale}; the engine writes a positive finite multiplier.")));
+        }
+        self.inner.set_market_day_scale(day_scale);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {

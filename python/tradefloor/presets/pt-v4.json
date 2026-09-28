@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v4",
   "fingerprint": "pt-v4",
-  "coefficient_digest": "b43bea0ac64b7c7c8e2b95270bbec3f7c17a089db383b776d51748589a0da4b2",
+  "coefficient_digest": "aa3f7233a61cfb1d2da613b4b1f03cbcbba05ef1bc69b2b47c9d330df1497fe3",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_depth_coefficient": 0.0,
@@ -158,6 +158,8 @@
     "market_beta_down_asym_lag_recentre": 0.0,
     "market_beta_down_asym_recentre": 0.0,
     "market_burn_in_sessions": 0.0,
+    "market_day_tail_df": 0.0,
+    "market_day_tail_state_share": 0.0,
     "market_factor_sigma": 0.015879388479656826,
     "market_idio_down_suppress": 0.0,
     "market_pe_buybacks": 0.0,

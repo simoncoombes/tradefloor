@@ -680,6 +680,12 @@ pub struct Engine {
     /// close; 0.0, never written, with the dial off. Carried by the snapshot
     /// and the state hash only while non-zero, as `macro_pins_today` is.
     pinned_vix_jump: f64,
+    /// The day's market t scale (`market_day_tail_df`): the multiplier on
+    /// the market factor's variance for this session, drawn at the open
+    /// and cleared to 1.0 by the close. Exactly 1.0, never written, with
+    /// the dial off. Carried by the snapshot and the state hash only while
+    /// it is not 1.0.
+    market_day_scale: f64,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -1554,6 +1560,7 @@ impl Engine {
             macro_pins_today: 0,
             pinned_corporate_spread: 0.0,
             pinned_vix_jump: 0.0,
+            market_day_scale: 1.0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -5121,6 +5128,19 @@ impl Engine {
     /// least `1 - share` of it. The state's sigma, bit for bit, with no such
     /// move.
     pub fn market_sigma_today(&self) -> f64 {
+        let sigma = self.market_sigma_before_day_scale();
+        // The day's t scale (`market_day_tail_df`): exactly 1.0 with the
+        // dial off, so the product is skipped and the sigma is the bits it was.
+        if self.market_day_scale == 1.0 {
+            sigma
+        } else {
+            sigma * crate::mathx::sqrt(self.market_day_scale)
+        }
+    }
+
+    /// The session's market sigma before the day's t scale: the state's
+    /// sigma, less a priced VIX move's share (`pinned_vix_variance_share`).
+    fn market_sigma_before_day_scale(&self) -> f64 {
         let sigma = self.market_vol.sigma_daily();
         let j = self.pinned_vix_jump;
         if j == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
@@ -5134,17 +5154,87 @@ impl Engine {
         sigma * crate::mathx::sqrt(keep)
     }
 
+    /// The day's t scale on the market factor's variance
+    /// (`market_day_tail_df`), 1.0 with the dial off or before the open
+    /// drew one.
+    pub fn market_day_scale(&self) -> f64 {
+        self.market_day_scale
+    }
+
+    /// Put the day's t scale back, for checkpoints.
+    pub fn set_market_day_scale(&mut self, value: f64) {
+        self.market_day_scale = value;
+    }
+
+    /// Draw the day's t scale (`market_day_tail_df`) on the overnight
+    /// stream: `m = (nu - 2) / X`, `X = 2 G`, `G` a gamma of shape `nu / 2`
+    /// by Marsaglia and Tsang, so `E[m] = 1` and the day's market factor
+    /// is a unit-variance Student t times the state's sigma. The day's
+    /// variance `m v` is held under the state's ceiling and never below `v`
+    /// by that cap: `m <= max(1, C b / v)`, `C` the ceiling multiple and `b`
+    /// the baseline variance.
+    fn draw_market_day_scale(&mut self) {
+        let nu = self.params.market_day_tail_df;
+        if nu == 0.0 {
+            return;
+        }
+        let rng = &mut self.overnight_rng;
+        rng.site(Site::MarketDayTailChi2, 0);
+        let shape = 0.5 * nu;
+        let d = shape - 1.0 / 3.0;
+        let c = 1.0 / crate::mathx::sqrt(9.0 * d);
+        let mut gamma = shape;
+        // Accepted within a few tries at every shape the dial allows
+        // (above 0.97 per try at shape 1.5); the bound is a guard, and the
+        // mean is kept if it binds.
+        for _ in 0..64 {
+            let x = rng.next_normal();
+            let t = 1.0 + c * x;
+            if t <= 0.0 {
+                continue;
+            }
+            let v = t * t * t;
+            let u = rng.next_f64();
+            if u > 0.0 && crate::mathx::log(u) < 0.5 * x * x + d - d * v + d * crate::mathx::log(v) {
+                gamma = d * v;
+                break;
+            }
+        }
+        let chi2 = 2.0 * gamma;
+        let mut m = if chi2 > 0.0 { (nu - 2.0) / chi2 } else { 1.0 };
+        let v = self.market_vol.variance();
+        let b = self.params.market_factor_sigma * self.params.market_factor_sigma;
+        if v > 0.0 && b > 0.0 {
+            let cap = crate::mathx::max(1.0, self.params.market_vol_ceiling_multiple * b / v);
+            m = crate::mathx::min(m, cap);
+        }
+        self.market_day_scale = m;
+    }
+
     /// A market-factor draw as the variance state reads it: the draw
     /// itself, or, on a session whose draws a priced VIX move scaled
     /// (`market_sigma_today`), the draw at the state's full sigma, so the
     /// state evolves as it would have without the scale. The draw itself,
     /// bit for bit, with no such move.
     fn factor_for_state(&self, f: f64) -> f64 {
+        // The day's t scale, as much of it as the state reads
+        // (`market_day_tail_state_share`): the draw times
+        // `m^(-(1 - share) / 2)`. The draw itself with the dial off.
+        let f = if self.market_day_scale == 1.0 {
+            f
+        } else {
+            let share = self.params.market_day_tail_state_share;
+            if share == 1.0 {
+                f
+            } else {
+                f * crate::mathx::pow(self.market_day_scale, -0.5 * (1.0 - share))
+            }
+        };
         if self.pinned_vix_jump == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
             return f;
         }
         let full = self.market_vol.sigma_daily();
-        let today = self.market_sigma_today();
+        let today = self.market_sigma_before_day_scale();
         if today > 0.0 && today != full {
             f * (full / today)
         } else {
@@ -5518,6 +5608,10 @@ impl Engine {
             self.overnight_rng.site(Site::OvernightIdioZ, i as u32);
             z_idio.push(self.overnight_rng.next_normal());
         }
+        // The day's market t scale (`market_day_tail_df`), after the three
+        // sites above and before the night reads the market sigma. Nothing
+        // is drawn with the dial off.
+        self.draw_market_day_scale();
         self.overnight_moves.clear();
         self.overnight_moves.resize(self.companies.len(), 0.0);
         self.earnings_moves.clear();
@@ -7502,6 +7596,7 @@ impl Engine {
         }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
+        self.market_day_scale = 1.0;
         self.advance_anticipation_drift();
         self.refresh_earnings_anticipation();
         // The close's phase into the published history. The burn-in runs
@@ -9919,6 +10014,12 @@ impl Engine {
         if self.pinned_vix_jump != 0.0 {
             hash_f64(&mut buf, 10.0);
             hash_f64(&mut buf, self.pinned_vix_jump);
+        }
+        // The day's market t scale (`market_day_tail_df`), only between an
+        // open that drew one and the close, behind its own tag.
+        if self.market_day_scale != 1.0 {
+            hash_f64(&mut buf, 12.0);
+            hash_f64(&mut buf, self.market_day_scale);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

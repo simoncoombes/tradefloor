@@ -630,6 +630,10 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 1.0)},
     "market_vol_leverage_standardise": {"kind": "abs", "step_unit": 0.1,
                                         "hard_range": (0.0, 1.0)},
+    "market_day_tail_df": {"kind": "abs", "step_unit": 1.0,
+                           "hard_range": (0.0, 200.0)},
+    "market_day_tail_state_share": {"kind": "abs", "step_unit": 0.1,
+                                    "hard_range": (0.0, 1.0)},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     # How far the factor's shock share rotates with its own variance
