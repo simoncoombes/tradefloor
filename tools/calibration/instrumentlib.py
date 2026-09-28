@@ -161,9 +161,11 @@ PARAM_SPECS: dict[str, dict] = {
     "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fair_value_market_linear": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "fair_value_market_vol_cap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 32.0)},
+    "fair_value_market_excess_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
     "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    "fair_value_vix_release_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
     # Switches whose identity is the value, read only under a macro pin.
     "macro_pins_hold": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
                         "derived": True},

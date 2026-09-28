@@ -899,6 +899,30 @@ pub struct ModelParams {
     /// permanent share. Read only with `fair_value_market_share` non-zero.
     /// In [0, 32].
     pub fair_value_market_vol_cap: f64,
+    /// A floor under the market's permanent share above the ceiling
+    /// `fair_value_market_vol_cap` sets: the share of what the ceiling takes
+    /// off that moves fair value for good anyway. 0.0, which every preset
+    /// carries, is the ceiling as it stood (the share falls as `cap / sigma`
+    /// and the rest reverts on the mispricing half-life); 1.0 is no ceiling.
+    /// Off zero the share above the ceiling is
+    /// `capped + this * (share - capped)`, `capped` the ceiling's share, so
+    /// even the most turbulent market move keeps at least this share of it.
+    /// It applies wherever the ceiling does: the session's ticks, the night
+    /// and the market jump.
+    ///
+    /// Why. With the ceiling alone, a fear regime's market moves are almost
+    /// wholly transient: a crash sits in `s` and comes back on the 60-session
+    /// half-life, so the index rises after a VIX spike on a schedule the VIX
+    /// announces. On the r15 screen's leading arm (R15F, 90 held-out
+    /// histories) the index gained 1.96, 4.81 and 7.61 per cent over its
+    /// unconditional drift 21, 63 and 126 sessions after a one-day VIX rise
+    /// in the history's top 1 per cent, against -1.44, -0.50 and +2.75 (se
+    /// 1.14, 1.47, 1.89) on the S&P 500 and VIX 1990-2025; the C10 rules
+    /// that lever up after such a rise were ahead in 0.69 to 0.72 of the
+    /// histories, where on the tape's 21-year windows they are ahead in 0
+    /// to 0.35. Read only with `fair_value_market_share` and
+    /// `fair_value_market_vol_cap` non-zero. In [0, 1].
+    pub fair_value_market_excess_share: f64,
     /// Volatility feedback: a discount on every name's fair value while the
     /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
     /// knee))`. 0.0, which every preset through pt-v19 carries, is none;
@@ -932,6 +956,25 @@ pub struct ModelParams {
     /// snapshot and the state hash carry the exposure only while this and
     /// the gain are both set. In [0, 252].
     pub fair_value_vix_half_life: f64,
+    /// Half-life, in sessions, at which the volatility feedback's smoothed
+    /// exposure falls back toward a LOWER target: the discount is built at
+    /// `fair_value_vix_half_life` and given back at this. 0.0, which every
+    /// preset carries, is the one half-life both ways, as it stood. Read
+    /// only with the gain and `fair_value_vix_half_life` set; no new state
+    /// (the exposure the snapshot and the state hash already carry).
+    ///
+    /// Why. At one half-life of 5 sessions the discount is given back as
+    /// fast as the VIX falls, so the index's rise after a VIX spike runs on
+    /// a schedule the published VIX announces: on the r15 screen's leading
+    /// arm (R15F) the discount's give-back alone was worth +2.5 and +3.8
+    /// per cent 63 and 126 sessions after a one-day VIX rise in the
+    /// history's top 1 per cent (desk decomposition, seeds 201-206), where
+    /// the S&P 500's whole excess return after the same events 1990-2025
+    /// was -0.5 and +2.75. A fear premium that outlasts the VIX's own fall,
+    /// as required returns stay high after a crisis while risk appetite
+    /// recovers, gives the same depth with a slower, smaller rebound. In
+    /// [0, 2520].
+    pub fair_value_vix_release_half_life: f64,
     /// How much of a pinned VIX is priced the moment it is published: the
     /// share of the gap between the smoothed exposure and the pinned VIX's
     /// own excess that the pin closes. 0.0, which every preset carries,
@@ -6584,9 +6627,11 @@ impl ModelParams {
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
             fair_value_market_vol_cap: 0.0,
+            fair_value_market_excess_share: 0.0,
             fair_value_vix_discount: 0.0,
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
+            fair_value_vix_release_half_life: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
             buyback_yield_cap: 0.0,
@@ -8989,9 +9034,11 @@ impl ModelParams {
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
             "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
+            "fair_value_market_excess_share" => self.fair_value_market_excess_share,
             "fair_value_vix_discount" => self.fair_value_vix_discount,
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
+            "fair_value_vix_release_half_life" => self.fair_value_vix_release_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "buyback_yield_cap" => self.buyback_yield_cap,
@@ -9310,9 +9357,11 @@ impl ModelParams {
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
             "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
+            "fair_value_market_excess_share" => out.fair_value_market_excess_share = value,
             "fair_value_vix_discount" => out.fair_value_vix_discount = value,
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
+            "fair_value_vix_release_half_life" => out.fair_value_vix_release_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
@@ -10265,6 +10314,11 @@ impl ModelParams {
                 "fair_value_vix_half_life is {}. It is a half-life in sessions, in [0, 252]; 0 reads the VIX as it stands.",
                 self.fair_value_vix_half_life));
         }
+        if !(self.fair_value_vix_release_half_life >= 0.0 && self.fair_value_vix_release_half_life <= 2520.0) {
+            return Err(format!(
+                "fair_value_vix_release_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 gives the discount back at fair_value_vix_half_life.",
+                self.fair_value_vix_release_half_life));
+        }
         if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
             return Err(format!(
                 "fair_value_vix_knee is {}. It is a VIX level, in (0, 200].",
@@ -10274,6 +10328,11 @@ impl ModelParams {
             return Err(format!(
                 "fair_value_market_vol_cap is {}. It is a multiple of market_factor_sigma, in [0, 32]; 0 is no ceiling.",
                 self.fair_value_market_vol_cap));
+        }
+        if !(self.fair_value_market_excess_share >= 0.0 && self.fair_value_market_excess_share <= 1.0) {
+            return Err(format!(
+                "fair_value_market_excess_share is {}. It is the share of what the volatility ceiling takes off the market's permanent share that stays permanent, in [0, 1].",
+                self.fair_value_market_excess_share));
         }
         if !(self.fair_value_market_linear >= 0.0 && self.fair_value_market_linear <= 1.0) {
             return Err(format!(
@@ -10804,9 +10863,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_market_share",
         "fair_value_market_linear",
         "fair_value_market_vol_cap",
+        "fair_value_market_excess_share",
         "fair_value_vix_discount",
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
+        "fair_value_vix_release_half_life",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
         "buyback_yield_cap",

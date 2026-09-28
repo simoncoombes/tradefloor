@@ -7365,7 +7365,17 @@ impl Engine {
             && !exposure_pinned
         {
             let target = crate::market::tick::vix_excess(&self.params, self.economy.vix);
-            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_vix_half_life);
+            // A fall back toward a lower target is pulled at
+            // `fair_value_vix_release_half_life` when that is set; a branch,
+            // so 0.0 is the one half-life both ways, as it stood.
+            let half_life = if self.params.fair_value_vix_release_half_life != 0.0
+                && target < self.economy.vix_feedback
+            {
+                self.params.fair_value_vix_release_half_life
+            } else {
+                self.params.fair_value_vix_half_life
+            };
+            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / half_life);
             self.economy.vix_feedback += pull * (target - self.economy.vix_feedback);
         }
 

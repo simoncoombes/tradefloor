@@ -794,6 +794,27 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_leverage` is 0.0",
     "market_vol_leverage_down":
         "unread while `market_vol_leverage` is 0.0",
+    "fair_value_market_excess_share":
+        "inert at 0.0 as shipped: `market::tick::market_permanent_share` "
+        "branches on `== 0.0` and returns the ceiling's share as it stood. "
+        "Off zero it puts back that share of what `fair_value_market_vol_cap` "
+        "takes off the market's permanent share above the ceiling, so a "
+        "fear regime's market moves are not almost wholly transient. Target: "
+        "the index's path after a VIX spike, +1.96/+4.81/+7.61 per cent at "
+        "21/63/126 sessions over the drift on the r15 screen's R15F against "
+        "-1.44/-0.50/+2.75 on the S&P 500 1990-2025, and the C10 rules that "
+        "lever up after a spike (0.8.5 thirteenth-registration work, "
+        "sim/r16-spike)",
+    "fair_value_vix_release_half_life":
+        "inert at 0.0 as shipped: the close branches on `== 0.0` and pulls the "
+        "volatility feedback's exposure at `fair_value_vix_half_life` both "
+        "ways, as it stood. Off zero, a fall toward a lower target is pulled "
+        "at this half-life, so the discount outlasts the VIX's own fall. "
+        "Target: the discount's give-back after a VIX spike, +2.5/+3.8 per "
+        "cent at 63/126 sessions on the r15 screen's R15F (desk "
+        "decomposition) against the S&P 500's whole excess of -0.5/+2.75 "
+        "after the same events 1990-2025, and the audit's xfb lever rule "
+        "(0.8.5 thirteenth-registration work, sim/r16-spike)",
     "market_vol_leverage_standardise":
         "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
         "memory counts a day in the baseline sd, the form that stood "

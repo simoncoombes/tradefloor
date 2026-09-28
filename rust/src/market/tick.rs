@@ -908,6 +908,11 @@ fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
 /// `market_factor_sigma`, times `ceiling_scale` (exactly 1.0 unless
 /// `market_vol_cycle_cap_relative` is set; a branch at 1.0). The share
 /// itself at a cap of 0.0, bit for bit.
+///
+/// Above the ceiling, `fair_value_market_excess_share` of what the ceiling
+/// took off the share is put back: `capped + e * (share - capped)`. At 0.0,
+/// every preset's value, that is the capped share bit for bit (a branch);
+/// at 1.0 it is the share itself, as a cap of 0.0 gives.
 pub fn market_permanent_share(
     p: &crate::params::ModelParams,
     market_sigma_daily: f64,
@@ -920,7 +925,12 @@ pub fn market_permanent_share(
     let ceiling = p.fair_value_market_vol_cap * p.market_factor_sigma;
     let ceiling = if ceiling_scale == 1.0 { ceiling } else { ceiling * ceiling_scale };
     if market_sigma_daily > ceiling {
-        share * (ceiling / market_sigma_daily)
+        let capped = share * (ceiling / market_sigma_daily);
+        if p.fair_value_market_excess_share == 0.0 {
+            capped
+        } else {
+            capped + p.fair_value_market_excess_share * (share - capped)
+        }
     } else {
         share
     }

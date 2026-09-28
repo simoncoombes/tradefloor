@@ -383,11 +383,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # market's daily sigma spends most of its time (median 0.78, 99th
     # percentile 4.9 on pt-v20).
     "fair_value_market_vol_cap": (0.0, 4.0),
+    # A share of what the ceiling takes off the market's permanent share: 0
+    # is the ceiling as it stood, 1 no ceiling.
+    "fair_value_market_excess_share": (0.0, 1.0),
     # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
     # about a quarter off fair value, past any measured feedback.
     "fair_value_vix_discount": (0.0, 0.3),
     # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
     "fair_value_vix_half_life": (0.0, 63.0),
+    # Sessions the discount is given back at; 0 is the build's half-life.
+    # 252 is a year's fear premium after the VIX has gone.
+    "fair_value_vix_release_half_life": (0.0, 252.0),
     # Read only on a session a caller pinned a macro field: a switch that
     # holds a pinned field through the close, the share of a pinned VIX
     # priced the moment it is published, and the most of the session's

@@ -1025,6 +1025,11 @@ PERTURBATIONS = [
     # never reaches 1.5 times the base; 0.5 binds on every tick and is
     # LIVE. Was (1.5, False). tests/test_market_linear.py holds it.
     ("fair_value_market_vol_cap", 0.5, True),
+    # INERT on this probe: the share it puts back is read only above the
+    # ceiling (1.5 base sigmas on pt-v20), which the probe's market sigma
+    # never reaches (see the ceiling's row above: 2.0 and 0.0 are inert
+    # here too). tests/test_market_linear.py holds the mechanism (r16 spike).
+    ("fair_value_market_excess_share", 1.0, False),
     # INERT on this probe: the discount applies only while the VIX is above
     # its knee (40 on pt-v20, 30 by default), and the probe's three calm
     # days sit below it. tests/test_vix_discount.py holds the mechanism.
@@ -1037,6 +1042,11 @@ PERTURBATIONS = [
     # the knee, which is zero on this probe (above), so it stays 0.0 at
     # any half-life. Was inert because the default carried no discount.
     ("fair_value_vix_half_life", 10.0, False),
+    # INERT on this probe for the same reason as the half-life above: the
+    # exposure is read only while the VIX has been above the knee, which the
+    # probe's calm days never reach. tests/test_vix_discount.py holds it
+    # (r16 spike).
+    ("fair_value_vix_release_half_life", 60.0, False),
     # INERT: both read only on a session a caller pinned a macro field, and
     # the probe pins nothing. tests/test_macro_pins_hold.py holds the
     # mechanisms.
