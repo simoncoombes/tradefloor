@@ -12869,6 +12869,41 @@ mod tests {
     }
 
     #[test]
+    fn the_relative_knee_pulls_only_a_name_past_it_toward_it() {
+        // `fair_value_relative_knee`: at the close, a name whose level sits
+        // more than the knee below the equal-weighted mean moves toward the
+        // knee by `1 - 0.5^(1/h)` of the gap; every other name is untouched.
+        let mut p = crate::params::PT_V20;
+        p.fair_value_relative_knee = 2.0;
+        p.fair_value_relative_half_life = 10.0;
+        let mut e = Engine::with_params(
+            5,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            p,
+        );
+        assert!(e.carries_fair_value_offsets());
+        for c in e.companies.iter_mut() {
+            c.stock.mispricing_s = Some(0.0);
+        }
+        e.set_fair_value_offsets(&[-6.0, 0.3, -0.3]).unwrap();
+        e.pull_relative_levels();
+        let v = e.fair_value_offsets();
+        let mean = (-6.0 + 0.3 - 0.3) / 3.0;
+        let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / 10.0);
+        assert_eq!(v[0], -6.0 + pull * ((mean - 2.0) - (-6.0)));
+        assert_eq!(v[1], 0.3);
+        assert_eq!(v[2], -0.3);
+        // Off at 0.0: nothing moves, whatever the half-life.
+        e.params.fair_value_relative_knee = 0.0;
+        e.set_fair_value_offsets(&[-6.0, 0.3, -0.3]).unwrap();
+        e.pull_relative_levels();
+        assert_eq!(e.fair_value_offsets(), vec![-6.0, 0.3, -0.3]);
+    }
+
+    #[test]
     fn a_bankrupt_company_stops_ticking_once_the_engine_is_told() {
         // The reason `set_status` exists. The tick skips a company only when
         // it reads `is_bankrupt || !is_public`, so before there was a setter

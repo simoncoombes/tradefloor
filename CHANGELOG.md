@@ -312,6 +312,18 @@ index's rise after a VIX spike, which on the r15 screen's leading arm ran
 one-day VIX rise in a history's top 1 per cent, against -1.44, -0.50 and
 +2.75 on the S&P 500 1990-2025.
 
+`fair_value_relative_knee` and `fair_value_relative_half_life` put a knee
+under a name's own fair-value level: at each close a name whose level sits
+more than the knee below the roster's equal-weighted mean is pulled back
+toward the knee at the half-life, and no other name moves. The level is a
+random walk with no anchor, so over a century a name can fall to the 0.01
+price floor and sit there (the thirteenth grade's H1-100y: one name at the
+floor for 277 sessions). Both are 0 on every preset and every known-answer
+digest is unchanged; the book known answer moved for the fingerprint only.
+On R16A with a knee of 4 and a half-life of 63 sessions no name reaches the
+floor on 60 held-out 100-year runs, where R16A has 3,171 name-days at it on
+seeds 20201-20212.
+
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
 meeting, in quarter points, where the ladder would cut less, hold or hike,

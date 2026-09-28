@@ -1010,7 +1010,12 @@ pub struct ModelParams {
     /// falls that far is restructured, recapitalised or taken over; one that
     /// is not leaves the index. With a fixed roster the knee stands in for
     /// that: only the names past the knee are touched, and every other
-    /// name's level is left as it was. In [0, 20].
+    /// name's level is left as it was. Measured on R16A at 4.0 with a
+    /// 63-session half-life (box r17floor1c, 100-year runs on held-out seeds
+    /// 201-212, 20201-20212 and 30201-30236): no name at the floor, where R16A
+    /// has 3,171 name-days at it on 20201-20212; the lowest close of any name
+    /// e^1.88 times the floor or more; H1-100y's other clauses as R16A's. A
+    /// 21-year history reaches the knee in 5 to 7 of 90. In [0, 20].
     pub fair_value_relative_knee: f64,
     /// Half-life, in sessions, of the pull `fair_value_relative_knee` puts on
     /// a name's fair-value level below the knee. Read only with the knee

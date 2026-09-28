@@ -1405,6 +1405,59 @@ to the volatility ceiling.
 | $\psi$ | `fair_value_news_share` | 1.0 (0, off) | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
 | $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
 
+#### The knee under a name's level
+
+**Timescale:** once a session, at the close, after the buybacks. **State:**
+none beyond $v$.
+
+$v$ has no anchor. Every permanent part of a name's moves adds to it with its
+$-\tfrac12\Delta^2$, so over a century the names' levels spread without
+bound, and a high-beta name loses about $\tfrac12(\beta^2 - 1)\sigma_m^2$ a
+year against the market through every turbulent year. On R16A (the
+thirteenth grade's arm; seeds 201-208, 100 years) the cross-sectional sd of
+$v_i - \bar v$ is 1.0 at 21 years, 1.5 at 50 and 2.0 at 100, and the deepest
+name reaches -11. A name that far down prints at the 0.01 price floor and
+stays there: the thirteenth grade's H1-100y failed on one name at the floor
+for 277 sessions, and on held-out seeds 20201-20212 R16A has 3,171 name-days
+at the floor (seed 20201, one name, decades 80 and 90). A real company that
+falls that far is restructured, recapitalised or taken over, or leaves the
+index; this roster is fixed.
+
+With `fair_value_relative_knee` $k$ and `fair_value_relative_half_life` $h$
+(`engine.rs`, `pull_relative_levels`), at each close, over the public,
+solvent, traded names,
+
+```math
+\bar v = \frac1n\sum_j v_j,
+\qquad
+v_i \leftarrow v_i + \big(1 - 2^{-1/h}\big)\,\big(\bar v - k - v_i\big)
+\quad\text{when } v_i < \bar v - k
+```
+
+and no other name moves. It draws nothing, and the price follows $v$ from
+the next tick ($s$ is not touched). $k = 0$ is off on every preset.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $k$ | `fair_value_relative_knee` | 0 (off) | fitted on a candidate | r17 floor box r17floor1c, held-out seeds |
+| $h$ | `fair_value_relative_half_life` | 0 (read only with $k$) | fitted on a candidate | the same |
+
+Measured on a candidate (no preset sets it). On R16A with $k = 4$ and
+$h = 63$ (box r17floor1c; 100-year runs on the certified roster), no name
+reaches the floor on seeds 201-212, 20201-20212 or 30201-30236: the lowest
+close of any name is $e^{2.59}$, $e^{3.20}$ and $e^{1.88}$ times the floor
+(R16A: $e^{1.63}$, the floor itself, and $e^{0.42}$), and each seed's lowest
+name sits on average $e^{4.24}$, $e^{4.53}$ and $e^{4.52}$ above it (se 0.27,
+0.20, 0.16). The deepest name left is a $3.91 name early in a run during a
+market trough, 2.6 to 3.1 below the mean, which the knee does not reach.
+H1-100y's other clauses stay where R16A has them on all three sets: each
+decade's volatility over the first decade's within 0.001, the share of moves
+over 20 per cent within 0.0005 points (and never above R16A's), and the tick
+autocorrelation's decade mean within 0.003. In a 21-year history the knee is
+reached in 5, 7 and 6 of 90 (R16A's relative levels on seeds 201-230,
+501-530, 801-830 and the same plus 20000 and 30000); every other history is
+R16A's to the bit.
+
 ### The factor structure
 
 **Timescale:** every tick. **Draws:** one market normal $z_t$, one normal
