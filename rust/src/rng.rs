@@ -223,6 +223,11 @@ pub enum Site {
     /// Taken only while `overnight_idio_df` is set on a model with a night
     /// share, so every other model's overnight schedule is the one it was.
     OvernightIdioChi2 = 24,
+    /// The day's market t scale (`market_day_tail_df`): the gamma draw
+    /// behind one chi-square per session, normals and uniforms by
+    /// Marsaglia and Tsang (a variable count), on [`stream::OVERNIGHT`]
+    /// after every other overnight site. Taken only while the dial is set.
+    MarketDayTailChi2 = 25,
 }
 
 impl Site {
@@ -253,6 +258,7 @@ impl Site {
             Site::CrisisEpicentreU => "crisis_epicentre_u",
             Site::CycleNowcastU => "cycle_nowcast_u",
             Site::OvernightIdioChi2 => "overnight_idio_chi2",
+            Site::MarketDayTailChi2 => "market_day_tail_chi2",
         }
     }
 }

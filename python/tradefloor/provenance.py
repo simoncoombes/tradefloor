@@ -819,6 +819,23 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
         "memory counts a day in the baseline sd, the form that stood "
         "(0.8.5 thirteenth-registration work, sim/r15-volstate)",
+    "market_day_tail_df":
+        "inert at 0.0 as shipped: `Engine::draw_market_day_scale` returns "
+        "before any draw, the day's multiplier stays exactly 1.0 and "
+        "`market_sigma_today` skips the product, so the session's market "
+        "sigma is the bits it was and the snapshot and state hash omit it. "
+        "Off zero each session's market variance is multiplied by "
+        "(nu - 2) / chi-square(nu), a Student-t day at the state's variance. "
+        "Target: the certification's tail row, index_tail_dn3_pct, 0.52 on "
+        "R16A's thirteenth grade against [0.64, 2.34] and 0.81 on 60 "
+        "held-out varying-roster seeds, and the index's one-year excess "
+        "kurtosis, 0.9 against the tape's 1.46; the S&P 500's GJR-t fit "
+        "1990-2025 reads nu = 6.9 (0.8.5 fourteenth-registration work, "
+        "sim/r17-d1tail)",
+    "market_day_tail_state_share":
+        "unread while `market_day_tail_df` is 0.0; at 0.0 the variance "
+        "state reads the day as if drawn at its own variance (0.8.5 "
+        "fourteenth-registration work, sim/r17-d1tail)",
     "market_vol_cycle_ratio":
         "inert at 0.0 as shipped: `Engine::close_market` branches on "
         "`== 0.0` before the cycle multiplier, which is never stepped, and "

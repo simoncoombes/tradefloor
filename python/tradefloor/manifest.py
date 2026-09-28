@@ -495,6 +495,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "pinned_corporate_spread",
          # Today's priced VIX move, only while a pin has made one.
          "pinned_vix_jump",
+         # The day's market t scale, only between an open that drew one
+         # and the close (`market_day_tail_df`).
+         "market_day_scale",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -767,6 +770,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("pinned_vix_jump"):
         _f64(buf, 10.0)
         _f64(buf, float(snapshot["pinned_vix_jump"]))
+    if "market_day_scale" in snapshot and float(snapshot["market_day_scale"]) != 1.0:
+        _f64(buf, 12.0)
+        _f64(buf, float(snapshot["market_day_scale"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

@@ -1130,7 +1130,11 @@ def _nothing_dormant():
                    market_vol_cycle_relative=1.0,
                    # Its two pin switches are 0.0 or 1.0 (r15 bearcycle).
                    market_vol_cycle_pin_neutral=1.0,
-                   market_vol_cycle_pin_phase=1.0)
+                   market_vol_cycle_pin_phase=1.0,
+                   # The day's market t scale takes degrees of freedom from
+                   # 3 (r17 d1tail); at 5 a restore between the open and
+                   # the close has a live scale to carry.
+                   market_day_tail_df=5.0)
     return tf.ModelParams.from_preset(**dormant)
 
 

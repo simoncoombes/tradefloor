@@ -2739,6 +2739,57 @@ pub struct ModelParams {
     /// volatility (Bouchaud, Matacz and Potters 2001 normalise the index
     /// kernel the same way).
     pub market_vol_leverage_standardise: f64,
+    /// Degrees of freedom of the day's market draw: each session's
+    /// market-factor variance is multiplied by `m = (nu - 2) / X`, `X` a
+    /// chi-square with `nu` degrees of freedom drawn once at the open, so
+    /// the day's market factor is a Student t with `nu` degrees of freedom
+    /// and the variance the state set (a GARCH-t innovation). 0.0, which
+    /// every preset carries, is the normal day that stood: no draw, no
+    /// state. `E[m] = 1`, so the mean variance, the VIX's read of it and
+    /// the index volatility level do not move; what moves is the day's
+    /// tail. The multiplier scales the night's market draw and every tick's
+    /// alike, so the whole day is one t draw, and the day's variance
+    /// `m * v` is held under the state's ceiling (`market_vol_ceiling_multiple`
+    /// baselines), never below `v`. Drawn on `stream::OVERNIGHT` after the
+    /// night's normals (a gamma by Marsaglia and Tsang, so `nu` need not be
+    /// an integer); the snapshot and the state hash carry `m` only between
+    /// an open that drew one and the close. 0 or in [3, 200].
+    ///
+    /// Why. The certification's tail row (`index_tail_dn3_pct`, sessions at
+    /// or below -3 per cent) read 0.52 on R16A's thirteenth grade against
+    /// [0.64, 2.34]; on held-out seeds R16A reads 0.81 on the varying
+    /// rosters (60 seeds) against a tape centre of 1.21 (1990-2025) and
+    /// 1.49 (1928-2025), with half the seeds at zero. The index's own
+    /// one-year excess kurtosis reads a median of 0.9 against the tape's
+    /// 1.46: at a given variance the model's day is Gaussian, so a -3 per
+    /// cent day needs a storm. A GJR-GARCH(1,1) with Student-t
+    /// innovations fitted by maximum likelihood to the S&P 500's daily log
+    /// returns 1990-2025 (^GSPC closes; the same fit with normal
+    /// innovations gives `market_vol_alpha`, `market_vol_beta` and
+    /// `market_vol_gamma` to four places) puts the degrees of freedom at
+    /// 6.9, a profile-likelihood 95 per cent interval of 6.0 to 8.0; the
+    /// normal fit's standardised residuals have an excess kurtosis of 2.05
+    /// and 1.38 per cent of days below -2.5 against a normal's 0.62.
+    ///
+    /// Measured on R16A (sim/r17-d1tail, the certification's varying-roster
+    /// protocol, 720 held-out seeds, 201-230, 501-530, 801-830, 2001-2270
+    /// and each plus 20000): at 7, with `market_day_tail_state_share` 1, the
+    /// one-year index kurtosis went from 0.8 to 1.6 and the share of seeds
+    /// with no -3 per cent session from 0.66 to 0.58, but the tail row only
+    /// from 0.64 to 0.76; at 4, 5 and 6 no higher. On the varying rosters a
+    /// -3 per cent day is near three of the index's sigmas, about where a t
+    /// and a normal of one variance cross. Not recommended on R16A for that
+    /// row; it stays inert.
+    pub market_day_tail_df: f64,
+    /// The share of the day's t scale the market variance state reads: the
+    /// state is fed the day factor times `m^(-(1 - this) / 2)`. 0.0, which
+    /// every preset carries, feeds it the day as if drawn at the state's
+    /// own variance, so a fat-tailed day moves the next day's variance, the
+    /// VIX's target and the return memory no more than a normal one; 1.0
+    /// feeds it the day as it landed, the GARCH-t recursion, where a large
+    /// day raises the next day's variance by its size. Read only with
+    /// `market_day_tail_df` set. In [0, 1].
+    pub market_day_tail_state_share: f64,
 
     /// How far the common factor's shock share moves with the factor's own
     /// variance excursion. 0.0 is a constant share, which is every preset
@@ -6513,6 +6564,8 @@ impl ModelParams {
             market_vol_leverage_half_life: 0.0,
             market_vol_leverage_down: 0.0,
             market_vol_leverage_standardise: 0.0,
+            market_day_tail_df: 0.0,
+            market_day_tail_state_share: 0.0,
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
@@ -8943,6 +8996,8 @@ impl ModelParams {
             "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
             "market_vol_leverage_down" => self.market_vol_leverage_down,
             "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
+            "market_day_tail_df" => self.market_day_tail_df,
+            "market_day_tail_state_share" => self.market_day_tail_state_share,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
@@ -9269,6 +9324,8 @@ impl ModelParams {
             "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
             "market_vol_leverage_down" => out.market_vol_leverage_down = value,
             "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
+            "market_day_tail_df" => out.market_day_tail_df = value,
+            "market_day_tail_state_share" => out.market_day_tail_state_share = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
@@ -10154,6 +10211,18 @@ impl ModelParams {
                 "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
                 self.market_vol_leverage_standardise));
         }
+        if !(self.market_day_tail_df == 0.0
+            || (self.market_day_tail_df >= 3.0 && self.market_day_tail_df <= 200.0))
+        {
+            return Err(format!(
+                "market_day_tail_df is {}. It is the degrees of freedom of the day's market draw, 0 (a normal day) or in [3, 200].",
+                self.market_day_tail_df));
+        }
+        if !(self.market_day_tail_state_share >= 0.0 && self.market_day_tail_state_share <= 1.0) {
+            return Err(format!(
+                "market_day_tail_state_share is {}. It is the share of the day's t scale the market variance state reads, in [0, 1].",
+                self.market_day_tail_state_share));
+        }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
@@ -10869,6 +10938,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_leverage_half_life",
         "market_vol_leverage_down",
         "market_vol_leverage_standardise",
+        "market_day_tail_df",
+        "market_day_tail_state_share",
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",
