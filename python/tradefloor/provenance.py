@@ -815,6 +815,20 @@ OUT_OF_SCOPE = {
         "decomposition) against the S&P 500's whole excess of -0.5/+2.75 "
         "after the same events 1990-2025, and the audit's xfb lever rule "
         "(0.8.5 thirteenth-registration work, sim/r16-spike)",
+    "fair_value_relative_knee":
+        "inert at 0.0 as shipped: the close branches on `== 0.0` and pulls "
+        "nothing. Off zero, a name whose fair-value level `v` sits more than "
+        "this many log units below the roster's equal-weighted mean is pulled "
+        "back toward the knee at `fair_value_relative_half_life`, so a name "
+        "cannot walk to the 0.01 price floor over a century and sit there. "
+        "Target: H1-100y's floor clause (0 floor share per decade; the "
+        "thirteenth grade had one name at the floor for 277 sessions in "
+        "decade 60-70), with no crossing on a 21-year history so no other "
+        "row moves (0.8.5 fourteenth-registration work, sim/r17-floor)",
+    "fair_value_relative_half_life":
+        "unread while `fair_value_relative_knee` is 0.0; with the knee set it "
+        "is the pull's half-life in sessions and must be positive (0.8.5 "
+        "fourteenth-registration work, sim/r17-floor)",
     "market_vol_leverage_standardise":
         "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
         "memory counts a day in the baseline sd, the form that stood "

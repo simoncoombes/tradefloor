@@ -6665,6 +6665,40 @@ impl Engine {
             self.rates.close();
         }
         self.accrue_buybacks();
+        self.pull_relative_levels();
+    }
+
+    /// `fair_value_relative_knee`'s close step, after the buybacks. The
+    /// reference is the equal-weighted mean fair-value level of the public,
+    /// solvent names with a mispricing state; each such name whose level
+    /// sits more than the knee below it is pulled toward the knee at
+    /// `fair_value_relative_half_life`. A branch at 0.0, and nothing runs
+    /// unless the model carries the levels (so the snapshot and the state
+    /// hash see every change). No draws.
+    fn pull_relative_levels(&mut self) {
+        let knee = self.params.fair_value_relative_knee;
+        if knee == 0.0 || !self.carries_fair_value_offsets() {
+            return;
+        }
+        let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_relative_half_life);
+        let live = |c: &TickCompany| {
+            c.is_public && !c.is_bankrupt && c.stock.mispricing_s.is_some()
+        };
+        let (mut sum, mut n) = (0.0, 0usize);
+        for c in self.companies.iter().filter(|c| live(c)) {
+            sum += c.stock.fair_value_offset.unwrap_or(0.0);
+            n += 1;
+        }
+        if n < 2 {
+            return;
+        }
+        let floor = sum / n as f64 - knee;
+        for c in self.companies.iter_mut().filter(|c| live(c)) {
+            let v = c.stock.fair_value_offset.unwrap_or(0.0);
+            if v < floor {
+                c.stock.fair_value_offset = Some(v + pull * (floor - v));
+            }
+        }
     }
 
     /// `buyback_accrual`'s close step, after the rates close. Each public,

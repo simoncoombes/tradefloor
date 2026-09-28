@@ -984,6 +984,38 @@ pub struct ModelParams {
     /// (ahead 0.64 to 0.57), and D2's sessions back to the high from 67 to
     /// 78 (real 126); the driven 2020 fall (F1) is unchanged. In [0, 2520].
     pub fair_value_vix_release_half_life: f64,
+    /// A knee on how far a name's own fair-value level `v` may sit below the
+    /// roster's: the depth, in log units below the equal-weighted mean `v` of
+    /// the public, solvent, traded names, past which the close pulls the
+    /// name's level back toward the knee at `fair_value_relative_half_life`.
+    /// 0.0, which every preset carries, is a branch: no pull, nothing read.
+    /// Off zero, each close adds `(1 - 0.5^(1/h)) (-k - rel)` to the level of
+    /// every name whose `rel = v - mean(v)` is below `-k`, and nothing to any
+    /// other name. It draws nothing and holds no state beyond `v` (which the
+    /// snapshot and the state hash already carry), and it runs only while
+    /// the model carries the levels. The pull moves the fair value, not `s`,
+    /// so the price follows it at the next tick.
+    ///
+    /// Why. `v` is a random walk with no anchor: the permanent share of a
+    /// name's own news, its beta's share of every market move, and its
+    /// earnings surprises all add to it for good, each with its `-dv^2/2`,
+    /// so a high-beta name loses `(beta^2 - 1) sigma_m^2 / 2` a year against
+    /// the market through every turbulent year. Over a century the spread of
+    /// the levels grows without bound: on R16A (seeds 201-208, 100 years) the
+    /// equal-weighted relative level's cross-sectional sd is 1.0 at 21 years,
+    /// 1.5 at 50 and 2.0 at 100, and a name's deepest relative level reaches
+    /// -11. A name that far down, with the market's own trough on top, prints
+    /// at the 0.01 price floor and sits there (the thirteenth grade's
+    /// H1-100y: a name at the floor for 277 sessions). A real company that
+    /// falls that far is restructured, recapitalised or taken over; one that
+    /// is not leaves the index. With a fixed roster the knee stands in for
+    /// that: only the names past the knee are touched, and every other
+    /// name's level is left as it was. In [0, 20].
+    pub fair_value_relative_knee: f64,
+    /// Half-life, in sessions, of the pull `fair_value_relative_knee` puts on
+    /// a name's fair-value level below the knee. Read only with the knee
+    /// set, and then it must be positive. In [0, 25200].
+    pub fair_value_relative_half_life: f64,
     /// How much of a pinned VIX is priced the moment it is published: the
     /// share of the gap between the smoothed exposure and the pinned VIX's
     /// own excess that the pin closes. 0.0, which every preset carries,
@@ -6641,6 +6673,8 @@ impl ModelParams {
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
             fair_value_vix_release_half_life: 0.0,
+            fair_value_relative_knee: 0.0,
+            fair_value_relative_half_life: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
             buyback_yield_cap: 0.0,
@@ -9048,6 +9082,8 @@ impl ModelParams {
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
             "fair_value_vix_release_half_life" => self.fair_value_vix_release_half_life,
+            "fair_value_relative_knee" => self.fair_value_relative_knee,
+            "fair_value_relative_half_life" => self.fair_value_relative_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "buyback_yield_cap" => self.buyback_yield_cap,
@@ -9371,6 +9407,8 @@ impl ModelParams {
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
             "fair_value_vix_release_half_life" => out.fair_value_vix_release_half_life = value,
+            "fair_value_relative_knee" => out.fair_value_relative_knee = value,
+            "fair_value_relative_half_life" => out.fair_value_relative_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
@@ -10328,6 +10366,21 @@ impl ModelParams {
                 "fair_value_vix_release_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 gives the discount back at fair_value_vix_half_life.",
                 self.fair_value_vix_release_half_life));
         }
+        if !(self.fair_value_relative_knee >= 0.0 && self.fair_value_relative_knee <= 20.0) {
+            return Err(format!(
+                "fair_value_relative_knee is {}. It is a depth in log units below the roster's mean fair-value level, in [0, 20]; 0 is no knee.",
+                self.fair_value_relative_knee));
+        }
+        if !(self.fair_value_relative_half_life >= 0.0 && self.fair_value_relative_half_life <= 25200.0) {
+            return Err(format!(
+                "fair_value_relative_half_life is {}. It is a half-life in sessions, in [0, 25200].",
+                self.fair_value_relative_half_life));
+        }
+        if self.fair_value_relative_knee != 0.0 && self.fair_value_relative_half_life == 0.0 {
+            return Err(format!(
+                "fair_value_relative_knee is {} and fair_value_relative_half_life is 0. The knee pulls at that half-life, so set it (in sessions, above 0).",
+                self.fair_value_relative_knee));
+        }
         if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
             return Err(format!(
                 "fair_value_vix_knee is {}. It is a VIX level, in (0, 200].",
@@ -10877,6 +10930,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
         "fair_value_vix_release_half_life",
+        "fair_value_relative_knee",
+        "fair_value_relative_half_life",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
         "buyback_yield_cap",
