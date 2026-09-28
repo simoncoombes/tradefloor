@@ -312,6 +312,15 @@ index's rise after a VIX spike, which on the r15 screen's leading arm ran
 one-day VIX rise in a history's top 1 per cent, against -1.44, -0.50 and
 +2.75 on the S&P 500 1990-2025.
 
+`pinned_vix_calm_knee` and `pinned_vix_calm_share` price a pinned VIX below
+the knee of the volatility feedback: a pin's target is the larger of the
+knee's excess and a shallower line from the calm knee. Without them a
+scenario that forces the VIX from 12 to 30 moved no price, so the share of a
+forced VIX priced the day it lands was a ratio of noise on half the seeds.
+`pinned_vix_priced_cap` stops a VIX held at one pinned level from closing the
+rest of the gap over the sessions after. All three are 0 on every preset and
+every known-answer digest is unchanged.
+
 `fed_put_gain` gives the central bank a Fed put: at a meeting with inflation
 under 4, it cuts by the gain times the index's log fall since the last
 meeting, in quarter points, where the ladder would cut less, hold or hike,

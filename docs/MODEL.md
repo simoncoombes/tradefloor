@@ -2815,6 +2815,14 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 ```
 
   for the state's daily variance $v_d$: a small priced move leaves the day's total at $v_d$, and a large one keeps at least $1 - s$ of the draw. The variance state reads each draw rescaled to $\sqrt{v_d}$, so it evolves as it would have without the scale. Off, a replay that pins the real VIX every session adds the priced move to a full draw: with $w = 1$ the 2008 replay's worst month read 131.8 against the real 84.3 (seed 201). Real: above a VIX of 40 the day's log VIX change explains 0.61 (2020) to 0.72 (2007-09) of the S&P 500's daily variance. The move is carried by the snapshot and both state hashes only while non-zero, and the close clears it.
+- **A pinned VIX priced below the knee** (`pinned_vix_calm_knee` $K_c$, `pinned_vix_calm_share` $c$; read only with `pinned_vix_feedback` on). Off, a pin's target is the knee's excess alone, so a scenario that forces the VIX from 12 to 30 moves no price: on R16A, 11 of 30 held-out seeds (201-230) and 15 of 30 on 20201-20230 had a paired morning move of exactly zero under SF1's x2.5 hold, and SF1 read 0.80 / 0.39 on 30 seeds. On, the pin's target is
+
+```math
+x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
+```
+
+  and the close's pull on an unpinned session still reads the knee alone, since a VIX the market itself reached comes with the fall that raised it. $K_c = 17.6$ is the real median VIX (1990-2025); at $c = 0.2$ a pin under the knee moves the index $g\,w\,c = 0.056$ log points per log point of VIX the day it lands, against the S&P 500's 0.05 on one-day spikes of 16 per cent or more from under 20 (1990-2025; -0.110 on every session closing under 40).
+- **A held pin priced once** (`pinned_vix_priced_cap`, a switch; read only with `pinned_vix_feedback` on). Off, a VIX held at one pinned level keeps closing the gap: $w$ of it on the day, then $w$ of the rest each pinned session, a fall an agent reading the VIX can sell ahead of, and SF1 reads near $w$ even where the pin prices a large move. On, the step is capped at $\max(e, w\,x)$, so a held pin prices once and holds; a pin below the exposure steps down as before. Screen r17sf1s1 (R16A with $K_c = 17.6$, $c = 0.2$ and the cap): SF1 1.06 / 1.03 on the graded 12 seeds of held-out sets A and B, the driven 2022 P/E per 100 bp of Baa -7.1 / -7.2 (real -5.2), the driven 2020 sessions back to the high 97.5 / 71 (real 126).
 - **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.

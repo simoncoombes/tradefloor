@@ -1046,12 +1046,25 @@ pub struct ModelParams {
     /// (corr -0.73) on sessions closing under 40, -0.05 on one-day spikes
     /// of 16 per cent or more from under 20 (1990-2025). The real median
     /// VIX, 17.6 over 1990-2025, is the natural level for the line to start.
+    ///
+    /// Measured on R16A (sim/r17-sf1 screen r17sf1s1, held-out set A
+    /// 201-230/501-530/801-830 and set B, the same plus 20000) with 17.6,
+    /// `pinned_vix_calm_share` 0.2 and `pinned_vix_priced_cap` 1.0: SF1 on
+    /// the graded 12 seeds 1.06 / 1.03 (R16A 0.82 / 0.66), every one of 30
+    /// seeds on set B at 0.86 or more; the driven 2022 P/E per 100 bp of Baa
+    /// -7.1 / -7.2 against the S&P 500's -5.2 (R16A -3.8 / -4.0); the driven
+    /// 2020 sessions back to the high 97.5 / 71 against 126 (R16A 78 / 61).
     /// Read only with `pinned_vix_feedback` on. In [0, 200].
     pub pinned_vix_calm_knee: f64,
     /// The slope of the calm line (`pinned_vix_calm_knee`) as a share of the
     /// knee's: log exposure per log VIX above the calm knee. 0.0, which every
-    /// preset carries, is none. Read only with `pinned_vix_feedback` on and
-    /// the calm knee set. In [0, 1].
+    /// preset carries, is none. At 0.2 with `fair_value_vix_discount` 0.35
+    /// and `pinned_vix_feedback` 0.8 a pin under the knee moves the index
+    /// 0.056 log points per log point of VIX the day it lands, against the
+    /// S&P 500's 0.05 on one-day spikes from under 20 (1990-2025); 0.3 and
+    /// 0.4 take the driven 2022 P/E slope to -8.7 and -10.2 (band -10.4 to
+    /// -2.6). Read only with `pinned_vix_feedback` on and the calm knee set.
+    /// In [0, 1].
     pub pinned_vix_calm_share: f64,
     /// A switch: a pin never lifts the volatility feedback's exposure past
     /// the share of its target it prices the day it lands
@@ -1063,8 +1076,11 @@ pub struct ModelParams {
     /// step at `pinned_vix_feedback * target`, or at the exposure already
     /// standing if that is higher and the target higher still, so a held
     /// pin prices once and holds; a pin below the exposure steps down as
-    /// before. Read only with `pinned_vix_feedback` on and below 1.0. In
-    /// [0, 1].
+    /// before. Without it a pin at 0.8 reads SF1 near 0.8 even where it
+    /// prices a large move (0.76 to 0.90 on R16A's seeds above the knee), so
+    /// the row sits a noise's width over its 0.75 floor; with it the row
+    /// reads 1.02 to 1.06 on both held-out sets (screen r17sf1s1). Read only
+    /// with `pinned_vix_feedback` on and below 1.0. In [0, 1].
     pub pinned_vix_priced_cap: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. 0.0,
