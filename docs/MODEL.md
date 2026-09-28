@@ -1763,6 +1763,44 @@ not the more efficient form: per unit of leverage sum it cost about as much B5
 and B7 (45 histories each). It is kept for the mean-one multiplier in a storm,
 not for a better trade.
 
+**A Student-t day** (`market_day_tail_df` $\nu$, `market_day_tail_state_share`
+$\varsigma_t$). Off on every shipped preset. Off zero, each open draws one
+multiplier on the day's market variance on the overnight stream, after the
+night's normals (a gamma by Marsaglia and Tsang), and the night's market draw
+and every tick read the session's sigma times its root
+(`draw_market_day_scale` and `market_sigma_today` in `engine.rs`):
+
+```math
+m_d = \min\Big(\frac{\nu - 2}{X_d},\ \max\big(1,\ C\,b_m / v_d\big)\Big),
+\qquad X_d \sim \chi^{2}_{\nu},
+\qquad \sigma_{d}^{\text{day}} = \sqrt{m_d\,v_d}
+```
+
+$E[m_d] = 1$, so the day's market factor is a unit-variance Student t at the
+state's variance and the VIX, which reads $v_d$, does not see it in advance.
+$C$ is the ceiling multiple (32). The close feeds the variance state the day
+factor times $m_d^{-(1 - \varsigma_t)/2}$: at $\varsigma_t = 0$ a fat-tailed
+day moves the next day's variance no more than a normal one, at 1 it moves it
+by its size (the GARCH-t recursion). The close clears $m_d$ to 1; the snapshot
+and the state hash carry it only between the open and the close.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $\nu$ | `market_day_tail_df` | 0 (off) | | 0 or in [3, 200]; the S&P 500's GJR-GARCH(1,1)-t fit 1990-2025 reads 6.9 (profile 95% interval 6.0 to 8.0) |
+| $\varsigma_t$ | `market_day_tail_state_share` | 0 | | in [0, 1]; read only with $\nu$ set |
+
+What it was measured to do (sim/r17-d1tail, R16A, the certification's
+varying-roster protocol, 720 held-out seeds: 201-230, 501-530, 801-830,
+2001-2270 and the same plus 20000). At $\nu = 7$, $\varsigma_t = 1$ the index's
+one-year excess kurtosis rose from a median of 0.8 to 1.6 (tape 1.46) and the
+share of seeds with no session at or below -3 per cent fell from 0.66 to
+0.58, but the tail row `index_tail_dn3_pct` rose only from 0.64 to 0.76
+(tape 1.21 over 1990-2025, band [0.64, 2.34]): at the varying rosters' index
+volatility, about 15 per cent against the tape's 18, a -3 per cent day is a
+3-sigma day, near where a t and a normal of equal variance cross, and the
+t's extra mass sits further out. It is therefore not in the vector the
+sim/r17-d1tail recommends on top of R16A; see [Jumps](#jumps) for what it recommends instead.
+
 #### The business cycle in the market's volatility
 
 Off on every shipped preset (`market_vol_cycle_ratio` 0.0, where the close
