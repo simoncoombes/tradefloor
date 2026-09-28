@@ -5209,6 +5209,26 @@ pub struct ModelParams {
     /// a single agent, `evaluate` and an untraded market never read it.
     /// Off the live book it orders only `World.rejected`.
     pub book_arrival_shuffle: f64,
+    /// Whether an agent's resting order that the book has left crossed
+    /// during the session trades at its OWN limit. A switch.
+    ///
+    /// 0.0, which every preset carries: an order the maker's re-quote
+    /// leaves crossed (a resting ask below the maker's new bid) trades
+    /// against the ladder at the ladder's prices before the tick's flow, so
+    /// the price improvement goes to the resting order.
+    ///
+    /// 1.0: it trades at its own limit, as a continuous book fills a
+    /// standing order at its price and gives any improvement to the order
+    /// that arrives, here the maker's re-quote (Nasdaq Rule 4757, NYSE
+    /// Pillar 7.36-7.37). It is still taker flow, and still pays its
+    /// impact. Without it an agent that pushes the price up with taker buys
+    /// while resting asks at the touch sells those asks at the maker's
+    /// higher bid, more than it paid for the same shares a tick earlier:
+    /// the round-trip guard's wash on a name quoted a cent wide (R16A,
+    /// held-out seeds). The open is unchanged: an order the night's gap
+    /// went through fills at the opening ladder's prices, as an opening
+    /// auction would fill it.
+    pub book_cross_at_limit: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills.
@@ -5288,6 +5308,39 @@ pub struct ModelParams {
     /// size from rewarding a stream of tiny orders. 0.0 is a pure power
     /// law. In [0, 0.05].
     pub impact_memory_crossover: f64,
+    /// Whether an agent's resting order that fills AGAINST the metaorder
+    /// memory's lean refills the memory. A switch.
+    ///
+    /// 0.0, which every preset carries: only taker flow against the house
+    /// moves the memory. A resting order the market's own flow fills does
+    /// not, and one the maker's re-quote leaves crossed is taker flow whose
+    /// move is capped by what it paid, which at its own limit is about
+    /// nothing.
+    ///
+    /// 1.0: a resting order filled on the side against the lean (an ask
+    /// while agents' flow has displaced the price up, a bid while it has
+    /// displaced it down), by the market's flow or by a crossing during the
+    /// session, takes its size off the memory, uncapped, never past zero.
+    /// A crossed order's shares beyond zero are taker flow as before, and
+    /// every crossed share still pays the linear law. On the lean's own
+    /// side nothing changes: a bid filled under a buy lean adds depth the
+    /// lean did not take.
+    ///
+    /// Why. Without it, a group of agents that buys as a taker and sells
+    /// the same shares back through asks resting at the touch ends flat,
+    /// but the memory has seen only the buys, and a third agent sells a
+    /// holding into the displacement. The round-trip guard's wash
+    /// (`metaorder_curve.py trips`) found it on names quoted a cent wide,
+    /// where the inside ask joins the maker's queue at the touch: +0.51 bp
+    /// on the thirteenth grade and up to +18 bp on held-out seeds (R16A).
+    /// In the volume-recovery book of Obizhaeva and Wang (Journal of
+    /// Financial Markets 16(1), 2013) and Alfonsi, Fruth and Schied (2010)
+    /// the displacement is the consumed depth, and an order resting on the
+    /// consumed side is new depth there; Eisler, Bouchaud and Kockelkoren
+    /// (Quantitative Finance 12(9), 2012) measure a limit order's impact
+    /// with the sign opposite to a market order's on its side. Taker orders
+    /// are unchanged. Read only with `impact_memory_coefficient` on.
+    pub impact_memory_refill: f64,
 
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
     /// How fast VIX reverts toward its target each day.
@@ -6700,12 +6753,14 @@ impl ModelParams {
             book_refill_half_life: 0.0,
             book_resting: 0.0,
             book_arrival_shuffle: 0.0,
+            book_cross_at_limit: 0.0,
             fill_impact_coefficient: 0.0,
             impact_memory_coefficient: 0.0,
             impact_memory_half_life: 0.0,
             impact_memory_slow_half_life: 0.0,
             impact_memory_slow_weight: 0.0,
             impact_memory_crossover: 0.0,
+            impact_memory_refill: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -9107,12 +9162,14 @@ impl ModelParams {
             "book_refill_half_life" => self.book_refill_half_life,
             "book_resting" => self.book_resting,
             "book_arrival_shuffle" => self.book_arrival_shuffle,
+            "book_cross_at_limit" => self.book_cross_at_limit,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
             "impact_memory_coefficient" => self.impact_memory_coefficient,
             "impact_memory_half_life" => self.impact_memory_half_life,
             "impact_memory_slow_half_life" => self.impact_memory_slow_half_life,
             "impact_memory_slow_weight" => self.impact_memory_slow_weight,
             "impact_memory_crossover" => self.impact_memory_crossover,
+            "impact_memory_refill" => self.impact_memory_refill,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -9430,12 +9487,14 @@ impl ModelParams {
             "book_refill_half_life" => out.book_refill_half_life = value,
             "book_resting" => out.book_resting = value,
             "book_arrival_shuffle" => out.book_arrival_shuffle = value,
+            "book_cross_at_limit" => out.book_cross_at_limit = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
             "impact_memory_coefficient" => out.impact_memory_coefficient = value,
             "impact_memory_half_life" => out.impact_memory_half_life = value,
             "impact_memory_slow_half_life" => out.impact_memory_slow_half_life = value,
             "impact_memory_slow_weight" => out.impact_memory_slow_weight = value,
             "impact_memory_crossover" => out.impact_memory_crossover = value,
+            "impact_memory_refill" => out.impact_memory_refill = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -9691,6 +9750,11 @@ impl ModelParams {
                 "impact_memory_crossover is {m}. It is a fraction of daily volume, in \
                  [0, 0.05]; 0.0 is a pure power law."));
         }
+        let r = self.impact_memory_refill;
+        if !(r == 0.0 || r == 1.0) {
+            return Err(format!(
+                "impact_memory_refill is {r}. It is a switch: 0.0 as shipped, 1.0 on."));
+        }
         if y == 0.0 {
             return Ok(());
         }
@@ -9887,7 +9951,8 @@ impl ModelParams {
                           ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting),
-                          ("book_arrival_shuffle", self.book_arrival_shuffle)] {
+                          ("book_arrival_shuffle", self.book_arrival_shuffle),
+                          ("book_cross_at_limit", self.book_cross_at_limit)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -10936,12 +11001,14 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_refill_half_life",
         "book_resting",
         "book_arrival_shuffle",
+        "book_cross_at_limit",
         "fill_impact_coefficient",
         "impact_memory_coefficient",
         "impact_memory_half_life",
         "impact_memory_slow_half_life",
         "impact_memory_slow_weight",
         "impact_memory_crossover",
+        "impact_memory_refill",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",

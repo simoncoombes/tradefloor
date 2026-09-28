@@ -172,6 +172,16 @@
 //! every agent, so splitting an order across agent names does not escape
 //! it. The linear `gamma` stays as the long-lived permanent part.
 //!
+//! Two switches, both 0 on every preset, handle agents' RESTING orders
+//! against the memory (sim/r17-wash). `impact_memory_refill`: a resting
+//! order filled against the memory's lean (by the market's flow, or crossed
+//! during the session) takes its size off the memory, never past zero, as
+//! new depth on the side the lean consumed; without it a group that buys as
+//! a taker and sells back through asks at the touch leaves the memory
+//! displaced for free. `book_cross_at_limit`: a resting order the book
+//! leaves crossed during the session trades at its own limit, not at the
+//! maker's better price. See `Engine::refill_memory`.
+//!
 //! What a tick's flow may add to the displacement is capped by what it
 //! paid: `|D(after) - D(before)| <= (1 + delta) * paid / |net shares|`,
 //! `paid` the flow's `sum shares * |log(price / reference)|`. A sell back

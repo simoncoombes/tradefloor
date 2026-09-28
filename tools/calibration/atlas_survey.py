@@ -328,6 +328,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "impact_memory_slow_half_life": (0.0, 39000.0),
     "impact_memory_slow_weight": (0.0, 0.5),
     "impact_memory_crossover": (0.0, 0.01),
+    # Switches (sim/r17-wash): a resting order against the memory's lean
+    # refills it; a resting order crossed during the session trades at its
+    # own limit.
+    "impact_memory_refill": (0.0, 1.0),
+    "book_cross_at_limit": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is

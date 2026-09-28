@@ -521,6 +521,28 @@ OUT_OF_SCOPE = {
         "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
         ": the linear regime below m* of daily volume (Bucci, "
         "Benzaquen, Lillo and Bouchaud, PRL 122, 108302, 2019)",
+    "impact_memory_refill":
+        "inert at 0.0 as shipped: `Engine::refill_memory` is never called, "
+        "so only taker flow against the house moves the metaorder memory, "
+        "and it is unread while `impact_memory_coefficient` is 0.0. Read "
+        "only when an agent's RESTING order fills against the memory's lean "
+        "(by the market's flow, or crossed during the session): at 1.0 it "
+        "takes its size off the memory, never past zero, as new depth on "
+        "the side the lean consumed (Obizhaeva and Wang 2013; Alfonsi, "
+        "Fruth and Schied 2010). Target: row G-rt's wash on names quoted a "
+        "cent wide, +0.51 bp on the thirteenth grade (R16A, trip seed 15532, "
+        "name 19) and up to +18 bp on held-out trip seeds (0.8.5 "
+        "fourteenth-round work, sim/r17-wash)",
+    "book_cross_at_limit":
+        "inert at 0.0 as shipped: a resting order the book leaves crossed "
+        "during the session trades at the ladder's prices, as it stood. "
+        "Read only when an agent's resting order is crossed: at 1.0 it "
+        "trades at its own limit and the improvement is the arriving "
+        "re-quote's (price-time priority, Nasdaq Rule 4757). Target: row "
+        "G-rt's wash, where resting asks at the touch sold at the maker's "
+        "higher bid after the group's own taker buys lifted it, +19 bp on "
+        "the two wash legs alone on a held-out trip seed (R16A; 0.8.5 "
+        "fourteenth-round work, sim/r17-wash)",
     # CASH DIVIDENDS (0.8.5 realism work, sim/real-dividends). Inert on
     # every shipped preset; a candidate for a new registration, with the
     # graded arm as the fallback.
