@@ -491,6 +491,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # the market's forecast of the policy path, only while
          # `treasury_path_pricing` is set.
          "fed_stress_hold_age", "treasury_policy_path",
+         # What the curve prices of the next meeting, only while
+         # `policy_anticipation` is set.
+         "policy_anticipation_priced",
          # and the spread a spread pin holds tonight, only with its mark.
          "pinned_corporate_spread",
          # Today's priced VIX move, only while a pin has made one.
@@ -755,6 +758,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "treasury_policy_path" in snapshot:
         _f64(buf, 11.0)
         _f64(buf, float(snapshot["treasury_policy_path"]))
+    if "policy_anticipation_priced" in snapshot:
+        _f64(buf, 31.0)
+        _f64(buf, float(snapshot["policy_anticipation_priced"]))
     if "rate_live_marks" in snapshot:
         marks = list(snapshot["rate_live_marks"])
         if len(marks) != 6:

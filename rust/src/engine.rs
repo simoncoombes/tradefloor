@@ -795,6 +795,11 @@ pub struct Engine {
     /// dial off; carried in the snapshot and the state hash only while it is
     /// set.
     policy_path: f64,
+    /// `policy_anticipation`: the share of the next meeting's expected change
+    /// the curve prices tonight, `P`, percentage points, signed. 0.0 and
+    /// never touched with the dial off; carried in the snapshot and the
+    /// state hash only while it is set.
+    policy_anticipation_priced: f64,
     /// The rate instruments, if the embedder listed any
     /// ([`Engine::set_rate_instruments`]). Empty on every engine built
     /// without them, and an empty book is never touched: no hook runs, no
@@ -1582,6 +1587,7 @@ impl Engine {
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             policy_path: 0.0,
+            policy_anticipation_priced: 0.0,
             rates: crate::rates::RateBook::default(),
             book: crate::agent_book::BookState::default(),
             cycle_history: std::collections::VecDeque::new(),
@@ -7500,6 +7506,14 @@ impl Engine {
             self.economy.corporate_bond_yield =
                 self.economy.treasury_yield_10y + self.pinned_corporate_spread;
         }
+        // THE ANTICIPATED MEETING (`policy_anticipation`): what the curve
+        // prices of the next decision, re-read on tonight's economy, and the
+        // 10-year, the 2-year and the corporate yield moved by the change in
+        // what they price. A branch: off, nothing runs, and no draw at any
+        // setting.
+        if self.params.policy_anticipation != 0.0 {
+            self.reprice_anticipated_meeting(request, &policy, meeting_held, pins_today);
+        }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
         self.advance_anticipation_drift();
@@ -7683,6 +7697,7 @@ impl Engine {
                 // reads them as the close does.
                 priced_put: self.priced_fed_put(),
                 priced_path: self.priced_policy_path(),
+                priced_anticipation: self.priced_anticipation(),
                 rate_damping: self.params.treasury_policy_damping,
                 haven_gain: self.params.treasury_haven_gain,
                 // Credit's VIX slope and leverage term
@@ -8529,6 +8544,125 @@ impl Engine {
             0.0
         } else {
             self.params.treasury_path_pricing * self.policy_path
+        }
+    }
+
+    /// What the curve prices of the next meeting (`policy_anticipation`),
+    /// for the snapshot: `Some` only while the dial is set.
+    pub fn policy_anticipation_priced(&self) -> Option<f64> {
+        if self.params.policy_anticipation == 0.0 {
+            None
+        } else {
+            Some(self.policy_anticipation_priced)
+        }
+    }
+
+    /// For a restore. Refused with the dial off, where no engine writes it.
+    pub fn set_policy_anticipation_priced(&mut self, priced: Option<f64>) -> Result<(), String> {
+        match priced {
+            Some(_) if self.params.policy_anticipation == 0.0 => Err(
+                "this snapshot carries what the curve prices of the next meeting \
+                 (policy_anticipation_priced), which only an engine with policy_anticipation \
+                 on writes, and this engine's model has it off. Restore it into the model it \
+                 was taken from."
+                    .to_string()),
+            Some(v) => {
+                self.policy_anticipation_priced = v;
+                Ok(())
+            }
+            None => {
+                self.policy_anticipation_priced = 0.0;
+                Ok(())
+            }
+        }
+    }
+
+    /// The next decision the curve prices tonight (`policy_anticipation`),
+    /// percentage points, signed. 0.0 with the dial off.
+    fn priced_anticipation(&self) -> f64 {
+        if self.params.policy_anticipation == 0.0 {
+            0.0
+        } else {
+            self.policy_anticipation_priced
+        }
+    }
+
+    /// The change the next meeting would make if it were held at tonight's
+    /// close, as the market can forecast it: the meeting function on the
+    /// economy as published (the published phase, growth and VIX; inflation,
+    /// unemployment and the rate as they stand), with tonight's options, on
+    /// a silent draw source. No stream is touched and nothing is written.
+    fn shadow_meeting_change(&self, request: &DayAdvanceRequest, options: &crate::economy::PolicyOptions) -> f64 {
+        struct Silent;
+        impl Rng for Silent {
+            fn next_f64(&mut self) -> f64 {
+                0.5
+            }
+            fn next_normal(&mut self) -> f64 {
+                0.0
+            }
+        }
+        let mut economy = self.economy.clone();
+        economy.cycle_phase = self.published_cycle_phase();
+        economy.gdp_growth = self.published_gdp_growth();
+        economy.vix = self.published_vix();
+        let mut cb = self.central_bank;
+        cb.next_meeting_date = request.timestamp;
+        let options = crate::economy::PolicyOptions {
+            stress_level: self.stress_vix_max,
+            stress_hold: self.params.fed_stress_hold != 0.0
+                && self.stress_hold_age < self.params.fed_stress_hold,
+            path_before: self.priced_policy_path(),
+            ..*options
+        };
+        let shadow = update_central_bank_with(&cb, &economy, request.timestamp, &mut Silent, &options);
+        shadow.economy.federal_funds_rate - self.economy.federal_funds_rate
+    }
+
+    /// `policy_anticipation` at the close: `P = a w S`, with `S` the shadow
+    /// meeting's change (a cut times `policy_anticipation_cut_share`) and `w`
+    /// the share of the interval from the last meeting to the next already
+    /// elapsed. The curve holds `f P` above what it would be without it,
+    /// `f` the pass-through the priced path has (`1 - d` on the 10-year and
+    /// the corporate yield, `0.85 + 0.15 (1 - d)` on the 2-year, with `d`
+    /// `treasury_policy_damping`): the daily anchor keeps it, and a meeting,
+    /// which re-anchors the 10-year halfway to a target that does not carry
+    /// it and sets the 2-year from the rate, leaves half of it on the 10-year
+    /// and the corporate yield and 0.15 of that on the 2-year. So the close
+    /// moves each by what it should price less what it holds. A pinned
+    /// field is left where the pin holds it.
+    fn reprice_anticipated_meeting(
+        &mut self,
+        request: &DayAdvanceRequest,
+        options: &crate::economy::PolicyOptions,
+        meeting_held: bool,
+        pins_today: u16,
+    ) {
+        let a = self.params.policy_anticipation;
+        let change = self.shadow_meeting_change(request, options);
+        let change = if change < 0.0 { change * self.params.policy_anticipation_cut_share } else { change };
+        let (last, next) = (self.central_bank.last_meeting_date, self.central_bank.next_meeting_date);
+        let w = if next > last {
+            crate::mathx::min(1.0, crate::mathx::max(0.0, (request.timestamp - last) as f64 / (next - last) as f64))
+        } else {
+            1.0
+        };
+        let priced = a * w * change;
+        let before = self.policy_anticipation_priced;
+        self.policy_anticipation_priced = priced;
+        let f10 = 1.0 - self.params.treasury_policy_damping;
+        let f2 = 0.85 + 0.15 * f10;
+        let (held10, held2) = if meeting_held { (0.5 * f10 * before, 0.075 * f10 * before) } else { (f10 * before, f2 * before) };
+        let (d10, d2) = (f10 * priced - held10, f2 * priced - held2);
+        let e = &mut self.economy;
+        if pins_today & PIN_T10 == 0 {
+            e.treasury_yield_10y = crate::mathx::clamp_via_min_max(e.treasury_yield_10y + d10, 0.5, 12.0);
+        }
+        if pins_today & PIN_T2 == 0 {
+            e.treasury_yield_2y = crate::mathx::clamp_via_min_max(e.treasury_yield_2y + d2, 0.0, 12.0);
+        }
+        if pins_today & (PIN_CORPORATE | PIN_SPREAD | PIN_T10) == 0 {
+            e.corporate_bond_yield += d10;
         }
     }
 
@@ -9905,6 +10039,12 @@ impl Engine {
         if let Some(path) = self.policy_path() {
             hash_f64(&mut buf, 11.0);
             hash_f64(&mut buf, path);
+        }
+        // What the curve prices of the next meeting, only while
+        // `policy_anticipation` is set, behind its own tag.
+        if let Some(priced) = self.policy_anticipation_priced() {
+            hash_f64(&mut buf, 31.0);
+            hash_f64(&mut buf, priced);
         }
         // The rate indices' live mark, only while `rate_intraday_live` is set
         // and a session holds one, behind its own tag.

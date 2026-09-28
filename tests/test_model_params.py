@@ -1216,6 +1216,13 @@ PERTURBATIONS = [
     # LIVE: the 10-year's anchor reads the rate pulled toward 2.5 from the
     # first close, and fair value reads the corporate yield on it. No draw.
     ("treasury_policy_damping", 0.5, True),
+    # sim/r17-c10c. INERT on this probe: the shadow meeting on its calm
+    # economy would hold (or cut, which the cut share of 0.0 leaves
+    # unpriced), so nothing is priced and no yield moves. No draw either
+    # way. tests/test_policy_anticipation.py holds the mechanism.
+    ("policy_anticipation", 1.0, False),
+    # INERT: read only with policy_anticipation non-zero.
+    ("policy_anticipation_cut_share", 1.0, False),
     # LIVE: the default moves the corporate yield every close
     # (`corporate_yield_daily`) by the formula's VIX slope, and the VIX moves
     # every session, so cutting the slope moves the discount rate fair value

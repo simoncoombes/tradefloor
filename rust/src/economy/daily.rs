@@ -346,6 +346,11 @@ pub struct YieldDials {
     /// further change. 0.0 unless the dial is set. See
     /// [`crate::params::ModelParams::treasury_path_pricing`].
     pub priced_path: f64,
+    /// The next meeting's expected change the curve prices tonight,
+    /// percentage points, signed (`policy_anticipation`): read beside the
+    /// priced path, damped with it. 0.0 unless the dial is set. See
+    /// [`crate::params::ModelParams::policy_anticipation`].
+    pub priced_anticipation: f64,
     /// `treasury_policy_damping`: the share of the priced policy rate's
     /// distance from [`TREASURY_NEUTRAL_RATE`] the 10-year's anchor leaves
     /// out. 0.0 unless the dial is set.
@@ -413,6 +418,7 @@ impl Default for YieldDials {
             treasury_2y_pinned: false,
             priced_put: 0.0,
             priced_path: 0.0,
+            priced_anticipation: 0.0,
             rate_damping: 0.0,
             haven_gain: 0.0,
             spread_vix_cut: 0.0,
@@ -1058,6 +1064,14 @@ pub fn vix_and_yields(
     } else {
         fed_rate_for_10y
     };
+    // THE ANTICIPATED MEETING (`policy_anticipation`): the anchor and the
+    // 2-year's formula read the next decision the market expects, as far as
+    // it is priced tonight. Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.priced_anticipation != 0.0 {
+        fed_rate_for_10y + inputs.yields.priced_anticipation
+    } else {
+        fed_rate_for_10y
+    };
     let current_10y = new_state.treasury_yield_10y;
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
     // anchor reads the priced rate pulled toward the neutral rate; the
@@ -1067,6 +1081,11 @@ pub fn vix_and_yields(
     // through whole.
     let rate_for_10y_anchor = if inputs.yields.rate_damping != 0.0 {
         let ladder = new_state.federal_funds_rate + new_state.fed_put_owed + inputs.yields.priced_path;
+        let ladder = if inputs.yields.priced_anticipation != 0.0 {
+            ladder + inputs.yields.priced_anticipation
+        } else {
+            ladder
+        };
         fed_rate_for_10y - inputs.yields.rate_damping * (ladder - TREASURY_NEUTRAL_RATE)
     } else {
         fed_rate_for_10y
