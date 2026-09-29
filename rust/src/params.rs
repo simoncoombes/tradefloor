@@ -2072,18 +2072,23 @@ pub struct ModelParams {
     /// (`macro_burn_in_days`). Neither has an index, so
     /// `cycle_equity_hazard` adds nothing there, and the phase the run opens
     /// in is drawn from a cycle whose expansions last longer than the run's.
-    /// This stands in for the market's average: set it to the mean of
+    /// This stands in for the market's hazard: set it so the phase a run
+    /// opens in has the run's own phase shares. That is below the mean of
     /// `cycle_equity_hazard * max(0, gap - knee)` over a run's expansion and
-    /// peak sessions. 0.0, which every preset carries, adds nothing and the
-    /// opening law is the one that stood. Read only in those two places,
-    /// never in a session with a market. In [0, 1].
+    /// peak sessions, because the market's hazard comes in bursts and a
+    /// constant of the same mean ends more expansions. 0.0, which every
+    /// preset carries, adds nothing and the opening law is the one that
+    /// stood. Read only in those two places, never in a session with a
+    /// market. In [0, 1].
     ///
     /// Why. With `cycle_equity_hazard` at 5 and a knee of 0.1 on R17T a
     /// contraction or trough holds 0.08 of year 0's sessions and 0.10 to
-    /// 0.12 of each later year's (90 held-out histories, sets A and B), so
-    /// year 0 is calmer than the years after it, which PH5's volatility
-    /// clause reads. The mean added hazard over expansion and peak sessions
-    /// is 0.010 to 0.012 a month (30 histories, seeds 50201-50230).
+    /// 0.12 of each later year's (90 held-out histories, sets A and B). The
+    /// mean added hazard over expansion and peak sessions is 0.010 to 0.012
+    /// a month (30 histories, seeds 50201-50230), but at 0.011 the opening
+    /// holds 0.667 expansion and 0.153 recovery against the run's 0.690 and
+    /// 0.140; at 0.007 each of the five shares is within 0.01 of the run's
+    /// (1500 openings, docs/MODEL.md).
     pub cycle_equity_hazard_opening: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of

@@ -309,9 +309,11 @@ R17T over 180 held-out histories, against 7 of 11 post-war S&P 500 bears).
 With the hazard at 5, a knee of 0.1 and `market_vol_cycle_expansion` 0.82, B12
 reads 0.636 and 0.608 on two held-out sets of 90 histories against 0.495 and
 0.472, with more recessions (1.47 and 1.39 a decade against 1.23 and 1.16).
-`cycle_equity_hazard_opening` adds the market's average hazard where the
-economy runs without an index, before day zero, so the opening's phase comes
-from the same cycle as the run's.
+`cycle_equity_hazard_opening` adds a constant hazard where the economy runs
+without an index, before day zero, so the opening's phase comes from the same
+cycle as the run's. At 0.007 the opening's five phase shares are each within
+0.01 of the run's (1500 openings); 0.011 opened too few expansions and too
+many recoveries.
 
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index

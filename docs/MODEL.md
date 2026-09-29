@@ -284,9 +284,12 @@ law and the macro burn-in), so the fall's hazard cannot act there and the
 phase a run opens in comes from a cycle with longer expansions than the run's.
 `cycle_equity_hazard_opening` $h_0$ stands in for it: while the economy runs
 alone, the ladder and the hazard-only law the opening is drawn from add $h_0$
-in an expansion and at a peak. It is the mean of $h_q \max(0, G_d - q_0)$
-over a run's expansion and peak sessions, 0.010 to 0.012 a month at the
-settings below.
+in an expansion and at a peak. Set it so the phase the run opens in has the
+run's own phase shares. That is 0.007 a month at the settings below, less
+than the mean of $h_q \max(0, G_d - q_0)$ over a run's expansion and peak
+sessions (0.010 to 0.012): the market's hazard comes in bursts, and a burst
+spends much of its hazard on expansions it has already ended, so a constant
+of the same mean ends more of them.
 
 What it was measured to do (sim/r17-b12, on R17T, 30 held-out histories of
 5292 sessions, seeds 50201-50230, paired): at $h_q = 5$, $q_0 = 0.1$ with
@@ -333,6 +336,71 @@ R17Bb's calmer year 0 is a bias the pooled clause finds: it fails at 180 and
 at 270, and its year 0 sits 0.006 below the later years against R17T's 0.003.
 R17Bc passes pooled at 0.83, which is 0.34 se inside the bound in the
 difference's own se (R17T 0.54 se).
+
+The opening's value, tuned (615624e3; boxes b12tG1, b12tLP1, b12tX1, b12tX2
+and b12tS1). The phase a run opens in, over 1500 construction-only seeds
+(200001-201500), against the run's own shares over years 1-20 (270
+histories), in the order expansion, peak, contraction, trough, recovery:
+
+| $h_0$ | opening shares | contraction and trough |
+|---|---|---|
+| 0 | 0.742 0.061 0.050 0.033 0.115 | 0.083 |
+| 0.0055 | 0.701 0.071 0.056 0.045 0.127 | 0.101 |
+| 0.007 | 0.693 0.070 0.053 0.047 0.137 | 0.100 |
+| 0.011 | 0.667 0.073 0.059 0.048 0.153 | 0.107 |
+| the run, years 1-20 | 0.690 0.067 0.064 0.039 0.140 | 0.103 |
+
+At 0.007 every share is within 0.01 of the run's; 0.011 opens too few
+expansions and too many recoveries. Years 0 to 7 over 1350 histories (sets
+A, B and C from r14gen, and twelve more held-out blocks of 90, 40201 to
+190830, from `lite8.py`, which runs r14gen's session loop and records the
+index and the true phase):
+
+| Arm | $h_0$ | contraction share, year 0 / years 1-7 | year 0 vol less years 1-7 (se) | PH5 use at 270 (A+B+C) | PH5 use at 1350 |
+|---|---|---|---|---|---|
+| R17T | -- | 0.078 / 0.084 | +0.0039 (0.0021) | 0.73 | 1.28 |
+| R17Bb | 0 | 0.095 / 0.104 | +0.0019 (0.0021) | 1.20 | 1.07 |
+| R17Bf | 0.0055 | 0.109 / 0.102 (1080) | +0.0075 (0.0026) | -- | 1.54 (1080) |
+| R17Bd | 0.007 | 0.103 / 0.101 | +0.0055 (0.0022) | 0.64 | 1.32 |
+| R17Bc | 0.011 | 0.106 / 0.096 (630) | +0.0094 (0.0033) | 0.83 | 1.49 (630) |
+
+Sets A, B and C are a calm draw for year 0 on every arm (R17T -0.0032 there,
++0.0056 on the other 1080), which is why R17Bb failed there and R17Bd reads
+0.64. The heat is in the market's opening state, not in the phase, and R17T
+has it too. A run that opens in an expansion opens with the VIX at 19.2
+where the run's expansions hold 16.2 (R17Bd; R17T 19.3 against 17.0), and
+index volatility at 0.169 in the first month against 0.14, decaying over a
+quarter; a run that opens in a contraction opens calm (VIX 18.7) and lives
+the contraction's whole rise in volatility inside year 0. Two thirds or
+more of the histories keep the same path across R17Bb, R17Bd and R17Bc (the
+opening phase differs in the rest), so the arms' differences are paired: $h_0$ adds
+about 0.0005 of year-0 volatility per 0.001, and no value keeps the phase
+shares and brings year 0's volatility to the later years'. PH5's clause is
+seven tests at 2 se against one year 0; on the pooled covariance of the
+yearly means a stationary model fails it at 270 histories about one time in
+five, and with year 0 0.0055 above the later years about 0.44 of the time.
+
+R17Bd over sets A, B and C (270): B12 0.597 (se 0.016), F-bear's median
+-0.55 (+0.86 se), C10c 0 of 384 breach (least margin 1.14 se,
+`out_unemployment_rate_down21` ahead in 0.633), the exploit repro
+`c10_mirror` 0 breaches against the exposure-matched position. The L-rate
+sign probes over 270 seeds (201-230, 501-530, 801-830 and the same plus
+20000 and 50000) read -3.0 to -3.3 per cent a year, positive in 0.30 to 0.34
+(R17T -3.3 to -3.7, 0.27 to 0.30); R17Bc's set A reading (UST10Y at step 5,
++3.4, 9 of 12) is noise, and a 12-seed draw from R17Bd's 270 fails the row
+about 0.5 per cent of the time for each probe.
+
+The hazard with `market_vol_cycle_expansion` at 0.82 moves two C10c rule
+families toward the bound, over the same 270 histories: the mirror of
+`out_unemployment_rate_down21` is ahead in 0.633 (R17T 0.570) and of
+`out63_after_vix_5d_p99.9_up` in 0.622 (0.530). Each change alone moves them
+less: R17T with 0.82 reads 0.574 and 0.570, and R17Bd with 0.85 reads 0.596
+and 0.574 (with B12 0.575 and F-bear's median at -0.50). Resampling the 270
+histories, some rule breaches in 2.5 per cent of draws for R17T, 3.5 for
+R17T with 0.82, 8.7 for R17Bd with 0.85 and 23 for R17Bd. On the tape
+(1990-2025) the unemployment mirror beats its exposure-matched position by
+1.43 points a year, above the model's median of 0.34; the VIX mirror by
+-0.08.
 
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
