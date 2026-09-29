@@ -252,6 +252,65 @@ growth and $\mathrm{PE}$ the market's trailing P/E:
 - In recovery (R): the Weibull hazard is cut by 0.1, to no less than 0, if $u > 10$.
 - In peak (P): $\Delta = 0$.
 
+**The market's fall in the hazard** (`cycle_equity_hazard` $h_q$,
+`cycle_equity_hazard_knee` $q_0$). Off on every shipped preset. Off zero, in
+an expansion and at a peak the adjustment gains, before the expansion's guard,
+
+```math
+\Delta \mathrel{+}= h_q \max(0,\ G_d - q_0)
+```
+
+where $G_d$ is the index's log fall below its slow average, the gap credit's
+leverage term reads (`EconomyState::spread_equity_gap`, half-life
+`corporate_spread_equity_half_life`), which the hazard runs even with
+`corporate_spread_equity_gain` at 0. A bear market that begins in an expansion
+raises the chance the expansion ends, through the wealth effect and tighter
+financial conditions; the index leads the cycle (Estrella and Mishkin 1998).
+Without it the cycle reads no market, and on R17T 0.48 of 20 per cent bears
+have a true contraction between the peak and the trough plus 63 sessions
+(B12, 620 bears over 180 held-out histories) against 7 of 11 post-war S&P 500
+bears, with 0.89 bears a decade outside a recession against the tape's 0.53.
+On the certified roster the gap reads about 0.1 at a bear's 20 per cent line
+and about -0.06 at the median session.
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $h_q$ | `cycle_equity_hazard` | 0 (off) | | in [0, 20], per month |
+| $q_0$ | `cycle_equity_hazard_knee` | 0 | | in [0, 1] |
+| $h_0$ | `cycle_equity_hazard_opening` | 0 (off) | | in [0, 1], per month |
+
+Before day zero the economy runs without an index (the stationary opening's
+law and the macro burn-in), so the fall's hazard cannot act there and the
+phase a run opens in comes from a cycle with longer expansions than the run's.
+`cycle_equity_hazard_opening` $h_0$ stands in for it: while the economy runs
+alone, the ladder and the hazard-only law the opening is drawn from add $h_0$
+in an expansion and at a peak. It is the mean of $h_q \max(0, G_d - q_0)$
+over a run's expansion and peak sessions, 0.010 to 0.012 a month at the
+settings below.
+
+What it was measured to do (sim/r17-b12, on R17T, 30 held-out histories of
+5292 sessions, seeds 50201-50230, paired): at $h_q = 5$, $q_0 = 0.1$ with
+`market_vol_cycle_expansion` 0.80 (R17T 0.85), B12 reads 0.66 against 0.51,
+recessions start 1.37 times a decade against 1.18 (post-war NBER 1.47),
+20 per cent bears fall from 1.73 to 1.50 a decade and those outside a
+recession from 0.85 to 0.52, index volatility is 18.4 against 18.8 per cent
+and sessions under -5 per cent 8.4 against 8.1 a decade. The hazard alone
+(expansion 0.85) lifts B12 by about 0.07 at a knee of 0.1 and adds about a
+point of index volatility; at a knee of 0.05 it lifts B12 by 0.2 but starts
+0.6 more recessions a decade and adds 2.4 points of volatility.
+
+On the screen's 90 held-out histories per set (sets A and B, boxes b12sA and
+b12sB4, R17T with $h_q = 5$, $q_0 = 0.1$ and `market_vol_cycle_expansion`
+0.82) B12 reads 0.636 and 0.608 against R17T's 0.495 and 0.472, B10 and B11
+stay in their bands and F-bear's median cut deepens (-0.75 and -0.60 against
+-0.50). A contraction or trough then holds 0.08 of year 0 and 0.10 to 0.12 of
+the later years, and PH5's volatility clause read 0.61 and 1.21 of its bound
+(R17T 0.75 and 0.94). With $h_0 = 0.011$ year 0's share is 0.10, and over the
+270 histories of sets A, B and C year 0's volatility sits 0.005 above the
+later years' where R17T's sits 0.003 below; the clause still reads 1.21,
+1.00 and 1.12 of its bound on the three sets, against R17T's 0.75, 0.94 and
+0.92.
+
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
 earnings of [Fair value](#fair-value) (`engine.rs:5583-5629`).
@@ -3036,6 +3095,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
 - **The anticipated meeting** (`policy_anticipation`, `policy_anticipation_cut_share`): the curve learns a decision on the day it is published.
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
+- **The market's fall in the cycle's hazard** (`cycle_equity_hazard`, `cycle_equity_hazard_knee`, `cycle_equity_hazard_opening`): the business cycle does not read the index.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work

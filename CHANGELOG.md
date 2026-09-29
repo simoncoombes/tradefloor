@@ -299,6 +299,20 @@ is unchanged. `price_hard_cap` now documents why a century-long run should lift
 it: a name at the cap stops moving, and the frozen winners drag the index's
 VIX and every other name's volatility down with them.
 
+`cycle_equity_hazard` lets the index's fall below its slow average raise the
+business cycle's hazard in an expansion and at a peak, past
+`cycle_equity_hazard_knee`, so a bear market that begins in an expansion makes
+a recession more likely, as the index leads the cycle. It is 0 on every preset
+and every known-answer digest is unchanged. Without it the cycle read no
+market and half of the 20 per cent bears fell outside a recession (B12 0.48 on
+R17T over 180 held-out histories, against 7 of 11 post-war S&P 500 bears).
+With the hazard at 5, a knee of 0.1 and `market_vol_cycle_expansion` 0.82, B12
+reads 0.636 and 0.608 on two held-out sets of 90 histories against 0.495 and
+0.472, with more recessions (1.47 and 1.39 a decade against 1.23 and 1.16).
+`cycle_equity_hazard_opening` adds the market's average hazard where the
+economy runs without an index, before day zero, so the opening's phase comes
+from the same cycle as the run's.
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas
