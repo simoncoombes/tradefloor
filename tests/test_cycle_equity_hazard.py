@@ -7,7 +7,10 @@ in an expansion and at a peak, the monthly hazard gains `cycle_equity_hazard`
 per unit of the index's log fall below its slow average beyond the knee: the
 gap credit's leverage term reads (`EconomyState::spread_equity_gap`), averaged
 at `corporate_spread_equity_half_life`, which the hazard runs even with
-`corporate_spread_equity_gain` at 0.0. These tests hold the default, the
+`corporate_spread_equity_gain` at 0.0. `cycle_equity_hazard_opening` adds a
+fixed monthly hazard in those phases only while the economy runs alone before
+day zero (the stationary opening's law and the macro burn-in), as the stand-in
+for an index the economy does not have there. These tests hold the default, the
 domain, that the gap is carried while the hazard is set, that a gap under the
 knee leaves the market as it was and takes no draw, that a hazard above it
 ends an expansion sooner, and that a snapshot restores to the same
@@ -22,7 +25,7 @@ import tradefloor as tf
 from tradefloor import manifest
 
 UNIVERSE = list(tf.Universe.random(12, seed=3))
-DIALS = ("cycle_equity_hazard", "cycle_equity_hazard_knee")
+DIALS = ("cycle_equity_hazard", "cycle_equity_hazard_knee", "cycle_equity_hazard_opening")
 HALF = {"corporate_spread_equity_half_life": 126.0}
 
 
@@ -46,6 +49,8 @@ def test_off_on_every_shipped_preset(preset):
     {"cycle_equity_hazard": 20.5, **HALF},
     {"cycle_equity_hazard_knee": -0.1},
     {"cycle_equity_hazard_knee": 1.1},
+    {"cycle_equity_hazard_opening": -0.01},
+    {"cycle_equity_hazard_opening": 1.5},
     # The gap is averaged at the half-life, so the hazard needs one.
     {"cycle_equity_hazard": 5.0},
 ])
@@ -118,3 +123,19 @@ def test_the_hashes_agree_and_a_restore_reproduces_the_run():
         x.run_days(4, record=False, first_day=6)
     assert floats(e.prices()) == floats(twin.prices())
     assert e.state_hash() == twin.state_hash()
+
+
+def opening_phases(n, **dials):
+    return [engine(seed=s, **dials).state_snapshot()["economy"]["cycle_phase"] for s in range(n)]
+
+
+def test_the_opening_stand_in_moves_the_opening():
+    # Off, the opening is the default's to the bit; on, a strong stand-in
+    # opens fewer runs in an expansion (the law and the burn-in both shorten
+    # it). The stand-in takes no draw of its own, but a burn-in that lives
+    # through other phases takes the draws those phases take.
+    base = opening_phases(40)
+    assert opening_phases(40, cycle_equity_hazard_opening=0.0) == base
+    on = opening_phases(40, cycle_equity_hazard_opening=0.2)
+    assert on != base
+    assert on.count("expansion") < base.count("expansion")

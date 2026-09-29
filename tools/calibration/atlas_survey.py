@@ -559,6 +559,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The log fall under which the hazard adds nothing; the gap reads about
     # 0.1 at the 20 per cent line of a bear on roster 111.
     "cycle_equity_hazard_knee": (0.0, 0.2),
+    # The market's average added hazard, a month, where the economy runs
+    # without one (the opening's law and the burn-in); 0.011 at a hazard of
+    # 5 and a knee of 0.1 on R17T.
+    "cycle_equity_hazard_opening": (0.0, 0.05),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

@@ -1273,6 +1273,11 @@ PERTURBATIONS = [
     ("cycle_equity_hazard", 5.0, False),
     # INERT: read only with cycle_equity_hazard non-zero.
     ("cycle_equity_hazard_knee", 0.05, False),
+    # LIVE: the stationary opening's law and the burn-in read it, so the
+    # phase the run opens in, and every field the burn-in relaxes under it,
+    # can move. It takes no draw of its own; the burn-in's phase path moves
+    # which macro sites fire (ECONOMY_STREAM_MOVERS).
+    ("cycle_equity_hazard_opening", 0.05, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1758,6 +1763,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     "earnings_cycle_sigma",
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
     "cycle_stationary_opening",
+    # The opening's stand-in for the market's cycle hazard (sim/r17-b12):
+    # it moves the phase the opening draws and the phase path the 755-day
+    # burn-in lives through, and with them which state-dependent macro
+    # sites fire there, as `cycle_stationary_opening` does.
+    "cycle_equity_hazard_opening",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.

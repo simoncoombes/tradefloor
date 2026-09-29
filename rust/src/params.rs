@@ -2066,6 +2066,25 @@ pub struct ModelParams {
     /// `cycle_equity_hazard` reads) under which that dial adds nothing. Read
     /// only with `cycle_equity_hazard` set. In [0, 1].
     pub cycle_equity_hazard_knee: f64,
+    /// Monthly hazard added in an expansion and at a peak where the economy
+    /// runs without a market: the stationary opening's law
+    /// (`cycle_stationary_opening`) and the macro burn-in
+    /// (`macro_burn_in_days`). Neither has an index, so
+    /// `cycle_equity_hazard` adds nothing there, and the phase the run opens
+    /// in is drawn from a cycle whose expansions last longer than the run's.
+    /// This stands in for the market's average: set it to the mean of
+    /// `cycle_equity_hazard * max(0, gap - knee)` over a run's expansion and
+    /// peak sessions. 0.0, which every preset carries, adds nothing and the
+    /// opening law is the one that stood. Read only in those two places,
+    /// never in a session with a market. In [0, 1].
+    ///
+    /// Why. With `cycle_equity_hazard` at 5 and a knee of 0.1 on R17T a
+    /// contraction or trough holds 0.08 of year 0's sessions and 0.10 to
+    /// 0.12 of each later year's (90 held-out histories, sets A and B), so
+    /// year 0 is calmer than the years after it, which PH5's volatility
+    /// clause reads. The mean added hazard over expansion and peak sessions
+    /// is 0.010 to 0.012 a month (30 histories, seeds 50201-50230).
+    pub cycle_equity_hazard_opening: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -7014,6 +7033,7 @@ impl ModelParams {
             corporate_spread_equity_half_life: 0.0,
             cycle_equity_hazard: 0.0,
             cycle_equity_hazard_knee: 0.0,
+            cycle_equity_hazard_opening: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -9435,6 +9455,7 @@ impl ModelParams {
             "corporate_spread_equity_half_life" => self.corporate_spread_equity_half_life,
             "cycle_equity_hazard" => self.cycle_equity_hazard,
             "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
+            "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9772,6 +9793,7 @@ impl ModelParams {
             "corporate_spread_equity_half_life" => out.corporate_spread_equity_half_life = value,
             "cycle_equity_hazard" => out.cycle_equity_hazard = value,
             "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
+            "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -10707,6 +10729,12 @@ impl ModelParams {
                  average, in [0, 1].",
                 self.cycle_equity_hazard_knee));
         }
+        if !(self.cycle_equity_hazard_opening >= 0.0 && self.cycle_equity_hazard_opening <= 1.0) {
+            return Err(format!(
+                "cycle_equity_hazard_opening is {}. It is monthly cycle hazard added in an \
+                 expansion and at a peak where the economy runs without a market, in [0, 1].",
+                self.cycle_equity_hazard_opening));
+        }
         if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
             return Err(format!(
                 "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
@@ -11380,6 +11408,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_equity_half_life",
         "cycle_equity_hazard",
         "cycle_equity_hazard_knee",
+        "cycle_equity_hazard_opening",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

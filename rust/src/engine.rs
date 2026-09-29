@@ -378,6 +378,12 @@ pub struct Distribution {
 /// without anyone remembering to.
 #[derive(Clone)]
 pub struct Engine {
+    /// True only while the economy runs alone before day zero (the
+    /// stationary opening's draw and the macro burn-in), when the cycle
+    /// reads `cycle_equity_hazard_opening` in place of an index it does not
+    /// have. False in every session; not state, so nothing snapshots,
+    /// restores or hashes it.
+    economy_alone: bool,
     /// The root seed the streams were derived from. Kept only to key
     /// [`Engine::arrival_order`], which is a function of it and holds no
     /// state, so nothing snapshots, restores or hashes it: an engine is
@@ -1500,6 +1506,7 @@ impl Engine {
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
         let mut engine = Self {
+            economy_alone: false,
             nominal_output_base,
             root_seed: seed,
             market_rng: GameRng::substream(seed, stream::MARKET),
@@ -2875,12 +2882,18 @@ impl Engine {
         // the fields under the phase the run will OPEN in. Inert at the
         // default, where it returns without drawing and every line below
         // is the line that stood here.
+        //
+        // The economy runs alone from here to the end of the burn-in, so the
+        // cycle reads `cycle_equity_hazard_opening` for the index it does
+        // not have (0.0 on every preset, where nothing changes).
+        self.economy_alone = true;
         let drawn = self.draw_stationary_opening();
         // The market's belief on the phase the burn-in opens in; the
         // construction puts it back on the opening phase afterwards. Nothing
         // with `cycle_nowcast_accuracy` at 0.0.
         self.seed_cycle_nowcast();
         if self.params.macro_burn_in_days <= 0.0 {
+            self.economy_alone = false;
             return;
         }
         let days = self.params.macro_burn_in_days as i64;
@@ -2943,6 +2956,7 @@ impl Engine {
         self.central_bank.last_meeting_date -= elapsed_minutes;
         self.economy.oil_last_opec_day -= days;
         self.nominal_output_base = self.economy.gdp * self.economy.cpi;
+        self.economy_alone = false;
     }
 
     /// The model coefficients this engine runs. Read-only: an engine's
@@ -2965,6 +2979,11 @@ impl Engine {
             us: self.params.cycle_us_calibration != 0.0,
             equity_hazard: self.params.cycle_equity_hazard,
             equity_knee: self.params.cycle_equity_hazard_knee,
+            equity_opening: if self.economy_alone {
+                self.params.cycle_equity_hazard_opening
+            } else {
+                0.0
+            },
         }
     }
 
