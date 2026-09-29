@@ -241,6 +241,7 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_equity_hazard": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "cycle_equity_hazard_knee": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "cycle_equity_hazard_opening": {"kind": "abs", "step_unit": 0.002, "hard_range": (0.0, 1.0)},
+    "market_prehistory_sessions": {"kind": "abs", "step_unit": 63.0, "hard_range": (0.0, 2520.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

@@ -778,6 +778,20 @@ OUT_OF_SCOPE = {
         "Target: PH5's volatility clause, year 0 against years 1-7, which "
         "the extra recessions of `cycle_equity_hazard` push apart (0.8.5 "
         "fourteenth-registration work, sim/r17-b12)",
+    "market_prehistory_sessions":
+        "inert at 0.0 as shipped: the constructor branches on `> 0.0`, so "
+        "no copy is made or run and every volatility state opens at the "
+        "constructor's baseline, as it stood. Off zero, a copy of the "
+        "opening engine lives the last this many sessions of the macro "
+        "burn-in on the economy's recorded phases, on generators of its own, "
+        "and the run opens with the copy's volatility state (factor "
+        "variance and its return memory, the VIX and its slow level, the "
+        "anchor's and stress premium's memories, the cycle's volatility "
+        "multiplier, each sector's and name's variance). Target: PH5's "
+        "volatility clause, whose year 0 read about 0.004 hotter than years "
+        "1-7 over 1350 held-out histories because a run opening in an "
+        "expansion started at the phase-free baseline (0.8.5 "
+        "fourteenth-registration work, sim/r18-opening)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

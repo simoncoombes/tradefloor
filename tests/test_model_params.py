@@ -1278,6 +1278,11 @@ PERTURBATIONS = [
     # can move. It takes no draw of its own; the burn-in's phase path moves
     # which macro sites fire (ECONOMY_STREAM_MOVERS).
     ("cycle_equity_hazard_opening", 0.05, True),
+    # LIVE: the run opens with a copy's volatility state (the VIX, the factor
+    # variance, the names' GARCH), so every price moves from the first tick.
+    # The copy draws from surgery generators of its own; the run's market
+    # stream is untouched.
+    ("market_prehistory_sessions", 21.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

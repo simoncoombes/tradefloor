@@ -614,6 +614,19 @@ pub const PUBLICATION_TAG: u32 = 0x5055_424C;
 /// bijection on `u64` for a fixed tag, and its input is never the input of a
 /// draw below (whose low half is a turn index, never all ones in practice).
 /// The engine keeps the key rather than the root.
+/// The tag of the market's prehistory (`market_prehistory_sessions`), ASCII
+/// "PREH": the surgery seed its stream generators are derived under, and the
+/// word its counter keys are mixed with.
+pub const PREHISTORY_TAG: u64 = 0x5052_4548;
+
+/// A counter key of the market's prehistory (the earnings calendar's, the
+/// cycle publication's): the run's own key mixed with [`PREHISTORY_TAG`], so
+/// the sessions played before day zero draw no reaction or publication
+/// uniform the run's own sessions draw.
+pub fn prehistory_key(key: u64) -> u64 {
+    splitmix64_mix(key ^ (PREHISTORY_TAG << 32 | PREHISTORY_TAG))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }

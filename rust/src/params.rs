@@ -2090,6 +2090,33 @@ pub struct ModelParams {
     /// 0.140; at 0.007 each of the five shares is within 0.01 of the run's
     /// (1500 openings, docs/MODEL.md).
     pub cycle_equity_hazard_opening: f64,
+    /// Sessions of market the run has lived before day zero: the last this
+    /// many days of the economy's burn-in (`macro_burn_in_days`), played on
+    /// a copy of the opening engine with the economy's recorded phase set
+    /// each day and every stream drawn from generators of its own. The run
+    /// then opens with that copy's volatility state: the factor variance
+    /// components and their return memory, the VIX and its slow level,
+    /// the anchor's and the stress premium's memories, the cycle's
+    /// volatility multiplier, and each name's and sector's variance and
+    /// jump excitation. Nothing else is copied, so prices, fair values, the
+    /// economy and every draw the run itself takes are the ones the engine
+    /// would open with. 0.0, which every preset carries, runs nothing and
+    /// the market opens at the constructor's baseline. Read only at
+    /// construction, and only when the opening is settled (not when a
+    /// caller supplies the macro state). A whole number in [0, 2520].
+    ///
+    /// Why. The burn-in runs the economy without a market, so every
+    /// volatility state opens at the phase-free baseline: a run that opens
+    /// in an expansion starts with its factor variance at 1.8 times the
+    /// level its expansions hold, the VIX near 19 where they hold 16, and
+    /// index volatility of 0.17 in its first months against 0.145, which
+    /// takes two quarters to settle; a run that opens in a contraction
+    /// starts calm. Year 0 then reads about 0.004 hotter than the years
+    /// after it over 1350 held-out histories on R17T and R17Bd, which
+    /// PH5's volatility clause reads. The slow variance component's
+    /// persistence (0.9913 a session) leaves 0.11 of the opening's gap
+    /// after 252 sessions and 0.012 after 504.
+    pub market_prehistory_sessions: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -7039,6 +7066,7 @@ impl ModelParams {
             cycle_equity_hazard: 0.0,
             cycle_equity_hazard_knee: 0.0,
             cycle_equity_hazard_opening: 0.0,
+            market_prehistory_sessions: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -9461,6 +9489,7 @@ impl ModelParams {
             "cycle_equity_hazard" => self.cycle_equity_hazard,
             "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
             "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
+            "market_prehistory_sessions" => self.market_prehistory_sessions,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9799,6 +9828,7 @@ impl ModelParams {
             "cycle_equity_hazard" => out.cycle_equity_hazard = value,
             "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
             "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
+            "market_prehistory_sessions" => out.market_prehistory_sessions = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -10740,6 +10770,15 @@ impl ModelParams {
                  expansion and at a peak where the economy runs without a market, in [0, 1].",
                 self.cycle_equity_hazard_opening));
         }
+        if !(self.market_prehistory_sessions >= 0.0
+            && self.market_prehistory_sessions <= 2520.0
+            && self.market_prehistory_sessions.fract() == 0.0)
+        {
+            return Err(format!(
+                "market_prehistory_sessions is {}. It is the number of sessions the market \
+                 lives before day zero, a whole number in [0, 2520].",
+                self.market_prehistory_sessions));
+        }
         if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
             return Err(format!(
                 "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
@@ -11414,6 +11453,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_equity_hazard",
         "cycle_equity_hazard_knee",
         "cycle_equity_hazard_opening",
+        "market_prehistory_sessions",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

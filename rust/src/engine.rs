@@ -1638,9 +1638,13 @@ impl Engine {
         // Unemployment's impulse opens at the drive of the economy it opens
         // in, so the adjustment starts stationary; the burn-in then runs it.
         engine.seed_unemployment_impulse();
-        if settle_opening {
-            engine.burn_in_economy();
-        }
+        // The burn-in's phase path, kept only for the market's prehistory
+        // (`market_prehistory_sessions`), and empty with that dial at 0.0.
+        let burn_in_path = if settle_opening {
+            engine.burn_in_economy()
+        } else {
+            Vec::new()
+        };
         // The earnings cycle opens at the level of the phase the economy
         // opens in, so a market that opens in a contraction does not spend
         // its first months drifting toward it: a stationary opening, as the
@@ -1660,7 +1664,135 @@ impl Engine {
         engine.seed_cycle_history();
         // Likewise the growth the run opens at, as day 0 of quarter 0.
         engine.seed_gdp_publication(0);
+        // THE MARKET'S PREHISTORY, last, on the engine as it opens: a copy
+        // lives the burn-in's last sessions and hands back its volatility
+        // state. A branch at 0.0, every preset: nothing is copied or run, and
+        // the market opens at the constructor's baseline as it always did.
+        // Not when the caller named the opening, for the burn-in's reason.
+        if settle_opening && engine.params.market_prehistory_sessions > 0.0 {
+            engine.live_market_prehistory(&burn_in_path);
+        }
         engine
+    }
+
+    /// Play the market's last `market_prehistory_sessions` sessions before
+    /// day zero on a copy of this engine, and open with the copy's
+    /// volatility state.
+    ///
+    /// # Why
+    ///
+    /// The burn-in (`macro_burn_in_days`) runs the economy without a market,
+    /// so every volatility state the constructor seeds opens at its
+    /// phase-free baseline: the factor variance at `market_factor_sigma`
+    /// squared, the VIX wherever the index's baseline variance puts it, the
+    /// anchor's memory at zero and the cycle's multiplier unset. A run that
+    /// opens in an expansion then spends two quarters falling to the level
+    /// its expansions hold, and one that opens in a contraction rises
+    /// through the whole of its own. Both are travel the run's later years
+    /// never show.
+    ///
+    /// # What the copy lives through
+    ///
+    /// The economy's own recorded phases, one a session, ending on the
+    /// phase and age the run opens in: `path` is the burn-in's phase after
+    /// each of its days. A prehistory longer than the burn-in holds its
+    /// first phase for the difference (and the opening's phase throughout
+    /// when there is no burn-in). The copy's cycle may turn between
+    /// sessions; the recorded phase is set again before the next, so the
+    /// copy's volatility follows the path the run's economy actually took.
+    ///
+    /// # What it draws
+    ///
+    /// Every stream of the copy is a surgery generator of the run's root
+    /// seed under [`crate::rng::PREHISTORY_TAG`], and its earnings and
+    /// publication keys are mixed with the same tag, so no session of the
+    /// prehistory shares a draw with any session of the run. The run's own
+    /// generators are not touched: its draw schedule is the one it had.
+    ///
+    /// # What comes back
+    ///
+    /// The volatility state and nothing else: the factor variance (its two
+    /// components, the mixture, the smoothed VIX and the return memory),
+    /// the VIX, the VIX's and the factor's slow levels, the anchor's and
+    /// the stress premium's memories, the cycle's volatility multiplier,
+    /// and each sector's variance and each name's GARCH and idiosyncratic
+    /// variance and jump excitation. Prices, fair values, the economy's
+    /// other fields, the central bank and the books are the run's own. The
+    /// central bank's stress level (`fed_stress_cut`), the highest VIX
+    /// since the last meeting, is restarted at the VIX the run opens on.
+    fn live_market_prehistory(&mut self, path: &[(crate::economy::CyclePhase, f64)]) {
+        let n = self.params.market_prehistory_sessions as usize;
+        let tag = crate::rng::PREHISTORY_TAG;
+        let root = self.root_seed;
+        let mut pre = self.clone();
+        pre.market_rng = GameRng::surgery(root, stream::MARKET, tag);
+        pre.economy_rng = GameRng::surgery(root, stream::ECONOMY, tag);
+        pre.external_rng = GameRng::surgery(root, stream::EXTERNAL, tag);
+        pre.jump_rng = GameRng::surgery(root, stream::JUMPS, tag);
+        pre.volume_rng = GameRng::surgery(root, stream::VOLUME, tag);
+        pre.volume_idio_rng = GameRng::surgery(root, stream::VOLUME_IDIO, tag);
+        pre.news_rng = GameRng::surgery(root, stream::NEWS, tag);
+        pre.overnight_rng = GameRng::surgery(root, stream::OVERNIGHT, tag);
+        pre.market_vol_level_rng = GameRng::surgery(root, stream::MARKET_VOL_LEVEL, tag);
+        pre.crisis_epicentre_rng = GameRng::surgery(root, stream::CRISIS_EPICENTRE, tag);
+        pre.cycle_nowcast_rng = GameRng::surgery(root, stream::CYCLE_NOWCAST, tag);
+        pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
+        pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
+        let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
+        let mut buffer = SessionBuffer::new();
+        let names = pre.companies.len();
+        for k in 0..n {
+            // Session k of n ends the prehistory at k = n - 1 on the path's
+            // last day, which is the phase and age the run opens in.
+            let back = n - k;
+            let (phase, months) = if path.is_empty() {
+                opening
+            } else if back <= path.len() {
+                path[path.len() - back]
+            } else {
+                path[0]
+            };
+            pre.economy.cycle_phase = phase;
+            pre.economy.months_in_current_phase = months;
+            pre.set_current_day(k as i64);
+            pre.open_market();
+            let innovations: Vec<Option<f64>> = vec![None; names];
+            let variances = pre.sector_base_variances();
+            pre.run_session(
+                &SessionRequest {
+                    start: GameTime { hour: 9, minute: 30, day_of_week: 3 },
+                    ticks: 390,
+                    volatility_multiplier: 1.0,
+                    news: &[],
+                    news_impact_queue: &[],
+                    order_volumes: &[],
+                    fills: &[],
+                    close_at_end: false,
+                    reopen: false,
+                    daily_innovations: &innovations,
+                    sector_base_variances: &variances,
+                    stop: None,
+                },
+                &mut buffer,
+            );
+            pre.close_day(k as i64 + 1);
+        }
+        self.market_vol = pre.market_vol;
+        self.economy.vix = pre.economy.vix;
+        self.vix_log_level = pre.vix_log_level;
+        self.market_vol_log_level = pre.market_vol_log_level;
+        self.vix_anchor_slow = pre.vix_anchor_slow;
+        self.vix_stress_memory = pre.vix_stress_memory;
+        self.market_vol_cycle_log = pre.market_vol_cycle_log;
+        self.sector_variance = pre.sector_variance;
+        self.idio_variance = pre.idio_variance;
+        self.jump_excitation = pre.jump_excitation;
+        for (c, p) in self.companies.iter_mut().zip(pre.companies.iter()) {
+            c.stock.garch_variance = p.stock.garch_variance;
+        }
+        if self.params.fed_stress_cut != 0.0 {
+            self.stress_vix_max = self.economy.vix;
+        }
     }
 
     /// The share of the gap to its drive unemployment's impulse closes at a
@@ -2877,7 +3009,7 @@ impl Engine {
     /// pre-burn-in value it would open every valuation about nine per cent
     /// above its earnings, which is a level jump nobody asked for and
     /// which the ratio was never meant to carry.
-    fn burn_in_economy(&mut self) {
+    fn burn_in_economy(&mut self) -> Vec<(crate::economy::CyclePhase, f64)> {
         // The day-zero phase and its age first, so what follows relaxes
         // the fields under the phase the run will OPEN in. Inert at the
         // default, where it returns without drawing and every line below
@@ -2894,10 +3026,14 @@ impl Engine {
         self.seed_cycle_nowcast();
         if self.params.macro_burn_in_days <= 0.0 {
             self.economy_alone = false;
-            return;
+            return Vec::new();
         }
         let days = self.params.macro_burn_in_days as i64;
         let phase = self.economy.cycle_phase;
+        // The phase after each day, for the market's prehistory
+        // (`market_prehistory_sessions`); nothing is kept with it at 0.0.
+        let keep = self.params.market_prehistory_sessions > 0.0;
+        let mut path = Vec::with_capacity(if keep { days as usize } else { 0 });
         for day in 1..=days {
             let months_before = self.economy.months_in_current_phase;
             self.advance_day(&DayAdvanceRequest {
@@ -2912,9 +3048,16 @@ impl Engine {
                 self.economy.months_in_current_phase =
                     months_before + 1.0 / self.macro_calendar().month_f64();
             }
+            if keep {
+                path.push((self.economy.cycle_phase, self.economy.months_in_current_phase));
+            }
         }
         if !drawn {
             self.economy.months_in_current_phase = 0.0;
+            // The clock the run opens on, which the held burn-in resets.
+            if let Some(last) = path.last_mut() {
+                last.1 = 0.0;
+            }
         }
         // PUT THE CALENDARS BACK ON THE CALLER'S AXIS.
         //
@@ -2957,6 +3100,7 @@ impl Engine {
         self.economy.oil_last_opec_day -= days;
         self.nominal_output_base = self.economy.gdp * self.economy.cpi;
         self.economy_alone = false;
+        path
     }
 
     /// The model coefficients this engine runs. Read-only: an engine's
@@ -12096,6 +12240,57 @@ mod tests {
             assert!((mean[j] - occupancy[j]).abs() < 0.05, "{mean:?} against {occupancy:?}");
         }
         assert_eq!(e.draws.economy, control.draws.economy);
+    }
+
+    /// `market_prehistory_sessions`: at 0.0 the engine opens as it stood; on,
+    /// it opens with the run's own generators, prices and economy (the VIX
+    /// apart) and a copy's volatility state, the same for the same seed;
+    /// and a caller's named opening runs no prehistory.
+    #[test]
+    fn the_market_prehistory_hands_back_the_volatility_state_alone() {
+        let off = engine_macro_clock(11, &[]);
+        let zero = engine_macro_clock(11, &[("market_prehistory_sessions", 0.0)]);
+        assert_eq!(off.state_hash(0, false), zero.state_hash(0, false));
+        let on = engine_macro_clock(11, &[("market_prehistory_sessions", 21.0)]);
+        let again = engine_macro_clock(11, &[("market_prehistory_sessions", 21.0)]);
+        assert_eq!(on.state_hash(0, false), again.state_hash(0, false));
+        assert_ne!(on.state_hash(0, false), off.state_hash(0, false));
+        // The run's own generators and draw counts are untouched.
+        assert_eq!(on.rng_state(), off.rng_state());
+        assert_eq!(on.draws_consumed(), off.draws_consumed());
+        // Prices and the economy but its VIX open where they would.
+        for (a, b) in on.companies().iter().zip(off.companies().iter()) {
+            assert_eq!(a.stock.price.to_bits(), b.stock.price.to_bits());
+            assert_eq!(a.stock.market_cap.to_bits(), b.stock.market_cap.to_bits());
+        }
+        let mut econ = on.economy().clone();
+        assert_ne!(econ.vix, off.economy().vix);
+        econ.vix = off.economy().vix;
+        assert_eq!(&econ, off.economy());
+        // The factor variance is the copy's, not the constructor's baseline.
+        assert_ne!(on.market_variance_state(), off.market_variance_state());
+        let base = off.params().market_factor_sigma * off.params().market_factor_sigma;
+        assert_eq!(off.market_variance_state().0, base);
+        // A named opening is a statement: no prehistory runs.
+        let named = |dials: &[(&str, f64)]| {
+            let mut params = Engine::default_model();
+            for (name, value) in dials {
+                params = params.with_override(name, *value).unwrap();
+            }
+            Engine::with_params_from_opening(
+                11,
+                vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                sectors(),
+                params,
+                false,
+            )
+        };
+        let a = named(&[]);
+        let b = named(&[("market_prehistory_sessions", 21.0)]);
+        assert_eq!(a.market_variance_state(), b.market_variance_state());
+        assert_eq!(a.economy(), b.economy());
     }
 
     /// The engine the macro-clock tests read: the default, pt-v20, with the
