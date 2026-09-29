@@ -187,6 +187,59 @@ that depends on the roster and hardly on the seed: on
 and at 17.68 to 17.85 on the other three. The opening corporate yield
 depends on where the cycle opens, 2.5% to 6.7% across the same seeds.
 
+**The market's prehistory** (`market_prehistory_sessions`, off on every
+shipped preset). The burn-in has no market, so without it every volatility
+state opens at its phase-free baseline: the factor variance at
+`market_factor_sigma` squared, the VIX where the index's baseline variance
+puts it, the anchor's memory at zero. A run that opens in an expansion then
+falls for two quarters to the level its expansions hold, and one that opens
+in a contraction rises through the whole of its own. Off zero, the
+constructor clones the opening engine, gives the copy generators of its own
+(surgery generators of the root seed under the tag `PREH`, and tagged
+earnings and publication keys), and plays it the last $N$ sessions of the
+burn-in with the economy's recorded phase and age set before each session.
+The run then opens with the copy's volatility state: the factor variance
+(both components, the mixture, the smoothed VIX, the return memory), the VIX,
+the VIX's and the factor's slow levels, the anchor's and the stress premium's
+memories, the cycle's volatility multiplier, and each sector's variance and
+each name's GARCH and idiosyncratic variance and jump excitation. Prices,
+fair values, the economy's other fields and the run's own draws are the ones
+it would open with. $N$ = 252 costs about 3 seconds a construction on the
+40-name roster; the slow variance component keeps 0.11 of the opening's gap
+after 252 sessions, but the copy's recorded path, not its start, sets where
+it ends (504 sessions read the same on 81 paired histories).
+
+Measured (sim/r18-opening 8385f016). On R17Bd, 200 held-out histories
+(seeds 300201-300400): a run that opens in an expansion opened with factor
+variance 5.04e-5 against the 2.98e-5 its expansions hold, the VIX at 17.6
+against 16.2, the anchor's memory at +0.02 against -0.22, and index
+volatility of 0.17 to 0.18 a year for five months against 0.146; with
+$N$ = 252 it opens at 2.92e-5, 16.3 and -0.19. Over 1350 held-out histories
+(sets A, B and C from `r14gen`, and the twelve blocks 40201-40830 and
+90201-190830 from `lite8.py`), year 0's index volatility less the mean of
+years 1-7:
+
+| Arm | without | with $N$ = 252 | PH5 volatility use at 1350 | largest year gap at 270, in its se |
+|---|---|---|---|---|
+| R17T | +0.0039 (se 0.0021) | +0.0005 (0.0024) | 1.28 to 0.77 | 1.15 to 0.69 |
+| R17Bd | +0.0055 (0.0022) | +0.0012 (0.0025) | 1.32 to 0.44 | 1.18 to 0.40 |
+| R17Bh (R17Bd at `market_vol_cycle_expansion` 0.85) | -- | +0.0007 (0.0026) | 0.65 | 0.58 |
+
+A Monte Carlo of a fresh 270-history grade on the pooled covariance of the
+1350 histories passes the volatility clause 0.73, 0.78 and 0.77 of the time
+(R17T and R17Bd without it 0.61 and 0.57), against 0.79 to 0.80 for a model
+whose years all share one mean under the same covariance, which is the
+clause's own ceiling: seven tests at 2 se against one year 0.
+
+The return clause is not the opening's volatility, and the prehistory leaves
+it where it was: year 0's index return is about 2 points below later years'
+(4.0 to 4.6 per cent against 5.5 to 7.3), all of it in the first two
+quarters, on every arm with and without the prehistory (mean of year 1 less
+year 0 +0.017 to +0.020, 1.1 to 1.25 se at 270). Two valuation states open at
+zero and drift in that half year: the names' mean mispricing falls to -0.013
+by month 6 and settles near -0.008, and the VIX feedback's exposure
+(`fair_value_vix_discount`) builds from 0 to about 0.02 over nine months.
+
 ## The macro economy
 
 The economy steps once per session, after the close (`engine.rs:5529-5539`).
@@ -401,6 +454,42 @@ R17T with 0.82, 8.7 for R17Bd with 0.85 and 23 for R17Bd. On the tape
 (1990-2025) the unemployment mirror beats its exposure-matched position by
 1.43 points a year, above the model's median of 0.34; the VIX mirror by
 -0.08.
+
+With the market's prehistory (`market_prehistory_sessions` 252, sim/r18-opening
+8385f016) the same question over more histories. Each arm below is R17Bd with
+the prehistory and the one change named; A+B+C is 270 histories, "540" adds
+270 more from the held-out blocks 40201-40830, 90201-90830 and 100201-100830.
+"Breach odds" resample 270 histories with replacement and count the draws in
+which any of the 384 rules breaches (median over +1 or ahead in over 2/3).
+
+| Arm | change | B12 (se) | F-bear median (margin) | breach odds |
+|---|---|---|---|---|
+| R17TP | R17T, no hazard | 0.474 (0.014) | -0.50 (0.00 se) | 0.086 (A+B+C) |
+| R17BdP | none | 0.587 (0.013), 540 | -0.60 (+2.19 se), 540 | 0.052 (540); 0.131 and 0.111 on each half |
+| R17BhP | expansion 0.85 | 0.576 (0.011), 540 | -0.60 (+1.98 se), 540 | 0.121 (540) |
+| R18f | hazard 4, expansion 0.85 | 0.571 (0.012), 540 | -0.60 (+2.11 se), 540 | 0.138 (540) |
+| R18g | knee 0.12, expansion 0.85 | 0.558 (0.012), 540 | -0.60 (+1.78 se), 540 | 0.107 (540) |
+| R18a | hazard 7, expansion 0.85 | 0.595 (0.014) | -0.53 (+0.54 se) | 0.289 (A+B+C) |
+| R18b | knee 0.08, expansion 0.85 | 0.588 (0.013) | -0.50 (0.00 se) | 0.227 (A+B+C) |
+| R18c | expansion 0.835 | 0.582 (0.019) | -0.60 (+1.65 se) | 0.273 (A+B+C) |
+| R18d | hazard 6, knee 0.09, expansion 0.85 | 0.585 (0.013) | -0.50 (0.00 se) | 0.252 (A+B+C) |
+| R18e | hazard 10, expansion 0.85 | 0.604 (0.013) | -0.50 (0.00 se) | 0.522 (A+B+C) |
+
+A stronger or earlier hazard (R18a, R18b, R18e) raises the odds, through the
+rules that read the cycle itself (`out_contraction_trough`, the GDP-growth
+event rules, `out_unemployment_rate_down21`); a weaker or later one (R18f,
+R18g) gives up B12 and does not lower them measurably. The two rules the
+earlier reading named are not a fixed property of the 0.82 setting: over two
+independent sets of 270 R17BdP reads `out_unemployment_rate_down21` ahead in
+0.607 and 0.574, and `out63_after_vix_5d_p99.9_up` in 0.615 and 0.600, where
+R17Bd without the prehistory read 0.633 and 0.622 on A+B+C. A rule's share
+ahead over 270 histories has an se of about 0.03, and resampling one set of 270
+counts that noise twice, so odds read off a single set run high; the 540-history
+figure is the better estimate. F-bear's median sits on the atom at -0.5 (about
+a tenth of the bears cut exactly two quarters) on half the sets of 270 and
+moves off it only when the share of bears with more than 0.5 of cuts passes
+one half; over 540 every arm reads -0.60, and in every draw of 270 from those
+540 the median is at or under -0.5.
 
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
@@ -3187,6 +3276,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 - **The anticipated meeting** (`policy_anticipation`, `policy_anticipation_cut_share`): the curve learns a decision on the day it is published.
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **The market's fall in the cycle's hazard** (`cycle_equity_hazard`, `cycle_equity_hazard_knee`, `cycle_equity_hazard_opening`): the business cycle does not read the index.
+- **The market's prehistory** (`market_prehistory_sessions`): every volatility state opens at the constructor's phase-free baseline.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work
@@ -3266,7 +3356,7 @@ equation. They are listed so a reader can judge them.
 
 - The neutral rate $r^{\ast}$ = 0.0482 was read off pt-v18's burn-in, which always opened in expansion. The opening corporate yield ranges from 2.5% to 6.7% across seeds. On pt-v20 the stationary opening books the resulting rate term into each company's fair-value level, so no run opens with a drift from it; on pt-v19 it shifts the opening mispricing by -0.04 to +0.03.
 - The opening yield also depends on the roster, through the roster-derived VIX anchor acting on the burn-in; the path has not been traced.
-- The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX.
+- The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX (unless `market_prehistory_sessions` is set).
 - After the burn-in the macro calendar restarts at day 1, so the first monthly step of a run comes 41 sessions after the last one of the burn-in.
 - The opening's no-price-move identity holds because the buyback factor is 1 on day zero; an opening applied later would not be exact.
 

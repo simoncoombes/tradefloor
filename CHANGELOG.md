@@ -315,6 +315,18 @@ cycle as the run's. At 0.007 the opening's five phase shares are each within
 0.01 of the run's (1500 openings); 0.011 opened too few expansions and too
 many recoveries.
 
+`market_prehistory_sessions` gives the market a past. The burn-in runs the
+economy alone, so every volatility state used to open at its phase-free
+baseline, and a run that opened in an expansion spent two quarters calming to
+the level its expansions hold. Off zero, a copy of the opening engine, on
+generators of its own, lives the burn-in's last sessions on the economy's
+recorded phases, and the run opens with the copy's volatility state (the
+factor variance, the VIX, their memories and each name's variance); prices,
+the economy and the run's own draws are unchanged. It is 0 on every preset
+and every known-answer digest is unchanged. At 252 sessions year 0's index
+volatility sits 0.0005 and 0.0012 above years 1-7 on R17T and R17Bd over 1350
+held-out histories (se 0.0025), against 0.0039 and 0.0055 without it.
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas
