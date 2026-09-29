@@ -311,6 +311,29 @@ later years' where R17T's sits 0.003 below; the clause still reads 1.21,
 1.00 and 1.12 of its bound on the three sets, against R17T's 0.75, 0.94 and
 0.92.
 
+PH5 pooled, with its standard errors over the pooled histories (grade_all's
+`ph5`, the registered formula; sets A and B from the screen boxes, set C's
+long run and true-phase histories from box ph5pC1 at a5ecbcaf, R17T's set C
+long run from c10cC1). "Use" is the volatility clause's worst gap over its
+bound; the pass line is 1.00.
+
+| Arm | A+B (180): use, worst year | A+B+C (270): use, worst year | PH5 at 270 | year 0 vol less years 1-7 | contraction share, year 0 / years 1-7 |
+|---|---|---|---|---|---|
+| R17T | 1.03, year 7 (fails) | 0.73, year 7 | pass | -0.0032 | 0.067 / 0.081 |
+| R17Bb | 1.11, year 1 (fails) | 1.20, year 1 (gap 0.0151, bound 0.0126) | fails | -0.0059 | 0.077 / 0.101 |
+| R17Bc | 0.70, year 6 | 0.83, year 6 | pass | +0.0048 | 0.100 / 0.094 |
+
+The return clause passes on every arm (at most 0.35 of its bound). Over the
+same 270 histories: B12 reads 0.477 (se 0.013), 0.602 (0.014) and 0.581
+(0.015) for R17T, R17Bb and R17Bc; F-bear's median policy change in a 20 per
+cent bear is -0.50, -0.60 and -0.55 (the share form 0.586, 0.606, 0.606);
+C10c breaches 0 of 384 rules on each arm, with the target rules' least margin
+3.55, 2.12 and 1.38 se and the least over all rules 2.12, 0.76 and 0.76 se.
+R17Bb's calmer year 0 is a bias the pooled clause finds: it fails at 180 and
+at 270, and its year 0 sits 0.006 below the later years against R17T's 0.003.
+R17Bc passes pooled at 0.83, which is 0.34 se inside the bound in the
+difference's own se (R17T 0.54 se).
+
 The market P/E is the cap-weighted mean of $P_i / (E_i n_d B_{i,d})$ over
 profitable companies with a P/E between 0 and 200, using the restated
 earnings of [Fair value](#fair-value) (`engine.rs:5583-5629`).
