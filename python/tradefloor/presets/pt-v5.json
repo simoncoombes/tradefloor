@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v5",
   "fingerprint": "pt-v5",
-  "coefficient_digest": "68264d0a4a5882d808d42a1e9ce73d29b9a8fb5c09acb87fd799cc9c41df1d10",
+  "coefficient_digest": "868d32bbc7390cddea72e7782f556e802b401199af6946bf03446cd31a4cc5c2",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_cross_at_limit": 0.0,
@@ -39,6 +39,8 @@
     "crowd_lean_cap": 0.02,
     "crowd_momentum_gain": 0.02,
     "crowd_valuation_gain": 0.006,
+    "cycle_equity_hazard": 0.0,
+    "cycle_equity_hazard_knee": 0.0,
     "cycle_hazard_per_month": 0.0,
     "cycle_nowcast_accuracy": 0.0,
     "cycle_publication_lag": 0.0,

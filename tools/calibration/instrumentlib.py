@@ -238,6 +238,8 @@ PARAM_SPECS: dict[str, dict] = {
     "corporate_spread_vix_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "corporate_spread_equity_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0)},
     "corporate_spread_equity_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 1260.0)},
+    "cycle_equity_hazard": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
+    "cycle_equity_hazard_knee": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down

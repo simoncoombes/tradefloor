@@ -71,16 +71,23 @@ fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
 /// `cycle_us_calibration != 0.0`, the phase table derived from NBER and BEA
 /// (see [`phase_characteristics_for`]). [`CycleSpec::shipped`] is what every
 /// preset reads, and the functions that take `per_month` alone take it.
+///
+/// `equity_hazard` and `equity_knee` are `cycle_equity_hazard` and
+/// `cycle_equity_hazard_knee`: monthly hazard added in an expansion and at a
+/// peak per unit of `EconomyState::spread_equity_gap` beyond the knee. 0.0
+/// adds nothing, and the ladder is the one that stood.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CycleSpec {
     pub per_month: f64,
     pub month_days: f64,
     pub us: bool,
+    pub equity_hazard: f64,
+    pub equity_knee: f64,
 }
 
 impl CycleSpec {
     pub const fn shipped(per_month: f64) -> Self {
-        CycleSpec { per_month, month_days: 30.0, us: false }
+        CycleSpec { per_month, month_days: 30.0, us: false, equity_hazard: 0.0, equity_knee: 0.0 }
     }
 }
 
@@ -136,7 +143,7 @@ pub fn get_cycle_transition_probability_for(
     }
 
     let (shape, scale) = cycle_hazard_params_for(economy.cycle_phase, spec.us);
-    let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
+    let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale), spec);
 
     (per_day(clamp(p, 0.0, hazard_cap(spec.us)), spec), phase.next_phase)
 }
@@ -155,7 +162,17 @@ pub fn hazard_cap(us: bool) -> f64 {
 /// not textually identical (one inlines the inversion depth, the other binds
 /// it to a temporary), but every condition, constant and operation matches.
 /// If they ever diverge upstream this must split back into two.
-fn adjust_transition_probability(economy: &EconomyState, mut p: f64) -> f64 {
+fn adjust_transition_probability(economy: &EconomyState, mut p: f64, spec: &CycleSpec) -> f64 {
+    // THE MARKET'S FALL (`cycle_equity_hazard`): in an expansion and at a
+    // peak, monthly hazard per unit of the index's log fall below its slow
+    // average beyond the knee. Added first, so the expansion's guard below
+    // still takes its 0.2 off an economy that has not recovered. Guarded,
+    // so at 0.0 the ladder is the one that stood, operation for operation.
+    if spec.equity_hazard != 0.0
+        && matches!(economy.cycle_phase, CyclePhase::Expansion | CyclePhase::Peak)
+    {
+        p += spec.equity_hazard * mathx::max(0.0, economy.spread_equity_gap - spec.equity_knee);
+    }
     match economy.cycle_phase {
         CyclePhase::Expansion => {
             if economy.inflation_rate > 4.0 {
@@ -243,7 +260,7 @@ pub fn check_cycle_transition_for(
     }
 
     let (shape, scale) = cycle_hazard_params_for(economy.cycle_phase, spec.us);
-    let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale));
+    let p = adjust_transition_probability(economy, weibull_hazard(months, shape, scale), spec);
     // The cap on the hazard, at 0.3 of whatever unit the hazard carries.
     // Under the reference implementation's reading that is a 30 per cent
     // chance on any one day; under the monthly reading it caps a rate per
@@ -658,6 +675,82 @@ mod stationary_law {
             assert!(phase_cycle().contains(&last));
             assert!(age.is_finite() && age > 0.0, "age {age}");
         }
+    }
+
+    /// `cycle_equity_hazard` at 0.0 is the ladder that stood, whatever the
+    /// gap and the knee read: the probability is the shipped spec's to the
+    /// bit in every phase, on both tables and both clocks.
+    #[test]
+    fn the_equity_hazard_off_is_the_ladder_that_stood() {
+        for us in [false, true] {
+            for per_month in [0.0, 1.0] {
+                for phase in phase_cycle() {
+                    for gap in [-0.3, 0.0, 0.2, 0.9] {
+                        let mut e = ladder_free_economy();
+                        e.cycle_phase = phase;
+                        e.months_in_current_phase = 7.0;
+                        e.spread_equity_gap = gap;
+                        let shipped = CycleSpec { us, ..CycleSpec::shipped(per_month) };
+                        let off = CycleSpec { equity_knee: 0.05, ..shipped };
+                        assert_eq!(get_cycle_transition_probability_for(&e, &shipped),
+                                   get_cycle_transition_probability_for(&e, &off),
+                                   "{phase:?} gap {gap} us {us} clock {per_month}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// On: in an expansion and at a peak the monthly hazard gains
+    /// `equity_hazard * (gap - knee)` above the knee and nothing at or
+    /// below it; a contraction, a trough and a recovery read no gap. Checked
+    /// on the US table read per month, where the conversion is `/ 21` after
+    /// the clamp at 1.0.
+    #[test]
+    fn the_equity_hazard_adds_in_an_expansion_and_at_a_peak_above_the_knee() {
+        let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
+                               equity_hazard: 0.0, equity_knee: 0.0 };
+        let on = CycleSpec { equity_hazard: 4.0, equity_knee: 0.05, ..base };
+        for phase in phase_cycle() {
+            let mut e = ladder_free_economy();
+            e.cycle_phase = phase;
+            e.months_in_current_phase = 7.0;
+            for gap in [-0.2, 0.0, 0.05, 0.1, 0.15] {
+                e.spread_equity_gap = gap;
+                let (p0, next0) = get_cycle_transition_probability_for(&e, &base);
+                let (p1, next1) = get_cycle_transition_probability_for(&e, &on);
+                assert_eq!(next0, next1);
+                let fires = matches!(phase, CyclePhase::Expansion | CyclePhase::Peak) && gap > 0.05;
+                if fires {
+                    let monthly0 = p0 * 21.0;
+                    let want = (monthly0 + 4.0 * (gap - 0.05)).min(US_HAZARD_CAP) / 21.0;
+                    assert!((p1 - want).abs() < 1e-12, "{phase:?} gap {gap}: {p1} against {want}");
+                    assert!(p1 > p0, "{phase:?} gap {gap}");
+                } else {
+                    assert_eq!(p0, p1, "{phase:?} gap {gap}");
+                }
+            }
+        }
+    }
+
+    /// The expansion's guard still takes its 0.2 off an economy that has not
+    /// recovered: the gap's addition comes first, so with growth under 1 an
+    /// addition of 0.1 on a hazard near 0.003 leaves the probability at 0.0,
+    /// where the guard put it without the gap.
+    #[test]
+    fn the_expansion_guard_still_applies_to_the_equity_hazard() {
+        let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
+                               equity_hazard: 0.0, equity_knee: 0.0 };
+        let on = CycleSpec { equity_hazard: 1.0, equity_knee: 0.0, ..base };
+        let mut e = ladder_free_economy();
+        e.cycle_phase = CyclePhase::Expansion;
+        e.months_in_current_phase = 7.0;
+        e.gdp_growth = 0.5;
+        e.spread_equity_gap = 0.1;
+        let (p0, _) = get_cycle_transition_probability_for(&e, &base);
+        let (p1, _) = get_cycle_transition_probability_for(&e, &on);
+        assert_eq!(p0, 0.0);
+        assert_eq!(p1, 0.0);
     }
 
     /// An economy on which no ladder condition fires, so the hazard alone

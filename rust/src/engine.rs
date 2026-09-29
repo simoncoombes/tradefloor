@@ -1321,10 +1321,10 @@ impl Engine {
 
     /// Whether this engine's model carries credit's leverage gap
     /// (`EconomyState::spread_equity_gap`), which is when the snapshot and
-    /// the state hash carry it: `corporate_spread_equity_gain` set. Off on
-    /// every preset.
+    /// the state hash carry it: `corporate_spread_equity_gain` or
+    /// `cycle_equity_hazard` set. Off on every preset.
     pub fn carries_spread_equity_gap(&self) -> bool {
-        self.params.corporate_spread_equity_gain != 0.0
+        self.params.corporate_spread_equity_gain != 0.0 || self.params.cycle_equity_hazard != 0.0
     }
 
     /// The Fed put's cut the curve prices tonight (`treasury_put_pricing`),
@@ -2963,6 +2963,8 @@ impl Engine {
             per_month: self.params.cycle_hazard_per_month,
             month_days: self.macro_calendar().month_f64(),
             us: self.params.cycle_us_calibration != 0.0,
+            equity_hazard: self.params.cycle_equity_hazard,
+            equity_knee: self.params.cycle_equity_hazard_knee,
         }
     }
 
@@ -7451,6 +7453,7 @@ impl Engine {
             && self.params.vix_level_identity == 0.0
             && self.params.flight_to_quality_day == 0.0
             && self.params.corporate_spread_equity_gain == 0.0
+            && self.params.cycle_equity_hazard == 0.0
         {
             0.0
         } else {
@@ -7934,7 +7937,8 @@ impl Engine {
                 // 0.0 unless set; the projection reads them as the close does.
                 spread_vix_cut: self.params.corporate_spread_vix_cut,
                 spread_equity_gain: self.params.corporate_spread_equity_gain,
-                spread_equity_decay: if self.params.corporate_spread_equity_gain != 0.0 {
+                // The gap also runs for the cycle's hazard (`cycle_equity_hazard`).
+                spread_equity_decay: if self.carries_spread_equity_gap() {
                     crate::mathx::pow(0.5, 1.0 / self.params.corporate_spread_equity_half_life)
                 } else {
                     0.0

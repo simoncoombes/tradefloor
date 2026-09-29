@@ -2042,6 +2042,30 @@ pub struct ModelParams {
     /// spread widened by a fall stays wide while the index stays down. Must
     /// be positive with the gain set; read by nothing otherwise. In [0, 1260].
     pub corporate_spread_equity_half_life: f64,
+    /// Monthly cycle hazard added per unit of the index's log fall below its
+    /// slow average beyond `cycle_equity_hazard_knee`, in an expansion and
+    /// at a peak (`adjust_transition_probability`, economy/cycle.rs). The
+    /// fall is `EconomyState::spread_equity_gap`, credit's leverage gap, at
+    /// `corporate_spread_equity_half_life`; with this set the gap runs even
+    /// when `corporate_spread_equity_gain` is 0.0. 0.0, which every preset
+    /// carries, adds nothing and leaves the gap unrun unless the credit gain
+    /// runs it. In [0, 20].
+    ///
+    /// Why. A bear market that begins in an expansion raises the chance the
+    /// expansion ends: the wealth effect and tighter financial conditions,
+    /// and the index's standing as a leading indicator (Estrella and
+    /// Mishkin 1998; the Conference Board's leading index carries the
+    /// S&P 500). The engine's cycle read no market at all, so its 20 per
+    /// cent bears fell in an expansion as often as in a recession: 0.48 of
+    /// them have a true contraction between the peak and the trough plus 63
+    /// sessions on R17T (620 bears over 180 held-out histories, sets A and
+    /// B), against 7 of 11 post-war S&P 500 bears (0.64); 0.89 bears a
+    /// decade fall outside a recession against the tape's 0.53.
+    pub cycle_equity_hazard: f64,
+    /// The index's log fall below its slow average (the gap
+    /// `cycle_equity_hazard` reads) under which that dial adds nothing. Read
+    /// only with `cycle_equity_hazard` set. In [0, 1].
+    pub cycle_equity_hazard_knee: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -6988,6 +7012,8 @@ impl ModelParams {
             corporate_spread_vix_cut: 0.0,
             corporate_spread_equity_gain: 0.0,
             corporate_spread_equity_half_life: 0.0,
+            cycle_equity_hazard: 0.0,
+            cycle_equity_hazard_knee: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -9407,6 +9433,8 @@ impl ModelParams {
             "corporate_spread_vix_cut" => self.corporate_spread_vix_cut,
             "corporate_spread_equity_gain" => self.corporate_spread_equity_gain,
             "corporate_spread_equity_half_life" => self.corporate_spread_equity_half_life,
+            "cycle_equity_hazard" => self.cycle_equity_hazard,
+            "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9742,6 +9770,8 @@ impl ModelParams {
             "corporate_spread_vix_cut" => out.corporate_spread_vix_cut = value,
             "corporate_spread_equity_gain" => out.corporate_spread_equity_gain = value,
             "corporate_spread_equity_half_life" => out.corporate_spread_equity_half_life = value,
+            "cycle_equity_hazard" => out.cycle_equity_hazard = value,
+            "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -10665,6 +10695,25 @@ impl ModelParams {
                  so it needs one above 0.",
                 self.corporate_spread_equity_gain));
         }
+        if !(self.cycle_equity_hazard >= 0.0 && self.cycle_equity_hazard <= 20.0) {
+            return Err(format!(
+                "cycle_equity_hazard is {}. It is monthly cycle hazard per unit of the index's \
+                 log fall below its slow average beyond the knee, in [0, 20]; 0 is off.",
+                self.cycle_equity_hazard));
+        }
+        if !(self.cycle_equity_hazard_knee >= 0.0 && self.cycle_equity_hazard_knee <= 1.0) {
+            return Err(format!(
+                "cycle_equity_hazard_knee is {}. It is a log fall of the index below its slow \
+                 average, in [0, 1].",
+                self.cycle_equity_hazard_knee));
+        }
+        if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
+            return Err(format!(
+                "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
+                 The hazard reads the index's fall below its own average at that half-life, \
+                 so it needs one above 0.",
+                self.cycle_equity_hazard));
+        }
         if self.fed_put_gain != 0.0 && self.fed_put_half_life == 0.0 {
             return Err(format!(
                 "fed_put_gain is {} but fed_put_half_life is 0. The put's stock decays \
@@ -11329,6 +11378,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_vix_cut",
         "corporate_spread_equity_gain",
         "corporate_spread_equity_half_life",
+        "cycle_equity_hazard",
+        "cycle_equity_hazard_knee",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

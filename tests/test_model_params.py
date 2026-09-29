@@ -1263,6 +1263,16 @@ PERTURBATIONS = [
     ("corporate_spread_equity_gain", 1.5, True),
     # INERT: read only with corporate_spread_equity_gain non-zero.
     ("corporate_spread_equity_half_life", 126.0, False),
+    # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
+    # half-life as a companion, without which it is refused. INERT on this
+    # probe: the ladder reads the gap only in an expansion or at a peak past
+    # its minimum age, and the gain the knee leaves at 0.0 adds hazard only
+    # on a fall below the slow average, so the probe's roll is not moved.
+    # The cycle's roll takes its one uniform whatever the probability, so no
+    # draw either way. tests/test_cycle_equity_hazard.py holds the mechanism.
+    ("cycle_equity_hazard", 5.0, False),
+    # INERT: read only with cycle_equity_hazard non-zero.
+    ("cycle_equity_hazard_knee", 0.05, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -2061,6 +2071,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # refused without one; the half-life alone is unread, so both arms are
     # the default's.
     "corporate_spread_equity_gain": {"corporate_spread_equity_half_life": 126.0},
+    # The cycle's hazard reads the same gap at the same half-life, so it is
+    # refused without one.
+    "cycle_equity_hazard": {"corporate_spread_equity_half_life": 126.0},
 }
 
 

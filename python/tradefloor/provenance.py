@@ -752,6 +752,21 @@ OUT_OF_SCOPE = {
     "corporate_spread_equity_half_life":
         "unread while `corporate_spread_equity_gain` is 0.0 (0.8.5 realism "
         "work, bondcorr)",
+    "cycle_equity_hazard":
+        "inert at 0.0 as shipped: `adjust_transition_probability` "
+        "(economy/cycle.rs) branches on `== 0.0` before reading the gap, so "
+        "the cycle's ladder is the one that stood, and the gap is not run "
+        "unless `corporate_spread_equity_gain` runs it. Off zero, in an "
+        "expansion and at a peak, the monthly hazard gains the dial times "
+        "the index's log fall below its slow average past "
+        "`cycle_equity_hazard_knee`. Target: B12, the share of 20 per cent "
+        "bears with a true contraction between the peak and the trough plus "
+        "63 sessions, 0.48 on R17T over 180 held-out histories against 7 of "
+        "11 post-war S&P 500 bears (0.64), band [0.45, 0.85] (0.8.5 "
+        "fourteenth-registration work, sim/r17-b12)",
+    "cycle_equity_hazard_knee":
+        "unread while `cycle_equity_hazard` is 0.0 (0.8.5 "
+        "fourteenth-registration work, sim/r17-b12)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

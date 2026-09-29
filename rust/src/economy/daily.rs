@@ -1172,9 +1172,11 @@ pub fn vix_and_yields(
     // CREDIT'S LEVERAGE TERM (`corporate_spread_equity_gain`): the index's
     // log fall below its own slow average, stepped on the session's return
     // from the last close. Written whatever the pins, so the meeting's
-    // re-anchor reads it too; nothing runs with the gain at 0.0.
+    // re-anchor reads it too; nothing runs with the gain at 0.0 unless the
+    // cycle's hazard (`cycle_equity_hazard`) reads the gap, which the engine
+    // signals with a decay set and the gain at 0.0.
     let equity_gain = inputs.yields.spread_equity_gain;
-    let (gap_before, gap_after) = if equity_gain != 0.0 {
+    let (gap_before, gap_after) = if equity_gain != 0.0 || inputs.yields.spread_equity_decay != 0.0 {
         let r = mathx::log(mathx::max(1.0 + inputs.market_day_return_pct / 100.0, 1e-6));
         let g = inputs.yields.spread_equity_decay * (economy.spread_equity_gap - r);
         new_state.spread_equity_gap = g;

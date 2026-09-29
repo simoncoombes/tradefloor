@@ -552,6 +552,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "corporate_spread_equity_gain": (0.0, 3.0),
     # The slow average's half-life in sessions; 252 is a year.
     "corporate_spread_equity_half_life": (0.0, 504.0),
+    # Monthly cycle hazard per unit of the index's log fall below its slow
+    # average past the knee, in an expansion and at a peak; 10 adds 0.5 a
+    # month on a fall 0.05 past the knee, about a transition in two months.
+    "cycle_equity_hazard": (0.0, 10.0),
+    # The log fall under which the hazard adds nothing; the gap reads about
+    # 0.1 at the 20 per cent line of a bear on roster 111.
+    "cycle_equity_hazard_knee": (0.0, 0.2),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
