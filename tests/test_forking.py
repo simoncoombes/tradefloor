@@ -1134,7 +1134,11 @@ def _nothing_dormant():
                    # The day's market t scale takes degrees of freedom from
                    # 3 (r17 d1tail); at 5 a restore between the open and
                    # the close has a live scale to carry.
-                   market_day_tail_df=5.0)
+                   market_day_tail_df=5.0,
+                   # The wash fix's two book switches are 0.0 or 1.0 (r17
+                   # wash); they are read only by resting orders.
+                   book_cross_at_limit=1.0,
+                   impact_memory_refill=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
