@@ -121,6 +121,13 @@ pub struct ModelParams {
     /// moves the two the opposite ways (15.4 to 15.7, 17.1 to 16.2), and a
     /// market factor raised to restore roster 111 then lifts every roster's
     /// systematic variance alike.
+    ///
+    /// Measured (sim/r17-tails, on R17A). At 1.0 with `market_factor_sigma`
+    /// 10 per cent higher, the tail row reads 0.81 and 0.85 over 360
+    /// certification seeds per set (201-400 and 431-590, and the same plus
+    /// 20000) against R17A's 0.58 and 0.56, and roster 111's 21-year
+    /// histories read an index volatility of 19.5 (R17A 18.8, tape 18.1)
+    /// and 8.8 sessions under -5 per cent a decade (7.5, tape 6.2).
     pub market_beta_normalise: f64,
     /// How much the sector draw's variance follows VIX, on the same
     /// `(VIX / anchor)^2` target the market factor's variance uses

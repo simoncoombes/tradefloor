@@ -299,6 +299,19 @@ is unchanged. `price_hard_cap` now documents why a century-long run should lift
 it: a name at the cap stops moving, and the frozen winners drag the index's
 VIX and every other name's volatility down with them.
 
+`market_beta_normalise` divides each name's beta by the roster's
+cap-weighted beta when the engine is built, so at 1 every roster's index
+carries one unit of the market factor, as a real index's constituents' betas
+average one against it. It is 0 on every preset and every known-answer digest
+is unchanged. The certification's varying rosters (cap-weighted beta 0.97 at
+the median) and the long run's roster 111 (1.06, technology a third of its cap)
+had index volatilities of 15.4 and 17.1 per cent a year from the opening, so
+the tail row counted half the tape's -3 per cent sessions on the one and the
+tape's rate on the other. With it on and `market_factor_sigma` 10 per cent
+higher the random rosters read 17.0 and roster 111 17.3, and the tail row reads
+0.81 and 0.85 over 360 held-out seeds per set against R17A's 0.58 and 0.56
+(band [0.64, 2.34]).
+
 `market_day_tail_df` makes each session's market draw a Student t at the
 variance the state set: the open draws one multiplier, `(nu - 2)` over a
 chi-square with `nu` degrees of freedom, for the night's market draw and every

@@ -1290,6 +1290,40 @@ $\mathcal{U}(a, b)$ is uniform and $\mathrm{LogU}(a, b)$ log-uniform. $M$ is mar
 outstanding, $\bar A$ average daily volume in shares. Short interest is
 $S_i \mathrm{LogU}(0.004, 0.30)$, and all these ranges are chosen.
 
+**The roster's beta, normalised** (`market_beta_normalise` $d$). Off on every
+shipped preset, where the engine takes no sum and every name keeps the beta
+above. Off zero, `Engine::with_params_from_opening` divides each public name's
+beta by the roster's cap-weighted beta at the opening caps before anything
+reads it (`normalise_roster_beta` in `engine.rs`):
+
+```math
+\beta_i \leftarrow \beta_i \,/\, B^{d},\qquad
+B = \frac{\sum_j M_{j,0}\,\beta_j}{\sum_j M_{j,0}}
+```
+
+At $d = 1$ the roster's cap-weighted beta is one, so the market factor is the
+systematic part of the roster's own index, as the betas of a real index's
+constituents average one against it. The generated rosters' $B$ scatters with
+their sector mix: the certified roster 111 reads 1.06 (technology 33 per cent
+of its cap), a random 40-name roster's median 0.97 (technology 7 per cent).
+
+| Symbol | Dial | Value | Kind | Source |
+|---|---|---|---|---|
+| $d$ | `market_beta_normalise` | 0 (off) | | in [0, 1] |
+
+What it was measured to do (sim/r17-tails, on R17A, 252 sessions from the
+opening; the certification's varying rosters over 360 held-out seeds per set,
+2001-2360 and 22001-22360, and roster 111 over 60). Alone it moves the two
+rosters' index volatility opposite ways, 15.4 to 15.7 per cent on the random
+rosters and 17.1 to 16.2 on roster 111. With `market_factor_sigma` raised 10
+per cent the random rosters read 17.0 and roster 111 17.3, and the
+certification's tail row `index_tail_dn3_pct` rises from 0.62 and 0.67 to 0.90
+and 0.96 (band [0.64, 2.34]); roster 111's 21-year histories (90 held-out
+seeds) read an index volatility of 19.5 against 18.8 (tape 18.1) and 8.8
+sessions under -5 per cent a decade against 7.5 (tape 6.2). The same tail from
+the return memory instead (`market_vol_leverage` 3 and `vix_level_sigma`
+0.0135, no normalisation) put roster 111's histories at 21.1 and 12.2.
+
 **The stationary opening.** A roster opens with a day-zero premium
 $g_i = \ln(\max(0.01, P_{i,0})/V_{i,0})$ that has a cross-sectional
 standard deviation of about 0.33 (`market/tick.rs:1730-1756`), for a

@@ -473,6 +473,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The power on the day's own sd the memory counts a day in: 0 the
     # baseline sd (as shipped), 1 the day's z-score.
     "market_vol_leverage_standardise": (0.0, 1.0),
+    # The power of the roster's cap-weighted beta each name's beta is divided
+    # by at construction: 0 the instrument's beta (as shipped), 1 a roster
+    # whose cap-weighted beta is exactly one.
+    "market_beta_normalise": (0.0, 1.0),
     # Degrees of freedom of the day's market draw: 0 is a normal day (as
     # shipped); the S&P 500's GJR-t fit reads 6.9 (6.0 to 8.0), and 3 is
     # past any measured tail. A draw in (0, 3) is refused by the engine.

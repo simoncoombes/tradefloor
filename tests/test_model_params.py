@@ -283,6 +283,11 @@ PERTURBATIONS = [
     # LIVE with the memory on (its companions): counting a day in its own
     # sd moves the memory on every session drawn off the baseline.
     ("market_vol_leverage_standardise", 1.0, True),
+    # The roster's beta normalised at construction (tails). Ships at 0.0, so
+    # the perturbation is TO a roster whose cap-weighted beta is one; LIVE
+    # from the first tick, which loads every name on the market factor by
+    # its beta.
+    ("market_beta_normalise", 1.0, True),
     # The day's market t scale (d1tail). Ships at 0.0, so the perturbation
     # is TO the tape's GJR-t fit; LIVE from the first open, which draws a
     # multiplier on the session's market variance.

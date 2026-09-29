@@ -874,6 +874,18 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
         "memory counts a day in the baseline sd, the form that stood "
         "(0.8.5 thirteenth-registration work, sim/r15-volstate)",
+    "market_beta_normalise":
+        "inert at 0.0 as shipped: `Engine::with_params_from_opening` "
+        "branches on `== 0.0` before any sum, so every name keeps the "
+        "instrument's beta bit for bit. Off zero each public name's beta is "
+        "divided by B^d at construction, B the roster's cap-weighted beta at "
+        "the opening caps, so at 1.0 the market factor is the systematic "
+        "part of the roster's own index. Target: the certification's tail "
+        "row, index_tail_dn3_pct, 0.62 and 0.67 on R17A over 360 held-out "
+        "varying-roster seeds per set against [0.64, 2.34], while roster "
+        "111 (cap-weighted beta 1.06, a random roster's median 0.97) reads "
+        "the tape's -3 per cent rate on the long run (0.8.5 "
+        "fourteenth-registration work, sim/r17-tails)",
     "market_day_tail_df":
         "inert at 0.0 as shipped: `Engine::draw_market_day_scale` returns "
         "before any draw, the day's multiplier stays exactly 1.0 and "

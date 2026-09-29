@@ -11262,6 +11262,93 @@ mod tests {
     /// scale is never drawn, read or hashed; on, each open draws one on the
     /// overnight stream alone, the session's market sigma carries its root,
     /// the close clears it, and the state hash covers it while it is live.
+    /// `market_beta_normalise`: off, every beta is the one the company came
+    /// with; on, the roster's cap-weighted beta is divided out at
+    /// construction, names outside the index keep theirs, and the market
+    /// moves.
+    mod market_beta_normalise {
+        use super::*;
+
+        fn roster() -> Vec<TickCompany> {
+            let mut a = company("A", 100.0);
+            let mut b = company("B", 50.0);
+            let mut c = company("C", 220.0);
+            let mut d = company("D", 80.0);
+            a.stock.beta = Some(1.3);
+            b.stock.beta = Some(0.8);
+            c.stock.beta = None; // read as 1.0
+            d.stock.beta = Some(2.0);
+            d.is_bankrupt = true; // outside the index, keeps its beta
+            vec![a, b, c, d]
+        }
+
+        fn with(d: f64) -> Engine {
+            let mut params = Engine::default_model();
+            params.market_beta_normalise = d;
+            Engine::with_params(
+                13,
+                roster(),
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                sectors(),
+                params,
+            )
+        }
+
+        fn cap_weighted_beta(e: &Engine) -> f64 {
+            let (mut cap, mut w) = (0.0, 0.0);
+            for c in e.companies().iter().filter(|c| c.is_public && !c.is_bankrupt) {
+                cap += c.stock.market_cap;
+                w += c.stock.market_cap * c.stock.beta.unwrap_or(1.0);
+            }
+            w / cap
+        }
+
+        #[test]
+        fn off_every_beta_is_the_one_given() {
+            let e = with(0.0);
+            let got: Vec<Option<f64>> = e.companies().iter().map(|c| c.stock.beta).collect();
+            let want: Vec<Option<f64>> = roster().iter().map(|c| c.stock.beta).collect();
+            assert_eq!(got, want);
+        }
+
+        #[test]
+        fn on_the_roster_beta_is_one_and_the_ratios_hold() {
+            let before = {
+                let r = roster();
+                let (mut cap, mut w) = (0.0, 0.0);
+                for c in r.iter().filter(|c| !c.is_bankrupt) {
+                    cap += c.stock.market_cap;
+                    w += c.stock.market_cap * c.stock.beta.unwrap_or(1.0);
+                }
+                w / cap
+            };
+            assert!((before - 1.0).abs() > 0.05, "{before}");
+            let e = with(1.0);
+            assert!((cap_weighted_beta(&e) - 1.0).abs() < 1e-12, "{}", cap_weighted_beta(&e));
+            let b: Vec<f64> = e.companies().iter().map(|c| c.stock.beta.unwrap()).collect();
+            assert!((b[0] / b[1] - 1.3 / 0.8).abs() < 1e-12);
+            assert!((b[2] - 1.0 / before).abs() < 1e-12, "an absent beta reads 1.0");
+            assert_eq!(b[3], 2.0, "a bankrupt name is outside the index and keeps its beta");
+            // Half the power leaves half the log distance.
+            let h = with(0.5);
+            assert!((cap_weighted_beta(&h) - before.sqrt()).abs() < 1e-12);
+        }
+
+        #[test]
+        fn on_the_market_moves() {
+            let mut on = with(1.0);
+            let mut off = with(0.0);
+            for e in [&mut on, &mut off] {
+                e.open_market();
+                for m in 0..10 {
+                    e.tick(&request(10, m));
+                }
+            }
+            assert_ne!(on.prices(), off.prices());
+        }
+    }
+
     mod market_day_tail {
         use super::*;
 
