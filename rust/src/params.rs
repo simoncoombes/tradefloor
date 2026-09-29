@@ -95,6 +95,33 @@ pub struct ModelParams {
     /// Baseline daily sigma of the shared market factor. It is the anchor of
     /// the factor's variance process and the crash amplifier's denomination.
     pub market_factor_sigma: f64,
+    /// The power of the roster's cap-weighted beta each name's beta is
+    /// divided by when the engine is built: `beta_i / B^d`, with
+    /// `B = sum(cap_i * beta_i) / sum(cap_i)` over the public names at
+    /// their opening caps. 0.0, which every preset carries, is the beta the
+    /// instrument gave, bit for bit: no sum is taken. 1.0 makes the
+    /// roster's cap-weighted beta exactly one, so the market factor is the
+    /// systematic part of the roster's OWN index, as a real index's
+    /// constituents' betas measured against it average one by definition.
+    /// Read once, at construction (`Engine::with_params_from_opening`);
+    /// every reader of `stock.beta` then sees the normalised value, and a
+    /// snapshot carries it. A name added later (`add_company`) keeps the
+    /// beta it is given. In [0, 1].
+    ///
+    /// Why. The certification's tail row (`index_tail_dn3_pct`, sessions
+    /// at or below -3 per cent on 40-name random rosters) reads 0.62 to
+    /// 0.67 on R17A against [0.64, 2.34], while the long run's certified
+    /// roster (seed 111) reads the tape's rate (31.5 sessions under -3 per
+    /// cent a decade against 30.1). The two rosters differ in the index's
+    /// systematic exposure: roster 111's cap-weighted beta is 1.06 with
+    /// technology 33 per cent of its cap, a random roster's median is 0.97
+    /// with technology 7 per cent, so the random index's volatility is 15.4
+    /// per cent against roster 111's 17.1 (one year from the opening, 360
+    /// and 60 held-out seeds) and the tape's 18.1. Normalising the beta
+    /// moves the two the opposite ways (15.4 to 15.7, 17.1 to 16.2), and a
+    /// market factor raised to restore roster 111 then lifts every roster's
+    /// systematic variance alike.
+    pub market_beta_normalise: f64,
     /// How much the sector draw's variance follows VIX, on the same
     /// `(VIX / anchor)^2` target the market factor's variance uses
     /// (`factor_vol.rs`). At 0.0 the sector sigma is static, bit-identical by
@@ -6663,6 +6690,7 @@ impl ModelParams {
     pub const fn pt_v1() -> ModelParams {
         ModelParams {
             market_factor_sigma: tick::MARKET_FACTOR_SIGMA,
+            market_beta_normalise: 0.0,
             sector_factor_sigma: tick::SECTOR_FACTOR_SIGMA,
             sector_loading: 0.5,
             sector_loading_beta_slope: 0.0,
@@ -9101,6 +9129,7 @@ impl ModelParams {
         }
         Some(match name {
             "market_factor_sigma" => self.market_factor_sigma,
+            "market_beta_normalise" => self.market_beta_normalise,
             "sector_factor_sigma" => self.sector_factor_sigma,
             "sector_loading" => self.sector_loading,
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
@@ -9435,6 +9464,7 @@ impl ModelParams {
         let mut out = self.clone();
         match name {
             "market_factor_sigma" => out.market_factor_sigma = value,
+            "market_beta_normalise" => out.market_beta_normalise = value,
             "sector_factor_sigma" => out.sector_factor_sigma = value,
             "sector_loading" => out.sector_loading = value,
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
@@ -10375,6 +10405,11 @@ impl ModelParams {
                 "market_vol_leverage_down is {}. It is the share of an up day the return memory ignores, in [0, 1].",
                 self.market_vol_leverage_down));
         }
+        if !(self.market_beta_normalise >= 0.0 && self.market_beta_normalise <= 1.0) {
+            return Err(format!(
+                "market_beta_normalise is {}. It is the power of the roster's cap-weighted beta each name's beta is divided by, in [0, 1].",
+                self.market_beta_normalise));
+        }
         if !(self.market_vol_leverage_standardise >= 0.0 && self.market_vol_leverage_standardise <= 1.0) {
             return Err(format!(
                 "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
@@ -11130,6 +11165,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "jump_sigma_market",
         "jump_vix_coupling",
         "market_factor_sigma",
+        "market_beta_normalise",
         "market_vol_alpha",
         "market_vol_beta",
         "market_vol_gamma",

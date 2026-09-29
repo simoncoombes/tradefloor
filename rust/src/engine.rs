@@ -1487,6 +1487,14 @@ impl Engine {
         params: ModelParams,
         settle_opening: bool,
     ) -> Self {
+        // THE ROSTER'S BETA, normalised before anything reads it
+        // (`market_beta_normalise`). A branch, so at 0.0 no sum is taken and
+        // every beta is the instrument's bit for bit.
+        let companies = if params.market_beta_normalise == 0.0 {
+            companies
+        } else {
+            normalise_roster_beta(companies, params.market_beta_normalise)
+        };
         let companies_len = companies.len();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
@@ -11120,6 +11128,52 @@ impl SessionBuffer {
         let base = tick * self.companies;
         &self.prices[base..base + self.companies]
     }
+}
+
+
+/// Divide each public name's beta by `B^power`, `B` the roster's
+/// cap-weighted beta at the opening caps (`market_beta_normalise`).
+///
+/// `B` is taken over the names that are public and not bankrupt, with a
+/// positive finite market cap, reading an absent beta as 1.0 (the loading
+/// every reader gives it). A roster with no such name, or a `B` that is not
+/// positive and finite, is returned as it came: there is no index to
+/// normalise against. The names outside the sum keep their betas too, so a
+/// name that lists later carries the beta it was given, as `add_company`'s
+/// does.
+pub(crate) fn normalise_roster_beta(mut companies: Vec<TickCompany>, power: f64) -> Vec<TickCompany> {
+    let mut cap = 0.0;
+    let mut weighted = 0.0;
+    for c in companies.iter() {
+        if !c.is_public || c.is_bankrupt {
+            continue;
+        }
+        let m = c.stock.market_cap;
+        if !(m.is_finite() && m > 0.0) {
+            continue;
+        }
+        cap += m;
+        weighted += m * c.stock.beta.unwrap_or(1.0);
+    }
+    if !(cap > 0.0) {
+        return companies;
+    }
+    let b = weighted / cap;
+    if !(b.is_finite() && b > 0.0) {
+        return companies;
+    }
+    let k = if power == 1.0 { 1.0 / b } else { crate::mathx::pow(b, -power) };
+    for c in companies.iter_mut() {
+        if !c.is_public || c.is_bankrupt {
+            continue;
+        }
+        let m = c.stock.market_cap;
+        if !(m.is_finite() && m > 0.0) {
+            continue;
+        }
+        c.stock.beta = Some(c.stock.beta.unwrap_or(1.0) * k);
+    }
+    companies
 }
 
 #[cfg(test)]
