@@ -72,6 +72,216 @@ def test_a_missing_fn_is_refused_the_same_way():
         CallableAgentAdapter()
 
 
+def _recorded(fn=buy, days=2, **kwargs):
+    """A live run of ``fn`` recorded into a fresh transcript, and the world
+    it ran in, so a test can replay it against the same market."""
+    recorder = ci.Transcript()
+    agent = callable_agent(fn, mode="live", recorder=recorder, **kwargs)
+    world = contract.make_world(agent)
+    world.run(days=days)
+    return recorder, world, agent
+
+
+def test_replay_mode_needs_no_function():
+    """Reported twice by 0.8.5's reviewers: replay never calls fn, the
+    signature says fn=None, and replay mode still refused None, so each of
+    them wrote a function that raised if called. OpenAIAgentsAdapter takes
+    no agent in replay mode, and this adapter now matches it."""
+    recorder, first, _ = _recorded()
+    for build in (
+            lambda: CallableAgentAdapter(mode="replay", transcript=recorder),
+            lambda: CallableAgentAdapter(None, name="x", mode="replay",
+                                         transcript=recorder),
+            lambda: callable_agent(mode="replay", transcript=recorder)):
+        agent = build()
+        world = contract.make_world(agent)
+        world.run(days=2)
+        assert world.digest() == first.digest()
+        assert len(agent.record) == 2
+
+
+def test_live_mode_still_needs_a_function_and_says_replay_does_not():
+    with pytest.raises(tf.ValidationError, match="mode='replay'"):
+        CallableAgentAdapter(mode="live")
+    # Replay accepts None, which is not the same as accepting anything.
+    with pytest.raises(tf.ValidationError, match="callable"):
+        CallableAgentAdapter("not a function", mode="replay",
+                             transcript=ci.Transcript())
+
+
+def test_a_replay_without_a_function_refuses_a_live_call_by_name():
+    recorder, world, _ = _recorded(days=1)
+    agent = callable_agent(mode="replay", transcript=recorder)
+    with pytest.raises(tf.ValidationError, match="noise floor of zero"):
+        agent.reask({"prompt": {}, "step": 0, "day": 0})
+    with pytest.raises(tf.ValidationError, match="nothing to call"):
+        agent.call(None, {})
+
+
+def test_a_replay_without_a_function_forks():
+    recorder, _, _ = _recorded()
+    agent = callable_agent(mode="replay", transcript=recorder)
+    world = contract.make_world(agent)
+    world.run(days=1)
+    control, shock = world.fork("control", "shock")
+    assert control.agent.fn is None and control.agent.mode == "replay"
+    control.run(days=1)
+    assert len(control.agent.record) == 2
+
+
+# -- the instructions a recording was made under ------------------------------
+
+PROMPT_A = "Buy what fell."
+PROMPT_B = "Sell everything."
+
+
+def _info(prompt):
+    return ci.AdapterInfo(framework="callable",
+                          instructions_digest=ci.digest(prompt))
+
+
+def test_a_replay_under_a_changed_prompt_is_refused():
+    """The reviewer's repro. The key is the payload alone, so a new system
+    prompt inside fn left every key matching, and the replay reproduced the
+    old prompt's scorecard exactly with nothing raised or warned. prior=
+    already refused the same situation; replay now does too."""
+    recorder, _, live = _recorded(info=_info(PROMPT_A))
+    recorder.meta.update(live.provenance())      # as the reviewer did
+    with pytest.raises(tf.ValidationError,
+                       match="recorded under different instructions"):
+        callable_agent(buy, info=_info(PROMPT_B), mode="replay",
+                       transcript=recorder)
+    # The same prompt replays, and so does an adapter that names no prompt
+    # (it claims nothing, so there is nothing to contradict).
+    for info in (_info(PROMPT_A), None):
+        agent = callable_agent(buy, mode="replay", transcript=recorder,
+                               info=info)
+        contract.make_world(agent).run(days=2)
+        assert len(agent.record) == 2
+
+
+def test_a_recording_with_no_prompt_digest_is_not_refused():
+    """Recordings made before the check, or by an adapter that named no
+    prompt, cannot be checked. They replay, as they do under prior=."""
+    recorder, _, _ = _recorded()
+    recorder.meta.pop("instructions_digest", None)
+    callable_agent(mode="replay", transcript=recorder, info=_info(PROMPT_B))
+
+
+def test_a_recording_names_its_prompt_without_a_manual_meta_update():
+    """The refusal above only works if the recording says what it ran
+    under. The framework adapters write their provenance into the recorder
+    on its first write; the callable adapter left that to the caller, so a
+    recording made without `rec.meta.update(agent.provenance())` could
+    never be refused. The caller's own keys still win."""
+    recorder, _, agent = _recorded(info=_info(PROMPT_A))
+    assert recorder.meta["instructions_digest"] == ci.digest(PROMPT_A)
+    assert recorder.meta["framework"] == "callable"
+    assert recorder.meta["decision_every_steps"] == agent.every
+
+    mine = ci.Transcript(meta={"framework": "mine"})
+    contract.make_world(callable_agent(buy, recorder=mine)).run(days=1)
+    assert mine.meta["framework"] == "mine"
+
+
+def test_the_info_says_which_mode_ran_and_a_shared_info_is_not_changed():
+    """AdapterInfo.mode stayed '' on a callable adapter in both modes, so a
+    recording could not say whether it was a live run. The info is copied
+    before the mode is set, because one info is often handed to a live and
+    a replaying adapter together."""
+    recorder, _, _ = _recorded()
+    shared = _info(PROMPT_A)
+    live = callable_agent(buy, info=shared)
+    replay = callable_agent(buy, mode="replay", transcript=recorder,
+                            info=shared)
+    assert live.info.mode == "live" and live.provenance()["mode"] == "live"
+    assert replay.info.mode == "replay"
+    assert shared.mode == "", "the caller's AdapterInfo was changed"
+    assert recorder.meta["mode"] == "live"
+
+
+def test_a_recording_names_the_library_version_that_made_it():
+    recorder, _, _ = _recorded(days=1)
+    assert recorder.meta["tradefloor_version"] == tf.__version__
+
+
+# -- code that runs after the model answers -----------------------------------
+
+
+def _raw_model(payload):
+    """A stand-in model: text with the decision buried in it."""
+    return ("Thinking it over. TOOL_CALL buy TECH_A 2000 "
+            f"(step {payload['step']})")
+
+
+def _parse_tool_call(raw, payload):
+    words = raw.split("TOOL_CALL ")[1].split()
+    side, symbol, quantity = words[0].upper(), words[1], float(words[2])
+    cap = payload["portfolio"]["buying_power"]
+    return {"actions": [{"symbol": symbol, "side": side,
+                         "quantity": quantity}],
+            "rationale": f"parsed; buying power {cap:,.0f}"}
+
+
+def test_postprocess_runs_on_replay_and_the_transcript_holds_the_raw_response():
+    """The reviewer subclassed the mixin and overrode ask(), which the mixin
+    says not to do, to keep parsing and risk code under test: whatever fn
+    returns is recorded, so code inside fn after the model call never ran
+    on replay. With postprocess, fn's return is the raw response that is
+    recorded, and postprocess runs on it in both modes."""
+    seen = []
+
+    def parse(raw, payload):
+        seen.append(payload["step"])
+        return _parse_tool_call(raw, payload)
+
+    recorder, first, live = _recorded(_raw_model, postprocess=parse)
+    assert [e["response"] for e in recorder.entries] == [
+        _raw_model({"step": 0}), _raw_model({"step": 6})]
+    assert live.record[0]["response"] == recorder.entries[0]["response"], (
+        "the record must join to the transcript on the raw response")
+    assert live.record[0]["decision"]["actions"][0]["symbol"] == "TECH_A"
+    assert seen == [0, 6]
+
+    replayer = callable_agent(mode="replay", transcript=recorder,
+                              postprocess=parse)
+    second = contract.make_world(replayer)
+    second.run(days=2)
+    assert seen == [0, 6, 0, 6], "postprocess did not run on replay"
+    assert second.digest() == first.digest()
+    assert [e["decision"] for e in replayer.record] \
+        == [e["decision"] for e in live.record]
+
+
+def test_a_postprocess_refusal_is_a_decision_error():
+    def strict(raw, payload):
+        raise ci.DecisionError("risk check: order too large")
+
+    world = contract.make_world(callable_agent(_raw_model,
+                                               postprocess=strict))
+    with pytest.raises(ci.DecisionError, match="risk check"):
+        world.run(days=1)
+
+
+def test_postprocess_may_be_async_and_survives_a_fork_and_a_reask():
+    async def parse(raw, payload):
+        return _parse_tool_call(raw, payload)
+
+    agent = callable_agent(_raw_model, postprocess=parse)
+    world = contract.make_world(agent)
+    world.run(days=1)
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    control, _ = world.fork("control", "shock")
+    assert control.agent.postprocess is parse
+    # resample parses what reask returns, so reask must post-process too.
+    assert ci.parse_decision(agent.reask(agent.record[0])).actions
+
+
+def test_postprocess_must_be_callable():
+    with pytest.raises(tf.ValidationError, match="postprocess"):
+        callable_agent(buy, postprocess="parse")
+
+
 def test_an_async_callable_trades_through_the_shared_bridge():
     """An async fn is supported: its coroutine goes through common.run_sync,
     the one bridge every adapter uses. Wrappers are covered too, because
