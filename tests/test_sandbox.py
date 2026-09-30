@@ -14,6 +14,7 @@ import copy
 import gc
 import pickle
 import struct
+import sys
 
 import pytest
 
@@ -100,6 +101,9 @@ def test_look_ahead_under_the_opt_in_is_marked_trusted():
     # flag is for: the card cannot pass as a peer of a sandboxed one.
     assert peek.trades > 0 and peek.pnl > cards["hold"].pnl
     assert peek.trusted and cards["hold"].trusted
+    # A trusted agent may fork the engine it was handed. That is not
+    # tampering, and the card already says trusted.
+    assert not peek.tampered and peek.errors == []
     assert "trusted" in repr(peek)
 
 
@@ -569,7 +573,7 @@ def test_world_records_a_privileged_agent():
 
 
 def test_tca_refuses_a_tampering_agent():
-    with pytest.raises(tf.ValidationError, match="changed the market"):
+    with pytest.raises(tf.ValidationError, match="changed or copied the market"):
         tf.tca.analyse(Mutate(), seed=3, universe=U, days=1,
                        trusted_agents=True)
     # Sandboxed, the write is refused inside act and the analysis runs.
@@ -857,3 +861,152 @@ def test_route_mcp_runs_strategies_sandboxed(monkeypatch):
 
     for r in results:
         assert not set(keys(r)) & (HIDDEN_ECONOMY | {"mispricing_s"})
+
+
+# -- a copy of the engine, however it was reached -----------------------------
+#
+# The view closes the routes the harness hands over. Code in the same process
+# can still reach the live engine: a security review of the 0.8.5 release
+# branch did it in one attribute (the view's private slot), forked it, ran
+# the fork a session ahead and bought the name that rose, and the card read
+# tampered False, trusted False, uses_hidden_state False, no errors. A fork
+# writes nothing to the engine it came from, so the state-hash check could
+# not see it. The engine now counts calls to fork, state_snapshot and
+# restore_state (`Engine.copy_count`), and the guard compares the count
+# around agent code. One agent takes the review's route; the others reach
+# the engine through the caller's frame, a route no view can close.
+
+
+def _live_engine():
+    """The live engine, found in a caller's frame: the harness's local
+    `engine`, or the `engine` of a World that is asking."""
+    frame = sys._getframe(2)
+    while frame is not None:
+        for value in frame.f_locals.values():
+            if isinstance(value, tf.Engine):
+                return value
+            if isinstance(getattr(value, "engine", None), tf.Engine):
+                return value.engine
+        frame = frame.f_back
+    raise AssertionError("no engine on the stack")
+
+
+class AheadThroughAFrame(Peek):
+    """Peek, reaching past the view by walking the stack."""
+
+    @staticmethod
+    def reach(obs):
+        return _live_engine()
+
+
+class AheadThroughTheSlot(Peek):
+    """Peek, reaching past the view through its private slot: the review's
+    one-attribute route."""
+
+    @staticmethod
+    def reach(obs):
+        return obs.engine._MarketView__engine
+
+
+class SnapshotAhead:
+    """Copies the live engine's state into an engine of its own, runs that
+    ahead, and buys what rises. No fork is called."""
+
+    def act(self, obs):
+        live = _live_engine()
+        state = live.state_snapshot()
+        ahead = tf.Engine(seed=0, universe=U)
+        ahead.restore_state(state)
+        ahead.run_session(9, 30, 3, 65)
+        later = _f64(ahead.prices())
+        best = max(range(len(later)), key=lambda i: later[i] / obs.prices[i])
+        return {obs.tickers[best]: 100.0}
+
+
+class RunAndRewind:
+    """Snapshots the live engine, runs it ahead, reads the future and puts
+    the snapshot back. The state hash comes back to where it was."""
+
+    def act(self, obs):
+        live = _live_engine()
+        state = live.state_snapshot()
+        live.run_session(9, 30, 3, 65)
+        later = _f64(live.prices())
+        live.restore_state(state)
+        best = max(range(len(later)), key=lambda i: later[i] / obs.prices[i])
+        return {obs.tickers[best]: 100.0}
+
+
+@pytest.mark.parametrize("agent", [AheadThroughTheSlot, AheadThroughAFrame,
+                                   SnapshotAhead, RunAndRewind])
+def test_look_ahead_through_a_copy_is_flagged_however_it_was_reached(agent):
+    card = _run({"ahead": agent(), "hold": tf.StrategySpec.hold()})["ahead"]
+    assert card.tampered and not card.trusted and card.trades > 0
+    assert card.errors and all("tampered" in e and "copied" in e
+                               for e in card.errors)
+    assert "TAMPERED" in repr(card)
+
+
+def test_rank_leaves_out_an_agent_that_copied_the_engine():
+    ranking = tf.rank(
+        lambda: {"ahead": AheadThroughAFrame(),
+                 "hold": tf.StrategySpec.hold(),
+                 "momentum": tf.StrategySpec.momentum()},
+        seeds=[1, 2], universe=U, days=1)
+    assert "ahead" not in ranking.records
+    assert ranking.tampered == {"ahead": [1, 2]}
+
+
+def test_world_and_tca_flag_a_copy_too():
+    world = tf.World(seed=2, universe=U, agents={"ahead": AheadThroughAFrame(),
+                                                 "hold": tf.baselines.BuyAndHold()})
+    world.run(1)
+    assert list(world.tampered) == ["ahead"]
+    assert all("copied" in e for e in world.tampered["ahead"])
+
+    with pytest.raises(tf.ValidationError, match="copied"):
+        tf.tca.analyse(AheadThroughAFrame(), seed=3, universe=U, days=1)
+
+
+def test_the_oracle_reads_the_economy_without_counting_as_a_copy():
+    engine = tf.Engine(seed=1, universe=U)
+    hidden = HiddenState(engine)
+    assert hidden.economy() == engine.economy()
+    assert engine.economy() == engine.state_snapshot()["economy"]
+    before = engine.copy_count
+    hidden.economy()
+    engine.economy()
+    assert engine.copy_count == before
+    card = _run({"oracle": tf.baselines.Oracle()})["oracle"]
+    assert not card.tampered and card.errors == []
+
+
+def test_the_copy_count_counts_copies_and_nothing_else():
+    engine = tf.Engine(seed=9, universe=U)
+    twin = tf.Engine(seed=9, universe=U)
+    assert engine.copy_count == 0
+    fork, = engine.fork(1)
+    assert engine.copy_count == 1 and fork.copy_count == 0
+    state = engine.state_snapshot()
+    engine.restore_state(state)
+    assert engine.copy_count == 3
+    # A ledger's snapshots are the engine's own reads, not a caller's copy.
+    ledger = tf.DayLedger(snapshots=True)
+    engine.run_days(2, record=False, ledger=ledger)
+    twin.run_days(2, record=False)
+    assert engine.copy_count == 3
+    # Not market state: the copies leave the hash and the prices alone.
+    assert engine.state_hash() == twin.state_hash()
+    assert engine.prices() == twin.prices()
+
+
+def test_a_trusted_guard_ignores_copies():
+    engine = tf.Engine(seed=9, universe=U)
+    strict = TamperGuard(engine, ())
+    trusting = TamperGuard(engine, (), trusted=True)
+    with strict:
+        engine.fork(1)
+    assert strict.tampered and "copied 1 time(s)" in strict.what
+    with trusting:
+        engine.fork(1)
+    assert not trusting.tampered

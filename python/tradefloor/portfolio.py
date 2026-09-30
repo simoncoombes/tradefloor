@@ -203,6 +203,14 @@ def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
                                "tf.Cancel")
     return quantity if quantity != 0 else None
 
+def _finite_positive(value: object) -> bool:
+    """Whether ``value`` is a finite number above zero. False for NaN, the
+    infinities, and anything that is not a number."""
+    try:
+        return math.isfinite(value) and value > 0  # type: ignore[arg-type]
+    except (TypeError, OverflowError):
+        return False
+
 
 class Limit:
     """A limit order, as a value in an agent's ``act()`` mapping.
@@ -310,9 +318,11 @@ class Portfolio:
         what makes the impact constraint bite economically rather than only
         mechanically.
         """
-        if cash != cash or cash <= 0:
+        # `x != x or x <= 0` let +inf through, and an infinite cash balance
+        # or leverage cap is not a portfolio anybody can hold.
+        if not _finite_positive(cash):
             raise ValidationError(f"cash must be finite and positive, got {cash}")
-        if max_leverage is not None and (max_leverage != max_leverage or max_leverage <= 0):
+        if max_leverage is not None and not _finite_positive(max_leverage):
             raise ValidationError(
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )

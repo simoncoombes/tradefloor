@@ -250,6 +250,33 @@ def test_an_invalid_cap_is_refused():
         tradefloor.Portfolio(cash=1e6, max_leverage=0)
 
 
+@pytest.mark.parametrize("bad", [float("inf"), float("-inf"), float("nan"),
+                                 0.0, -1.0, "lots", None, 10**400])
+def test_cash_and_the_cap_must_be_finite_and_positive(bad):
+    """Before 0.8.5 was tagged the check was `x != x or x <= 0`, which let
+    +inf through under a message that said "must be finite". A string or
+    None raised TypeError; every one of these is now the library's own
+    refusal."""
+    with pytest.raises(tradefloor.ValidationError, match="cash must be finite"):
+        tradefloor.Portfolio(cash=bad)
+    if bad is not None:
+        with pytest.raises(tradefloor.ValidationError,
+                           match="max_leverage must be finite"):
+            tradefloor.Portfolio(cash=1e6, max_leverage=bad)
+
+
+def test_evaluate_refuses_bad_cash_before_running_the_untraded_market(
+        monkeypatch):
+    def not_reached(*args, **kwargs):
+        raise AssertionError("the untraded market ran before cash was checked")
+
+    monkeypatch.setattr(tradefloor.harness, "_run_untraded", not_reached)
+    for kwargs in ({"cash": float("inf")}, {"max_leverage": float("inf")}):
+        with pytest.raises(tradefloor.ValidationError, match="finite"):
+            tradefloor.evaluate({"hold": tradefloor.StrategySpec.hold()},
+                                seed=1, universe=UNIVERSE, days=1, **kwargs)
+
+
 # --------------------------------------------------------------------------
 # Determinism
 # --------------------------------------------------------------------------

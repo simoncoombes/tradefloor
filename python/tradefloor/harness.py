@@ -545,6 +545,10 @@ def evaluate(
         raise ValidationError("no agents given")
     if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
         raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
+    # The portfolio's own checks on cash and max_leverage, run before the
+    # untraded market rather than after it: that run costs as much as one
+    # agent's, and a bad argument should not wait for it.
+    Portfolio(cash=cash, max_leverage=max_leverage, cash_interest=cash_interest)
 
     hour, minute, day_of_week = start
     results: dict[str, Scorecard] = {}
@@ -637,7 +641,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
     shown_engine = engine if trusted else MarketView(engine)
     shown_portfolio = portfolio if trusted else PortfolioView(portfolio, engine)
     hidden = HiddenState(engine) if privileged else None
-    guard = TamperGuard(engine, (portfolio,))
+    guard = TamperGuard(engine, (portfolio,), trusted=trusted)
     tampered = False
 
     trades = 0
@@ -696,7 +700,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             if guard.tampered:
                 tampered = True
                 errors.append(f"step {step}: tampered: agent code changed "
-                              f"the market during act() ({guard.what})")
+                              f"or copied the market during act() "
+                              f"({guard.what})")
 
             # What came back, checked for shape first. A list of pairs or a
             # string is a step that trades nothing and an error line, never
@@ -780,7 +785,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             if guard.tampered:
                 tampered = True
                 errors.append(f"day {day} explain: tampered: agent code "
-                              f"changed the market ({guard.what})")
+                              f"changed or copied the market ({guard.what})")
             if claimed is not None and actual is not None:
                 explanations.append((claimed, actual))
 

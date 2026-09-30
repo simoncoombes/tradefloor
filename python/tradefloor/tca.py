@@ -444,7 +444,7 @@ def analyse(
     shown_portfolio = (portfolio if trusted_agents
                        else PortfolioView(portfolio, engine))
     hidden = HiddenState(engine) if declares_hidden_state(agent) else None
-    guard = TamperGuard(engine, (portfolio,))
+    guard = TamperGuard(engine, (portfolio,), trusted=trusted_agents)
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
@@ -467,7 +467,8 @@ def analyse(
                 orders = agent.act(obs)
             if guard.tampered:
                 raise ValidationError(
-                    f"step {step}: the agent changed the market during act() "
+                    f"step {step}: the agent changed or copied the market "
+                    f"during act() "
                     f"({guard.what}), so there is no execution to price. "
                     "See tradefloor.sandbox.")
             try:

@@ -870,6 +870,57 @@ impl PyTickResult {
     }
 }
 
+/// The clock and volatility `tick` takes: a time of day, a day of the week
+/// from 0 (Sunday) to 6, and a volatility multiplier that is finite and not
+/// negative.
+fn check_clock(hour: i64, minute: i64, day_of_week: i64, volatility: f64) -> PyResult<()> {
+    if !(0..24).contains(&hour) || !(0..60).contains(&minute) {
+        return Err(ValidationError::new_err(format!(
+            "invalid time {hour:02}:{minute:02}"
+        )));
+    }
+    check_day_and_volatility(day_of_week, volatility)
+}
+
+/// The start a session entry point (`run_session`, `run_days`, `run_until`)
+/// takes. Looser than [`check_clock`] in one way: the minute may carry into
+/// the hour, as the session's own clock does after each tick, so 09:60 is
+/// 10:00. Callers have always passed `30 + i * 30` minutes, and they still
+/// can. The start must fall inside the day, the minute may not be negative,
+/// and the day and volatility are checked as `tick` checks them.
+fn check_session_start(
+    hour: i64,
+    minute: i64,
+    day_of_week: i64,
+    volatility: f64,
+) -> PyResult<()> {
+    let within_day = hour
+        .checked_mul(60)
+        .and_then(|h| h.checked_add(minute))
+        .is_some_and(|m| (0..24 * 60).contains(&m));
+    if hour < 0 || minute < 0 || !within_day {
+        return Err(ValidationError::new_err(format!(
+            "invalid session start {hour:02}:{minute:02}: it must fall \
+             between 00:00 and 23:59 (the minute may carry into the hour)"
+        )));
+    }
+    check_day_and_volatility(day_of_week, volatility)
+}
+
+fn check_day_and_volatility(day_of_week: i64, volatility: f64) -> PyResult<()> {
+    if !(0..7).contains(&day_of_week) {
+        return Err(ValidationError::new_err(format!(
+            "day_of_week must be 0 (Sunday) to 6 (Saturday), got {day_of_week}"
+        )));
+    }
+    if !volatility.is_finite() || volatility < 0.0 {
+        return Err(ValidationError::new_err(format!(
+            "volatility must be finite and not negative, got {volatility}"
+        )));
+    }
+    Ok(())
+}
+
 fn status_name(s: crate::market::MarketStatus) -> &'static str {
     use crate::market::MarketStatus::*;
     match s {
@@ -1069,6 +1120,38 @@ struct Explanations {
     opens: std::collections::BTreeMap<i64, KeptOpen>,
 }
 
+/// How many times Python code has copied this engine or put a copy back:
+/// calls to `fork`, `state_snapshot` and `restore_state`.
+///
+/// Read by `tradefloor.sandbox.TamperGuard` around agent code. A fork run
+/// ahead is look-ahead, and it writes nothing to the engine it came from, so
+/// the state-hash comparison cannot see it; this count can, however the
+/// agent reached the engine. Not market state: the hash, the snapshot and
+/// the log leave it out, and a copy starts its own count at zero, so no
+/// digest moves. Atomic so the engine stays `Sync` for a later PyO3.
+#[derive(Default)]
+struct CopyCount(std::sync::atomic::AtomicU64);
+
+impl CopyCount {
+    fn bump(&self) {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn get(&self) -> u64 {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn set(&self, value: u64) {
+        self.0.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl Clone for CopyCount {
+    fn clone(&self) -> Self {
+        CopyCount::default()
+    }
+}
+
 impl Explanations {
     fn wants(&self, day: i64) -> bool {
         match self.window {
@@ -1153,6 +1236,8 @@ pub struct PyEngine {
     /// tick, the snapshot and the hash leave it out, so it cannot change a
     /// run. `None` until the day's first session, which never warns.
     session_clock: Option<SessionClock>,
+    /// Copies taken of this engine; see [`CopyCount`].
+    copies: CopyCount,
 }
 
 /// Minutes in a day, the modulus `harness.session_clock` wraps the clock at.
@@ -1209,6 +1294,15 @@ fn repeated_clock_warning(start: i64, end: i64) -> String {
 /// every method of a `#[pymethods]` block becomes a binding and every
 /// binding has to be declared in the stub.
 impl PyEngine {
+    /// `state_snapshot` for this binding's own reads, which the copy count
+    /// does not see: the ledger's snapshots in `run_days` and `economy`.
+    fn snapshot_uncounted(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let before = self.copies.get();
+        let out = self.state_snapshot(py);
+        self.copies.set(before);
+        out
+    }
+
     /// Roll the day's opening marks, numbering the day `day`.
     ///
     /// The day is stamped BEFORE `inner.open_market()`, and the order is the
@@ -1661,6 +1755,7 @@ impl PyEngine {
             log: Vec::new(),
             explanations: Explanations::default(),
             session_clock: None,
+            copies: CopyCount::default(),
         };
         // After construction, so a settled opening has run its burn-in and
         // the indices are marked at the curve the run actually starts from.
@@ -1699,21 +1794,7 @@ impl PyEngine {
         news_impacts: Option<Vec<PyNewsImpact>>,
         order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<PyTickResult> {
-        if !(0..24).contains(&hour) || !(0..60).contains(&minute) {
-            return Err(ValidationError::new_err(format!(
-                "invalid time {hour:02}:{minute:02}"
-            )));
-        }
-        if !(0..7).contains(&day_of_week) {
-            return Err(ValidationError::new_err(format!(
-                "day_of_week must be 0 (Sunday) to 6 (Saturday), got {day_of_week}"
-            )));
-        }
-        if !volatility.is_finite() || volatility < 0.0 {
-            return Err(ValidationError::new_err(format!(
-                "volatility must be finite and not negative, got {volatility}"
-            )));
-        }
+        check_clock(hour, minute, day_of_week, volatility)?;
         let news = self.build_news(news)?;
         let impacts = self.build_impacts(news_impacts)?;
         let flow = self.build_flow(order_flow)?;
@@ -1852,6 +1933,11 @@ impl PyEngine {
         if ticks == 0 {
             return Err(ValidationError::new_err("ticks must be greater than zero"));
         }
+        // The checks `tick` makes, except that the minute may carry. Without
+        // them a session started at 99:999 on day 9 with NaN volatility ran
+        // and was logged, and a replay of a log someone sent could carry any
+        // of those.
+        check_session_start(hour, minute, day_of_week, volatility)?;
         let session_news = self.build_news(news)?;
         let session_impacts = self.build_impacts(news_impacts)?;
         let session_flow = self.build_flow(flow_per_tick)?;
@@ -2055,6 +2141,8 @@ impl PyEngine {
         if ticks_per_day == 0 {
             return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
         }
+        // Before the first day opens, so a bad clock opens nothing.
+        check_session_start(hour, minute, day_of_week, volatility)?;
         // Defaults to the engine's own counter, not to zero. Numbering from
         // zero on every call gave a second run the day numbers of the first:
         // two `run_days(2)` calls on one engine put four simulated days on
@@ -2092,7 +2180,7 @@ impl PyEngine {
             if let Some(l) = &ledger {
                 let leaf = self.state_hash();
                 let snapshot = if keeps_snapshots {
-                    Some(self.state_snapshot(py)?)
+                    Some(self.snapshot_uncounted(py)?)
                 } else {
                     None
                 };
@@ -2158,6 +2246,7 @@ impl PyEngine {
         if max_ticks == 0 {
             return Err(ValidationError::new_err("max_ticks must be greater than zero"));
         }
+        check_session_start(hour, minute, day_of_week, volatility)?;
         let company = self
             .tickers
             .iter()
@@ -3683,7 +3772,32 @@ impl PyEngine {
                 "count must be at least 1, got {count}"
             )));
         }
+        self.copies.bump();
         Ok((0..count).map(|_| self.clone()).collect())
+    }
+
+    /// How many times `fork`, `state_snapshot` or `restore_state` has been
+    /// called on this engine. Not market state, and a fork starts at zero.
+    /// `tradefloor.sandbox.TamperGuard` compares it around agent code,
+    /// because a copy run ahead is look-ahead and changes nothing a hash
+    /// can see.
+    #[getter]
+    fn copy_count(&self) -> u64 {
+        self.copies.get()
+    }
+
+    /// The economy block of [`PyEngine::state_snapshot`], and only that,
+    /// without counting as a copy. The whole snapshot carries the generator
+    /// state, so it counts; this does not, which is what lets
+    /// `tradefloor.sandbox.HiddenState.economy` serve an agent that declared
+    /// hidden state without its scorecard reading as look-ahead.
+    fn economy(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let snapshot = self.snapshot_uncounted(py)?;
+        let economy = snapshot
+            .bind(py)
+            .get_item("economy")?
+            .ok_or_else(|| ValidationError::new_err("the snapshot carried no economy block"))?;
+        Ok(economy.unbind())
     }
 
     /// This market's state as one 64-character hex digest: the ledger leaf.
@@ -3758,6 +3872,7 @@ impl PyEngine {
     /// copies the engine rather than rebuilding one, and it is what
     /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        self.copies.bump();
         let out = PyDict::new_bound(py);
         let columns = PyDict::new_bound(py);
         for name in COLUMN_FIELDS {
@@ -4131,6 +4246,7 @@ impl PyEngine {
     /// the universe the snapshot came from; this guard catches a re-ordered or
     /// resized roster, not a substituted one.
     fn restore_state(&mut self, snapshot: &Bound<'_, PyDict>) -> PyResult<()> {
+        self.copies.bump();
         let tickers: Vec<String> = snapshot
             .get_item("tickers")?
             .ok_or_else(|| ValidationError::new_err("snapshot has no 'tickers'"))?
