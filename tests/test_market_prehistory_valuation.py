@@ -91,3 +91,20 @@ def test_the_same_seed_opens_the_same_and_a_snapshot_before_the_open_restores_it
             e.open_market(); e.run_session(9, 30, 3, 60); e.close_market()
     assert floats(a.prices()) == floats(c.prices())
     assert a.state_hash() == c.state_hash()
+
+
+def test_a_pre_open_snapshot_carries_the_opening_into_an_engine_of_another_seed():
+    # An engine of the same seed builds the same carry, so only another
+    # seed's engine shows what the key holds: with it the restored run opens
+    # as the parent does, without it at its own prehistory's mispricing.
+    parent = engine(11)
+    snap = parent.state_snapshot()
+    runs = {}
+    for keep in (True, False):
+        restored = engine(12)
+        restored.restore_state(snap if keep else {k: v for k, v in snap.items() if k != "opening_carry"})
+        twin = engine(11)
+        for e in (twin, restored):
+            e.open_market(); e.run_session(9, 30, 3, 60); e.close_market()
+        runs[keep] = floats(twin.prices()) == floats(restored.prices())
+    assert runs == {True: True, False: False}

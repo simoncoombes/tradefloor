@@ -1138,7 +1138,12 @@ def _nothing_dormant():
                    # The wash fix's two book switches are 0.0 or 1.0 (r17
                    # wash); they are read only by resting orders.
                    book_cross_at_limit=1.0,
-                   impact_memory_refill=1.0)
+                   impact_memory_refill=1.0,
+                   # The market's prehistory is a whole number of sessions
+                   # and its valuation carry a switch (r18 valopen); five
+                   # sessions keep the build short and still hand on state.
+                   market_prehistory_sessions=5.0,
+                   market_prehistory_valuation=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1454,6 +1459,22 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "and_a_restore_carry_the_memory is the test that does see it: it "
         "restores the memory and compares the published quote and the state "
         "hash, which carries it.",
+    "opening_carry":
+        "the prehistory's carried mispricing (`market_prehistory_valuation`, "
+        "r18 valopen), which the first open takes in place of its draws. "
+        "This guard forks mid-day, after that open, so the snapshot carries "
+        "an empty buffer, as with opening_z; and before the open an engine "
+        "built from the same seed builds the same carry. tests/test_market_"
+        "prehistory_valuation.py::test_a_pre_open_snapshot_carries_the_"
+        "opening_into_an_engine_of_another_seed restores before the open into "
+        "another seed's engine, where a snapshot without it opens elsewhere.",
+    "fed_drawdown_returns":
+        "the drawdown hold's window of index returns (`fed_drawdown_hold`, "
+        "r20 fedbear). A meeting reads it only to hold a rise, and `CRISIS` "
+        "starts the policy rate at 0.05 in a contraction, where no meeting "
+        "has a rise to hold. tests/test_fed_put_carry.py::test_the_hashes_"
+        "agree_and_a_restore_reproduces_the_run carries the window across a "
+        "restore and asserts the state hash reads it and its base.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "
