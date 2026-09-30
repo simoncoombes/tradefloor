@@ -1357,6 +1357,16 @@ impl Engine {
         self.params.fed_put_gain != 0.0
     }
 
+    /// Whether a meeting tonight holds any rise: within `fed_stress_hold`
+    /// sessions of a stressed close, or, under `fed_drawdown_hold`, with
+    /// credit's leverage gap (the index's log fall below its slow average)
+    /// at or above that dial. False with both off.
+    fn stress_hold_now(&self) -> bool {
+        (self.params.fed_stress_hold != 0.0 && self.stress_hold_age < self.params.fed_stress_hold)
+            || (self.params.fed_drawdown_hold != 0.0
+                && self.economy.spread_equity_gap >= self.params.fed_drawdown_hold)
+    }
+
     /// Whether this engine's model carries credit's leverage gap
     /// (`EconomyState::spread_equity_gap`), which is when the snapshot and
     /// the state hash carry it: `corporate_spread_equity_gain` or
@@ -7981,8 +7991,8 @@ impl Engine {
             put_threshold: self.params.fed_put_threshold,
             put_pricing: self.params.treasury_put_pricing,
             haven_gain: self.params.treasury_haven_gain,
-            stress_hold: self.params.fed_stress_hold != 0.0
-                && self.stress_hold_age < self.params.fed_stress_hold,
+            put_carry: self.params.fed_put_carry,
+            stress_hold: self.stress_hold_now(),
             path_gain: self.params.treasury_path_pricing,
             path_before: self.priced_policy_path(),
             rate_damping: self.params.treasury_policy_damping,
@@ -9170,8 +9180,7 @@ impl Engine {
         cb.next_meeting_date = request.timestamp;
         let options = crate::economy::PolicyOptions {
             stress_level: self.stress_vix_max,
-            stress_hold: self.params.fed_stress_hold != 0.0
-                && self.stress_hold_age < self.params.fed_stress_hold,
+            stress_hold: self.stress_hold_now(),
             path_before: self.priced_policy_path(),
             ..*options
         };

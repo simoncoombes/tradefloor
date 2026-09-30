@@ -2140,6 +2140,44 @@ pub struct ModelParams {
     /// over 1350 held-out histories, all in its first two quarters, which
     /// PH5's return clause reads.
     pub market_prehistory_valuation: f64,
+    /// The share of the intermeeting fall the Fed put's cut left unanswered
+    /// that the next meeting's clock starts from. 0.0, which every preset
+    /// carries, restarts the clock at zero at every meeting, as it stood.
+    /// Read only with `fed_put_gain` non-zero. In [0, 1].
+    ///
+    /// The put rounds its ask to a quarter point, so at a gain of 3 an
+    /// intermeeting fall under about 4.2 per cent asks for nothing, and a
+    /// bear that falls 3 to 4 per cent between each pair of meetings is
+    /// never answered however far it goes: on R19V's held-out histories
+    /// (sets A and B, 602 bears of 20 per cent) the median policy change
+    /// from peak to trough sits on -0.50, the quarter-point atom, with 0.44
+    /// to 0.48 of bears cut by 0.75 or more by their trough and 0.70 to 0.73
+    /// by 63 sessions after it. Off zero, at a meeting where the put was
+    /// live and not held at the rate, the clock restarts at this share of
+    /// `min(0, I + c / gain)`, where `I` is the intermeeting return the
+    /// meeting read and `c` the cut the put took: the fall its cut did not
+    /// answer, which the index's later returns then add to or take back.
+    /// Nothing is carried when the put's cut stopped at the policy rate, or
+    /// with inflation at or above the put's ceiling. The priced put
+    /// (`treasury_put_pricing`) reads the same clock. No draw. No state
+    /// beyond the intermeeting return the put already carries.
+    pub fed_put_carry: f64,
+    /// Credit's leverage gap (`EconomyState::spread_equity_gap`, the index's
+    /// log fall below its own slow average) at or above which a meeting
+    /// holds any rise, as the stress hold does (`fed_stress_hold`): with
+    /// inflation under target plus `fed_stress_inflation_gap`, a rise the
+    /// ladder chose is held and the Fed put gives nothing back. 0.0, which
+    /// every preset carries, is off. Requires the gap
+    /// (`corporate_spread_equity_gain` or `cycle_equity_hazard` non-zero).
+    /// In [0, 1].
+    ///
+    /// The stress hold reads the VIX, which reverts within weeks of a
+    /// sell-off while the index stays down, so a bear whose VIX has settled
+    /// is hiked into: on R19V's held-out histories 0.43 to 0.47 of 20 per
+    /// cent bears see a rise between peak and trough. The FOMC's rises at
+    /// CPI under 4 came with the S&P 500 within about 10 per cent of its
+    /// high, December 2018 (16 per cent down) the exception.
+    pub fed_drawdown_hold: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -7091,6 +7129,8 @@ impl ModelParams {
             cycle_equity_hazard_opening: 0.0,
             market_prehistory_sessions: 0.0,
             market_prehistory_valuation: 0.0,
+            fed_put_carry: 0.0,
+            fed_drawdown_hold: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -9515,6 +9555,8 @@ impl ModelParams {
             "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
             "market_prehistory_sessions" => self.market_prehistory_sessions,
             "market_prehistory_valuation" => self.market_prehistory_valuation,
+            "fed_put_carry" => self.fed_put_carry,
+            "fed_drawdown_hold" => self.fed_drawdown_hold,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9855,6 +9897,8 @@ impl ModelParams {
             "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
             "market_prehistory_sessions" => out.market_prehistory_sessions = value,
             "market_prehistory_valuation" => out.market_prehistory_valuation = value,
+            "fed_put_carry" => out.fed_put_carry = value,
+            "fed_drawdown_hold" => out.fed_drawdown_hold = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -10818,6 +10862,28 @@ impl ModelParams {
                  prehistory's length as well."
                     .to_string());
         }
+        if !(self.fed_put_carry >= 0.0 && self.fed_put_carry <= 1.0) {
+            return Err(format!(
+                "fed_put_carry is {}. It is the share of the Fed put's unanswered fall \
+                 carried to the next meeting, in [0, 1]; 0 is none.",
+                self.fed_put_carry));
+        }
+        if !(self.fed_drawdown_hold >= 0.0 && self.fed_drawdown_hold <= 1.0) {
+            return Err(format!(
+                "fed_drawdown_hold is {}. It is the index's log fall below its slow average \
+                 at or above which the bank holds any rise, in [0, 1]; 0 is off.",
+                self.fed_drawdown_hold));
+        }
+        if self.fed_drawdown_hold != 0.0
+            && self.corporate_spread_equity_gain == 0.0
+            && self.cycle_equity_hazard == 0.0
+        {
+            return Err(format!(
+                "fed_drawdown_hold is {} but neither corporate_spread_equity_gain nor \
+                 cycle_equity_hazard is set. The hold reads credit's leverage gap, which \
+                 the engine keeps only with one of them on.",
+                self.fed_drawdown_hold));
+        }
         if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
             return Err(format!(
                 "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
@@ -11494,6 +11560,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_equity_hazard_opening",
         "market_prehistory_sessions",
         "market_prehistory_valuation",
+        "fed_put_carry",
+        "fed_drawdown_hold",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

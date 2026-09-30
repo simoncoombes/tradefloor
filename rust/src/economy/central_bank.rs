@@ -176,6 +176,10 @@ pub struct PolicyOptions {
     /// `treasury_haven_gain`: 0.0 is no haven in the meeting's 10-year
     /// target.
     pub haven_gain: f64,
+    /// `fed_put_carry`: the share of the put's unanswered intermeeting fall
+    /// the clock restarts from. 0.0 restarts it at zero, as it stood. See
+    /// [`crate::params::ModelParams::fed_put_carry`].
+    pub put_carry: f64,
     /// `fed_stress_hold`: the meeting falls within the dial's sessions of a
     /// stressed close, so a rise is held while inflation is under target
     /// plus `stress_inflation_gap`. False with the dial off. See
@@ -217,6 +221,7 @@ impl PolicyOptions {
             put_threshold: 0.0,
             put_pricing: 0.0,
             haven_gain: 0.0,
+            put_carry: 0.0,
             stress_hold: false,
             path_gain: 0.0,
             path_before: 0.0,
@@ -576,7 +581,23 @@ pub fn update_central_bank_with(
             new_economy.fed_put_owed = economy.fed_put_owed + taken;
             new_economy.fed_put = economy.fed_put + taken;
         }
-        new_economy.intermeeting_return = 0.0;
+        // THE UNANSWERED FALL (`fed_put_carry`): the clock restarts at the
+        // share of the fall this meeting's cut did not answer, `min(0, I +
+        // c / gain)` with `c` the cut the meeting took (whichever of the
+        // ladder, the stress cut and the put chose it), while the put was
+        // live at this meeting and the rate is still above zero. A branch:
+        // at 0.0 it restarts at zero as it stood.
+        new_economy.intermeeting_return = if options.put_carry != 0.0
+            && !options.hold_rate
+            && economy.inflation_rate < FED_PUT_INFLATION_CEILING
+            && new_economy.federal_funds_rate > 0.0
+        {
+            let cut = mathx::max(0.0, current_rate - new_economy.federal_funds_rate);
+            options.put_carry
+                * mathx::min(0.0, economy.intermeeting_return + cut / options.put_gain)
+        } else {
+            0.0
+        };
     }
     // What the 10-year hears on the day: the rate change, less the share of
     // the put the curve had priced (`treasury_put_pricing`), so a priced cut
