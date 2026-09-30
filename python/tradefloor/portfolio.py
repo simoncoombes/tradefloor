@@ -565,7 +565,7 @@ class Portfolio:
                     "quantity": signed,
                     "price": out["average_price"],
                     "worst_price": out["worst_price"],
-                    "notional": sum(
+                    "notional": ordered_sum(
                         (f["quantity"] if side == "buy" else -f["quantity"])
                         * f["price"] for f in out["fills"]),
                     "requested": quantity,

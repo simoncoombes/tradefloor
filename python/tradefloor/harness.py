@@ -732,8 +732,9 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                             engine, ticker, order.quantity, order.price)
                         if report["filled"] > 0:
                             trades += 1
-                            turnover += sum(f["quantity"] * f["price"]
-                                            for f in report["fills"])
+                            turnover += ordered_sum(
+                                f["quantity"] * f["price"]
+                                for f in report["fills"])
                         continue
                     fill = portfolio.execute(engine, ticker, order)
                     trades += 1
