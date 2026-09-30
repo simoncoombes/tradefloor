@@ -1,26 +1,37 @@
-//! # tradefloor - the engine core
+#![doc = include_str!("../README.md")]
 //!
-//! The price model, in Rust, compiled once and consumed twice: as WebAssembly
-//! inside a browser, and as a Python extension module for backtesting.
+//! ## Where things are
 //!
-//! "Once" is the load-bearing word. A Rust implementation that runs only in
-//! Python while the browser keeps a reference implementation of its own is
-//! not a port, it is a fork, and two models that quietly disagree about the
-//! same prices is a worse
-//! outcome than having no Python bindings at all. See the port plan.
+//! [`engine::Engine`] owns a market and runs the day loop. It takes its
+//! coefficients from a [`params::ModelParams`], which is one of the named
+//! presets ([`params::ModelParams::preset`]) or a preset with overrides, and
+//! its roster from [`universe`]. The rest are the parts the engine is built
+//! from, and each can be called on its own:
 //!
-//! ## The rule this crate is written under
+//! - [`market`]: the tick, the factor model, GARCH and the trading clock.
+//! - [`economy`]: the macro chain (GDP, inflation, unemployment, the VIX,
+//!   the business cycle) and the central bank.
+//! - [`order_book`], [`agent_book`], [`market_maker`] and
+//!   [`microstructure`]: the limit order book and the depth around it.
+//! - [`fair_value`] and [`mispricing`]: what a stock is worth and how far
+//!   its price has strayed from it.
+//! - [`rates`]: bond indices priced off the engine's yield curve.
+//! - [`rng`] and [`mathx`]: the random streams and the transcendental
+//!   maths, both written here so that a seed gives the same bits on every
+//!   platform.
 //!
-//! Every module here is a port of a specific reference-implementation
-//! module, and the target is **bit-identical output**, not equivalent
-//! behaviour. Where the original
-//! does something surprising, the port reproduces the surprise and comments
-//! why. Improvements, tidy-ups and bug fixes are all out of scope: each one
-//! would be a silent divergence, and the divergences are invisible until a
-//! whole simulated market has drifted apart.
+//! The `python` feature builds the Python extension module and the `wasm`
+//! feature builds the WebAssembly binding. Both drive
+//! [`engine::Engine::close_day`], so a day in Python and a day in a browser
+//! run the same code.
 //!
-//! Fixes belong upstream in the reference implementation first, where the
-//! existing test suite can catch them — then they arrive here as an ordinary re-port.
+//! Many modules began as line-for-line ports of an earlier reference
+//! implementation, and their comments still cite it. The crate has since
+//! changed the model on purpose and is now its only definition.
+//!
+//! What it promises is determinism: the same seed, roster and preset give
+//! the same market, bit for bit, on every supported platform and in every
+//! patch release of an LTS line.
 
 // `!(x > 0.0)` rather than `x <= 0.0` is a deliberate, load-bearing idiom
 // throughout this crate: the negated form also rejects NaN, and it is how the

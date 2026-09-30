@@ -924,6 +924,58 @@ strategy named after a baseline, an authored row with nothing to value it on,
 `rank_strategies(seeds=[])` and `explain_price_move(top_n=0)` are refused.
 `list_scenarios` lists `rate_ramp` and `vix_shock` as the constructors.
 
+### The Rust crate since 0.8.1
+
+The crate takes the Python package's version, so it is 0.8.5 too, and Cargo
+treats 0.8.5 as a compatible update to 0.8.1: `tradefloor = "0.8"` moves to
+it on `cargo update`. It is not compatible. Code written against the 0.8.1
+crate can stop compiling, and code that still compiles runs a different
+default market. To stay on the old API, pin `tradefloor = "=0.8.1"`.
+
+These signatures changed:
+
+- Seeds are `u64` where they were `u32`: `Engine::new` and the other
+  `Engine` constructors, `universe::random_universe`, `GameRng::new`,
+  `GameRng::from_seed`, `GameRng::substream`, `GameRng::surgery` (both
+  seeds), `Pcg32::new` and `engine::fixed_simulation_digest` (both
+  seeds). A `u32` argument needs `u64::from(seed)`.
+- `Engine::tick_components` returns rows of
+  `market::factors::TICK_COMPONENT_COUNT` (9) entries, where it returned
+  `[f64; 8]`. The ninth is the tick's fair-value shift.
+- `market::factors::COMPONENT_COUNT` is one larger, for the new
+  `FAIR_VALUE_SLOT`.
+- `Engine::state_hash_with_pending` takes a fifth argument,
+  `pending_fair_value`.
+
+These public structs gained public fields, so a struct literal written for
+0.8.1 no longer compiles: `SessionRequest` (`fills`), `TickInputs`
+(`resting_orders`, `fill_impact`), `TickStock` (`fair_value_offset`),
+`TickOutcome` (`agent_fills`), `LiveFactors` (`company_news_market`,
+`noise_market_linear`), `DailyInputs` (`unemployment_adjustment`,
+`fear_greed_published`, `yields`), `EconomyState` (`earnings_cycle`,
+`vix_feedback`, `earnings_anticipation`, `unemployment_impulse`),
+`OrderBook` (`cap`), `SessionBuffer` and `TickTruth` (`repriced`), and
+`ModelParams` (37 fields, one per new coefficient). Build a `ModelParams`
+with `ModelParams::preset` and `with_override`, and a
+`SessionRequest` with the new `SessionRequest::new`, which fills in a quiet
+session.
+
+So that adding a field is no longer a breaking change, `ModelParams`,
+`SessionRequest`, `SessionBuffer`, `SessionOutcome`, `TickTruth` and both
+`TickOutcome` structs are now `#[non_exhaustive]`. Outside the crate they
+cannot be written as struct literals or with `..base` update syntax. Use the
+constructors above and `SessionBuffer::new`, then set or read fields on the
+value. A pattern that destructures one needs a trailing `..`.
+
+`params::DEFAULT_PRESET_NAME` is `pt-v20`, so `Engine::new` builds a
+different market from the same seed than it did on 0.8.1. Pass
+`ModelParams::preset("pt-v19")` to `Engine::with_params` for the old one.
+
+The crate also declares `rust-version = "1.83"`, its README example now runs
+a trading day (the 0.8.1 example called only `close_day`, which moves no
+prices) and is compiled and run by `cargo test`, and the docs build without
+warnings.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

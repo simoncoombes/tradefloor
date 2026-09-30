@@ -8,7 +8,7 @@
 //! market factor's variance process — is carried here as a plain `f64`, and
 //! the engine reads the field where it used to read the `pub const`. The
 //! constants themselves REMAIN, as the definition of the shipped preset:
-//! [`PT_V1`] is built from them, so every existing test asserting a constant
+//! [`PT_V1`](crate::params::PT_V1) is built from them, so every existing test asserting a constant
 //! still guards the preset, and a build whose constants moved fingerprints
 //! differently by construction.
 //!
@@ -20,7 +20,8 @@
 //! this crate additionally bans `mul_add` and non-`mathx` transcendentals.
 //! The one hazard §5.3 names — a `const` deriving another — is handled by
 //! deriving once, in the constructor: the circuit-breaker band multipliers
-//! ([`ModelParams::breaker_up`]/[`ModelParams::breaker_down`]) are computed
+//! ([`breaker_up`](crate::params::ModelParams::breaker_up) and
+//! [`breaker_down`](crate::params::ModelParams::breaker_down)) are computed
 //! when the params are built, never per call site. The acceptance gate is
 //! trajectory equality: an engine built from `PT_V1` must reproduce the
 //! const build's known-answer digest bit for bit, and does — see
@@ -34,7 +35,7 @@
 //! keeps every preset comparable under common random numbers and replayable
 //! against order logs.
 //!
-//! 1. **Settable** — the live dynamics numbers ([`settable_names`]): the searched
+//! 1. **Settable** — the live dynamics numbers ([`settable_names`](crate::params::settable_names)): the searched
 //!    surface (both variance processes, the factor sigmas and their scale,
 //!    the mispricing dynamics) plus the guards that live in the threaded
 //!    chain (the mispricing cap, the crowd lean cap, the price breaker and
@@ -89,6 +90,29 @@ use crate::mispricing;
 /// The complete runtime-settable model surface, plus the derived values the
 /// tick loop reads. Plain `f64`s, no interior mutability: immutable once
 /// built, which is what lets the fingerprint be trusted.
+///
+/// Build one with [`ModelParams::preset`] and change it with
+/// [`ModelParams::with_override`], which checks the value and recomputes the
+/// fields derived from it. Outside this crate that is the only way, because
+/// the struct is `#[non_exhaustive]`: new coefficients arrive in patch
+/// releases (0.8.5 added 37), and each would otherwise break a struct
+/// literal. Struct update syntax is refused too, since it would copy a
+/// derived field such as `breaker_up` without recomputing it:
+///
+/// ```compile_fail,E0639
+/// use tradefloor::params::{ModelParams, PT_V1};
+///
+/// let wider = ModelParams { quote_model_weight: 0.5, ..PT_V1 };
+/// ```
+///
+/// ```
+/// use tradefloor::params::ModelParams;
+///
+/// let base = ModelParams::preset("pt-v20").unwrap();
+/// let wider = base.with_override("quote_model_weight", 0.5).unwrap();
+/// assert_ne!(wider, base);
+/// ```
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelParams {
     // ── Factor structure (market/tick.rs, market/factors.rs) ────────────
@@ -162,7 +186,7 @@ pub struct ModelParams {
     /// and bit-identical.
     ///
     /// The injection is `source * gain * crisis_spike * market_factor`, and
-    /// at a held VIX the spike is pinned at [`crisis_blend_cap`] (§63), so
+    /// at a held VIX the spike is pinned at [`crisis_blend_cap`](Self::crisis_blend_cap) (§63), so
     /// the ONLY thing that varies between seed blocks is `market_factor`'s
     /// magnitude — which is the market variance level, which is what GARCH
     /// persistence governs.
@@ -176,7 +200,7 @@ pub struct ModelParams {
     /// At `d` the injection is scaled by `|market_factor / baseline|^-d`, so
     /// at 1.0 its magnitude no longer depends on how large the market factor
     /// happens to be and the crisis correlation it produces stops inheriting
-    /// the variance level. The baseline is [`market_factor_sigma`] at tick
+    /// the variance level. The baseline is [`market_factor_sigma`](Self::market_factor_sigma) at tick
     /// scale, the same normaliser `crash_amplifier` already uses, so
     /// "ordinary" means the same thing in both places.
     ///
@@ -228,7 +252,8 @@ pub struct ModelParams {
     /// bit-identical.
     ///
     /// At `k` the scale is `idio_sigma_scale * beta^k`, bounded by
-    /// [`IDIO_BETA_BOUNDS`]. Like [`sector_loading_beta_slope`] it reuses a
+    /// [`IDIO_BETA_BOUNDS`](crate::market::factors::IDIO_BETA_BOUNDS). Like
+    /// [`sector_loading_beta_slope`](Self::sector_loading_beta_slope) it reuses a
     /// per-name attribute the universe already carries rather than drawing a
     /// fresh one, so it costs no RNG stream and cannot move the draw
     /// schedule.
@@ -3756,7 +3781,7 @@ pub struct ModelParams {
     /// preset's trajectory moves.
     ///
     /// Clamped so GJR persistence `alpha + beta + gamma/2` stays below
-    /// [`GARCH_PERSISTENCE_CEILING`]. A name whose variance process is not
+    /// [`GARCH_PERSISTENCE_CEILING`](crate::market::garch::GARCH_PERSISTENCE_CEILING). A name whose variance process is not
     /// stationary does not produce fat tails, it produces a number that
     /// grows until a guard catches it.
     ///
@@ -4782,8 +4807,9 @@ pub struct ModelParams {
     /// g_up^2   = m A / (1 - m) + e^2 g_down^2
     /// ```
     ///
-    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`] and `w` is
-    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`], both MEASURED on the composed
+    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`](crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)
+    /// and `w` is
+    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`](crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE), both MEASURED on the composed
     /// pt-v19 and recorded there with their recipes. At `m = 0.3916`,
     /// `w = 0.1019` and `e = 1.93` that is `g_down^2 = 0.4996655 /
     /// 0.7773328 = 0.642795`, `g_down = 0.801745`, and `g_up^2 = 1.753897 +
@@ -4993,7 +5019,8 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 pub const DEFAULT_PRESET_NAME: &str = "pt-v20";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
-/// certificate recorded.
+/// certificate recorded. Read only by the tests.
+#[cfg(test)]
 const PT_V3_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FAE_77BA_B2AC_7C70u64),
     ("garch_beta", 0x3FE5_EE19_E4CB_5403u64),
@@ -5005,6 +5032,7 @@ const PT_V3_BITS: &[(&str, u64)] = &[
     ("momentum_theta", 0x3FB2_FF2E_48E8_A71Cu64),
 ];
 
+#[cfg(test)]
 const PT_V2_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FB0_319F_E8B2_672Eu64),
     ("garch_beta", 0x3FE7_0C76_769C_A23Fu64),
@@ -5961,7 +5989,7 @@ impl ModelParams {
     /// **The driven window is improved, not closed.** 1.336 against 1.527,
     /// and still a third too volatile. Most of that excess is not the VIX
     /// channel but the QE valuation channel, whose gain
-    /// ([`qe_pe_gain`]) ships inert because the driven test feeds it a
+    /// ([`qe_pe_gain`](Self::qe_pe_gain)) ships inert because the driven test feeds it a
     /// harness-derived proxy rather than measured data.
     ///
     pub const fn pt_v14() -> ModelParams {
@@ -7978,7 +8006,7 @@ impl ModelParams {
     /// read by nothing without. Part of [`ModelParams::invariants`].
     fn book_invariants(&self) -> Result<(), String> {
         let y = self.book_depth_coefficient;
-        if !(y >= 0.0 && y <= 10.0) {
+        if !(0.0..=10.0).contains(&y) {
             return Err(format!(
                 "book_depth_coefficient is {y}. It is the latent depth's Y in \
                  Y sigma (Q/V)^delta, a non-negative number of order one; 0.0 \
@@ -7995,21 +8023,21 @@ impl ModelParams {
             }
         }
         let d = self.book_depth_exponent;
-        if !(d >= 0.0 && d <= 1.0) {
+        if !(0.0..=1.0).contains(&d) {
             return Err(format!(
                 "book_depth_exponent is {d}. It is the exponent of the \
                  price-for-size law, in [0, 1]: 0.5 is the square root, 1.0 is \
                  linear, and 0.0 reads as the square root."));
         }
         let r = self.book_depth_reach;
-        if !(r >= 0.0 && r <= 10.0) {
+        if !(0.0..=10.0).contains(&r) {
             return Err(format!(
                 "book_depth_reach is {r}. It is how far the latent depth reaches, \
                  in multiples of daily volume, inside [0, 10]; 0.0 reads as one \
                  day's volume."));
         }
         let h = self.book_refill_half_life;
-        if !(h >= 0.0 && h <= 390.0) {
+        if !(0.0..=390.0).contains(&h) {
             return Err(format!(
                 "book_refill_half_life is {h}. It is a half-life in ticks inside \
                  the 390-tick session, in [0, 390]; 0.0 refills at the next tick."));
@@ -8021,7 +8049,7 @@ impl ModelParams {
                  it is read by nothing without both."));
         }
         let g = self.fill_impact_coefficient;
-        if !(g >= 0.0 && g <= 5.0) {
+        if !(0.0..=5.0).contains(&g) {
             return Err(format!(
                 "fill_impact_coefficient is {g}. It is gamma in gamma sigma Q/V, \
                  non-negative and of order 0.1 to 1 (Almgren et al. 2005 measure \
@@ -8281,7 +8309,7 @@ impl ModelParams {
         for (name, v) in [("quote_model_weight", self.quote_model_weight),
                           ("fair_value_news_share", self.fair_value_news_share),
                           ("fair_value_market_share", self.fair_value_market_share)] {
-            if !(v >= 0.0 && v <= 1.0) {
+            if !(0.0..=1.0).contains(&v) {
                 return Err(format!(
                     "{name} is {v}. It is a weight in [0, 1]; 0.0 as shipped."));
             }
@@ -8301,7 +8329,7 @@ impl ModelParams {
         for (name, v) in [("news_absorption_half_life", self.news_absorption_half_life),
                           ("news_absorption_drift_half_life",
                            self.news_absorption_drift_half_life)] {
-            if !(v >= 0.0 && v <= 390.0) {
+            if !(0.0..=390.0).contains(&v) {
                 return Err(format!(
                     "{name} is {v}. It is a half-life in ticks inside the 390-tick \
                      session, in [0, 390]; 0.0 is the straight-line spread."));
@@ -9807,7 +9835,7 @@ mod tests {
     }
 
     fn word_at(s: &str, i: usize, word: &str) -> Option<usize> {
-        if s.len() >= i + word.len() && s[i..].as_bytes()[..word.len()].eq_ignore_ascii_case(word.as_bytes()) {
+        if s.len() >= i + word.len() && s.as_bytes()[i..][..word.len()].eq_ignore_ascii_case(word.as_bytes()) {
             Some(i + word.len())
         } else {
             None
@@ -9917,7 +9945,7 @@ mod tests {
                         && rest[i + 3..]
                             .chars()
                             .next()
-                            .map_or(true, |c| !c.is_ascii_alphanumeric())
+                            .is_none_or(|c| !c.is_ascii_alphanumeric())
                 });
             match hit {
                 Some(i) => {
@@ -10137,16 +10165,15 @@ mod tests {
                 // "At `1.0` ... which is what <scope> does" -- indicative,
                 // unlike "at X every preset is bit-identical", which is a
                 // counterfactual about a value no preset need set.
-                if after_trim.starts_with("does")
+                if (after_trim.starts_with("does")
                     || after_trim.starts_with("do ")
-                    || after_trim.starts_with("did")
+                    || after_trim.starts_with("did"))
+                    && s[..i].trim_end().ends_with("what")
                 {
-                    if s[..i].trim_end().ends_with("what") {
-                        let opener = head.strip_prefix("At ").unwrap_or("");
-                        let opener = opener.strip_prefix('`').unwrap_or(opener);
-                        if let Some((v, t)) = number_at(opener, 0) {
-                            push(v, t, presets.clone(), &format!("At {t} ... what {}", &s[i..end]));
-                        }
+                    let opener = head.strip_prefix("At ").unwrap_or("");
+                    let opener = opener.strip_prefix('`').unwrap_or(opener);
+                    if let Some((v, t)) = number_at(opener, 0) {
+                        push(v, t, presets.clone(), &format!("At {t} ... what {}", &s[i..end]));
                     }
                 }
             }

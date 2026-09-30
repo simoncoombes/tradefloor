@@ -116,7 +116,7 @@ pub fn cycle_hazard_params_for(phase: CyclePhase, us: bool) -> (f64, f64) {
 /// This is `getCycleTransitionProbability` — the UI-safe form that computes
 /// the probability **without rolling the dice**. The original duplicates the
 /// condition ladder between this and [`check_cycle_transition`]; here the two
-/// share [`adjust_transition_probability`], on the evidence recorded there.
+/// share `adjust_transition_probability`, on the evidence recorded there.
 pub fn get_cycle_transition_probability(
     economy: &EconomyState,
     per_month: f64,
@@ -492,8 +492,8 @@ pub fn stationary_opening_for(spec: &CycleSpec, u_phase: f64, u_age: f64) -> (Cy
 
     let mut cumulative = 0.0;
     let mut pick = phases.len() - 1;
-    for k in 0..phases.len() {
-        cumulative += mean[k];
+    for (k, share) in mean.iter().enumerate().take(phases.len()) {
+        cumulative += share;
         if cumulative / cycle >= u_phase {
             pick = k;
             break;

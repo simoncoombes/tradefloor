@@ -54,7 +54,7 @@ pub const FAIR_VALUE_FLOOR: f64 = 0.01;
 /// Fallback sector anchor.
 ///
 /// The reference implementation writes `sectorConfig?.avgPe || 18`. That `||` is
-/// **truthiness**, not a null check — see [`sector_anchor_pe`].
+/// **truthiness**, not a null check — see `sector_anchor_pe`.
 pub const DEFAULT_SECTOR_ANCHOR_PE: f64 = 18.0;
 
 /// The exactly four company fields the valuation reads.
@@ -84,7 +84,7 @@ pub struct CompanyValuationInputs {
 pub struct EconomyValuationInputs {
     /// `None` means the field is absent, and the policy rate is used instead.
     /// A `Some(0.0)` is a real zero yield and MUST be used — see
-    /// [`discount_rate`].
+    /// `discount_rate`.
     pub corporate_bond_yield: Option<f64>,
     pub federal_funds_rate: f64,
     pub qe_pe_boost: Option<f64>,
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn qe_stock_channel_is_inert_off_and_concave_on() {
         let base = econ(Some(10.0), 3.5, Some(0.05));
-        let mut high = base.clone();
+        let mut high = base;
         high.qe_assets_ratio = Some(2.2);
         let c = co(Some(20.0), Some(4.0), None, Some(0.1));
 
@@ -427,7 +427,7 @@ mod tests {
         assert_eq!(off_base.qe_adjustment.to_bits(), off_high.qe_adjustment.to_bits());
 
         // neutral ratio: no contribution at any gain
-        let mut neutral = base.clone();
+        let mut neutral = base;
         neutral.qe_assets_ratio = Some(1.0);
         assert_eq!(
             compute_target_pe(&c, &neutral, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment.to_bits(),
@@ -438,7 +438,7 @@ mod tests {
         // equally per doubling; concavity in the LEVEL: equal increments of
         // ratio add less and less.
         let term = |r: f64| {
-            let mut e = base.clone();
+            let mut e = base;
             e.qe_assets_ratio = Some(r);
             compute_target_pe(&c, &e, 1.0, 0.13, NEUTRAL_DISCOUNT_RATE).qe_adjustment
         };

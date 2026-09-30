@@ -257,7 +257,7 @@ pub fn update_garch_cascade(
     let previous_component_0 = cascade[0];
 
     let mut total = 0.0;
-    for i in 0..k {
+    for (i, slot) in cascade.iter_mut().enumerate().take(k) {
         let half_life = base_half_life * powi(params.garch_cascade_ratio, i);
         // beta that puts THIS component at that half-life, with alpha and
         // gamma/2 already spending part of the persistence budget.
@@ -266,12 +266,12 @@ pub fn update_garch_cascade(
         let beta_i = if beta_i < 0.0 { 0.0 } else { beta_i };
         let pers_i = params.garch_alpha + beta_i + params.garch_gamma / 2.0;
         let omega_i = sector_base_variance * (1.0 - pers_i);
-        let raw = omega_i + shock + beta_i * cascade[i];
-        cascade[i] = mathx::max(
+        let raw = omega_i + shock + beta_i * *slot;
+        *slot = mathx::max(
             mathx::min(raw, sector_base_variance * params.garch_ceiling_multiple),
             sector_base_variance * params.garch_floor_multiple,
         );
-        total += cascade[i];
+        total += *slot;
     }
     let cascade_variance = total / (k as f64);
 

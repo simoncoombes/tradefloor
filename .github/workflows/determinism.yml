@@ -300,9 +300,10 @@ jobs:
             echo
             echo "This is the failure the libm-only design exists to prevent."
             echo "Do not ship these wheels. Likely causes, in order:"
-            echo "  - a std transcendental reached the source (the grep test"
-            echo "    in mathx_parity should have caught it -- check whether"
-            echo "    it was weakened or its walk stopped being recursive)"
+            echo "  - a std transcendental reached the source (the source test"
+            echo "    in rust/tests/platform_maths.rs should have caught it --"
+            echo "    check whether it was weakened or its walk stopped"
+            echo "    being recursive)"
             echo "  - a build flag enabling float reassociation or FMA"
             echo "    contraction, or target-cpu=native"
             echo "  - a dependency that is not itself deterministic"

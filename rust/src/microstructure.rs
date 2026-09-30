@@ -28,7 +28,7 @@
 //! company on that tick then gets different numbers, and the whole simulation
 //! diverges from a difference that has nothing to do with this function's
 //! own output. The loop is therefore written to run its full four iterations
-//! unconditionally, and [`tests`] asserts the draw count rather than trusting
+//! unconditionally, and the module's tests assert the draw count rather than trusting
 //! the shape of the code.
 //!
 //! Since the 2026-08 stream split, the four-or-zero consumption is the
@@ -52,7 +52,7 @@
 //! levels a slice can walk differs.
 //!
 //! The shipped multiplier is `1.0` and the shipped bound is returned
-//! untouched at that value ([`scaled_depth`]). `f64::INFINITY` lifts the
+//! untouched at that value (`scaled_depth`). `f64::INFINITY` lifts the
 //! bound to [`BOOK_LEVELS`], which is the unbounded-depth arm the engine's
 //! depth counterfactual runs.
 //!
@@ -63,7 +63,7 @@
 //!   port using "if present" semantics would stop at a real zero and quote a
 //!   one-share book. `makerInventory` and `shortInterest`, by contrast, use
 //!   `??`, where a real zero must be kept. The distinction is preserved per
-//!   field; see [`truthy`].
+//!   field; see `truthy`.
 //! - **`!(x > 0)` and not `x <= 0`.** The negated form also rejects NaN, and
 //!   the guards are copied in that form deliberately.
 

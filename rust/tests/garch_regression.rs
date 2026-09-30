@@ -157,10 +157,13 @@ fn run_chain(drive: impl Fn(usize) -> f64) -> (u64, u64, u64) {
 /// The fold makes every one of the 60 days load-bearing, not just the two
 /// endpoints; single-step agreement plus 60-day agreement is what the
 /// retired chains proved about compounding, minus the external oracle.
+/// A named return path and the three variances it must land on, as bits.
+type ChainPin = (&'static str, fn(usize) -> f64, u64, u64, u64);
+
 #[test]
 fn sixty_day_chain_pins_hold_bit_for_bit() {
     #[rustfmt::skip]
-    let pins: [(&str, fn(usize) -> f64, u64, u64, u64); 6] = [
+    let pins: [ChainPin; 6] = [
         ("calm",
             |_| 0.0,
             0x3F27DAE81882ADC5, 0x3F0D7DBF487FCB92, 0x3EEAB0782442DBBE),
