@@ -696,6 +696,41 @@ view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
 scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
 or pass `trusted_agents=True`.
 
+### The gym environment
+
+`TradingEnv.reset()` without a seed used to replay the constructor's market
+every time, even straight after `reset(seed=99)`, so a loop of 1000 resets
+trained on one market 1000 times. The first `reset()` still runs the
+constructor's seed. Each later `reset()` without a seed now runs a new seed
+below `2**32`, drawn from the env's generator, so the loop meets 1000
+markets and the same 1000 on every run. `reset(seed=n)` runs seed `n` and
+reseeds that generator. `info["seed"]` is the seed an episode ran, and
+`reset(seed=info["seed"])` replays it.
+
+The generator is Gymnasium's `np_random`. The first `reset()` without a seed
+used to leave it seeded from the operating system, so it differed on every
+run. It is now seeded from the constructor's seed, which makes it
+deterministic. Without Gymnasium installed the env builds the same
+generator itself, so the drawn seeds are the same either way.
+
+An action whose absolute weights add up to more than `max_leverage` allows
+is now scaled down, every weight by one factor, to a gross of 1.96x under
+the default 2x cap, and the step's `info["scaled"]` is `True`. The gap below
+2x leaves room for fills that cost up to 1 per cent of what they buy. Before,
+the env traded names in roster order until the cap refused one, so
+`[1, 1, 1, 1, 1]` bought the first name at 1x and refused the other four.
+The step also trades every position it shrinks before any it grows, so
+moving 1.9x from one name into another no longer has the purchase refused
+when the new name comes first in the roster.
+
+**What breaks.** Training code that relied on `reset()` replaying one
+market now sees a new one each time, and should call `reset(seed=n)` with
+the seed it wants. An episode whose actions went over the cap trades a
+different book and earns a different reward. Notebook 5's random policy
+loses 83,412 over its episode where it lost 83,236, and its 0.40 row in the
+size sweep now reads the scaled book. The change is in the env's Python
+code and leaves the engine alone, so no known-answer digest moves.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the
