@@ -83,27 +83,18 @@ DAYS = 5
 
 #: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
 #: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
-#: past two per cent, so on a five-day run it gets one usable reading. That
-#: was enough on the market pt-v16 produced and is not on pt-v18's, whose
-#: worst five-day fall over this roster and seed is 1.85 per cent -- under
-#: the rule's own trigger, so it holds every day, trades nothing and
-#: demonstrates nothing. Measured across horizons at the 0.7.0 boundary:
-#: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
-#: refusals.
+#: past two per cent, so a five-day run gives it one usable reading, and on
+#: pt-v20, the default from 0.8.5, that reading never trips it on this roster
+#: and seed. Measured on pt-v20: 5 days 0 trades, 8 days 1, 10 and 15 days 2,
+#: 20 days 10 with none refused, 25 days 17 with 6 refused at the funding
+#: limit. Twenty shows the rule at work and stays inside the limit. The RULE
+#: is untouched: lowering its threshold until this market tripped it would be
+#: fitting a demonstration to a market, and the threshold is the thing being
+#: demonstrated.
 #:
-#: Ten until 0.8.5, because it gave the five-day rule five usable days
-#: instead of one and stayed inside the funding limit. Twenty since: on
-#: pt-v20, the default from 0.8.5, no name on this roster falls two per
-#: cent over five days in the first fifteen, so ten days trades nothing.
-#: Measured on pt-v20: 5, 8, 10, 12 and 15 days 0 trades, 20 days 9 with
-#: none refused, 25 days 15 to 17 (callable and openai_agents meet market
-#: refusals there). The RULE is untouched: lowering its threshold until
-#: this market tripped it would be fitting a demonstration to a market,
-#: and the threshold is the thing being demonstrated.
-#:
-#: The recorded model runs stay at `DAYS`. A language model reads the
-#: observation rather than waiting for a window, and both recordings trade
-#: on five days.
+#: The recorded model run stays at `DAYS`. A language model reads the
+#: observation rather than waiting for a window, and the recording trades
+#: within five days.
 OFFLINE_DAYS = 20
 
 #: The model a live run calls, the key variable it needs, and the per-decision

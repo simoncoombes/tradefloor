@@ -15,7 +15,7 @@ the chart. About half the run's CPU goes on building the five pt-v20 engines
 it uses, about 0.7 seconds each, because pt-v20 runs a 755-day burn-in before
 day 0.
 
-It takes under ten seconds of CPU and answers one question:
+It runs in a few seconds and answers one question:
 
 > **How does the exact same trading agent behave when interest rates
 > unexpectedly rise by 200 basis points?**
@@ -60,12 +60,14 @@ Fair value in Tradefloor is earnings times a target multiple, and the multiple
 is discounted by
 
 ```
-rate_adjustment = 1 - (discount - neutral) * 1.5 * (1 + growth * 2)
+rate_adjustment = 1 - (discount - neutral) * sensitivity * (1 + growth * 2)
 ```
 
-where `neutral` is the preset's `neutral_discount_rate`, 0.0482 on `pt-v20`.
-Revenue growth **is** the duration term. On `pt-v20` a 200bp rise costs `NOVA`
-about 5.2% of its multiple and `STAP` about 3.1%.
+where `neutral` is the preset's `neutral_discount_rate`, 0.0482, and
+`sensitivity` its `rate_pe_sensitivity`, 3 on `pt-v20` (the default) and 1.5
+on `pt-v19`. Revenue growth **is** the duration term. On `pt-v20` a 200bp
+rise costs `NOVA` about 10.6% of its multiple and `STAP` about 6.2%; on
+`pt-v19` it cost them 5.2% and 3.1%.
 
 That correspondence is honest for this market and does not transfer. A real
 utility is a long-duration bond proxy; here, on one percent revenue growth, it

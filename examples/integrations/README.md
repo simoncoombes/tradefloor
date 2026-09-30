@@ -67,12 +67,12 @@ roster the other three use. The scorecards differ accordingly, and a
 difference between two rows here is a fact about two markets and not about
 two adapters:
 
-| example | trades | return | impact |
-|---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 10 | -1.16% | +0.04 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 10 | -1.16% | +0.04 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 10 | -2.18% | +0.95 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 1 | +0.64% | +1.24 bps |
+| example | days | trades | return | impact |
+|---|---|---|---|---|
+| [`callable/five_days.py`](callable/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 10 | -2.18% | +0.95 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 1 | +0.64% | +1.24 bps |
 
 These are the figures on pt-v20. The impact column is the end-of-run price
 against the untraded run, and at these sizes it is mostly which way the

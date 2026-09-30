@@ -51,18 +51,22 @@ NEEDS: dict[str, str | None] = {
 #: rather than inferred, so a sixth integration cannot slip in unseen.
 NOT_IN_THE_TABLE = {"finrobot"}
 
-#: A row of the scorecard table: the linked file name, then trades, return
-#: and impact exactly as the examples print them.
+#: A row of the scorecard table: the linked file name, then days, trades,
+#: return and impact exactly as the examples print them. Days since 0.8.5,
+#: when the page said all four ran five days and three of them ran twenty.
 ROW = re.compile(
     r"^\|\s*\[`(?P<file>[a-z_]+/[a-z_]+\.py)`\]\([^)]*\)\s*\|"
+    r"\s*(?P<days>\d+)\s*\|"
     r"\s*(?P<trades>\d+)\s*\|"
     r"\s*(?P<ret>[-+][0-9.]+)%\s*\|"
     r"\s*(?P<impact>[-+][0-9.]+) bps\s*\|\s*$",
     re.M,
 )
 
-#: The three lines of the printed scorecard the table quotes.
+#: The lines of the printed output the table quotes: the horizon from the
+#: header, then three lines of the scorecard.
 PRINTED = {
+    "days": re.compile(r"^seed \d+, (\d+) days,", re.M),
     "trades": re.compile(r"^trades\s+(\d+)\s*$", re.M),
     "ret": re.compile(r"^return\s+([-+][0-9.]+)%\s*$", re.M),
     "impact": re.compile(r"^impact\s+([-+][0-9.]+) bps\s*$", re.M),
@@ -72,7 +76,7 @@ PRINTED = {
 def table() -> dict[str, dict[str, str]]:
     text = README.read_text(encoding="utf-8")
     return {m.group("file"): {k: m.group(k)
-                              for k in ("trades", "ret", "impact")}
+                              for k in ("days", "trades", "ret", "impact")}
             for m in ROW.finditer(text)}
 
 
@@ -104,6 +108,11 @@ def test_the_table_matches_a_real_run(name: str):
     With the API keys stripped from the environment, so the page's other
     claim -- that these need no key, no provider account and no network -- is
     checked by the same run rather than asserted beside it.
+
+    Without `CI` and `PYTEST_VERSION` either, because pydantic-ai stays quiet
+    when it sees them, and a reader's shell has neither: at 0.8.5 the
+    pydantic_ai example opened on a nine-line Logfire banner that no test
+    run could see.
     """
     framework = NEEDS[name]
     if framework:
@@ -114,11 +123,15 @@ def test_the_table_matches_a_real_run(name: str):
     assert claimed, f"{name} has no row in the README scorecard table"
 
     env = {k: v for k, v in os.environ.items()
-           if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY")}
+           if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+                        "CI", "PYTEST_VERSION")}
     done = subprocess.run([sys.executable, str(EXAMPLES / name)],
                           capture_output=True, text=True, timeout=600,
                           env=env)
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    assert "NO_BANNER" not in done.stdout + done.stderr, (
+        f"{name} printed a framework's promotional banner above its own "
+        f"output:\n{done.stderr[:1500]}")
 
     for field, pattern in PRINTED.items():
         found = pattern.search(done.stdout)

@@ -153,7 +153,8 @@ finrobot = [
 ]
 
 [project.scripts]
-# Reads scenario files: `tradefloor scenario validate scenarios/*.yml`. It
+# Reads scenario files, by path or by shipped name: `tradefloor scenario
+# validate python/tradefloor/scenarios/*.yml` in a checkout. It
 # does not run a market, which is the point -- configuration that can only be
 # checked by running a hundred-day simulation is configuration nobody checks.
 # `python -m tradefloor ...` is the same command tree without the script.

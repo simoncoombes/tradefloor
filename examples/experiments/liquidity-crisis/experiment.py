@@ -6,9 +6,9 @@ differs.
 
     control   nothing
     crisis    `scenarios/liquidity_crisis_at_fork.yml` -- the scenario that
-              ships with Tradefloor, rebased to fire at the fork. Quoted
-              depth to 40%, volatility doubled, and one stated assumption
-              that credit widens 50 basis points alongside them.
+              shipped with Tradefloor before 0.8.5, rebased to fire at the
+              fork. Quoted depth to 40%, volatility doubled, and one stated
+              assumption that credit widens 50 basis points alongside them.
 
 The scenario is the experiment. Anyone can read the file and see exactly
 what changed, which is the thing a hand-written mutation inside experiment
@@ -195,8 +195,10 @@ def load_scenario(name: str = SCENARIO_NAME) -> tf.Scenario:
 
     `Scenario.from_yaml` rather than `Scenario.load`, because this file
     lives with the experiment rather than in the wheel. The packaged one it
-    was rebased from is reachable as `tf.Scenario.load(PACKAGED_SCENARIO)`,
-    and the only field that differs is `at`.
+    was rebased from is reachable as `tf.Scenario.load(PACKAGED_SCENARIO)`.
+    Against the package before 0.8.5 the only field that differs is `at`;
+    0.8.5 recalibrated the packaged file (VIX x3.5 rather than x2, and an
+    earnings path), and this study keeps the one it was recorded under.
     """
     path = SCENARIO_DIR / f"{name}.yml"
     if not path.is_file():

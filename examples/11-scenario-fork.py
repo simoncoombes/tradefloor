@@ -17,19 +17,25 @@ experiment you can run and one you can hand to somebody else.
          \\            /
           tf.compare
 
-It should take under five minutes to read and under a second to run.
+It should take under five minutes to read and about two seconds to run.
 
 ## What the scenario says, and what it does not
 
-`liquidity_crisis.yml` declares two shocks -- quoted depth to 40%, volatility
-doubled -- and one ASSUMPTION, that credit widens 50 basis points alongside
-them. The file keeps those apart, and so does everything that prints them,
-because this simulator does not derive the third from the first two. It runs
-the market you describe; the description is yours.
+`liquidity_crisis.yml` declares shocks to three things and one ASSUMPTION.
+Quoted depth goes to 40% and the VIX to three and a half times its level for
+twenty-five days, and earnings fall 15% over two months and recover over the
+next four. The assumption is that credit widens 50 basis points alongside
+them. The file keeps the shocks apart from the assumption, and so does
+everything that prints them, because this simulator does not derive the
+credit move from the others. It runs the market you describe; the
+description is yours.
 
-That is also why the depth shock barely moves prices and moves fills a lot.
-An evaluation that reads only the price series will score an agent as though
-it traded for free.
+On its own the depth shock leaves the median name's price where the control
+has it (+0.00% on this seed) and moves fills a lot, so an evaluation that
+reads only the price series will score an agent as though it traded for
+free. The price move this prints comes from the
+earnings cut, which is still falling when the run stops eighty days after
+the fork. The file's recovery runs to day 175, past the end of this run.
 
 The book is read twice, inside the window and after it. Both readings matter:
 the first is what the shock cost, and the second is that the shock ENDED.
@@ -77,8 +83,9 @@ def sweep_cost_bps(engine, universe, shares=20_000):
     and stops rising. At 50,000 the stress branch's median name was past
     its depth on every preset measured, and on pt-v19 the two branches read
     14.10bp and 14.30bp, so the check below passed by a fifth of a basis
-    point on a reading that had saturated. At 20,000 pt-v19 reads 8.28bp
-    against 12.62bp inside the window.
+    point on a reading that had saturated. At 20,000 pt-v19 read 8.28bp
+    against 12.62bp inside the window, under the file before 0.8.5. pt-v20
+    with the 0.8.5 file reads 7.16bp against 17.39bp.
     """
     costs = []
     for instrument in universe:
@@ -131,8 +138,20 @@ def main() -> dict:
     #
     #    The control branch gets nothing at all. It is not a scenario with
     #    the values turned down; it is the same world without the shock.
-    first = min(item.at for item in scenario.interventions)
-    last = max(item.last_day or 0 for item in scenario.interventions)
+    #
+    #    The book is read against the DEPTH window, days 50 to 74, and not
+    #    against every intervention in the file. The earnings ramp the file
+    #    gained in 0.8.5 runs to day 175; taken over everything, the two
+    #    reading days fell past the end of this eighty-day loop, neither
+    #    reading was taken, and the script died on a TypeError halfway
+    #    through its report.
+    depth = [item for item in scenario.interventions
+             if item.target == "market.liquidity"]
+    first = min(item.at for item in depth)
+    last = max(item.last_day or 0 for item in depth)
+    assert last + 3 < DAYS_AFTER_FORK, (
+        f"the depth window ends on day {last}, too late to read the book "
+        f"three days after it in a {DAYS_AFTER_FORK}-day run")
     print(f"  scenario applied   to the stress branch only, firing at "
           f"step {DAYS_BEFORE_FORK + first} of the parent's history")
 
@@ -190,7 +209,9 @@ def main() -> dict:
     # so the scenario does it: without that, a twenty-five day crisis quietly
     # lasted for the rest of the run and this check read the same either way.
     ok &= check("the book came back after it",
-                scenario.log[-1].operation == "release"
+                any(firing.target == "market.liquidity"
+                    and firing.operation == "release"
+                    for firing in scenario.log)
                 and abs(after[1] - after[0]) < abs(during[1] - during[0]))
     ok &= check("both branches stayed on one draw schedule",
                 control.draws_by_stream()["market"]

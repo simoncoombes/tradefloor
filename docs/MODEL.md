@@ -1061,7 +1061,7 @@ global and scale with each company's own beta.
 
 ### The universe and the opening
 
-`Universe.random(n, seed)` draws a roster from its own random stream,
+`Universe.random(n, seed=seed)` draws a roster from its own random stream,
 independent of the market's (`universe.rs:36`, `universe.rs:204-282`).
 Company $i$ is in sector $k = i \bmod 12$, and:
 
