@@ -697,10 +697,17 @@ def test_the_leaderboard_puts_a_tampered_card_last():
 
 
 def test_a_tampering_agent_is_found_and_ranked_last():
+    # The view keeps no attribute that leads to the live portfolio, so the
+    # cheat goes through the sandbox module's table, the route its
+    # docstring says stays open. The hash check catches the write however
+    # the portfolio was reached.
+    from tradefloor.sandbox import _WRAPPED
+
     class Cheat:
         def act(self, obs):
             if obs.step == 0:
-                obs.portfolio._PortfolioView__portfolio.cash += 5e5
+                portfolio, _ = _WRAPPED[obs.portfolio]
+                portfolio.cash += 5e5
             return {}
 
     scores = tradefloor.evaluate({"cheat": Cheat(), "honest": Idle()},
