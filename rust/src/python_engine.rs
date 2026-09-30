@@ -3509,12 +3509,20 @@ impl PyEngine {
         // at 80 and a pin of the real March 2020 close, 82.69, is a
         // reasonable thing to ask of them.
         if let Some(v) = vix {
-            check_vix(v)?;
             let ceiling = crate::mathx::max(
                 self.inner.params().vix_ceiling,
                 crate::params::ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
                     .map_or(0.0, |p| p.vix_ceiling),
             );
+            // Worded as `Macro` words it (`check_vix`), with the bound this
+            // pin also has.
+            if v < 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "vix cannot be negative, got {v}. It is the index level, \
+                     such as 20, above 0 and at most {ceiling}, the highest \
+                     vix_ceiling of this model and the default preset."
+                )));
+            }
             if !(v > 0.0 && v <= ceiling) {
                 return Err(ValidationError::new_err(format!(
                     "vix must be above 0 and at most {ceiling}, the highest \
