@@ -79,3 +79,15 @@ def test_a_plain_question_is_inside() -> None:
     verdict = env.check(horizon_days=252)
     assert verdict.inside, verdict.reasons
     assert not verdict.gaps
+
+
+@pytest.mark.parametrize("basis", sorted(env.RULERS_BY_BASIS))
+@pytest.mark.parametrize("gap_id", sorted(ROUTES))
+def test_the_route_surfaces_the_gap_on_every_basis(gap_id: str,
+                                                   basis: str) -> None:
+    """`check` takes the band basis `score` takes, since 0.8.5. The basis
+    changes which band a row is printed against, and must not change which
+    gaps a question reaches."""
+    verdict = env.check(basis=basis, **ROUTES[gap_id])
+    assert gap_id in [g.id for g in verdict.gaps], (gap_id, basis)
+    assert not verdict.inside
