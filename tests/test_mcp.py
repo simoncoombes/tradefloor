@@ -325,7 +325,7 @@ def test_a_request_beyond_the_limits_is_refused_as_a_result(call, expect):
 
 
 def test_the_factors_sum_to_the_move_as_returned():
-    """The tool claims the seven factors sum to the move. It reports a
+    """The tool claims the factors sum to `total_log_move`. It reports a
     per-row `residual` so the claim is checkable on the figures actually
     returned, rather than on unrounded ones the caller never sees."""
     r = mcp.explain_price_move(universe_size=12, day=1, top_n=5)
@@ -335,6 +335,25 @@ def test_the_factors_sum_to_the_move_as_returned():
         assert row["residual"] < 1e-9
         assert abs(sum(row["factors"].values())
                    - row["total_log_move"]) == pytest.approx(row["residual"])
+
+
+def test_explain_price_move_says_what_its_factors_sum_to():
+    """The description said "the seven factor contributions that SUM to the
+    move". There are eleven, and they sum to the day's change in the
+    mispricing. On pt-v20 that is a small part of the price move, because
+    most of the day's news and noise moves fair value and
+    `fair_value_shift` takes it back out."""
+    tools = {t.name: t for t in asyncio.run(mcp.server.list_tools())}
+    text = tools["explain_price_move"].description
+    assert "seven" not in text and "SUM to the move" not in text
+    assert f"{len(pt.Engine.FACTORS)} factor contributions" in text
+    assert "mispricing" in text and "fair_value_shift" in text
+
+    r = mcp.explain_price_move(universe_size=8, day=1, top_n=2)
+    assert r["ok"]
+    note = r["reading_note"]
+    assert f"The {len(pt.Engine.FACTORS)} factors" in note
+    assert "not the log change in the price" in note
 
 
 def test_a_stress_test_always_carries_its_control():

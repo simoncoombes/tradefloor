@@ -54,12 +54,12 @@ false.
 call that cannot return inside a conversation is not a tool. Atlas stays a
 library API, driven by `tools/calibration/atlas_survey.py`.
 
-**Arbitrary model parameters.** `ModelParams` has 87 settable coefficients
-and a preset fingerprint that makes a result citable. Letting a model
-improvise coefficients produces markets nobody calibrated, reported with
-the authority of a named preset. No tool here takes a preset argument
+**Arbitrary model parameters.** `ModelParams` has over 200 settable
+coefficients and a preset fingerprint that makes a result citable. Letting
+a model improvise coefficients produces markets nobody calibrated, reported
+with the authority of a named preset. No tool here takes a preset argument
 either: every run is the shipped default, named in provenance, and
-selecting another of the twelve is a library call.
+selecting another preset is a library call.
 
 **Anything that writes.** Every tool is read-only and pure: same arguments,
 same bytes, on every platform.
@@ -1247,12 +1247,12 @@ def _scenario_from(doc: Any, days: int) -> Any:
 def list_scenarios() -> dict[str, Any]:
     """The catalogue: shipped documents, constructors, and the registry.
 
-    A model authoring a scenario is choosing between fourteen targets whose
+    A model authoring a scenario is choosing between fifteen targets whose
     effect sizes differ by three orders of magnitude, and nothing on the wire
-    told it which. `macro.qe_pe_boost` moves the median instrument 19.78%;
-    `macro.fear_greed` moves it exactly 0.00%, measured, because nothing in
-    the market reads it. Both are legitimate to write and only one of them is
-    an experiment.
+    told it which. `macro.corporate_yield` held 200bp higher moves the median
+    instrument -4.02%; `macro.fear_greed` moves it exactly 0.00%, measured,
+    because nothing in the market reads it. Both are legitimate to write and
+    only one of them is an experiment.
 
     So every target here carries the note the library carries: what reads it,
     how long it takes to arrive, and what it was MEASURED to be worth. The
@@ -1512,9 +1512,15 @@ def run_stress_scenario(
 
 
 @server.tool(
-    description="Why did a price move? Returns the seven factor "
-                "contributions that SUM to the move -- ground truth the "
-                "simulator can give because it computed the reasons."
+    description="Why did a price move? Returns the "
+                f"{len(tf.Engine.FACTORS)} factor contributions that sum to "
+                "the day's change in the mispricing, the log gap between the "
+                "model price and fair value. They are the simulator's own "
+                "bookkeeping, and they are not the whole price move. On the "
+                "default preset most of the day's news and noise moves fair "
+                "value, `fair_value_shift` takes that part out of the "
+                "mispricing, and the fair-value move itself is not split up. "
+                "`explain` breaks down the price move."
 )
 def explain_price_move(
     ticker: str | None = None,
@@ -1526,11 +1532,13 @@ def explain_price_move(
     day: int = 1,
     top_n: int = 10,
 ) -> dict[str, Any]:
-    """The labelled-dataset output, and the thing no historical data has.
+    """How much each driver moved each name's mispricing on one day.
 
-    You can observe that a stock fell. You cannot observe that 60% of the
-    fall was order-flow pressure and the rest was noise -- unless something
-    computed it, and something did.
+    A price history shows that a stock fell. It cannot show how much of the
+    fall was order-flow pressure and how much was noise, and this can,
+    because the simulator computed each part. It covers the mispricing
+    only. On pt-v20 most of a price's move is fair value moving, and these
+    factors do not split that move up.
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
@@ -1586,12 +1594,17 @@ def explain_price_move(
         "rows": rows,
         "factors": list(tf.Engine.FACTORS),
         "reading_note": (
-            f"The {len(tf.Engine.FACTORS)} factors in `factors` SUM to "
-            "`total_log_move`. Each row carries "
-            "its own `residual` -- the measured disagreement in the figures "
-            "as returned, so the claim is checkable rather than asserted. "
-            "Contributions accumulate per day and reset at market open, so "
-            "this is the named day only."
+            f"The {len(tf.Engine.FACTORS)} factors in `factors` sum to "
+            "`total_log_move`, which is the day's change in the mispricing "
+            "`s` (the log gap between the model price and fair value), not "
+            "the log change in the price. On pt-v20, the default, most of "
+            "the day's news and noise moves fair value instead, so "
+            "`random_noise` and `fair_value_shift` are both large and mostly "
+            "cancel, and `total_log_move` is a small part of the price's "
+            "move. Each row carries its own `residual`, the measured "
+            "disagreement in the figures as returned, so the sum can be "
+            "checked. Contributions accumulate per day and reset at market "
+            "open, so this is the named day only."
         ),
         "caveats": [
             "This is the simulator's own bookkeeping, not an inference. It "
