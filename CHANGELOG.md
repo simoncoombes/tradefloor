@@ -361,6 +361,16 @@ of bears cut by more than half a point. On the same arm's full screens
 0.358 (R19V 0.381 and 0.379), and the share of nights beyond eight times the
 median gap 1.13 and 1.10 per cent (1.02 and 1.00; real 1.96).
 
+R19V's volatility regimes last too long: the autocorrelation of log monthly
+realised volatility reads 0.725 over 270 held-out histories against a band
+ceiling of 0.740. The cause is the cycle's volatility multiplier staying at
+the contraction's level through the trough. With
+`market_vol_cycle_trough_release` 1, `treasury_haven_gain` 0.02 and
+`market_vol_leverage` 2.5 it reads 0.691, the index's absolute-return
+autocorrelation at lag 1 0.267 (from 0.277) and at lag 20 0.198 (from 0.218),
+and H4 -0.303 (from -0.278), with no change to the engine's code
+(docs/MODEL.md has the arms and the rows they move).
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas
