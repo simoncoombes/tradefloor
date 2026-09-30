@@ -509,8 +509,7 @@ class PortfolioView:
         about each of its N names made N squared copies a step. This returns
         a float, so the agent still cannot reach the live position.
         """
-        held = self.__portfolio.positions.get(ticker)
-        return held.quantity if held else 0.0
+        return _WRAPPED[self][0].quantity_of(ticker)
 
     @property
     def positions(self) -> dict[str, Any]:
