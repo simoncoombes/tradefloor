@@ -86,6 +86,16 @@ jobs:
       - name: Clippy is clean
         working-directory: rust
         run: cargo clippy --all-targets --all-features -- -D warnings
+      # The crate docs as docs.rs builds them (with `wasm`), warnings as
+      # errors. 0.8.5 shipped 24 rustdoc warnings, all broken or private
+      # intra-doc links, which render as plain text or dead links on docs.rs.
+      # The README example is the crate root's doctest, so `cargo test`
+      # above runs it.
+      - name: The docs build without warnings
+        working-directory: rust
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --features wasm
 
   msrv:
     name: cargo check on the declared rust-version

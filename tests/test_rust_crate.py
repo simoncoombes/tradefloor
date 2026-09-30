@@ -73,3 +73,101 @@ def test_ci_runs_clippy_on_everything_with_warnings_as_errors():
     run = runs[0]
     for flag in ("--all-targets", "--all-features", "-D warnings"):
         assert flag in run, f"clippy runs without {flag}: {run}"
+
+
+def test_ci_builds_the_docs_with_warnings_as_errors():
+    """`cargo doc` runs in CI and a rustdoc warning fails it.
+
+    0.8.5 shipped 24 rustdoc warnings: links to items that did not resolve
+    from where they were written, and public docs linking private items. On
+    docs.rs those render as plain text or dead links.
+    """
+    job = rust_job()
+    runs = [line.strip() for line in job.splitlines()
+            if line.strip().startswith("run: cargo doc")]
+    assert runs, "the rust job does not build the docs"
+    assert "--no-deps" in runs[0]
+    assert re.search(r"RUSTDOCFLAGS:\s*-D warnings", job), (
+        "cargo doc runs without RUSTDOCFLAGS=-D warnings")
+    docs_rs = re.search(r"^\[package\.metadata\.docs\.rs\]\n(.*?)(?=^\[)",
+                        manifest(), re.M | re.S)
+    assert docs_rs, "Cargo.toml does not tell docs.rs which features to build"
+    assert '"wasm"' in docs_rs.group(1)
+    assert "--features wasm" in runs[0], (
+        "CI must build the docs with the features docs.rs builds")
+
+
+def readme_rust_blocks() -> list[str]:
+    readme = (RUST / "README.md").read_text(encoding="utf-8")
+    return re.findall(r"^```rust\n(.*?)^```", readme, re.M | re.S)
+
+
+def test_the_readme_example_runs_as_a_doctest_and_moves_prices():
+    """The README's example is compiled and run by `cargo test`, and trades.
+
+    0.8.5's example built an engine and called `close_day(0)`. That settles a
+    day and steps the economy but runs no ticks, so every price stayed where
+    it started. Nothing ran the snippet, so nothing noticed. The crate root
+    now includes the README, which makes each rust block a doctest, and the
+    example asserts that the prices moved.
+    """
+    lib = (RUST / "src" / "lib.rs").read_text(encoding="utf-8")
+    assert '#![doc = include_str!("../README.md")]' in lib, (
+        "lib.rs does not include the README, so its example is not a doctest")
+    blocks = readme_rust_blocks()
+    assert blocks, "the README has no rust example"
+    example = blocks[0]
+    for call in ("open_market()", "run_session(", "close_day("):
+        assert call in example, f"the README example never calls {call}"
+    assert example.index("open_market()") < example.index("run_session(") \
+        < example.index("close_day("), "the day loop is out of order"
+    assert re.search(r"assert_ne!\(engine\.prices\(\), \w+\)", example), (
+        "the README example does not check that the prices moved")
+
+    readme = (RUST / "README.md").read_text(encoding="utf-8")
+    bare = re.findall(r"^```\n", readme, re.M)
+    fences = re.findall(r"^```", readme, re.M)
+    # Every opening fence names a language. rustdoc compiles an unlabelled
+    # block as Rust, so `pip install tradefloor` in a bare fence would fail
+    # the doctest run. Closing fences are the bare ones, one per block.
+    assert len(bare) == len(fences) // 2, (
+        "a README code block has no language, and rustdoc would compile it")
+
+
+def excluded_tests() -> set[str]:
+    return set(re.findall(r'"tests/(\w+)\.rs"', manifest()))
+
+
+def test_the_package_ships_what_it_says_and_no_dev_scripts():
+    """The README names every integration test that ships, and nothing else.
+
+    0.8.5's README and manifest said three integration tests ship. Four did
+    (depth_counterfactual was missing from the list), and sync-goldens.py, a
+    script that reads the excluded goldens/, shipped too.
+    """
+    shipped = {p.stem for p in (RUST / "tests").glob("*.rs")} - excluded_tests()
+    assert shipped, "every integration test is excluded"
+    readme = (RUST / "README.md").read_text(encoding="utf-8")
+    scope = readme[readme.index("## Scope of this crate"):]
+    named = set(re.findall(r"`(\w+)`", scope))
+    assert shipped <= named, (
+        f"README does not name shipped tests: {sorted(shipped - named)}")
+    for name in named & {p.stem for p in (RUST / "tests").glob("*.rs")}:
+        assert name in shipped, f"README names {name}, which does not ship"
+    assert re.search(r'^\s*"sync-goldens\.py",', manifest(), re.M), (
+        "sync-goldens.py is not excluded from the package")
+    assert "tradefloor-design" not in manifest(), (
+        "Cargo.toml ships a comment pointing into a private repository")
+
+
+def test_cargo_test_is_optimised():
+    """`cargo test` builds optimised, so the unit tests finish in minutes.
+
+    At opt-level 0 the unit tests took about 17 minutes on a shared machine.
+    Optimising cannot move a result, because Rust does not reassociate or
+    fuse floating point at any opt-level.
+    """
+    profile = re.search(r"^\[profile\.test\]\n(.*?)(?=^\[|\Z)", manifest(),
+                        re.M | re.S)
+    assert profile, "Cargo.toml has no [profile.test]"
+    assert re.search(r"^opt-level\s*=\s*[123]\s*$", profile.group(1), re.M)

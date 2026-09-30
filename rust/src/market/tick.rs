@@ -313,7 +313,7 @@ pub fn sector_sigma_at(p: &ModelParams, economy: &EconomyState, vix_anchor: f64)
 /// is not a random variable, so the blend's injection is a known multiple of
 /// the market factor and its second moment is the factor's own.
 ///
-/// Lifted out of [`compute_tick`], where it stood inline, for the reason
+/// Lifted out of [`simulate_market_tick`], where it stood inline, for the reason
 /// `sector_sigma_at` was: the read-back and the tick must not be able to
 /// disagree about when a crisis is on. The arithmetic is the arithmetic that
 /// stood there, branch for branch, so every preset is bit-identical.
@@ -662,7 +662,7 @@ pub struct TickOutcome {
     /// earnings, sector anchor, rates. No mispricing in it.
     pub fundamental_values: Vec<f64>,
     /// Every contribution to this tick's change in `s`, per active company, in
-    /// [`S_COMPONENT_KEYS`] order.
+    /// [`S_COMPONENT_KEYS`](crate::market::factors::S_COMPONENT_KEYS) order.
     ///
     /// The reason the whole library exists. `factors` below says what the four
     /// shock drivers were; this says what each of them, plus the reversion and

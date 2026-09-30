@@ -33,33 +33,55 @@ libm.
 
 ## Using it
 
+A trading day is three calls: `open_market`, `run_session` for the ticks,
+then `close_day`, which settles the day and steps the economy. This runs
+five days of a 20-name market, with 390 one-minute ticks a day as the
+Python package does:
+
 ```rust
-use tradefloor::engine::Engine;
+use tradefloor::economy::{create_initial_central_bank_state, create_initial_economy_state};
+use tradefloor::engine::{Engine, SessionBuffer, SessionRequest};
+use tradefloor::market::GameTime;
 use tradefloor::universe::random_universe;
 
-let companies = random_universe(20, 7)
+let seed = 42;
+let companies = random_universe(20, seed)
     .iter()
     .enumerate()
     .map(|(i, g)| g.to_init().to_tick_company(i))
     .collect();
 
 let mut engine = Engine::new(
-    42,
+    seed,
     companies,
-    tradefloor::economy::create_initial_economy_state(&Default::default()),
-    tradefloor::economy::create_initial_central_bank_state(0),
+    create_initial_economy_state(&Default::default()),
+    create_initial_central_bank_state(0),
     tradefloor::sectors::keys().iter().map(|s| s.to_string()).collect(),
 );
-engine.close_day(0);
-let prices = engine.prices();
+
+let opening = engine.prices();
+let mut buffer = SessionBuffer::new();
+for day in 1..=5 {
+    engine.open_market();
+    let bell = GameTime { hour: 9, minute: 30, day_of_week: 3 };
+    engine.run_session(&SessionRequest::new(bell, 390), &mut buffer);
+    engine.close_day(day);
+}
+assert_ne!(engine.prices(), opening);
 ```
+
+`close_day` on its own does not trade, so a loop that skips `run_session`
+leaves every price where it started. `SessionRequest::new` is a session with
+no news and no orders; set its `news`, `order_volumes` or `fills` fields to
+add them. `SessionBuffer` holds the last session's prices, volumes and
+attribution, one row per tick.
 
 The Rust API is the engine itself and is low level: it takes tick requests
 and day advances and hands back state. Most users want the Python package,
 which wraps this crate and adds universes, scenarios, checkpoints, an
 Arrow bar reader, strategy evaluation and the realism panel:
 
-```
+```sh
 pip install tradefloor
 ```
 
@@ -68,18 +90,19 @@ suitable for, is at <https://tradefloor.dev/>.
 
 ## Scope of this crate
 
-The published crate carries the engine, its unit tests and three
-integration tests that run standalone. The parity corpus that pins this
-port against the reference implementation is 140 MB of fixtures and stays
-in the repository, so the tests that read it are excluded here rather than shipped
-in a state where they cannot pass.
+The published crate carries the engine, the unit tests in its source
+modules and five integration tests that run standalone:
+`circuit_breaker`, `depth_counterfactual`, `platform_maths`,
+`roster_mutation` and `stream_alignment`. The parity corpus that pins the
+engine's output is 140 MB of fixtures and stays in the repository, so the
+tests that read it are left out of the package rather than shipped in a
+state where they cannot pass.
 
-That corpus is not run by CI. The two workflows -- `determinism.yml` and
-`release.yml` -- build wheels and compare known-answer digests; neither
-invokes `cargo` at all. `cargo test --offline` is a manual step in
-`RELEASING.md`, run against the repository and again against the packaged
-crate before a publish. It is a release checklist item, not automation, and
-saying so beats implying a gate that does not exist.
+In the repository, the `suite.yml` workflow runs `cargo test --release`
+with the parity corpus, `cargo clippy` with warnings as errors, a build on
+the declared minimum Rust (1.83) and `cargo doc` with warnings as errors.
+Before it publishes, `release.yml` packages the crate and runs
+`cargo test --offline` on the package.
 
 ## Licence
 

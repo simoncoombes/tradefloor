@@ -39,7 +39,7 @@
 //! # The process
 //!
 //! GARCH(1,1) on the factor's own daily innovation, at daily scale,
-//! reverting to the baseline [`MARKET_FACTOR_SIGMA`]²:
+//! reverting to the baseline [`MARKET_FACTOR_SIGMA`](crate::market::tick::MARKET_FACTOR_SIGMA)²:
 //!
 //! ```text
 //! v' = (1 − α − β)·target + α·ε² + β·v      then clamped to

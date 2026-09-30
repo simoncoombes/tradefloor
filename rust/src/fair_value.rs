@@ -54,7 +54,7 @@ pub const FAIR_VALUE_FLOOR: f64 = 0.01;
 /// Fallback sector anchor.
 ///
 /// The reference implementation writes `sectorConfig?.avgPe || 18`. That `||` is
-/// **truthiness**, not a null check — see [`sector_anchor_pe`].
+/// **truthiness**, not a null check — see `sector_anchor_pe`.
 pub const DEFAULT_SECTOR_ANCHOR_PE: f64 = 18.0;
 
 /// The exactly four company fields the valuation reads.
@@ -84,7 +84,7 @@ pub struct CompanyValuationInputs {
 pub struct EconomyValuationInputs {
     /// `None` means the field is absent, and the policy rate is used instead.
     /// A `Some(0.0)` is a real zero yield and MUST be used — see
-    /// [`discount_rate`].
+    /// `discount_rate`.
     pub corporate_bond_yield: Option<f64>,
     pub federal_funds_rate: f64,
     pub qe_pe_boost: Option<f64>,

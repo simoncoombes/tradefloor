@@ -73,7 +73,7 @@
 //! idiosyncratic shock by `1 - c` on a down tick and by
 //! `sqrt(2 - (1 - c)^2)` on an up tick, so the two SQUARED scales sum to 2
 //! and average to exactly one over an even split of the half-lines.
-//! [`name_noise_variance`]'s `idio * idio` is that unconditional variance,
+//! `name_noise_variance`'s `idio * idio` is that unconditional variance,
 //! and this dial holds it exactly at every `c` -- so the identity needs no
 //! term for it, and needs none because of an exact cancellation rather than
 //! a small one. See `ModelParams::market_idio_down_suppress`.

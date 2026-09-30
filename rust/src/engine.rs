@@ -3919,6 +3919,12 @@ impl Engine {
         0.5 * (lo + hi)
     }
 
+    /// Open a trading day. Call once per day, before its first session.
+    ///
+    /// Steps the overnight processes (the crisis episode, the overnight gap
+    /// in each name's `s`, the day's endogenous news), resets the day's
+    /// attribution and anchors the daily open. [`Engine::run_session`] with
+    /// `reopen: true` calls this itself.
     pub fn open_market(&mut self) {
         // THE CRISIS EPISODE, stepped before anything else the session does.
         // At `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's fourth
@@ -5440,6 +5446,17 @@ impl Engine {
         self.nominal_output_base = base;
     }
 
+    /// Close the trading day and step the economy to the next one.
+    ///
+    /// This settles the day the ticks just traded: it feeds each name's
+    /// accumulated noise to GARCH as the day's innovation, rolls the daily
+    /// open and close, then runs [`Engine::advance_macro_day`] for
+    /// `game_day` (the macro chain, the central bank and the rates).
+    ///
+    /// It does not trade and draws no prices. Called on its own, with no
+    /// session since the last close, it leaves every price where it was. A
+    /// day that moves the market is [`Engine::open_market`], then
+    /// [`Engine::run_session`] (or [`Engine::tick`] in a loop), then this.
     pub fn close_day(&mut self, game_day: i64) {
         let noise = self.daily_innovation_column();
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
@@ -6234,6 +6251,8 @@ impl Engine {
         Ok(())
     }
 
+    /// One field for every company, in roster order. A field a company does
+    /// not have yet (a return before its first close, say) is NaN.
     pub fn column(&self, field: PriceField) -> Vec<f64> {
         self.companies
             .iter()
@@ -6266,7 +6285,8 @@ impl Engine {
             .collect()
     }
 
-    /// Convenience for the most-read column.
+    /// Every company's current price, in roster order. Rate indices are not
+    /// in it. A copy, so it does not follow later ticks.
     pub fn prices(&self) -> Vec<f64> {
         self.column(PriceField::Price)
     }
@@ -6994,11 +7014,21 @@ impl Rng for Counting<'_> {
 }
 
 /// What a session needs beyond the engine's own state.
+///
+/// [`SessionRequest::new`] gives a quiet session (no news, no orders,
+/// volatility multiplier 1.0) that leaves opening and closing the day to the
+/// caller. Set the other fields on the value it returns.
 pub struct SessionRequest<'a> {
+    /// The clock at the first tick. Each tick is one minute after the last.
     pub start: GameTime,
+    /// How many one-minute ticks to run. 390 is a full session, 09:30 to
+    /// 16:00, and is the Python package's default.
     pub ticks: usize,
+    /// Scales the per-tick noise. 1.0 is the model as calibrated.
     pub volatility_multiplier: f64,
+    /// News events that reach the factor model this session.
     pub news: &'a [NewsEvent],
+    /// News already in flight from earlier sessions, still being absorbed.
     pub news_impact_queue: &'a [NewsImpactEntry],
     /// Order volume held on EVERY tick of the session: a standing rate, in
     /// shares per minute, for a program that trades all session long.
@@ -7061,10 +7091,51 @@ pub struct SessionRequest<'a> {
     /// Set false for the second and later sessions of one day. A day of one
     /// session is unaffected either way, which is why no parity vector moves.
     pub reopen: bool,
+    /// Read only when `close_at_end` is set: each name's daily innovation for
+    /// GARCH. A `None` slot takes the noise the engine accumulated this
+    /// session, which is what [`Engine::close_day`] always uses.
     pub daily_innovations: &'a [Option<f64>],
+    /// Read only when `close_at_end` is set: each sector's base variance.
     pub sector_base_variances: &'a [f64],
     /// Stop early when a condition is met, for event-driven advancement.
     pub stop: Option<StopCondition>,
+}
+
+impl<'a> SessionRequest<'a> {
+    /// A quiet session of `ticks` minutes starting at `start`.
+    ///
+    /// No news, no order flow, volatility multiplier 1.0, no stop
+    /// condition. It neither opens the market (`reopen` is false) nor
+    /// closes it (`close_at_end` is false), so it fits the day loop
+    /// [`Engine::open_market`], [`Engine::run_session`], [`Engine::close_day`]
+    /// that the WebAssembly binding runs. Set any field on the result to add
+    /// news or flow.
+    ///
+    /// ```
+    /// use tradefloor::engine::SessionRequest;
+    /// use tradefloor::market::GameTime;
+    ///
+    /// let open = GameTime { hour: 9, minute: 30, day_of_week: 3 };
+    /// let request = SessionRequest::new(open, 390);
+    /// assert_eq!(request.ticks, 390);
+    /// assert!(!request.reopen && !request.close_at_end);
+    /// ```
+    pub fn new(start: GameTime, ticks: usize) -> Self {
+        SessionRequest {
+            start,
+            ticks,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            fills: &[],
+            close_at_end: false,
+            reopen: false,
+            daily_innovations: &[],
+            sector_base_variances: &[],
+            stop: None,
+        }
+    }
 }
 
 /// One flow per ticker: `standing` with `once` added to it.
@@ -7151,10 +7222,11 @@ pub struct SessionBuffer {
     pub mispricing_s: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    /// The seven component columns, each `ticks * companies`, in
-    /// `S_COMPONENT_KEYS` order. Seven flat buffers rather than one of
-    /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
-    /// contiguous run of its own values.
+    /// The component columns, each `ticks * companies`: the eight
+    /// `S_COMPONENT_KEYS` in order, then the tick's fair-value shift
+    /// (`TICK_COMPONENT_COUNT` in all). Flat buffers rather than one of
+    /// `[f64; TICK_COMPONENT_COUNT]`, because each becomes an Arrow column
+    /// and a column wants a contiguous run of its own values.
     pub components: [Vec<f64>; crate::market::factors::TICK_COMPONENT_COUNT],
     /// The print decomposition, each `ticks * companies`: the shock that
     /// arrived and the depth that absorbed it, in log units.
@@ -7175,7 +7247,7 @@ pub struct SessionBuffer {
 }
 
 /// One tick's ground truth, as the engine holds it, handed to
-/// [`SessionBuffer::write_tick`].
+/// `SessionBuffer::write_tick`.
 ///
 /// A struct rather than nine positional slices. The call site passes nine
 /// same-typed buffers and a transposition there would compile, run, and
@@ -7195,6 +7267,8 @@ pub struct TickTruth<'a> {
 }
 
 impl SessionBuffer {
+    /// An empty buffer. [`Engine::run_session`] sizes it to the session on
+    /// each call, so one buffer serves every day of a run.
     pub fn new() -> Self {
         Self::default()
     }

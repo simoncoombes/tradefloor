@@ -636,10 +636,12 @@ environments must be constrained to a single environment name on the registry
 side**, or any workflow in the repository with `id-token: write` can publish.
 
 The crate job packages and runs the packaged crate's own tests before
-uploading. That check matters more than it sounds: sixteen of nineteen
+uploading. That check matters more than it sounds: sixteen of 21
 integration tests read the 140 MB parity corpus that `exclude` deliberately
-keeps out, and they panic when it is absent. What remains is `circuit_breaker`,
-`roster_mutation` and `stream_alignment` plus the unit tests. They are excluded
+keeps out, and they panic when it is absent. What remains is five integration
+tests (`circuit_breaker`, `depth_counterfactual`, `platform_maths`,
+`roster_mutation` and `stream_alignment`), the unit tests and the doctests,
+among them the README example. The others are excluded
 **by name**, so a new test is not silently dropped: add one that reads
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.

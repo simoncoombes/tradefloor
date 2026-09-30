@@ -9,7 +9,7 @@
 //! the simulation diverges for a reason that has nothing to do with the
 //! economy.
 //!
-//! Worse than a count: [`GameRng::next_normal`] caches a **spare**. Box-Muller
+//! Worse than a count: [`GameRng::next_normal`](crate::rng::GameRng::next_normal) caches a **spare**. Box-Muller
 //! produces two normals per pair of uniforms, so an extra or missing normal
 //! call flips the parity of the cache and changes which uniforms every
 //! subsequent normal anywhere in the engine is built from. The count and the

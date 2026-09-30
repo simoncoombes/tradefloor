@@ -8,7 +8,7 @@
 //! market factor's variance process — is carried here as a plain `f64`, and
 //! the engine reads the field where it used to read the `pub const`. The
 //! constants themselves REMAIN, as the definition of the shipped preset:
-//! [`PT_V1`] is built from them, so every existing test asserting a constant
+//! [`PT_V1`](crate::params::PT_V1) is built from them, so every existing test asserting a constant
 //! still guards the preset, and a build whose constants moved fingerprints
 //! differently by construction.
 //!
@@ -20,7 +20,8 @@
 //! this crate additionally bans `mul_add` and non-`mathx` transcendentals.
 //! The one hazard §5.3 names — a `const` deriving another — is handled by
 //! deriving once, in the constructor: the circuit-breaker band multipliers
-//! ([`ModelParams::breaker_up`]/[`ModelParams::breaker_down`]) are computed
+//! ([`breaker_up`](crate::params::ModelParams::breaker_up) and
+//! [`breaker_down`](crate::params::ModelParams::breaker_down)) are computed
 //! when the params are built, never per call site. The acceptance gate is
 //! trajectory equality: an engine built from `PT_V1` must reproduce the
 //! const build's known-answer digest bit for bit, and does — see
@@ -34,7 +35,7 @@
 //! keeps every preset comparable under common random numbers and replayable
 //! against order logs.
 //!
-//! 1. **Settable** — the live dynamics numbers ([`settable_names`]): the searched
+//! 1. **Settable** — the live dynamics numbers ([`settable_names`](crate::params::settable_names)): the searched
 //!    surface (both variance processes, the factor sigmas and their scale,
 //!    the mispricing dynamics) plus the guards that live in the threaded
 //!    chain (the mispricing cap, the crowd lean cap, the price breaker and
@@ -162,7 +163,7 @@ pub struct ModelParams {
     /// and bit-identical.
     ///
     /// The injection is `source * gain * crisis_spike * market_factor`, and
-    /// at a held VIX the spike is pinned at [`crisis_blend_cap`] (§63), so
+    /// at a held VIX the spike is pinned at [`crisis_blend_cap`](Self::crisis_blend_cap) (§63), so
     /// the ONLY thing that varies between seed blocks is `market_factor`'s
     /// magnitude — which is the market variance level, which is what GARCH
     /// persistence governs.
@@ -176,7 +177,7 @@ pub struct ModelParams {
     /// At `d` the injection is scaled by `|market_factor / baseline|^-d`, so
     /// at 1.0 its magnitude no longer depends on how large the market factor
     /// happens to be and the crisis correlation it produces stops inheriting
-    /// the variance level. The baseline is [`market_factor_sigma`] at tick
+    /// the variance level. The baseline is [`market_factor_sigma`](Self::market_factor_sigma) at tick
     /// scale, the same normaliser `crash_amplifier` already uses, so
     /// "ordinary" means the same thing in both places.
     ///
@@ -228,7 +229,8 @@ pub struct ModelParams {
     /// bit-identical.
     ///
     /// At `k` the scale is `idio_sigma_scale * beta^k`, bounded by
-    /// [`IDIO_BETA_BOUNDS`]. Like [`sector_loading_beta_slope`] it reuses a
+    /// [`IDIO_BETA_BOUNDS`](crate::market::factors::IDIO_BETA_BOUNDS). Like
+    /// [`sector_loading_beta_slope`](Self::sector_loading_beta_slope) it reuses a
     /// per-name attribute the universe already carries rather than drawing a
     /// fresh one, so it costs no RNG stream and cannot move the draw
     /// schedule.
@@ -3756,7 +3758,7 @@ pub struct ModelParams {
     /// preset's trajectory moves.
     ///
     /// Clamped so GJR persistence `alpha + beta + gamma/2` stays below
-    /// [`GARCH_PERSISTENCE_CEILING`]. A name whose variance process is not
+    /// [`GARCH_PERSISTENCE_CEILING`](crate::market::garch::GARCH_PERSISTENCE_CEILING). A name whose variance process is not
     /// stationary does not produce fat tails, it produces a number that
     /// grows until a guard catches it.
     ///
@@ -4782,8 +4784,9 @@ pub struct ModelParams {
     /// g_up^2   = m A / (1 - m) + e^2 g_down^2
     /// ```
     ///
-    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`] and `w` is
-    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`], both MEASURED on the composed
+    /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`](crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)
+    /// and `w` is
+    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`](crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE), both MEASURED on the composed
     /// pt-v19 and recorded there with their recipes. At `m = 0.3916`,
     /// `w = 0.1019` and `e = 1.93` that is `g_down^2 = 0.4996655 /
     /// 0.7773328 = 0.642795`, `g_down = 0.801745`, and `g_up^2 = 1.753897 +
@@ -5963,7 +5966,7 @@ impl ModelParams {
     /// **The driven window is improved, not closed.** 1.336 against 1.527,
     /// and still a third too volatile. Most of that excess is not the VIX
     /// channel but the QE valuation channel, whose gain
-    /// ([`qe_pe_gain`]) ships inert because the driven test feeds it a
+    /// ([`qe_pe_gain`](Self::qe_pe_gain)) ships inert because the driven test feeds it a
     /// harness-derived proxy rather than measured data.
     ///
     pub const fn pt_v14() -> ModelParams {
