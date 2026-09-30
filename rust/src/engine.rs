@@ -1846,7 +1846,8 @@ impl Engine {
     /// VIX feedback's exposure (built by spikes and given back at
     /// `fair_value_vix_release_half_life`), the anticipation's drift, the
     /// earnings cycle (the burn-in's level, replaced by the phase's target),
-    /// credit's leverage gap and the Fed put's owed cut. On R17Bd with a
+    /// credit's leverage gap, the Fed put's owed cut and the policy path's
+    /// forecast. On R17Bd with a
     /// 252-session prehistory year 0 returned about two points less than
     /// the years after it, all in its first two quarters.
     ///
@@ -1867,6 +1868,9 @@ impl Engine {
     ///   yields, the corporate yield and the mortgage rate moved by the same
     ///   amount, which is where the rule, the curve's anchor (whose ladder
     ///   adds the owed cut back) and the spreads put them.
+    /// - the market's forecast of the policy path, with the curve moved by
+    ///   the share of its change each yield prices (the burn-in leaves the
+    ///   forecast where the economy's own early cuts put it).
     ///
     /// Every price the run opens at, its draws and every other state are its
     /// own. The rate instruments are marked after construction, at the curve
@@ -1923,6 +1927,21 @@ impl Engine {
             self.economy.treasury_yield_2y -= cut;
             self.economy.corporate_bond_yield -= cut;
             self.economy.mortgage_rate_30y -= cut;
+        }
+        if self.params.treasury_path_pricing != 0.0 {
+            // The priced path's change moves the 10-year's anchor by `1 - d`
+            // of itself and the 2-year's formula by `0.85 + 0.15 (1 - d)`,
+            // `d` the damping, as `reprice_anticipated_meeting` books a
+            // priced change; the corporate yield and the mortgage rate move
+            // with the 10-year.
+            let moved = self.params.treasury_path_pricing * (pre.policy_path - self.policy_path);
+            let f10 = 1.0 - self.params.treasury_policy_damping;
+            let f2 = 0.85 + 0.15 * f10;
+            self.policy_path = pre.policy_path;
+            self.economy.treasury_yield_10y += f10 * moved;
+            self.economy.treasury_yield_2y += f2 * moved;
+            self.economy.corporate_bond_yield += f10 * moved;
+            self.economy.mortgage_rate_30y += f10 * moved;
         }
     }
 
@@ -12463,6 +12482,9 @@ mod tests {
             ("earnings_anticipation_drift_share", 0.9),
             ("earnings_anticipation_drift_half_life", 252.0),
             ("fair_value_vix_release_half_life", 504.0),
+            ("treasury_path_pricing", 1.0),
+            ("treasury_path_half_life", 63.0),
+            ("treasury_policy_damping", 0.5),
         ];
         let with = |on: f64| {
             let mut d = dials.to_vec();
@@ -12509,7 +12531,10 @@ mod tests {
         assert_eq!(&econ, o);
         let moved = on.economy().federal_funds_rate - o.federal_funds_rate;
         assert!((on.economy().fed_put_owed + moved).abs() < 1e-12);
-        assert!(((on.economy().treasury_yield_10y - o.treasury_yield_10y) - moved).abs() < 1e-12);
+        let path = on.policy_path().unwrap() - off.policy_path().unwrap();
+        assert!(path != 0.0);
+        assert!(((on.economy().treasury_yield_10y - o.treasury_yield_10y) - (moved + 0.5 * path)).abs() < 1e-12);
+        assert!(((on.economy().mortgage_rate_30y - o.mortgage_rate_30y) - (moved + 0.5 * path)).abs() < 1e-12);
         // The first tick opens every name where it stood: the opening's split
         // booked the carried state into the fair-value level.
         let innovations = vec![None; 3];

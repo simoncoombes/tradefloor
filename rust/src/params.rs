@@ -2125,7 +2125,8 @@ pub struct ModelParams {
     /// drift, the earnings cycle, credit's leverage gap (with the corporate
     /// yield moved by what it adds to the spread) and the Fed put's owed cut
     /// and stock (with the policy rate and the curve lowered by the owed
-    /// cut). Whatever moves fair value is booked into the names' fair-value
+    /// cut) and the market's forecast of the policy path (with the curve
+    /// moved by what it prices). Whatever moves fair value is booked into the names' fair-value
     /// levels by the opening's split, so no opening price moves. 0.0, which
     /// every preset carries, carries none of it. Requires
     /// `market_prehistory_sessions` above zero; read only at construction.

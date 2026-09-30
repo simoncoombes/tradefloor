@@ -4,9 +4,9 @@ The switch ships at 0.0 on every preset, and there the market's prehistory
 (`market_prehistory_sessions`) hands back its volatility state alone. On, the
 run also opens with the copy's valuation state: each name's mispricing, which
 the opening's split takes in place of its draw, the VIX feedback's exposure,
-the anticipation's drift, the earnings cycle, credit's leverage gap and the
-Fed put's owed cut, with the corporate yield and the curve moved by what the
-gap and the owed cut change. The split books all of it into the names'
+the anticipation's drift, the earnings cycle, credit's leverage gap, the Fed
+put's owed cut and the policy path's forecast, with the corporate yield and
+the curve moved by what the gap, the owed cut and the forecast change. The split books all of it into the names'
 fair-value levels, so no opening price moves. These tests hold the default,
 the domain, that the run's draws and opening prices are untouched, that the
 first print is where it stood, determinism and the snapshot round trip before
@@ -23,7 +23,8 @@ UNIVERSE = list(tf.Universe.random(12, seed=3))
 ARM = dict(market_prehistory_sessions=42.0, fed_put_gain=3.0, fed_put_half_life=126.0,
            corporate_spread_equity_gain=2.0, corporate_spread_equity_half_life=126.0,
            earnings_anticipation_drift_share=0.9, earnings_anticipation_drift_half_life=252.0,
-           fair_value_vix_release_half_life=504.0)
+           fair_value_vix_release_half_life=504.0, treasury_path_pricing=1.0,
+           treasury_path_half_life=63.0, treasury_policy_damping=0.5)
 
 
 def floats(raw):
