@@ -257,6 +257,24 @@ _SNAPSHOT_KEYS = (
     "pending_jump", "pending_overnight",
 )
 
+#: Snapshot keys the state hash accepts and does not cover. One:
+#: ``session_tick``, the ticks the day has run, which is the tick the book
+#: stamps a fill with. It moves no price, and every snapshot of an open or a
+#: closed day carries a count, so covering it would have moved every leaf
+#: written before it was carried. A restore puts it back, which is what it
+#: is carried for: a fill after a restore is stamped as the original's was.
+_UNHASHED_KEYS = ("session_tick",)
+
+
+def _default_day(day_count: int, market_open: bool) -> int:
+    """The day an engine's label and valuation clock hold when nothing moved
+    them off its counter: ``day_count`` while a session is open, the day just
+    closed after a close, 0 before the first open. The engine's
+    ``default_day``, which decides when a snapshot carries the two."""
+    count = int(day_count)
+    return count if market_open or count == 0 else count - 1
+
+
 #: The generator sequence :func:`verify` draws its sample of days from.
 #: The library's own PCG32 rather than `random`, because a verification is
 #: reproducible only if the days it sampled are: the same seed must name the
@@ -400,7 +418,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     the market factor's variance, the volume states, the universe stress, the
     forced-flow budget, the growth term's nominal base, the day's endogenous
     news, the economy in declared order, the central bank and the day
-    counter.
+    counter. After the book come four fields a snapshot carries only when
+    they have moved: the day's label and the valuation's clock where they
+    are not the day the counter gives, the fair-value inputs once
+    ``set_fundamentals`` has changed them, and the variance cascade on a
+    model that runs it.
+
+    The one key it accepts and does not cover is ``session_tick``, the
+    ticks the day has run (:data:`_UNHASHED_KEYS` says why).
 
     ``market_digest`` covers nine columns and the draw count, which is what a
     published result is checked against. This covers the macro chain and the
@@ -465,7 +490,15 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
-         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value"}
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # Carried only where they are not the day the counter gives, once
+         # `set_fundamentals` has moved them, and on a model that runs the
+         # variance cascade. Hashed after the book, each behind its name.
+         "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # Carried by every snapshot since 0.8.5 and hashed by none: the
+         # ticks the day has run, the tick the book stamps a fill with. See
+         # `_UNHASHED_KEYS`.
+         *_UNHASHED_KEYS}
         & carried)
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
@@ -801,6 +834,50 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # snapshot carries it, which is only once an agent has used it.
     if "book" in snapshot:
         _book(buf, snapshot["book"])
+    # The day's label and the valuation's clock, each behind its name and
+    # only where it is not the day the counter gives. The engine never
+    # writes one equal to that day, so a snapshot that does was edited, and
+    # hashing it would describe a state no engine holds.
+    usual = _default_day(snapshot["day_count"], snapshot["market_open"])
+    for name in ("current_day", "elapsed_days"):
+        if name in snapshot:
+            day = int(snapshot[name])
+            if day == usual:
+                raise ValidationError(
+                    f"this snapshot carries {name}={day}, which is the day its "
+                    f"day_count and market_open give. The engine writes the "
+                    f"key only when the two differ, so the snapshot was "
+                    f"edited.")
+            _text(buf, name)
+            _i64(buf, day)
+    # The fair-value inputs, once `set_fundamentals` has moved them: every
+    # equity's earnings, book value and revenue growth, NaN where absent.
+    if "fundamentals" in snapshot:
+        block = snapshot["fundamentals"]
+        keys = ("eps", "book_value_per_share", "revenue_growth")
+        if not isinstance(block, dict) or set(block) != set(keys):
+            raise ValidationError(
+                "this snapshot's fundamentals are not the three columns the "
+                f"state hash covers: {sorted(block) if isinstance(block, dict) else block!r}.")
+        columns = [_column(block[k], n, f"fundamentals.{k}") for k in keys]
+        _text(buf, "fundamentals")
+        _u32(buf, n)
+        for i in range(n):
+            for column in columns:
+                _f64(buf, column[i])
+    # The variance cascade's components, on a model that runs it,
+    # LENGTH-PREFIXED as the engine writes them.
+    if "garch_cascade" in snapshot:
+        raw = snapshot["garch_cascade"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'garch_cascade' carries {len(raw)} bytes, "
+                "which is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "garch_cascade")
+        _text(buf, "garch_cascade")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     return hashlib.sha256(bytes(buf)).hexdigest()
 
 

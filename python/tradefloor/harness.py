@@ -534,7 +534,11 @@ def evaluate(
 
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
-    default: cash earns nothing, as it always has here.
+    default: cash earns nothing, as it always has here. Borrowing is charged
+    the policy rate either way. An agent whose cash goes negative, holding
+    more than it is worth under ``max_leverage``, pays a day's interest on
+    the balance before each close; until 0.8.5 that was free unless
+    ``cash_interest`` was on.
 
     Agents are sandboxed. ``obs.engine`` is a read-only
     :class:`~tradefloor.sandbox.MarketView` and ``obs.portfolio`` a read-only
@@ -961,7 +965,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                 explanations.append((claimed, actual))
 
         # A day's interest on cash at the rate the day traded under, before
-        # the close's macro step can move it. Nothing with the option off.
+        # the close's macro step can move it: earned on a positive balance
+        # with `cash_interest` on, charged on a negative one always.
         portfolio.accrue(engine)
         engine.close_market()
         # Marked after the close, which on pt-v20 re-marks every name, so

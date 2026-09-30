@@ -1441,7 +1441,7 @@ impl PyEngine {
         }
         for entry in self.log.get(self.restored_at..).unwrap_or(&[]).iter().rev() {
             match entry {
-                crate::python_log::LogEntry::OpenMarket => return true,
+                crate::python_log::LogEntry::OpenMarket { .. } => return true,
                 crate::python_log::LogEntry::CloseMarket => return false,
                 crate::python_log::LogEntry::RunSession { close_at_end, .. }
                     if *close_at_end =>
@@ -1515,7 +1515,12 @@ impl PyEngine {
                 },
             );
         }
-        self.log.push(crate::python_log::LogEntry::OpenMarket);
+        // The label goes into the log only when it is not the counter's, so
+        // a replay numbers the day as this run did and every log of a run
+        // that never passed `first_day` is the one it was.
+        self.log.push(crate::python_log::LogEntry::OpenMarket {
+            day: (day != i64::from(self.day_count)).then_some(day),
+        });
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
         self.day_buffer.clear();
@@ -1525,7 +1530,14 @@ impl PyEngine {
         // The day a draw carries in the draw log is the day whose open it
         // follows, so the jumps, volume and macro draws taken at a close
         // belong to the day they close rather than to the one after.
-        self.inner.set_current_day(day);
+        //
+        // Two numbers, set apart. `day` is a LABEL: the draw log, the day
+        // mark and the book's fill stamps carry it. The valuation's clock is
+        // the days this engine has run, `day_count`, whatever the label. They
+        // were one field until 0.8.5, so `run_days(30, first_day=1000)`
+        // priced every name as though a thousand days had passed.
+        self.inner.set_day_label(day);
+        self.inner.set_elapsed_days(i64::from(self.day_count));
         self.inner.open_market();
         // The overnight move the open applied to `s`, for the tape: booked
         // onto the day's first row, where its effect is observed, as the
@@ -1556,7 +1568,7 @@ impl PyEngine {
         };
         let start = self.log[..end]
             .iter()
-            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket))
+            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket { .. }))
             .unwrap_or(0);
         for entry in &self.log[start..end] {
             match entry {
@@ -1982,8 +1994,13 @@ impl PyEngine {
 
     /// Roll the day's opening marks. Call once before the session's ticks.
     ///
-    /// Numbers the day from the engine's own counter. `run_days` numbers it
-    /// from `first_day` instead, through [`Self::open_market_on`].
+    /// Numbers the day from the engine's own counter, or `day` when given,
+    /// the way `run_days(first_day=...)` does. The number is a LABEL: the
+    /// draw log, the day marks and the book's fill stamps carry it, and
+    /// nothing that prices reads it. The valuation counts the days this
+    /// engine has run, so a label cannot reprice the market. A label that
+    /// is not the counter's goes into the order log, and a replay opens the
+    /// day under it.
     ///
     /// Refused while a day is open. Until 0.8.5 a second call reopened the
     /// day: it cleared the day's tape, logged a second open and changed the
@@ -1991,13 +2008,24 @@ impl PyEngine {
     /// nothing said so. Close the day with `close_market()` first. A day
     /// closed by `run_session(close_at_end=True)` is closed, and opening the
     /// next one after it works as it always did.
-    fn open_market(&mut self) -> PyResult<()> {
+    #[pyo3(signature = (*, day = None))]
+    fn open_market(&mut self, day: Option<i64>) -> PyResult<()> {
         if self.day_is_open() {
             return Err(ValidationError::new_err(self.open_day_refusal(
                 "Call close_market() to end it before opening the next day.",
             )));
         }
-        self.open_market_on(i64::from(self.day_count));
+        let day = match day {
+            None => i64::from(self.day_count),
+            Some(d) if d < 0 => {
+                return Err(ValidationError::new_err(format!(
+                    "day must be 0 or more, got {d}. It numbers the day for the \
+                     draw log and the fills, and days count from 0."
+                )))
+            }
+            Some(d) => d,
+        };
+        self.open_market_on(day);
         Ok(())
     }
 
@@ -2341,6 +2369,10 @@ impl PyEngine {
     /// 252 days holds 252 leaves and the caller usually wants them beside a
     /// `RunManifest` rather than in a list this method built.
     ///
+    /// `first_day` numbers the days for the record, the draw log and the
+    /// fills, and defaults to the engine's own counter. It is a label and
+    /// prices nothing: the valuation counts the days the engine has run.
+    ///
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
@@ -2393,8 +2425,15 @@ impl PyEngine {
         // two numbers, so `draw_log("jumps", 0, 0)` returned two days of
         // draws and `day_marks()` read 0, 1, 0, 1. The counter is what the
         // record and the day marks already advanced on, so following it is
-        // what makes the second call continue the first. A caller that
-        // wants to restart the numbering passes `first_day=0`.
+        // what makes the second call continue the first.
+        //
+        // Another `first_day` renumbers the days and nothing else. It is a
+        // label for the record, the draw log and the fills: the valuation
+        // counts the days this engine has run, so `first_day=1000` prices
+        // the market exactly as the default does, and the order log keeps
+        // the label so a replay numbers the days the same way. Until 0.8.5
+        // the label was the valuation's clock as well, and `first_day=1000`
+        // moved prices by 0.17 in log within thirty days on pt-v20.
         let first_day = first_day.unwrap_or(self.day_count);
         // Asked once rather than per day: whether the ledger wants the
         // predecessor states decides how much a later verification costs, and
@@ -2953,22 +2992,34 @@ impl PyEngine {
     }
 
     /// The day the draws taken from now on carry in the draw log and the
-    /// day marks. `open_market` stamps the engine's own day counter and
-    /// `run_days` stamps `first_day`, each at the open it labels, so this is
-    /// for a caller that drives the core between an open and a close and
-    /// wants the draws numbered its own way, or an embedder taking draws
-    /// through `draw_uniform` on a closed market.
+    /// day marks, and the day the book stamps fills with. `open_market`
+    /// stamps the engine's own day counter and `run_days` stamps
+    /// `first_day`, each at the open it labels, so this is for a caller that
+    /// drives the core between an open and a close and wants the draws
+    /// numbered its own way, or an embedder taking draws through
+    /// `draw_uniform` on a closed market.
     ///
     /// Stamped between an open and the close that follows it, this moves the
     /// number the rest of that day's draws carry and leaves the day mark on
     /// the number the open stamped.
     ///
-    /// It moves the VALUATION too, under a preset that sets
-    /// `buyback_payout_share`, because the buyback factor reads this number
-    /// as its elapsed time. So a stamp taken to label draws reprices every
-    /// name from the next tick. Nothing in this repository calls it.
-    fn set_day(&mut self, day: i64) {
-        self.inner.set_current_day(day);
+    /// A label only. The valuation counts the days the engine has run, so
+    /// this moves no price. Until 0.8.5 it was the buyback factor's elapsed
+    /// time as well, and `set_day(5000)` mid-day moved the next session's
+    /// prices by 0.21 in log with the state hash unchanged. The call goes
+    /// into the order log, and a label off the counter's goes into the
+    /// snapshot and the state hash, so a replay and a restore stamp the
+    /// fills that follow as this engine does. A negative day is refused.
+    fn set_day(&mut self, day: i64) -> PyResult<()> {
+        if day < 0 {
+            return Err(ValidationError::new_err(format!(
+                "day must be 0 or more, got {day}. It numbers the draws and the \
+                 fills, and days count from 0."
+            )));
+        }
+        self.log.push(crate::python_log::LogEntry::SetDay { day });
+        self.inner.set_day_label(day);
+        Ok(())
     }
 
     /// `(uniforms, normals)` taken so far on each stream, keyed by stream
@@ -2984,10 +3035,30 @@ impl PyEngine {
     /// Install substitutions: `(stream, kind, index, value)` tuples, the
     /// stream and kind by name. The generators still advance at every
     /// address; only the value the consumer receives changes.
+    ///
+    /// A normal must be finite and a uniform must lie in `[0, 1]`, 1.0
+    /// being the value that stops an event from firing. Every patch is
+    /// checked before any is installed, so a refused list installs nothing.
+    /// An infinite normal made every price NaN before this was checked.
     fn patch_draws(&mut self, patches: Vec<(String, String, u64, f64)>) -> PyResult<()> {
+        let mut checked = Vec::with_capacity(patches.len());
         for (stream, kind, index, value) in patches {
             let id = stream_id(&stream)?;
             let kind = draw_kind(&kind)?;
+            let ok = match kind {
+                crate::rng::DrawKind::Uniform => (0.0..=1.0).contains(&value),
+                crate::rng::DrawKind::Normal => value.is_finite(),
+            };
+            if !ok {
+                return Err(ValidationError::new_err(format!(
+                    "the patch at {stream} {} {index} is {value}. A normal must be \
+                     finite and a uniform must lie in [0, 1]; nothing was installed.",
+                    kind.name()
+                )));
+            }
+            checked.push((id, kind, index, value));
+        }
+        for (id, kind, index, value) in checked {
             self.inner.patch_draw(id, kind, index, value);
         }
         Ok(())
@@ -3296,7 +3367,11 @@ impl PyEngine {
         }
     }
 
-    /// Pin one or more macro series to given values.
+    /// Write today's value of one or more macro series. The model moves each
+    /// from the next close, so this is a one-day write rather than a hold:
+    /// a VIX written at 45 drifts back toward the chain's own level over the
+    /// sessions that follow. `tradefloor.Scenario.hold` writes a value every
+    /// day, which is what holding one means.
     ///
     /// # A scenario is a path, not a feature
     ///
@@ -3424,8 +3499,30 @@ impl PyEngine {
                 }
             }
         }
+        // The VIX above zero and no higher than the highest ceiling a
+        // shipped chain holds: this model's `vix_ceiling` or the default
+        // preset's (181.33 on pt-v20), whichever is higher. Finite was the
+        // only check, and a pinned -10 or a million made every price NaN; a
+        // hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400
+        // to 800 turned a fear shock into a rally. The default's ceiling
+        // rather than this model's alone, because presets before pt-v19 clamp
+        // at 80 and a pin of the real March 2020 close, 82.69, is a
+        // reasonable thing to ask of them.
         if let Some(v) = vix {
             check_vix(v)?;
+            let ceiling = crate::mathx::max(
+                self.inner.params().vix_ceiling,
+                crate::params::ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+                    .map_or(0.0, |p| p.vix_ceiling),
+            );
+            if !(v > 0.0 && v <= ceiling) {
+                return Err(ValidationError::new_err(format!(
+                    "vix must be above 0 and at most {ceiling}, the highest \
+                     vix_ceiling of this model and the default preset, got {v}. \
+                     A level past it is one no shipped chain produces, and a \
+                     pin there prices the market off it."
+                )));
+            }
         }
         // A price, not a rate, so the fractional band does not apply -- but a
         // non-positive one is not a cheaper barrel, it is a barrel the
@@ -3690,6 +3787,66 @@ impl PyEngine {
         Ok(out.into())
     }
 
+    /// Every company's three fair-value inputs, in roster order: earnings
+    /// per share, book value per share and revenue growth, NaN where absent.
+    /// The equities only; rate instruments carry no fundamentals.
+    ///
+    /// Returns a tuple of three lists, `(eps, book_value_per_share,
+    /// revenue_growth)`, one value per equity in `tickers` order. It reads
+    /// what the engine is valuing on, which is the published figures: under
+    /// a preset with `fair_value_news_share` or an earnings cycle, the
+    /// valuation scales these by the name's own level and the aggregate
+    /// cycle, and neither is here. `set_fundamentals` writes them.
+    fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        self.inner.fundamentals()
+    }
+
+    /// Replace every company's fair-value inputs, in roster order, NaN to
+    /// clear one. The equities only, one value each.
+    ///
+    /// The embedder's hook for reported earnings, and the one the
+    /// `market.earnings` scenario target writes through. It consumes no
+    /// draws, so it cannot move the generator, and an engine that is never
+    /// told anything values on the figures it was built with, exactly as
+    /// before this was exposed. A change moves every affected fair value, and
+    /// so every price, from the next tick.
+    ///
+    /// Each value is finite, or NaN to clear it, as `Instrument` takes them;
+    /// an infinite one is refused and nothing is written. Once the figures
+    /// differ from the ones the engine was built with, `state_snapshot`
+    /// carries them and `state_hash` covers them, so a restore values on
+    /// what this wrote rather than on the figures the roster started with.
+    fn set_fundamentals(
+        &mut self,
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
+    ) -> PyResult<()> {
+        for (name, values) in [
+            ("eps", &eps),
+            ("book_value_per_share", &book_value_per_share),
+            ("revenue_growth", &revenue_growth),
+        ] {
+            if let Some((i, v)) = values.iter().enumerate().find(|(_, v)| v.is_infinite()) {
+                return Err(ValidationError::new_err(format!(
+                    "{name}[{i}] = {v}. Each value must be finite, or NaN to clear \
+                     it, as Instrument takes it; nothing was written."
+                )));
+            }
+        }
+        self.inner
+            .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
+            .map_err(ValidationError::new_err)?;
+        // Logged once the engine has taken it, so a refused write leaves no
+        // entry a replay would then fail on.
+        self.log.push(crate::python_log::LogEntry::SetFundamentals {
+            eps,
+            book_value_per_share,
+            revenue_growth,
+        });
+        Ok(())
+    }
+
     /// Write the `avg_volume` column: one value per instrument, in shares.
     ///
     /// # Why this is the liquidity lever
@@ -3722,46 +3879,6 @@ impl PyEngine {
     /// so a column read with `column("avg_volume")` can be scaled and written
     /// back whole. A rate index quotes its depth off this column exactly as an
     /// equity does.
-    /// Every company's three fair-value inputs, in roster order: earnings
-    /// per share, book value per share and revenue growth, NaN where absent.
-    /// The equities only; rate instruments carry no fundamentals.
-    ///
-    /// What the engine is valuing on, which is the published figures: under
-    /// a preset with `fair_value_news_share` or an earnings cycle, the
-    /// valuation scales these by the name's own level and the aggregate
-    /// cycle, and neither is here.
-    fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-        self.inner.fundamentals()
-    }
-
-    /// Replace every company's fair-value inputs, in roster order, NaN to
-    /// clear one. The equities only, one value each.
-    ///
-    /// The embedder's hook for reported earnings, and the one the
-    /// `market.earnings` scenario target writes through. It consumes no
-    /// draws, so it cannot move the generator, and an engine that is never
-    /// told anything values on the figures it was built with, exactly as
-    /// before this was exposed. A change moves every affected fair value, and
-    /// so every price, from the next tick.
-    fn set_fundamentals(
-        &mut self,
-        eps: Vec<f64>,
-        book_value_per_share: Vec<f64>,
-        revenue_growth: Vec<f64>,
-    ) -> PyResult<()> {
-        self.inner
-            .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
-            .map_err(ValidationError::new_err)?;
-        // Logged once the engine has taken it, so a refused write leaves no
-        // entry a replay would then fail on.
-        self.log.push(crate::python_log::LogEntry::SetFundamentals {
-            eps,
-            book_value_per_share,
-            revenue_growth,
-        });
-        Ok(())
-    }
-
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
         let n = self.inner.instrument_count();
         if values.len() != n {
@@ -4059,11 +4176,21 @@ impl PyEngine {
 
     /// This market's state as one 64-character hex digest: the ledger leaf.
     ///
-    /// Covers every field [`PyEngine::state_snapshot`] carries, in one fixed
-    /// order, on the canonical-f64 rule `manifest._f64` and
+    /// Covers every field [`PyEngine::state_snapshot`] carries but one, in
+    /// one fixed order, on the canonical-f64 rule `manifest._f64` and
     /// `tests/known_answer.py` share. `crate::engine::Engine::state_hash`
     /// documents the encoding and why the generator states are hashed as
     /// `u64` bit patterns rather than as floats.
+    ///
+    /// The one is `session_tick`, the ticks the day has run. It numbers the
+    /// fills the book stamps and moves no price, and every snapshot of an
+    /// open or a closed day carries a count, so covering it would have moved
+    /// every leaf already written. Two engines that differ only in it hash
+    /// equal until one of them fills an order. The day's label and the
+    /// valuation's clock are covered where they are carried, which is only
+    /// where they are not the day the counter gives, and so are the
+    /// fair-value inputs once `set_fundamentals` has moved them and the
+    /// variance cascade on a model that runs it.
     ///
     /// Two engines whose hashes agree hold the same market state to the bit,
     /// including the macro chain and the generator positions that
@@ -4479,6 +4606,43 @@ impl PyEngine {
         // exactly when it is here.
         if !self.inner.book_state().is_pristine() {
             out.set_item("book", book_to_py(py, self.inner.book_state())?)?;
+        }
+        // THE DAY'S TWO NUMBERS, each only where it is not the day
+        // `day_count` and the session flag give (`engine::default_day`), so
+        // every snapshot of a run that numbered its days from the counter is
+        // the dict it was. `current_day` is the label the draws and the fills
+        // carry; `elapsed_days` is the valuation's clock. A restore set the
+        // label to `day_count` until 0.8.5, a day ahead of the original after
+        // a close, and a fill after it was stamped with the wrong day.
+        let usual = crate::engine::default_day(self.day_count, self.market_open);
+        if self.inner.current_day() != usual {
+            out.set_item("current_day", self.inner.current_day())?;
+        }
+        if self.inner.elapsed_days() != usual {
+            out.set_item("elapsed_days", self.inner.elapsed_days())?;
+        }
+        // The ticks the day has run, which is the tick the book stamps a
+        // fill with. Recording state, like the pending tape buffers, and the
+        // one key here the state hash does not cover: every snapshot of an
+        // open or a closed day carries a count, so hashing it would have
+        // moved every leaf already written, and it moves no price.
+        out.set_item("session_tick", self.inner.session_ticks())?;
+        // The fair-value inputs, once `set_fundamentals` has moved them off
+        // the figures each company was built or listed with. Absent, a
+        // restore puts those figures back.
+        if self.inner.fundamentals_changed() {
+            let (eps, book, growth) = self.inner.fundamentals();
+            let block = PyDict::new_bound(py);
+            block.set_item("eps", f64_bytes(py, &eps))?;
+            block.set_item("book_value_per_share", f64_bytes(py, &book))?;
+            block.set_item("revenue_growth", f64_bytes(py, &growth))?;
+            out.set_item("fundamentals", block)?;
+        }
+        // The variance cascade's components, only on a model that runs it
+        // (`garch_cascade_components` at 1 or more; off on every shipped
+        // preset), for the reason `fair_value_offset` is carried.
+        if self.inner.carries_garch_cascade() {
+            out.set_item("garch_cascade", f64_bytes(py, &self.inner.garch_cascade()))?;
         }
         Ok(out.into())
     }
@@ -5095,21 +5259,96 @@ impl PyEngine {
         // reported marks for 0, 1, 3 and 4.
         self.inner.clear_day_marks();
         if let Some(v) = snapshot.get_item("day_count")? {
-            self.day_count = v.extract()?;
+            let count: i64 = v.extract()?;
+            self.day_count = u32::try_from(count).map_err(|_| {
+                ValidationError::new_err(format!(
+                    "this snapshot's day_count is {count}. It counts the days \
+                     the engine has closed, from 0."
+                ))
+            })?;
         }
-        // The core's own day, pushed rather than left where construction put
-        // it. `open_market` sets it from `day_count` at every open, so the
-        // two agree at every point a snapshot can be taken; a restore that
-        // stops before the next open is the one path where they part.
+        // The core's two day numbers, pushed rather than left where
+        // construction put them: the label the draws and the fills carry,
+        // and the valuation's clock, which the buyback factor reads as
+        // elapsed time. A restore that stops before the next open reads
+        // both, so a market restored MID-DAY priced its next tick as though
+        // the run had just begun until this was pushed.
         //
-        // That path used to reach nothing. It reaches the valuation now,
-        // because the buyback factor is `exp(yield * elapsed / 252)` and
-        // elapsed is this number, so a market restored MID-DAY priced its
-        // next tick as though the run had just begun. The forking guard
-        // caught it as a divergence in every column, which is what it is
-        // for: something the engine carries drove the market and was not
-        // restored with it.
-        self.inner.set_current_day(i64::from(self.day_count));
+        // Each from the snapshot when it carries one, and otherwise the day
+        // the counter and the session flag give. This set both to
+        // `day_count` until 0.8.5, which is a day ahead of the original after
+        // a close: a pin after a boundary restore re-marked the prices off
+        // the wrong elapsed time, and a fill was stamped with the wrong day.
+        let usual = crate::engine::default_day(self.day_count, self.market_open);
+        let label: i64 = match snapshot.get_item("current_day")? {
+            Some(v) => v.extract()?,
+            None => usual,
+        };
+        let elapsed: i64 = match snapshot.get_item("elapsed_days")? {
+            Some(v) => v.extract()?,
+            None => usual,
+        };
+        if label < 0 || elapsed < 0 {
+            return Err(ValidationError::new_err(format!(
+                "this snapshot's day numbers are {label} (current_day) and \
+                 {elapsed} (elapsed_days). Days count from 0."
+            )));
+        }
+        self.inner.set_day_label(label);
+        self.inner.set_elapsed_days(elapsed);
+        // The ticks the day had run, for the fills stamped before the next
+        // open. Absent means a snapshot from before it was carried, which
+        // restored to no count at all, and so does this.
+        if let Some(v) = snapshot.get_item("session_tick")? {
+            self.inner.set_session_ticks(v.extract()?);
+        }
+        // The fair-value inputs. Absent means a snapshot of an engine whose
+        // inputs had not moved, so the figures each company was built with
+        // go back, whatever this engine was told since.
+        match snapshot.get_item("fundamentals")? {
+            Some(raw) => {
+                let block = raw.downcast::<PyDict>()?;
+                let column = |key: &str| -> PyResult<Vec<f64>> {
+                    let raw = block.get_item(key)?.ok_or_else(|| {
+                        ValidationError::new_err(format!(
+                            "this snapshot's fundamentals carry no {key:?}"
+                        ))
+                    })?;
+                    let bytes: &[u8] = raw.extract()?;
+                    Ok(bytes
+                        .chunks_exact(8)
+                        .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                        .collect())
+                };
+                let (eps, book, growth) = (
+                    column("eps")?,
+                    column("book_value_per_share")?,
+                    column("revenue_growth")?,
+                );
+                if eps.iter().chain(&book).chain(&growth).any(|v| v.is_infinite()) {
+                    return Err(ValidationError::new_err(
+                        "this snapshot's fundamentals hold an infinite value. Each \
+                         is finite, or NaN where the company has none.",
+                    ));
+                }
+                self.inner
+                    .set_fundamentals(&eps, &book, &growth)
+                    .map_err(ValidationError::new_err)?;
+            }
+            None => self.inner.reset_fundamentals(),
+        }
+        // The variance cascade. Absent means a snapshot of a model that does
+        // not run it, where the components are never read.
+        if let Some(raw) = snapshot.get_item("garch_cascade")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_garch_cascade(&values)
+                .map_err(ValidationError::new_err)?;
+        }
         match gdp_publication {
             Some(Some(state)) => {
                 self.inner.set_gdp_publication(state).map_err(ValidationError::new_err)?

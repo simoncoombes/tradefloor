@@ -635,11 +635,13 @@ class TamperGuard:
 
     Compares, before and after: ``Engine.state_hash`` (prices, every column,
     the generator states, the economy, the agent-facing book), the
-    fundamentals ``set_fundamentals`` writes (which the hash does not
-    cover), the recording counters, and each portfolio's cash, positions,
-    fills and pending flow. Compared as ``repr`` so a NaN in a fundamentals
-    list compares equal to itself. Reading is free of side effects, so a
-    run with the guard is the run without it, digest for digest.
+    fundamentals ``set_fundamentals`` writes, the recording counters, and
+    each portfolio's cash, positions, fills and pending flow. The hash
+    covers the fundamentals too since 0.8.5; they are compared on their own
+    as well so that ``what`` can name them. Compared as ``repr`` so a NaN in
+    a fundamentals list compares equal to itself. Reading is free of side
+    effects, so a run with the guard is the run without it, digest for
+    digest.
 
     It also compares ``Engine.copy_count``, which counts calls to ``fork``,
     ``state_snapshot`` and ``restore_state``. A copy run ahead is

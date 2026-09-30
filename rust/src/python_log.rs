@@ -34,8 +34,19 @@ use pyo3::types::{PyDict, PyList};
 /// One recorded call.
 #[derive(Debug, Clone)]
 pub enum LogEntry {
-    OpenMarket,
+    /// `day` is the label the day was opened under, present only when it
+    /// is not the engine's own counter (`run_days(first_day=...)`,
+    /// `open_market(day=...)`), so every log of a run that numbered its
+    /// days from the counter reads as it always did. A label moves no
+    /// price; it is logged because the book stamps fills with it.
+    OpenMarket {
+        day: Option<i64>,
+    },
     CloseMarket,
+    /// `set_day`: the label the draws and fills from here on carry.
+    SetDay {
+        day: i64,
+    },
     Tick {
         hour: i64,
         minute: i64,
@@ -179,11 +190,18 @@ impl LogEntry {
     pub fn to_py(&self, py: Python<'_>) -> PyResult<PyObject> {
         let d = PyDict::new_bound(py);
         match self {
-            LogEntry::OpenMarket => {
+            LogEntry::OpenMarket { day } => {
                 d.set_item("op", "open_market")?;
+                if let Some(day) = day {
+                    d.set_item("day", day)?;
+                }
             }
             LogEntry::CloseMarket => {
                 d.set_item("op", "close_market")?;
+            }
+            LogEntry::SetDay { day } => {
+                d.set_item("op", "set_day")?;
+                d.set_item("day", day)?;
             }
             LogEntry::Tick {
                 hour,

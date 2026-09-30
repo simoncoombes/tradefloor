@@ -532,7 +532,29 @@ pub struct Engine {
     /// The day the engine is on, for the draw log and the day marks. Set by
     /// the caller that knows it (`set_current_day`), at each open, so the
     /// draws a close takes carry the day they close; zero on a fresh engine.
+    /// A LABEL: the fills the book stamps and the draw log carry it, and
+    /// nothing that prices reads it. The valuation reads `elapsed_days`.
     current_day: i64,
+    /// Trading days elapsed when the current day opened: the clock the
+    /// valuation reads, which is the buyback factor's elapsed time
+    /// (`buyback_payout_share`). `set_current_day` sets it with the label,
+    /// so a caller of the core sees one number as before; the Python
+    /// binding sets the two apart, the label from `first_day` or `set_day`
+    /// and this from its own day counter, so a label cannot reprice the
+    /// market. They are equal on every run that numbers its days from the
+    /// counter, which is every run that passes neither.
+    elapsed_days: i64,
+    /// The ticks run on the current day, carried across a restore. A
+    /// restore drops the day marks, which is where the count normally
+    /// lives (`ticks_today`), so a fill after it was stamped tick 0.
+    /// `None` until a restore sets it, and ignored once a day mark exists.
+    carried_ticks: Option<u32>,
+    /// Each company's fair-value inputs as it was built or listed: earnings,
+    /// book value and revenue growth per share. What `set_fundamentals`
+    /// changes is measured against this, so a snapshot carries the three
+    /// only once they have moved and every engine that was never told
+    /// anything snapshots and hashes as it did before they were carried.
+    base_fundamentals: Vec<[Option<f64>; 3]>,
     /// One mark per opened day: the day, the seven streams' draw positions
     /// at the open, the active company indices and the sector count, and
     /// the ticks the day ran. Together they map a `(day, company)` pair to
@@ -976,6 +998,54 @@ impl Engine {
             || self.params.opening_market_sigma != 0.0
     }
 
+    /// Whether this engine's model runs the variance cascade
+    /// (`garch_cascade_components` at 1 or more), which is when the snapshot
+    /// and the state hash carry its components. Off on every shipped
+    /// preset, so their snapshots and hashes are the ones they were.
+    pub fn carries_garch_cascade(&self) -> bool {
+        self.params.garch_cascade_components >= 1.0
+    }
+
+    /// Every company's cascade components, `CASCADE_MAX` per name in roster
+    /// order. For checkpoints and forks: the close updates them from the
+    /// day's return, so a restore that dropped them ran every name's
+    /// variance off another level (1.4 per cent in log price after twenty
+    /// days at three components).
+    pub fn garch_cascade(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .flat_map(|c| c.stock.garch_cascade.iter().copied())
+            .collect()
+    }
+
+    /// Put the cascade components back, `CASCADE_MAX` per name. A width
+    /// mismatch is refused, as the fair-value levels' is: the components
+    /// are positional against the roster.
+    pub fn set_garch_cascade(&mut self, values: &[f64]) -> Result<(), String> {
+        let width = crate::market::garch::CASCADE_MAX;
+        if values.len() != self.companies.len() * width {
+            return Err(format!(
+                "this snapshot carries {} variance cascade components and the \
+                 roster holds {} companies of {width} each. The components are \
+                 positional against the roster, so this restore is refused \
+                 rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        if let Some(v) = values.iter().find(|v| !v.is_finite()) {
+            return Err(format!(
+                "this snapshot's variance cascade holds {v}. A component is a \
+                 variance, and a non-finite one would carry into every price \
+                 its name prints."
+            ));
+        }
+        for (c, chunk) in self.companies.iter_mut().zip(values.chunks_exact(width)) {
+            c.stock.garch_cascade.copy_from_slice(chunk);
+        }
+        Ok(())
+    }
+
     /// Put the per-name jump excitation back. See
     /// [`Engine::jump_excitation`]. A width mismatch is refused, on the
     /// reasoning in [`Engine::set_volume_idio`], and this write sits AFTER
@@ -1108,6 +1178,12 @@ impl Engine {
         settle_opening: bool,
     ) -> Self {
         let companies_len = companies.len();
+        // Read before the companies move into the struct, and never
+        // rewritten: what `set_fundamentals` is measured against.
+        let base_fundamentals = companies
+            .iter()
+            .map(|c| [c.eps, c.book_value_per_share, c.revenue_growth])
+            .collect();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
@@ -1183,6 +1259,9 @@ impl Engine {
             sector_keys,
             draws: StreamDraws::default(),
             current_day: 0,
+            elapsed_days: 0,
+            carried_ticks: None,
+            base_fundamentals,
             day_marks: Vec::new(),
             params,
             model_fingerprint: std::sync::OnceLock::new(),
@@ -2256,33 +2335,63 @@ impl Engine {
     /// its own: `run_session` and `tick` take no day, and only the caller
     /// that numbers its days does.
     ///
-    /// It was a label until pt-v18. The sentence here used to read that
-    /// nothing in the tick, the close or the macro chain consults it, so
-    /// moving it could not move a trajectory. `buyback_payout_share` made
-    /// that false: the buyback factor is an earnings yield over elapsed
-    /// time and this is the elapsed time, so under a preset that sets that
-    /// share, moving this number reprices every name.
+    /// Sets both of the engine's day numbers: the label the draw log, the
+    /// day marks and the book's fill stamps carry, and the elapsed trading
+    /// days the valuation reads (`elapsed_days`). A caller of the core that
+    /// counts its days from zero, which is what this has always asked of
+    /// one, sees one number and the behaviour it always had.
+    ///
+    /// It was a label until pt-v18. `buyback_payout_share` made the number
+    /// the valuation's clock as well: the buyback factor is an earnings
+    /// yield over elapsed time. With one field serving both, a label moved
+    /// the market. `run_days(first_day=1000)` on pt-v20 priced every name as
+    /// though a thousand days had passed, 0.17 in log price within thirty
+    /// days, and the log recorded no input that said so. So the two are two
+    /// fields now, and [`Engine::set_day_label`] moves the label alone.
     ///
     /// `open_market` is the only caller that must run before a draw is
     /// taken, because the day mark and the day's news draws are taken
-    /// there, and `PyEngine::restore_state` pushes the restored day here
-    /// for the mid-day case that no open follows.
-    ///
-    /// The valuation and the draw log want different things from this
-    /// field, elapsed trading days and a label, and they coincide only
-    /// because one counter serves both. Giving the valuation its own
-    /// counter is the better answer and it costs a snapshot field and a
-    /// state-hash entry, beside a `day` key the snapshot already carries,
-    /// so it belongs to a preset boundary rather than to a fix inside one.
+    /// there, and `PyEngine::restore_state` sets both numbers for the
+    /// mid-day case that no open follows.
     pub fn set_current_day(&mut self, day: i64) {
+        self.set_day_label(day);
+        self.elapsed_days = day;
+    }
+
+    /// Move the label alone: the day the draw log, the day marks and the
+    /// book's fill stamps carry. Nothing that prices reads it.
+    pub fn set_day_label(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..stream::COUNT as u32 {
             self.stream_rng_mut(id).set_day(day);
         }
     }
 
+    /// Set the valuation's clock alone: trading days elapsed at the open of
+    /// the current day. See `elapsed_days` on the struct.
+    pub fn set_elapsed_days(&mut self, days: i64) {
+        self.elapsed_days = days;
+    }
+
     pub fn current_day(&self) -> i64 {
         self.current_day
+    }
+
+    /// Trading days elapsed at the open of the current day, the number the
+    /// valuation reads.
+    pub fn elapsed_days(&self) -> i64 {
+        self.elapsed_days
+    }
+
+    /// The ticks run on the current day: the tick a fill is stamped with.
+    pub fn session_ticks(&self) -> u32 {
+        self.ticks_today()
+    }
+
+    /// Put back the ticks a restored day had run, for the fills stamped
+    /// before the next open. See `carried_ticks` on the struct.
+    pub fn set_session_ticks(&mut self, ticks: u32) {
+        self.carried_ticks = Some(ticks);
     }
 
     /// `(uniforms, normals)` taken so far on each stream, by stream id.
@@ -2395,6 +2504,10 @@ impl Engine {
         outcome.draws_consumed = consumed;
         if let Some(mark) = self.day_marks.last_mut() {
             mark.ticks += 1;
+        } else if let Some(ticks) = self.carried_ticks.as_mut() {
+            // A restored day with no mark of its own: counted here, so the
+            // fills of its later ticks carry the tick the original's did.
+            *ticks += 1;
         }
         // The rate indices' minute, after the equities' and reading nothing
         // they wrote: the economy does not move inside a tick, and the flow
@@ -2631,7 +2744,7 @@ impl Engine {
                 // Resolved at this session's `open_market` and fixed for
                 // the day; `None` on every preset before pt-v19.
                 crisis_epicentre: epicentre,
-                elapsed_days: self.current_day,
+                elapsed_days: self.elapsed_days,
                 params: &self.params,
             },
             rng,
@@ -2978,9 +3091,13 @@ impl Engine {
         self.book_live() || self.params.book_depth_coefficient != 0.0 || !self.book.is_pristine()
     }
 
-    /// The ticks already run on the current day.
+    /// The ticks already run on the current day: the day mark's count, or
+    /// the count a restore carried when no day has opened since it.
     fn ticks_today(&self) -> u32 {
-        self.day_marks.last().map(|m| m.ticks).unwrap_or(0)
+        match self.day_marks.last() {
+            Some(m) => m.ticks,
+            None => self.carried_ticks.unwrap_or(0),
+        }
     }
 
     /// The agent-facing book for one name, leaving out one agent's orders.
@@ -4003,6 +4120,9 @@ impl Engine {
             .filter(|(_, c)| !c.is_bankrupt && c.is_public)
             .map(|(i, _)| i as u32)
             .collect();
+        // The day's own mark counts its ticks from here, so a count a
+        // restore carried for the day before is spent.
+        self.carried_ticks = None;
         self.day_marks.push(DayMark {
             day: self.current_day,
             positions: self.stream_positions(),
@@ -4557,7 +4677,7 @@ impl Engine {
                 continue;
             }
             let fv = crate::market::tick::published_fair_value(
-                &self.params, &self.economy, self.nominal_output_base, self.current_day, c);
+                &self.params, &self.economy, self.nominal_output_base, self.elapsed_days, c);
             let g = crate::mathx::log(crate::mathx::max(0.01, c.stock.price) / fv);
             gap[i] = g;
             let w = c.stock.price * c.stock.shares_outstanding;
@@ -5556,7 +5676,7 @@ impl Engine {
                     // every year. A branch, so 0.0 is the line that stood.
                     let earnings = if self.params.market_pe_buybacks != 0.0 {
                         earnings * crate::market::tick::buyback_scale(
-                            &self.params, Some(earnings), c.stock.price, self.current_day)
+                            &self.params, Some(earnings), c.stock.price, self.elapsed_days)
                     } else {
                         earnings
                     };
@@ -5619,7 +5739,7 @@ impl Engine {
                     } else {
                         crate::market::tick::tick_fair_value(
                             &self.params, &self.economy, self.nominal_output_base,
-                            self.current_day, c, c.stock.price)
+                            self.elapsed_days, c, c.stock.price)
                     }
                 })
                 .collect(),
@@ -5659,7 +5779,7 @@ impl Engine {
         let p = &self.params;
         let economy = &self.economy;
         let base = self.nominal_output_base;
-        let day = self.current_day;
+        let day = self.elapsed_days;
         let pending = &mut self.repriced_pending;
         for (slot, (c, &fv0)) in self.companies.iter_mut().zip(before.iter()).enumerate() {
             if !(fv0 > 0.0) || c.is_bankrupt || !c.is_public {
@@ -5871,6 +5991,8 @@ impl Engine {
     /// under a preset with a non-zero `volume_idio_sigma` every company past
     /// the new one read a state that was not its own.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
+        self.base_fundamentals
+            .push([company.eps, company.book_value_per_share, company.revenue_growth]);
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
@@ -5994,6 +6116,9 @@ impl Engine {
         }
         if index < self.tick_liquidity_share.len() {
             self.tick_liquidity_share.remove(index);
+        }
+        if index < self.base_fundamentals.len() {
+            self.base_fundamentals.remove(index);
         }
         Some(self.companies.remove(index))
     }
@@ -6219,6 +6344,34 @@ impl Engine {
                 .map(|c| c.revenue_growth.unwrap_or(nan))
                 .collect(),
         )
+    }
+
+    /// Whether any company's fair-value inputs differ from the ones it was
+    /// built or listed with, to the bit. What decides whether a snapshot
+    /// carries them and whether the state hash covers them, so an engine
+    /// `set_fundamentals` never moved snapshots and hashes as it did before
+    /// they were carried.
+    pub fn fundamentals_changed(&self) -> bool {
+        fn bits(v: Option<f64>) -> Option<u64> {
+            v.map(f64::to_bits)
+        }
+        self.companies.len() != self.base_fundamentals.len()
+            || self.companies.iter().zip(&self.base_fundamentals).any(|(c, b)| {
+                bits(c.eps) != bits(b[0])
+                    || bits(c.book_value_per_share) != bits(b[1])
+                    || bits(c.revenue_growth) != bits(b[2])
+            })
+    }
+
+    /// Put every company's fair-value inputs back to the ones it was built
+    /// or listed with. What a restore does when the snapshot carries none:
+    /// such a snapshot was taken on an engine whose inputs had not moved.
+    pub fn reset_fundamentals(&mut self) {
+        for (c, b) in self.companies.iter_mut().zip(&self.base_fundamentals) {
+            c.eps = b[0];
+            c.book_value_per_share = b[1];
+            c.revenue_growth = b[2];
+        }
     }
 
     pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
@@ -6761,6 +6914,49 @@ impl Engine {
             hash_book(&mut buf, &self.book);
         }
 
+        // Four fields added after the book, each behind its own name and
+        // each only where it can differ from what an engine that never
+        // moved it holds, so every state hashed before them hashes the same.
+        //
+        // The day's label and the valuation's clock, each only when it is not
+        // the day `day_count` and the session flag give (`default_day`). A
+        // run that numbers its days from the counter never writes either.
+        // The label is here although nothing prices off it, because the
+        // book stamps fills with it and two engines owing different stamps
+        // would hash apart one fill later.
+        let usual = default_day(day_count, market_open);
+        if self.current_day != usual {
+            hash_str(&mut buf, "current_day");
+            hash_i64(&mut buf, self.current_day);
+        }
+        if self.elapsed_days != usual {
+            hash_str(&mut buf, "elapsed_days");
+            hash_i64(&mut buf, self.elapsed_days);
+        }
+        // The fair-value inputs, once `set_fundamentals` has moved them off
+        // the ones each company was built or listed with. Every price
+        // values off them, so two engines alike in every column and valuing
+        // different earnings are not the same state; before this they
+        // hashed equal and a restore brought back the construction figures.
+        if self.fundamentals_changed() {
+            hash_str(&mut buf, "fundamentals");
+            hash_u32(&mut buf, n as u32);
+            for c in &self.companies {
+                hash_f64(&mut buf, c.eps.unwrap_or(f64::NAN));
+                hash_f64(&mut buf, c.book_value_per_share.unwrap_or(f64::NAN));
+                hash_f64(&mut buf, c.revenue_growth.unwrap_or(f64::NAN));
+            }
+        }
+        // The variance cascade's components, only on a model that runs it.
+        if self.carries_garch_cascade() {
+            let values = self.garch_cascade();
+            hash_str(&mut buf, "garch_cascade");
+            hash_u32(&mut buf, values.len() as u32);
+            for value in values {
+                hash_f64(&mut buf, value);
+            }
+        }
+
         let mut hasher = Sha256::new();
         hasher.update(&buf);
         let out = hasher.finalize();
@@ -6832,6 +7028,25 @@ pub const STATE_HASH_COLUMNS: [PriceField; 18] = [
     PriceField::ShortInterest,
     PriceField::FloatShares,
 ];
+
+/// The day an engine's two day numbers hold when nothing has moved them
+/// off the binding's counter: `day_count` while a session is open, the day
+/// just closed once it has closed (`day_count - 1`), and 0 before the first
+/// open. [`Engine::state_hash`] covers the label and the valuation's clock
+/// only where they differ from this, and a restore that finds neither in
+/// its snapshot sets both to it.
+///
+/// `run_session(close_at_end=True)` closes the day and leaves the session
+/// flag set, so after it the two read one day behind this and the snapshot
+/// carries them.
+pub fn default_day(day_count: u32, market_open: bool) -> i64 {
+    let count = i64::from(day_count);
+    if market_open || count == 0 {
+        count
+    } else {
+        count - 1
+    }
+}
 
 /// Where a column sits in [`Engine::state_hash`].
 ///

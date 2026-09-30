@@ -300,6 +300,18 @@ class World:
     trades cost more through the book, but arbitrarily large is always
     available and "trade everything" wins.
 
+    Borrowing is free here by default, as it was in :func:`tradefloor.evaluate`
+    until 0.8.5: the portfolios a World builds book no interest, so a
+    negative cash balance costs nothing. That is kept because an LLM agent's
+    observation shows its cash, and every recorded World run (the FinRobot
+    and pydantic-ai fixtures, the liquidity-crisis study) replays only
+    against the cash it was shown. To charge it, give the world a portfolio
+    built with ``cash_interest=True`` (``world.portfolio = Portfolio(...,
+    cash_interest=True)``), which earns the policy rate on cash and pays it
+    on a negative balance before each close. To compare levered strategies
+    on a financed footing, use :func:`tradefloor.evaluate` or
+    :func:`tradefloor.rank`, which charge it.
+
     ``on_refusal`` decides what an agent that cannot produce a decision
     costs. ``"raise"`` is the default and ends the run, which is what this
     class has always done. ``"skip"`` records the refusal, trades nothing
@@ -704,6 +716,16 @@ class World:
                 self.trace.append(self._row(day, macro, asked, done, synced))
                 self._step += 1
 
+            # A day's interest before the close, as `tradefloor.evaluate`
+            # books it, on a portfolio built with `cash_interest=True`: its
+            # cash earns the policy rate and a negative balance pays it.
+            # Until 0.8.5 a World booked no interest on any portfolio,
+            # whatever it asked for. The portfolios a World builds itself
+            # leave it off, so their borrowing stays free (see the class
+            # docstring).
+            for portfolio in self._portfolios.values():
+                if portfolio.cash_interest:
+                    portfolio.accrue(self.engine)
             if record:
                 self.engine.record(day)
             self.engine.close_market()

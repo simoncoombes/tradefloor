@@ -255,7 +255,9 @@ they leave every equity price unchanged. `Scenario.load("curve_shock")` moves
 the whole curve 200 basis points in one day, which takes about 15% off
 `UST10Y`; `tradefloor.baselines.Balanced` is a 60/40 portfolio with a drift
 band. `evaluate(..., cash_interest=True)` pays uninvested cash the policy
-rate, and is off by default.
+rate, and is off by default. A negative cash balance is charged the policy
+rate whether it is on or off. A `World` books interest only on a portfolio
+built with `cash_interest=True`, so borrowing there is free unless you ask.
 
 ## Realism
 

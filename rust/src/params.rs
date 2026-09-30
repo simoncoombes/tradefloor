@@ -8347,6 +8347,23 @@ impl ModelParams {
                 self.news_absorption_drift_share));
         }
         self.book_invariants()?;
+        // Two guards the audit of 0.8.5 found open. A hard cap at or below
+        // zero clamps every price to nothing, and a payout share outside
+        // [0, 1] pays out more than the earnings or buys shares back with a
+        // negative budget. Every shipped preset carries 50,000 and a share of
+        // 0.0, 1/3 or 0.75.
+        if !(self.price_hard_cap.is_finite() && self.price_hard_cap > 0.0) {
+            return Err(format!(
+                "price_hard_cap is {}. It is the absolute cap on any model price, \
+                 in dollars (50,000 shipped), so it is finite and above zero.",
+                self.price_hard_cap));
+        }
+        if !(self.buyback_payout_share >= 0.0 && self.buyback_payout_share <= 1.0) {
+            return Err(format!(
+                "buyback_payout_share is {}. It is the share of earnings spent on \
+                 buybacks, in [0, 1]; 0.0 is none.",
+                self.buyback_payout_share));
+        }
         if self.news_absorption_drift_half_life != 0.0 && self.news_absorption_drift_share == 0.0 {
             return Err(format!(
                 "news_absorption_drift_half_life is {} but news_absorption_drift_share \

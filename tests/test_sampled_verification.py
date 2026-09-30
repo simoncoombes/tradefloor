@@ -302,7 +302,15 @@ def test_the_hash_moves_when_any_snapshot_field_moves(preset):
     snapshot = engine.state_snapshot()
     base = state_hash(snapshot)
 
-    fields = list(_walk(snapshot))
+    # `session_tick` is carried and deliberately not hashed
+    # (`manifest._UNHASHED_KEYS` says why), so it is walked apart: moving it
+    # must leave the leaf where it was.
+    unhashed = set(mf._UNHASHED_KEYS)
+    assert unhashed <= set(snapshot)
+    for label, mutated in _walk({k: snapshot[k] for k in unhashed}):
+        assert state_hash(dict(snapshot, **mutated)) == base, label
+    fields = [(label, mutated) for label, mutated in _walk(snapshot)
+              if label.split("[")[0].split(".")[0] not in unhashed]
     labels = [label for label, _ in fields]
     named = {label.split("[")[0] for label in labels}
     assert {name.split(".")[0] for name in named} == (
@@ -1027,10 +1035,12 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     at all, so the boundary test is the one that matters here: the run
     ledgers, and replaying its log rebuilds the same leaves.
 
-    The two leaves themselves differ, in one field that is not the market.
-    `close_market` clears the binding's session flag and the `close_at_end`
-    path leaves it set, so a snapshot taken at the two boundaries carries
-    `market_open` False and True. Every other field the hash covers -- the
+    The two leaves themselves differ, in one field that is not the market
+    and in what that field leaves the snapshot to carry. `close_market`
+    clears the binding's session flag and the `close_at_end` path leaves it
+    set, so a snapshot taken at the two boundaries carries `market_open`
+    False and True, and since 0.8.5 the session-closed one carries the day
+    just closed as well. Every other field the hash covers -- the
     columns, the generators, the macro chain, the central bank -- is
     identical, and the pinned equality below is what would fail if that
     stopped being true. The flag itself is the binding's to change, and
@@ -1066,6 +1076,16 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     assert left["market_open"] is False and right["market_open"] is True
     aligned = dict(right)
     aligned["market_open"] = False
+    # The flag also decides which day a snapshot takes for granted: the
+    # counter's while it is set, the day just closed once it is clear. With
+    # it set after a close the day just closed is not the one taken for
+    # granted, so the session-closed snapshot carries it (and its hash covers
+    # it), which is what lets a restore at that boundary number the next
+    # fill and price the next open as the original does. With the flag
+    # cleared it is the day taken for granted again, and is not carried.
+    assert right["current_day"] == right["elapsed_days"] == 2
+    assert "current_day" not in left and "elapsed_days" not in left
+    del aligned["current_day"], aligned["elapsed_days"]
     assert state_hash(left) == state_hash(aligned), (
         "the two spellings of a close differ in the session flag alone; "
         "something else in the state has moved"
