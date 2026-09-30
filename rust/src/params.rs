@@ -90,6 +90,29 @@ use crate::mispricing;
 /// The complete runtime-settable model surface, plus the derived values the
 /// tick loop reads. Plain `f64`s, no interior mutability: immutable once
 /// built, which is what lets the fingerprint be trusted.
+///
+/// Build one with [`ModelParams::preset`] and change it with
+/// [`ModelParams::with_override`], which checks the value and recomputes the
+/// fields derived from it. Outside this crate that is the only way, because
+/// the struct is `#[non_exhaustive]`: new coefficients arrive in patch
+/// releases (0.8.5 added 37), and each would otherwise break a struct
+/// literal. Struct update syntax is refused too, since it would copy a
+/// derived field such as `breaker_up` without recomputing it:
+///
+/// ```compile_fail,E0639
+/// use tradefloor::params::{ModelParams, PT_V1};
+///
+/// let wider = ModelParams { quote_model_weight: 0.5, ..PT_V1 };
+/// ```
+///
+/// ```
+/// use tradefloor::params::ModelParams;
+///
+/// let base = ModelParams::preset("pt-v20").unwrap();
+/// let wider = base.with_override("quote_model_weight", 0.5).unwrap();
+/// assert_ne!(wider, base);
+/// ```
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelParams {
     // ── Factor structure (market/tick.rs, market/factors.rs) ────────────

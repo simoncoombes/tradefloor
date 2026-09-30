@@ -55,7 +55,7 @@ that defect. `ModelParams.pt_v20` in `rust/src/params.rs` lists every change.
 - **Known-answer digests.** A digest that moves means the trajectory moved, and a trajectory change cannot ship in an LTS patch.
 - **The default preset.**
 - **The random draw schedule.** How many draws are taken, from which stream, in what order.
-- **The public API**: nothing is removed or renamed, no signature changes in a way that breaks a call, and no new features.
+- **The public API**: nothing is removed or renamed, no signature changes in a way that breaks a call, and no new features. This covers the Rust crate's public items as well as the Python package, and `cargo semver-checks` checks them before each release (RELEASING.md). The Rust API broke once, between 0.8.1 and 0.8.5, before the line began. CHANGELOG.md lists each change.
 - **Saved formats**: a checkpoint, `RunManifest` or recorded transcript written by one patch release loads in every other patch release of the same line.
 
 ### Errata for trajectory bugs

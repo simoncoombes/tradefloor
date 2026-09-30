@@ -88,6 +88,21 @@ pip install tradefloor
 Documentation, including the realism envelope and what the simulator is not
 suitable for, is at <https://tradefloor.dev/>.
 
+## Upgrading from 0.8.1
+
+The crate follows the Python package's version, and 0.8.5 breaks Rust code
+written against 0.8.1 even though Cargo treats 0.8.5 as a compatible update.
+Seeds are `u64` rather than `u32`, several public structs gained fields, the
+default preset is `pt-v20` rather than `pt-v19`, and
+`Engine::tick_components` rows have nine entries rather than eight.
+The repository's
+[CHANGELOG](https://github.com/simoncoombes/tradefloor/blob/main/CHANGELOG.md)
+lists every change under "The Rust crate since 0.8.1". Pin `tradefloor = "=0.8.1"` to stay on the old API.
+
+`ModelParams` and `SessionRequest` are now `#[non_exhaustive]`, so adding a
+field to either no longer breaks a build. Make them with
+`ModelParams::preset`, `with_override` and `SessionRequest::new`.
+
 ## Scope of this crate
 
 The published crate carries the engine, the unit tests in its source

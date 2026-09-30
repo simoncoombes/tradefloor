@@ -184,6 +184,7 @@ pub struct TickRequest<'a> {
 }
 
 /// What one tick produced.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TickOutcome {
     pub market_status: MarketStatus,
@@ -7018,6 +7019,32 @@ impl Rng for Counting<'_> {
 /// [`SessionRequest::new`] gives a quiet session (no news, no orders,
 /// volatility multiplier 1.0) that leaves opening and closing the day to the
 /// caller. Set the other fields on the value it returns.
+///
+/// Outside this crate a `SessionRequest` can only come from `new`, because
+/// the struct is `#[non_exhaustive]`: a later patch release can add a field
+/// without breaking your code. 0.8.5 added `fills`, and every struct literal
+/// written for 0.8.1 stopped compiling. So this does not compile:
+///
+/// ```compile_fail,E0639
+/// use tradefloor::engine::SessionRequest;
+/// use tradefloor::market::GameTime;
+///
+/// let request = SessionRequest {
+///     start: GameTime { hour: 9, minute: 30, day_of_week: 3 },
+///     ticks: 390,
+///     volatility_multiplier: 1.0,
+///     news: &[],
+///     news_impact_queue: &[],
+///     order_volumes: &[],
+///     fills: &[],
+///     close_at_end: false,
+///     reopen: false,
+///     daily_innovations: &[],
+///     sector_base_variances: &[],
+///     stop: None,
+/// };
+/// ```
+#[non_exhaustive]
 pub struct SessionRequest<'a> {
     /// The clock at the first tick. Each tick is one minute after the last.
     pub start: GameTime,
@@ -7196,6 +7223,7 @@ impl StopCondition {
     }
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SessionOutcome {
     pub draws_consumed: usize,
@@ -7211,6 +7239,7 @@ pub struct SessionOutcome {
 /// hot direction: emission is per tick.
 ///
 /// `f64` only. See [`Engine::run_session`] for why there is no `f32` variant.
+#[non_exhaustive]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SessionBuffer {
     pub companies: usize,
@@ -7252,6 +7281,7 @@ pub struct SessionBuffer {
 /// A struct rather than nine positional slices. The call site passes nine
 /// same-typed buffers and a transposition there would compile, run, and
 /// mislabel every row of every column it touched.
+#[non_exhaustive]
 pub struct TickTruth<'a> {
     pub components: &'a [[f64; crate::market::factors::TICK_COMPONENT_COUNT]],
     pub fundamental: &'a [f64],

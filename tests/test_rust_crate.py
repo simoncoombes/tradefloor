@@ -171,3 +171,56 @@ def test_cargo_test_is_optimised():
                         re.M | re.S)
     assert profile, "Cargo.toml has no [profile.test]"
     assert re.search(r"^opt-level\s*=\s*[123]\s*$", profile.group(1), re.M)
+
+
+def changelog_085() -> str:
+    text = "\n" + (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    start = text.index("\n## 0.8.5\n")
+    return text[start:text.index("\n## ", start + 1)]
+
+
+def test_the_rust_api_breaks_since_0_8_1_are_listed_and_the_growing_structs_are_closed():
+    """0.8.5 breaks Rust code written for 0.8.1, and the release says so.
+
+    crates.io's newest crate before this release was 0.8.1, and Cargo treats
+    0.8.5 as a compatible update, so `tradefloor = "0.8"` moves to it on
+    `cargo update`. Seeds went from u32 to u64, `tick_components` rows from
+    eight entries to nine, a dozen public structs gained fields and the
+    default preset moved. The 0.8.5 changelog covered only the Python
+    surface. It now has a section that names each Rust change (below the
+    release-note marker, since the note is at its 250-word budget), the
+    crate README says how to stay on 0.8.1, and the two structs
+    a user is told to build are `#[non_exhaustive]` so the next added field
+    breaks nothing. The compile_fail doctests on those structs prove a
+    literal is refused; this test keeps the attribute and the notes in place.
+    """
+    section = changelog_085()
+    assert "### The Rust crate since 0.8.1" in section, (
+        "the 0.8.5 changelog has no section on the Rust API changes")
+    rust = section[section.index("### The Rust crate since 0.8.1"):]
+    for item in ("Engine::new", "universe::random_universe", "GameRng::from_seed",
+                 "GameRng::substream", "GameRng::surgery", "Pcg32::new",
+                 "fixed_simulation_digest", "Engine::tick_components",
+                 "COMPONENT_COUNT", "state_hash_with_pending", "SessionRequest",
+                 "TickInputs", "TickStock", "LiveFactors", "DailyInputs",
+                 "EconomyState", "OrderBook", "ModelParams", "DEFAULT_PRESET_NAME",
+                 "pt-v20", '"=0.8.1"'):
+        assert item in rust, f"'The Rust crate since 0.8.1' does not name {item}"
+
+    readme = (RUST / "README.md").read_text(encoding="utf-8")
+    assert "## Upgrading from 0.8.1" in readme
+    assert '"=0.8.1"' in readme
+
+    src = RUST / "src"
+    for path, header in ((src / "engine.rs", "pub struct SessionRequest<'a> {"),
+                         (src / "params.rs", "pub struct ModelParams {")):
+        text = path.read_text(encoding="utf-8")
+        before = text[:text.index(header)].rstrip().splitlines()[-3:]
+        assert "#[non_exhaustive]" in before, (
+            f"{header} is not #[non_exhaustive], so a new field breaks users")
+        assert re.search(r"^/// ```compile_fail", text, re.M), (
+            f"{path.name} has no compile_fail doctest refusing a struct literal")
+
+    releasing = (ROOT / "RELEASING.md").read_text(encoding="utf-8")
+    assert "cargo semver-checks check-release" in releasing, (
+        "RELEASING.md does not check the Rust API against crates.io")

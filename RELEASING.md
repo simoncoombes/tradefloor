@@ -646,6 +646,23 @@ among them the README example. The others are excluded
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.
 
+**Check the Rust API against the last published crate.** The crate takes
+the Python package's version, so a patch release reaches every user who wrote
+`tradefloor = "0.8"` on their next `cargo update`. 0.8.5 broke code written
+for 0.8.1 (seeds went from `u32` to `u64`, structs gained fields) and nothing
+caught it until a review of the published crate. Before every publish, run
+cargo-semver-checks against the newest version on crates.io:
+
+```
+cargo install cargo-semver-checks --locked   # once
+cd rust && cargo semver-checks check-release
+```
+
+If it reports a break, either take it out or list every item in the
+CHANGELOG, as 0.8.5's "The Rust crate since 0.8.1" does, and in the crate
+README. A new public struct that will grow should be `#[non_exhaustive]`
+with a constructor, as `ModelParams` and `SessionRequest` are.
+
 Unlike PyPI, the crate upload is not idempotent. PyPI's `skip-existing` lets a
 re-run finish a partial upload; crates.io refuses a version that already
 exists, and that refusal is the right outcome for a re-run rather than

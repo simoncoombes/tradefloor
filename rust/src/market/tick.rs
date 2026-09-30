@@ -647,6 +647,7 @@ pub struct TickInputs<'a> {
 }
 
 /// What one tick produced, beyond the mutations applied to the companies.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TickOutcome {
     /// Indices into the input slice, in the order the tick processed them.
