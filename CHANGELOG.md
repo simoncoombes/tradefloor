@@ -774,6 +774,27 @@ loses 83,412 over its episode where it lost 83,236, and its 0.40 row in the
 size sweep now reads the scaled book. The change is in the env's Python
 code and leaves the engine alone, so no known-answer digest moves.
 
+### Speed
+
+`evaluate` of five momentum strategies on 40 names over 20 days took 11.0 s
+of CPU on pt-v20 and now takes 3.95 s. `rank` of the five reference agents
+over 12 seeds of 5 days went from 66 s to 12 s. Every digest and every
+scorecard is the same as before.
+
+Building a pt-v20 engine took 0.70 s and takes about 0.01 s. The earnings
+anticipation asks for the business cycle's stationary phase shares on every
+close, 755 times in the burn-in alone, and each answer walked the survival
+function of every phase. The answer depends only on the cycle's dials, so
+the engine now keeps the last one.
+
+`Engine.state_hash` took 1.2 ms and takes 0.09 ms, because each engine works
+out its model fingerprint once. The harness hashes the engine before and
+after every call into agent code, so this was a quarter of `evaluate`.
+`Observation.position` no longer copies every holding on each call, through
+a new `quantity_of(ticker)` on `Portfolio` and `PortfolioView`. The maker's
+ladder, rebuilt every tick, makes two allocations a level instead of four,
+which takes `run_days(20)` from 0.51 s to 0.42 s.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

@@ -463,7 +463,8 @@ class PortfolioView:
     The valuation methods take an engine argument for compatibility with
     ``obs.portfolio.net_worth(obs.engine)`` and ignore it: the view values
     against the market it was built on. Positions and fills come back as
-    copies.
+    copies. :meth:`quantity_of` reads one holding's quantity and copies
+    nothing.
     """
 
     # As on MarketView: the portfolio and the engine live in `_WRAPPED`.
@@ -495,6 +496,17 @@ class PortfolioView:
     @property
     def owner(self) -> str:
         return _WRAPPED[self][0].owner
+
+    def quantity_of(self, ticker: str) -> float:
+        """Shares held in ``ticker``, signed, or 0.0 with no position.
+
+        ``obs.position(ticker)`` calls this. Until 0.8.5 it read
+        ``positions``, which copies every holding, so a strategy that asked
+        about each of its N names made N squared copies a step. This returns
+        a float, so the agent still cannot reach the live position.
+        """
+        held = self.__portfolio.positions.get(ticker)
+        return held.quantity if held else 0.0
 
     @property
     def positions(self) -> dict[str, Any]:

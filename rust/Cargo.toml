@@ -33,9 +33,10 @@ exclude = [
     # conclude the crate is broken.
     #
     # What remains is a suite that runs on its own: circuit_breaker,
-    # roster_mutation and stream_alignment, plus the unit tests in 21 source
-    # modules. The parity corpus is the port contract and lives in the
-    # repository, where `cargo test --offline` runs it as a manual step in
+    # depth_counterfactual, maker_ladder_allocations, roster_mutation and
+    # stream_alignment, plus the unit tests in the source modules. The
+    # parity corpus is the port contract and lives in the repository, where
+    # `cargo test --offline` runs it as a manual step in
     # RELEASING.md. No workflow invokes cargo, so this is a checklist item
     # rather than a gate, and calling it a gate would overstate it.
     "tests/divergence_statistics.rs",

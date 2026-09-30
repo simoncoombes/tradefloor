@@ -484,14 +484,38 @@ impl OrderBook {
         quantity: f64,
         owner_id: &str,
     ) -> Option<BookOrder> {
+        if self.push_maker_level(side, price, quantity, owner_id) {
+            self.side(side).last().cloned()
+        } else {
+            None
+        }
+    }
+
+    /// [`OrderBook::append_maker_level`] without handing back a copy of
+    /// the order: `true` when the level was appended.
+    ///
+    /// The engine rebuilds every name's maker ladder on every tick and
+    /// never reads the returned order, so the copy was two string
+    /// allocations per level thrown away. The id is written straight into
+    /// a string sized for it rather than through `format!`, whose capacity
+    /// estimate starts small and grows; the text is the same
+    /// `"{company_id}-{sequence}"`. Together these were most of the
+    /// ladder's cost in a `sample` of `run_days` on pt-v20.
+    pub fn push_maker_level(
+        &mut self,
+        side: Side,
+        price: f64,
+        quantity: f64,
+        owner_id: &str,
+    ) -> bool {
         if !(quantity > 0.0) || !(price > 0.0) {
-            return None;
+            return false;
         }
         if self.side(side).len() >= self.cap {
-            return None;
+            return false;
         }
         let order = BookOrder {
-            id: format!("{}-{}", self.company_id, self.sequence),
+            id: sequenced_id(&self.company_id, self.sequence),
             side,
             price,
             quantity,
@@ -500,9 +524,31 @@ impl OrderBook {
             owner_id: owner_id.to_string(),
         };
         self.sequence += 1;
-        self.side_mut(side).push(order.clone());
-        Some(order)
+        self.side_mut(side).push(order);
+        true
     }
+}
+
+/// `format!("{company_id}-{sequence}")`, into a string allocated once at
+/// its final length.
+fn sequenced_id(company_id: &str, sequence: u64) -> String {
+    let mut digits = [0u8; 20];
+    let mut i = digits.len();
+    let mut n = sequence;
+    loop {
+        i -= 1;
+        digits[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    let mut id = String::with_capacity(company_id.len() + 1 + (digits.len() - i));
+    id.push_str(company_id);
+    id.push('-');
+    // ASCII digits only, so this is valid UTF-8.
+    id.push_str(std::str::from_utf8(&digits[i..]).unwrap_or("0"));
+    id
 }
 
 #[cfg(test)]
@@ -654,6 +700,14 @@ mod tests {
         }
         assert_eq!(b.bids.len(), MAX_DEPTH_PER_SIDE);
         assert_eq!(b.bids[0].price, 100.0 + (MAX_DEPTH_PER_SIDE + 9) as f64);
+    }
+
+    #[test]
+    fn sequenced_id_matches_format() {
+        for &n in &[0u64, 1, 9, 10, 99, 100, 12345, u64::MAX] {
+            assert_eq!(sequenced_id("ACME", n), format!("{}-{}", "ACME", n));
+        }
+        assert_eq!(sequenced_id("", 7), "-7");
     }
 
     #[test]
