@@ -3,7 +3,12 @@
 The smallest complete integration: a decision rule written as one function,
 run against a simulated market with the same validation, clipping and
 record-keeping every framework adapter gets. No network, no API key, and it
-finishes in seconds.
+finishes in about two seconds of CPU.
+
+The name is older than the horizon. The rule below runs for twenty simulated
+days (`OFFLINE_DAYS`), because on pt-v20 it trades nothing in the first five
+and makes its first trade on day 7. The recorded model run in the notebook
+still runs five (`DAYS`). The comment on `OFFLINE_DAYS` has the measurements.
 
 This is also the template the framework examples follow, so a reader can
 compare them line for line. Each one does the same job:
@@ -20,6 +25,11 @@ a comparison between two adapters would measure the harness.
 Run it:
 
     python examples/integrations/callable/five_days.py
+
+This file runs anywhere the library is installed, including as a copy
+outside the repository. The notebook's recorded model run does not travel
+with it: that recording lives in the repository's `tests/fixtures/`, and
+:func:`fixture_path` says so when it cannot find it.
 
 The notebook beside this file runs the same market twice -- once with the
 rule below, once with a function that calls a language model -- through the
@@ -44,27 +54,18 @@ DAYS = 5
 
 #: HOW LONG THE OFFLINE RULE RUNS, which is not how long the recorded model
 #: run does. `mean_reversion` reads `return_5d` and acts on a five-day move
-#: past two per cent, so on a five-day run it gets one usable reading. That
-#: was enough on the market pt-v16 produced and is not on pt-v18's, whose
-#: worst five-day fall over this roster and seed is 1.85 per cent -- under
-#: the rule's own trigger, so it holds every day, trades nothing and
-#: demonstrates nothing. Measured across horizons at the 0.7.0 boundary:
-#: 5 days 0 trades, 8 days 2, 10 days 4, 20 days 17 with two market
-#: refusals.
+#: past two per cent, so a five-day run gives it one usable reading, and on
+#: pt-v20, the default from 0.8.5, that reading never trips it on this roster
+#: and seed. Measured on pt-v20: 5 days 0 trades, 8 days 1, 10 and 15 days 2,
+#: 20 days 10 with none refused, 25 days 17 with 6 refused at the funding
+#: limit. Twenty shows the rule at work and stays inside the limit. The RULE
+#: is untouched: lowering its threshold until this market tripped it would be
+#: fitting a demonstration to a market, and the threshold is the thing being
+#: demonstrated.
 #:
-#: Ten until 0.8.5, because it gave the five-day rule five usable days
-#: instead of one and stayed inside the funding limit. Twenty since: on
-#: pt-v20, the default from 0.8.5, no name on this roster falls two per
-#: cent over five days in the first fifteen, so ten days trades nothing.
-#: Measured on pt-v20: 5, 8, 10, 12 and 15 days 0 trades, 20 days 9 with
-#: none refused, 25 days 15 to 17 (callable and openai_agents meet market
-#: refusals there). The RULE is untouched: lowering its threshold until
-#: this market tripped it would be fitting a demonstration to a market,
-#: and the threshold is the thing being demonstrated.
-#:
-#: The recorded model runs stay at `DAYS`. A language model reads the
-#: observation rather than waiting for a window, and both recordings trade
-#: on five days.
+#: The recorded model run stays at `DAYS`. A language model reads the
+#: observation rather than waiting for a window, and the recording trades
+#: within five days.
 OFFLINE_DAYS = 20
 
 #: The model the live half of the notebook calls, the key variable it
@@ -80,27 +81,42 @@ LIVE_MAX_TOKENS = 1500
 LIVE_OPT_IN_VAR = "TRADEFLOOR_LIVE_EXAMPLES"
 
 
-def _repo_root() -> Path:
-    """The repository root, found by marker rather than by counting parents.
+#: Where the recorded model run lives in a repository checkout. It sits under
+#: `tests/fixtures/` like every other recording, because the test suite and
+#: the notebook must read the SAME file: two copies of a recording can drift
+#: apart.
+FIXTURE_IN_REPO = Path("tests") / "fixtures" / "callable" / "five-days.json"
 
-    ``parents[2]`` was correct at this file's previous depth and would have
-    broken silently when `examples/` gained a level -- the exact defect the
-    FinRobot example carried through the same move. A marker survives any
-    future rearrangement or fails loudly, and those are the only two
-    acceptable outcomes.
+
+def fixture_path() -> Path:
+    """The recorded model run, found by looking for the file itself.
+
+    Called on the replay path only. It used to run at import, to find the
+    repository root by its `pyproject.toml`, so a copy of this file outside
+    a checkout failed before :func:`main`, which never reads the recording.
+    Looking for the recording, and not for a marker, also keeps a copy that
+    sits inside some other project from pointing at that project's tests.
     """
     for parent in Path(__file__).resolve().parents:
-        if (parent / "pyproject.toml").exists():
-            return parent
-    raise RuntimeError("no pyproject.toml above this file; is the "
-                       "repository layout intact?")
+        candidate = parent / FIXTURE_IN_REPO
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"no {FIXTURE_IN_REPO.as_posix()} in any folder above "
+        f"{Path(__file__).resolve()}. The recorded model run is part of the "
+        "tradefloor repository and is not installed with the package. Clone "
+        "https://github.com/simoncoombes/tradefloor and run the notebook "
+        f"there, or run it live with {LIVE_OPT_IN_VAR}=1 and {LIVE_KEY_VAR} "
+        "set. The rule-based run in main() needs neither.")
 
 
-#: The recorded model run. Committed under tests/fixtures/ like every other
-#: recording, because the test suite and the notebook must read the SAME
-#: file -- two copies of a recording are two recordings that can drift
-#: apart.
-FIXTURE = _repo_root() / "tests" / "fixtures" / "callable" / "five-days.json"
+def __getattr__(name: str):
+    # `example.FIXTURE`, which the notebook reads, resolved when it is read
+    # rather than at import. See fixture_path().
+    if name == "FIXTURE":
+        return fixture_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 #: What the model is told, once, as the system prompt. It states the job,
 #: the answer contract and the limits to respect; it says nothing about

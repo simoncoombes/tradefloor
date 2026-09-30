@@ -6,14 +6,33 @@ Run:
     export ANTHROPIC_API_KEY=...          # or: ant auth login
     python examples/08-claude-agent.py
 
+Without a key, read `integrations/callable/five_days.ipynb` instead. It
+replays a committed Claude recording through the callable adapter, so it
+shows an LLM agent's run end to end with no call made. It also has the
+record-and-replay pattern (`Transcript`) that this file leaves out, which
+you need for tests that run in CI without a key.
+
 What makes this worth doing here rather than on real data: the harness knows
 why every price moved. Claude is asked for a portfolio AND for the factor it
-believes drove the largest recent move, and `evaluate` scores that answer
+believes moved prices most that day, and `evaluate` scores that answer
 against the engine's own attribution. So the run reports two different things
 that usually get conflated -- whether the model made money, and whether it was
 right for the right reason. A model can score well on the first by accident.
 Nobody can measure the second on real market data, because nobody knows the
 answer there.
+
+The second score has a floor well above zero. On pt-v20, the default, the
+scored factor is `random_noise` or `fair_value_shift` on nearly every day, so
+an agent that names `random_noise` every day scores about 55 to 70 per cent
+on this market without reading anything. The run prints what that constant
+answer scored on the same days, and Claude's figure means something only
+where it is higher.
+
+Claude decides once a day, on the day's last step. The harness scores the
+driver against the attribution of the day it was named on, and by the last
+step Claude has seen that day's overnight gap and five of its six steps. A
+decision at the open would see only yesterday's moves and be scored on
+today's.
 
 Cost: one API call per day. The harness steps six times a day by default, so
 the agent gates itself to one decision per day -- without that gate this is six
@@ -29,9 +48,11 @@ from __future__ import annotations
 
 import os
 import sys
+from collections import Counter
 from typing import Literal
 
 import tradefloor as tf
+from tradefloor.harness import FACTOR_NAMES
 
 try:
     import anthropic
@@ -40,19 +61,13 @@ except ImportError:
     sys.exit('This example needs the extra: pip install "tradefloor[claude]"')
 
 
-# The ten components the engine decomposes every price move into. Claude
-# picks from exactly this list so the answer is checkable rather than prose.
-# It has to be all ten: the harness scores against tf.Engine.FACTORS, so a
-# list missing `circuit_breaker` and `jump` -- as this one was until 0.3.0 --
-# marks the agent wrong on a day it was never offered the right answer to.
-# `overnight`, the tenth slot since 0.7.0, was missing until 0.8.0. It is
-# zero on every shipped preset, so no day's answer was out of reach, but the
-# list follows FACTORS so that it stays right when a preset turns it on.
-Factor = Literal[
-    "reversion", "momentum", "crowd_lean", "company_news",
-    "order_flow_impact", "short_squeeze_effect", "random_noise",
-    "circuit_breaker", "jump", "overnight",
-]
+# The components the engine splits every price move into, read from the
+# harness's own list. `evaluate` scores Claude's answer against exactly these
+# names, so a list typed out here can fall behind, and it did three times.
+# The last one missed `fair_value_shift`, which pt-v20 added in 0.8.5 and
+# scores as the answer on about two days in five of this market, so Claude
+# was marked wrong on days it was never offered the right answer.
+Factor = Literal[FACTOR_NAMES]  # type: ignore[valid-type]
 
 
 class Decision(BaseModel):
@@ -74,8 +89,8 @@ class Decision(BaseModel):
     )
     driver: Factor = Field(
         description=(
-            "The factor you believe drove the largest price move you can see "
-            "since the last decision."
+            "The factor you believe moved prices most today, adding up its "
+            "push on every name whichever way it went."
         )
     )
     reasoning: str = Field(
@@ -103,9 +118,17 @@ notional size.
 model (%s), which is inside the range real equities show. Momentum is not a \
 free edge here, though it was in earlier versions of this simulator.
 
+You also name the factor that moved prices most today. The engine splits \
+every name's move into these factors: %s. For each factor it adds up the \
+size of its push on every name, up or down alike, and the factor with the \
+largest total is the answer you are scored against. `fair_value_shift` is \
+the part of the day's shocks that changed a company's fair value for good \
+rather than its mispricing.
+
 Give a portfolio, not a trade list. Concentration is allowed and often \
 correct; equal-weighting everything is a way of declining to have a view.\
-""" % (tf.envelope.CERTIFIED["return_acf1"], tf.envelope.PRESET)
+""" % (tf.envelope.CERTIFIED["return_acf1"], tf.envelope.PRESET,
+       ", ".join(FACTOR_NAMES))
 # The autocorrelation is read from the envelope rather than typed: it read
 # +0.0239 here, a figure no current preset record carries, until 0.8.0.
 
@@ -127,8 +150,7 @@ class ClaudeTrader:
         self.model = model
         self.effort = effort
         self.max_names = max_names
-        self._driver: str | None = None
-        self._last_day: int = -1
+        self._drivers: dict[int, str] = {}
         self._last_prices: dict[str, float] = {}
         self._log: list[tuple[int, str, str]] = []
 
@@ -158,8 +180,9 @@ class ClaudeTrader:
         return (
             "Day %d. Cash %.0f. Net worth %.0f.\n\n"
             "%s\n\nTop of book (first three):\n%s\n\n"
-            "Choose target weights for the next day, and name the factor that "
-            "drove the largest move you can see."
+            "This is the last decision of the day; since_last is the move "
+            "since the same point yesterday. Choose target weights for the "
+            "next day, and name the factor that moved prices most today."
             % (
                 obs.day,
                 obs.portfolio.cash,
@@ -174,11 +197,11 @@ class ClaudeTrader:
     def act(self, obs) -> dict[str, float]:
         # The harness steps six times a day by default. Deciding on every step
         # would be six API calls a day and six times the bill, for a horizon
-        # the model was told is daily. Decide once, then hold: the position is
-        # already on from the first step of the day.
-        if obs.day == self._last_day:
+        # the model was told is daily. Decide once, on the day's last step,
+        # and hold: the driver is scored against the attribution of the day
+        # it is named on, and by the last step Claude has seen most of it.
+        if not obs.is_last_step_of_day:
             return {}
-        self._last_day = obs.day
 
         response = self.client.messages.parse(
             model=self.model,
@@ -199,7 +222,7 @@ class ClaudeTrader:
             return {}
 
         decision = response.parsed_output
-        self._driver = decision.driver
+        self._drivers[obs.day] = decision.driver
         self._log.append((obs.day, decision.driver, decision.reasoning))
 
         # Weights to share deltas. The harness wants quantities, and this
@@ -225,13 +248,15 @@ class ClaudeTrader:
         return orders
 
     def explain(self, day: int) -> str | None:
-        """The factor the agent believes moved prices most.
+        """The factor Claude named on this day's last step.
 
-        The harness passes the day and checks the answer against the engine's
-        own attribution, which turns a plausible-sounding rationale into a
-        score.
+        The harness calls this after the day's last step and checks the
+        answer against the engine's attribution for that day, which turns a
+        plausible-sounding rationale into a score. None, for a day whose call
+        failed or was refused, leaves the day unscored instead of scoring an
+        older answer against it.
         """
-        return self._driver
+        return self._drivers.get(day)
 
 
 def main() -> None:
@@ -285,9 +310,19 @@ def main() -> None:
     else:
         print("\n" + withheld)
 
+    # The floor for the why-right column: the best single factor named on
+    # every scored day. On pt-v20 it is `random_noise` at 55 to 70 per cent
+    # on this market, so a figure near it says Claude read nothing.
+    scored = scores["claude"].explanations
+    if scored:
+        best, hits = Counter(actual for _, actual in scored).most_common(1)[0]
+        print("\nNaming %s every day would have scored %.0f%% on the same %d days."
+              % (best, 100 * hits / len(scored), len(scored)))
+
     print("\nWhat Claude said, and whether the engine agreed:")
-    for day, driver, why in claude._log[:5]:
-        print("  day %-3d %-20s %s" % (day, driver, why[:60]))
+    for (claimed, actual), (day, _, why) in list(zip(scored, claude._log))[:5]:
+        mark = "right" if claimed == actual else "engine: " + actual
+        print("  day %-3d %-18s %-24s %s" % (day, claimed, mark, why[:48]))
 
     print(
         "\nOne seed ranks the seed, not the agents. Before concluding anything,"
