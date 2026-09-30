@@ -341,6 +341,16 @@ unchanged. On R17Bd with a 504-session prehistory it takes year 1 less year 0
 from +1.95 to +0.63 points over 1350 held-out histories; year 0 still returns
 about 0.9 points below years 1-7, in its first two quarters.
 
+R19V's volatility regimes last too long: the autocorrelation of log monthly
+realised volatility reads 0.725 over 270 held-out histories against a band
+ceiling of 0.740. The cause is the cycle's volatility multiplier staying at
+the contraction's level through the trough. With
+`market_vol_cycle_trough_release` 1, `treasury_haven_gain` 0.02 and
+`market_vol_leverage` 2.5 it reads 0.691, the index's absolute-return
+autocorrelation at lag 1 0.267 (from 0.277) and at lag 20 0.198 (from 0.218),
+and H4 -0.303 (from -0.278), with no change to the engine's code
+(docs/MODEL.md has the arms and the rows they move).
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas

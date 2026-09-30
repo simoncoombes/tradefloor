@@ -2317,6 +2317,43 @@ realised volatility peak at the market's low and fall within a quarter of
 it (at the 1990, 2002, 2009 and 2020 lows the VIX read 34, 42, 50 and 62,
 and 27, 26, 30 and 32 sixty-three sessions later).
 
+**Volatility persistence on R19V** (measured, no dial added; boxes vcp1 to
+vcp6, sim/r18-valopen b93b9999, `r14gen`'s recording over held-out sets A, B
+and C, 270 histories). R19V's monthly realised volatility is too persistent:
+the lag-one autocorrelation of log monthly realised volatility (VC4f) reads
+0.725 against the band 0.489 to 0.740 (CRSP 20-year windows, p10 to p90;
+the S&P 500 tape 1990-2025 reads 0.676). The excess is a bias, not noise: the per-history sd is
+0.075, so the median's se is about 0.006. It is the cycle multiplier held at
+the contraction's level through the trough: with `market_vol_cycle_ratio` off
+VC4f reads 0.662 (and B10, B11 and B12 fail), and a VIX-residual of log
+realised volatility is as persistent with the multiplier as without it. The
+other candidates move it less: `market_vol_slow_gamma`
+(+0.009 at 0), `market_vol_vix_smooth` (+0.013 at 0), `vix_level_sigma`
+(-0.003 at half), `market_vol_slow_vix_damp`, `market_vol_slow_weight` and
+`market_vol_slow_persistence` (+0.008 to +0.012), `market_vol_leverage`
+(+0.005 at 1), `market_vol_vix_coupling` (-0.010 at 0.6),
+`market_vol_vix_exponent` (-0.016 at 3.5) and `market_day_tail_df` (-0.019
+at 7, -0.034 at 5, with CV1 out of band at 5). $g$ = 1, the trough at the expansion's multiplier, takes VC4f
+by -0.039 (se 0.003, paired), the absolute-return ACF at lag 1 by -0.030 and
+at lag 20 by -0.029, and time with the VIX above 30 from 6.9 to 4.6 per cent
+(B1's floor 4.1). A return memory of 2.5 in place of 2 gives back the leverage
+sum (CV1 -0.98 against -0.84) and the VIX's time above 30 (5.1 per cent).
+Doubling `treasury_haven_gain` to 0.02 takes H4 from -0.28 to -0.30.
+
+| Arm (on R19V) | VC4a | VC4c | VC4f | H1 | H4 | CV1 | VIX > 30 |
+|---|---|---|---|---|---|---|---|
+| R19V | 0.277 | 0.218 | 0.725 | -0.646 | -0.278 | -0.886 | 6.9% |
+| $g$ 1, haven 0.02 (K1) | 0.244 | 0.185 | 0.689 | -0.612 | -0.306 | -0.840 | 4.6% |
+| K1 with return memory 2.5 (M1) | 0.267 | 0.198 | 0.691 | -0.610 | -0.303 | -0.977 | 5.1% |
+| haven 0.02, exponent 3, memory 2.5 (E2) | 0.262 | 0.195 | 0.687 | -0.620 | -0.309 | -0.996 | 6.4% |
+
+Bands: VC4a 0.158 to 0.305, VC4c 0.077 to 0.245, VC4f 0.489 to 0.740, H1
+-0.69 to -0.13, H4 -0.94 to -0.24, CV1 -1.75 to -0.80. M1 on each set of 90
+reads VC4f 0.691, 0.698 and 0.682 (paired against R19V -0.036, se 0.004), and R4 on the held close 0.384, 0.376 and
+0.373 (R19V 0.381, 0.379 and 0.380). E2 keeps more time above 30 but lowers
+`market_vol_vix_exponent`, which moves every pinned-VIX path, and the replays
+and the crisis lever were not measured on it.
+
 ### Company variance (GJR-GARCH)
 
 **Timescale:** daily, at the close, before the jumps. **State:** $h_{i,d}$,
