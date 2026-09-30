@@ -722,6 +722,77 @@ transcript recorded under a different preset raises `ReplayMiss`.
 
 <!-- release-note-ends -->
 
+### Snapshots, day numbers, input checks and borrowing (audit of 0.8.5)
+
+None of these moves a known-answer digest. A run that numbers its days from
+the engine's counter, closes its days with `close_market`, never calls
+`set_fundamentals` and runs no variance cascade hashes and logs as it did,
+and its snapshots gain one key, `session_tick`. Scores of levered agents in
+`evaluate` and `rank` move.
+
+- The day number is a label. `run_days(first_day=N)` and `set_day(N)` were
+  documented as labels, but the buyback factor read the same field as its
+  elapsed time, so on pt-v20 `first_day=1000` moved prices by 0.17 in log
+  within thirty days and `set_day(5000)` mid-day moved the next session by
+  0.21, with no log entry and the state hash unchanged. The valuation now
+  counts the days the engine has run. The label goes into the order log
+  (`open_market` carries `day` when it is not the counter, and `set_day` is
+  an entry of its own), so a replay numbers the days as the run did.
+  `open_market` takes `day=`. A negative day is refused.
+- A restore puts back the day stamp and the session tick. After a close the
+  restore set the day one ahead of the original, so a pin after it
+  re-marked prices off the wrong elapsed time and a fill was stamped day 4
+  tick 0 where the original said day 3 tick 390. Snapshots carry
+  `session_tick`, and `current_day` and `elapsed_days` where they differ
+  from the counter. `session_tick` is not hashed: it moves no price, and
+  hashing it would have moved every ledger leaf already written. A run that
+  closes its sessions with `run_session(close_at_end=True)` leaves the
+  session flag set, so its snapshots now carry the day just closed and its
+  leaves move; the restore set that day one ahead.
+- `set_fundamentals` is in the snapshot and the state hash, once the figures
+  differ from the ones the engine was built with. A restore brought back the
+  construction earnings while the hash check passed, so an earnings shock
+  resumed at day 30 left the index 1.35 times the uninterrupted run twenty
+  sessions later.
+- The variance cascade (`garch_cascade_components` at 1 or more) is in the
+  snapshot and the hash. Off on every shipped preset.
+  `tests/test_restore_dial_sweep.py` restores every dial moved off pt-v20
+  and runs in the slow lane.
+- Inputs that made every price NaN are refused. `pin_macro(vix=...)` takes
+  a level above zero and at most the higher of the model's `vix_ceiling`
+  and the default preset's, 181.33, so presets that clamp at 80 still take
+  the real March 2020 close of 82.69. `run_days`, `run_session` and
+  `run_until` check volatility and day_of_week as `tick` does, and refuse a
+  start at or past 24:00 (a start written as 9:60 still runs, as it always
+  has). `patch_draws` refuses a non-finite normal or a uniform outside
+  [0, 1]; `set_fundamentals` refuses an infinite value. `ModelParams`
+  refuses `price_hard_cap` at or below zero and `buyback_payout_share`
+  outside [0, 1]. A scenario refuses a VIX `set` or `hold` above 181.33,
+  and a relative VIX shock that computes a level above it writes 181.33.
+  A hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400 to
+  800 turned a fear shock into a rally.
+- Borrowing pays the policy rate in `evaluate` and `rank`.
+  `Portfolio.accrue` charged a negative cash balance only with
+  `cash_interest` on, which both leave off, so levered agents borrowed for
+  free. On the 90 graded pt-v20 histories 1.8 times the index beat the
+  index by 2.33 points a year that way, against 0.21 with the rate charged.
+  `accrue` now charges a negative balance whether the option is on or off.
+  Idle cash still earns nothing unless `cash_interest` is on. Scores of
+  levered agents move and the market does not. A levered agent's cash,
+  which its observation shows, now falls by a day's interest at each close,
+  so a prompt built from it changes once the balance is negative; none of
+  the recorded fixtures reaches that.
+- A `World` never called `accrue`, so a portfolio built with
+  `cash_interest=True` earned and paid nothing there. It now books interest
+  before each close for such a portfolio. The portfolios a World builds
+  itself still book none, so borrowing in a World stays free unless you
+  pass one: an LLM agent's observation shows its cash, and the recorded
+  World runs (the FinRobot and pydantic-ai fixtures, the liquidity-crisis
+  study) replay only against the cash they were shown.
+- `Engine.fundamentals` had `set_avg_volume`'s docstring and
+  `set_avg_volume` had none. `pin_macro`'s docstring says it writes today's
+  value and points to `Scenario.hold` for a hold.
+
 ### Text corrections after 0.8.0
 
 No coefficient, default or trajectory moves, and the known-answer digest
