@@ -341,6 +341,23 @@ unchanged. On R17Bd with a 504-session prehistory it takes year 1 less year 0
 from +1.95 to +0.63 points over 1350 held-out histories; year 0 still returns
 about 0.9 points below years 1-7, in its first two quarters.
 
+`fed_put_carry` and `fed_drawdown_hold` give a slow bear a Fed that keeps
+answering it. The put rounds its ask to a quarter point, so at a gain of 3 a
+bear falling 3 or 4 per cent between meetings was never answered, and the
+stress hold reads the VIX, which settles while the index stays down, so 0.43
+to 0.47 of 20 per cent bears saw a rise between peak and trough. On R19V the
+median policy change from peak to trough of a 20 per cent bear sat on the
+-0.50 atom (held-out sets A and B, 602 bears; 0.50 of them cut by more than
+half a point). `fed_put_carry` restarts the put's clock at the share of the
+intermeeting fall a meeting's cut left unanswered; `fed_drawdown_hold` holds
+any rise while the index is that far below its highest close of the last 252
+sessions. Both are 0 on every preset; every known-answer digest but the
+book's fingerprint is unchanged. With both on (1.0 and 0.12), the put's
+emergency meeting at a VIX of 50, and the idiosyncratic jumps, credit's
+leverage gain and the flight to quality retuned (arm R20F, sim/r20-fedbear),
+the median over sets A, B and C (878 bears) reads -0.70 (+3.4 se), with 0.55
+of bears cut by more than half a point.
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas
