@@ -175,6 +175,7 @@ import statistics
 import warnings
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from ._arith import ordered_sum
 from ._core import Instrument, Macro, ModelParams, ValidationError
 from ._core import check_seed
 
@@ -679,7 +680,7 @@ class Ranking:
             hit = record.seeds_with_errors
             if not hit:
                 continue
-            total = sum(record.errors)
+            total = ordered_sum(record.errors)
             count = f"{total} error" + ("" if total == 1 else "s")
             first = (f", the first on {record.first_error}"
                      if record.first_error else "")
