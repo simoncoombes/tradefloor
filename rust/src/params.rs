@@ -8580,8 +8580,6 @@ pub fn claims_of(preset: &str) -> &'static [Claim] {
     }
 }
 
-/// The settable names, sorted. A function rather than the const above so
-/// the list is derived from `to_pairs`' actual coverage in tests.
 /// Bytes as lowercase hex, two digits each: what `format!("{byte:02x}")`
 /// per byte wrote, into one string allocated at its final length.
 pub(crate) fn lower_hex(bytes: &[u8]) -> String {
@@ -8626,6 +8624,8 @@ pub(crate) fn digests_taken() -> u64 {
     DIGESTS_TAKEN.with(|n| n.get())
 }
 
+/// The settable names, sorted. A function rather than the const above so
+/// the list is derived from `to_pairs`' actual coverage in tests.
 pub fn settable_names() -> Vec<&'static str> {
     vec![
         "cascade_symmetry",
