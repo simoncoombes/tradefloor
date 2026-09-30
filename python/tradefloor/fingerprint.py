@@ -66,13 +66,25 @@ run -- is a new version, never an edit to `1`.
 Each cell is one :class:`~tradefloor.counterfactual.World`, seeded and
 rostered by :func:`tradefloor.Universe.random`, running one shipped
 :class:`~tradefloor.Scenario` from day zero at the library's own six
-steps a day. The six cells cover the six scenarios `Scenario.available()`
-ships today; a battery version pins their NAMES, not the live directory,
-so a scenario added to the package later changes nothing this version
-already committed to. Sixty days puts every shipped scenario's own shock
-(day 30 to day 55, across the six) behind the run, not only its
-run-up -- see the per-cell seeds and days named in
-`tests/test_fingerprint.py`.
+steps a day. Version 1 has one cell for each of the six scenarios that
+shipped when it was fixed: ``geopolitical_conflict``, ``liquidity_crisis``,
+``oil_price_spike``, ``policy_regime_shift``, ``rate_shock`` and
+``recession``. It pins those names, not the live directory.
+`Scenario.available()` lists seven today, and ``curve_shock``, packaged
+later, is not in version 1 and cannot be added to it.
+
+Every version 1 cell runs 60 days, which is short for these scenarios.
+Five of the six fire their main shock at day 50, so their cells see ten
+days after it. ``policy_regime_shift`` moves credit at day 30, tariffs at
+day 40 and inflation at day 50. Several shocks are still running when a
+cell stops: ``liquidity_crisis`` holds its depth and volatility shock to
+day 74, ``geopolitical_conflict`` its volatility to day 79, and
+``recession`` its contraction to day 364. So a version 1 fingerprint
+hashes how an agent reacts in the first ten days of a shock, and says
+nothing about how it trades through the rest. A longer battery would be
+version 2, which does not exist yet. The ``at:`` and ``duration:`` fields
+under ``python/tradefloor/scenarios/`` give each day, and
+`tests/test_fingerprint.py` checks the ones quoted here.
 
 A :class:`Cell` is one un-forked :meth:`~tradefloor.counterfactual.World.run`
 and cannot express a checkpoint-fork-intervene experiment -- two arms
@@ -101,20 +113,30 @@ asserting either silently.
 
 ## Commit-reveal
 
-:func:`commit` hashes a sorted, caller-salted seed LIST -- the set of
-per-cell market seeds a battery will run with -- and is meant to be
-published before the run it describes. :func:`reveal` recomputes the same
-hash from a later-disclosed `(seeds, salt)` and says whether it matches;
-it refuses silently rather than raising, because "does this reveal match
-that commitment" is exactly the boolean a verifier asks.
-:func:`sealed_battery` builds the battery those seeds describe, in the
-order given, everything else -- roster seed, scenario, days, steps --
-staying whatever the named `version` already pins. The commitment binds
-the SET of seeds a run used, not their assignment to cells: two reveals of
-the same set in a different order both satisfy the same commitment and
-build two different batteries, and a verifier that cares which cell got
-which seed checks the reveal's order against a record kept alongside it,
-not against the commitment alone.
+Commit-reveal keeps a battery's market seeds secret until after the run,
+so the agent's author cannot tune against them, and lets anyone check
+afterwards that the seeds were fixed before the results were in. Draw the
+seeds, publish the commitment, run, then publish the seeds and the salt:
+
+```python
+import secrets
+
+seeds = [secrets.randbits(64) for _ in tf.battery().cells]
+salt = secrets.token_bytes(16)
+commitment = tf.commit(seeds, salt)          # publish this before the run
+result = tf.fingerprint.fingerprint(agent, tf.sealed_battery(seeds, salt))
+# Later, publish seeds and salt. Anyone can then check them:
+assert tf.reveal(commitment, seeds, salt)
+```
+
+:func:`commit` is sha256 over the sorted seed list and the salt.
+:func:`reveal` recomputes it and answers True or False. :func:`sealed_battery`
+puts the seeds into the cells in the order given and keeps everything else
+(roster seed, scenario, days, steps) as the battery version pins it. The
+commitment covers the set of seeds and not which cell got which, so the
+same seeds in another order also pass :func:`reveal` and build a different
+battery. A verifier who cares about that assignment has to get the order
+from a record kept with the reveal.
 
 Draw sealed seeds from the whole range, ``secrets.randbits(64)`` for each
 cell. A seed is any integer from 0 to ``2**64 - 1``, and a hidden seed is
@@ -210,12 +232,12 @@ class Battery:
 #: to the package after this version shipped must not silently grow it.
 #: Seeds are well clear of the ones the shipped examples and fixtures use
 #: (4242, 11, 101, ...), so a battery run can never collide with a
-#: recorded transcript's own world. `days=60` and `steps=6` are named
-#: once, here, rather than per cell: every shipped scenario's own shock
-#: fires between day 30 and day 55 (`tests/test_fingerprint.py` names the
-#: six `at:` values it was measured against), and 6 steps a day is the
-#: library's own decision cadence -- see `World`'s default and
-#: `examples/rate-shock/counterfactual.py`.
+#: recorded transcript's own world. `days=60` and `steps=6` are fixed for
+#: every cell. Five of the six scenarios fire their main shock at day 50,
+#: so those cells see ten days after it (see the module docstring). 6 steps
+#: a day is the library's own decision cadence -- see `World`'s default
+#: and `examples/rate-shock/counterfactual.py`. Never edit these. A longer
+#: or different set is a new version.
 _CELLS: dict[int, tuple[Cell, ...]] = {
     1: (
         Cell(90_000, 91_000, "geopolitical_conflict", 60, 6),
@@ -640,19 +662,24 @@ class FingerprintComparison:
 # ---------------------------------------------------------------------------
 
 def commit(seeds: Sequence[int], salt: bytes) -> str:
-    """sha256 of the sorted seed list plus ``salt``. Publish before the run.
+    """sha256 of the sorted seed list and ``salt``, in hex. Publish it
+    before the run.
 
-    ``salt`` is caller-supplied and never stored: the library only ever
-    recomputes this same hash, in :func:`reveal`, from a later-disclosed
-    ``(seeds, salt)``. It must be ``bytes`` -- a ``str`` silently encoded
-    would make two salts that read identically on screen hash
-    differently, and a commitment scheme that can fail that way for a
-    typo is not one worth calling a commitment.
+    ``salt`` must be ``bytes``. A ``str`` is refused because it would have
+    to be encoded, and two salts that look the same on screen could then
+    hash differently. Keep the salt private until the reveal. The library
+    never stores it.
 
-    Each seed is any integer from 0 to ``2**64 - 1`` and is checked here, at
-    the commitment, so a list the engine would refuse cannot be committed to
-    and found wanting only at the reveal. See the module docs for why a
-    sealed seed should be drawn from all 64 bits.
+    Each seed must be an integer from 0 to ``2**64 - 1``. They are checked
+    here, so a list the engine would refuse cannot be committed to. Draw
+    them with ``secrets.randbits(64)``; the module docstring says why the
+    full range matters.
+
+    ```python
+    seeds = [secrets.randbits(64) for _ in tf.battery().cells]
+    salt = secrets.token_bytes(16)
+    commitment = tf.commit(seeds, salt)
+    ```
     """
     if isinstance(salt, str):
         raise ValidationError(
@@ -666,14 +693,19 @@ def commit(seeds: Sequence[int], salt: bytes) -> str:
 
 
 def reveal(commitment: str, seeds: Sequence[int], salt: bytes) -> bool:
-    """Whether ``(seeds, salt)`` reproduces ``commitment``.
+    """Whether ``seeds`` and ``salt`` reproduce ``commitment``.
 
-    Refuses by returning ``False`` rather than raising: a verifier checks
-    a reveal, and the answer to "does this match" is exactly the boolean
-    this returns, for a different seed list, a different salt, or both.
-    A list holding something that is not a seed (a negative integer, one of
-    ``2**64`` or more, a float) could never have been committed to, so it is
-    ``False`` too.
+    Returns False for a different seed list or a different salt, and for a
+    list holding something that could never have been committed to (a
+    negative integer, one of ``2**64`` or more, a float). It raises only for
+    a ``str`` salt, as :func:`commit` does. The order of ``seeds`` does not
+    matter, because :func:`commit` sorts them.
+
+    ```python
+    tf.reveal(commitment, seeds, salt)         # True
+    tf.reveal(commitment, seeds[::-1], salt)   # also True
+    tf.reveal(commitment, seeds, b"other")     # False
+    ```
     """
     try:
         seeds = [check_seed(s) for s in seeds]
@@ -684,22 +716,21 @@ def reveal(commitment: str, seeds: Sequence[int], salt: bytes) -> bool:
 
 def sealed_battery(seeds: Sequence[int], salt: bytes,
                    version: int = BATTERY_VERSION) -> Battery:
-    """The named battery, its cells' market seeds replaced by ``seeds``.
+    """Battery ``version`` with ``seeds`` as its cells' market seeds.
 
-    ``seeds`` are assigned to cells IN THE ORDER GIVEN, one per cell,
-    after :func:`reveal` -- called separately, against whatever
-    commitment was published -- has already said they match. ``salt`` is
-    accepted for the same reason :func:`reveal` takes one: a caller
-    revealing a run passes the ``(seeds, salt)`` pair it was given as one
-    unit. This function does not itself check a commitment, because it is
-    handed no commitment to check; nothing here re-derives anything from
-    ``salt`` beyond that symmetry. Everything but the market seed --
-    roster seed, scenario, days, steps, the reference renderer key --
-    stays whatever ``version`` already pins.
+    The seeds go to the cells in the order given, one per cell, and a list
+    of any other length is refused. Everything else (roster seed, scenario,
+    days, steps, the reference renderer key) stays as ``version`` pins it.
 
-    Raises if ``seeds`` is not exactly one entry per cell: a shorter or
-    longer reveal cannot be a reveal of THIS battery's commitment, whatever
-    :func:`reveal` says about the set.
+    This does not check a commitment, because it is not given one. Call
+    :func:`reveal` for that. ``salt`` is taken so the same ``(seeds, salt)``
+    pair passes through all three functions, and a ``str`` salt is refused
+    as in :func:`commit`. Nothing else is done with it.
+
+    ```python
+    sealed = tf.sealed_battery(seeds, salt)
+    result = tf.fingerprint.fingerprint(agent, sealed)
+    ```
     """
     base = _build(version)
     seeds = [check_seed(s) for s in seeds]
