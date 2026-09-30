@@ -116,6 +116,7 @@ from __future__ import annotations
 import struct
 from typing import Any, Sequence
 
+from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import Observation, session_clock
@@ -187,7 +188,7 @@ class Execution:
         Currency alone is not comparable between a $10m programme and a
         $100k one, and bps is the unit every execution desk already reads.
         """
-        notional = sum(
+        notional = ordered_sum(
             abs(f["notional"]) for f in self.fills
             if ticker is None or f["ticker"] == ticker
         )
@@ -349,7 +350,7 @@ class Execution:
             "steps": self.steps,
             "fills": len(self.fills),
             "traded": traded,
-            "notional": sum(abs(f["notional"]) for f in self.fills),
+            "notional": ordered_sum(abs(f["notional"]) for f in self.fills),
             "shortfall": self.shortfall(),
             "shortfall_bps": self.shortfall_bps(),
             "impact_bps": {t: self.impact_bps(t) for t in traded},

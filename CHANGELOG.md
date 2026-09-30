@@ -818,6 +818,27 @@ a new `quantity_of(ticker)` on `Portfolio` and `PortfolioView`. The maker's
 ladder, rebuilt every tick, makes two allocations a level instead of four,
 which takes `run_days(20)` from 0.51 s to 0.42 s.
 
+### Python versions and installs
+
+Python 3.12 made built-in `sum()` over floats compensated, and the Python
+code between the engine and the orders used it for net worth, gross
+exposure, rebalancing weights and the scores. On `Universe.random(40,
+seed=111)`, seed 7, ten days, the random baseline's orders split between
+3.11 and 3.12 at step 29 in the last digit, and 557 of 2,428 logged orders
+differed. The engine digests did not move, because the engine is Rust. The
+package now adds floats left to right as 3.11 did (`tradefloor._arith`), so
+3.11 results are unchanged and 3.12 and 3.13 match them. On 3.12 and later
+an LLM agent's observation can change in its last digit, to the 3.11 value.
+`tests/test_python_versions.py` compares an agent-driven run with digests
+taken on 3.11 and runs in CI on 3.12 and 3.13. A run manifest records the
+Python version.
+
+`pip install "tradefloor[mcp]"` now installs pyarrow, which the `explain`
+tool needs. Without the extra, `tradefloor-mcp` prints one line naming it
+instead of two tracebacks. The README says to clone the repository before
+running an example, since `examples/` is not in the package, and says the
+`finrobot` extra installs only on Python 3.11 and only `--live` needs it.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

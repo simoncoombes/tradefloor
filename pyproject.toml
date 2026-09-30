@@ -22,14 +22,27 @@ license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-APACHE", "LICENSE-MIT", "NOTICE"]
 authors = [{ name = "Simon Coombes" }]
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic", "backtesting"]
+# The Python versions are the ones CI runs: 3.11 in every job, 3.12 and 3.13
+# in the `versions` job of .github/workflows/suite.yml. tests/test_packaging.py
+# checks the two lists agree. The operating systems are the ones release.yml
+# builds wheels for. `Typing :: Typed` because py.typed and _core.pyi ship.
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Financial and Insurance Industry",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Rust",
   "Topic :: Office/Business :: Financial :: Investment",
   "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
 ]
 
 [project.urls]
@@ -39,6 +52,8 @@ Documentation = "https://tradefloor.dev"
 # PyPI has no changelog field, so a project page can only point at one.
 # Without this a visitor has no route from the package to its release notes.
 Changelog = "https://github.com/simoncoombes/tradefloor/releases"
+# Without it the PyPI sidebar has no link for reporting a problem.
+Issues = "https://github.com/simoncoombes/tradefloor/issues"
 
 [project.optional-dependencies]
 # The core package depends on NOTHING. These are for surfaces that genuinely
@@ -53,7 +68,10 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 # The MCP server, which lets an LLM agent drive the simulator over tool calls.
 # Optional for the same reason as the rest: nothing in the library imports it,
 # and a user who only wants the simulator should not install a server stack.
-mcp = ["mcp>=2.0"]
+# pyarrow because the `explain` tool reads the truth table, which arrives as
+# an Arrow stream. Without it, `pip install "tradefloor[mcp]"` (the README's
+# install line) gave a server whose explain tool failed on every call.
+mcp = ["mcp>=2.0", "pyarrow>=14"]
 # One extra per framework adapter under python/tradefloor/integrations/,
 # named after the framework, as that subpackage's rules require. Floors only,
 # no ceilings: every adapter imports its framework lazily and validates
@@ -77,8 +95,10 @@ mcp = ["mcp>=2.0"]
 # `pydantic_ai` module, and the umbrella adds openai, anthropic, google-genai,
 # groq, mistral, cohere and boto3 that no adapter imports. Whoever hands us a
 # PydanticAI agent already installed the provider they built it against.
-# `TestModel` and `FunctionModel` are both in slim, so the test suite needs
-# nothing further.
+# `TestModel` and `FunctionModel` are both in slim, and every test of the
+# adapter runs on them except two in tests/test_pydantic_ai.py. Those build a
+# real `openai:` model to check the rails before a request, so they need the
+# `openai` package too and skip without it. CI has it through openai-agents.
 openai-agents = ["openai-agents>=0.22"]
 pydantic-ai = ["pydantic-ai-slim>=2.36"]
 langgraph = ["langgraph>=1.2"]
@@ -161,7 +181,10 @@ finrobot = [
 tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
 # arguments; see tradefloor-docs: docs/mcp.md for a client configuration block.
-tradefloor-mcp = "tradefloor.mcp:main"
+# Through a shim rather than `tradefloor.mcp:main`, so that without the `mcp`
+# extra the script prints one line naming the extra instead of two chained
+# tracebacks.
+tradefloor-mcp = "tradefloor.__main__:mcp_main"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"

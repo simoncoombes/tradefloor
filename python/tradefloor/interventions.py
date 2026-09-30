@@ -86,6 +86,7 @@ import json
 import struct
 from typing import Any, Callable, Sequence
 
+from ._arith import ordered_sum
 from ._core import Engine, ValidationError
 
 #: The version of the YAML/JSON scenario document this build reads. A document
@@ -1309,7 +1310,7 @@ def apply_operation(operation: str, current: Any, value: Any) -> Any:
 def summarise(value: Any) -> Any:
     """What goes in the audit trail: a scalar, or a column's total."""
     if isinstance(value, tuple):
-        return sum(value)
+        return ordered_sum(value)
     return value
 
 

@@ -54,6 +54,7 @@ import struct
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
+from ._arith import ordered_sum
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from ._core import check_seed
 from .portfolio import (Cancel, LeverageError, Limit, Portfolio, check_order,
@@ -446,7 +447,7 @@ def _dominant_factor(engine: Engine) -> str | None:
     """
     best, best_size = None, 0.0
     for name in FACTOR_NAMES:
-        size = sum(abs(x) for x in _f64(engine.attribution(name)))
+        size = ordered_sum(abs(x) for x in _f64(engine.attribution(name)))
         if size > best_size:
             best, best_size = name, size
     return best
@@ -865,7 +866,7 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     if not traded:
         return 0.0
 
-    total = sum(traded.values())
+    total = ordered_sum(traded.values())
     weighted = 0.0
     for ticker, notional in traded.items():
         i = tickers.index(ticker)
