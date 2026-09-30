@@ -240,6 +240,60 @@ zero and drift in that half year: the names' mean mispricing falls to -0.013
 by month 6 and settles near -0.008, and the VIX feedback's exposure
 (`fair_value_vix_discount`) builds from 0 to about 0.02 over nine months.
 
+**The prehistory's valuation** (`market_prehistory_valuation`, a switch, off
+on every shipped preset, and refused without a prehistory). Those are not the
+only states the burn-in leaves where a market that never traded would. On
+R17Bd with $N$ = 252 (180 histories, seeds 300401-300580) the names'
+cap-weighted mispricing went from 0 to -0.011 by month 6, the VIX feedback's
+exposure from 0 to 0.035 by month 12 (0.049 over months 12-36, since the
+give-back runs at `fair_value_vix_release_half_life` 504), the Fed put's owed
+cut from 0 to 0.15 (0.24 settled) with the policy rate a quarter point lower
+by month 12, credit's leverage gap from 0 to -0.022, and the market's forecast
+of the policy path from -0.086 to +0.028. The first two cheapen the market
+over year 0; the last three move the corporate yield down, then up, and
+partly hide it. On, the copy's end also hands back each name's mispricing
+(which the opening's split takes in place of the name's draw, and leaves out
+of the draws' centring), the VIX feedback's exposure, the anticipation's
+drift, the earnings cycle (the burn-in's own level, which the constructor
+otherwise replaces with the opening phase's target), credit's leverage gap
+with the corporate yield moved by the change it makes to the spread formula,
+the Fed put's owed cut and stock with the policy rate lowered by the owed cut
+(not below zero) and the prime rate, both Treasury yields, the corporate yield
+and the mortgage rate moved with it, and the path's forecast with the curve
+moved by the share of its change each yield prices ($1 - d$ on the 10-year,
+the corporate yield and the mortgage rate, $0.85 + 0.15(1 - d)$ on the 2-year,
+$d$ = `treasury_policy_damping`). Everything that moves fair value is booked
+into the names' fair-value levels by the opening's split at the first open,
+so no price moves at the opening. The run's draws are its own.
+
+Measured (sim/r18-valopen 9a4a524d; boxes r19X1, r19G1, r19G2, r19L2). Each
+arm is R17Bd with the prehistory; the paired shift is against R17Bd with
+$N$ = 252 alone on the same held-out seeds (sets A, B and C from `r14gen`, and
+`lite8` on the twelve blocks 40201-40830 and 90201-190830).
+
+| Arm | carried | $N$ | histories | year 0 shift (se) | year 1 less year 0 shift (se) |
+|---|---|---|---|---|---|
+| V7 | mispricing, VIX feedback, anticipation drift | 252 | 1014 | +1.62 (0.11) | -1.45 (0.11) |
+| V15 | V7 and the leverage gap | 252 | 1034 | +1.35 (0.15) | -1.00 (0.20) |
+| V31 | V15 and the Fed put | 252 | 1033 | +1.01 (0.15) | -0.74 (0.20) |
+| V31L | V31 | 504 | 1011 | +1.20 (0.19) | -1.28 (0.27) |
+| R19V | all, with the earnings cycle and the path's forecast | 504 | 1350 | +1.31 (0.17) | -1.32 (0.24) |
+
+(points of index return). On 405 of the same histories 1008 sessions read as
+504 do (year 0 +1.41 against +1.62 on the pair). The earnings cycle alone
+moves year 0 by +0.04 (se 0.03, 90 paired histories), since its opening at
+the phase's target is too low in a contraction and too high in a recovery by
+about as much. R19V over 1350 histories: year 1 less year 0 +0.0063 (0.40 of
+its se at 270, against +0.0195 and 1.25), year 0's volatility less years 1-7
++0.0012 (se 0.0025), and a Monte Carlo of a fresh 270-history grade passes
+PH5 0.736 of the time (the volatility clause alone 0.776) against 0.767 for a
+model whose years share one mean under the same covariance. Year 0 still
+returns 5.3 per cent against 6.3 for the mean of years 1-7 (-0.93 points, se
+0.52), in its first two quarters (1.10 and 0.90 against 1.5 to 1.6 later);
+switching the earnings calendar off moves year 0 by -0.09 (se 0.24, 153
+paired histories), so the reporting seasons are not the cause, and what is
+has not been found.
+
 ## The macro economy
 
 The economy steps once per session, after the close (`engine.rs:5529-5539`).
@@ -474,6 +528,7 @@ which any of the 384 rules breaches (median over +1 or ahead in over 2/3).
 | R18c | expansion 0.835 | 0.582 (0.019) | -0.60 (+1.65 se) | 0.273 (A+B+C) |
 | R18d | hazard 6, knee 0.09, expansion 0.85 | 0.585 (0.013) | -0.50 (0.00 se) | 0.252 (A+B+C) |
 | R18e | hazard 10, expansion 0.85 | 0.604 (0.013) | -0.50 (0.00 se) | 0.522 (A+B+C) |
+| R19V | prehistory 504 with its valuation (`market_prehistory_valuation`, sim/r18-valopen 9a4a524d) | 0.598 (0.012), 540 | -0.60 (+2.16 se), 540 | 0.013 (540) |
 
 A stronger or earlier hazard (R18a, R18b, R18e) raises the odds, through the
 rules that read the cycle itself (`out_contraction_trough`, the GDP-growth
@@ -3277,6 +3332,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **The market's fall in the cycle's hazard** (`cycle_equity_hazard`, `cycle_equity_hazard_knee`, `cycle_equity_hazard_opening`): the business cycle does not read the index.
 - **The market's prehistory** (`market_prehistory_sessions`): every volatility state opens at the constructor's phase-free baseline.
+- **The prehistory's valuation** (`market_prehistory_valuation`): the mispricing, the VIX feedback, the anticipation's drift, the earnings cycle, credit's leverage gap, the Fed put's owed cut and the path's forecast open where the burn-in leaves them.
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.
 
 ## pt-v19: reproducing earlier work

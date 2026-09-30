@@ -327,6 +327,20 @@ and every known-answer digest is unchanged. At 252 sessions year 0's index
 volatility sits 0.0005 and 0.0012 above years 1-7 on R17T and R17Bd over 1350
 held-out histories (se 0.0025), against 0.0039 and 0.0055 without it.
 
+`market_prehistory_valuation` carries the valuation state from the same
+copy. The burn-in has no market, so the names' mispricing, the VIX feedback's
+exposure, the anticipation's drift, the earnings cycle, credit's leverage
+gap, the Fed put's owed cut and the market's forecast of the policy path used
+to open where a market that never traded leaves them and drift over the first
+year. On, the run opens on the copy's, with the policy rate and the curve
+moved by what the owed cut, the gap and the forecast change, and the opening's
+split books every difference into the names' fair-value levels, so no price
+moves at the opening. It is a switch, 0 on every preset, refused without a
+prehistory, and every known-answer digest but the book's fingerprint is
+unchanged. On R17Bd with a 504-session prehistory it takes year 1 less year 0
+from +1.95 to +0.63 points over 1350 held-out histories; year 0 still returns
+about 0.9 points below years 1-7, in its first two quarters.
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas
