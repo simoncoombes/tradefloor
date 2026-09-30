@@ -889,8 +889,11 @@ class World:
         never an order. Under ``"raise"`` it raises
         :class:`ValidationError` naming the step and what came back, and
         under ``"skip"`` the step is recorded as unusable with that text.
-        :func:`tradefloor.evaluate` writes the same text to the scorecard's
-        ``errors``. See :func:`tradefloor.portfolio.order_items`.
+        An empty list, ``0`` and ``False`` count as bad returns too. Before
+        0.8.5 they passed as a step with no trade, and now a World on the
+        default ends the run on them; return ``None`` or ``{}`` to trade
+        nothing. :func:`tradefloor.evaluate` writes the same text to the
+        scorecard's ``errors``. See :func:`tradefloor.portfolio.order_items`.
         """
         if self.on_refusal == "raise":
             return self._order_mapping(agent.act(obs), obs, label), None

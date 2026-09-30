@@ -489,6 +489,46 @@ def test_numpy_quantities_are_numbers_of_shares():
     assert (card.trades, card.errors) == (2, [])
 
 
+def test_whatever_float_reads_trades_and_a_bool_or_complex_does_not():
+    """A Decimal and a 0-d numpy array traded at 5b56d0b, and a first cut
+    of the 0.8.5 check refused them as "not a number of shares" (review of
+    fix085/agent-orders). They trade the same shares as a float. A numpy
+    bool and a numpy complex are refused as Python's are."""
+    import decimal
+    import fractions
+    np = pytest.importorskip("numpy")
+
+    def trades(value):
+        return Returns(lambda obs: {obs.tickers[0]: value})
+
+    good = {"float": 10.0, "decimal": decimal.Decimal("10"),
+            "fraction": fractions.Fraction(10), "array0d": np.array(10.0),
+            "float32": np.float32(10)}
+    bad = {"np_bool": (np.bool_(True), "got True (bool_)"),
+           "bool0d": (np.array(True), "got array(True) (ndarray)"),
+           "np_complex": (np.complex128(10), "got (10+0j) (complex128)"),
+           "decimal_nan": (decimal.Decimal("NaN"), "must be finite, got nan")}
+    agents = {k: trades(v) for k, v in good.items()}
+    agents.update({k: trades(v) for k, (v, _) in bad.items()})
+    scores = tradefloor.evaluate(agents, seed=5, universe=SMALL, days=1)
+    for name in good:
+        assert (scores[name].trades, scores[name].errors) == (1, []), name
+        assert scores[name].final_net_worth == scores["float"].final_net_worth
+    for name, (_, said) in bad.items():
+        assert scores[name].trades == 0, name
+        assert said in "\n".join(scores[name].errors), name
+
+
+def test_a_torch_scalar_is_a_number_of_shares():
+    torch = pytest.importorskip("torch")
+    scores = tradefloor.evaluate(
+        {"t": Returns(lambda obs: {obs.tickers[0]: torch.tensor(10.0)}),
+         "b": Returns(lambda obs: {obs.tickers[0]: torch.tensor(True)})},
+        seed=5, universe=SMALL, days=1)
+    assert (scores["t"].trades, scores["t"].errors) == (1, [])
+    assert scores["b"].trades == 0 and scores["b"].rejected == 1
+
+
 class RestingBid:
     """A limit order at the bid on step zero: it rests, and fills later."""
 

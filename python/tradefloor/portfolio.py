@@ -91,25 +91,55 @@ def _describe(value: Any) -> str:
     return f"{text} ({type(value).__name__})"
 
 
-def shares(value: Any, *, what: str = "quantity") -> float:
+def _not_a_count(value: Any) -> bool:
+    """Whether ``value`` is refused as a share count before ``float()`` is
+    tried: a ``bool`` (Python's or numpy's), a string, bytes, or a complex
+    number. ``float()`` would take ``True`` and ``"100"``, and a numpy or
+    torch value carries its kind in ``dtype``, so a 0-d bool, complex or
+    string array is refused the same way.
+    """
+    if isinstance(value, (bool, str, bytes, bytearray)):
+        return True
+    if isinstance(value, numbers.Complex) and not isinstance(value,
+                                                             numbers.Real):
+        return True
+    dtype = getattr(value, "dtype", None)
+    if dtype is None:
+        return False
+    # numpy names a dtype "bool" or "complex128", torch "torch.bool" or
+    # "torch.complex64"; numpy's string kinds are "U" and "S".
+    name = str(dtype).rsplit(".", 1)[-1]
+    return (name == "bool" or name.startswith("complex")
+            or getattr(dtype, "kind", None) in ("U", "S"))
+
+
+def shares(value: Any, *, what: str = "quantity",
+           expected: str = "a number of shares") -> float:
     """``value`` as a signed number of shares, or a :class:`ValidationError`.
 
-    Any finite real number passes, numpy scalars included. A ``bool`` does
-    not, although Python counts it as an integer, and nor does a string.
-    Before 0.8.5 ``True`` and ``"100"`` traded 1 and 100 shares, while the
-    framework adapters refused ``"100"`` as not a number of shares. Zero
-    passes, and the caller decides what it means. The message shows the
-    value with its sign, so ``-inf`` reads as ``-inf``.
+    Whatever ``float()`` turns into a finite number counts: an int, a
+    float, a numpy scalar or 0-d array, a ``Decimal``, a ``Fraction``, a
+    torch scalar tensor. A ``bool``, a string, bytes and a complex number
+    do not, although ``float()`` takes the first two. Before 0.8.5 ``True``
+    and ``"100"`` traded 1 and 100 shares, while the framework adapters
+    refused ``"100"`` as not a number of shares. Zero passes, and the
+    caller decides what it means. The message shows the value with its
+    sign, so ``-inf`` reads as ``-inf``. ``expected`` is what the message
+    says the value should have been.
     """
-    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+    if _not_a_count(value):
         raise ValidationError(
-            f"{what} must be a number of shares, got {_describe(value)}")
+            f"{what} must be {expected}, got {_describe(value)}")
     try:
         quantity = float(value)
-    except (OverflowError, TypeError, ValueError):
+    except OverflowError:
         raise ValidationError(
-            f"{what} must be a finite number of shares, got "
-            f"{_describe(value)}") from None
+            f"{what} must be finite, got {_describe(value)}") from None
+    except Exception:                                   # noqa: BLE001
+        # float() on an arbitrary object can raise anything; what matters
+        # to the reader is what was sent.
+        raise ValidationError(
+            f"{what} must be {expected}, got {_describe(value)}") from None
     if not math.isfinite(quantity):
         raise ValidationError(f"{what} must be finite, got {quantity}")
     return quantity
@@ -155,22 +185,22 @@ def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
 
     Returns a :class:`Limit` or :class:`Cancel` as given, a market order's
     signed share count as a float, or ``None`` for an entry that trades
-    nothing (``None`` or zero). Raises :class:`ValidationError`, naming the
-    ticker, for a ticker that is not a string and for a value that is not
-    one of those: a ``bool``, a string, a complex number, NaN or an
-    infinity. Whether the ticker is listed is left to the engine, which
-    refuses an unknown one with its own :class:`ValidationError`.
+    nothing (``None`` or zero). A market order's count is checked by
+    :func:`shares`. Raises :class:`ValidationError`, naming the ticker, for
+    a ticker that is not a string and for a value :func:`shares` refuses: a
+    ``bool``, a string, a complex number, NaN, an infinity, or anything
+    ``float()`` cannot read. Whether the ticker is listed is left to the
+    engine, which refuses an unknown one with its own
+    :class:`ValidationError`.
     """
     if not isinstance(ticker, str):
         raise ValidationError(
             f"a ticker must be a string, got {_describe(ticker)}")
     if order is None or isinstance(order, (Limit, Cancel)):
         return order
-    if isinstance(order, bool) or not isinstance(order, numbers.Real):
-        raise ValidationError(
-            f"the order for {ticker!r} must be a number of shares, a "
-            f"tf.Limit or a tf.Cancel, got {_describe(order)}")
-    quantity = shares(order, what=f"the order for {ticker!r}")
+    quantity = shares(order, what=f"the order for {ticker!r}",
+                      expected="a number of shares, a tf.Limit or a "
+                               "tf.Cancel")
     return quantity if quantity != 0 else None
 
 
@@ -198,13 +228,15 @@ class Limit:
         if quantity == 0:
             raise ValidationError(
                 f"a Limit needs a non-zero, finite quantity, got {quantity}")
-        if (isinstance(price, bool) or not isinstance(price, numbers.Real)
-                or not (price > 0) or price != price
-                or price == float("inf")):
+        try:
+            limit_price = shares(price, what="a Limit's price")
+        except ValidationError:
+            limit_price = float("nan")
+        if not limit_price > 0:
             raise ValidationError(
                 f"a Limit needs a finite positive price, got {price!r}")
         self.quantity = quantity
-        self.price = float(price)
+        self.price = limit_price
 
     def __repr__(self) -> str:
         return f"Limit({self.quantity:g}, {self.price:g})"

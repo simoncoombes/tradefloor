@@ -363,6 +363,10 @@ def test_a_string_a_bool_or_an_infinity_is_not_a_quantity():
         tradefloor.Limit(float("inf"), 10.0)
     with pytest.raises(tradefloor.ValidationError):
         tradefloor.Limit(10, True)
+    import decimal
+    limit = tradefloor.Limit(decimal.Decimal("10"), decimal.Decimal("25.5"))
+    assert (limit.quantity, limit.price) == (10.0, 25.5)
+    assert type(limit.price) is float
 
 
 def test_a_leverage_refusal_is_an_order_error_of_its_own_kind():

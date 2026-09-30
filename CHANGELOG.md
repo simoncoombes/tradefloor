@@ -696,6 +696,41 @@ view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
 scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
 or pass `trusted_agents=True`.
 
+### Orders an agent may send
+
+The five 0.8.5 pre-release reviewers found that a bad order could end an
+evaluation for every agent in it. `evaluate` crashed on a list return, a
+non-string ticker, a complex quantity, and on `tf.Limit` or `tf.Cancel`,
+which `World` already took. A stale recording scored as an agent holding
+cash, and `"100"` and `True` traded 100 shares and one share.
+
+`act()` returns a mapping of ticker to order, or `None` or `{}` to trade
+nothing. A share count is anything `float()` reads as a finite number, so an
+int, a float, a numpy scalar or 0-d array, a `Decimal`, a `Fraction` and a
+torch scalar tensor all trade as before. A bool (Python's or numpy's), a
+string, bytes, a complex number, NaN and an infinity are refused. In
+`evaluate` a bad entry is a rejection with a line in the scorecard's
+`errors`, and the rest of the mapping still trades. A list, a string or a
+number returned in place of a mapping trades nothing that step and gets its
+own error line. `tf.Limit` and `tf.Cancel` work in `evaluate` as they do
+in `World`. A `ReplayMiss` now stops the run with the step, the agent and
+the seed named.
+
+The scorecard gains `equity_curve`, `max_drawdown_pct`, `ruined`,
+`leverage_refusals` and `explanation_baseline`, and its repr shows
+`errors=N`. `leaderboard` sorts tampered cards last, and
+`versus_buy_and_hold` and `capture_ratio` leave them out. `evaluate` builds
+one engine and forks it for the baseline and each agent, so pt-v20's
+burn-in is paid once. None of this changes a price, and every known-answer
+digest is unchanged.
+
+**What breaks.** `True` and `"100"` as quantities, which traded, are now
+refused. A falsy return such as `[]`, `0`, `""` or `False` used to pass as
+a step with no trade. `evaluate` now records it as an error, and a `World`
+on the default `on_refusal="raise"` raises `ValidationError` and ends the
+run. Return `None` or `{}` instead, or build
+the World with `on_refusal="skip"`.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

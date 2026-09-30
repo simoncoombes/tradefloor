@@ -241,10 +241,16 @@ class Agent(Protocol):
     shares for a market order, positive buys and negative sells, or a
     :class:`tradefloor.Limit` or :class:`tradefloor.Cancel`. A ticker left
     out, or a value of zero or None, does nothing, and so does returning
-    None or ``{}``. A string, a ``bool``, NaN or an infinity is refused as
-    an order, and a return that is not a mapping at all, such as a list of
-    pairs, trades nothing that step. :func:`evaluate` records both in the
-    scorecard's ``errors``. See :func:`tradefloor.portfolio.check_order`.
+    None or ``{}``. A share count is anything ``float()`` reads as a finite
+    number, so a numpy scalar, a ``Decimal`` or a torch scalar tensor
+    trades. A string, a ``bool``, a complex number, NaN or an infinity is
+    refused as an order. A return that is not a mapping at all, such as a
+    list of pairs, trades nothing that step, and that includes an empty
+    list, ``0`` or ``False``, which before 0.8.5 passed as no trade.
+    :func:`evaluate` records both in the scorecard's ``errors``;
+    :class:`tradefloor.World` raises on a bad return under its default
+    ``on_refusal="raise"``, so a World run ends there. See
+    :func:`tradefloor.portfolio.check_order`.
 
     ``explain`` is optional. When present it returns the factor the agent
     believes drove the largest recent move, one of ``Engine.FACTORS``. That is

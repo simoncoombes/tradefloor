@@ -750,6 +750,26 @@ def test_a_return_that_is_not_a_mapping_raises_a_validation_error():
         world.run(days=1)
 
 
+def test_an_empty_list_ends_a_world_run_on_the_default():
+    """[] passed as a step with no trade before 0.8.5. It is a return that
+    is not a mapping, so the default on_refusal="raise" ends the run."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(lambda obs: []))
+    with pytest.raises(tf.ValidationError, match="It returned a list"):
+        world.run(days=1)
+
+
+def test_a_decimal_or_a_0d_array_is_a_number_of_shares():
+    """Anything float() reads as a finite number trades, as it did before
+    0.8.5 (review of fix085/agent-orders)."""
+    import decimal
+    np = pytest.importorskip("numpy")
+    for value in (decimal.Decimal("10"), np.array(10.0)):
+        world = World(seed=1, universe=FOUR,
+                      agent=OnStepZero(lambda obs: {obs.tickers[0]: value}))
+        world.run(days=1)
+        assert world.summary()["trades"] == 1, value
+
+
 def test_under_skip_a_return_that_is_not_a_mapping_is_unusable():
     world = World(seed=1, universe=FOUR, on_refusal="skip",
                   agent=OnStepZero(lambda obs: [(obs.tickers[0], 10)]))
