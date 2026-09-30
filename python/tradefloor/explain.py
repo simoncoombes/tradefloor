@@ -1413,7 +1413,9 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
     for entry in inputs:
         op = entry["op"]
         if op == "open_market":
-            engine.open_market()
+            engine.open_market(day=entry.get("day"))
+        elif op == "set_day":
+            engine.set_day(entry["day"])
         elif op == "close_market":
             engine.close_market()
         elif op == "record":

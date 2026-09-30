@@ -292,6 +292,7 @@ from . import yaml_subset
 from .interventions import (
     SCENARIO_SCHEMA,
     TARGETS,
+    VIX_CEILING,
     Firing,
     Intervention,
     ScenarioValidationError,
@@ -417,6 +418,14 @@ def _check(field: str, value: Any) -> None:
                 f"{field} = {value} is outside the plausible range "
                 f"[{low}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
                 "0.052, not 5.2."
+            )
+    if field == "vix" and isinstance(value, (int, float)):
+        if not 0 < value <= VIX_CEILING:
+            raise ValidationError(
+                f"vix = {value} is not a level a shipped model holds. It is "
+                f"above zero and at most {VIX_CEILING:g}, the default "
+                "preset's vix_ceiling, which its close clamps the VIX to. A "
+                "hold at 1000 made the index NaN."
             )
     if field == "oil_price" and isinstance(value, (int, float)):
         if value <= 0:
@@ -1307,6 +1316,10 @@ class Scenario:
         # arrived -- so `add -500` on macro.vix wrote a VIX of -485 and the
         # market traded a session against it, since (vix/15)^2 squares the
         # sign away rather than raising anything.
+        # What a shipped chain can hold, first: a VIX computed above the
+        # default preset's ceiling (181.33) is written at that ceiling, and
+        # the firing below records what was written.
+        new = target.bound(engine, new)
         reason = target.outside_domain(new)
         if reason is not None:
             raise ScenarioValidationError(

@@ -200,10 +200,19 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     # 2024, 7, 101 and 555, so the seed this test runs stopped binding at
     # all.
     #
-    # At 400 and -0.95 it binds on 592, 931, 555 and 624 rows across the same
+    # At 400 and -0.95 it bound on 592, 931, 555 and 624 rows across the same
     # four seeds. Raised to there rather than to the first setting that binds
     # on seed 2024, so the margin survives the next preset that runs calmer
     # still, which is the lesson of having done this twice.
+    #
+    # BACK DOWN TO THE CEILING, and onto seed 7, since the 0.8.5 audit. A VIX
+    # is now at most 181.33, pt-v20's own `vix_ceiling`: holds of 400 to 800
+    # turned a fear shock into a rally and a hold at 1000 made the index NaN,
+    # so a scenario may no longer write a level no shipped chain produces.
+    # At 181 and -0.95 the breaker binds on 3, 22, 29 and 14 rows across
+    # seeds 2024, 7, 101 and 555 on the shipped pt-v20, on 10, 47, 20 and 55
+    # on pt-v19, and on 0, 27, 28 and 15 on pt-v20 with the permanent share
+    # off. Seed 7 binds on all three models, 22, 47 and 27 rows.
     #
     # THE PERMANENT SHARE IS OFF WHERE THE SUM IS READ, since 0.8.5. pt-v20,
     # the default, ships `fair_value_news_share` 1.0, which moves a name's
@@ -214,17 +223,16 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     # pt-v20 the sum reads -0.3027 against a change of +0.0629 on name 0,
     # and misses on every tick of a quiet run too. The identity is asserted
     # where it is defined: pt-v19, which ships the share at 0.0, and pt-v20
-    # with the share at 0.0. The breaker binds on 82 rows there, on 84 on the
-    # shipped pt-v20 and on 152 on pt-v19, and the shipped default is
-    # asserted to bind as well.
+    # with the share at 0.0, and the shipped default is asserted to bind as
+    # well.
     universe = tradefloor.Universe.random(20, seed=5)
     scenario = (tradefloor.Scenario()
                 .hold(vix=15.0, corporate_bond_yield=0.055)
-                .ramp("vix", start=400.0, end=15.0, over=20, begin=5)
+                .ramp("vix", start=181.0, end=15.0, over=20, begin=5)
                 .step("qe_pe_boost", before=0.0, after=-0.95, at=5))
 
     def truth(model):
-        engine = tradefloor.Engine(seed=2024, universe=universe, model=model)
+        engine = tradefloor.Engine(seed=7, universe=universe, model=model)
         for day in range(25):
             scenario.apply(engine, day)
             engine.run_days(1, first_day=day, record=True)

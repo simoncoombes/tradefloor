@@ -1288,6 +1288,12 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "session under the threshold and this scenario has none.",
     "crisis_epicentre":
         "the same episode, for the same reason.",
+    "session_tick":
+        "the ticks the day has run, which is the tick the book stamps a fill "
+        "with and nothing else. This scenario sends no order, so no fill is "
+        "stamped and no price reads it. tests/test_restore_state_carries.py::"
+        "test_restore_mid_session_then_submit_carries_the_tick submits after "
+        "a mid-session restore, where a snapshot without it stamped tick 0.",
     "crisis_epicentre_pin":
         "the scenario's pin, and this scenario sets none, so there is nothing "
         "to drop. tests/test_crisis_epicentre.py pins one and asserts the "

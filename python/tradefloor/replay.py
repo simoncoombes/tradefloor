@@ -26,6 +26,8 @@ from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 # by name rather than by falling through a chain of ifs into silence.
 _OPS = frozenset({
     "open_market", "close_market", "tick", "run_session", "pin_macro",
+    # The day's label, moved between an open and its close (`set_day`).
+    "set_day",
     "set_avg_volume", "set_fundamentals", "list_instrument", "delist",
     "draw_uniform", "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
@@ -105,7 +107,12 @@ def apply_log(
             )
 
         if op == "open_market":
-            engine.open_market()
+            # The day's label, logged only when the run opened the day under
+            # one that was not the engine's counter (`run_days(first_day=)`).
+            # A label moves no price; the book stamps fills with it.
+            engine.open_market(day=entry.get("day"))
+        elif op == "set_day":
+            engine.set_day(entry["day"])
         elif op == "close_market":
             engine.close_market()
             if ledger is not None:

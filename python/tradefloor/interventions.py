@@ -86,7 +86,7 @@ import json
 import struct
 from typing import Any, Callable, Sequence
 
-from ._core import Engine, ValidationError
+from ._core import Engine, ModelParams, ValidationError
 
 #: The version of the YAML/JSON scenario document this build reads. A document
 #: that names a newer one is refused rather than read on a best-effort basis:
@@ -168,7 +168,7 @@ class Target:
     """
 
     __slots__ = ("name", "units", "note", "numeric", "restores", "_read",
-                 "_write", "_check", "_domain", "_format")
+                 "_write", "_check", "_domain", "_format", "_bound")
 
     def __init__(self, name: str, *, units: str, note: str,
                  read: Callable[[Engine], Any],
@@ -176,7 +176,8 @@ class Target:
                  check: Callable[[str, Any], None],
                  format: Callable[[float], str],
                  domain: Callable[[Any], str | None] | None = None,
-                 numeric: bool = True, restores: bool = True) -> None:
+                 numeric: bool = True, restores: bool = True,
+                 bound: Callable[[Engine, Any], Any] | None = None) -> None:
         self.name = name
         self.units = units
         self.note = note
@@ -199,9 +200,22 @@ class Target:
         self._check = check
         self._domain = domain
         self._format = format
+        self._bound = bound
 
     def read(self, engine: Engine) -> Any:
         return self._read(engine)
+
+    def bound(self, engine: Engine, value: Any) -> Any:
+        """The COMPUTED value this engine's model can hold, before it is
+        written.
+
+        One target has a bound today, the VIX: a relative write can compute
+        a level above :data:`VIX_CEILING` (x3.5 on a VIX already at 55), a
+        level no shipped chain produces. The ceiling is written instead, and
+        the firing records it, so the trail says what the market traded at.
+        Every other target returns the value unchanged.
+        """
+        return value if self._bound is None else self._bound(engine, value)
 
     def write(self, engine: Engine, value: Any) -> None:
         self._write(engine, value)
@@ -363,6 +377,48 @@ def _range_check(low: float, high: float, what: str) -> Callable[[str, Any], Non
     return check
 
 
+#: The highest VIX the shipped model's chain holds: its ``vix_ceiling``,
+#: 181.33 on pt-v20. The close clamps the VIX to it, so a level above it is
+#: one the model never produces. A scenario that sets or holds one is
+#: refused where it is written, and one that computes one writes this
+#: ceiling (:meth:`Target.bound`). A hold at 1000 made the index NaN on 9 of
+#: 30 seeds, and holds of 400 to 800 turned a fear shock into a rally.
+#: Presets before pt-v19 clamp at 80, and a scenario may still take them to
+#: this level for the days it holds it, as it always could.
+VIX_CEILING: float = ModelParams.from_preset().vix_ceiling
+
+
+def _vix_check(operation: str, value: Any) -> None:
+    """A VIX `set` above zero and at most the ceiling; any multiplier."""
+    _finite(value)
+    if operation == "multiply":
+        _positive_multiplier(value)
+    elif operation == "set" and not 0 < value <= VIX_CEILING:
+        raise ScenarioValidationError(
+            f"set {value} is not a VIX level a shipped model holds. It is "
+            f"above zero and at most {VIX_CEILING:g}, the default preset's "
+            f"vix_ceiling, which its close clamps the VIX to."
+        )
+
+
+def _domain_vix(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or value != value:
+        return f"{value!r} is not a number"
+    if value <= 0:
+        return f"{value:g} is not a positive VIX level"
+    if value > VIX_CEILING:
+        return (f"{value:g} is above {VIX_CEILING:g}, the highest VIX the "
+                f"model's chain holds")
+    return None
+
+
+def _bound_vix(engine: Engine, value: Any) -> Any:
+    """A computed VIX, at most :data:`VIX_CEILING`."""
+    if not isinstance(value, (int, float)) or value != value:
+        return value
+    return VIX_CEILING if value > VIX_CEILING else value
+
+
 def _finite_check(operation: str, value: Any) -> None:
     """Any finite number, including zero and negatives.
 
@@ -492,11 +548,13 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
                        check: Callable[[str, Any], None],
                        format: Callable[[float], str],
                        domain: Callable[[Any], str | None] | None = None,
-                       numeric: bool = True, restores: bool = True) -> Target:
+                       numeric: bool = True, restores: bool = True,
+                       bound: Callable[[Engine, Any], Any] | None = None,
+                       ) -> Target:
     read, write = _macro(field)
     return Target(name, units=units, note=note, read=read, write=write,
                   check=check, format=format, domain=domain, numeric=numeric,
-                  restores=restores)
+                  restores=restores, bound=bound)
 
 
 #: Every intervention target this build supports, and nothing else.
@@ -577,10 +635,12 @@ _register(_make_macro_target(
         "the lever widens the spread of outcomes far more than it moves the "
         "median. Held for the whole run it measures +4.46% median with a "
         "+62.7% best, which is also a dispersion effect rather than a "
-        "crisis. Use a duration for a crisis."
+        "crisis. Use a duration for a crisis. A level is at most 181.33, "
+        "pt-v20's vix_ceiling: a `set` above it is refused, and a relative "
+        "write that computes one writes 181.33, which the firing records."
     ),
-    check=_positive_check("VIX level"), format=_points,
-    domain=_domain_positive("VIX level"),
+    check=_vix_check, format=_points,
+    domain=_domain_vix, bound=_bound_vix,
 ))
 
 _register(_make_macro_target(
