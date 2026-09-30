@@ -131,9 +131,8 @@ impl PyInstrument {
             }
         } else if crate::sectors::by_key(sector).is_none() {
             return Err(ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}, or \"{}\" for a \
-                 simulated rate index ({})",
-                crate::sectors::keys().join(", "),
+                "{}, or \"{}\" for a simulated rate index ({})",
+                crate::python::unknown_sector(sector),
                 crate::rates::RATE_SECTOR,
                 crate::rates::tickers().join(", ")
             )));
@@ -349,6 +348,7 @@ impl PyMacro {
                 )));
             }
         }
+        check_vix(vix)?;
         Ok(Self {
             vix,
             federal_funds_rate,
@@ -732,10 +732,9 @@ pub fn model_params_from(
     if let Ok(name) = value.extract::<String>() {
         return crate::params::ModelParams::preset(&name).ok_or_else(|| {
             ValidationError::new_err(format!(
-                "unknown model preset {name:?}. Shipped presets: {}. For a \
-                 modified model, pass ModelParams.from_preset(name, ...) \
+                "{}. For a modified model, pass ModelParams.from_preset(name, ...) \
                  instead of a string.",
-                crate::params::ModelParams::preset_names().join(", ")
+                crate::python::unknown_preset(&name)
             ))
         });
     }
@@ -762,6 +761,102 @@ pub fn economy_from(
     })
 }
 
+/// Refuse a VIX below zero. The rates beside it are range-checked by
+/// `units::check_rate`, and a VIX is an index level that cannot be negative.
+/// There is no upper bound here: a scenario may pin a level above anything
+/// recorded, and the daily step clamps the VIX into its band at the next
+/// close.
+fn check_vix(v: f64) -> PyResult<()> {
+    if v < 0.0 {
+        return Err(ValidationError::new_err(format!(
+            "vix cannot be negative, got {v}. It is the index level, such as 20."
+        )));
+    }
+    Ok(())
+}
+
+/// A universe argument as instruments, or a refusal that says what came
+/// instead.
+///
+/// pyo3's own words for a wrong type named its internals: `None` or a
+/// number read "'int' object is not iterable", and a list of ticker strings
+/// "'str' object cannot be converted to 'Instrument'". The Python side
+/// (`tradefloor.universe_util.as_universe`) refuses the same inputs in the
+/// same words, since `evaluate` reads the roster before any engine does.
+pub(crate) fn universe_from(value: &Bound<'_, PyAny>) -> PyResult<Vec<PyInstrument>> {
+    if !value.is_instance_of::<pyo3::types::PyString>() {
+        if let Ok(instruments) = value.extract::<Vec<PyInstrument>>() {
+            return Ok(instruments);
+        }
+    }
+    Err(ValidationError::new_err(format!(
+        "universe must be a list of instruments, such as \
+         tf.Universe.random(40, seed=1). {}",
+        universe_got(value)
+    )))
+}
+
+/// The "Got ..." half of [`universe_from`]'s refusal.
+fn universe_got(value: &Bound<'_, PyAny>) -> String {
+    if value.is_none() {
+        return "Got None.".to_string();
+    }
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return format!("Got {}.", value);
+    }
+    if let Ok(n) = value.extract::<i64>() {
+        return format!(
+            "Got the number {n}. For {n} random companies use \
+             tf.Universe.random({n}, seed=1)."
+        );
+    }
+    if value.is_instance_of::<pyo3::types::PyString>() {
+        return format!(
+            "Got the string {}. Tickers alone are not enough: the simulator \
+             needs each company's price, shares and sector.",
+            value.repr().map(|r| r.to_string()).unwrap_or_default()
+        );
+    }
+    let kind = value
+        .get_type()
+        .name()
+        .map(|n| n.to_string())
+        .unwrap_or_else(|_| "value".to_string());
+    let Ok(items) = value.iter() else {
+        return format!("Got a {kind}.");
+    };
+    let items: Vec<Bound<'_, PyAny>> = items.filter_map(Result::ok).collect();
+    if !items.is_empty() && items.iter().all(|i| i.is_instance_of::<pyo3::types::PyString>()) {
+        return "Got a list of ticker strings; the simulator needs each \
+                company's price, shares and sector, not only its name. \
+                Universe.from_edgar builds instruments for real companies."
+            .to_string();
+    }
+    match items
+        .iter()
+        .position(|i| i.extract::<PyRef<'_, PyInstrument>>().is_err())
+    {
+        Some(at) => format!(
+            "Got a {kind} holding a {} at position {at}.",
+            items[at]
+                .get_type()
+                .name()
+                .map(|n| n.to_string())
+                .unwrap_or_else(|_| "value".to_string())
+        ),
+        None => format!("Got a {kind}."),
+    }
+}
+
+/// The refusal for a ticker listed twice in one roster.
+fn duplicate_ticker(ticker: &str, first: usize, second: usize) -> String {
+    format!(
+        "ticker {ticker:?} appears twice in the universe (positions {first} and \
+         {second}). Each ticker must be unique: orders and books find a name by \
+         its ticker, so the second one could never be traded."
+    )
+}
+
 /// Split a universe into its equities and its rate instruments.
 ///
 /// Rate instruments must come after every equity. The engine keeps the two in
@@ -779,7 +874,20 @@ pub fn split_roster(
 ) -> PyResult<(Vec<PyInstrument>, Vec<PyInstrument>)> {
     let mut equities = Vec::new();
     let mut rates: Vec<PyInstrument> = Vec::new();
-    for inst in universe {
+    for (position, inst) in universe.iter().enumerate() {
+        // Orders, books and every by-ticker lookup find the first name with
+        // a ticker, so a second one could be priced and never traded or
+        // read. Refused here, where the engine is built, and by
+        // `list_instrument` for a name listed later.
+        if !inst.is_rate() {
+            if let Some(first) = universe[..position].iter().position(|e| e.ticker == inst.ticker) {
+                return Err(ValidationError::new_err(duplicate_ticker(
+                    &inst.ticker,
+                    first,
+                    position,
+                )));
+            }
+        }
         if inst.is_rate() {
             if rates.iter().any(|r| r.ticker == inst.ticker) {
                 return Err(ValidationError::new_err(format!(
@@ -1238,6 +1346,11 @@ pub struct PyEngine {
     session_clock: Option<SessionClock>,
     /// Copies taken of this engine; see [`CopyCount`].
     copies: CopyCount,
+    /// The log length at the last `restore_state`. What came before it is
+    /// another history, so [`Self::day_is_open`] reads the log from here.
+    /// Bookkeeping for a refusal only: nothing reads it that the tick, the
+    /// snapshot or the hash sees.
+    restored_at: usize,
 }
 
 /// Minutes in a day, the modulus `harness.session_clock` wraps the clock at.
@@ -1301,6 +1414,50 @@ impl PyEngine {
         let out = self.state_snapshot(py);
         self.copies.set(before);
         out
+    }
+
+    /// Whether a day is open and has not closed, the state in which a
+    /// second open would reopen it.
+    ///
+    /// Not `market_open` alone. `run_session(close_at_end=True)` closes the
+    /// day in the core and leaves that flag set (see `state_hash`), and
+    /// `open_market()` after it is the documented way on to the next day. So
+    /// the day counts as open only when the log since its `open_market`
+    /// holds no session that closed it. With no open in the log since the
+    /// last restore, the state came from a snapshot this engine cannot read
+    /// back, and the answer is no, which is what every call did before 0.8.5.
+    fn day_is_open(&self) -> bool {
+        if !self.market_open {
+            return false;
+        }
+        for entry in self.log.get(self.restored_at..).unwrap_or(&[]).iter().rev() {
+            match entry {
+                crate::python_log::LogEntry::OpenMarket => return true,
+                crate::python_log::LogEntry::CloseMarket => return false,
+                crate::python_log::LogEntry::RunSession { close_at_end, .. }
+                    if *close_at_end =>
+                {
+                    return false
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// What a call that needs a closed market says when a day is open: which
+    /// day, how far it has run, and `then`, the way out for that call.
+    fn open_day_refusal(&self, then: &str) -> String {
+        let day = self.inner.current_day();
+        let ticks = self.day_buffer.ticks;
+        let run = if ticks == 0 {
+            "is open".to_string()
+        } else if ticks == 1 {
+            "has run 1 tick".to_string()
+        } else {
+            format!("has run {ticks} ticks")
+        };
+        format!("the market is already open: day {day} {run} and has not closed. {then}")
     }
 
     /// Roll the day's opening marks, numbering the day `day`.
@@ -1698,14 +1855,60 @@ impl PyEngine {
     /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
     /// deliberately ceremonial, because the fingerprint means an overridden run
     /// can never silently masquerade as the benchmark model (API §3).
+    ///
+    /// Keyword arguments only. `*args` is taken so that `Engine(7, universe)`
+    /// is refused in words that show the call, rather than as pyo3's
+    /// "takes 0 positional arguments but 2 were given". `seed` and
+    /// `universe` then need defaults, and [`crate::python::Given`] keeps
+    /// "left out" (a `TypeError` that shows the call) apart from a value
+    /// that is wrong, `None` included (a `ValidationError` naming it).
     #[new]
-    #[pyo3(signature = (*, seed, universe, macro_state = None, model = None))]
+    #[pyo3(
+        signature = (
+            *args,
+            seed = crate::python::Given::Missing,
+            universe = crate::python::Given::Missing,
+            macro_state = None,
+            model = None
+        ),
+        text_signature = "(*, seed, universe, macro_state=None, model=None)"
+    )]
     fn new(
-        seed: crate::python::Seed,
-        universe: Vec<PyInstrument>,
+        args: &Bound<'_, pyo3::types::PyTuple>,
+        seed: crate::python::Given<'_>,
+        universe: crate::python::Given<'_>,
         macro_state: Option<PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        if !args.is_empty() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Engine takes keyword arguments: Engine(seed=7, universe=universe). \
+                 It was given {} positional argument{}.",
+                args.len(),
+                if args.len() == 1 { "" } else { "s" }
+            )));
+        }
+        let seed = match seed {
+            crate::python::Given::Value(value) => {
+                crate::python::Seed(crate::python::seed_from(&value, "seed")?)
+            }
+            crate::python::Given::Missing => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Engine needs a seed: Engine(seed=7, universe=universe). There is \
+                     no default, because a run seeded from the clock cannot be \
+                     reproduced.",
+                ))
+            }
+        };
+        let universe = match universe {
+            crate::python::Given::Value(value) => universe_from(&value)?,
+            crate::python::Given::Missing => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Engine needs a universe: Engine(seed=7, \
+                     universe=tf.Universe.random(40, seed=1)).",
+                ))
+            }
+        };
         if universe.is_empty() {
             return Err(ValidationError::new_err(
                 "universe is empty - an engine with no instruments has nothing to simulate",
@@ -1756,6 +1959,7 @@ impl PyEngine {
             explanations: Explanations::default(),
             session_clock: None,
             copies: CopyCount::default(),
+            restored_at: 0,
         };
         // After construction, so a settled opening has run its burn-in and
         // the indices are marked at the curve the run actually starts from.
@@ -1771,8 +1975,21 @@ impl PyEngine {
     ///
     /// Numbers the day from the engine's own counter. `run_days` numbers it
     /// from `first_day` instead, through [`Self::open_market_on`].
-    fn open_market(&mut self) {
+    ///
+    /// Refused while a day is open. Until 0.8.5 a second call reopened the
+    /// day: it cleared the day's tape, logged a second open and changed the
+    /// state hash, so the run no longer matched one that closed first, and
+    /// nothing said so. Close the day with `close_market()` first. A day
+    /// closed by `run_session(close_at_end=True)` is closed, and opening the
+    /// next one after it works as it always did.
+    fn open_market(&mut self) -> PyResult<()> {
+        if self.day_is_open() {
+            return Err(ValidationError::new_err(self.open_day_refusal(
+                "Call close_market() to end it before opening the next day.",
+            )));
+        }
         self.open_market_on(i64::from(self.day_count));
+        Ok(())
     }
 
     /// Advance one game-minute.
@@ -1977,7 +2194,7 @@ impl PyEngine {
         // replayed to different prices, because replaying it opened the market
         // in the middle of the day instead of at the start.
         if !self.market_open {
-            self.open_market();
+            self.open_market_on(i64::from(self.day_count));
         }
         self.log.push(crate::python_log::LogEntry::RunSession {
             hour,
@@ -2125,21 +2342,39 @@ impl PyEngine {
     fn run_days(
         &mut self,
         py: Python<'_>,
-        days: usize,
+        days: i64,
         hour: i64,
         minute: i64,
         day_of_week: i64,
-        ticks_per_day: usize,
+        ticks_per_day: i64,
         volatility: f64,
         record: bool,
         first_day: Option<u32>,
         ledger: Option<Py<PyAny>>,
     ) -> PyResult<usize> {
-        if days == 0 {
-            return Err(ValidationError::new_err("days must be greater than zero"));
+        // Signed, so a negative count is refused in these words rather than
+        // as pyo3's "can't convert negative int to unsigned".
+        if days < 1 {
+            return Err(ValidationError::new_err(format!(
+                "run_days: days must be 1 or more, got {days}"
+            )));
         }
-        if ticks_per_day == 0 {
-            return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
+        if ticks_per_day < 1 {
+            return Err(ValidationError::new_err(format!(
+                "ticks_per_day must be 1 or more, got {ticks_per_day}"
+            )));
+        }
+        let days = days as usize;
+        let ticks_per_day = ticks_per_day as usize;
+        // Whole days from a closed market. On an open one each day below
+        // would open again, and until 0.8.5 that reopened the open day: its
+        // tape was cleared, a second open was logged and the run no longer
+        // matched one that closed first.
+        if self.day_is_open() {
+            return Err(ValidationError::new_err(self.open_day_refusal(
+                "run_days runs whole days. Finish this one with run_session(...) \
+                 and close_market(), or call close_market() now, then run_days().",
+            )));
         }
         // Before the first day opens, so a bad clock opens nothing.
         check_session_start(hour, minute, day_of_week, volatility)?;
@@ -2283,7 +2518,7 @@ impl PyEngine {
             .collect();
 
         if !self.market_open {
-            self.open_market();
+            self.open_market_on(i64::from(self.day_count));
         }
         let outcome = self.inner.run_session(
             &SessionRequest {
@@ -2432,6 +2667,16 @@ impl PyEngine {
             return Err(ValidationError::new_err(format!(
                 "{} is a rate index; rate instruments are fixed when the engine \
                  is built. Include it in the universe instead.",
+                instrument.ticker
+            )));
+        }
+        // Refused before it is logged, like every other refusal here.
+        if let Some(first) = self.tickers.iter().position(|t| *t == instrument.ticker) {
+            return Err(ValidationError::new_err(format!(
+                "ticker {:?} is already listed, at position {first}. Each ticker \
+                 must be unique: orders and books find a name by its ticker, so a \
+                 second one could never be traded. Delist the first one, or give \
+                 the new name another ticker.",
                 instrument.ticker
             )));
         }
@@ -3169,6 +3414,9 @@ impl PyEngine {
                     )));
                 }
             }
+        }
+        if let Some(v) = vix {
+            check_vix(v)?;
         }
         // A price, not a rate, so the fractional band does not apply -- but a
         // non-positive one is not a cheaper barrel, it is a barrel the
@@ -4472,6 +4720,7 @@ impl PyEngine {
         // The snapshot carries no clock, so the restored engine's next
         // session is treated as the day's first and does not warn.
         self.session_clock = None;
+        self.restored_at = self.log.len();
         if let Some(raw) = snapshot.get_item("volume_state")? {
             self.inner.set_volume_state(raw.extract::<f64>()?);
         }
@@ -5734,15 +5983,21 @@ pub fn market_status(hour: i64, minute: i64, day_of_week: i64) -> PyResult<Strin
 #[pyfunction]
 #[pyo3(signature = (n = 108, *, seed = crate::python::Seed(0)),
        text_signature = "(n=108, *, seed=0)")]
-pub fn random_instruments(n: usize, seed: crate::python::Seed) -> PyResult<Vec<PyInstrument>> {
-    if n == 0 {
-        return Err(ValidationError::new_err("n must be greater than zero"));
+pub fn random_instruments(n: i64, seed: crate::python::Seed) -> PyResult<Vec<PyInstrument>> {
+    // Signed, so a negative count is refused in these words rather than as
+    // pyo3's "can't convert negative int to unsigned".
+    if n < 1 {
+        return Err(ValidationError::new_err(format!(
+            "Universe.random needs a number of companies of 1 or more, got {n}"
+        )));
     }
     if n > 26 * 26 * 26 {
         return Err(ValidationError::new_err(format!(
-            "n must be at most {} - tickers are three letters", 26 * 26 * 26
+            "Universe.random makes at most 17,576 companies, since tickers are \
+             three letters; got {n}. For more, run several universes."
         )));
     }
+    let n = n as usize;
     Ok(crate::universe::random_universe(n, seed.0)
         .into_iter()
         .map(|g| PyInstrument {
@@ -5864,10 +6119,7 @@ impl PyNews {
         }
         if let Some(s) = sector.as_deref() {
             if crate::sectors::by_key(s).is_none() {
-                return Err(ValidationError::new_err(format!(
-                    "unknown sector {s:?}. Valid sectors: {}",
-                    crate::sectors::keys().join(", ")
-                )));
+                return Err(ValidationError::new_err(crate::python::unknown_sector(s)));
             }
         }
         Ok(Self { ticker, sector, price_impact })
@@ -5918,10 +6170,7 @@ impl PyNewsImpact {
         let sectors = sectors.unwrap_or_default();
         for s in sector.iter().chain(sectors.iter()) {
             if crate::sectors::by_key(s).is_none() {
-                return Err(ValidationError::new_err(format!(
-                    "unknown sector {s:?}. Valid sectors: {}",
-                    crate::sectors::keys().join(", ")
-                )));
+                return Err(ValidationError::new_err(crate::python::unknown_sector(s)));
             }
         }
         Ok(Self { ticker, sector, sectors, remaining_impact, reversal_phase })
@@ -6044,10 +6293,7 @@ pub fn sector_volatility(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
         .map(|s| s.volatility)
         .ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
-            ))
+            ValidationError::new_err(crate::python::unknown_sector(sector))
         })
 }
 
@@ -6061,10 +6307,7 @@ pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
         .map(|s| s.daily_sigma)
         .ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
-            ))
+            ValidationError::new_err(crate::python::unknown_sector(sector))
         })
 }
 

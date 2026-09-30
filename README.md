@@ -93,6 +93,7 @@ scores = tf.evaluate({"mine": spec}, seed=7, universe=universe, days=10)
 scores["mine"].return_pct            # what it made
 scores["mine"].impact_bps            # what its own footprint cost
 scores["mine"].strategy_fingerprint  # sha256, cite this
+scores["mine"].errors                # each step that raised or was refused
 ```
 
 That result comes from one random market, so it says as much about the seed
@@ -109,8 +110,9 @@ buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
 agent's P&L less buy-and-hold's. The reference set includes an Oracle that
 reads the model's fair value. On pt-v19 and earlier `tf.capture_ratio(scores)`
 gives each P&L as a fraction of the Oracle's. On pt-v20, the default, it
-gives nothing: market moves there mostly stick, so even perfect knowledge of
-fair value leaves little edge, and buy-and-hold is the comparison to quote.
+returns `{}` and warns why: market moves there mostly stick, so even perfect
+knowledge of fair value leaves little edge, and buy-and-hold is the
+comparison to quote.
 
 ## The agent's view
 

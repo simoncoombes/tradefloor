@@ -111,7 +111,9 @@ CADENCES = ("step", "daily")
 
 #: The kinds that produce a ranking and therefore take ``top_k``. ``hold``
 #: owns the whole roster and ``random`` weights every name by its draw, so a
-#: concentration parameter on either would describe nothing.
+#: concentration parameter on either would describe nothing. A run takes at
+#: most half the universe on each side, so ``top_k`` above that runs as half
+#: the universe, and :func:`tradefloor.evaluate` warns when it does.
 _RANKED = ("momentum", "mean_reversion", "oracle", "blend")
 
 #: The kinds a blend may combine. ``hold`` ranks nothing, so blending it is

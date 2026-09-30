@@ -253,7 +253,13 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
             "agent=MyAgent() is one trader with one portfolio; "
             "agents={'a': A(), 'b': B()} is a cohort in one market, each "
             "with its own portfolio and its own leverage limit.")
+    from . import _checks
     if agents is None:
+        # Checked here, before an engine is built. A class passed for an
+        # instance used to fail on the first step with "act() missing 1
+        # required positional argument", which never says a class was
+        # passed.
+        _checks.agent("agent=", agent, specs=False)
         return True, {SOLO: agent}
     if not isinstance(agents, dict):
         raise ValidationError(
@@ -270,6 +276,7 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
                 f"agent labels are non-empty strings, got {key!r}. The "
                 f"empty label is the single-agent form's own, so a cohort "
                 f"cannot take it.")
+        _checks.agent(f"Agent {key!r}", agents[key], specs=False)
     return False, {key: agents[key] for key in sorted(agents)}
 
 
@@ -344,9 +351,12 @@ class World:
         on_refusal: str = "raise",
         trusted_agents: bool = False,
     ) -> None:
-        if steps_per_day < 1 or ticks_per_step < 1:
-            raise ValidationError(
-                "steps_per_day and ticks_per_step must be >= 1")
+        from . import _checks
+        steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
+        ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+        _checks.number("cash", cash)
+        macro = _checks.macro(macro)
+        _checks.start_clock(start)
         if on_refusal not in ("raise", "skip"):
             raise ValidationError(
                 f"on_refusal must be 'raise' or 'skip', got {on_refusal!r}")
@@ -1280,19 +1290,18 @@ class World:
 
         :meth:`run` cannot leave one -- it takes whole days and closes each
         one -- so this guards against a caller who reached into ``.engine``
-        and drove it directly. The hazard it closes is documented in
-        `checkpoint.py`: an engine forked between two sessions of the same day
-        carries per-day accumulators the copy has to carry with it, and a copy
-        that misses one restores a market that looks right and prices
-        differently tomorrow. Refusing is cheap; finding that later is not.
+        and drove it directly. The engine itself forks mid-day exactly
+        (``Engine.fork`` and a mid-day ``Checkpoint.of`` continue as the
+        parent does), but a world's copy would go on with :meth:`run`, which
+        opens a new day, and since 0.8.5 the engine refuses to open a day
+        that is already open rather than silently reopening it.
         """
         if self.engine.state_snapshot()["market_open"]:
             raise ValidationError(
-                f"cannot {what} a world with the market open. Days are the "
-                "safe boundary: mid-day state includes the day's own "
-                "accumulators, and a fork taken there restores a market that "
-                "looks correct and diverges from its parent tomorrow. Close "
-                "the day first.")
+                f"cannot {what} a world with the market open. world.run() "
+                "takes whole days, so a world is only stopped mid-day when "
+                "its engine was driven directly. Close the day first with "
+                "world.engine.close_market().")
 
     # -- draw surgery -----------------------------------------------------
 

@@ -126,7 +126,9 @@ will read: ``tf.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 from __future__ import annotations
 
 import copy
+import difflib
 import math
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -871,9 +873,17 @@ def versus_buy_and_hold(scores: dict[str, Any], *,
     :class:`ValidationError`, since every excess would be measured against
     it. :func:`tradefloor.rank` leaves tampered agents out the same way.
 
-    Returns an empty mapping when buy-and-hold did not run.
+    Returns an empty mapping when buy-and-hold did not run, with a warning
+    that says so and, for a misspelt ``reference``, names the key meant.
     """
     if reference not in scores:
+        close = difflib.get_close_matches(reference, list(scores), n=1)
+        hint = (f" Did you mean reference={close[0]!r}?" if close else
+                " Add tf.baselines.reference_agents() to the agents you "
+                "evaluate.")
+        warnings.warn(
+            f"No {reference!r} in these scores, so there is nothing to "
+            f"compare against.{hint}", stacklevel=2)
         return {}
     _refuse_tampered(scores[reference], reference, "buy-and-hold reference")
     base = scores[reference].pnl
@@ -927,14 +937,28 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
 
     A tampered agent is left out and a tampered Oracle is refused with a
     :class:`ValidationError`, as :func:`versus_buy_and_hold` does.
+
+    Each empty result comes with a warning that gives its reason, since at
+    the prompt ``{}`` alone says nothing.
     """
-    if capture_withheld(scores, oracle=oracle) is not None:
+    withheld = capture_withheld(scores, oracle=oracle)
+    if withheld is not None:
+        warnings.warn(f"{withheld} tf.versus_buy_and_hold(scores) makes that "
+                      "comparison.", stacklevel=2)
         return {}
     if oracle not in scores:
+        warnings.warn(
+            f"No {oracle!r} in these scores, so there is no ceiling to divide "
+            "by. Add tf.baselines.reference_agents() to the agents you "
+            "evaluate.", stacklevel=2)
         return {}
     _refuse_tampered(scores[oracle], oracle, "Oracle")
     ceiling = scores[oracle].pnl
     if ceiling <= 0:
+        warnings.warn(
+            f"The Oracle made {ceiling:,.2f} here, and a ratio against a "
+            "loss would flip every sign, so there is none. Use "
+            "tf.versus_buy_and_hold(scores) for this market.", stacklevel=2)
         return {}
     return {
         name: card.pnl / ceiling

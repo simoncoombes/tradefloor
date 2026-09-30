@@ -111,6 +111,9 @@ impl PyEngineBatch {
                 rate.ticker
             )));
         }
+        // Equities only by now, so `split_roster` refuses nothing here but a
+        // ticker listed twice, in the words `Engine` uses.
+        crate::python_engine::split_roster(&universe)?;
         let mut sorted = seeds.clone();
         sorted.sort_unstable();
         sorted.dedup();

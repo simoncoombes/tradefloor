@@ -52,6 +52,42 @@ pub(crate) fn seed_from(value: &Bound<'_, PyAny>, name: &str) -> PyResult<u64> {
     }
 }
 
+/// " Did you mean \"x\"? <note>" when `given` differs from one of `valid`
+/// only in case, and nothing otherwise.
+///
+/// Preset and sector names are lower case, and `"PT-V20"` or
+/// `"Technology"` used to be refused with the full list of valid names and
+/// nothing to say that case was the only problem.
+pub(crate) fn case_hint(given: &str, valid: &[&str], note: &str) -> String {
+    match valid
+        .iter()
+        .find(|v| **v != given && v.eq_ignore_ascii_case(given))
+    {
+        Some(v) => format!(" Did you mean {v:?}? {note}"),
+        None => String::new(),
+    }
+}
+
+/// The refusal for a model preset name this build does not ship.
+pub(crate) fn unknown_preset(name: &str) -> String {
+    let names = crate::params::ModelParams::preset_names();
+    format!(
+        "unknown model preset {name:?}.{} Shipped presets: {}",
+        case_hint(name, names, "Preset names are lower case."),
+        names.join(", ")
+    )
+}
+
+/// The first sentence of the refusal for a sector name that is not in the
+/// sector table, with the case hint when that is all that is wrong.
+pub(crate) fn unknown_sector(sector: &str) -> String {
+    format!(
+        "unknown sector {sector:?}.{} Valid sectors: {}",
+        case_hint(sector, &crate::sectors::keys(), "Sector names are lower case."),
+        crate::sectors::keys().join(", ")
+    )
+}
+
 /// A seed argument, read through [`seed_from`] under the name `seed`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Seed(pub u64);
@@ -59,6 +95,26 @@ pub(crate) struct Seed(pub u64);
 impl<'py> FromPyObject<'py> for Seed {
     fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
         seed_from(value, "seed").map(Seed)
+    }
+}
+
+/// A keyword argument that tells "left out" from "passed None".
+///
+/// pyo3 reads an `Option` argument's `None` default and a caller's `None`
+/// as the same thing. `Engine` takes `*args` so it can refuse positional
+/// arguments in its own words, which means `seed` and `universe` need a
+/// default to be reachable at all, and this default says nothing was
+/// passed: a missing seed stays a `TypeError`, as it was when the argument
+/// was required, and `seed=None` stays the `ValidationError` that names
+/// the range.
+pub(crate) enum Given<'py> {
+    Missing,
+    Value(Bound<'py, PyAny>),
+}
+
+impl<'py> FromPyObject<'py> for Given<'py> {
+    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        Ok(Given::Value(value.clone()))
     }
 }
 
@@ -370,10 +426,7 @@ fn fair_value(
     // so transposing two would typecheck, run, and quietly value the company
     // wrong.
     let s = crate::sectors::by_key(sector).ok_or_else(|| {
-        Rejected::new_err(format!(
-            "unknown sector {sector:?}. Valid sectors: {}",
-            crate::sectors::keys().join(", ")
-        ))
+        Rejected::new_err(crate::python::unknown_sector(sector))
     })?;
 
     // Finite floats everywhere, per the validation policy. The core
@@ -647,10 +700,7 @@ fn model_preset(py: Python<'_>, name: Option<&str>) -> PyResult<PyObject> {
     // `Engine::default_model()` so the two cannot drift apart again.
     let name = name.unwrap_or(crate::params::DEFAULT_PRESET_NAME);
     let preset = crate::params::ModelParams::preset(name).ok_or_else(|| {
-        ValidationError::new_err(format!(
-            "unknown model preset {name:?}. Shipped presets: {}",
-            crate::params::ModelParams::preset_names().join(", ")
-        ))
+        ValidationError::new_err(crate::python::unknown_preset(name))
     })?;
     let d = pyo3::types::PyDict::new_bound(py);
     d.set_item("name", name)?;

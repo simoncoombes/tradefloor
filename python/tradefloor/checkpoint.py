@@ -168,7 +168,8 @@ class Checkpoint:
 
     @classmethod
     def of(cls, engine: Engine, *, universe: Sequence[Instrument], seed: int,
-           macro: Macro | None = None, label: str = "") -> "Checkpoint":
+           macro: Macro | None = None, label: str = "",
+           verify: bool = False) -> "Checkpoint":
         """Capture an engine's history.
 
         ``universe`` and ``seed`` are passed rather than read off the engine
@@ -176,6 +177,13 @@ class Checkpoint:
         a seed and keeps neither. Requiring them here is honest about that,
         and it means a checkpoint records the inputs it will need rather than
         discovering at resume time that it cannot reproduce anything.
+
+        Nothing here can tell a wrong seed from the right one, since the
+        engine does not carry its seed: a checkpoint taken under seed 8 of an
+        engine built with seed 7 resumes a different market, silently.
+        ``verify=True`` replays the log once, now, and refuses a checkpoint
+        whose replay does not reach ``engine``'s state hash. It costs what
+        :meth:`resume` costs, about what reaching the state cost.
         """
         # Compared against the ENGINE'S default preset, not against a
         # "custom-" prefix: `resume` passes None straight to Engine, so
@@ -194,11 +202,27 @@ class Checkpoint:
 
         fingerprint = engine.model_fingerprint
         default = ModelParams.from_preset().fingerprint
-        return cls(seed=seed, universe=universe, log=engine.order_log,
-                   macro=macro, label=label,
-                   model=(dict(engine.model_params)
-                          if fingerprint != default else None),
-                   written_by=__version__, era=era_fingerprint())
+        checkpoint = cls(seed=seed, universe=universe, log=engine.order_log,
+                         macro=macro, label=label,
+                         model=(dict(engine.model_params)
+                                if fingerprint != default else None),
+                         written_by=__version__, era=era_fingerprint())
+        if verify:
+            try:
+                reached = checkpoint.resume().state_hash()
+            except ValidationError as exc:
+                raise ValidationError(
+                    "This checkpoint does not reach the engine it was taken "
+                    f"from: replaying its log under seed {seed} failed ({exc}). "
+                    "Pass the seed, universe and macro the engine was built "
+                    "with.") from None
+            if reached != engine.state_hash():
+                raise ValidationError(
+                    "This checkpoint does not reach the engine it was taken "
+                    f"from: replaying its log under seed {seed} gives a "
+                    "different market. Pass the seed, universe and macro the "
+                    "engine was built with.")
+        return checkpoint
 
     def resume(self, *, universe: Sequence[Instrument] | None = None) -> Engine:
         """A fresh engine at this exact state.
