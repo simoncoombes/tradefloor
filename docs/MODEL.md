@@ -763,6 +763,30 @@ the put reads as $\delta$. A policy rate pinned through the close
 alike, and the put neither cuts nor returns anything at that meeting. The
 three overlays have not been fitted together.
 
+**The put's unanswered fall** (`fed_put_carry` $\kappa$, 0 on every preset,
+read only with the put on). The put rounds its ask to a quarter point, so at
+$g_F = 3$ an intermeeting fall under about 4.2 per cent asks for nothing, and
+a bear that falls 3 or 4 per cent between each pair of meetings is never
+answered. Off zero, a meeting at which the put was live ($\pi < 4$, the rate
+not pinned) and after which the rate is still above zero restarts $I$ at
+$\kappa \min(0,\ I + c / g_F)$ instead of zero, with $c$ the cut the meeting
+took, whichever of the ladder, the stress cut and the put chose it: the fall
+that cut did not answer, which the index's later returns add to or take
+back. The priced put reads the same $I$. No draw, and no state beyond $I$
+(`economy/central_bank.rs`, "The unanswered fall").
+
+**The drawdown hold** (`fed_drawdown_hold` $x$, 0 on every preset). The
+engine keeps the log change of total public market cap at each of the last
+252 closes, and at a meeting reads the index's log fall from its highest
+close in that window. At $x$ or more, with $\pi$ under target plus
+`fed_stress_inflation_gap`, the meeting holds any rise and the put returns
+nothing, exactly as within the stress hold's sessions; a cut stands. The
+stress hold reads the VIX, which reverts within weeks while the index stays
+down, so without this a bear whose VIX has settled is hiked into. No draw;
+the window and its base are carried in the snapshot and the state hash while
+$x$ is set, and a market prehistory hands its window to the run
+(`engine.rs`, `index_drawdown`, `book_drawdown_close`).
+
 **The stress hold** (`fed_stress_hold`, 0 on every preset) keeps a count of
 sessions since the last close whose published VIX was at or over
 `fed_stress_vix`. At a meeting within that many sessions of it, with $\pi$
@@ -3328,6 +3352,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
+- **The put's unanswered fall and the drawdown hold** (`fed_put_carry`, `fed_drawdown_hold`): every meeting restarts the put's clock at zero, and only the stress hold's VIX clock holds a rise.
 - **The anticipated meeting** (`policy_anticipation`, `policy_anticipation_cut_share`): the curve learns a decision on the day it is published.
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **The market's fall in the cycle's hazard** (`cycle_equity_hazard`, `cycle_equity_hazard_knee`, `cycle_equity_hazard_opening`): the business cycle does not read the index.
