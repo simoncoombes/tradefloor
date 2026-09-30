@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v4",
   "fingerprint": "pt-v4",
-  "coefficient_digest": "0cbb390725cd128c769824559728b68c0241a89151571e1fa4b053c5a3f16ffa",
+  "coefficient_digest": "2fb30fa9acd4350ee3cd4a03b4a4f4d8ddfc2143794b13687c859feefac834d7",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_cross_at_limit": 0.0,
@@ -172,6 +172,7 @@
     "market_idio_down_suppress": 0.0,
     "market_pe_buybacks": 0.0,
     "market_prehistory_sessions": 0.0,
+    "market_prehistory_valuation": 0.0,
     "market_vol_alpha": 0.46779624669755665,
     "market_vol_alpha_excursion": 0.0,
     "market_vol_beta": 0.5212617214385166,

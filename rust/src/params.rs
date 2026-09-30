@@ -2117,6 +2117,28 @@ pub struct ModelParams {
     /// persistence (0.9913 a session) leaves 0.11 of the opening's gap
     /// after 252 sessions and 0.012 after 504.
     pub market_prehistory_sessions: f64,
+    /// Whether the run also opens with the valuation state the market's
+    /// prehistory (`market_prehistory_sessions`) left on its copy: a switch,
+    /// 0.0 or 1.0. On, the copy's end hands back, beside the volatility
+    /// state, each name's mispricing (which the opening's split takes in
+    /// place of its draw), the VIX feedback's exposure, the anticipation's
+    /// drift, the earnings cycle, credit's leverage gap (with the corporate
+    /// yield moved by what it adds to the spread) and the Fed put's owed cut
+    /// and stock (with the policy rate and the curve lowered by the owed
+    /// cut). Whatever moves fair value is booked into the names' fair-value
+    /// levels by the opening's split, so no opening price moves. 0.0, which
+    /// every preset carries, carries none of it. Requires
+    /// `market_prehistory_sessions` above zero; read only at construction.
+    ///
+    /// Why. Those states open where a market that never traded leaves them
+    /// and drift over the first year: on R17Bd with a 252-session prehistory
+    /// the names' mean mispricing fell to -0.013 by month 6 and the VIX
+    /// feedback's exposure built from 0 to 0.035 by month 12, while the Fed
+    /// put's owed cut built from 0 to 0.24 and took the policy rate down by
+    /// a quarter point. Year 0's index return was 1.95 points below year 1's
+    /// over 1350 held-out histories, all in its first two quarters, which
+    /// PH5's return clause reads.
+    pub market_prehistory_valuation: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
     /// price over fair value as `s`: on a generated roster that premium is
@@ -7067,6 +7089,7 @@ impl ModelParams {
             cycle_equity_hazard_knee: 0.0,
             cycle_equity_hazard_opening: 0.0,
             market_prehistory_sessions: 0.0,
+            market_prehistory_valuation: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
@@ -9490,6 +9513,7 @@ impl ModelParams {
             "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
             "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
             "market_prehistory_sessions" => self.market_prehistory_sessions,
+            "market_prehistory_valuation" => self.market_prehistory_valuation,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
@@ -9829,6 +9853,7 @@ impl ModelParams {
             "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
             "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
             "market_prehistory_sessions" => out.market_prehistory_sessions = value,
+            "market_prehistory_valuation" => out.market_prehistory_valuation = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
@@ -10779,6 +10804,19 @@ impl ModelParams {
                  lives before day zero, a whole number in [0, 2520].",
                 self.market_prehistory_sessions));
         }
+        if !(self.market_prehistory_valuation == 0.0 || self.market_prehistory_valuation == 1.0) {
+            return Err(format!(
+                "market_prehistory_valuation is {}. It is a switch: 0 opens the valuation \
+                 state as it stood, 1 carries it from the market's prehistory.",
+                self.market_prehistory_valuation));
+        }
+        if self.market_prehistory_valuation != 0.0 && self.market_prehistory_sessions == 0.0 {
+            return Err(
+                "market_prehistory_valuation is 1 but market_prehistory_sessions is 0. The \
+                 valuation state is carried from the market's prehistory, so set the \
+                 prehistory's length as well."
+                    .to_string());
+        }
         if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
             return Err(format!(
                 "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
@@ -11454,6 +11492,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_equity_hazard_knee",
         "cycle_equity_hazard_opening",
         "market_prehistory_sessions",
+        "market_prehistory_valuation",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",

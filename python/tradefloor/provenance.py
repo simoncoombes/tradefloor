@@ -792,6 +792,20 @@ OUT_OF_SCOPE = {
         "1-7 over 1350 held-out histories because a run opening in an "
         "expansion started at the phase-free baseline (0.8.5 "
         "fourteenth-registration work, sim/r18-opening)",
+    "market_prehistory_valuation":
+        "inert at 0.0 as shipped: the constructor branches on `!= 0.0`, so "
+        "nothing but the volatility state is carried from the market's "
+        "prehistory and every valuation state opens as it stood. Off zero "
+        "(a switch, and only with `market_prehistory_sessions` set) the run "
+        "opens with the copy's mispricing per name, VIX feedback exposure, "
+        "anticipation drift, earnings cycle, credit's leverage gap and the "
+        "Fed put's owed cut, with the corporate yield and the curve moved "
+        "by what the gap and the owed cut change, all booked into the "
+        "names' fair-value levels by the opening's split so no opening "
+        "price moves. Target: PH5's return clause, whose year 0 read 1.95 "
+        "points below year 1 over 1350 held-out histories because those "
+        "states opened where a market that never traded leaves them "
+        "(0.8.5 fourteenth-registration work, sim/r18-valopen)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

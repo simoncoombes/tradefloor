@@ -1283,6 +1283,11 @@ PERTURBATIONS = [
     # The copy draws from surgery generators of its own; the run's market
     # stream is untouched.
     ("market_prehistory_sessions", 21.0, True),
+    # LIVE, on its companion prehistory: the run opens with the copy's
+    # mispricing and valuation state, booked into the fair-value levels, so
+    # the same draws price from other levels from the first tick. No stream
+    # moves: the copy draws from generators of its own.
+    ("market_prehistory_valuation", 1.0, True),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1908,6 +1913,8 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 COMPANIONS: dict[str, dict[str, float]] = {
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
+    # The valuation is carried from the prehistory, and refused without one.
+    "market_prehistory_valuation": {"market_prehistory_sessions": 21.0},
     # The live mark requires the close's re-mark (`ModelParams::invariants`).
     "rate_intraday_live": {"rate_close_remark": 1.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see

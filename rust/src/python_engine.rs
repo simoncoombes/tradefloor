@@ -4181,6 +4181,11 @@ impl PyEngine {
             // The opening draws the hash covers beside the levels: empty once
             // the market has opened, the roster's plus one before it.
             out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
+            // The prehistory's carried opening (`market_prehistory_valuation`),
+            // under its own key and only with that dial on.
+            if self.inner.params().market_prehistory_valuation != 0.0 {
+                out.set_item("opening_carry", f64_bytes(py, self.inner.opening_carry()))?;
+            }
         }
         // The dividend states, only on a model that pays dividends, so every
         // other snapshot is the one it was. Seven f64s a name
@@ -4804,6 +4809,16 @@ impl PyEngine {
                 .collect();
             self.inner
                 .set_opening_z(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(raw) = snapshot.get_item("opening_carry")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_opening_carry(&values)
                 .map_err(ValidationError::new_err)?;
         }
         if let Some(raw) = snapshot.get_item("idio_variance")? {

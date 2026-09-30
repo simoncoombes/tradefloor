@@ -407,6 +407,13 @@ pub struct Engine {
     /// `opening_mispricing_sigma` or `opening_market_sigma` is non-zero,
     /// and emptied once the opening has been applied.
     opening_z: Vec<f64>,
+    /// The mispricing each name opens at under the market's prehistory's
+    /// valuation carry (`market_prehistory_valuation`), in roster order,
+    /// NaN for a name the copy left without one: the copy's `s` at the end
+    /// of its prehistory, which the opening takes in place of its draw.
+    /// Empty unless the dial is on, and emptied with `opening_z` once the
+    /// opening has been applied.
+    opening_carry: Vec<f64>,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
@@ -1245,6 +1252,31 @@ impl Engine {
         Ok(())
     }
 
+    /// The prehistory's carried opening mispricing not yet applied
+    /// (`market_prehistory_valuation`): one per name of the roster, NaN for
+    /// a name that takes its draw, until the first open that is not closed
+    /// takes them, and empty after it or with the dial off. For checkpoints
+    /// and forks, beside [`Self::opening_z`].
+    pub fn opening_carry(&self) -> &[f64] {
+        &self.opening_carry
+    }
+
+    /// Put the unapplied carried opening back. Empty is a legal state; any
+    /// other length must be the roster's.
+    pub fn set_opening_carry(&mut self, values: &[f64]) -> Result<(), String> {
+        if !values.is_empty() && values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} opening mispricings and the roster holds {} \
+                 companies. They are positional against the roster, so this restore \
+                 is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        self.opening_carry = values.to_vec();
+        Ok(())
+    }
+
     /// Whether this engine runs the per-name idiosyncratic variance state
     /// (`ModelParams::idio_vol_alpha`), which is when the snapshot and the
     /// state hash carry it. Off on every preset, whose two dials are 0.0.
@@ -1530,6 +1562,7 @@ impl Engine {
             } else {
                 Vec::new()
             },
+            opening_carry: Vec::new(),
             overnight_moves: vec![0.0; companies_len],
             jump_fair_value_moves: vec![0.0; companies_len],
             dividend_moves: vec![0.0; companies_len],
@@ -1784,14 +1817,112 @@ impl Engine {
         self.vix_anchor_slow = pre.vix_anchor_slow;
         self.vix_stress_memory = pre.vix_stress_memory;
         self.market_vol_cycle_log = pre.market_vol_cycle_log;
-        self.sector_variance = pre.sector_variance;
-        self.idio_variance = pre.idio_variance;
-        self.jump_excitation = pre.jump_excitation;
+        self.sector_variance = pre.sector_variance.clone();
+        self.idio_variance = pre.idio_variance.clone();
+        self.jump_excitation = pre.jump_excitation.clone();
         for (c, p) in self.companies.iter_mut().zip(pre.companies.iter()) {
             c.stock.garch_variance = p.stock.garch_variance;
         }
         if self.params.fed_stress_cut != 0.0 {
             self.stress_vix_max = self.economy.vix;
+        }
+        // THE VALUATION STATE, under its own switch: a branch at 0.0, every
+        // preset, where the market opens at the valuation it always did.
+        if self.params.market_prehistory_valuation != 0.0 {
+            self.carry_prehistory_valuation(&pre);
+        }
+    }
+
+    /// Open with the valuation state the market's prehistory left on its
+    /// copy (`market_prehistory_valuation`), booked so no opening price
+    /// moves.
+    ///
+    /// # Why
+    ///
+    /// The burn-in has no market, so every valuation state the market feeds
+    /// opens where a market that never traded leaves it, and drifts to its
+    /// level over the first year: the names' mispricing (whose settled mean
+    /// is below zero, from the non-zero-mean market terms left in `s`), the
+    /// VIX feedback's exposure (built by spikes and given back at
+    /// `fair_value_vix_release_half_life`), the anticipation's drift, the
+    /// earnings cycle (the burn-in's level, replaced by the phase's target),
+    /// credit's leverage gap and the Fed put's owed cut. On R17Bd with a
+    /// 252-session prehistory year 0 returned about two points less than
+    /// the years after it, all in its first two quarters.
+    ///
+    /// # What is carried
+    ///
+    /// From the copy, at the end of its prehistory:
+    ///
+    /// - each name's mispricing `s`, which the opening's split takes in
+    ///   place of its draw (`opening_carry`), so the name's fair-value level
+    ///   absorbs the difference at the first open;
+    /// - the VIX feedback's exposure, the anticipation's drift and the
+    ///   earnings cycle, which move fair value only, so the same split books
+    ///   them into the fair-value levels;
+    /// - credit's leverage gap, with the corporate yield moved by the change
+    ///   it makes to the spread formula at tonight's VIX and multiplier;
+    /// - the Fed put's owed cut and its stock, with the policy rate lowered
+    ///   by the owed cut (not below zero) and the prime rate, both Treasury
+    ///   yields, the corporate yield and the mortgage rate moved by the same
+    ///   amount, which is where the rule, the curve's anchor (whose ladder
+    ///   adds the owed cut back) and the spreads put them.
+    ///
+    /// Every price the run opens at, its draws and every other state are its
+    /// own. The rate instruments are marked after construction, at the curve
+    /// the run opens on.
+    fn carry_prehistory_valuation(&mut self, pre: &Engine) {
+        if !self.opening_z.is_empty() {
+            self.opening_carry = self
+                .companies
+                .iter()
+                .zip(pre.companies.iter())
+                .map(|(c, p)| match p.stock.mispricing_s {
+                    Some(v) if !c.is_bankrupt && c.is_public && !p.is_bankrupt && p.is_public => v,
+                    _ => f64::NAN,
+                })
+                .collect();
+        }
+        if self.carries_vix_feedback() {
+            self.economy.vix_feedback = pre.economy.vix_feedback;
+        }
+        if self.params.earnings_cycle_depth != 0.0 {
+            self.economy.earnings_cycle = pre.economy.earnings_cycle;
+        }
+        if self.carries_anticipation_drift() {
+            self.anticipation_drift = pre.anticipation_drift;
+        }
+        self.refresh_earnings_anticipation();
+        if self.carries_spread_equity_gap() {
+            let gap = pre.economy.spread_equity_gap;
+            let m = if self.params.cycle_nowcast_accuracy != 0.0
+                || self.params.corporate_spread_cycle != 0.0
+            {
+                self.priced_spread_multiplier(self.economy.cycle_phase)
+            } else {
+                crate::economy::central_bank::spread_multiplier_of(self.economy.cycle_phase)
+            };
+            let cut = self.params.corporate_spread_vix_cut;
+            let gain = self.params.corporate_spread_equity_gain;
+            let vix = self.economy.vix;
+            let moved = crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * gap)
+                - crate::economy::central_bank::spread_formula_with(
+                    vix, m, cut, gain * self.economy.spread_equity_gap);
+            self.economy.spread_equity_gap = gap;
+            self.economy.corporate_bond_yield += moved;
+        }
+        if self.params.fed_put_gain != 0.0 {
+            let owed = pre.economy.fed_put_owed;
+            let ffr = self.economy.federal_funds_rate;
+            let cut = ffr - crate::mathx::max(0.0, ffr - owed);
+            self.economy.fed_put = if owed > 0.0 { pre.economy.fed_put * cut / owed } else { 0.0 };
+            self.economy.fed_put_owed = cut;
+            self.economy.federal_funds_rate -= cut;
+            self.economy.prime_rate -= cut;
+            self.economy.treasury_yield_10y -= cut;
+            self.economy.treasury_yield_2y -= cut;
+            self.economy.corporate_bond_yield -= cut;
+            self.economy.mortgage_rate_30y -= cut;
         }
     }
 
@@ -7158,20 +7289,30 @@ impl Engine {
         let n_draws = z.len().saturating_sub(1);
         let mut gap = vec![f64::NAN; self.companies.len()];
         let (mut wsum, mut wgap, mut wz) = (0.0, 0.0, 0.0);
+        // The prehistory's carried mispricing (`market_prehistory_valuation`),
+        // empty unless that dial is on: a carried name opens at the copy's
+        // `s` and stays out of the draws' centring.
+        let carry = std::mem::take(&mut self.opening_carry);
+        let mut carried = vec![false; self.companies.len()];
         for (i, c) in self.companies.iter().enumerate() {
             if i >= n_draws || c.stock.mispricing_s.is_some() || c.is_bankrupt || !c.is_public {
                 continue;
             }
+            let is_carried = carry.get(i).is_some_and(|v| v.is_finite());
             let fv = crate::market::tick::published_fair_value(
                 &self.params, &self.economy, self.nominal_output_base, self.current_day, c);
             let g = crate::mathx::log(crate::mathx::max(0.01, c.stock.price) / fv);
             gap[i] = g;
+            if is_carried {
+                carried[i] = true;
+                continue;
+            }
             let w = c.stock.price * c.stock.shares_outstanding;
             wsum += w;
             wgap += w * g;
             wz += w * z[i];
         }
-        if !(wsum > 0.0) {
+        if !(wsum > 0.0) && !carried.iter().any(|&b| b) {
             return;
         }
         let centre = if self.params.opening_market_sigma != 0.0 {
@@ -7184,7 +7325,11 @@ impl Engine {
             if gap[i].is_nan() {
                 continue;
             }
-            let s0 = crate::market::tick::clamp_s(&self.params, centre + sigma * (z[i] - zbar));
+            let s0 = if carried[i] {
+                crate::market::tick::clamp_s(&self.params, carry[i])
+            } else {
+                crate::market::tick::clamp_s(&self.params, centre + sigma * (z[i] - zbar))
+            };
             c.stock.mispricing_s = Some(s0);
             c.stock.mispricing_s_prev_close = Some(s0);
             c.stock.mispricing_momentum = Some(0.0);
@@ -10376,6 +10521,14 @@ impl Engine {
             for value in &self.opening_z {
                 hash_f64(&mut buf, *value);
             }
+            // The prehistory's carried opening, only while one waits: empty
+            // on every shipped preset, so their hashes are the ones they were.
+            if !self.opening_carry.is_empty() {
+                hash_u32(&mut buf, self.opening_carry.len() as u32);
+                for value in &self.opening_carry {
+                    hash_f64(&mut buf, *value);
+                }
+            }
         }
         // The dividend states, on the same rule: only on a model that pays
         // them. NaN (one pattern) for a name without one.
@@ -12293,6 +12446,97 @@ mod tests {
         assert_eq!(a.economy(), b.economy());
     }
 
+    /// `market_prehistory_valuation`: at 0.0 nothing but the volatility state
+    /// is carried; on, the run opens on its own generators, draws and prices
+    /// with the copy's valuation state, each name's carried mispricing waits
+    /// for the opening, the economy moves only in the carried fields, no
+    /// opening price moves at the first tick, the same seed opens the same,
+    /// and the switch is refused without a prehistory or off {0, 1}.
+    #[test]
+    fn the_prehistory_valuation_carries_the_valuation_state_and_moves_no_price() {
+        let dials: &[(&str, f64)] = &[
+            ("market_prehistory_sessions", 63.0),
+            ("fed_put_gain", 3.0),
+            ("fed_put_half_life", 126.0),
+            ("corporate_spread_equity_gain", 2.0),
+            ("corporate_spread_equity_half_life", 126.0),
+            ("earnings_anticipation_drift_share", 0.9),
+            ("earnings_anticipation_drift_half_life", 252.0),
+            ("fair_value_vix_release_half_life", 504.0),
+        ];
+        let with = |on: f64| {
+            let mut d = dials.to_vec();
+            d.push(("market_prehistory_valuation", on));
+            engine_macro_clock(11, &d)
+        };
+        let off = with(0.0);
+        let on = with(1.0);
+        let again = with(1.0);
+        assert!(off.opening_carry().is_empty());
+        assert_eq!(on.state_hash(0, false), again.state_hash(0, false));
+        assert_ne!(on.state_hash(0, false), off.state_hash(0, false));
+        assert_eq!(on.rng_state(), off.rng_state());
+        assert_eq!(on.draws_consumed(), off.draws_consumed());
+        assert_eq!(on.market_variance_state(), off.market_variance_state());
+        for (a, b) in on.companies().iter().zip(off.companies().iter()) {
+            assert_eq!(a.stock.price.to_bits(), b.stock.price.to_bits());
+            assert!(a.stock.mispricing_s.is_none() && a.stock.fair_value_offset.is_none());
+        }
+        let carry = on.opening_carry().to_vec();
+        assert_eq!(carry.len(), on.companies().len());
+        assert!(carry.iter().all(|v| v.is_finite()));
+        // The economy moves only in the carried fields.
+        let mut econ = on.economy().clone();
+        let o = off.economy();
+        for (field, a, b) in [
+            ("federal_funds_rate", econ.federal_funds_rate, o.federal_funds_rate),
+            ("corporate_bond_yield", econ.corporate_bond_yield, o.corporate_bond_yield),
+        ] {
+            assert!(a <= b + 1.0, "{field}");
+        }
+        econ.vix_feedback = o.vix_feedback;
+        econ.earnings_cycle = o.earnings_cycle;
+        econ.earnings_anticipation = o.earnings_anticipation;
+        econ.spread_equity_gap = o.spread_equity_gap;
+        econ.fed_put = o.fed_put;
+        econ.fed_put_owed = o.fed_put_owed;
+        econ.federal_funds_rate = o.federal_funds_rate;
+        econ.prime_rate = o.prime_rate;
+        econ.treasury_yield_10y = o.treasury_yield_10y;
+        econ.treasury_yield_2y = o.treasury_yield_2y;
+        econ.corporate_bond_yield = o.corporate_bond_yield;
+        econ.mortgage_rate_30y = o.mortgage_rate_30y;
+        assert_eq!(&econ, o);
+        let moved = on.economy().federal_funds_rate - o.federal_funds_rate;
+        assert!((on.economy().fed_put_owed + moved).abs() < 1e-12);
+        assert!(((on.economy().treasury_yield_10y - o.treasury_yield_10y) - moved).abs() < 1e-12);
+        // The first tick opens every name where it stood: the opening's split
+        // booked the carried state into the fair-value level.
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut first = [off.clone(), on.clone()];
+        for e in first.iter_mut() {
+            let mut buf = SessionBuffer::new();
+            e.run_session(&session(1, &innovations, &variances), &mut buf);
+        }
+        for i in 0..3 {
+            let a = first[0].companies()[i].stock.price;
+            let b = first[1].companies()[i].stock.price;
+            assert!((a / b).ln().abs() < 1e-3, "name {i}: {a} against {b}");
+            // One tick from the copy's mispricing, not from a draw.
+            let s = first[1].companies()[i].stock.mispricing_s.unwrap();
+            assert!((s - carry[i]).abs() < 0.01, "name {i}: {s} against {}", carry[i]);
+        }
+        assert!(first[1].opening_carry().is_empty());
+        // Refused without a prehistory, and off the switch.
+        let base = Engine::default_model();
+        let refused = |p: Result<ModelParams, String>| p.and_then(|p| p.invariants()).is_err();
+        assert!(refused(base.with_override("market_prehistory_valuation", 1.0)));
+        let pre = base.with_override("market_prehistory_sessions", 21.0).unwrap();
+        assert!(refused(pre.with_override("market_prehistory_valuation", 0.5)));
+        assert!(!refused(pre.with_override("market_prehistory_valuation", 1.0)));
+    }
+
     /// The engine the macro-clock tests read: the default, pt-v20, with the
     /// dials given.
     fn engine_macro_clock(seed: u64, dials: &[(&str, f64)]) -> Engine {
@@ -14170,3 +14414,4 @@ pub fn fixed_simulation_digest(
     }
     Some(format!("{:x}", hasher.finalize()))
 }
+
