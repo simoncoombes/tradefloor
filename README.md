@@ -95,8 +95,9 @@ fair value leaves little edge, and buy-and-hold is the comparison to quote.
 ## The agent's view
 
 A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
-read-only market view: prices, the public columns, each book, bars, the
-published macro fields, the curve and which names have news today.
+read-only market view: prices, the public columns, each book, the bars of
+days already recorded (a World run with `record=True`; `tf.evaluate` records
+none), the published macro fields, the curve and which names have news today.
 `obs.portfolio` reads the agent's own positions and cannot trade. Forking the
 engine, writing to it and reading the hidden state all raise
 `tf.SandboxError`. The hidden state includes the true business-cycle phase;
@@ -109,7 +110,11 @@ research that needs the live engine, and every scorecard says so. Either way
 the harness compares the engine's state hash around each call, and an agent
 that changed the market is scored `tampered` and left out of `tf.rank`.
 [`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
-lists what the view serves and what the check cannot catch.
+lists what the view serves and what the check cannot catch. The view and the
+check guard against accident. Agent code runs in the harness's own process, so
+it can reach the engine by walking the interpreter, and a read made that way
+leaves no trace. Run code you do not trust in a separate process, through the
+MCP server.
 
 ## Contents
 
