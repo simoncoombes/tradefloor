@@ -12,7 +12,8 @@ a short list of candidates, runs a small market to a day boundary and to the
 middle of a session, restores a fresh engine from the snapshot, runs both on,
 and requires the same state hash.
 
-Slow, about a minute per worker, so it runs under TRADEFLOOR_SLOW_TESTS=1 as
+Slow, about six minutes on two workers (212 dials pass and 30 take no
+candidate value), so it runs under TRADEFLOOR_SLOW_TESTS=1 as
 the release check does.
 """
 
