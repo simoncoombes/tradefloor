@@ -148,9 +148,10 @@ class Portfolio:
                  owner: str = "agent") -> None:
         """
         ``cash_interest`` makes cash earn the policy rate, one day at a time,
-        when :meth:`accrue` is called; the harness calls it once a day, before
-        the close. Off by default, and with it off cash earns nothing, which
-        is how every run before this option behaved. See :meth:`accrue`.
+        when :meth:`accrue` is called; the harness calls it once a day before
+        the close, and a World does for a portfolio with the option on. Off by
+        default, and with it off cash earns nothing. :meth:`accrue` charges a
+        negative balance the policy rate either way. See :meth:`accrue`.
 
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
         defaults to ``None``, meaning unconstrained, because a bare simulator should
@@ -523,26 +524,36 @@ class Portfolio:
     # -- cash -------------------------------------------------------------
 
     def accrue(self, engine: Engine) -> float:
-        """Credit one trading day's interest on cash, if ``cash_interest``.
+        """Book one trading day's interest on cash.
 
         ``cash * policy_rate / 252``, at the policy rate in force now
         (``engine.macro_fields["federal_funds_rate"]``), added to cash and to
-        :attr:`interest`. Returns the amount, 0.0 with the option off.
+        :attr:`interest`. Returns the amount.
 
-        A negative balance, which is borrowing to hold more than the account
-        is worth, is charged at the same rate. That is cheaper than any broker
-        lends, so a levered strategy's financing cost is a floor here, not an
-        estimate.
+        A positive balance earns it only with ``cash_interest`` on, and earns
+        nothing otherwise. A negative balance, which is borrowing to hold
+        more than the account is worth, is charged it whether the option is
+        on or off. That is cheaper than any broker lends, so a levered
+        strategy's financing cost is a floor here, not an estimate.
+
+        Until 0.8.5 the charge came only with ``cash_interest`` on, which
+        :func:`tradefloor.evaluate` and :func:`tradefloor.rank` leave off, so
+        every levered run there borrowed for free. On the 90 graded pt-v20
+        histories, 1.8 times the index beat the index by 2.33 points a year
+        and was ahead in 64% of one-year windows that way, against 0.21
+        points and 57% with the policy rate charged. A World calls this only
+        for a portfolio with ``cash_interest`` on; see
+        :class:`tradefloor.World` for why its own portfolios leave it off.
 
         Call it once per trading day. The harness calls it just before the
         close, so the day's interest is at the rate the day traded under and
         the close's macro step, which may move the rate, applies to the next
-        day. Before this option existed cash earned nothing: a portfolio
-        holding cash through a rate shock gained nothing from the higher
-        rate, and a 60/40 portfolio's bond sleeve was compared against cash
-        that paid zero.
+        day. Before ``cash_interest`` existed cash earned nothing: a
+        portfolio holding cash through a rate shock gained nothing from the
+        higher rate, and a 60/40 portfolio's bond sleeve was compared against
+        cash that paid zero.
         """
-        if not self.cash_interest:
+        if not self.cash_interest and self.cash >= 0:
             return 0.0
         rate = engine.macro_fields["federal_funds_rate"]
         amount = self.cash * rate / 252.0
