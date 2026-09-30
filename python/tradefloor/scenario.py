@@ -1547,7 +1547,10 @@ class Scenario:
 
         A string that names a readable file is read as one; anything else is
         treated as the document itself, so a scenario can be written inline
-        in a notebook or a test.
+        in a notebook or a test. A one-line string that looks like a path
+        (it ends in ``.yml`` or ``.yaml``, or holds a path separator, and has
+        no ``:``) and names no file raises :class:`FileNotFoundError`. Until
+        0.8.5 it was parsed as YAML text and refused as a syntax error.
 
         The reader is :mod:`tradefloor.yaml_subset`, which implements the
         block-style subset this schema uses and REFUSES everything else by
@@ -1569,6 +1572,12 @@ class Scenario:
                     text = handle.read()
                 path = source
             except OSError:
+                if _looks_like_path(source):
+                    import os
+                    raise FileNotFoundError(
+                        f"No file at {source!r} (looked in {os.getcwd()}). "
+                        "from_yaml takes the path to a .yml file or the YAML "
+                        "text itself.") from None
                 text = source
         return cls.from_document(yaml_subset.read(text), source=path)
 
@@ -1868,6 +1877,20 @@ class Scenario:
     ))
 
 
+def _looks_like_path(source: str) -> bool:
+    """A one-line string that is a file name rather than YAML text.
+
+    YAML text for a scenario has a ``key: value`` line, and a path has no
+    colon, except a Windows drive (``C:\\...``), which is allowed for."""
+    body = source.strip()
+    if len(body) > 2 and body[1] == ":" and body[2] in "\\/":
+        body = body[2:]
+    if ":" in body:
+        return False
+    return (body.lower().endswith((".yml", ".yaml"))
+            or "/" in body or "\\" in body)
+
+
 def run_scenario(
     scenario: Scenario,
     *,
@@ -1890,9 +1913,14 @@ def run_scenario(
     :class:`tradefloor.ModelParams`, defaulting to the shipped preset. The
     returned engine reports it as ``model_fingerprint``, like any other.
     """
-    if days < 1:
-        raise ValidationError("days must be at least 1")
-    hour, minute, day_of_week = start
+    from . import _checks
+    _checks.scenario(scenario)
+    if scenario is None:
+        raise ValidationError(
+            "run_scenario needs a scenario, such as "
+            "tf.Scenario.load('liquidity_crisis').")
+    days = _checks.whole_number("days", days)
+    hour, minute, day_of_week = _checks.start_clock(start)
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     for day in range(days):

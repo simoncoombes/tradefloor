@@ -80,11 +80,18 @@ except ImportError:  # pragma: no cover
     _Base = object
 
 
-def _require(module, name: str, extra: str):
+#: How to install what this module needs, named in every refusal. The
+#: ``rl`` extra brings numpy and gymnasium together; naming only the module
+#: that was missing sent people to install numpy and then meet the missing
+#: gymnasium later, as a missing ``action_space``.
+_INSTALL = "pip install 'tradefloor[rl]'"
+
+
+def _require(module, name: str, extra: str = ""):
     if module is None:
         raise ImportError(
-            f"{name} is required for tradefloor.gym but is not installed. "
-            f"Install it with: pip install {extra}"
+            f"tradefloor.gym needs numpy and gymnasium, and {name} is not "
+            f"installed. Install them with: {_INSTALL}"
         )
     return module
 
@@ -119,7 +126,7 @@ class TradingEnv(_Base):
         model: str | ModelParams | None = None,
         trusted_agents: bool = False,
     ) -> None:
-        _require(_np, "numpy", "numpy")
+        _require(_np, "numpy")
 
         self.universe = as_universe(universe)
         self.base_seed = check_seed(seed)
@@ -140,8 +147,11 @@ class TradingEnv(_Base):
         #: than read-only views. See the module docstring.
         self.trusted_agents = bool(trusted_agents)
 
-        if self.days < 1 or self.steps_per_day < 1 or self.ticks_per_step < 1:
-            raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
+        for label, count in (("days", self.days),
+                             ("steps_per_day", self.steps_per_day),
+                             ("ticks_per_step", self.ticks_per_step)):
+            if count < 1:
+                raise ValidationError(f"{label} must be 1 or more, got {count}.")
 
         self.n = len(self.universe)
         self.max_steps = self.days * self.steps_per_day
@@ -351,6 +361,18 @@ class TradingEnv(_Base):
         return _np.ascontiguousarray(
             _np.concatenate([returns, holdings, cash_fraction]), dtype=_np.float64
         )
+
+    def __getattr__(self, name: str) -> Any:
+        # Only reached when normal lookup fails. With gymnasium installed
+        # `__init__` sets both spaces, so this refuses them only without it:
+        # the env steps without gymnasium, but a trainer that reads
+        # `action_space` failed on a bare missing attribute.
+        if name in ("action_space", "observation_space"):
+            raise AttributeError(
+                f"TradingEnv has no {name} without gymnasium, which defines "
+                f"the spaces. Install it with: {_INSTALL}")
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}")
 
     def render(self):  # pragma: no cover - no visual mode
         return None

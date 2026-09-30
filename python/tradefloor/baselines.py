@@ -126,7 +126,9 @@ will read: ``tf.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 from __future__ import annotations
 
 import copy
+import difflib
 import math
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -862,9 +864,17 @@ def versus_buy_and_hold(scores: dict[str, Any], *,
     every agent in one evaluation starts with the same cash. The Oracle is
     included; it is a reference agent like the others.
 
-    Returns an empty mapping when buy-and-hold did not run.
+    Returns an empty mapping when buy-and-hold did not run, with a warning
+    that says so and, for a misspelt ``reference``, names the key meant.
     """
     if reference not in scores:
+        close = difflib.get_close_matches(reference, list(scores), n=1)
+        hint = (f" Did you mean reference={close[0]!r}?" if close else
+                " Add tf.baselines.reference_agents() to the agents you "
+                "evaluate.")
+        warnings.warn(
+            f"No {reference!r} in these scores, so there is nothing to "
+            f"compare against.{hint}", stacklevel=2)
         return {}
     base = scores[reference].pnl
     return {
@@ -906,13 +916,27 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20), whatever
     the Oracle earned. :func:`capture_withheld` gives the reason, and
     :func:`versus_buy_and_hold` the comparison to quote there.
+
+    Each empty result comes with a warning that gives its reason, since at
+    the prompt ``{}`` alone says nothing.
     """
-    if capture_withheld(scores, oracle=oracle) is not None:
+    withheld = capture_withheld(scores, oracle=oracle)
+    if withheld is not None:
+        warnings.warn(f"{withheld} tf.versus_buy_and_hold(scores) makes that "
+                      "comparison.", stacklevel=2)
         return {}
     if oracle not in scores:
+        warnings.warn(
+            f"No {oracle!r} in these scores, so there is no ceiling to divide "
+            "by. Add tf.baselines.reference_agents() to the agents you "
+            "evaluate.", stacklevel=2)
         return {}
     ceiling = scores[oracle].pnl
     if ceiling <= 0:
+        warnings.warn(
+            f"The Oracle made {ceiling:,.2f} here, and a ratio against a "
+            "loss would flip every sign, so there is none. Use "
+            "tf.versus_buy_and_hold(scores) for this market.", stacklevel=2)
         return {}
     return {
         name: card.pnl / ceiling

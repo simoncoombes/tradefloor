@@ -410,10 +410,11 @@ def analyse(
     that never happened.
     """
     universe = as_universe(universe)
-    if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
-        raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
-
-    hour, minute, day_of_week = start
+    from . import _checks
+    days = _checks.whole_number("days", days)
+    steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
+    ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+    hour, minute, day_of_week = _checks.start_clock(start)
     tickers = None
     adv = [instrument.avg_volume for instrument in universe]
 

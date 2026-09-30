@@ -91,9 +91,11 @@ def main() -> dict:
     # marked to its own impact counted on each tick of a step. It is a
     # finding about portfolio construction, not a broken denominator, so
     # nothing here clamps it.
-    ratios = capture_ratio(scores)
-    report["capture"] = ratios
+    # Asked for only where there is one: on pt-v20 capture_ratio returns {}
+    # and warns with the reason, which capture_withheld gives as text.
     withheld = capture_withheld(scores)
+    ratios = capture_ratio(scores) if withheld is None else {}
+    report["capture"] = ratios
     if withheld is None:
         print(f"     capture vs the oracle: "
               f"{ {k: round(v, 3) for k, v in ratios.items()} }")

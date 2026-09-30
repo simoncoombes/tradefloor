@@ -2018,7 +2018,7 @@ agent.
 with the reason a result gives. It holds pt-v20 alone. The check reads a
 scorecard's `model_fingerprint`, so a custom model (`custom-XXXXXXXX`) keeps
 the ratio whatever preset it was built from. Where a preset is named:
-- `capture_ratio` returns an empty mapping, whatever the Oracle earned, and `capture_withheld` returns the reason;
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned, with a warning that gives the reason, and `capture_withheld` returns the reason as text;
 - `versus_buy_and_hold` gives each agent's P&L less buy-and-hold's in the same market, the comparison to quote;
 - `rank` sets `Ranking.capture_withheld`, counts no seed as unmeasurable, leaves every capture `None` and out of `as_dict()`, and sorts the table on each agent's mean P&L over buy-and-hold's (`mean_excess_pnl`, with `seeds_ahead`);
 - the MCP tools `evaluate_strategies` and `rank_strategies` send no capture field. They send the buy-and-hold comparison and the reason in its place.

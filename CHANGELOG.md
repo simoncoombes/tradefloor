@@ -696,6 +696,43 @@ view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
 scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
 or pass `trusted_agents=True`.
 
+### Wrong arguments and broken agents
+
+A review of what a new user is told found wrong arguments reaching Python's
+internals first ("'int' object is not iterable") and several mistakes that
+ran to the end without a word. `evaluate`, `rank`, `World`, `tca.analyse`
+and `Engine` now check their arguments and refuse a wrong one by name, with
+a call that works. A class, a function or an uncalled `StrategySpec` factory passed as an agent
+is refused before any market runs; it used to score `pnl=0.00`. So is a
+scenario passed by name (`tf.Scenario.load(name)` loads it), a list of ticker
+strings as a universe, a single number as `seeds`, a dict as `macro`, and
+positional arguments to `Engine`. `Scenario.from_yaml` on a path that names
+no file raises `FileNotFoundError`; it used to report a YAML syntax error.
+`obs.price` and `obs.book` name an unknown ticker and, for a case slip, the
+one meant. A negative count to `run_days` or `Universe.random` is refused in
+words, not as an `OverflowError`, and a preset or sector name in the wrong
+case says which name was meant.
+
+`evaluate` warns, and changes nothing it runs, when an agent failed on every
+step (its card read like one that held cash), when every order in a step was
+a fraction of a share (portfolio weights sent as shares), and when a spec's
+`top_k` is more than half the universe, which the ranked agents cap. A market
+order the book could not fill in full is listed in the new
+`Scorecard.partial_fills`, and the repr counts errors and partial fills.
+`versus_buy_and_hold` and `capture_ratio` warn with the reason whenever they
+return `{}`. `Checkpoint.of(..., verify=True)` replays the log and refuses a
+checkpoint that does not reach the engine, which catches a wrong seed.
+`ArrowStream`'s repr says how to read it, and `tradefloor.gym` names the `rl`
+extra whether numpy or gymnasium is missing.
+
+**What breaks.** Calls that valid runs never make are refused: `open_market()`
+or `run_days()` on an engine whose day is open (each silently reopened the
+day and moved the state hash; call `close_market()` first, and a day closed
+by `run_session(close_at_end=True)` counts as closed), a ticker listed
+twice in one universe (the second could never be traded), and a negative VIX
+in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
+every known-answer digest is unchanged.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

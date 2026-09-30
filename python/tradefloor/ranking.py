@@ -131,6 +131,7 @@ use what it was given.
 from __future__ import annotations
 
 import statistics
+import warnings
 from typing import Any, Callable, Iterable, Sequence
 
 from ._core import Instrument, Macro, ModelParams, ValidationError
@@ -374,7 +375,9 @@ class Ranking:
                   else "pooled_capture")
         if by not in ("pooled_capture", "median_capture", "median_pnl",
                       "win_rate", "mean_excess_pnl"):
-            raise ValidationError(f"cannot rank by {by!r}")
+            raise ValidationError(
+                "a Ranking orders by pooled_capture, median_capture, "
+                f"median_pnl, win_rate or mean_excess_pnl; got {by!r}.")
         if by in ("pooled_capture", "median_capture",
                   "mean_excess_pnl") and not any(
             getattr(r, by) is not None for r in self.records.values()
@@ -615,12 +618,13 @@ def rank(
     ranking.separation("momentum", "mean_reversion")
     ```
     """
+    from . import _checks
     from .baselines import capture_ratio, capture_withheld
     from .harness import evaluate
     from .universe_util import as_universe, fingerprint_of
 
     factory = _factory_or_refuse(make_agents)
-    seed_list = [check_seed(s) for s in seeds]
+    seed_list = [check_seed(s) for s in _checks.seeds(seeds)]
     if not seed_list:
         raise ValidationError("no seeds given")
     if len(set(seed_list)) != len(seed_list):
@@ -673,7 +677,12 @@ def rank(
     # One model for every seed, so the first seed's answer is every seed's.
     withheld = capture_withheld(results[0][1], oracle=oracle)
     for seed, scores in results:
-        ratios = capture_ratio(scores, oracle=oracle)
+        # Quietly: capture_ratio warns on an empty result, and a ranking
+        # reports why a capture is missing on itself (`capture_withheld`,
+        # `unmeasurable`), once rather than once per seed.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            ratios = capture_ratio(scores, oracle=oracle)
         reference = scores[oracle].pnl if oracle in scores else 0.0
         reference_pnls.append(reference)
         benchmark_pnls.append(scores["buy_and_hold"].pnl

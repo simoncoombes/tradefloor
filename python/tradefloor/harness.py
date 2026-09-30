@@ -51,8 +51,10 @@ scorecard records all three. See :mod:`tradefloor.sandbox`.
 from __future__ import annotations
 
 import struct
+import warnings
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
+from . import _checks
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from ._core import check_seed
 from .portfolio import Portfolio
@@ -194,11 +196,24 @@ class Observation:
         """
         return self.step_of_day == self.steps_per_day - 1
 
+    def _index(self, ticker: str) -> int:
+        """Where ``ticker`` sits in :attr:`tickers`, or a refusal that names
+        it and, for a slip of case or spacing, the ticker meant.
+
+        ``list.index`` said only "'ZZZZ' is not in list", which is how an
+        agent's error line read until 0.8.5.
+        """
+        try:
+            return self.tickers.index(ticker)
+        except ValueError:
+            raise ValidationError(_unknown_ticker(ticker, self.tickers)) from None
+
     def price(self, ticker: str) -> float:
-        return self.prices[self.tickers.index(ticker)]
+        return self.prices[self._index(ticker)]
 
     def book(self, ticker: str):
         """The live order book, as a trader would see the depth."""
+        self._index(ticker)
         return self.engine.book(ticker)
 
     def avg_volume(self, ticker: str) -> float:
@@ -211,7 +226,7 @@ class Observation:
         flat share counts is choosing a different experiment per instrument
         rather than a position.
         """
-        return self._adv[self.tickers.index(ticker)]
+        return self._adv[self._index(ticker)]
 
     def participation(self, ticker: str, shares: float) -> float:
         """``shares`` as a fraction of the instrument's average daily volume."""
@@ -236,7 +251,9 @@ class Agent(Protocol):
     """The interface an agent implements.
 
     ``act`` returns share quantities keyed by ticker: positive buys, negative
-    sells, omitted or zero does nothing.
+    sells, omitted or zero does nothing. Numbers of shares, not portfolio
+    weights: ``{'AAA': 0.2}`` buys a fifth of one share. :func:`evaluate`
+    warns when every order in a step is such a fraction.
 
     ``explain`` is optional. When present it returns the factor the agent
     believes drove the largest recent move, one of ``Engine.FACTORS``. That is
@@ -260,7 +277,7 @@ class Scorecard:
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
                  "strategy_fingerprint", "model_fingerprint", "trusted",
-                 "uses_hidden_state", "tampered")
+                 "uses_hidden_state", "tampered", "partial_fills")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -270,6 +287,7 @@ class Scorecard:
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
         model_fingerprint: str = "", trusted: bool = False,
         uses_hidden_state: bool = False, tampered: bool = False,
+        partial_fills: list[str] | None = None,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -314,6 +332,11 @@ class Scorecard:
         #: order path. ``errors`` names the step. The score is of a market
         #: the agent rewrote and ranks nothing.
         self.tampered = tampered
+        #: One line per market order the book could not fill in full, such
+        #: as "step 0: asked to buy 1,000,000,000,000 AAA; the book held
+        #: 5,529,929, and the rest did not fill." Kept apart from
+        #: ``errors``: the order traded, only less of it than was asked.
+        self.partial_fills = list(partial_fills or [])
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -324,10 +347,18 @@ class Scorecard:
                                          ("trusted", self.trusted),
                                          ("hidden-state",
                                           self.uses_hidden_state)) if on)
+        # Counts, so an agent that failed on every step does not print like
+        # one that chose to hold cash. The lines are in `errors` and
+        # `partial_fills`.
+        counts = "".join(
+            f", {label}={len(lines)}"
+            for label, lines in (("errors", self.errors),
+                                 ("partial_fills", self.partial_fills))
+            if lines)
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
-            f"impact={self.impact_bps:+.2f}bps{flags})"
+            f"impact={self.impact_bps:+.2f}bps{counts}{flags})"
         )
 
 
@@ -443,16 +474,38 @@ def evaluate(
     ``tampered=True`` with an error line naming the step. See
     :mod:`tradefloor.sandbox`.
 
+    The arguments are checked before any market runs. An entry of
+    ``agents`` that is a class rather than an instance, a function, or
+    anything else without an ``act(obs)`` method is refused then, as is a
+    scenario passed by name. Three things are warned about and not
+    refused, because the run is still valid: an agent whose every step
+    raised or was refused (its card reads like one that chose not to
+    trade), an agent whose orders in a step were all fractions of a share
+    (``act`` returns shares, not portfolio weights), and a spec whose
+    ``top_k`` is more than the universe has room for on each side. A market
+    order the book could not fill in full is listed in the card's
+    ``partial_fills``.
+
     Returns a scorecard per agent, keyed by name.
     """
     from .spec import StrategySpec
     seed = check_seed(seed)
+    agents = _checks.agents(agents)
     if not agents:
         raise ValidationError("no agents given")
-    if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
-        raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
-
-    hour, minute, day_of_week = start
+    days = _checks.whole_number("days", days)
+    steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
+    ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+    _checks.number("cash", cash)
+    if max_leverage is not None:
+        _checks.number("max_leverage", max_leverage)
+    macro = _checks.macro(macro)
+    scenario = _checks.scenario(scenario)
+    hour, minute, day_of_week = _checks.start_clock(start)
+    # Every entry, before any market runs. Until 0.8.5 a class or a
+    # function here ran to the end, raised on every step and scored zero.
+    for name, entry in agents.items():
+        _checks.agent(f"Agent {name!r}", entry)
     results: dict[str, Scorecard] = {}
 
     # The baseline market: the same seed with nobody trading. Every agent's
@@ -475,13 +528,132 @@ def evaluate(
         declared = getattr(agent, "spec", None)
         strategy_fingerprint = (declared.fingerprint
                                 if isinstance(declared, StrategySpec) else "")
+        if isinstance(declared, StrategySpec):
+            _warn_top_k(name, declared, len(universe))
         results[name] = _evaluate_one(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
             cash_interest, bool(trusted_agents),
         )
+        _warn_if_every_step_failed(results[name], days * steps_per_day)
     return results
+
+
+def _warn_top_k(name: str, spec: "StrategySpec", size: int) -> None:
+    """Warn when a spec asks for more names on each side than the universe
+    holds.
+
+    The ranked agents take ``min(top_k, n // 2)`` names on each side, so on
+    five names ``top_k`` of 2, 5 and 50 run the same trades under three
+    different strategy fingerprints: two cards would cite different
+    strategies for one set of trades. A warning and not a refusal, because
+    the default ``top_k=5`` on a small universe is a common first run, and
+    the trades are what they always were.
+    """
+    top_k = spec.as_dict().get("portfolio", {}).get("top_k")
+    room = size // 2
+    if top_k is None or top_k <= room:
+        return
+    warnings.warn(
+        f"Agent {name!r}: top_k={top_k} asks for {top_k} names on each side, "
+        f"but a {size}-name universe has room for {room}, so the run used "
+        f"{room}. Its strategy fingerprint names top_k={top_k}. Pass "
+        f"top_k={room} or a bigger universe.", stacklevel=3)
+
+
+def _steps_with_errors(card: "Scorecard") -> set[int]:
+    """The steps an ``errors`` line names, leaving out tamper lines and
+    ``explain()`` lines, which do not cost a step its orders."""
+    steps: set[int] = set()
+    for line in card.errors:
+        head, _, rest = line.partition(": ")
+        if not head.startswith("step ") or rest.startswith("tampered:"):
+            continue
+        try:
+            steps.add(int(head[5:]))
+        except ValueError:
+            continue
+    return steps
+
+
+def _warn_if_every_step_failed(card: "Scorecard", steps: int) -> None:
+    """Warn once when an agent traded nothing and every one of its steps
+    raised or had its orders refused.
+
+    Its card reads ``pnl=0.00`` like an agent that chose to hold cash, and
+    the README's first run reads only the headline figures, so the errors
+    list was never seen.
+    """
+    if card.trades or steps < 1 or not card.errors:
+        return
+    if len(_steps_with_errors(card)) < steps:
+        return
+    first = next(line for line in card.errors
+                 if line.startswith("step ")
+                 and not line.partition(": ")[2].startswith("tampered:"))
+    warnings.warn(
+        f"Agent {card.name!r} failed on all {steps} of its steps, so its "
+        f"score is empty. First error: {first.rstrip('.')}. The rest are in "
+        f"scores[{card.name!r}].errors.", stacklevel=3)
+
+
+def _partial_fill_lines(fills: list[dict[str, Any]]) -> list[str]:
+    """One line per market order that filled only in part."""
+    lines = []
+    for fill in fills:
+        if not fill.get("partial"):
+            continue
+        requested = abs(float(fill.get("requested", 0.0)))
+        filled = abs(float(fill["quantity"]))
+        side = "buy" if float(fill["quantity"]) > 0 else "sell"
+        lines.append(
+            f"step {fill.get('step', 0)}: asked to {side} {requested:,.0f} "
+            f"{fill['ticker']}; the book held {filled:,.0f}, and the rest did "
+            "not fill.")
+    return lines
+
+
+def _warn_fractional(name: str, fills: list[dict[str, Any]]) -> None:
+    """Warn once when every order an agent sent in some step was a fraction
+    of a share: the portfolio-weights mistake.
+
+    ``{t: 0.2 for t in tickers}`` reads as 20% in each name and buys a
+    fifth of a share of each. It trades, is refused nowhere and scores a
+    P&L of a few units of currency. Nothing about what is executed
+    changes; this only says so.
+    """
+    by_step: dict[int, list[dict[str, Any]]] = {}
+    for fill in fills:
+        by_step.setdefault(int(fill.get("step", 0)), []).append(fill)
+    for step in sorted(by_step):
+        asked = [(fill["ticker"], float(fill.get("requested",
+                                                 fill["quantity"])))
+                 for fill in by_step[step]]
+        if not asked or any(abs(q) >= 1.0 for _, q in asked):
+            continue
+        shown = ", ".join(f"{q:g} of {t}" for t, q in asked[:3])
+        more = ", ..." if len(asked) > 3 else ""
+        ticker = asked[0][0]
+        warnings.warn(
+            f"Agent {name!r} asked for fractions of a share ({shown}{more}). "
+            "act() returns numbers of shares, not portfolio weights. To put "
+            f"20% of your money in {ticker}, send 0.2 * net_worth / "
+            f"obs.price({ticker!r}) shares.", stacklevel=4)
+        return
+
+
+def _unknown_ticker(ticker: Any, tickers: Sequence[str]) -> str:
+    """The refusal for a ticker that is not in the market, with the ticker
+    meant when the difference is only case or spacing."""
+    hint = ""
+    if isinstance(ticker, str):
+        wanted = ticker.strip().upper()
+        near = next((t for t in tickers if t.upper() == wanted), None)
+        if near is not None and near != ticker:
+            hint = f" Did you mean {near!r}?"
+    return (f"No ticker {ticker!r} in this market.{hint} obs.tickers lists "
+            f"all {len(tickers)}.")
 
 
 def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
@@ -639,6 +811,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         / len(explanations)
         if explanations else None
     )
+    _warn_fractional(name, portfolio.fills)
 
     return Scorecard(
         name=name,
@@ -660,6 +833,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         trusted=trusted,
         uses_hidden_state=privileged,
         tampered=tampered,
+        partial_fills=_partial_fill_lines(portfolio.fills),
     )
 
 
@@ -712,7 +886,9 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
        separate.
     """
     if by not in ("pnl", "return_pct", "impact_bps", "turnover"):
-        raise ValidationError(f"cannot rank by {by!r}")
+        raise ValidationError(
+            "leaderboard ranks by pnl, return_pct, impact_bps or turnover; "
+            f"got {by!r}.")
     # Impact is a cost, so less is better; everything else is more-is-better.
     #
     # The direction is applied by NEGATING the metric rather than by

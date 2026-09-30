@@ -254,7 +254,7 @@ def test_impact_ranks_as_a_cost_so_lower_is_better():
 
 
 def test_an_unknown_ranking_key_is_refused():
-    with pytest.raises(tradefloor.ValidationError, match="cannot rank"):
+    with pytest.raises(tradefloor.ValidationError, match="leaderboard ranks by pnl"):
         tradefloor.leaderboard(run({"idle": Idle()}), by="vibes")
 
 

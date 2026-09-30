@@ -535,8 +535,14 @@ impl PyArrowStream {
     }
 
     fn __repr__(&self) -> String {
+        // The reading hint is in the repr because the repr is what a user
+        // sees at the prompt, and `pandas.DataFrame(stream)` fails with
+        // "DataFrame constructor not properly called!", which names no
+        // reader.
         format!(
-            "ArrowStream({:?}, {} rows in {} batch(es))",
+            "ArrowStream({:?}, {} rows in {} batch(es)). Read it with \
+             pyarrow.table(stream) or polars.from_arrow(stream); pip install \
+             \"tradefloor[arrow]\" for pyarrow.",
             self.name,
             self.num_rows(),
             self.batches.len()
