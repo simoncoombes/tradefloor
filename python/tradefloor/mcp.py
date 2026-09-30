@@ -2550,18 +2550,18 @@ _pool = ThreadPoolExecutor(max_workers=MAX_RUNNING_JOBS,
 _job_counter = 0
 
 #: What a run costs, in CPU seconds, measured with `tf.evaluate` on pt-v20
-#: on 2026-09-26 on an Apple-silicon Mac (rosters of 8 to 120 names, 1 to
-#: 11 days, 1 to 6 entrants, sim seed 7). `tf.evaluate` builds one engine
-#: per entrant and one more for the untraded market, and an engine costs
-#: about 0.9s to build whether it holds 8 names or 40, so a short run is
-#: mostly start-up: an 8-name, 1-day evaluation with the five baselines and
-#: one strategy used 6.7s, and an 11-day one 8.3s. The 0.1.0 anchors this
-#: replaced (0.5s at 5 days, 20s at 60, 95s at 252, at 40 names) had no
-#: start-up term and came from an early preset. They put a default 5-day
-#: ranking at 11s, where this model puts it at 43s.
-_COST_ENGINE = 0.9
-_COST_ENTRANT_DAY = 0.02
-_COST_NAME_DAY = 0.0012
+#: on the 0.8.5 release candidate on an Apple-silicon Mac (rosters of 8, 40
+#: and 120 names, 1 and 11 days, the five reference agents, sim seed 7).
+#: `tf.evaluate` builds one engine and forks it for the untraded market and
+#: each entrant, and a pt-v20 engine now takes about 0.02s to build, so the
+#: cost is almost all days times entrants: 0.05s for 8 names over 1 day,
+#: 1.58s for 40 names over 11 days, 4.44s for 120 names over 11 days.
+#: Measured on 2026-09-26, before the engine build went from 0.9s to 0.02s
+#: and before evaluate forked one engine, the same model had 0.9s per
+#: entrant of start-up, 0.02s per entrant-day and 0.0012s per name-day.
+_COST_ENGINE = 0.02
+_COST_ENTRANT_DAY = 0.002
+_COST_NAME_DAY = 0.00065
 
 
 def _roster_size(args: dict[str, Any]) -> int:
@@ -2590,9 +2590,9 @@ def _roster_size(args: dict[str, Any]) -> int:
 def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
     """A rough run time, from measured cost (see `_COST_ENGINE`).
 
-    Scaled by entrants, roster size, days and steps per day, by the seed count for a
-    ranking (six when none are given, as `rank_strategies` runs), and by
-    two for a stress test, which runs its control as well. It is an
+    Scaled by entrants, roster size, days and steps per day, by the seed
+    count for a ranking (six when none are given, as `rank_strategies`
+    runs), and by two for a stress test, which runs its control as well. It is an
     estimate and the field says so; a model deciding whether to wait or
     poll needs an order of magnitude, not a promise. The figures are CPU
     time, so a loaded machine takes longer.
@@ -2609,7 +2609,7 @@ def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
     steps = args.get("steps_per_day", DEFAULT_STEPS_PER_DAY)
     steps = (float(steps) if isinstance(steps, (int, float)) and steps > 0
              else float(DEFAULT_STEPS_PER_DAY))
-    run = (_COST_ENGINE * (entrants + 1)
+    run = (_COST_ENGINE
            + days * entrants * (steps / DEFAULT_STEPS_PER_DAY)
            * (_COST_ENTRANT_DAY + _COST_NAME_DAY * _roster_size(args)))
     if tool == "rank_strategies":
@@ -2757,7 +2757,7 @@ def start_job(
         "job_id": job_id,
         "status": "running",
         "estimated_seconds": round(est, 1),
-        "note": (f"Poll `check_job` with this id. Estimated ~{est:.0f}s of "
+        "note": (f"Poll `check_job` with this id. Estimated ~{est:.1f}s of "
                  f"CPU time, from measured cost. It is an estimate, and a "
                  f"loaded machine takes longer. Jobs live in the server "
                  f"process and do not survive a restart."),

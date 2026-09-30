@@ -8,8 +8,8 @@ short version is that the numbers are a curriculum and a directory is a study.
 **[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py)** is the
 canonical demo: one market, one agent, twenty days of shared history, a
 checkpoint, a fork into two identical worlds, +200bps in one of them, and a
-comparison of what the same agent did next. It runs in a few seconds and
-needs nothing installed beyond the library.
+comparison of what the same agent did next. It takes under five seconds of
+CPU and needs nothing installed beyond the library.
 
 ```
 python examples/rate-shock/counterfactual.py
@@ -53,7 +53,7 @@ same experiment two ways, and writes its output to its own git-ignored
 
 | | what it asks |
 |---|---|
-| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. A few seconds, no keys |
+| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Under five seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
@@ -70,12 +70,16 @@ read the Arrow tables and need `tradefloor[arrow]`, and 05 needs
 `tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
-`rate-shock/counterfactual.py`, `10-forking-a-market.py` and
-`11-scenario-fork.py` each run in a few seconds and need nothing extra. The
-first writes a chart if `matplotlib` is installed and says so if it is not.
-`07-research-workflow.py` takes ten to twenty seconds and needs
+The times below are CPU time (user plus system), measured with
+`/usr/bin/time` at 0.8.5 and rounded up.
+
+`10-forking-a-market.py` and `11-scenario-fork.py` take under a second each
+and need nothing extra. `rate-shock/counterfactual.py` takes under five
+seconds of CPU. It writes a chart if `matplotlib` is installed and says so if
+it is not. `07-research-workflow.py` takes about forty seconds and prints its
+own wall-clock total on the last line. It needs
 `tradefloor[arrow]`, because its realism step reads the daily bars table.
-`integrations/finrobot/rate_shock.py` takes about five seconds and also runs
+`integrations/finrobot/rate_shock.py` takes about a second and also runs
 on the core library alone in its default replay mode; `--live` is the one
 that needs `tradefloor[finrobot]`, Python 3.11 and an API key. The recording
 that replay reads is in the repository's `tests/fixtures/`, so the replay

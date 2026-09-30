@@ -194,8 +194,8 @@ def test_support_says_what_each_digest_covers():
 def test_the_readme_states_cpu_time_as_the_examples_pages_do():
     """'About two seconds' and 'ten to twenty seconds' were a third of it."""
     text = flat(read("README.md"))
-    for stale in ("about two seconds", "ten to twenty seconds"):
+    for stale in ("about two seconds", "ten to twenty seconds",
+                  "about two minutes", "0.7 seconds"):
         assert stale not in text, stale
-    assert "The run takes under ten seconds of CPU" in text
-    assert "about two minutes of CPU" in text
-    assert "about 0.7 seconds of CPU to build" in text
+    assert "The run takes under five seconds of CPU" in text
+    assert "about forty seconds of CPU" in text

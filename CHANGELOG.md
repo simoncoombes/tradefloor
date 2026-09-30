@@ -904,8 +904,9 @@ a two-name roster buy-and-hold lost 26 per cent on day one.
 before the job starts. An unknown argument used to be accepted and fail later,
 and a universe given as JSON text made the estimate raise after the job had
 started, so the caller never saw its id. The estimate counts
-`rank_strategies`' six default seeds and each run's start-up, measured again on
-pt-v20, and `rank_strategies(seeds=[])` is refused. An exception that escapes
+`rank_strategies`' six default seeds and the steps per day, its costs were
+measured again on pt-v20 after the engine build fell to about 0.02 s, and
+`rank_strategies(seeds=[])` is refused. An exception that escapes
 any tool comes back as a refusal with its type and message, where the SDK sent
 only `Error executing tool <name>`.
 

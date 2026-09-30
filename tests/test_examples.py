@@ -541,26 +541,30 @@ def test_the_liquidity_crisis_study_names_the_default_it_is_not_on():
 
 
 #: What each page says a run costs: CPU time, user plus system, measured with
-#: /usr/bin/time on the release venv at 0.8.5 and rounded up. The measured
-#: figures on a loaded 10-core Mac were 7 to 9 s for the rate-shock demo
-#: (reviewers saw 6 to 8), 85 to 114 s for 07, and about 4.5 s for the
-#: FinRobot replay. About 0.7 s of each is every pt-v20 engine the run builds.
-#: Before this, the pages gave the rate-shock demo "about a second" in one
+#: /usr/bin/time on the release venv at 0.8.5 and rounded up. Measured first
+#: on a loaded 10-core Mac at 7 to 9 s for the rate-shock demo (reviewers saw
+#: 6 to 8), 85 to 114 s for 07, and about 4.5 s for the FinRobot replay, when
+#: every pt-v20 engine cost about 0.7 s to build. qa085/performance took that
+#: to about 0.02 s, and on the merged candidate the same runs took 4.3 s,
+#: 37.6 s and 0.6 s, and 10 and 11 under a second each. Before the first
+#: measurement the pages gave the rate-shock demo "about a second" in one
 #: place and "two seconds" in another, and 07 "ten to twenty seconds".
 CPU_CLAIMS = {
-    "examples/README.md": ("under ten seconds of CPU",
-                           "07-research-workflow.py` takes about two minutes",
-                           "rate_shock.py` takes about five seconds"),
-    "examples/rate-shock/README.md": ("under ten seconds of CPU",),
-    "examples/rate-shock/counterfactual.py": ("under ten seconds of CPU",),
-    "examples/07-research-workflow.py": ("about two minutes of CPU",),
-    "examples/integrations/finrobot/README.md": ("about five seconds of CPU",),
+    "examples/README.md": ("under five seconds of CPU",
+                           "07-research-workflow.py` takes about forty seconds",
+                           "rate_shock.py` takes about a second"),
+    "examples/rate-shock/README.md": ("under five seconds of CPU",),
+    "examples/rate-shock/counterfactual.py": ("under five seconds of CPU",),
+    "examples/07-research-workflow.py": ("about forty seconds of CPU",),
+    "examples/integrations/finrobot/README.md": ("about a second of CPU",),
 }
 
-#: The figures those pages carried before, each of which understated the run.
+#: The figures those pages carried before, each of which is now wrong: the
+#: early ones understated the run, and the 0.7 s engine build is gone.
 STALE_TIMINGS = ("in about a second", "runs in about a second",
                  "Two seconds, no keys", "ten to twenty seconds",
-                 "each run in about a second")
+                 "each run in about a second", "0.7 seconds",
+                 "about two minutes", "under ten seconds")
 
 
 @pytest.mark.parametrize("page", sorted(CPU_CLAIMS))

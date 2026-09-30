@@ -1,11 +1,8 @@
-"""A complete research workflow, start to finish, in about two minutes of CPU.
+"""A complete research workflow, start to finish, in about forty seconds of CPU.
 
 That is user plus system time, measured with /usr/bin/time at 0.8.5 and
-rounded up; the run prints its own wall-clock total on the last line. Each
-pt-v20 engine costs about 0.7 seconds of CPU to build, because the preset
-runs a 755-day burn-in before day 0, and the sweep, the evaluation and the
-ranking build one per seed and agent. Step 8, the realism panel, runs the
-252 days its bands were derived at.
+rounded up; the run prints its own wall-clock total on the last line. Step
+8, the realism panel, runs the 252 days its bands were derived at.
 
 Run it:
 

@@ -50,8 +50,8 @@ python examples/integrations/finrobot/rate_shock.py
 
 That replays a genuine recorded FinRobot run. It needs no API key, no network
 and no FinRobot install. The market is deterministic, so re-executing it
-against the recorded agent responses reproduces the experiment exactly, in
-about five seconds of CPU.
+against the recorded agent responses reproduces the experiment exactly. The
+replay takes about a second of CPU.
 
 The recording is in the repository's `tests/fixtures/finrobot/` and is not
 installed with the package, so the replay needs a clone. A copy of

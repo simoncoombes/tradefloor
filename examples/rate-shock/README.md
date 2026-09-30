@@ -11,11 +11,9 @@ python examples/rate-shock/counterfactual.py
 
 The wheel carries the library, not the examples, so the clone is what puts
 the script on disk. `matplotlib` is optional and only decides whether you get
-the chart. About half the run's CPU goes on building the five pt-v20 engines
-it uses, about 0.7 seconds each, because pt-v20 runs a 755-day burn-in before
-day 0.
+the chart.
 
-It runs in a few seconds and answers one question:
+It takes under five seconds of CPU and answers one question:
 
 > **How does the exact same trading agent behave when interest rates
 > unexpectedly rise by 200 basis points?**
@@ -134,7 +132,7 @@ print(agree(control, shock).render())
   order book             identical  232 levels
   generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  41 fields, day 20
+  whole engine state     identical  42 fields, day 20
   portfolio              identical  $7,397,523 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
