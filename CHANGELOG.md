@@ -356,25 +356,9 @@ book's fingerprint is unchanged. With both on (1.0 and 0.12), the put's
 emergency meeting at a VIX of 50, and the idiosyncratic jumps, credit's
 leverage gain and the flight to quality retuned (arm R20F, sim/r20-fedbear),
 the median over sets A, B and C (878 bears) reads -0.70 (+3.4 se), with 0.55
-of bears cut by more than half a point.
-
-`fed_put_carry` and `fed_drawdown_hold` give the Fed a way to keep easing
-through a slow bear. The put rounds its ask to a quarter point, so a bear
-that falls 3 or 4 per cent between each pair of meetings was never answered,
-and the stress hold reads the VIX, which settles while the index stays down,
-so 0.43 to 0.47 of R19V's held-out 20 per cent bears saw a rise between peak
-and trough. The carry restarts the put's clock at the fall a meeting's cut
-did not answer; the hold keeps any rise off the table while the index is at
-least the dial's log fall below its highest close of the last 252 sessions.
-Both are 0 on every preset, and every known-answer digest but the book's
-fingerprint is unchanged. With both on (carry 1, hold 0.12), a meeting called
-at a VIX of 50 (`fed_put_emergency_vix`), a credit leverage gain of 1.8, the
-flight to quality at 0.013 and the Treasury haven at 0.014, and company jumps
-three times as frequent at the same variance (0.009 at 0.0318), the median
-policy change from peak to trough of a 20 per cent bear reads -0.75 and -0.60
-on held-out sets A and B (R19V -0.50 and -0.60) with 0.67 and 0.64 of bears
-cut by 0.5 or more, the stock-IG correlation on the held close 0.363 and
-0.358 (0.381 and 0.379), and the share of nights beyond eight times the
+of bears cut by more than half a point. On the same arm's full screens
+(sets A and B) the stock-IG correlation on the held close reads 0.363 and
+0.358 (R19V 0.381 and 0.379), and the share of nights beyond eight times the
 median gap 1.13 and 1.10 per cent (1.02 and 1.00; real 1.96).
 
 `market_beta_normalise` divides each name's beta by the roster's
