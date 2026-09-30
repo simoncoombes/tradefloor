@@ -107,7 +107,9 @@ The Oracle reads hidden state by declaring `privileged = True`, which gives
 it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for
 research that needs the live engine, and every scorecard says so. Either way
 the harness compares the engine's state hash around each call, and an agent
-that changed the market is scored `tampered` and left out of `tf.rank`.
+that changed the market is scored `tampered` and left out of `tf.rank`. So
+is a sandboxed agent that forked or snapshotted the engine, however it
+reached it.
 [`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
 lists what the view serves and what the check cannot catch.
 

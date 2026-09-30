@@ -669,6 +669,29 @@ line naming the step, `rank` leaves it out of its table and says so, and
 known-answer digest is unchanged. `tests/test_sandbox.py` reproduces both of
 the audit's agents.
 
+A later review reached the live engine from a sandboxed agent through the
+view's private slot, forked it and traded on the fork, and the card was
+clean, because a fork writes nothing to the engine it came from. The engine
+now counts calls to `fork`, `state_snapshot` and `restore_state`
+(`Engine.copy_count`, not market state), and a sandboxed agent that moved
+the count is scored `tampered` however it reached the engine.
+`Engine.economy()` returns the snapshot's economy block without counting,
+for `HiddenState`. `run_session`, `run_days` and `run_until` refuse a
+day of the week outside 0 to 6, a volatility that is negative or not
+finite, and a start outside the day. The start's minute may still carry
+into the hour (09:60 is 10:00), as it always could.
+
+The same review bounded what a hostile input can cost. The MCP run tools
+cap `steps_per_day` at 22 and days x steps at the day cap's six steps a
+day, and `start_job` checks a job's arguments before it takes a worker. A
+replayed log (a received `RunManifest` or `Checkpoint`) is checked whole
+before it runs, and a day in it may run at most 23,400 ticks
+(`replay(max_ticks_per_day=...)` for a trusted log). The scenario reader
+reads any line in linear time, refuses blocks nested over 32 deep and
+integers past Python's digit limit, and `tradefloor scenario validate`
+reports a bad file and reads the next. `Portfolio` refuses infinite cash
+and leverage.
+
 A second probe, on pt-v20, read three more things through the live engine:
 the economy block of `state_snapshot()` (the true business-cycle phase,
 `months_in_current_phase`, `phase_gdp_target`, `recession_probability` and

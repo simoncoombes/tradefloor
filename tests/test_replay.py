@@ -446,3 +446,43 @@ def test_a_received_checkpoint_naming_a_huge_session_is_refused():
     received = tradefloor.Checkpoint.from_json(json.dumps(payload))
     with pytest.raises(tradefloor.ValidationError, match="23,400"):
         received.resume()
+
+
+@pytest.mark.parametrize("bad", [dict(hour=99), dict(hour=-1),
+                                 dict(hour=24, minute=0), dict(minute=-1),
+                                 dict(minute=999), dict(day_of_week=9),
+                                 dict(day_of_week=-1), dict(hour=2**62),
+                                 dict(volatility=float("nan")),
+                                 dict(volatility=float("inf")),
+                                 dict(volatility=-1.0)])
+def test_a_session_with_an_impossible_clock_is_refused_and_not_logged(bad):
+    """`tick` refused these and `run_session` ran them, so a log someone
+    sent could carry a session at 99:00 on day 9 with NaN volatility."""
+    args = dict(hour=9, minute=30, day_of_week=3, volatility=1.0)
+    args.update(bad)
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError):
+        engine.run_session(args["hour"], args["minute"], args["day_of_week"],
+                           65, volatility=args["volatility"])
+    assert engine.order_log == []
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.replay([dict(SESSION, **bad)], seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError):
+        engine.run_days(1, hour=args["hour"], minute=args["minute"],
+                        day_of_week=args["day_of_week"],
+                        volatility=args["volatility"])
+    # Refused before the first day opened.
+    assert engine.order_log == []
+
+
+def test_a_session_start_may_carry_its_minute_into_the_hour():
+    """`tick` refuses 09:60, but a session start has always carried the
+    minute, the way the session's own clock does after each tick, and
+    callers write `30 + i * 30`. The clock check keeps that."""
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    engine.run_session(9, 60, 3, 5)
+    engine.run_session(9, 90, 3, 5)
+    engine.run_session(0, 23 * 60 + 59, 3, 5)
+    assert len(engine.order_log) >= 3
+    with pytest.raises(tradefloor.ValidationError):
+        engine.tick(9, 60, 3)

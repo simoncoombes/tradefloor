@@ -526,7 +526,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
     shown_engine = engine if trusted else MarketView(engine)
     shown_portfolio = portfolio if trusted else PortfolioView(portfolio, engine)
     hidden = HiddenState(engine) if privileged else None
-    guard = TamperGuard(engine, (portfolio,))
+    guard = TamperGuard(engine, (portfolio,), trusted=trusted)
     tampered = False
 
     trades = 0
@@ -575,7 +575,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             if guard.tampered:
                 tampered = True
                 errors.append(f"step {step}: tampered: agent code changed "
-                              f"the market during act() ({guard.what})")
+                              f"or copied the market during act() "
+                              f"({guard.what})")
 
             for ticker, quantity in orders.items():
                 if not quantity:
@@ -620,7 +621,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             if guard.tampered:
                 tampered = True
                 errors.append(f"day {day} explain: tampered: agent code "
-                              f"changed the market ({guard.what})")
+                              f"changed or copied the market ({guard.what})")
             if claimed is not None and actual is not None:
                 explanations.append((claimed, actual))
 

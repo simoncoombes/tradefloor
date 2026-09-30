@@ -81,16 +81,28 @@ a change made by the agent, and the scorecard says ``tampered=True`` with an
 error line naming the step. :func:`tradefloor.rank` leaves a tampered agent
 out of its table and says so.
 
+A copy is caught the same way. A fork run ahead is look-ahead and writes
+nothing to the engine it came from, so no hash shows it; the engine counts
+calls to ``fork``, ``state_snapshot`` and ``restore_state``
+(``Engine.copy_count``), and an untrusted agent whose code moved the count
+is scored ``tampered=True`` however it reached the engine. A trusted agent
+may copy the engine it was handed. :meth:`HiddenState.economy` reads
+through ``Engine.economy``, which does not count.
+
 ## What this is not
 
 It is not a security boundary. The agent runs in the harness's own Python
-process, and a determined author can walk the interpreter (``gc``, frame
-objects, a closure's cells) to the engine, or build a second engine from a
-guessed seed and run it ahead. The view closes the route the harness itself
-handed over, and the hash check catches any write, however it was reached;
-a second engine built from scratch writes nothing and is not caught. For
-code you do not trust, run it out of process against the MCP server, where
-strategies are data and there is no Python to submit.
+process, and code there can reach the live engine: through the view's
+private slot, ``obs.engine._MarketView__engine``, in one attribute, or by
+walking the interpreter (``gc``, frame objects, a closure's cells). The
+view closes the route the harness itself handed over. The hash check
+catches any write and the copy count any fork or snapshot, however the
+engine was reached. Neither sees a read. A hidden column read through the
+reached engine leaves the card clean. So does a second engine run ahead
+after being built from a guessed seed, or rebuilt by replaying the live
+engine's ``order_log``, because neither calls a copy method.
+For code you do not trust, run it out of process against the MCP server,
+where strategies are data and there is no Python to submit.
 """
 
 from __future__ import annotations
@@ -366,7 +378,7 @@ class HiddenState(MarketView):
     def economy(self) -> dict[str, Any]:
         """The economy block of ``Engine.state_snapshot``, and only that:
         the whole snapshot carries the generator state."""
-        return dict(self.__raw.state_snapshot()["economy"])
+        return dict(self.__raw.economy())
 
     def fundamentals(self) -> tuple[list[float], list[float], list[float]]:
         eps, bv, growth = self.__raw.fundamentals()
@@ -511,7 +523,7 @@ def economy_of(source: Any) -> dict[str, Any]:
     """The economy block, from a :class:`HiddenState` or a live engine."""
     if isinstance(source, HiddenState):
         return source.economy()
-    return source.state_snapshot()["economy"]
+    return dict(source.economy())
 
 
 def _portfolio_state(portfolio: Any) -> tuple:
@@ -525,11 +537,12 @@ def _portfolio_state(portfolio: Any) -> tuple:
 
 
 class TamperGuard:
-    """Detects any change agent code makes to the engine or a portfolio.
+    """Detects any change agent code makes to the engine or a portfolio, and
+    any copy it takes of the engine.
 
     Used as a context manager around each call into agent code::
 
-        guard = TamperGuard(engine, portfolios)
+        guard = TamperGuard(engine, portfolios, trusted=trusted_agents)
         with guard:
             orders = agent.act(obs)
         if guard.tampered: ...
@@ -541,13 +554,22 @@ class TamperGuard:
     fills and pending flow. Compared as ``repr`` so a NaN in a fundamentals
     list compares equal to itself. Reading is free of side effects, so a
     run with the guard is the run without it, digest for digest.
+
+    It also compares ``Engine.copy_count``, which counts calls to ``fork``,
+    ``state_snapshot`` and ``restore_state``. A copy run ahead is
+    look-ahead and writes nothing to the engine it came from, so only the
+    count shows it. Unless ``trusted``: an agent handed the live engine
+    under ``trusted_agents=True`` may fork it, and its card already says so.
     """
 
-    __slots__ = ("_engine", "_portfolios", "_before", "tampered", "what")
+    __slots__ = ("_engine", "_portfolios", "_trusted", "_before", "tampered",
+                 "what")
 
-    def __init__(self, engine: Engine, portfolios: Iterable[Any]) -> None:
+    def __init__(self, engine: Engine, portfolios: Iterable[Any], *,
+                 trusted: bool = False) -> None:
         self._engine = engine
         self._portfolios = tuple(portfolios)
+        self._trusted = bool(trusted)
         self._before: tuple | None = None
         self.tampered = False
         self.what = ""
@@ -556,7 +578,8 @@ class TamperGuard:
         e = self._engine
         return (e.state_hash(), repr(e.fundamentals()), e.recorded_days,
                 e.recorded_book_rows, e.session_ticks_written,
-                repr(tuple(_portfolio_state(p) for p in self._portfolios)))
+                repr(tuple(_portfolio_state(p) for p in self._portfolios)),
+                0 if self._trusted else e.copy_count)
 
     def __enter__(self) -> "TamperGuard":
         self._before = self._state()
@@ -580,5 +603,8 @@ class TamperGuard:
                 parts.append("recording changed")
             if after[5] != before[5]:
                 parts.append("portfolio changed outside the order path")
+            if after[6] != before[6]:
+                parts.append(f"engine copied {after[6] - before[6]} time(s) "
+                             f"by fork, state_snapshot or restore_state")
             self.what = "; ".join(parts)
         return False

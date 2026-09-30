@@ -655,7 +655,8 @@ class World:
                         label, portfolio, day, tickers, prices)
                     portfolio.stamp(day, self._step, tick)
 
-                guard = TamperGuard(self.engine, self._portfolios.values())
+                guard = TamperGuard(self.engine, self._portfolios.values(),
+                                    trusted=self.trusted_agents)
                 asked = {}
                 for label, obs in observed.items():
                     with guard:
@@ -663,7 +664,8 @@ class World:
                     if guard.tampered:
                         self.tampered.setdefault(label, []).append(
                             f"step {self._step}: tampered: agent code "
-                            f"changed the market during act() ({guard.what})")
+                            f"changed or copied the market during act() "
+                            f"({guard.what})")
                 self._step_mids = {}
                 # Execution in label order, against the one book. Off a live
                 # book the order fixes which agent's rejection is written
