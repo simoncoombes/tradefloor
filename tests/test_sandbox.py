@@ -900,13 +900,15 @@ class AheadThroughAFrame(Peek):
         return _live_engine()
 
 
-class AheadThroughTheSlot(Peek):
-    """Peek, reaching past the view through its private slot: the review's
-    one-attribute route."""
+class AheadThroughTheTable(Peek):
+    """Peek, reaching past the view through the sandbox module's table. The
+    review's route was one attribute, the view's private slot; since the
+    view keeps no engine on an attribute, the table is the shortest way to
+    the live engine left."""
 
     @staticmethod
     def reach(obs):
-        return obs.engine._MarketView__engine
+        return tf.sandbox._WRAPPED[obs.engine]
 
 
 class SnapshotAhead:
@@ -938,7 +940,7 @@ class RunAndRewind:
         return {obs.tickers[best]: 100.0}
 
 
-@pytest.mark.parametrize("agent", [AheadThroughTheSlot, AheadThroughAFrame,
+@pytest.mark.parametrize("agent", [AheadThroughTheTable, AheadThroughAFrame,
                                    SnapshotAhead, RunAndRewind])
 def test_look_ahead_through_a_copy_is_flagged_however_it_was_reached(agent):
     card = _run({"ahead": agent(), "hold": tf.StrategySpec.hold()})["ahead"]
