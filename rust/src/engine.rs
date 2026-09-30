@@ -121,6 +121,10 @@ pub const PIN_SPREAD: u16 = 0x4000;
 /// calendar pt-v20 runs, so one stressed month calls at most one.
 pub const FED_PUT_EMERGENCY_GAP_MINUTES: i64 = 21 * 24 * 60;
 
+/// The sessions over which `fed_drawdown_hold` reads the index's highest
+/// close: a year.
+pub const DRAWDOWN_WINDOW: usize = 252;
+
 /// The stress hold's clock before any stressed close (`fed_stress_hold`):
 /// longer than any hold the dial allows, and the ceiling the clock ages to.
 pub const STRESS_HOLD_NEVER: f64 = 1.0e9;
@@ -808,6 +812,15 @@ pub struct Engine {
     /// first. Never touched with the dial off; carried in the snapshot and
     /// the state hash only while it is set.
     stress_hold_age: f64,
+    /// `fed_drawdown_hold`: the close-to-close log return of total public
+    /// market cap over the last [`DRAWDOWN_WINDOW`] sessions, oldest first,
+    /// from which the meeting reads the index's fall from its highest close
+    /// in the window. Empty and never touched with the dial off; carried in
+    /// the snapshot and the state hash only while it is set.
+    drawdown_returns: std::collections::VecDeque<f64>,
+    /// `fed_drawdown_hold`: total public market cap at the last close, the
+    /// base of the next return. 0.0 before the first close.
+    drawdown_mcap_prev: f64,
     /// `treasury_path_pricing`: the market's forecast of the policy rate's
     /// further change, `M`, percentage points: each change decayed at
     /// `treasury_path_half_life` sessions. 0.0 and never touched with the
@@ -1364,7 +1377,43 @@ impl Engine {
     fn stress_hold_now(&self) -> bool {
         (self.params.fed_stress_hold != 0.0 && self.stress_hold_age < self.params.fed_stress_hold)
             || (self.params.fed_drawdown_hold != 0.0
-                && self.economy.spread_equity_gap >= self.params.fed_drawdown_hold)
+                && self.index_drawdown() >= self.params.fed_drawdown_hold)
+    }
+
+    /// The index's log fall from its highest close of the last
+    /// [`DRAWDOWN_WINDOW`] sessions (`fed_drawdown_hold`), read on total
+    /// public market cap: 0.0 at a new high, and 0.0 with the dial off.
+    pub fn index_drawdown(&self) -> f64 {
+        let (mut level, mut high) = (0.0, 0.0);
+        for r in self.drawdown_returns.iter() {
+            level += r;
+            high = crate::mathx::max(high, level);
+        }
+        high - level
+    }
+
+    /// Book tonight's close into the drawdown's window
+    /// (`fed_drawdown_hold`): the log change of total public market cap
+    /// since the last close, the oldest session dropped once the window is
+    /// full. The first close only records its base. Nothing with the dial
+    /// off.
+    fn book_drawdown_close(&mut self) {
+        if self.params.fed_drawdown_hold == 0.0 {
+            return;
+        }
+        let mut mcap = 0.0;
+        for c in self.companies.iter() {
+            if c.is_public && !c.is_bankrupt {
+                mcap += c.stock.market_cap;
+            }
+        }
+        if self.drawdown_mcap_prev > 0.0 && mcap > 0.0 {
+            self.drawdown_returns.push_back(crate::mathx::log(mcap / self.drawdown_mcap_prev));
+            while self.drawdown_returns.len() > DRAWDOWN_WINDOW {
+                self.drawdown_returns.pop_front();
+            }
+        }
+        self.drawdown_mcap_prev = mcap;
     }
 
     /// Whether this engine's model carries credit's leverage gap
@@ -1651,6 +1700,8 @@ impl Engine {
             rate_live: None,
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
+            drawdown_returns: std::collections::VecDeque::new(),
+            drawdown_mcap_prev: 0.0,
             policy_path: 0.0,
             policy_anticipation_priced: 0.0,
             rates: crate::rates::RateBook::default(),
@@ -1835,6 +1886,12 @@ impl Engine {
         }
         if self.params.fed_stress_cut != 0.0 {
             self.stress_vix_max = self.economy.vix;
+        }
+        // The drawdown hold's window: the copy's returns, so the run's first
+        // year reads a full window. Its base is the run's own cap, which the
+        // first close records.
+        if self.params.fed_drawdown_hold != 0.0 {
+            self.drawdown_returns = pre.drawdown_returns.clone();
         }
         // THE VALUATION STATE, under its own switch: a branch at 0.0, every
         // preset, where the market opens at the valuation it always did.
@@ -7774,6 +7831,10 @@ impl Engine {
             self.economy.fed_put *= crate::mathx::pow(0.5, 1.0 / self.params.fed_put_half_life);
         }
 
+        // THE DRAWDOWN'S WINDOW (`fed_drawdown_hold`), before tonight's
+        // meeting reads it. Nothing with the dial off, and no draw.
+        self.book_drawdown_close();
+
         // THE PRICED PATH'S CLOCK (`treasury_path_pricing`): one session's
         // decay of the market's forecast, before tonight's curve reads it.
         // Nothing runs with the dial at 0.0, and no draw at any setting.
@@ -9071,6 +9132,41 @@ impl Engine {
             }
             None => {
                 self.stress_hold_age = STRESS_HOLD_NEVER;
+                Ok(())
+            }
+        }
+    }
+
+    /// The drawdown's window and its base (`fed_drawdown_hold`), for the
+    /// snapshot: `Some` only while the dial is set.
+    pub fn drawdown_state(&self) -> Option<(Vec<f64>, f64)> {
+        if self.params.fed_drawdown_hold == 0.0 {
+            None
+        } else {
+            Some((self.drawdown_returns.iter().copied().collect(), self.drawdown_mcap_prev))
+        }
+    }
+
+    /// For a restore. Refused with the dial off, where no engine writes it,
+    /// and for a window longer than [`DRAWDOWN_WINDOW`].
+    pub fn set_drawdown_state(&mut self, state: Option<(Vec<f64>, f64)>) -> Result<(), String> {
+        match state {
+            Some(_) if self.params.fed_drawdown_hold == 0.0 => Err(
+                "this snapshot carries the drawdown hold's window (fed_drawdown_returns), \
+                 which only an engine with fed_drawdown_hold on writes, and this engine's \
+                 model has it off. Restore it into the model it was taken from."
+                    .to_string()),
+            Some((returns, _)) if returns.len() > DRAWDOWN_WINDOW => Err(format!(
+                "this snapshot's fed_drawdown_returns carries {} sessions; the window is {}.",
+                returns.len(), DRAWDOWN_WINDOW)),
+            Some((returns, prev)) => {
+                self.drawdown_returns = returns.into_iter().collect();
+                self.drawdown_mcap_prev = prev;
+                Ok(())
+            }
+            None => {
+                self.drawdown_returns.clear();
+                self.drawdown_mcap_prev = 0.0;
                 Ok(())
             }
         }
@@ -10616,6 +10712,16 @@ impl Engine {
         if let Some(path) = self.policy_path() {
             hash_f64(&mut buf, 11.0);
             hash_f64(&mut buf, path);
+        }
+        // The drawdown hold's window and base, only while `fed_drawdown_hold`
+        // is set, behind its own tag and length-prefixed.
+        if let Some((returns, prev)) = self.drawdown_state() {
+            hash_f64(&mut buf, 32.0);
+            hash_f64(&mut buf, returns.len() as f64);
+            for r in returns {
+                hash_f64(&mut buf, r);
+            }
+            hash_f64(&mut buf, prev);
         }
         // What the curve prices of the next meeting, only while
         // `policy_anticipation` is set, behind its own tag.

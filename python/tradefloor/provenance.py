@@ -806,6 +806,24 @@ OUT_OF_SCOPE = {
         "points below year 1 over 1350 held-out histories because those "
         "states opened where a market that never traded leaves them "
         "(0.8.5 fourteenth-registration work, sim/r18-valopen)",
+    "fed_put_carry":
+        "inert at 0.0 as shipped: the meeting restarts the Fed put's clock "
+        "at zero, and it is read only with `fed_put_gain` set. Off zero the "
+        "clock restarts at that share of the intermeeting fall the "
+        "meeting's cut did not answer, so a bear that falls under the "
+        "put's quarter-point rounding between each pair of meetings is "
+        "still answered. Target: F-bear, whose median policy change from "
+        "peak to trough sat on the -0.50 atom on R19V's held-out histories "
+        "(0.8.5 fifteenth-round work, sim/r20-fedbear)",
+    "fed_drawdown_hold":
+        "inert at 0.0 as shipped: only the stress hold's VIX clock holds a "
+        "rise. Off zero a meeting also holds any rise, and the put gives "
+        "nothing back, while credit's leverage gap (the index's log fall "
+        "below its slow average) is at or over the dial, with inflation "
+        "under target plus `fed_stress_inflation_gap`. Target: F-bear, as "
+        "0.43 to 0.47 of R19V's held-out 20 per cent bears saw a rise "
+        "between peak and trough (0.8.5 fifteenth-round work, "
+        "sim/r20-fedbear)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "

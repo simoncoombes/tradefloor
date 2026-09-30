@@ -491,6 +491,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # the market's forecast of the policy path, only while
          # `treasury_path_pricing` is set.
          "fed_stress_hold_age", "treasury_policy_path",
+         # The drawdown hold's window and base, only while
+         # `fed_drawdown_hold` is set.
+         "fed_drawdown_returns", "fed_drawdown_mcap_prev",
          # What the curve prices of the next meeting, only while
          # `policy_anticipation` is set.
          "policy_anticipation_priced",
@@ -761,6 +764,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "treasury_policy_path" in snapshot:
         _f64(buf, 11.0)
         _f64(buf, float(snapshot["treasury_policy_path"]))
+    # The drawdown hold's window and base, behind their tag, the window
+    # length-prefixed, only while carried.
+    if "fed_drawdown_returns" in snapshot:
+        raw = snapshot["fed_drawdown_returns"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'fed_drawdown_returns' carries {len(raw)} "
+                "bytes, which is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "fed_drawdown_returns")
+        _f64(buf, 32.0)
+        _f64(buf, float(len(values)))
+        for value in values:
+            _f64(buf, value)
+        _f64(buf, float(snapshot["fed_drawdown_mcap_prev"]))
     if "policy_anticipation_priced" in snapshot:
         _f64(buf, 31.0)
         _f64(buf, float(snapshot["policy_anticipation_priced"]))

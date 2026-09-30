@@ -1047,3 +1047,94 @@ mod spread_dials {
         assert_eq!(out.economy.federal_funds_rate, shipped.economy.federal_funds_rate);
     }
 }
+
+#[cfg(test)]
+mod put_carry {
+    use super::*;
+    use crate::economy::state::{
+        create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
+    };
+
+    struct Silent;
+    impl Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            0.5
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    fn meet(economy: &EconomyState, options: &PolicyOptions) -> MeetingOutcome {
+        let mut cb = create_initial_central_bank_state(0);
+        cb.next_meeting_date = -1;
+        update_central_bank_with(&cb, economy, 1000, &mut Silent, options)
+    }
+
+    fn calm(intermeeting: f64) -> EconomyState {
+        let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+        e.inflation_rate = 2.0;
+        e.unemployment_rate = 4.0;
+        e.federal_funds_rate = 2.0;
+        e.gdp_growth = 2.0;
+        e.intermeeting_return = intermeeting;
+        e
+    }
+
+    fn put(carry: f64) -> PolicyOptions {
+        PolicyOptions { put_gain: 3.0, put_carry: carry, ..PolicyOptions::shipped() }
+    }
+
+    /// At 0.0 the clock restarts at zero whatever the meeting read.
+    #[test]
+    fn off_the_clock_restarts_at_zero() {
+        for i in [-0.03, -0.06, -0.2, 0.04] {
+            let out = meet(&calm(i), &put(0.0));
+            assert_eq!(out.economy.intermeeting_return, 0.0, "I {i}");
+        }
+    }
+
+    /// A 3 per cent fall asks 0.09, which rounds to no cut, so the whole
+    /// fall is carried; the next 3 per cent then takes a quarter point and
+    /// the carried part is what that quarter did not answer.
+    #[test]
+    fn an_unanswered_fall_is_carried_and_a_cut_answers_its_share() {
+        let first = meet(&calm(-0.03), &put(1.0));
+        assert_eq!(first.economy.federal_funds_rate, 2.0);
+        assert!((first.economy.intermeeting_return + 0.03).abs() < 1e-12);
+        let second = meet(&calm(first.economy.intermeeting_return - 0.03), &put(1.0));
+        assert!((second.economy.federal_funds_rate - 1.75).abs() < 1e-12);
+        // 0.06 less the 0.083 a quarter answers is a rise: nothing carried.
+        assert_eq!(second.economy.intermeeting_return, 0.0);
+        // A 10 per cent fall: 0.3 rounds to a quarter, and 0.1 - 0.25/3 is carried.
+        let big = meet(&calm(-0.10), &put(1.0));
+        assert!((big.economy.federal_funds_rate - 1.75).abs() < 1e-12);
+        assert!((big.economy.intermeeting_return - (-0.10 + 0.25 / 3.0)).abs() < 1e-12);
+        // The share scales it; a rise carries nothing.
+        let half = meet(&calm(-0.03), &put(0.5));
+        assert!((half.economy.intermeeting_return + 0.015).abs() < 1e-12);
+        assert_eq!(meet(&calm(0.04), &put(1.0)).economy.intermeeting_return, 0.0);
+    }
+
+    /// Nothing is carried at the floor, with inflation at the put's ceiling
+    /// or on a pinned rate; the carry never moves the meeting's decision.
+    #[test]
+    fn the_carry_stops_at_the_floor_the_ceiling_and_a_pin() {
+        let mut floor = calm(-0.5);
+        floor.federal_funds_rate = 0.25;
+        let out = meet(&floor, &put(1.0));
+        assert_eq!(out.economy.federal_funds_rate, 0.0);
+        assert_eq!(out.economy.intermeeting_return, 0.0);
+        let mut hot = calm(-0.03);
+        hot.inflation_rate = FED_PUT_INFLATION_CEILING;
+        assert_eq!(meet(&hot, &put(1.0)).economy.intermeeting_return, 0.0);
+        let pinned = PolicyOptions { hold_rate: true, ..put(1.0) };
+        assert_eq!(meet(&calm(-0.03), &pinned).economy.intermeeting_return, 0.0);
+        for i in [-0.03, -0.1, 0.02] {
+            let mut on = meet(&calm(i), &put(1.0));
+            let off = meet(&calm(i), &put(0.0));
+            on.economy.intermeeting_return = 0.0;
+            assert_eq!(on, off, "I {i}");
+        }
+    }
+}

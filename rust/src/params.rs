@@ -2162,21 +2162,23 @@ pub struct ModelParams {
     /// (`treasury_put_pricing`) reads the same clock. No draw. No state
     /// beyond the intermeeting return the put already carries.
     pub fed_put_carry: f64,
-    /// Credit's leverage gap (`EconomyState::spread_equity_gap`, the index's
-    /// log fall below its own slow average) at or above which a meeting
+    /// The index's log fall from its highest close of the last 252 sessions
+    /// (total public market cap, close to close) at or above which a meeting
     /// holds any rise, as the stress hold does (`fed_stress_hold`): with
     /// inflation under target plus `fed_stress_inflation_gap`, a rise the
     /// ladder chose is held and the Fed put gives nothing back. 0.0, which
-    /// every preset carries, is off. Requires the gap
-    /// (`corporate_spread_equity_gain` or `cycle_equity_hazard` non-zero).
-    /// In [0, 1].
+    /// every preset carries, is off: no state. On, the engine keeps the
+    /// window's returns, carried in the snapshot and the state hash, and a
+    /// market prehistory hands its window to the run. In [0, 1].
     ///
     /// The stress hold reads the VIX, which reverts within weeks of a
     /// sell-off while the index stays down, so a bear whose VIX has settled
-    /// is hiked into: on R19V's held-out histories 0.43 to 0.47 of 20 per
-    /// cent bears see a rise between peak and trough. The FOMC's rises at
-    /// CPI under 4 came with the S&P 500 within about 10 per cent of its
-    /// high, December 2018 (16 per cent down) the exception.
+    /// is hiked into: on R19V's held-out histories (sets A and B) 0.43 to
+    /// 0.47 of 20 per cent bears see a rise between peak and trough, and
+    /// those rises leave the median policy change from peak to trough on the
+    /// -0.50 atom. The FOMC's rises at CPI under 4 came with the S&P 500
+    /// within about 10 per cent of its high, December 2018 (16 per cent
+    /// down) the exception.
     pub fed_drawdown_hold: f64,
     /// The cross-sectional sd of the opening mispricing. 0.0, which every
     /// preset through pt-v19 carries, adopts the whole day-zero premium of
@@ -10870,18 +10872,9 @@ impl ModelParams {
         }
         if !(self.fed_drawdown_hold >= 0.0 && self.fed_drawdown_hold <= 1.0) {
             return Err(format!(
-                "fed_drawdown_hold is {}. It is the index's log fall below its slow average \
-                 at or above which the bank holds any rise, in [0, 1]; 0 is off.",
-                self.fed_drawdown_hold));
-        }
-        if self.fed_drawdown_hold != 0.0
-            && self.corporate_spread_equity_gain == 0.0
-            && self.cycle_equity_hazard == 0.0
-        {
-            return Err(format!(
-                "fed_drawdown_hold is {} but neither corporate_spread_equity_gain nor \
-                 cycle_equity_hazard is set. The hold reads credit's leverage gap, which \
-                 the engine keeps only with one of them on.",
+                "fed_drawdown_hold is {}. It is the index's log fall from its highest close \
+                 of the last 252 sessions at or above which the bank holds any rise, in \
+                 [0, 1]; 0 is off.",
                 self.fed_drawdown_hold));
         }
         if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {

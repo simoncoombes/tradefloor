@@ -568,6 +568,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_prehistory_sessions": (0.0, 504.0),
     # A switch: the valuation state carried from the prehistory, or not.
     "market_prehistory_valuation": (0.0, 1.0),
+    # The share of the put's unanswered fall carried to the next meeting,
+    # and the leverage gap at which a meeting holds any rise.
+    "fed_put_carry": (0.0, 1.0),
+    "fed_drawdown_hold": (0.0, 0.3),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output

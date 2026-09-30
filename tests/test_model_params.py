@@ -1288,6 +1288,13 @@ PERTURBATIONS = [
     # the same draws price from other levels from the first tick. No stream
     # moves: the copy draws from generators of its own.
     ("market_prehistory_valuation", 1.0, True),
+    # INERT: read only with fed_put_gain non-zero, and then only at a
+    # meeting's restart of the put's clock. tests/test_fed_put_carry.py holds
+    # the mechanism.
+    ("fed_put_carry", 1.0, False),
+    # INERT: read only at a meeting, where it holds a rise, and the
+    # three-session probe holds none; its window moves no price.
+    ("fed_drawdown_hold", 0.05, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero

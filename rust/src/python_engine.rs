@@ -4116,6 +4116,12 @@ impl PyEngine {
         if let Some(path) = self.inner.policy_path() {
             out.set_item("treasury_policy_path", path)?;
         }
+        // The drawdown hold's window and its base, two keys only while
+        // `fed_drawdown_hold` is set.
+        if let Some((returns, prev)) = self.inner.drawdown_state() {
+            out.set_item("fed_drawdown_returns", f64_bytes(py, &returns))?;
+            out.set_item("fed_drawdown_mcap_prev", prev)?;
+        }
         // What the curve prices of the next meeting, a key only while
         // `policy_anticipation` is set.
         if let Some(priced) = self.inner.policy_anticipation_priced() {
@@ -4992,6 +4998,30 @@ impl PyEngine {
             None => None,
         };
         self.inner.set_policy_path(path).map_err(ValidationError::new_err)?;
+        // Absent means the dial was off, or the snapshot predates it.
+        let drawdown: Option<(Vec<f64>, f64)> = match snapshot.get_item("fed_drawdown_returns")? {
+            Some(raw) => {
+                let bytes: &[u8] = raw.extract()?;
+                if bytes.len() % 8 != 0 {
+                    return Err(ValidationError::new_err(format!(
+                        "snapshot field 'fed_drawdown_returns' carries {} bytes, which is not a \
+                         whole number of f64s.", bytes.len())));
+                }
+                let returns: Vec<f64> = bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                let prev: f64 = match snapshot.get_item("fed_drawdown_mcap_prev")? {
+                    Some(v) => v.extract()?,
+                    None => return Err(ValidationError::new_err(
+                        "this snapshot carries fed_drawdown_returns without \
+                         fed_drawdown_mcap_prev; the two travel together.")),
+                };
+                Some((returns, prev))
+            }
+            None => None,
+        };
+        self.inner.set_drawdown_state(drawdown).map_err(ValidationError::new_err)?;
         let priced: Option<f64> = match snapshot.get_item("policy_anticipation_priced")? {
             Some(v) => Some(v.extract()?),
             None => None,
