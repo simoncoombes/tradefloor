@@ -871,6 +871,29 @@ def test_an_unconstrained_portfolio_is_stated_honestly():
     assert book["buying_power"] is None
 
 
+def test_the_payload_gross_exposure_is_a_leverage_multiple_and_says_so():
+    """`portfolio.gross_exposure` in the payload is Portfolio.leverage(), a
+    multiple of net worth, while Portfolio.gross_exposure() is dollars and
+    buying_power is dollars too. A reviewer read 2.02 as dollars. The key
+    cannot be renamed yet (it is inside every recorded digest), so the
+    docstring states the unit, and this pins both the value and the
+    sentence until the rename lands with the next payload version."""
+    world = make_world(callable_agent(buy))
+    world.run(days=2)
+    obs = _observation(world)
+    book = ci.serialize_observation(obs)["portfolio"]
+    portfolio, engine = world.portfolio, world.engine
+    assert portfolio.gross_exposure(engine) > 10_000, "nothing was bought"
+    assert book["gross_exposure"] == pytest.approx(
+        portfolio.leverage(engine))
+    assert book["gross_exposure"] < 10
+    assert book["buying_power"] == pytest.approx(
+        2.0 * portfolio.net_worth(engine) - portfolio.gross_exposure(engine))
+    doc = " ".join(ci.serialize_observation.__doc__.split())
+    assert "``portfolio.gross_exposure`` is a multiple of net worth" in doc
+    assert "``buying_power`` are dollars" in doc
+
+
 def test_the_macro_allowlist_is_the_librarys_own():
     """The same object, not a copy. Two lists agreeing today can disagree
     after one edit, and a widening here would go unnoticed."""
@@ -1378,6 +1401,83 @@ def test_a_transcript_round_trips():
     assert again.response_for("missing") is None
 
 
+def _entry(arm, day, step, digest, response="{}"):
+    return {"arm": arm, "day": day, "step": step, "digest": digest,
+            "prompt": {"step": step}, "response": response}
+
+
+def test_save_writes_the_same_file_whatever_order_entries_arrived_in(
+        tmp_path):
+    """rank(workers=4) appends to a shared recorder from four threads in
+    whatever order they finish, and three recordings of one run had three
+    sha256s. save() now sorts by arm, day, step and digest. The order in
+    memory is left as recorded."""
+    import random
+    entries = [_entry(arm, day, 6 * day, f"{arm}{day}{seed}")
+               for arm in ("control", "shock") for day in range(3)
+               for seed in range(4)]
+    written = set()
+    for trial in range(4):
+        shuffled = list(entries)
+        random.Random(trial).shuffle(shuffled)
+        transcript = ci.Transcript(meta={"recorded_utc": "fixed",
+                                         "model_preset": "pt-v20"},
+                                   entries=shuffled)
+        path = tmp_path / f"t{trial}.json"
+        transcript.save(path)
+        written.add(path.read_bytes())
+        assert transcript.entries == shuffled, "save reordered memory"
+    assert len(written) == 1, "the saved bytes depend on arrival order"
+    loaded = ci.Transcript.load(path)
+    assert [(e["arm"], e["day"], e["digest"]) for e in loaded.entries] \
+        == sorted((e["arm"], e["day"], e["digest"]) for e in entries)
+
+
+def test_save_keeps_the_answer_a_repeated_digest_replays(tmp_path):
+    """Lookup is by digest and the LAST recording of a digest wins. Two
+    forked arms shown one payload record it twice, and a plain sort by arm
+    would put the other answer last and change what the replay returns.
+    The sort keeps a repeated digest's entries in recorded order."""
+    transcript = ci.Transcript()
+    transcript.record(_entry("shock", 2, 12, "same", "shock's answer"))
+    transcript.record(_entry("control", 2, 12, "same", "control's answer"))
+    transcript.record(_entry("control", 0, 0, "first", "day zero"))
+    assert transcript.response_for("same") == "control's answer"
+    transcript.save(tmp_path / "t.json")
+    loaded = ci.Transcript.load(tmp_path / "t.json")
+    assert loaded.response_for("same") == "control's answer"
+    assert loaded.response_for("first") == "day zero"
+    assert [e["digest"] for e in loaded.entries] == ["first", "same", "same"]
+
+
+def test_a_rank_recording_saves_to_the_same_bytes_every_time(tmp_path):
+    """The reviewer's repro, end to end: the same rank(workers=4) recorded
+    three times must save to one file."""
+    def hold_fn(payload):
+        return {"actions": []}
+
+    written = set()
+    for trial in range(3):
+        recorder = ci.Transcript(meta={"recorded_utc": "fixed"})
+        tf.rank(lambda: {"v1": callable_agent(hold_fn, mode="live",
+                                              recorder=recorder)},
+                seeds=range(4), days=2, universe=universe(), workers=4)
+        assert len(recorder) == 8
+        path = tmp_path / f"rank{trial}.json"
+        recorder.save(path)
+        written.add(path.read_bytes())
+    assert len(written) == 1
+
+
+def test_saved_order_tolerates_a_hand_built_entry():
+    entries = [{"digest": "b", "response": "{}"},
+               {"digest": "a", "day": "later", "step": None,
+                "response": "{}"},
+               {"digest": "c", "arm": "x", "day": 1, "step": 6,
+                "response": "{}"}]
+    assert [e["digest"] for e in ci.saved_order(entries)] == ["b", "a", "c"]
+
+
 def test_replay_returns_the_recorded_response():
     transcript = ci.Transcript()
     transcript.record({"digest": "abc", "response": "the answer"})
@@ -1858,6 +1958,42 @@ def test_the_price_memory_is_bounded():
     world = make_world(agent)
     world.run(days=7)       # 42 steps, above HISTORY_STEPS
     assert len(agent.history) == ci.HISTORY_STEPS
+
+
+def test_reusing_an_adapter_for_a_second_run_warns():
+    """FrameworkAdapter.history persists, so a second evaluate() with the
+    same instance showed the agent five days of the first market. In a
+    replay that showed up as a few misses and in a live run as nothing. It
+    warns now, in evaluate() and in World alike."""
+    agent = callable_agent(hold)
+    tf.evaluate({"a": agent}, seed=7, universe=universe(), days=1)
+    with pytest.warns(UserWarning, match="fresh adapter"):
+        tf.evaluate({"a": agent}, seed=7, universe=universe(), days=1)
+    with pytest.warns(UserWarning, match="fresh adapter"):
+        make_world(agent).run(days=1)
+
+    # Warning only. Clearing the memory would change the payload, and the
+    # payload is what every recording is keyed on, so the reused agent
+    # still sees a one-day return at step 0 that a fresh one does not.
+    assert agent.record[1]["step"] == 0
+    assert agent.record[1]["payload"]["assets"][0]["return_1d"] is not None
+    assert agent.record[0]["payload"]["assets"][0]["return_1d"] is None
+
+
+def test_a_single_run_and_a_fork_do_not_warn():
+    """The warning fires only on the first step of a run with a memory
+    already in place. A forked arm starts past step 0 with its parent's
+    memory, which is correct, and must stay quiet."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        world = make_world(callable_agent(hold))
+        world.run(days=1)
+        control, shock = world.fork("control", "shock")
+        control.run(days=1)
+        shock.run(days=1)
+        tf.evaluate({"a": callable_agent(hold)}, seed=7,
+                    universe=universe(), days=2)
 
 
 def test_ask_is_abstract_on_the_base():

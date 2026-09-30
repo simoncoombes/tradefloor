@@ -696,6 +696,76 @@ view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
 scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
 or pass `trusted_agents=True`.
 
+### Orders an agent may send
+
+The five 0.8.5 pre-release reviewers found that a bad order could end an
+evaluation for every agent in it. `evaluate` crashed on a list return, a
+non-string ticker, a complex quantity, and on `tf.Limit` or `tf.Cancel`,
+which `World` already took. A stale recording scored as an agent holding
+cash, and `"100"` and `True` traded 100 shares and one share.
+
+`act()` returns a mapping of ticker to order, or `None` or `{}` to trade
+nothing. A share count is anything `float()` reads as a finite number, so an
+int, a float, a numpy scalar or 0-d array, a `Decimal`, a `Fraction` and a
+torch scalar tensor all trade as before. A bool (Python's or numpy's), a
+string, bytes, a complex number, NaN and an infinity are refused. In
+`evaluate` a bad entry is a rejection with a line in the scorecard's
+`errors`, and the rest of the mapping still trades. A list, a string or a
+number returned in place of a mapping trades nothing that step and gets its
+own error line. `tf.Limit` and `tf.Cancel` work in `evaluate` as they do
+in `World`. A `ReplayMiss` now stops the run with the step, the agent and
+the seed named.
+
+The scorecard gains `equity_curve`, `max_drawdown_pct`, `ruined`,
+`leverage_refusals` and `explanation_baseline`, and its repr shows
+`errors=N`. `leaderboard` sorts tampered cards last, and
+`versus_buy_and_hold` and `capture_ratio` leave them out. `evaluate` builds
+one engine and forks it for the baseline and each agent, so pt-v20's
+burn-in is paid once. None of this changes a price, and every known-answer
+digest is unchanged.
+
+**What breaks.** `True` and `"100"` as quantities, which traded, are now
+refused. A falsy return such as `[]`, `0`, `""` or `False` used to pass as
+a step with no trade. `evaluate` now records it as an error, and a `World`
+on the default `on_refusal="raise"` raises `ValidationError` and ends the
+run. Return `None` or `{}` instead, or build
+the World with `on_refusal="skip"`.
+
+### The gym environment
+
+`TradingEnv.reset()` without a seed used to replay the constructor's market
+every time, even straight after `reset(seed=99)`, so a loop of 1000 resets
+trained on one market 1000 times. The first `reset()` still runs the
+constructor's seed. Each later `reset()` without a seed now runs a new seed
+below `2**32`, drawn from the env's generator, so the loop meets 1000
+markets and the same 1000 on every run. `reset(seed=n)` runs seed `n` and
+reseeds that generator. `info["seed"]` is the seed an episode ran, and
+`reset(seed=info["seed"])` replays it.
+
+The generator is Gymnasium's `np_random`. The first `reset()` without a seed
+used to leave it seeded from the operating system, so it differed on every
+run. It is now seeded from the constructor's seed, which makes it
+deterministic. Without Gymnasium installed the env builds the same
+generator itself, so the drawn seeds are the same either way.
+
+An action whose absolute weights add up to more than `max_leverage` allows
+is now scaled down, every weight by one factor, to a gross of 1.96x under
+the default 2x cap, and the step's `info["scaled"]` is `True`. The gap below
+2x leaves room for fills that cost up to 1 per cent of what they buy. Before,
+the env traded names in roster order until the cap refused one, so
+`[1, 1, 1, 1, 1]` bought the first name at 1x and refused the other four.
+The step also trades every position it shrinks before any it grows, so
+moving 1.9x from one name into another no longer has the purchase refused
+when the new name comes first in the roster.
+
+**What breaks.** Training code that relied on `reset()` replaying one
+market now sees a new one each time, and should call `reset(seed=n)` with
+the seed it wants. An episode whose actions went over the cap trades a
+different book and earns a different reward. Notebook 5's random policy
+loses 83,412 over its episode where it lost 83,236, and its 0.40 row in the
+size sweep now reads the scaled book. The change is in the env's Python
+code and leaves the engine alone, so no known-answer digest moves.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the

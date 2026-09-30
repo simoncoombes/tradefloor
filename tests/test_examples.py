@@ -275,3 +275,180 @@ def test_the_liquidity_crisis_study_replays_its_recording():
     assert not missed, missed[0][:300]
     assert [e["step"] for e in agent.record] == list(
         range(0, ex.STEPS_PER_DAY, ex.DECISION_EVERY))
+
+
+# -- the Claude example, without a model ------------------------------------
+#
+# Every check above that touches `08-claude-agent.py` runs it with no model
+# reachable. These load it as a module and drive `ClaudeTrader` with a stand-in
+# client, so what it offers Claude and when it asks are checked on every run
+# without a key or a bill.
+
+
+def _load_claude_example(monkeypatch):
+    pytest.importorskip("anthropic")
+    pytest.importorskip("pydantic")
+    import importlib.util
+    script = EXAMPLES / "08-claude-agent.py"
+    spec = importlib.util.spec_from_file_location("claude_example", script)
+    module = importlib.util.module_from_spec(spec)
+    # Registered first so pydantic can resolve the `Factor` annotation, which
+    # `from __future__ import annotations` leaves as a string.
+    monkeypatch.setitem(sys.modules, "claude_example", module)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_claude_example_offers_every_factor_the_harness_scores(monkeypatch):
+    """The answer Claude may give is the list `evaluate` scores against.
+
+    It was a list typed out in the example, and it fell behind the harness
+    three times. The last time it missed `fair_value_shift`, which pt-v20
+    scores as the day's answer on about two days in five of the example's
+    market, so Claude was marked wrong on days it could not give the right
+    answer. The schema Claude is handed and the prompt it reads must both
+    carry every name.
+    """
+    import typing
+    from tradefloor.harness import FACTOR_NAMES
+
+    ex = _load_claude_example(monkeypatch)
+    assert typing.get_args(ex.Factor) == FACTOR_NAMES
+    schema = ex.Decision.model_json_schema()["properties"]["driver"]
+    assert schema["enum"] == list(FACTOR_NAMES)
+    missing = [name for name in FACTOR_NAMES if name not in ex.SYSTEM]
+    assert not missing, f"the system prompt never names {missing}"
+
+
+class _StandInMessages:
+    """`client.messages` for `ClaudeTrader`: one scripted answer per call.
+
+    An answer of None raises, the way an unreachable provider does.
+    """
+
+    def __init__(self, ex, answers):
+        self.ex, self.answers, self.calls = ex, answers, 0
+
+    def parse(self, **kwargs):
+        import types
+        driver = self.answers[self.calls]
+        self.calls += 1
+        if driver is None:
+            raise ConnectionError("provider unreachable")
+        decision = self.ex.Decision(weights={}, driver=driver,
+                                    reasoning="stand-in")
+        return types.SimpleNamespace(stop_reason="end_turn",
+                                     parsed_output=decision)
+
+
+def test_the_claude_example_names_the_driver_of_the_day_it_is_scored_on(
+        monkeypatch):
+    """Asked on the day's last step, and scored on that day only.
+
+    `evaluate` calls `explain(day)` after the day's last step and checks the
+    answer against that day's attribution. The example used to ask Claude at
+    the open, when all it could see was yesterday's moves, so its answer was
+    about one day and scored on the next. A day whose call failed also
+    reported the previous day's answer, which scored a stale guess as a new
+    one. Here every call must land on a last step, each scored answer must
+    be the one given that day, and the failed day must go unscored.
+    """
+    import types
+    import tradefloor as tf
+
+    ex = _load_claude_example(monkeypatch)
+    answers = ["fair_value_shift", None, "random_noise"]
+    messages = _StandInMessages(ex, answers)
+    trader = ex.ClaudeTrader(client=types.SimpleNamespace(messages=messages))
+    asked_at = []
+
+    class Watched:
+        def act(self, obs):
+            before = messages.calls
+            try:
+                return trader.act(obs)
+            finally:
+                if messages.calls > before:
+                    asked_at.append((obs.day, obs.step_of_day))
+
+        def explain(self, day):
+            return trader.explain(day)
+
+    card = tf.evaluate({"claude": Watched()}, seed=2026,
+                       universe=tf.Universe.random(4, seed=7),
+                       days=len(answers))["claude"]
+
+    last = 5                         # the harness default, six steps a day
+    assert asked_at == [(day, last) for day in range(len(answers))], asked_at
+    assert [claimed for claimed, _ in card.explanations] == [
+        a for a in answers if a is not None], card.explanations
+    assert len(card.errors) == 1 and "provider unreachable" in card.errors[0]
+
+
+# -- what the pages say about the runs ---------------------------------------
+
+
+def _flat(page: str) -> str:
+    return " ".join((EXAMPLES.parent / page).read_text(encoding="utf-8").split())
+
+
+def test_the_liquidity_crisis_study_names_the_default_it_is_not_on():
+    """The study pins pt-v16, and says which preset it is NOT on.
+
+    It said the shipped default was pt-v19 through 0.8.5, a release whose
+    default is pt-v20. The sentence exists to tell a reader why the study's
+    numbers differ from a fresh run, so a stale name sends them to the wrong
+    preset to compare against.
+    """
+    import re
+    import tradefloor as tf
+    default = tf.ModelParams.from_preset().fingerprint
+    for page, pattern in (
+            ("examples/experiments/liquidity-crisis/README.md",
+             r"shipped default from [0-9.]+ is `(pt-v\d+)`"),
+            ("examples/experiments/liquidity-crisis/build_notebook.py",
+             r"it is `(pt-v\d+)` from [0-9.]+"),
+            ("examples/experiments/liquidity-crisis/notebook.ipynb",
+             r"it is `(pt-v\d+)` from [0-9.]+")):
+        named = re.findall(pattern, _flat(page))
+        assert named == [default], (
+            f"{page} names the shipped default as {named}; it is {default}")
+
+
+#: What each page says a run costs: CPU time, user plus system, measured with
+#: /usr/bin/time on the release venv at 0.8.5 and rounded up. The measured
+#: figures on a loaded 10-core Mac were 7 to 9 s for the rate-shock demo
+#: (reviewers saw 6 to 8), 85 to 114 s for 07, and about 4.5 s for the
+#: FinRobot replay. About 0.7 s of each is every pt-v20 engine the run builds.
+#: Before this, the pages gave the rate-shock demo "about a second" in one
+#: place and "two seconds" in another, and 07 "ten to twenty seconds".
+CPU_CLAIMS = {
+    "examples/README.md": ("under ten seconds of CPU",
+                           "07-research-workflow.py` takes about two minutes",
+                           "rate_shock.py` takes about five seconds"),
+    "examples/rate-shock/README.md": ("under ten seconds of CPU",),
+    "examples/rate-shock/counterfactual.py": ("under ten seconds of CPU",),
+    "examples/07-research-workflow.py": ("about two minutes of CPU",),
+    "examples/integrations/finrobot/README.md": ("about five seconds of CPU",),
+}
+
+#: The figures those pages carried before, each of which understated the run.
+STALE_TIMINGS = ("in about a second", "runs in about a second",
+                 "Two seconds, no keys", "ten to twenty seconds",
+                 "each run in about a second")
+
+
+@pytest.mark.parametrize("page", sorted(CPU_CLAIMS))
+def test_the_pages_agree_on_what_a_run_costs(page):
+    """One figure per run, in CPU time, on every page that states one.
+
+    A wall-clock figure depends on the machine and on what else it is
+    doing, and the reviewers who found these ran on a machine shared with
+    dozens of other jobs. CPU time is the figure a reader can check with
+    /usr/bin/time wherever they are.
+    """
+    text = _flat(page)
+    missing = [claim for claim in CPU_CLAIMS[page] if claim not in text]
+    assert not missing, f"{page} no longer says {missing}"
+    stale = [claim for claim in STALE_TIMINGS if claim in text]
+    assert not stale, f"{page} still says {stale}"

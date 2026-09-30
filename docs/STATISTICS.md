@@ -2,7 +2,7 @@
 
 tradefloor checks its market against real markets with several sets of
 statistics. The sets overlap, have different counts, and are measured over
-different horizons, so "19 of 19", "15 of 15", "14 of 14" and "28 of 28" can
+different horizons, so "19 of 19", "15 of 15", "14 of 14" and "40 of 40" can
 all be true of the same preset at once. This page names each set, lists what is in it,
 and says where it is used. The README and the documentation site use these
 names.
@@ -16,7 +16,7 @@ The model itself is specified in
 |---|---|---|---|---|
 | [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 |
 | [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band | 14 of 14 |
-| [The long-run criteria](#the-long-run-criteria) | 28 registered rows for pt-v20; 15 in records up to 0.8.1 | 21 years | 28 of 28 met | fails 10 of the 28, C9 not scored; its own record reads 15 of 17 |
+| [The long-run criteria](#the-long-run-criteria) | 40 registered rows for pt-v20; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
 | [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | |
 
 Three parts of the one-year table have counts of their own, and appear on
@@ -52,6 +52,15 @@ envelope publishes, over the one-year horizon it certifies. pt-v20 has all
 | `fear_gauge_dn3` | the VIX's rise on a day the index falls 3% or more | index |
 | `index_tail_dn3_pct` | the share of days the index falls 3% or more | index |
 
+The two short-lag clustering rows pass low. pt-v20's certified median is
+0.0282 for `abs_return_acf1` and 0.0188 for `abs_return_acf5`. In
+`tf.facts.REAL_MARKETS_WINDOWS` the lowest real year reads 0.039 and 0.034
+and the median year 0.1025 and 0.0455, so the model sits below every one of
+those windows on both rows. The ruled floors, 0.02 and -0.03, are lower
+still, which is why both rows count as in band. The `decay-shape` gap in
+`tf.envelope.GAPS` carries the defect. Raising clustering changes the
+simulation, so it is for the next preset.
+
 `tf.facts.measure()` returns 18 of the 19 on every run. The nineteenth,
 `crisis_sector_dispersion`, comes from `tf.facts.crisis_statistics()`, which
 `measure()` calls, and it appears only when a run holds at least 30 sessions
@@ -72,6 +81,29 @@ rows; the VIX against the S&P 500 from 1990 for the fear rows and crisis
 dispersion. A fixed rule sets each band from the spread of one-year windows
 on that record. `tf.envelope.score()` grades a run against the bands, and
 `tf.envelope.certified()` returns the default preset's table.
+
+**How a band is built, and what "in band" means.** For a shape row the rule
+takes 35 one-year windows (32 names, 1987 to 2025) and sets the band at their
+median plus or minus 2.11 times their trimmed standard deviation, the
+multiplier solved so the false-alarm rate does not move with the window count
+(`band_basis_detail` in `tf.envelope.certified()`). Two clamps move an edge
+inward where every source agrees on a sign. The band is symmetric whatever the
+statistic's shape, so an edge can sit where no value can: the
+`excess_kurtosis` band is -13 to 24, and excess kurtosis cannot go below -2.
+A 30-seed median of the model is then graded against the spread of single
+real years, which is a lenient test. "In band" says the model's median is not
+unusual for one real year. It does not say the model's median is close to
+the real median. `tf.facts.REAL_MARKETS_WINDOWS` holds ten 2015 to 2025
+windows on 40 US large caps, and reading the model's figure against them is
+the stricter comparison. Changing the rule changes the grade, so it waits for
+the next scoring rule.
+
+**One seed at a time.** The verdict is on the median across seeds. A single
+seed-year often misses one or more shape rows: on seeds 101 to 116 all 14
+shape rows were in band on 5 of the 16, and seed 114 had 8 of 14.
+`tf.envelope.intervals()` takes one `facts.measure()` result per seed and
+gives each statistic's median, 10th and 90th percentiles and range across
+them, and flags a statistic whose middle 80 percent crosses a band edge.
 
 **Where it is used.** The README and `rust/README.md` ("19 statistics"), and on the
 documentation site the Realism envelope, The metrics, Principles, The two
@@ -172,7 +204,7 @@ to 0.8.1 carry the first 15, and pt-v18 met 8 of those.
 | C6 | value signal's rank IC over 20 sessions, whole run and first 60 sessions | -0.03 to +0.05 | 0.000; 0.005 | 0.009 |
 | C7 | momentum's rank IC, 12-1 and 6-1 | -0.04 to +0.095; -0.02 to +0.10 | -0.003; -0.001 | 0.027; 0.041 |
 | C8 | one-day Lo-MacKinlay contrarian profit, bp a day | -6.4 to +2.9 | -0.06 | -1.74 |
-| C9 | cost of size: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.484; 0.424 | 0.5; 0.5 |
+| C9 | cost of size of one immediate order: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.484; 0.424 | 0.5; 0.5 |
 | C10 | timing rules on published macro data: the best rule's points a year over holding | at most +1.0, ahead in at most two thirds | +0.12 | -2.0 |
 | R1 | daily sd of the 2-year yield, bp | 3.65 to 6.80 | 3.87 | 5.23 |
 | R2 | daily sd of the 10-year yield, bp | 4.54 to 6.27 | 4.96 | 5.41 |
@@ -203,6 +235,21 @@ already taken the news leaves nothing to trade on. The R1 to R4 bands are
 the real figure plus or minus two bootstrap standard errors. The rows
 nearest their edges are C10 (92% of its tolerance), L1 and R1 (86%) and S1a
 (84%).
+
+C9 measures one order that sweeps the book at once. For every name on 40-name
+rosters and both sides, `tools/calibration/impact_curve.py` reads the average
+price of an immediate order of 1% to 100% of a day's volume off the book an
+agent meets, without trading, divides the cost by the name's daily volatility,
+and fits the exponent and coefficient by least squares of log cost on log
+size. A single name can fit steeper than the pooled line: on one name at
+seed 7 a one-shot buy fits an exponent of 0.60 to 0.65 over 3% to 100% of a
+day's volume, still inside the band, because the maker's ladder in front of
+the latent depth steepens the middle sizes. C9 does not measure an order
+sliced over time. One sliced over a day costs far less than the empirical
+law for such orders (0.04 of a daily standard deviation for 10% of a day's
+volume in 36 slices, against 0.15 to 0.3), because consumed depth refills
+with a 27-tick half-life and nothing in the model anticipates the order. That
+is for the next preset.
 
 D1 contains the one-year table: it requires the fixed-roster panel in band
 at one year, at two years, on held-out seeds and on a held-out roster, and

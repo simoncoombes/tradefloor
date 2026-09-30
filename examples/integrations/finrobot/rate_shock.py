@@ -30,9 +30,11 @@ The market is deterministic. FinRobot is an LLM behind an API, so running
 this twice live gives two different agents. The default run therefore
 replays a genuine recorded FinRobot run from
 `tests/fixtures/finrobot/rate-shock.json` -- no API key, no network, and
-FinRobot itself does not need to be installed. `--live` calls the real thing
-and costs money; `--live --record` overwrites the fixture with the run it
-just did.
+FinRobot itself does not need to be installed. That file is in the
+repository and not in the package, so the replay needs a clone, or
+`--fixture` pointing at a recording of your own. `--live` calls the real
+thing and costs money; `--live --record` overwrites the fixture with the run
+it just did.
 
 Everything reported is ground truth about THIS simulated market. It is a
 controlled synthetic experiment, not a prediction about how real securities
@@ -140,32 +142,46 @@ BY_DURATION = sorted(ROSTER, key=lambda row: row[7], reverse=True)
 OBJECTIVE = ("Manage the portfolio for attractive risk-adjusted returns "
              "while controlling downside risk.")
 
-#: The recorded run. In `tests/` rather than beside this file because the
-#: automated tests replay the same interactions, and two copies of a recording
-#: are two recordings that can drift apart.
-def _repo_root() -> Path:
-    """The repository root, found by marker rather than by counting parents.
+#: Where the recorded run lives in a repository checkout. In `tests/` rather
+#: than beside this file because the automated tests replay the same
+#: interactions, and two copies of a recording can drift apart.
+FIXTURE_IN_REPO = Path("tests") / "fixtures" / "finrobot" / "rate-shock.json"
 
-    A fixed `parents[N]` climb is a bet on this file's depth, and the bet was
-    lost once already: moving this study one level down, from
-    `examples/finrobot/` to `examples/integrations/finrobot/`, left
-    `parents[2]` pointing at `examples/` and the fixture path resolving to
-    nothing. It failed silently, because the end-to-end test passes its OWN
-    fixture path and so never exercised the default -- CI stayed green while
-    the command README tells a reader to run was broken for everyone.
+
+def fixture_path() -> Path:
+    """The recorded run, found by looking for the file itself.
+
+    Called only by the paths that need it: a replay, and `--live --record`
+    with no `--fixture`. It used to run at import, to find the repository
+    root by its `pyproject.toml`, so a copy of this file outside a checkout
+    could not even be imported. A fixed `parents[N]` climb, the version
+    before that, broke silently when this study moved one folder down.
+    Looking for the recording also keeps a copy that sits inside some other
+    project from pointing at that project's tests.
     """
     for parent in Path(__file__).resolve().parents:
-        if (parent / "pyproject.toml").is_file():
-            return parent
-    raise RuntimeError("no pyproject.toml above this file; where is the root?")
+        candidate = parent / FIXTURE_IN_REPO
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"no {FIXTURE_IN_REPO.as_posix()} in any folder above "
+        f"{Path(__file__).resolve()}. The recorded FinRobot run is part of "
+        "the tradefloor repository and is not installed with the package. "
+        "Clone https://github.com/simoncoombes/tradefloor and run this file "
+        "there, pass --fixture with a recording of your own, or run --live.")
 
 
-FIXTURE = (_repo_root()
-           / "tests" / "fixtures" / "finrobot" / "rate-shock.json")
+def __getattr__(name: str):
+    # `experiment.FIXTURE`, which the notebook reads, resolved when it is
+    # read rather than at import. See fixture_path().
+    if name == "FIXTURE":
+        return fixture_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 #: Where a run writes its artifacts. Beside the run that wrote them, and
 #: git-ignored: they are output, regenerable by running this file, and not the
-#: recorded input that `FIXTURE` is.
+#: recorded input that `fixture_path()` finds.
 DEFAULT_OUT = Path(__file__).resolve().parent / "artifacts"
 
 #: The provider FinRobot talks to in `--live`. Any provider `autogen` supports
@@ -257,9 +273,14 @@ def llm_config() -> dict:
 
 
 def main(*, live: bool = False, record: bool = False,
-         out: Path = DEFAULT_OUT, fixture: Path = FIXTURE) -> dict:
+         out: Path = DEFAULT_OUT, fixture: Path | None = None) -> dict:
     started = time.time()
     roster = list(universe())
+    if fixture is None and (record or not live):
+        try:
+            fixture = fixture_path()
+        except FileNotFoundError as exc:
+            sys.exit(str(exc))
 
     # -- 1. the agent -----------------------------------------------------
     #
@@ -735,8 +756,10 @@ def _cli() -> argparse.Namespace:
                              "the run just performed")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT,
                         help="where to write the experiment artifacts")
-    parser.add_argument("--fixture", type=Path, default=FIXTURE,
-                        help="the recorded run to replay, or to overwrite")
+    parser.add_argument("--fixture", type=Path, default=None,
+                        help="the recorded run to replay, or to overwrite. "
+                             "Defaults to the repository's "
+                             f"{FIXTURE_IN_REPO.as_posix()}")
     args = parser.parse_args()
     if args.record and not args.live:
         parser.error("--record only means something with --live: there is "

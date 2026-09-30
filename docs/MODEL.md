@@ -1302,7 +1302,10 @@ What each term does:
 - $I$ is the company's own noise. Its scale is the company's GJR variance $h_{i,d}$, floored, times a size step $c_i$: 0.8 above USD 50bn of market cap, 1.0 above 10bn, 1.3 above 1bn, 1.6 below (`market/factors.rs:722-733`).
 - $\xi_i$ is 1 except during a crisis episode with an epicentre, when it is 2.04 for companies in the epicentre sector and 0.80 for the rest; see [Crisis regimes](#crisis-regimes).
 
-Betas are fixed per company when the universe is built.
+Betas are fixed per company when the universe is built. Beta and sector are
+the only loadings. There are no style factors such as value, momentum, size
+or crowding, and a caller cannot supply a covariance matrix, so a factor
+crowding study cannot be set up on this structure.
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
@@ -1906,6 +1909,26 @@ also posted into the settlement book, where the background flow can fill it
 at its limit, as a maker fill (`microstructure.rs:674-716`,
 `microstructure.rs:740-755`).
 
+The cost of size in row C9 is this book read for one immediate order.
+`tools/calibration/impact_curve.py` takes every name on 40-name rosters and
+both sides, reads the average price of an order of 1% to 100% of a day's
+volume off the book without trading, divides the cost by the name's realised
+daily volatility, and fits exponent and coefficient by least squares of log
+cost on log size. The pooled fit is $0.469\,\sigma (Q/V)^{0.495}$, and the
+graded record reads 0.484 and 0.424. One name can fit steeper, because the
+maker's ladder sits in front of the latent depth and steepens the middle
+sizes: a one-shot buy on one name at seed 7 fits an exponent of 0.60 to 0.65
+over 3% to 100% of a day's volume, still inside the C9 band.
+
+In a `World` with several agents, orders placed at the same step execute one
+after another in label order, sorted alphabetically, for the whole run
+(`counterfactual.py`), so a later label meets a book an earlier one has
+already walked. Two identical buyers of 10% of a day's volume paid 19.5 to
+30.7 bp apart on seeds 1 to 10, the later label paying more, so label order
+confounds a study of different agents in one book unless the labels are
+rotated across runs. A seeded per-step shuffle would need random state in
+forks, checkpoints and manifests, and does not exist yet.
+
 ### The path of a fill to the price
 
 All agents' taker fills since the last tick are applied once, on the next
@@ -1935,7 +1958,7 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
-| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.487 and coefficient 0.468 |
+| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424, for one immediate order of 1% to 100% of a day's volume |
 | $\delta$ | `book_depth_exponent` | 0.5 | derived | the square-root law (Tóth et al. 2011) |
 | $R$ | `book_depth_reach` | 1.0 | derived | the latent book reaches one day's volume |
 | | `book_shared` | 1 (0) | derived | a switch: agents consume one book |
@@ -1945,6 +1968,17 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 
+### Cash and borrowing
+
+An agent's portfolio pays no commission and no fee to borrow shares for a
+short. With `cash_interest=False`, the default in `tf.evaluate`, cash earns
+nothing and a negative cash balance costs nothing, so leverage up to the
+default `max_leverage` of 2 is free. With `cash_interest=True`,
+`Portfolio.accrue` pays or charges `cash * r_p / 252` a day at the policy
+rate $r^{p}$, which is below any broker's margin rate, so a levered
+strategy's financing cost is a floor. Changing the default would change
+every `evaluate` result, so it waits for a minor release.
+
 ## The agent's observation
 
 An agent sees the market through a read-only view (`sandbox.py`). The
@@ -1952,7 +1986,7 @@ harness loops in `harness.py`, `counterfactual.py` and `tca.py` hand
 `act(obs)` the following:
 
 - `obs.prices`, `obs.tickers`, `obs.avg_volume(t)` and `obs.book(t)`, the last prints, the roster, $\bar A_i$ and a copy of the book at the step's start;
-- `obs.engine`, a `MarketView`: the columns price, previous close, previous tick price, open, high, low, volume, $\bar A_i$, market cap, last daily return, $\beta_i$, short interest and float; `bars`; the published macro fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as published); the curve; and which names and sectors have news today, without its size;
+- `obs.engine`, a `MarketView`: the columns price, previous close, previous tick price, open, high, low, volume, $\bar A_i$, market cap, last daily return, $\beta_i$, short interest and float; `bars` of the days recorded so far, which a World run with `record=True` has and `tf.evaluate` does not; the published macro fields (an allowlist, `PUBLISHED_MACRO`, in which `cycle` is the phase as published); the curve; and which names and sectors have news today, without its size;
 - `obs.portfolio`, a read-only view of the agent's own cash, positions and fills.
 
 Nothing in the observation carries $s_i$, its momentum $\mu_i$, the maker's
@@ -2256,7 +2290,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Noise in the earnings cycle** (`earnings_cycle_sigma`): the cycle follows the phase path alone.
 - **Overnight move** (`overnight_variance_ratio`): the draws are taken and nothing is applied, so each session opens at the last print.
 - **Crisis correlation blend** (`crisis_blend_gain`, `crisis_blend_variance_damp`): no extra market loading in a crisis.
-- **Forced selling** (`forced_flow_gain` and its four partner dials): no correlated selling above a VIX threshold.
+- **Forced selling** (`forced_flow_gain` and its four partner dials): no correlated selling above a VIX threshold, so a crowded trade unwinding, or any other correlated deleveraging, cannot be represented on pt-v20.
 - **Remembered stress** (`universe_stress_weight`, `universe_stress_decay`, `regime_stress_points`): the crisis spike reads today's VIX only, and the business cycle has no direct path to prices.
 - **QE valuation channels** (`qe_pe_gain`, `qe_pe_stock_gain`): QE reaches fair value only through the 10-year yield.
 - **Book-value floor on earnings** (`fair_value_book_floor`).
@@ -2340,13 +2374,15 @@ pt-v19's values for every other dial are the ones in the tables above.
 
 These are places where the code does something this document can state but
 not defend, or where it could not state the code's behaviour as a clean
-equation. They are listed so a reader can judge them.
+equation. They are listed so a reader can judge them. A gap marked *next
+preset* needs a change to the simulation, and a shipped preset never
+changes, so it waits for a new preset.
 
 **Openings.**
 
 - The neutral rate $r^{\ast}$ = 0.0482 was read off pt-v18's burn-in, which always opened in expansion. The opening corporate yield ranges from 2.5% to 6.7% across seeds. On pt-v20 the stationary opening books the resulting rate term into each company's fair-value level, so no run opens with a drift from it; on pt-v19 it shifts the opening mispricing by -0.04 to +0.03.
 - The opening yield also depends on the roster, through the roster-derived VIX anchor acting on the burn-in; the path has not been traced.
-- The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX.
+- The opening VIX is close to a fixed point of the burn-in, because the market is frozen during it, so every run on a roster opens at nearly the same VIX: 17.66 on the certified roster, whatever the seed. One-year statistics therefore describe years that start calm. To start from another state, run the engine forward with `run_days` and fork it; the README's limits table says the same. *Next preset.*
 - After the burn-in the macro calendar restarts at day 1, so the first monthly step of a run comes 41 sessions after the last one of the burn-in.
 - The opening's no-price-move identity holds because the buyback factor is 1 on day zero; an opening applied later would not be exact.
 
@@ -2363,6 +2399,8 @@ equation. They are listed so a reader can judge them.
 
 **Prices.**
 
+- Each session opens at the last print, because `overnight_variance_ratio` is 0 on pt-v20 (see [Off in pt-v20](#off-in-pt-v20)). On a 20-name roster over 80 days the first tick moved with a standard deviation of 0.67% against 2.0% for the whole day, about 11% of the daily variance, and moved more than 1% on 3.6% of days. An agent acting at step 0 sees, and fills at, the previous close. A stop held overnight is safer here than live. *Next preset.*
+- Nothing below the 65-minute step is calibrated, and row C4a reads 65-minute returns only. One-minute trade-price returns have a median lag-1 autocorrelation of -0.37 (mega caps -0.26, the smallest names -0.48), one-minute realised variance is 3.9 times the open-to-close variance, the open is only 1.15 times as volatile as midday, and names worth $1tn quote about 4 bp. *Next preset.*
 - A jump is written to $s$ at the close and reaches the price at the next session's first ticks. So the index return the VIX reads on the jump's day does not contain it; it contains the previous day's. A jump beyond the ±25% band is partly removed by the breaker.
 - The market leg's down-tick tilt is re-centred, but the lagged down-beta multiplies the tilted term, so a small drift of about $-a a_L \beta \sigma/\sqrt{2\pi}$ a tick remains on ticks where the market is down on the trailing window. It has not been measured.
 - When the $\pm 0.9$ cap on $s$ binds, the change is not booked to any attribution slot. When the 50,000 price cap binds, $s$ is not re-derived.
@@ -2371,6 +2409,10 @@ equation. They are listed so a reader can judge them.
 - The company GJR is fed the whole noise term, market and sector parts included, while its coefficients describe a company's own returns. The floor, not $\omega$, sets the resting level in 8 of 12 sectors.
 - The buyback factor is re-evaluated each tick at the current price over all elapsed sessions rather than integrated along the path, and it uses the engine's global session count, so a company listed mid-run is credited with buybacks from before it existed, and no shares are retired.
 
+**Volatility.**
+
+- Volatility clustering is weaker than real at every lag, and the two short-lag rows pass their bands low. pt-v20's certified median `abs_return_acf1` is 0.0282 and `abs_return_acf5` 0.0188, below the lowest of the ten real one-year windows in `tf.facts.REAL_MARKETS_WINDOWS` (0.039 and 0.034; medians 0.1025 and 0.0455). The ruled floors, 0.02 and -0.03, sit below every one of those windows, so "in band" hides the shortfall. The `decay-shape` gap in `tf.envelope.GAPS` has the whole curve. *Next preset.*
+
 **The VIX.**
 
 - With the VIX held at 65 the market is 5.1 times as volatile as with it held at 5, against 6.2 times in real markets (pt-v19: 5.2; pt-v20 before its graded arm: 3.6). The lower market sigma and jump rate take the lever down with them. It is reported beside the grade and does not gate it.
@@ -2378,8 +2420,9 @@ equation. They are listed so a reader can judge them.
 
 **Agents and the book.**
 
-- An agent's permanent impact lives in $s$, so it decays on the mispricing's half-life rather than lasting.
-- The model's own flow never meets depth an agent consumed or the latent depth, so an agent's temporary impact reaches the tape only through the maker's inventory.
+- An agent's permanent impact lives in $s$, so it decays on the mispricing's half-life rather than lasting. *Next preset.*
+- The model's own flow never meets depth an agent consumed or the latent depth, so an agent's temporary impact reaches the tape only through the maker's inventory. A one-shot buy of 60% of a day's volume pays 65 bp against the mid, while the public price moves 30 bp, the linear $\gamma \sigma Q/\bar A$, and that move decays with a half-life of about 40 sessions. Volume, depth and the background flow do not respond to agents, so the model cannot produce amplification, predatory trading or a liquidity spiral. *Next preset.*
+- An order sliced over time costs far less than the empirical law for such orders. Buying 10% of a day's volume in 36 slices ten minutes apart costs 0.040 of a daily standard deviation on a USD 160bn name, against 0.105 for one block and 0.15 to 0.3 implied by published metaorder studies, because consumed depth refills with a 27-tick half-life and nothing anticipates the order. Row C9 measures one sweep and cannot see this, and a schedule optimiser will overstate the value of trading slowly. *Next preset.*
 - On the closing tick, agents' resting-order fills are recorded at book prices while the print is the model price.
 - The settlement book keeps 32 orders a side, so a far agent order can be left out of a tick's settlement.
 - The maker's inventory never decays; only opposing flow unwinds it.

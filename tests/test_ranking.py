@@ -297,16 +297,18 @@ def test_the_table_can_still_be_asked_for_the_median(ceiling_ranking):
 
 def test_the_capture_ranking_is_unchanged_where_the_oracle_is_a_ceiling(
         ceiling_ranking):
-    """On pt-v19 a ranking reads exactly as it did before pt-v20 withheld
-    the capture: the same keys, the pooled capture in the report, and no
-    buy-and-hold field in its place."""
+    """On pt-v19 a ranking reads as it did before pt-v20 withheld the
+    capture: the same keys, the pooled capture in the report, and no
+    buy-and-hold field in its place. Since 0.8.5 each record also carries
+    what the agent's code did on each seed, in both forms."""
     payload = ceiling_ranking.as_dict()
     assert "capture_withheld" not in payload
     assert "unmeasurable_seeds" in payload
     for record in payload["agents"].values():
         assert set(record) == {"name", "seeds", "captures", "pnls", "wins",
                                "pooled_capture", "median_capture",
-                               "median_pnl", "win_rate"}
+                               "median_pnl", "win_rate", "errors",
+                               "rejected", "max_leverage"}
     assert "capture " in ceiling_ranking.report()
     assert "buy-and-hold" not in ceiling_ranking.report()
 
@@ -488,3 +490,279 @@ def test_pooling_equals_the_ratio_when_every_seed_is_identical():
     record = _record([25.0, 75.0], [100.0, 100.0])
     assert record.pooled_capture == pytest.approx(0.5)
     assert record.median_capture == pytest.approx(0.5)
+
+
+# --------------------------------------------------------------------------
+# An agent whose code raised is ranked, and named
+# --------------------------------------------------------------------------
+
+
+class _Raises:
+    """Raises on every call to act(), as a one-character bug would."""
+
+    def act(self, obs):
+        raise KeyError("x")
+
+
+class _ExplainRaises(BuyAndHold):
+    """Trades like buy-and-hold, and its explain() raises every day."""
+
+    def explain(self, day):
+        raise ValueError("no factor")
+
+
+class _Refused:
+    """Orders a ticker that does not exist on every step. Refused, not
+    raised: the harness counts these in `Scorecard.rejected`."""
+
+    def act(self, obs):
+        return {"NOT_A_TICKER": 10.0}
+
+
+#: The market the raising-agent report was reported on: three seeds, two
+#: days, a 20-name roster.
+RAISING_UNIVERSE = tradefloor.Universe.random(20, seed=111)
+
+
+def test_an_agent_that_raises_every_step_is_ranked_and_named():
+    """An agent whose act() raises on every step trades nothing and is
+    scored as though it chose to. The row stays, marked, and the report
+    says how often it raised and what the first exception was. Until 0.8.5
+    it read "ahead 2/3" against buy-and-hold with nothing to say it had
+    never run."""
+    ranking = tradefloor.rank(
+        lambda: {"broken": _Raises(), "buy_and_hold": BuyAndHold()},
+        seeds=range(3), universe=RAISING_UNIVERSE, days=2)
+    record = ranking.records["broken"]
+    steps = 2 * 6
+    assert record.errors == [steps, steps, steps]
+    assert record.seeds_with_errors == 3
+    assert record.raised_in_act
+    assert record.first_error == "seed 0, step 0: KeyError: 'x'"
+    assert ranking.records["buy_and_hold"].errors == [0, 0, 0]
+
+    report = ranking.report()
+    assert "[raised: see below]" in report
+    assert (f"RAISED broken: {3 * steps} errors on 3 of 3 seeds, the first "
+            "on seed 0, step 0: KeyError: 'x'.") in report
+    assert "act() raised as a step with no orders" in report
+    assert "raised on 3/3 seeds" in repr(record)
+    assert ranking.as_dict()["agents"]["broken"]["errors"] == [steps] * 3
+    assert (ranking.as_dict()["agents"]["broken"]["first_error"]
+            == record.first_error)
+
+
+def test_a_refused_order_is_not_counted_as_a_raise():
+    """A refused order is a line in `Scorecard.errors` too, and it is not
+    the agent's code raising. It goes in `rejected`."""
+    ranking = tradefloor.rank(
+        lambda: {"refused": _Refused(), "buy_and_hold": BuyAndHold()},
+        seeds=range(2), universe=RAISING_UNIVERSE, days=1)
+    record = ranking.records["refused"]
+    assert record.errors == [0, 0]
+    assert record.rejected == [6, 6]
+    assert record.first_error is None
+    assert "RAISED" not in ranking.report()
+    assert "[raised" not in ranking.report()
+
+
+def test_an_explain_that_raises_is_named_and_does_not_cost_orders():
+    ranking = tradefloor.rank(
+        lambda: {"explains": _ExplainRaises(), "buy_and_hold": BuyAndHold()},
+        seeds=range(2), universe=RAISING_UNIVERSE, days=2)
+    record = ranking.records["explains"]
+    assert record.errors == [2, 2]
+    assert not record.raised_in_act
+    assert record.first_error == "seed 0, day 0 explain: ValueError: no factor"
+    # It trades exactly as buy-and-hold does, since only explain() raised.
+    assert record.pnls == ranking.records["buy_and_hold"].pnls
+    assert "Only explain() raised, so its P&L is unaffected" in (
+        ranking.report())
+
+
+def test_each_record_keeps_the_scorecards_rejected_and_leverage_per_seed():
+    """What a regression gate reads, besides P&L. Parallel to `seeds`, and
+    equal to what `evaluate` put on each seed's scorecard."""
+    ranking = tradefloor.rank(make, seeds=[4, 9], universe=UNIVERSE, days=1)
+    for index, seed in enumerate(ranking.seeds):
+        cards = tradefloor.evaluate(make(), seed=seed, universe=UNIVERSE,
+                                    days=1)
+        for name, record in ranking.records.items():
+            assert record.rejected[index] == cards[name].rejected
+            assert record.max_leverage[index] == cards[name].max_leverage
+            assert record.errors[index] == 0
+    payload = ranking.as_dict()["agents"]["momentum"]
+    assert payload["rejected"] == ranking.records["momentum"].rejected
+    assert payload["max_leverage"] == ranking.records["momentum"].max_leverage
+
+
+# --------------------------------------------------------------------------
+# Shared instances, and specs
+# --------------------------------------------------------------------------
+
+
+def test_a_factory_that_returns_shared_instances_is_refused():
+    """`lambda: shared` passed the old check, which only asked whether the
+    argument was callable. On seeds 101, 202 and 303 of a six-name roster a
+    shared momentum agent read a median P&L of -5,356 against -2,163 for
+    fresh ones, and nothing said so."""
+    shared = {"mom": tradefloor.StrategySpec.momentum().build()}
+    with pytest.raises(tradefloor.ValidationError,
+                       match="returned the same 'mom' object for seed 202"):
+        tradefloor.rank(lambda: shared, seeds=[101, 202, 303],
+                        universe=UNIVERSE, days=1)
+
+
+def test_a_fresh_mapping_around_a_shared_agent_is_refused():
+    agent = Momentum()
+    with pytest.raises(tradefloor.ValidationError, match="same 'mom' object"):
+        tradefloor.rank(lambda: {"mom": agent,
+                                 "buy_and_hold": BuyAndHold()},
+                        seeds=range(3), universe=UNIVERSE, days=1, workers=2)
+
+
+def test_one_object_under_two_labels_is_refused():
+    agent = Momentum()
+    with pytest.raises(tradefloor.ValidationError,
+                       match="one object under two labels, 'a' and 'b'"):
+        tradefloor.rank(lambda: {"a": agent, "b": agent}, seeds=range(2),
+                        universe=UNIVERSE, days=1)
+
+
+def test_a_factory_must_return_a_mapping():
+    with pytest.raises(tradefloor.ValidationError, match="returned a list"):
+        tradefloor.rank(lambda: [Momentum()], seeds=range(2),
+                        universe=UNIVERSE, days=1)
+
+
+def test_a_mapping_of_specs_is_accepted_as_it_is():
+    """`evaluate` builds a spec fresh on every seed, so a mapping of specs
+    carries no state between seeds and needs no factory. It ranks exactly
+    as the same specs behind a factory do."""
+    specs = {"momentum": tradefloor.StrategySpec.momentum(),
+             "buy_and_hold": tradefloor.StrategySpec.hold()}
+    direct = tradefloor.rank(specs, seeds=range(3), universe=UNIVERSE, days=1)
+    behind = tradefloor.rank(lambda: dict(specs), seeds=range(3),
+                             universe=UNIVERSE, days=1)
+    assert direct.as_dict() == behind.as_dict()
+
+
+def test_a_mapping_with_one_built_agent_is_still_refused_and_named():
+    mixed = {"momentum": tradefloor.StrategySpec.momentum(),
+             "hold": BuyAndHold()}
+    with pytest.raises(tradefloor.ValidationError,
+                       match="Built here: 'hold'"):
+        tradefloor.rank(mixed, seeds=range(2), universe=UNIVERSE, days=1)
+
+
+# --------------------------------------------------------------------------
+# Which entrant is buy-and-hold
+# --------------------------------------------------------------------------
+
+
+def test_buy_and_hold_under_another_label_is_found_and_named():
+    """A BuyAndHold labelled 'bh' read "no buy-and-hold to compare" on
+    every row. It is now the benchmark, and the report says which label
+    it read."""
+    ranking = tradefloor.rank(
+        lambda: {"mine": Momentum(), "bh": BuyAndHold()},
+        seeds=[1, 2, 3], universe=UNIVERSE, days=2)
+    assert ranking.benchmark == "bh"
+    mine, bh = ranking.records["mine"], ranking.records["bh"]
+    assert mine.excess_pnls == pytest.approx(
+        [a - b for a, b in zip(mine.pnls, bh.pnls)])
+    report = ranking.report()
+    assert "no buy-and-hold to compare" not in report
+    assert "bh                the benchmark" in report
+    assert "The benchmark is 'bh', the one buy-and-hold entrant." in report
+    assert ranking.as_dict()["benchmark"] == "bh"
+
+
+def test_a_hold_spec_is_found_as_the_benchmark():
+    ranking = tradefloor.rank(
+        {"mom": tradefloor.StrategySpec.momentum(),
+         "hold": tradefloor.StrategySpec.hold()},
+        seeds=[1, 2], universe=UNIVERSE, days=1)
+    assert ranking.benchmark == "hold"
+
+
+def test_the_benchmark_can_be_named():
+    ranking = tradefloor.rank(
+        lambda: {"mine": Momentum(), "buy_and_hold": BuyAndHold()},
+        seeds=[1, 2], universe=UNIVERSE, days=1, benchmark="mine")
+    assert ranking.benchmark == "mine"
+    assert ranking.records["mine"].excess_pnls == [0.0, 0.0]
+    with pytest.raises(tradefloor.ValidationError,
+                       match="benchmark='nope' is not one of the entrants"):
+        tradefloor.rank(lambda: {"mine": Momentum()}, seeds=[1, 2],
+                        universe=UNIVERSE, days=1, benchmark="nope")
+
+
+def test_no_benchmark_says_how_to_name_one():
+    ranking = tradefloor.rank(lambda: {"mine": Momentum()}, seeds=[1, 2],
+                              universe=UNIVERSE, days=1)
+    assert ranking.benchmark is None
+    assert "rank(..., benchmark='<label>')" in ranking.report()
+
+    two = tradefloor.rank(
+        lambda: {"mine": Momentum(), "a": BuyAndHold(), "b": BuyAndHold()},
+        seeds=[1, 2], universe=UNIVERSE, days=1)
+    assert two.benchmark is None
+    assert "2 entrants hold the market ('a', 'b')" in two.report()
+
+
+class _TamperingHold(BuyAndHold):
+    """Buys the market, then rewrites the first name's earnings. Handed
+    the live engine only under `trusted_agents=True`."""
+
+    def act(self, obs):
+        if obs.step == 1:
+            eps, bv, g = obs.engine.fundamentals()
+            eps = list(eps)
+            eps[0] = eps[0] * 10 if eps[0] > 0 else 1.0
+            obs.engine.set_fundamentals(eps, list(bv), list(g))
+        return super().act(obs)
+
+
+def test_a_benchmark_that_changed_the_market_is_refused():
+    """It is left out of the table like any tampered agent, and every other
+    row would be measured against a market it rewrote."""
+    with pytest.raises(tradefloor.ValidationError,
+                       match="the benchmark 'bh' changed the market"):
+        tradefloor.rank(lambda: {"mine": Momentum(), "bh": _TamperingHold()},
+                        seeds=[1, 2], universe=UNIVERSE, days=1,
+                        trusted_agents=True)
+
+
+def test_the_withheld_capture_reason_is_printed_only_when_the_oracle_ran():
+    """On pt-v20 the reason no capture is reported is about the Oracle. A
+    ranking with no Oracle entered never had a capture to withhold, so the
+    paragraph is left out."""
+    from tradefloor.baselines import ORACLE_NOT_A_CEILING
+
+    reason = ORACLE_NOT_A_CEILING["pt-v20"]
+    without = tradefloor.rank(
+        lambda: {"mine": Momentum(), "buy_and_hold": BuyAndHold()},
+        seeds=[1, 2], universe=UNIVERSE, days=1)
+    assert without.capture_withheld == reason
+    assert reason not in without.report()
+    with_oracle = tradefloor.rank(make, seeds=[1, 2], universe=UNIVERSE,
+                                  days=1)
+    assert reason in with_oracle.report()
+
+
+# --------------------------------------------------------------------------
+# The docstring's seed-count guidance
+# --------------------------------------------------------------------------
+
+
+def test_the_seed_counts_in_the_docstring_are_the_sign_tests():
+    import tradefloor.ranking as module
+
+    doc = " ".join(module.__doc__.split())
+    for wins, losses, quoted in ((6, 0, "0.031"), (5, 0, "0.062"),
+                                 (8, 0, "0.0078"), (7, 1, "0.070"),
+                                 (6, 2, "0.29"), (10, 2, "0.039")):
+        assert f"{_sign_test(wins, losses):.2g}" == f"{float(quoted):.2g}"
+        assert f"p = {quoted}" in doc
+    assert _sign_test(5, 0) > 0.05

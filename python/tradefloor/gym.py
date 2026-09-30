@@ -18,9 +18,28 @@ step. A policy emitting share counts would have to learn the price scale of
 each instrument before it could learn anything about trading. Weights are
 scale-free, bounded, and mean the same thing on day one and day two hundred.
 
+The absolute weights can add up to more than ``max_leverage`` allows, and
+``[1, 1, 1, 1, 1]`` asks for 5x under the default 2x cap. Such an action is
+scaled down, every weight by the same factor, until its gross exposure is
+``max_leverage / (1 + 0.01 * max_leverage)``, which is 1.96x under a 2x cap.
+The gap below the cap leaves room for fills that cost up to 1% of what they
+buy, so all five names are filled at 0.39 each and the step's ``info`` says
+``scaled=True``. An action already under that level is traded as given.
+When fills cost more than 1% the last trades can still meet the cap, which
+refuses them, and ``info["rejected"]`` counts them.
+Before 0.8.5 the env traded names in roster order until the cap refused
+one, so ``[1, 1, 1, 1, 1]`` bought the first name at 1x and refused the
+other four.
+
+The step also trades every position it is shrinking before any it is
+growing, so moving 1.9x out of one name and into another sells the first and
+then buys the second. Before 0.8.5 the purchase came first whenever the new
+name was earlier in the roster, and the cap refused it.
+
 ## The reward is P&L for the step
 
-Change in net worth, not cumulative. Cumulative reward double-counts every
+The reward is the step's change in net worth in dollars, the same units as
+``cash``. It is not cumulative. Cumulative reward double-counts every
 earlier step and makes the return depend on episode length rather than on
 skill.
 
@@ -48,6 +67,17 @@ with the view or without it. See :mod:`tradefloor.sandbox`.
 that rewound would either secretly reconstruct, which is fine but then it is
 a constructor, or try to restore mutable state and eventually miss a field: the
 maker inventory, the Box-Muller spare, the GARCH state.
+
+Which market the new engine runs follows the Gymnasium convention. The
+first ``reset()`` runs the constructor's ``seed``. ``reset(seed=n)`` runs
+seed ``n``. Every later ``reset()`` without a seed draws the next episode's
+seed from the env's generator, seeded by the constructor's seed or by the
+latest ``reset(seed=n)``, so
+``for episode in range(1000): env.reset()`` meets 1000 markets and meets the
+same 1000 on every run. ``info["seed"]`` is the seed the episode ran, and
+``reset(seed=info["seed"])`` replays it. Until 0.8.5 a ``reset()`` without a
+seed always replayed the constructor's market, even straight after
+``reset(seed=99)``.
 """
 
 from __future__ import annotations
@@ -100,6 +130,11 @@ class TradingEnv(_Base):
     levels. A level of 512.44 tells a policy nothing without knowing what it
     was before, and the range across a generated roster spans two orders of
     magnitude; returns are stationary and comparable across instruments.
+
+    Action: a target weight in ``[-1, 1]`` per instrument, scaled down as a
+    whole when the weights ask for more than ``max_leverage`` allows. Reward:
+    the step's change in net worth, in dollars. The module docstring has the
+    details of both.
     """
 
     metadata: dict[str, Any] = {"render_modes": []}
@@ -178,6 +213,12 @@ class TradingEnv(_Base):
         self._step = 0
         self._prev_prices = None
         self._prev_worth = 0.0
+        # Whether a reset has seeded the generator that draws the seed of
+        # each reset() given none. Until one has, reset() runs `base_seed`.
+        self._seeded = False
+        # That generator when gymnasium is absent. With it, the generator is
+        # gymnasium's own `np_random`. See `_seed_generator`.
+        self._fallback_rng = None
 
     @property
     def engine(self) -> Any:
@@ -203,17 +244,22 @@ class TradingEnv(_Base):
         another is being tested rather than recalled. Any integer from 0 to
         ``2**64 - 1``, checked before Gymnasium's own generator sees it, so a
         refusal names the engine's range rather than numpy's.
+
+        With ``seed=None`` the first reset runs the constructor's seed, and
+        each later one runs a new seed below ``2**32`` drawn from the env's
+        generator. ``reset(seed=n)`` reseeds that generator, so the markets
+        that follow it are the same on every run. ``info["seed"]`` is the
+        seed the episode ran.
         """
-        episode_seed = self.base_seed if seed is None else check_seed(seed)
-        if _gym is not None:
-            # Gymnasium keeps its own generator on the base class and its API
-            # checker enforces that reset seeds it. This environment does not
-            # use `self.np_random` -- all randomness lives in the engine's
-            # PCG32 stream -- but skipping the call would make a conforming
-            # env fail conformance, and would leave a second, unseeded
-            # generator sitting on the object for any wrapper that reaches
-            # for it.
-            super().reset(seed=seed)
+        if seed is not None:
+            episode_seed = check_seed(seed)
+            self._seed_generator(episode_seed)
+        elif not self._seeded:
+            episode_seed = self.base_seed
+            self._seed_generator(episode_seed)
+        else:
+            episode_seed = self._draw_seed()
+        self._seeded = True
 
         engine = Engine(seed=episode_seed, universe=self.universe,
                         macro_state=self.macro, model=self.model)
@@ -252,6 +298,7 @@ class TradingEnv(_Base):
         # is normal, and killing the episode for it would make the environment
         # teach optimiser hygiene instead of trading.
         action = _np.clip(action, -1.0, 1.0)
+        action, scaled = self._within_cap(action)
 
         rejected = self._rebalance(action)
 
@@ -272,8 +319,8 @@ class TradingEnv(_Base):
                 engine.open_market()
 
         worth = portfolio.net_worth(engine)
-        # Reward is the step's P&L, measured AFTER the market moved, so it
-        # includes the cost of the agent's own footprint.
+        # Reward is the step's P&L in dollars, measured AFTER the market
+        # moved, so it includes the cost of the agent's own footprint.
         reward = worth - self._prev_worth
         self._prev_worth = worth
 
@@ -285,11 +332,56 @@ class TradingEnv(_Base):
             "cash": portfolio.cash,
             "leverage": portfolio.leverage(engine),
             "rejected": rejected,
+            # True when the action's weights asked for more than the
+            # leverage cap and were scaled down to fit. See `_within_cap`.
+            "scaled": scaled,
             "step": self._step,
         }
         return self._observe(), float(reward), bool(terminated), bool(truncated), info
 
     # -- internals --------------------------------------------------------
+
+    def _seed_generator(self, seed: int) -> None:
+        """Seed the generator that draws the seed of a reset given none."""
+        if _gym is not None:
+            # Gymnasium keeps its own generator on the base class and its API
+            # checker enforces that reset seeds it. That generator is the one
+            # `_draw_seed` reads; the market itself draws nothing from it,
+            # since all of its randomness lives in the engine's PCG32 stream.
+            super().reset(seed=seed)
+        else:
+            # Built the way gymnasium's `seeding.np_random` builds its
+            # generator, so the drawn seeds are the same with gymnasium
+            # installed or without it.
+            self._fallback_rng = _np.random.Generator(
+                _np.random.PCG64(_np.random.SeedSequence(seed)))
+
+    def _draw_seed(self) -> int:
+        """The next episode's seed, drawn from the seeded generator."""
+        rng = self.np_random if _gym is not None else self._fallback_rng
+        # Below 2**32: plenty of markets for any training run, and short
+        # enough to read in a log and to survive a JSON round trip through
+        # JavaScript, whose numbers lose integers above 2**53.
+        return int(rng.integers(2**32))
+
+    def _within_cap(self, weights):
+        """The target weights, scaled down if they ask for more than the cap.
+
+        Returns the weights and whether they were scaled. An action whose
+        absolute weights sum past the cap is scaled as a whole to a gross of
+        ``max_leverage / (1 + _FILL_COST * max_leverage)``: the most a book
+        can hold at the cap after paying fills that cost ``_FILL_COST`` of
+        what they buy. Scaling every weight by one factor keeps the action's
+        proportions, so the position a policy gets does not depend on which
+        name comes first in the roster.
+        """
+        if self.max_leverage is None:
+            return weights, False
+        room = self.max_leverage / (1.0 + _FILL_COST * self.max_leverage)
+        gross = float(_np.abs(weights).sum())
+        if gross <= room:
+            return weights, False
+        return weights * (room / gross), True
 
     def _prices(self):
         # Asserted rather than assumed: these helpers are only reachable after
@@ -306,18 +398,24 @@ class TradingEnv(_Base):
         assert self._engine is not None and self._portfolio is not None
         prices = self._prices()
         worth = self._portfolio.net_worth(self._engine)
-        rejected = 0
+        shrinking, growing = [], []
         for i, ticker in enumerate(self._engine.tickers):
             if prices[i] <= 0:
                 continue
             target = weights[i] * worth / prices[i]
-            delta = target - self._portfolio.positions.get(
-                ticker, _Zero
-            ).quantity
+            held = self._portfolio.positions.get(ticker, _Zero).quantity
+            delta = target - held
             # A threshold, so floating-point dust does not generate a trade
             # every step. One share is the smallest unit anyone would act on.
             if abs(delta) < 1.0:
                 continue
+            (shrinking if abs(target) < abs(held) else growing).append(
+                (ticker, delta))
+        # Every trade that shrinks a position goes before any that grows one.
+        # In roster order, a move from one name at 1.9x into another at 1.9x
+        # bought first when the new name came first, and the cap refused it.
+        rejected = 0
+        for ticker, delta in shrinking + growing:
             try:
                 self._portfolio.execute(self._engine, ticker, delta)
             except (OrderError, ValidationError):
@@ -359,6 +457,16 @@ class TradingEnv(_Base):
         self._engine = None
         self._portfolio = None
         self._shown = (None, None)
+
+
+#: What `TradingEnv._within_cap` allows a fill to cost, as a fraction of
+#: what it buys, when it scales an over-cap action. Measured on 540 trades
+#: from flat (3 to 20 names, six random rosters each, all-ones and random
+#: signed actions, the default 2x cap), fills cost at most 0.40% of what they
+#: bought at the default 1,000,000 of cash, 0.88% at 10,000,000 and 1.0% at
+#: 100,000,000, where the thinnest books filled only part of each order. The
+#: cap refused none of the 540.
+_FILL_COST = 0.01
 
 
 class _ZeroPosition:

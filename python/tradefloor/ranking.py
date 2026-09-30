@@ -4,8 +4,11 @@
 it is what makes a comparison exact, since all agents see the identical market
 but it is the wrong unit of judgement, and the difference is not small.
 
-Measured on this build, with the reference agents over
-``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11:
+Measured on this build under pt-v19, with the reference agents over
+``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11. Every
+capture figure in this docstring is from pt-v19, the last preset where the
+Oracle is a ceiling. The default, pt-v20, reports no capture and ranks each
+agent on its P&L over buy-and-hold's instead (see "On pt-v20" below).
 
     pooled capture over 12 seeds        per-seed range      wins
         buy_and_hold     +0.095       [-0.776, +0.836]      9/12
@@ -97,6 +100,13 @@ p-value computed as though they were would be a precise-looking number built
 on an assumption this library can measure to be false. Counting wins assumes
 almost nothing.
 
+It needs more seeds than people expect. Six wins out of six paired seeds is
+p = 0.031, and five out of five is p = 0.062, so below six seeds nothing can
+separate at 0.05. At eight seeds 8 of 8 is p = 0.0078, but 7 of 8 is
+p = 0.070 and 6 of 8 is p = 0.29. At twelve, 10 of 12 is p = 0.039. Pick the
+seed count before the run, from the smallest split you would want to call
+real.
+
 ## On pt-v20 there is no capture, and the table reads against buy-and-hold
 
 A capture divides by the Oracle's P&L, and on pt-v20 that is not a ceiling:
@@ -108,13 +118,43 @@ each agent's mean P&L over buy-and-hold's in the same market, with the count
 of seeds it came out ahead. The sign test is unchanged, since it never read
 a capture. Every preset through pt-v19 ranks on pooled capture as before.
 
+Buy-and-hold here is the entrant labelled ``buy_and_hold``. With no entrant
+of that name, `rank` uses the one entrant that is a
+:class:`~tradefloor.baselines.BuyAndHold` or a ``StrategySpec.hold()`` and
+the report says which label it read. Pass ``benchmark=`` to name another.
+
 ## Agents are stateful, so this takes a factory
 
 `Momentum` keeps a rolling window; `RandomTrader` advances a generator. Handing
 the same instances to twelve seeds would carry seed 0's history into seed 1 and
 score something that is not the agent. That failure is silent, because the
-numbers look fine, so `rank` refuses a plain mapping rather than accepting one and
-quietly measuring the wrong thing.
+numbers look fine, so `rank` refuses a mapping of built agents rather than
+accepting one and measuring the wrong thing.
+
+A factory that hands back the same objects every time has the same problem,
+so `rank` keeps the agents from the first call and refuses the run if a later
+call returns any of them again, or if one call puts the same object under two
+labels. On seeds 101, 202 and 303 of ``Universe.random(6, seed=1)``, three
+days each, a shared momentum agent read a median P&L of -5,356 against
+-2,163 for fresh ones.
+
+A mapping whose values are all :class:`tradefloor.StrategySpec` is accepted
+as it is. A spec is the instruction for building an agent, and
+:func:`tradefloor.evaluate` builds it fresh on every seed.
+
+## An agent whose code raised is ranked, and marked
+
+`evaluate` scores an agent whose `act()` raised as though it placed no orders
+on that step, and keeps the exception in `Scorecard.errors`. An agent that
+raised on every step is scored as one that did nothing, and against
+buy-and-hold in a falling market that can read as ahead. So each record keeps
+the number of times the agent's code raised on each seed
+(:attr:`AgentRecord.errors`), its refused orders (:attr:`AgentRecord.rejected`)
+and its peak leverage (:attr:`AgentRecord.max_leverage`), and
+:meth:`Ranking.report` names every agent that raised, with the count, the
+seeds and the first exception. The agent stays in the table, so gate on
+those fields if a raise should fail a run. An LLM integration's reply that
+cannot be parsed into orders raises in `act()`, so it is counted here too.
 
 ## A tampered agent is not ranked
 
@@ -130,11 +170,40 @@ use what it was given.
 
 from __future__ import annotations
 
+import re
 import statistics
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from ._core import Instrument, Macro, ModelParams, ValidationError
 from ._core import check_seed
+
+#: How `evaluate` writes what went wrong on a scorecard. A step where
+#: ``act()`` raised reads ``step 3: KeyError: 'x'``, and ``explain()``
+#: raising reads ``day 0 explain: KeyError: 'x'``. A refused order reads
+#: ``step 3: <reason>`` and is counted in ``Scorecard.rejected`` as well. A
+#: tamper line carries ``tampered:`` and is left out here, since a tampered
+#: agent is not ranked at all.
+_TAMPER_LINE = re.compile(r"^(?:step \d+|day \d+ explain): tampered: ")
+_EXPLAIN_LINE = re.compile(r"^day \d+ explain: ")
+_ACT_RAISED_LINE = re.compile(r"^step \d+: [A-Za-z_][\w.]*: ")
+
+
+def _raised(card: Any) -> tuple[int, int, str | None]:
+    """How many times an agent's ``act()`` and ``explain()`` raised on one
+    scorecard, and the first line that says so.
+
+    Counted by subtraction rather than by reading each line: every refused
+    order wrote exactly one step line and added one to ``rejected``, so the
+    step lines left over are the steps where ``act()`` raised, whatever the
+    refusal's text happens to look like.
+    """
+    lines = [line for line in card.errors if not _TAMPER_LINE.match(line)]
+    in_explain = sum(1 for line in lines if _EXPLAIN_LINE.match(line))
+    in_act = max(0, len(lines) - in_explain - card.rejected)
+    first = next((line for line in lines
+                  if (in_explain and _EXPLAIN_LINE.match(line))
+                  or (in_act and _ACT_RAISED_LINE.match(line))), None)
+    return in_act, in_explain, first
 
 
 class AgentRecord:
@@ -143,11 +212,16 @@ class AgentRecord:
     ``captures`` and ``pnls`` are parallel to the ranking's ``seeds``, so a
     result can always be traced back to the market that produced it. A capture
     is ``None`` where it could not be measured -- see :class:`Ranking`.
+
+    ``errors``, ``rejected`` and ``max_leverage`` are parallel to ``seeds``
+    too, read off each seed's scorecard: how many times the agent's own code
+    raised, how many of its orders were refused, and its peak leverage.
     """
 
     __slots__ = ("name", "seeds", "captures", "pnls", "wins",
                  "reference_pnls", "benchmark_pnls", "capture_withheld",
-                 "trusted", "uses_hidden_state")
+                 "trusted", "uses_hidden_state", "errors", "rejected",
+                 "max_leverage", "first_error", "raised_in_act")
 
     def __init__(self, name: str, seeds: list[int],
                  reference_pnls: list[float],
@@ -173,14 +247,34 @@ class AgentRecord:
         self.trusted = False
         #: Declared ``privileged = True`` and was handed hidden state.
         self.uses_hidden_state = False
+        #: Per seed, how many times this agent's ``act()`` or ``explain()``
+        #: raised. A step where ``act()`` raised traded nothing, and the
+        #: P&L counts it that way.
+        self.errors: list[int] = []
+        #: Per seed, how many of its orders were refused
+        #: (``Scorecard.rejected``).
+        self.rejected: list[int] = []
+        #: Per seed, its peak leverage (``Scorecard.max_leverage``).
+        self.max_leverage: list[float] = []
+        #: The first exception line, prefixed with its seed, or None.
+        self.first_error: str | None = None
+        #: Whether any of those raises came from ``act()``, which costs
+        #: orders, rather than only from ``explain()``, which does not.
+        self.raised_in_act = False
+
+    @property
+    def seeds_with_errors(self) -> int:
+        """How many seeds this agent's code raised on at least once."""
+        return sum(1 for count in self.errors if count)
 
     @property
     def marks(self) -> str:
         """The report's label for how this agent saw the market, if not as
-        every other agent did."""
+        every other agent did, and whether its code raised."""
         return "".join(tag for tag, on in (
             ("  [trusted: live engine]", self.trusted),
-            ("  [hidden state]", self.uses_hidden_state)) if on)
+            ("  [hidden state]", self.uses_hidden_state),
+            ("  [raised: see below]", self.seeds_with_errors > 0)) if on)
 
     @property
     def measured(self) -> list[float]:
@@ -274,6 +368,18 @@ class AgentRecord:
         return sum(1 for v in values if v > 0.0) if values else None
 
     def as_dict(self) -> dict[str, Any]:
+        # The same in both forms: what the agent's own code did on each
+        # seed, and how it saw the market.
+        conduct = {
+            "errors": list(self.errors),
+            "rejected": list(self.rejected),
+            "max_leverage": list(self.max_leverage),
+            **({"first_error": self.first_error}
+               if self.first_error is not None else {}),
+            **({"trusted": True} if self.trusted else {}),
+            **({"uses_hidden_state": True} if self.uses_hidden_state
+               else {}),
+        }
         if self.capture_withheld is not None:
             # No capture keys at all, rather than None: a missing ratio
             # cannot be read as a measured zero or sorted as one.
@@ -287,6 +393,7 @@ class AgentRecord:
                 "wins": self.wins,
                 "median_pnl": self.median_pnl,
                 "win_rate": self.win_rate,
+                **conduct,
             }
         return {
             "name": self.name,
@@ -298,21 +405,21 @@ class AgentRecord:
             "median_capture": self.median_capture,
             "median_pnl": self.median_pnl,
             "win_rate": self.win_rate,
-            **({"trusted": True} if self.trusted else {}),
-            **({"uses_hidden_state": True} if self.uses_hidden_state
-               else {}),
+            **conduct,
         }
 
     def __repr__(self) -> str:
+        raised = (f", raised on {self.seeds_with_errors}/{len(self.errors)} "
+                  "seeds" if self.seeds_with_errors else "")
         if self.capture_withheld is not None:
             excess = self.mean_excess_pnl
             shown = f"{excess:+,.0f}" if excess is not None else "n/a"
             return (f"AgentRecord({self.name!r}, mean_excess_pnl={shown}, "
-                    f"wins={self.wins}/{len(self.pnls)})")
+                    f"wins={self.wins}/{len(self.pnls)}{raised})")
         pooled = self.pooled_capture
         shown = f"{pooled:+.3f}" if pooled is not None else "n/a"
         return (f"AgentRecord({self.name!r}, pooled_capture={shown}, "
-                f"wins={self.wins}/{len(self.pnls)})")
+                f"wins={self.wins}/{len(self.pnls)}{raised})")
 
 
 class Ranking:
@@ -320,14 +427,18 @@ class Ranking:
 
     __slots__ = ("records", "seeds", "unmeasurable", "universe_fingerprint",
                  "oracle", "reference_pnls", "model_fingerprint",
-                 "capture_withheld", "tampered")
+                 "capture_withheld", "tampered", "benchmark",
+                 "benchmark_note", "oracle_entered")
 
     def __init__(self, records: dict[str, AgentRecord], seeds: list[int],
                  unmeasurable: list[int], universe_fingerprint: str,
                  oracle: str, reference_pnls: list[float],
                  model_fingerprint: str = "",
                  capture_withheld: str | None = None,
-                 tampered: dict[str, list[int]] | None = None) -> None:
+                 tampered: dict[str, list[int]] | None = None,
+                 benchmark: str | None = "buy_and_hold",
+                 benchmark_note: str | None = None,
+                 oracle_entered: bool = True) -> None:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
@@ -357,6 +468,17 @@ class Ranking:
         #: the seeds it did so on. Not in :attr:`records`: nothing they
         #: scored is a score.
         self.tampered: dict[str, list[int]] = dict(tampered or {})
+        #: The label whose P&L :attr:`AgentRecord.excess_pnls` subtracts, or
+        #: None when no entrant could serve as buy-and-hold.
+        self.benchmark = benchmark
+        #: What the report says about how :attr:`benchmark` was chosen, when
+        #: it was not the label ``buy_and_hold``, or why there is none.
+        self.benchmark_note = benchmark_note
+        #: Whether the :attr:`oracle` label was among the entrants. Without
+        #: it there is no capture to withhold or to measure, so the report
+        #: leaves out pt-v20's reason for withholding one and, on earlier
+        #: presets, says no Oracle ran rather than that it lost money.
+        self.oracle_entered = oracle_entered
 
     def table(self, by: str | None = None) -> list[AgentRecord]:
         """Records sorted best-first, ties broken on name.
@@ -443,6 +565,7 @@ class Ranking:
                 "universe_fingerprint": self.universe_fingerprint,
                 "model_fingerprint": self.model_fingerprint,
                 "oracle": self.oracle,
+                "benchmark": self.benchmark,
                 "reference_pnls": list(self.reference_pnls),
                 "agents": {n: r.as_dict() for n, r in self.records.items()},
                 **({"tampered": {n: list(s) for n, s in self.tampered.items()}}
@@ -474,7 +597,7 @@ class Ranking:
         if self.capture_withheld is not None:
             for record in self.table():
                 excess, ahead = record.mean_excess_pnl, record.seeds_ahead
-                if record.name == "buy_and_hold":
+                if record.name == self.benchmark:
                     lines.append(f"  {record.name:16s}  the benchmark  "
                                  f"median pnl {record.median_pnl:+12,.0f}  "
                                  f"wins {record.wins}/{len(record.pnls)}"
@@ -491,8 +614,14 @@ class Ranking:
                     f"{excess:+12,.0f} a seed  ahead {ahead}/{measured}  "
                     f"wins {record.wins}/{len(record.pnls)}{record.marks}"
                 )
+            if self.benchmark_note:
+                lines.append(f"  {self.benchmark_note}")
             lines.extend(self._excluded_lines())
-            lines.append(f"  {self.capture_withheld}")
+            lines.extend(self._error_lines())
+            # The reason is about the Oracle, so it is printed only where
+            # one ran. Without one there was never a capture to withhold.
+            if self.oracle_entered:
+                lines.append(f"  {self.capture_withheld}")
             return "\n".join(lines)
         for record in self.table():
             pooled = record.pooled_capture
@@ -511,7 +640,14 @@ class Ranking:
                 f"wins {record.wins}/{len(record.pnls)}{record.marks}"
             )
         lines.extend(self._excluded_lines())
-        if self.unmeasurable:
+        lines.extend(self._error_lines())
+        if self.unmeasurable and not self.oracle_entered:
+            lines.append(
+                f"  capture unmeasurable on every seed: no entrant is "
+                f"labelled {self.oracle!r}, so there is nothing to divide "
+                "by. Enter tf.baselines.Oracle() under that label, or name "
+                "yours with rank(..., oracle='<label>').")
+        elif self.unmeasurable:
             shown = ", ".join(str(s) for s in self.unmeasurable[:8])
             more = ", ..." if len(self.unmeasurable) > 8 else ""
             lines.append(
@@ -530,6 +666,28 @@ class Ranking:
             f"act() on seed(s) {', '.join(str(s) for s in seeds)}, so "
             "its score is not a score. See Scorecard.errors."
             for name, seeds in sorted(self.tampered.items())]
+
+    def _error_lines(self) -> list[str]:
+        """One line per ranked agent whose own code raised, in either form
+        of the report. The agent keeps its row; this says what the row
+        is a score of."""
+        lines = []
+        for name, record in sorted(self.records.items()):
+            hit = record.seeds_with_errors
+            if not hit:
+                continue
+            total = sum(record.errors)
+            count = f"{total} error" + ("" if total == 1 else "s")
+            first = (f", the first on {record.first_error}"
+                     if record.first_error else "")
+            cost = ("Its score counts every step where act() raised as a "
+                    "step with no orders" if record.raised_in_act else
+                    "Only explain() raised, so its P&L is unaffected")
+            lines.append(
+                f"  RAISED {name}: {count} on {hit} of "
+                f"{len(record.errors)} seeds{first}. {cost}. "
+                "See Scorecard.errors.")
+        return lines
 
     def __repr__(self) -> str:
         return (f"Ranking({len(self.records)} agents, {len(self.seeds)} seeds, "
@@ -557,21 +715,130 @@ def _sign_test(wins_a: int, wins_b: int) -> float | None:
     return min(1.0, 2.0 * total / (2.0 ** n))
 
 
+#: Why a built agent cannot be handed to more than one seed. Shared by every
+#: refusal below, which differ only in what they caught.
+_STATEFUL = (
+    "Agents are stateful (Momentum keeps a rolling window, RandomTrader "
+    "advances a generator), so reusing instances would carry the first "
+    "seed's history into the second and score something that is not the "
+    "agent, with no visible symptom.")
+
+
 def _factory_or_refuse(make_agents: Any) -> Callable[[], dict[str, Any]]:
+    from .spec import StrategySpec
+
     if callable(make_agents):
         return make_agents
+    built: list[str] = []
+    if isinstance(make_agents, Mapping):
+        built = [str(name) for name, entry in make_agents.items()
+                 if not isinstance(entry, StrategySpec)]
+        if make_agents and not built:
+            # Specs carry no state, and evaluate() builds each one fresh on
+            # every seed, so the mapping itself is a factory already.
+            specs = dict(make_agents)
+            return lambda: dict(specs)
     raise ValidationError(
-        "rank() needs a factory that BUILDS agents, not built agents. Agents "
-        "are stateful -- Momentum keeps a rolling window, RandomTrader "
-        "advances a generator -- so reusing instances would carry the first "
-        "seed's history into the second and score something that is not the "
-        "agent, with no visible symptom. Pass a callable: "
-        "rank(lambda: reference_agents(seed=3), seeds=range(12), ...)"
+        "rank() needs a factory that BUILDS agents, not built agents. "
+        + _STATEFUL + " Pass a callable: "
+        "rank(lambda: reference_agents(seed=3), seeds=range(12), ...), or a "
+        "mapping whose values are all StrategySpec, which evaluate() builds "
+        "fresh on every seed."
+        + (f" Built here: {', '.join(repr(n) for n in built)}."
+           if built else "")
     )
 
 
+def _entrants(factory: Callable[[], Any]) -> Mapping[str, Any]:
+    """One call to the factory, which must return a mapping."""
+    entrants = factory()
+    if not isinstance(entrants, Mapping):
+        raise ValidationError(
+            "rank()'s factory must return a mapping of label to agent, "
+            f"such as {{'mine': Mine()}}, and returned a "
+            f"{type(entrants).__name__}.")
+    return entrants
+
+
+def _refuse_shared(entrants: Mapping[str, Any],
+                   first: Mapping[str, Any] | None, *, first_seed: int,
+                   seed: int) -> None:
+    """Refuse a factory call that handed back an object it handed out
+    before, or one object under two labels.
+
+    ``first`` is a copy of the first call's mapping, or None when this IS
+    the first call. The copy is held for the whole ranking so its objects
+    stay alive: an identity check against an object that has been freed
+    could match a new one that happens to reuse its address. A copy rather
+    than the mapping itself, because a factory that returns one dict every
+    time could change what that dict holds between calls.
+    """
+    from .spec import StrategySpec
+
+    seen: dict[int, str] = {}
+    earlier = {id(entry) for entry in (first or {}).values()
+               if not isinstance(entry, StrategySpec)}
+    for name, entry in entrants.items():
+        if isinstance(entry, StrategySpec):
+            continue
+        if id(entry) in earlier:
+            raise ValidationError(
+                f"rank() needs a factory that BUILDS agents, and the one "
+                f"given returned the same {name!r} object for seed {seed} "
+                f"that it returned for seed {first_seed}. " + _STATEFUL
+                + " Build each agent inside the factory, as in "
+                "rank(lambda: {'mine': Mine()}, ...).")
+        if id(entry) in seen:
+            raise ValidationError(
+                f"rank() was handed one object under two labels, "
+                f"{seen[id(entry)]!r} and {name!r}. evaluate() runs one "
+                "label's market after the other's, so the second would "
+                "start with the first's history. " + _STATEFUL)
+        seen[id(entry)] = name
+
+
+def _is_buy_and_hold(entry: Any) -> bool:
+    """A :class:`~tradefloor.baselines.BuyAndHold`, a hold spec, or an
+    agent built from one."""
+    from .baselines import BuyAndHold
+    from .spec import StrategySpec
+
+    spec = entry if isinstance(entry, StrategySpec) else getattr(
+        entry, "spec", None)
+    if isinstance(spec, StrategySpec):
+        return spec.signal["kind"] == "hold"
+    return isinstance(entry, BuyAndHold)
+
+
+def _resolve_benchmark(benchmark: str, entrants: Mapping[str, Any],
+                       oracle: str) -> tuple[str | None, str | None]:
+    """The label to read buy-and-hold's P&L from, and what the report
+    should say about how it was chosen."""
+    if benchmark in entrants:
+        return benchmark, None
+    if benchmark != "buy_and_hold":
+        raise ValidationError(
+            f"benchmark={benchmark!r} is not one of the entrants: "
+            + ", ".join(repr(n) for n in sorted(entrants)) + ".")
+    held = sorted(name for name, entry in entrants.items()
+                  if name != oracle and _is_buy_and_hold(entry))
+    if len(held) == 1:
+        return held[0], (
+            f"The benchmark is {held[0]!r}, the one buy-and-hold entrant. "
+            "No entrant is labelled 'buy_and_hold'.")
+    if held:
+        return None, (
+            f"No benchmark: {len(held)} entrants hold the market ("
+            + ", ".join(repr(n) for n in held) + ") and none is labelled "
+            "'buy_and_hold'. Pick one with rank(..., benchmark='<label>').")
+    return None, (
+        "No benchmark: no entrant is labelled 'buy_and_hold' or is a "
+        "BuyAndHold. Enter tf.baselines.BuyAndHold(), or name another "
+        "entrant with rank(..., benchmark='<label>').")
+
+
 def rank(
-    make_agents: Callable[[], dict[str, Any]],
+    make_agents: Callable[[], dict[str, Any]] | Mapping[str, Any],
     *,
     seeds: Iterable[int],
     universe: Sequence[Instrument],
@@ -587,11 +854,28 @@ def rank(
     workers: int = 1,
     model: str | ModelParams | None = None,
     trusted_agents: bool = False,
+    benchmark: str = "buy_and_hold",
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
     ``make_agents`` is called once per seed and must return a fresh mapping;
-    see this module's docstring for why instances are refused.
+    see this module's docstring for why instances are refused. A later call
+    that returns an object from the first call is refused too. A mapping
+    whose values are all :class:`tradefloor.StrategySpec` can be passed
+    as it is, since :func:`tradefloor.evaluate` builds a spec fresh on
+    every seed.
+
+    ``benchmark`` is the label of the buy-and-hold entrant that
+    :attr:`AgentRecord.excess_pnls` subtracts, and the headline on pt-v20.
+    Left at ``"buy_and_hold"`` with no entrant of that name, the one entrant
+    that is a :class:`~tradefloor.baselines.BuyAndHold` or a
+    ``StrategySpec.hold()`` is used, and the report names it. Any other
+    label must be an entrant.
+
+    An agent whose code raised stays in the table, and the report names it
+    with the count and the first exception. :attr:`AgentRecord.errors`,
+    :attr:`~AgentRecord.rejected` and :attr:`~AgentRecord.max_leverage` hold
+    the per-seed counts to gate on.
 
     Every agent still meets an identical market within each seed, so the
     per-seed comparison stays exact. What changes is that the verdict is taken
@@ -639,19 +923,42 @@ def rank(
         trusted_agents=trusted_agents,
     )
 
-    def one(seed: int):
-        return seed, evaluate(factory(), seed=seed, **kwargs)
+    # The first seed's agents are built here, before any worker starts, and
+    # held until the end: every later call is checked against them, and
+    # they tell the benchmark lookup what each entrant is.
+    first = _entrants(factory)
+    _refuse_shared(first, None, first_seed=seed_list[0], seed=seed_list[0])
+    held = dict(first)
+    benchmark_label, benchmark_note = _resolve_benchmark(benchmark, held,
+                                                         oracle)
+
+    def one(index: int, seed: int):
+        if index == 0:
+            entrants = first
+        else:
+            entrants = _entrants(factory)
+            _refuse_shared(entrants, held, first_seed=seed_list[0],
+                           seed=seed)
+        return seed, evaluate(entrants, seed=seed, **kwargs)
 
     if workers == 1:
-        results = [one(seed) for seed in seed_list]
+        results = [one(index, seed) for index, seed in enumerate(seed_list)]
     else:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(one, seed) for seed in seed_list]
+            futures = [pool.submit(one, index, seed)
+                       for index, seed in enumerate(seed_list)]
             # Collected in SEED order, never completion order, so a median
             # over an even count picks the same element on every run.
-            results = [f.result() for f in futures]
+            try:
+                results = [f.result() for f in futures]
+            except BaseException:
+                # A refusal on one seed ends the ranking, so the seeds
+                # that have not started yet are not run for nothing.
+                for future in futures:
+                    future.cancel()
+                raise
 
     # Found across every seed first: an agent that tampered on one seed is
     # out of every seed, so its other seeds cannot take a win from anybody.
@@ -665,6 +972,11 @@ def rank(
             f"the reference {oracle!r} changed the market during act() on "
             f"seed(s) {tampered[oracle]}, so no capture here means "
             "anything. See Scorecard.errors.")
+    if benchmark_label is not None and benchmark_label in tampered:
+        raise ValidationError(
+            f"the benchmark {benchmark_label!r} changed the market during "
+            f"act() on seed(s) {tampered[benchmark_label]}, so no P&L "
+            "measured against it means anything. See Scorecard.errors.")
 
     records: dict[str, AgentRecord] = {}
     unmeasurable: list[int] = []
@@ -672,12 +984,13 @@ def rank(
     benchmark_pnls: list[float | None] = []
     # One model for every seed, so the first seed's answer is every seed's.
     withheld = capture_withheld(results[0][1], oracle=oracle)
+    oracle_entered = any(oracle in scores for _, scores in results)
     for seed, scores in results:
         ratios = capture_ratio(scores, oracle=oracle)
         reference = scores[oracle].pnl if oracle in scores else 0.0
         reference_pnls.append(reference)
-        benchmark_pnls.append(scores["buy_and_hold"].pnl
-                              if "buy_and_hold" in scores else None)
+        benchmark_pnls.append(scores[benchmark_label].pnl
+                              if benchmark_label in scores else None)
         # A withheld capture is not an unmeasurable one: the reference may
         # well have made money. The reason is on the ranking instead.
         if not ratios and withheld is None:
@@ -695,6 +1008,13 @@ def rank(
             record.trusted = record.trusted or card.trusted
             record.uses_hidden_state = (record.uses_hidden_state
                                         or card.uses_hidden_state)
+            in_act, in_explain, first_line = _raised(card)
+            record.errors.append(in_act + in_explain)
+            record.rejected.append(card.rejected)
+            record.max_leverage.append(card.max_leverage)
+            if first_line is not None and record.first_error is None:
+                record.first_error = f"seed {seed}, {first_line}"
+            record.raised_in_act = record.raised_in_act or in_act > 0
             if name == winner:
                 record.wins += 1
 
@@ -703,4 +1023,4 @@ def rank(
     model_fingerprint = next(iter(results[0][1].values())).model_fingerprint
     return Ranking(records, seed_list, unmeasurable, fingerprint_of(roster),
                    oracle, reference_pnls, model_fingerprint, withheld,
-                   tampered)
+                   tampered, benchmark_label, benchmark_note, oracle_entered)

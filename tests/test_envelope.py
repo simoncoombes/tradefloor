@@ -907,3 +907,256 @@ def test_the_model_slope_needs_no_committed_file():
         f"DECAY_SLOPE is {env.DECAY_SLOPE}; the fit over the published "
         f"DECAY_252 gives {fitted:.4f}"
     )
+
+
+# -- one band basis, measure() output, and real-window context (0.8.5) -------
+#
+# Three reports from a reviewer of the 0.8.5 pre-release. `check` printed the
+# 2015-2025 decade bands while `score` and `certified` graded on the ruled
+# ones, so `abs_return_acf1` read (0.02, 0.22) from one and (0.02, 0.17) from
+# the other. `score` refused every key of a `facts.measure()` result other
+# than the graded rows, though its docstring said it took one. And a row
+# carried its band and nothing about where the value sat among real years.
+
+
+def _certified_rows():
+    """Every row `certified()` grades, with its value, band and group."""
+    return env.certified()["statistics"]
+
+
+def _check_warning(name, **kwargs):
+    v = env.check(horizon_days=252, statistics=[name], **kwargs)
+    said = [w for w in v.warnings if w.startswith(name + " ")]
+    assert len(said) == 1, (name, v.warnings)
+    return said[0]
+
+
+def test_check_prints_the_bands_score_and_certified_grade_with():
+    """The reviewer's repro: `check` against `certified()` on one row, and
+    then every row `check` prints a band for."""
+    rows = _certified_rows()
+    ruler = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
+        env.CERTIFIED_HORIZON_DAYS][2]
+    scored = env.score(dict(env.certified_panel(), **env.CERTIFIED_LEVEL,
+                            **env.CERTIFIED_CRISIS))["statistics"]
+    printed = 0
+    for name in REAL_MARKETS:
+        if name == "abs_return_acf20":
+            continue            # fires the decay-shape gap instead
+        band = tuple(rows[name]["band"])
+        assert scored[name]["band"] == band, name
+        said = _check_warning(name)
+        assert str(band) in said, (name, band, said)
+        assert ruler in said, (name, said)
+        printed += 1
+    assert printed == len(REAL_MARKETS) - 1
+    # The three rows the reviewer quoted, by value, so a table that moved
+    # under both functions at once still shows up here.
+    assert "(0.35, 0.64)" in _check_warning("volume_abs_return_corr")
+    assert "(0.02, 0.17)" in _check_warning("abs_return_acf1")
+    assert "(0.09, 0.49)" in _check_warning("cross_sectional_corr")
+
+
+def test_check_takes_the_basis_score_takes():
+    said = _check_warning("abs_return_acf1", basis="shipped")
+    assert "(0.02, 0.22)" in said and "facts.REAL_MARKETS)" in said
+    with pytest.raises(tradefloor.ValidationError, match="not a band basis"):
+        env.check(horizon_days=252, basis="decade")
+    # Past 252 days the horizon reason grades on the same basis, and on the
+    # decade basis it does not repeat the decade count as a second sentence
+    # or call a row that is out "inside".
+    far = " ".join(env.check(horizon_days=504, basis="shipped").reasons)
+    assert "the shipped bands" in far and "envelope.BANDS_504" in far
+    assert "On the 2015-2025 decade bands" not in far
+    assert not re.search(r"-\d+\.\d+ seed-sd inside", far), far
+
+
+def test_check_names_a_row_that_is_out_of_band():
+    """It printed nothing at all for a shape row outside its band."""
+    low, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][252][0]["return_acf1"]
+    with mock.patch.object(env, "CERTIFIED",
+                           dict(env.CERTIFIED, return_acf1=low - 0.05)):
+        said = _check_warning("return_acf1")
+    assert "OUT of band" in said, said
+
+
+def test_intervals_grade_on_the_same_basis_as_score():
+    panels = [env.certified_panel(), env.certified_panel()]
+    rows = env.intervals(panels)
+    scored = env.score(env.certified_panel())["statistics"]
+    for name, row in rows.items():
+        if name in scored and scored[name]["band"] is not None:
+            assert row["band"] == scored[name]["band"], name
+    assert env.intervals(panels, basis="shipped")["abs_return_acf1"][
+        "band"] == REAL_MARKETS["abs_return_acf1"]
+
+
+def test_the_decay_gap_quotes_the_band_score_grades_with():
+    gap = {g.id: g for g in env.GAPS}["decay-shape"]
+    lo, hi = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][252][0][
+        "abs_return_acf1"]
+    assert f"`abs_return_acf1` inside {lo} to {hi}" in gap.detail
+    assert "between 0.02 and 0.22" not in gap.detail
+
+
+@pytest.fixture(scope="module")
+def measured_101():
+    """The reviewer's own panel: `facts.measure(seed=101, ...)` as returned."""
+    pytest.importorskip("pyarrow")
+    from tradefloor import facts
+    return facts.measure(seed=101,
+                         universe=tradefloor.Universe.random(40, seed=111))
+
+
+def test_score_takes_what_measure_returns(measured_101):
+    from tradefloor import facts
+    graded = set(facts.SHAPE + facts.LEVEL + facts.CRISIS
+                 + facts.PERSISTENCE + facts.DISPERSION)
+    scored = env.score(measured_101)
+    assert scored["horizon_days"] == 252
+    assert scored["ruler"] == "facts.REAL_MARKETS_RULED"
+    # Everything measure() returned is either graded or set aside by name.
+    assert set(scored["statistics"]) | set(scored["set_aside"]) | set(
+        scored["unmeasured"]) >= set(measured_101) - {
+        k for k in measured_101 if k.endswith("_blind")}
+    assert set(scored["set_aside"]) == set(measured_101) - graded
+    assert {"seed", "days", "burn", "model_fingerprint",
+            "skew"} <= set(scored["set_aside"])
+    assert scored["shape_of"] == 14
+    # The row this run could not read is named with measure()'s own reason.
+    if facts.CRISIS_DISPERSION_ROW + "_blind" in measured_101:
+        assert scored["unmeasured"][facts.CRISIS_DISPERSION_ROW] == \
+            measured_101[facts.CRISIS_DISPERSION_ROW + "_blind"]
+    # Setting those keys aside changes nothing about the graded rows.
+    bare = env.score({k: v for k, v in measured_101.items() if k in graded})
+    for name, row in bare["statistics"].items():
+        assert scored["statistics"][name]["in_band"] == row["in_band"], name
+    for key in ("in_band", "of", "shape_in_band", "shape_of"):
+        assert scored[key] == bare[key], key
+
+
+def test_every_key_measure_returns_is_graded_or_named(measured_101):
+    """The two lists are explicit, so a new statistic in `measure` fails
+    here until someone decides whether it is graded."""
+    from tradefloor import facts
+    graded = set(facts.SHAPE + facts.LEVEL + facts.CRISIS
+                 + facts.PERSISTENCE + facts.DISPERSION)
+    named = set(env.MEASURE_RECORD_KEYS) | set(env.MEASURE_UNGRADED)
+    assert not (named & graded)
+    assert set(measured_101) <= graded | named, sorted(
+        set(measured_101) - graded - named)
+
+
+def test_score_still_refuses_an_unknown_statistic_beside_measure_keys():
+    with pytest.raises(tradefloor.ValidationError, match="sharpe_ratio"):
+        env.score({"seed": 101, "days": 252, "skew": -0.8,
+                   "return_acf1": 0.01, "sharpe_ratio": 1.0})
+
+
+def test_score_names_a_row_the_panel_could_not_read():
+    """`measure` returns None for a row the run could not read (the 3 per
+    cent fear row on a seed with no 3 per cent fall) and a `_blind` reason
+    for a row it reports absent. Both were a crash or a refusal here."""
+    from tradefloor import facts
+    panel = {"seed": 7, "days": 252, "return_acf1": 0.01,
+             "fear_gauge_dn3": None,
+             facts.CRISIS_DISPERSION_ROW + "_blind": "no crisis sessions"}
+    scored = env.score(panel)
+    assert set(scored["statistics"]) == {"return_acf1"}
+    assert scored["unmeasured"][facts.CRISIS_DISPERSION_ROW] == \
+        "no crisis sessions"
+    assert "None" in scored["unmeasured"]["fear_gauge_dn3"]
+    assert scored["of"] == 1 and scored["crisis_of"] == 0
+
+
+def test_score_reads_the_horizon_off_a_measured_panel():
+    """A 504-day `measure()` result is graded on the 504-day bands, and a
+    `days` that disagrees with an explicit horizon is refused."""
+    panel = {k: v for k, v in env.MEASURED_504.items()
+             if v is not None and k in SHAPE}
+    scored = env.score(dict(panel, days=504))
+    assert scored["horizon_days"] == 504
+    assert scored["ruler"] == "facts.REAL_MARKETS_RULED_504"
+    with pytest.raises(tradefloor.ValidationError, match="504 days"):
+        env.score(dict(panel, days=504), horizon_days=252)
+    # A panel with no `days` still defaults to the certified horizon.
+    assert env.score(env.certified_panel())["horizon_days"] == 252
+
+
+@pytest.mark.parametrize("days", [252, 504])
+def test_every_scored_shape_row_says_where_it_sits_among_real_windows(days):
+    from tradefloor import facts
+    table = env.certified_panel() if days == 252 else {
+        k: v for k, v in env.MEASURED_504.items() if v is not None}
+    level = {} if days == 504 else dict(env.CERTIFIED_LEVEL,
+                                        **env.CERTIFIED_CRISIS)
+    rows = env.score(dict(table, **level), horizon_days=days)["statistics"]
+    for name, row in rows.items():
+        real = row["real"]
+        if name not in SHAPE:
+            assert real is None, name
+            continue
+        windows = facts.real_windows(name, horizon_days=days)
+        assert real["windows"] == len(windows), name
+        assert real["median"] == facts.real_centre(name, horizon_days=days)
+        assert (real["lowest"], real["highest"]) == (min(windows),
+                                                     max(windows))
+        assert real["windows_below"] == sum(w < row["measured"]
+                                            for w in windows)
+        assert real["position"] in row["note"], name
+        assert real["source"] in row["note"], name
+
+
+def test_abs_return_acf1_is_in_band_and_below_every_real_window():
+    """The reviewer's second report, as numbers a user can read: the
+    certified median, 0.0282, is inside its ruled band and below every
+    non-crisis real year of 2015-2025, whose lowest is 0.039."""
+    row = env.score(env.certified_panel())["statistics"]["abs_return_acf1"]
+    assert row["in_band"]
+    assert row["real"]["position"] == "below all 9"
+    assert row["real"]["lowest"] == 0.039
+    assert row["real"]["median"] == 0.083
+    assert "none of those windows read this low" in row["note"]
+    said = _check_warning("abs_return_acf1")
+    for part in ("0.0282", "below all 9", "lowest 0.039", "median 0.083"):
+        assert part in said, (part, said)
+
+
+def test_a_floor_that_cannot_bind_is_said_to():
+    """The ruled kurtosis floor is -13 at 252 days and -9.3 at 504, both
+    under -2, the lowest excess kurtosis can be. The band stays as pt-v20 was
+    graded on it; the row now says only its ceiling tests anything."""
+    from tradefloor import facts
+    ruled = env.score(env.certified_panel())["statistics"]
+    note = ruled["excess_kurtosis"]["note"]
+    assert "floor, -13, is below -2" in note and "only the ceiling, 24" in note
+    assert "floor, -13" in _check_warning("excess_kurtosis")
+    # The dispersion row's 252-day floor, 0.79, is under its arithmetic
+    # minimum of 1; its 504-day floor, 1.03, is not, and binds.
+    assert "floor, 0.79, is below 1" in ruled[
+        facts.CRISIS_DISPERSION_ROW]["note"]
+    far = env.score({facts.CRISIS_DISPERSION_ROW: 1.3, "excess_kurtosis": 19.0},
+                    horizon_days=504)["statistics"]
+    assert "floor" not in (far[facts.CRISIS_DISPERSION_ROW]["note"] or "")
+    assert "floor, -9.3, is below -2" in far["excess_kurtosis"]["note"]
+    # On the decade table the kurtosis floor is 1.6, which binds.
+    decade = env.score(env.certified_panel(), basis="shipped")["statistics"]
+    assert "floor" not in decade["excess_kurtosis"]["note"]
+    # And at 504 days `check` says why it quotes the decade floor.
+    v = env.check(horizon_days=504, statistics=["excess_kurtosis"])
+    assert any("-9.3, is below -2" in w for w in v.warnings), v.warnings
+
+
+def test_the_grade_did_not_move():
+    """None of the above may change a band, a count or a verdict: they are
+    what pt-v20 was graded on."""
+    from tradefloor import facts
+    scored = env.score(dict(env.certified_panel(), **env.CERTIFIED_LEVEL,
+                            **env.CERTIFIED_CRISIS))
+    assert (scored["shape_in_band"], scored["shape_of"]) == (14, 14)
+    assert (scored["in_band"], scored["of"]) == (19, 19)
+    for name, row in scored["statistics"].items():
+        assert row["band"] == tuple(facts.REAL_MARKETS_RULED[name]), name
+    cert = env.certified()
+    assert cert["band_basis"] == env.DEFAULT_BAND_BASIS == "ruled"
+    assert all(s["in_band"] for s in cert["statistics"].values())

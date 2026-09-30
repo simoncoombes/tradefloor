@@ -17,6 +17,7 @@ These hold today, on every release line, LTS or not:
 - **A shipped preset never changes.** A preset's coefficients are fixed when it first ships in a tagged release. A better coefficient is a new preset with a new name. `pt-v1` still runs exactly as it did in 0.3.0.
 - **The fingerprint cannot lie.** `ModelParams.fingerprint()` hashes every coefficient's bit pattern. A vector equal to a shipped preset reports that preset's name. Anything else reports `custom-XXXXXXXX`.
 - **The same seed gives the same market on every platform.** Each release runs one fixed simulation on five platforms and stops if any digest differs (`tests/known_answer.json`).
+- **A named preset's untraded market replays exactly in every later release.** [Digest coverage](#digest-coverage) says how far that reaches for a run with agent orders in it.
 
 A preset under development, on a branch and in no tagged release, can still
 change. pt-v19 went through five compositions before it shipped in 0.8.0.
@@ -44,7 +45,7 @@ that defect. `ModelParams.pt_v20` in `rust/src/params.rs` lists every change.
 
 ### Allowed changes in an LTS patch
 
-- Bug fixes that leave every known-answer digest unchanged: the simulation digest and the combined digest in `tests/known_answer.json`, and the per-preset digests in `tests/known_answer_presets.json`.
+- Bug fixes that leave every known-answer digest unchanged: the simulation digest and the combined digest in `tests/known_answer.json`, the per-preset digests in `tests/known_answer_presets.json`, and the book digest in `tests/known_answer_book.json`.
 - Security fixes, under the same condition.
 - Wheels for a new CPython version or platform, if they build from the same source and reproduce the same digests.
 - Documentation and error messages.
@@ -67,6 +68,32 @@ next minor release, as a new preset if it changes coefficients.
 
 This is the trade the LTS line makes. A known defect that stays put is
 better for a published result than a fix that silently changes it.
+
+## Digest coverage
+
+The known-answer tests run on all five platforms at every release, through
+`tests/test_known_answer.py` in the determinism workflow.
+
+- `tests/known_answer.py` runs one fixed simulation and hashes it (`tests/known_answer.json`), with a second digest for a roster holding the rate indices. `tests/known_answer_seed64.py` does the same for a seed above 2**32. No agent trades in any of them.
+- `tests/known_answer_presets.py` runs one fixed 60-session market on every shipped preset and hashes each on its own (`tests/known_answer_presets.json`). No agent trades in these either.
+- `tests/known_answer_book.py` covers the book agents trade against (`tests/known_answer_book.json`). It builds pt-v19 with the seven book dials at pt-v20's values, on a fixed 12-name roster, for 3 days of 6 steps. Four scripted agents send market orders from a tenth of a percent to a whole day's volume, queue limit orders at the touch and a cent inside the spread, and cancel, all through `Engine.submit_many` and `Engine.cancel`. The digest covers every report, fill, waiting order and impact row, the closing prices and the engine's state hash.
+
+So an untraded market is pinned on every preset, and the engine's book and
+fill path is pinned on one fixed script. Nothing pins a run through the
+Python harness: a traded `tf.evaluate` or `tf.rank` run, with its agents,
+scorecards and the prices it leaves, has no digest yet. That run is what an
+agent benchmark reports. A digest for it, `reference_agents` on a fixed seed
+and roster with the scorecards and final prices hashed, is planned for the
+LTS line. Until it lands, a benchmark score is reproducible by rerunning it
+on the same release, and nothing checks it across releases or platforms.
+
+0.8.5 also changed how an agent's fills reach the market, on every preset.
+They are now applied once, on the next tick, where 0.8.1 fed them in as order
+flow on every tick of the next step. So a traded run recorded before 0.8.5
+replays up to its first trade and differs after it, even on a preset that
+0.8.5 did not change. The recordings in
+`examples/experiments/liquidity-crisis/` stop replaying at the first decision
+for this reason.
 
 ## Before the first LTS tag
 
@@ -106,4 +133,9 @@ Name all of these, so a reader can rebuild your market:
 - any scenario file, and its digest
 
 `RunManifest` records all of them, and `RunManifest.reproduce()` stops on
-the first mismatch.
+the first mismatch. It replays and checks the market, and returns the
+engine. It does not recompute a score, so an edited `pnl` in a manifest's
+result block passes, and `tf.evaluate` and `tf.rank` write no manifest. To
+let a reader check a score, publish the agent, the call that scored it and
+the seeds, and let them rerun it. A manifest that checks a score does not
+exist yet.

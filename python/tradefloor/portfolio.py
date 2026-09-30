@@ -58,8 +58,10 @@ one is refused.
 
 from __future__ import annotations
 
+import math
+import numbers
 import struct
-from typing import Literal
+from typing import Any, Literal
 
 from . import _core
 from ._core import Engine, OrderError, ValidationError
@@ -71,6 +73,137 @@ from ._core import rate_specs as _rate_specs
 _RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 
 
+class LeverageError(OrderError):
+    """An order refused because it would take the portfolio past
+    ``max_leverage``.
+
+    A subclass of :class:`OrderError`, so code that catches that still
+    catches this. It exists so a harness can count leverage refusals apart
+    from the other reasons an order is refused (``Scorecard.leverage_refusals``).
+    """
+
+
+def _describe(value: Any) -> str:
+    """A short ``repr`` of what an agent sent, with its type."""
+    text = repr(value)
+    if len(text) > 80:
+        text = text[:77] + "..."
+    return f"{text} ({type(value).__name__})"
+
+
+def _not_a_count(value: Any) -> bool:
+    """Whether ``value`` is refused as a share count before ``float()`` is
+    tried: a ``bool`` (Python's or numpy's), a string, bytes, or a complex
+    number. ``float()`` would take ``True`` and ``"100"``, and a numpy or
+    torch value carries its kind in ``dtype``, so a 0-d bool, complex or
+    string array is refused the same way.
+    """
+    if isinstance(value, (bool, str, bytes, bytearray)):
+        return True
+    if isinstance(value, numbers.Complex) and not isinstance(value,
+                                                             numbers.Real):
+        return True
+    dtype = getattr(value, "dtype", None)
+    if dtype is None:
+        return False
+    # numpy names a dtype "bool" or "complex128", torch "torch.bool" or
+    # "torch.complex64"; numpy's string kinds are "U" and "S".
+    name = str(dtype).rsplit(".", 1)[-1]
+    return (name == "bool" or name.startswith("complex")
+            or getattr(dtype, "kind", None) in ("U", "S"))
+
+
+def shares(value: Any, *, what: str = "quantity",
+           expected: str = "a number of shares") -> float:
+    """``value`` as a signed number of shares, or a :class:`ValidationError`.
+
+    Whatever ``float()`` turns into a finite number counts: an int, a
+    float, a numpy scalar or 0-d array, a ``Decimal``, a ``Fraction``, a
+    torch scalar tensor. A ``bool``, a string, bytes and a complex number
+    do not, although ``float()`` takes the first two. Before 0.8.5 ``True``
+    and ``"100"`` traded 1 and 100 shares, while the framework adapters
+    refused ``"100"`` as not a number of shares. Zero passes, and the
+    caller decides what it means. The message shows the value with its
+    sign, so ``-inf`` reads as ``-inf``. ``expected`` is what the message
+    says the value should have been.
+    """
+    if _not_a_count(value):
+        raise ValidationError(
+            f"{what} must be {expected}, got {_describe(value)}")
+    try:
+        quantity = float(value)
+    except OverflowError:
+        raise ValidationError(
+            f"{what} must be finite, got {_describe(value)}") from None
+    except Exception:                                   # noqa: BLE001
+        # float() on an arbitrary object can raise anything; what matters
+        # to the reader is what was sent.
+        raise ValidationError(
+            f"{what} must be {expected}, got {_describe(value)}") from None
+    if not math.isfinite(quantity):
+        raise ValidationError(f"{what} must be finite, got {quantity}")
+    return quantity
+
+
+def order_items(orders: Any) -> list[tuple[Any, Any]]:
+    """The ``(ticker, order)`` pairs of what an agent's ``act()`` returned.
+
+    ``act()`` returns a mapping of ticker to order. ``None`` and an empty
+    mapping trade nothing. Anything else, a list of pairs, a string, a
+    number, raises :class:`ValidationError` with what came back, and the
+    harness that asked decides what that costs the agent:
+    :func:`tradefloor.evaluate` writes it to the scorecard's ``errors`` and
+    trades nothing that step, :class:`tradefloor.World` raises it or, under
+    ``on_refusal="skip"``, records the step as unusable, and
+    :func:`tradefloor.tca.analyse` raises it.
+
+    The entries themselves are not checked here. :func:`check_order` checks
+    one at a time, so one bad entry is refused and the rest still trade.
+    """
+    if orders is None:
+        return []
+    items = getattr(orders, "items", None)
+    if isinstance(orders, (str, bytes)) or not callable(items):
+        raise ValidationError(_shape_message(orders))
+    try:
+        return [(ticker, order) for ticker, order in items()]
+    except Exception:                                   # noqa: BLE001
+        # A mapping-like object whose items() does not give pairs. What it
+        # raised is less useful to the reader than what it was.
+        raise ValidationError(_shape_message(orders)) from None
+
+
+def _shape_message(orders: Any) -> str:
+    kind = type(orders).__name__
+    return ("act() must return a mapping of ticker to order, such as "
+            "{'AAA': 100} or {'AAA': tf.Limit(100, 25.0)}, or None to trade "
+            f"nothing. It returned a {kind}: {_describe(orders)}")
+
+
+def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
+    """One entry of an ``act()`` mapping, checked.
+
+    Returns a :class:`Limit` or :class:`Cancel` as given, a market order's
+    signed share count as a float, or ``None`` for an entry that trades
+    nothing (``None`` or zero). A market order's count is checked by
+    :func:`shares`. Raises :class:`ValidationError`, naming the ticker, for
+    a ticker that is not a string and for a value :func:`shares` refuses: a
+    ``bool``, a string, a complex number, NaN, an infinity, or anything
+    ``float()`` cannot read. Whether the ticker is listed is left to the
+    engine, which refuses an unknown one with its own
+    :class:`ValidationError`.
+    """
+    if not isinstance(ticker, str):
+        raise ValidationError(
+            f"a ticker must be a string, got {_describe(ticker)}")
+    if order is None or isinstance(order, (Limit, Cancel)):
+        return order
+    quantity = shares(order, what=f"the order for {ticker!r}",
+                      expected="a number of shares, a tf.Limit or a "
+                               "tf.Cancel")
+    return quantity if quantity != 0 else None
+
+
 class Limit:
     """A limit order, as a value in an agent's ``act()`` mapping.
 
@@ -79,19 +212,31 @@ class Limit:
     (see :meth:`Portfolio.submit_limit`), and a new ``Limit`` for the same
     ticker from the same agent replaces the one waiting. A plain number in
     the mapping is a market order, as it always was.
+
+    :func:`tradefloor.evaluate` and :class:`tradefloor.World` take it from
+    a Python agent. :func:`tradefloor.tca.analyse` refuses it, because the
+    part that waits fills inside a session, where the untraded market has
+    no price to compare it with. The framework adapters in
+    :mod:`tradefloor.integrations` send market orders only: an LLM's
+    decision there has no order type and no limit price.
     """
 
     __slots__ = ("quantity", "price")
 
     def __init__(self, quantity: float, price: float) -> None:
-        if quantity != quantity or quantity == 0:
+        quantity = shares(quantity, what="a Limit's quantity")
+        if quantity == 0:
             raise ValidationError(
                 f"a Limit needs a non-zero, finite quantity, got {quantity}")
-        if not (price > 0) or price != price or price == float("inf"):
+        try:
+            limit_price = shares(price, what="a Limit's price")
+        except ValidationError:
+            limit_price = float("nan")
+        if not limit_price > 0:
             raise ValidationError(
-                f"a Limit needs a finite positive price, got {price}")
-        self.quantity = float(quantity)
-        self.price = float(price)
+                f"a Limit needs a finite positive price, got {price!r}")
+        self.quantity = quantity
+        self.price = limit_price
 
     def __repr__(self) -> str:
         return f"Limit({self.quantity:g}, {self.price:g})"
@@ -207,8 +352,13 @@ class Portfolio:
         made-up price. Filling the remainder at the last level would be
         inventing liquidity that was not there, the kind of convenience that
         makes a backtest profitable and a live strategy not.
+
+        ``quantity`` is a finite real number, numpy scalars included. A
+        string or a ``bool`` is refused with a :class:`ValidationError`
+        (see :func:`shares`).
         """
-        if quantity != quantity or quantity == 0:
+        quantity = shares(quantity)
+        if quantity == 0:
             raise ValidationError(
                 f"quantity must be non-zero and finite, got {quantity}"
             )
@@ -234,7 +384,7 @@ class Portfolio:
             # entering it.
             projected = self._projected_leverage(engine, ticker, filled, price, notional)
             if projected > self.max_leverage:
-                raise OrderError(
+                raise LeverageError(
                     f"trade would take leverage to {projected:.2f}x, above the "
                     f"{self.max_leverage:.2f}x limit"
                 )
@@ -274,8 +424,16 @@ class Portfolio:
         The leverage limit is checked against the whole order filling at
         its limit, before anything is sent, because a resting order that
         fills during a session cannot be refused then.
+
+        The part that fills at once is recorded in :attr:`fills` as one
+        fill, the way :meth:`execute` records a market order, with the
+        engine's ``order_id``, ``liquidity="taker"`` and ``limit=True``. The
+        part that waits is recorded fill by fill as :meth:`sync` collects
+        it. So an agent's own ``obs.portfolio.fills``, :meth:`fills_table`
+        and the scorecard's impact see every share a limit order traded.
         """
-        if quantity != quantity or quantity == 0:
+        quantity = shares(quantity)
+        if quantity == 0:
             raise ValidationError(
                 f"quantity must be non-zero and finite, got {quantity}")
         if not (price > 0) or price != price:
@@ -377,7 +535,7 @@ class Portfolio:
             projected = self._projected_leverage(engine, ticker, filled, price,
                                                  filled * price)
             if projected > self.max_leverage:
-                raise OrderError(
+                raise LeverageError(
                     f"trade would take leverage to {projected:.2f}x, above the "
                     f"{self.max_leverage:.2f}x limit"
                 )
@@ -385,6 +543,29 @@ class Portfolio:
         self._in_book = True
         self._drain(engine, skip_order=out["order_id"])
         if report:
+            if out["filled"] > 0:
+                # The part of a limit order that filled at once, as one
+                # fill. `_drain` skipped these taker fills so they would not
+                # be counted twice, and for a market order the block below
+                # records them; a limit order returned here before it did.
+                signed = out["filled"] if side == "buy" else -out["filled"]
+                self.fills.append({
+                    "ticker": ticker,
+                    "quantity": signed,
+                    "price": out["average_price"],
+                    "worst_price": out["worst_price"],
+                    "notional": sum(
+                        (f["quantity"] if side == "buy" else -f["quantity"])
+                        * f["price"] for f in out["fills"]),
+                    "requested": quantity,
+                    "partial": out["filled"] < size,
+                    "day": self._stamp[0],
+                    "step": self._stamp[1],
+                    "tick": self._stamp[2],
+                    "order_id": out["order_id"],
+                    "liquidity": "taker",
+                    "limit": True,
+                })
             return out
         if out["filled"] <= 0:
             # The preview filled and the book did not: the only difference
