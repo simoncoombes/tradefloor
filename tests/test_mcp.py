@@ -21,7 +21,6 @@ pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
 
 import tradefloor as pt  # noqa: E402
 from tradefloor import envelope, mcp  # noqa: E402
-from tradefloor.facts import REAL_MARKETS  # noqa: E402
 
 MOMENTUM = {"signal": {"kind": "momentum", "lookback_days": 1.0},
             "portfolio": {"top_k": 5}}
@@ -118,9 +117,21 @@ def test_an_authored_document_is_runnable_as_it_stands():
 
 
 def test_a_shipped_scenario_runs_by_name():
-    out = mcp.run_stress_scenario("liquidity_crisis", seed=7,
-                                  universe_size=10, days=6)
+    """By name, and long enough to reach the document's first event.
+
+    `policy_regime_shift` because its first event is the earliest in the
+    pack (day 30), so this is the cheapest run in which a shipped document
+    does something. Until 0.8.5 this test ran `liquidity_crisis` for six
+    days, which is 44 days before its first shock, and passed on a result
+    that was 0.0 for every entrant.
+    """
+    first = min(item.at for item in
+                pt.Scenario.load("policy_regime_shift").interventions)
+    out = mcp.run_stress_scenario("policy_regime_shift", seed=7,
+                                  universe_size=4, days=first + 1)
     assert out["ok"] is True, out
+    assert any(row["difference"] != 0.0 for row in out["comparison"]), (
+        "the scenario reached the market, so some entrant must move")
     unknown = mcp.run_stress_scenario("no_such_scenario", universe_size=8,
                                       days=2)
     assert unknown.get("ok") is not True
@@ -171,12 +182,17 @@ def test_no_measured_number_is_hardcoded_in_the_module():
 
 
 def test_the_statistic_line_reports_what_the_envelope_measures():
+    """The band quoted is the one the envelope grades on, not the decade
+    table beside it. The two differ on most rows since the default basis
+    moved to `ruled`, and until 0.8.5 the line quoted the decade band next
+    to the ruled verdict."""
+    row = envelope.certified()["statistics"]["return_acf1"]
     line = mcp._statistic_line("return_acf1")
-    measured = envelope.CERTIFIED["return_acf1"]
-    lo, hi = REAL_MARKETS["return_acf1"]
-    assert f"{measured:.4g}" in line
+    lo, hi = row["band"]
+    assert f"{row['measured']:.4g}" in line
     assert f"{lo:g}" in line and f"{hi:g}" in line
-    assert "in band" in line or "OUT OF BAND" in line
+    assert ("in band" if row["in_band"] else "OUT OF BAND") in line
+    assert envelope.certified()["band_basis"] in line
 
 
 def test_a_single_seed_result_says_so_in_capitals():
@@ -272,7 +288,10 @@ def test_every_successful_result_carries_its_provenance(call):
     assert r["ok"], r.get("error")
     prov = r["provenance"]
     assert prov["model_preset"] == pt.model_preset()["name"]
+    assert prov["tradefloor_version"] == pt.__version__
+    # Kept for the 0.8 line, so an earlier reader does not break.
     assert prov["pretium_version"] == pt.__version__
+    assert prov["model_fingerprint"], "an empty fingerprint cites nothing"
 
 
 def test_a_scored_result_names_the_seed_and_the_universe():
@@ -379,7 +398,8 @@ def test_explain_price_move_says_what_its_factors_sum_to():
 
 
 def test_a_stress_test_always_carries_its_control():
-    r = mcp.run_stress_scenario("vix_shock", {"mine": MOMENTUM}, days=5)
+    r = mcp.run_stress_scenario("vix_shock", {"mine": MOMENTUM}, days=5,
+                                peak_day=2, universe_size=12)
     assert r["ok"], r.get("error")
     for row in r["comparison"]:
         assert row["return_pct_control"] is not None
@@ -517,9 +537,10 @@ def test_an_unknown_sector_is_refused_with_the_known_ones():
 
 def test_a_hand_authored_roster_runs():
     rows = [{"ticker": "ZZA", "sector": "technology", "initial_price": 100.0,
-             "shares_outstanding": 1e8},
+             "shares_outstanding": 1e8, "eps": 4.0},
             {"ticker": "ZZB", "sector": "energy", "initial_price": 50.0,
-             "shares_outstanding": 2e8, "beta": 1.4}]
+             "shares_outstanding": 2e8, "beta": 1.4,
+             "book_value_per_share": 30.0}]
     u = mcp.build_universe(instruments=rows)
     assert u["ok"], u.get("error")
     assert [i["ticker"] for i in u["instruments"]] == ["ZZA", "ZZB"]
@@ -556,7 +577,8 @@ def test_a_scenario_can_be_authored_and_handed_straight_back():
 
 
 def test_a_preset_scenario_still_works_and_is_marked_as_one():
-    r = mcp.run_stress_scenario("vix_shock", days=3)
+    r = mcp.run_stress_scenario("vix_shock", days=3, peak_day=1,
+                                universe_size=8)
     assert r["ok"] and r["scenario_authored"] is False
 
 
@@ -791,7 +813,8 @@ def test_a_tool_called_twice_returns_the_same_bytes(call):
     lambda: mcp.describe_simulator(),
     lambda: mcp.evaluate_strategies({"m": MOMENTUM}, days=1),
     lambda: mcp.rank_strategies({"m": MOMENTUM}, seeds=[1, 2], days=1),
-    lambda: mcp.run_stress_scenario("rate_shock", days=3),
+    lambda: mcp.run_stress_scenario("rate_ramp", days=3, peak_day=2,
+                                    universe_size=8),
     lambda: mcp.explain_price_move(universe_size=8, day=1, top_n=2),
     lambda: mcp.build_universe(size=8),
     lambda: mcp.build_scenario(steps=[{'kind': 'hold', 'fields': {'vix': 30.0}}]),
@@ -881,12 +904,17 @@ def test_the_step_budget_still_admits_what_the_day_cap_admitted():
      {"strategies": {"m": MOMENTUM}, "days": mcp.MAX_DAYS_ASYNC,
       "steps_per_day": 7},
      "days x steps_per_day must be at most 1512"),
-    ("evaluate_strategies", {"days": "abc"}, "days must be a whole number"),
-    ("evaluate_strategies", {"days": 2.5}, "days must be a whole number"),
-    ("rank_strategies", {"steps_per_day": [6]},
-     "steps_per_day must be a whole number"),
+    # A job's arguments go through the tool's own annotations, as a direct
+    # call's do (qa085/mcp-tools), so the wording is pydantic's.
+    ("evaluate_strategies", {"strategies": {"m": MOMENTUM}, "days": "abc"},
+     "days: Input should be a valid integer"),
+    ("evaluate_strategies", {"strategies": {"m": MOMENTUM}, "days": 2.5},
+     "days: Input should be a valid integer"),
+    ("rank_strategies", {"strategies": {"m": MOMENTUM},
+                         "steps_per_day": [6]},
+     "steps_per_day: Input should be a valid integer"),
     ("run_stress_scenario", {"scenario": "rate_shock", "steps_per_day": 6},
-     "takes no argument(s) ['steps_per_day']"),
+     "takes no argument named ['steps_per_day']"),
     ("evaluate_strategies", ["days", 1], "arguments must be an object"),
 ])
 def test_a_job_that_would_run_unbounded_is_refused_before_it_starts(
@@ -900,10 +928,12 @@ def test_a_job_that_would_run_unbounded_is_refused_before_it_starts(
 
 def test_the_estimate_counts_steps_and_survives_odd_arguments():
     base = mcp._estimate_seconds("evaluate_strategies", {"days": 10})
-    assert base == pytest.approx(0.38 * 10)
+    start_up = mcp._estimate_seconds("evaluate_strategies", {"days": 0})
+    # Twice the steps is twice the per-day cost; building the engines is not
+    # a per-step cost.
     assert mcp._estimate_seconds(
         "evaluate_strategies", {"days": 10, "steps_per_day": 12}) == \
-        pytest.approx(2 * base)
+        pytest.approx(base + (base - start_up))
     # A universe sent as a JSON string, or garbage, counts as the default
     # roster rather than raising after the job has been submitted.
     for universe in ('{"size": 40}', 7, ["x"]):
@@ -977,3 +1007,377 @@ def test_the_console_script_hands_over_to_the_server(monkeypatch):
     monkeypatch.setattr(mcp, "main", lambda: called.append(True))
     mcp_main()
     assert called == [True]
+
+# -- 0.8.5 QA findings -------------------------------------------------------
+#
+# One test (or a few) per finding from the 0.8.5 review of this server, each
+# failing on 5b56d0b and passing after. Most refuse before any engine is
+# built, so they cost a parse, not a simulation.
+
+SHOCK_AT_100 = [{"target": "macro.vix", "operation": "set", "value": 45,
+                 "at": 100, "duration": 5, "shape": "hold"}]
+
+
+@pytest.mark.parametrize("name", pt.Scenario.available())
+def test_a_shipped_scenario_that_cannot_fire_in_the_run_is_refused(name):
+    """Every shipped document starts on day 30 or later, and the default run
+    is 20 days. Each one used to come back ok with a difference of 0.0 for
+    every entrant and nothing saying the shock never fired."""
+    first = min(item.at for item in pt.Scenario.load(name).interventions)
+    assert first >= 20, "the premise: no shipped event inside the default"
+    r = mcp.run_stress_scenario(name, universe_size=8)
+    assert r["ok"] is False, r
+    assert f"first event is on day {first}" in r["error"]
+    assert f"at least {first + 1} days" in r["error"]
+
+
+def test_an_authored_shock_after_the_run_is_refused_when_built_and_run():
+    built = mcp.build_scenario(shocks=SHOCK_AT_100, days=20)
+    assert built["ok"] is False
+    assert "day 100" in built["error"] and "start_job" in built["error"]
+    ran = mcp.run_stress_scenario({"shocks": SHOCK_AT_100}, days=10,
+                                  universe_size=8)
+    assert ran["ok"] is False
+    assert "day 100" in ran["error"]
+
+
+def test_an_event_past_the_job_cap_is_said_to_be_out_of_reach():
+    r = mcp.build_scenario(shocks=[dict(SHOCK_AT_100[0], at=400)])
+    assert r["ok"] is False
+    assert f"{mcp.MAX_DAYS_ASYNC}-day cap on a job" in r["error"]
+
+
+def test_events_that_fall_outside_the_run_are_named_in_a_caveat():
+    r = mcp.build_scenario(
+        shocks=[{"target": "macro.vix", "operation": "multiply",
+                 "value": 2.0, "at": 2, "duration": 20},
+                {"target": "macro.corporate_yield", "operation": "add",
+                 "value": 0.01, "at": 30, "duration": 2}], days=10)
+    assert r["ok"] is True, r
+    text = " ".join(r["caveats"])
+    assert "1 of the scenario's 2 events starts after this 10-day run" in text
+    assert "day 30" in text
+    assert "still under way" in text, "the day-2 shock runs to day 21"
+
+
+def test_the_catalogue_gives_each_documents_first_and_last_event_day():
+    for entry in mcp.list_scenarios()["shipped"]:
+        starts = [item.at for item in
+                  pt.Scenario.load(entry["name"]).interventions]
+        assert entry["first_event_day"] == min(starts)
+        assert entry["last_event_day"] == max(starts)
+        assert f"at least {min(starts) + 1} days" in entry["reach"]
+    recession = next(e for e in mcp.list_scenarios()["shipped"]
+                     if e["name"] == "recession")
+    assert "no run here reaches them" in recession["reach"]
+
+
+#: The constructors this server exposes by name. Written out rather than read
+#: from `mcp.CONSTRUCTORS`, so the test states the public surface it checks.
+EXPOSED_CONSTRUCTORS = ["rate_ramp", "vix_shock"]
+
+
+@pytest.mark.parametrize("name", EXPOSED_CONSTRUCTORS)
+def test_every_constructor_takes_peak_day(name):
+    """peak_day was passed to vix_shock under its own name, which vix_shock
+    does not take, and `rate_shock` resolved to the shipped document before
+    the constructor, so no constructor could be timed."""
+    r = mcp.run_stress_scenario(name, peak_day=2, days=4, universe_size=4)
+    assert r["ok"] is True, r
+    assert r["scenario_authored"] is False
+    table = r["scenario_table"]
+    if name == "vix_shock":
+        # The spike arrives on the peak day and not before.
+        assert table[1]["vix"] < table[2]["vix"]
+    else:
+        # The ramp reaches its end level on the peak day and holds it.
+        assert table[2] == {**table[3], "day": 2}
+
+
+def test_no_constructor_is_shadowed_by_a_shipped_document():
+    assert sorted(mcp.CONSTRUCTORS) == EXPOSED_CONSTRUCTORS
+    assert not set(mcp.CONSTRUCTORS) & set(pt.Scenario.available())
+    assert set(mcp.list_scenarios()["constructors"]) == set(mcp.CONSTRUCTORS)
+    tools = {t.name: t for t in asyncio.run(mcp.server.list_tools())}
+    described = tools["run_stress_scenario"].description
+    assert "vol_shock" not in described, "a deprecated alias, not advertised"
+    assert all(name in described for name in mcp.CONSTRUCTORS)
+
+
+def test_peak_day_on_a_document_says_which_constructor_to_use():
+    r = mcp.run_stress_scenario("rate_shock", peak_day=5, days=10,
+                                universe_size=8)
+    assert r["ok"] is False and "rate_ramp" in r["error"]
+    r = mcp.run_stress_scenario({"shocks": SHOCK_AT_100}, peak_day=5,
+                                days=10, universe_size=8)
+    assert r["ok"] is False and "peak_day" in r["error"]
+
+
+@pytest.mark.parametrize("call", [
+    lambda: mcp.evaluate_strategies({"buy_and_hold": MOMENTUM}, days=1,
+                                    universe_size=8),
+    lambda: mcp.rank_strategies({"oracle": MOMENTUM}, seeds=[1, 2], days=1,
+                                universe_size=8),
+    lambda: mcp.run_stress_scenario("vix_shock", {"momentum": MOMENTUM},
+                                    peak_day=1, days=2, universe_size=8),
+])
+def test_a_strategy_named_after_a_baseline_is_refused(call):
+    """The baselines were added with setdefault, so a strategy called
+    buy_and_hold replaced the real one and every versus_buy_and_hold figure
+    was measured against the caller's own strategy."""
+    r = call()
+    assert r["ok"] is False, r
+    assert "baseline" in r["error"] and "Rename" in r["error"]
+
+
+def test_a_baseline_name_is_free_when_the_baselines_are_left_out():
+    r = mcp.evaluate_strategies({"buy_and_hold": MOMENTUM}, days=1,
+                                universe_size=4, include_baselines=False)
+    assert r["ok"] is True, r
+    assert [row["name"] for row in r["scores"]] == ["buy_and_hold"]
+
+
+def test_the_price_move_tool_states_no_factor_count():
+    tools = {t.name: t for t in asyncio.run(mcp.server.list_tools())}
+    text = tools["explain_price_move"].description.lower()
+    for count in ("seven", "eight", "nine", "ten", "eleven", "twelve"):
+        assert count not in text, (count, len(pt.Engine.FACTORS))
+
+
+def _job_count():
+    return len(mcp.check_job()["jobs"])
+
+
+def _wait(job_id):
+    for _ in range(3000):
+        c = mcp.check_job(job_id)
+        if c["status"] != "running":
+            return c
+        time.sleep(0.1)
+    raise AssertionError(f"{job_id} still running")
+
+
+def test_a_job_whose_estimate_cannot_read_the_universe_still_returns_its_id():
+    """The estimate ran after the job was submitted and raised on a universe
+    given as JSON text, so the job ran and the caller never saw its id."""
+    before = _job_count()
+    j = mcp.start_job("evaluate_strategies",
+                      {"strategies": {"m": MOMENTUM}, "days": 1,
+                       "universe": '{"size": 4}'})
+    assert j["ok"] is True, j
+    assert _job_count() == before + 1
+    assert _wait(j["job_id"])["status"] == "done"
+
+
+@pytest.mark.parametrize("arguments,named", [
+    ({"strategies": {"m": MOMENTUM}, "days": "abc"}, "days"),
+    ({"strategies": {"m": MOMENTUM}, "days": 1, "bogus": 1}, "bogus"),
+    ({"days": 1}, "strategies"),
+    ("not an object", "object"),
+])
+def test_a_job_with_bad_arguments_is_refused_before_it_starts(arguments,
+                                                               named):
+    before = _job_count()
+    r = mcp.start_job("evaluate_strategies", arguments)
+    assert r["ok"] is False, r
+    assert named in r["error"]
+    assert _job_count() == before, "a refused job must not be registered"
+
+
+def test_the_estimate_reads_every_universe_form():
+    base = {"strategies": {"m": MOMENTUM}, "days": 5}
+    small = mcp._estimate_seconds("evaluate_strategies",
+                                  {**base, "universe": {"size": 4}})
+    assert mcp._estimate_seconds(
+        "evaluate_strategies", {**base, "universe": '{"size": 4}'}) == small
+    rows = [{"ticker": f"T{i}"} for i in range(4)]
+    assert mcp._estimate_seconds(
+        "evaluate_strategies", {**base, "universe": {"instruments": rows}}
+    ) == small
+    assert mcp._estimate_seconds(
+        "evaluate_strategies", {**base, "universe": "not json"}) > small
+
+
+def test_the_ranking_estimate_counts_the_default_seeds():
+    assert mcp._estimate_seconds("rank_strategies", {"days": 5}) == \
+        mcp._estimate_seconds("rank_strategies",
+                              {"days": 5, "seeds": list(mcp.DEFAULT_SEEDS)})
+
+
+def test_an_empty_seed_list_is_refused():
+    r = mcp.rank_strategies({"m": MOMENTUM}, seeds=[], days=1,
+                            universe_size=4)
+    assert r["ok"] is False and "got 0" in r["error"]
+
+
+@pytest.mark.parametrize("steps,named", [
+    ([{"kind": "hold", "fields": [1, 2]}], "fields must be an object"),
+    ([{"kind": "hold", "fields": {"vix": "high"}}], "must be a number"),
+    ([{"kind": "ramp", "field": "vix", "start": "a", "end": 45, "over": 10}],
+     "start for 'vix' must be a number"),
+    ([{"kind": "step", "field": "vix", "before": 15, "after": 45,
+       "at": "5"}], "at must be a whole number"),
+    ("not a list", "steps must be a list"),
+])
+def test_a_malformed_step_is_refused_by_name(steps, named):
+    r = mcp.build_scenario(steps=steps)
+    assert r["ok"] is False, r
+    assert named in r["error"]
+
+
+def test_an_unexpected_exception_comes_back_with_its_message(monkeypatch):
+    """The SDK sends a crash as 'Error executing tool X' and nothing else.
+    Anything that escapes a tool now comes back as a refusal carrying the
+    exception's type and message."""
+    def boom():
+        raise RuntimeError("the pack is unreadable")
+
+    monkeypatch.setattr(mcp, "_packaged", boom)
+    r = mcp.list_scenarios()
+    assert r["ok"] is False
+    assert "RuntimeError: the pack is unreadable" in r["error"]
+    res = asyncio.run(mcp.server.call_tool("list_scenarios", {}))
+    assert res.is_error is False
+    assert "the pack is unreadable" in res.structured_content["error"]
+
+
+def test_provenance_carries_the_fingerprint_a_run_records():
+    engine = pt.Engine(universe=pt.Universe.random(2, seed=1), seed=1)
+    prov = mcp.describe_simulator()["provenance"]
+    assert prov["model_fingerprint"] == engine.model_fingerprint != ""
+    assert prov["tradefloor_version"] == pt.__version__
+
+
+def test_the_concentrated_caveat_points_at_a_tool_that_exists():
+    """The envelope's refusal tells a library caller to pass the mix name
+    as `sector_concentrated`, which no run tool here takes."""
+    caveats = mcp._caveats(days=2, n_seeds=1, signals=set(),
+                           max_leverage=2.0, universe_size=10,
+                           sector_concentrated=True)
+    text = " ".join(caveats)
+    assert "roster is sector-concentrated" in text, "the gap still fires"
+    assert "pass its name as `sector_concentrated`" not in text
+    assert "call `check_envelope`" in text
+
+
+def test_check_envelope_takes_a_mix_name_and_the_macro_question():
+    tools = {t.name: t for t in asyncio.run(mcp.server.list_tools())}
+    props = tools["check_envelope"].input_schema["properties"]
+    kinds = {branch.get("type")
+             for branch in props["sector_concentrated"].get("anyOf", [])}
+    assert {"boolean", "string"} <= kinds
+    assert "macro_regime" in props
+    r = mcp.check_envelope(horizon_days=20, macro_regime=True)
+    assert r["ok"] and r["inside"] is False
+    assert any(g["id"] == "macro-range" for g in r["gaps"])
+    named = mcp.check_envelope(horizon_days=20,
+                               sector_concentrated="sp500_like")
+    assert named["ok"] and "pt-v19" in " ".join(named["reasons"])
+
+
+def test_a_scenario_driving_inflation_earns_the_macro_range_caveat():
+    assert mcp._drives_regime(pt.Scenario.load("oil_price_spike"))
+    assert mcp._drives_regime(pt.Scenario("x").hold(inflation_rate=0.06))
+    assert not mcp._drives_regime(pt.Scenario.load("liquidity_crisis"))
+    r = mcp.run_stress_scenario(
+        {"shocks": [{"target": "macro.inflation", "operation": "add",
+                     "value": 0.03, "at": 1, "shape": "permanent"}]},
+        days=2, universe_size=4)
+    assert r["ok"], r
+    reason = envelope.check(horizon_days=2, macro_regime=True).reasons[0]
+    assert any(reason[:60] in c for c in r["caveats"])
+
+
+def test_every_tool_parameter_carries_a_description():
+    tools = asyncio.run(mcp.server.list_tools())
+    for t in tools:
+        for name, prop in t.input_schema.get("properties", {}).items():
+            assert prop.get("description"), f"{t.name}.{name}"
+    by_name = {t.name: t for t in tools}
+    scenario = by_name["run_stress_scenario"].input_schema["properties"][
+        "scenario"]
+    assert {b.get("type") for b in scenario["anyOf"]} == {"string", "object"}
+    tool = by_name["start_job"].input_schema["properties"]["tool"]
+    assert tool["enum"] == list(mcp.JOBBABLE)
+    assert '"signal"' in by_name["evaluate_strategies"].description
+
+
+def test_an_authored_row_with_nothing_to_value_is_refused():
+    """eps and book value are both optional on Instrument, and a row with
+    neither is valued at the one-cent floor, so its price falls toward one
+    cent every day. Buy-and-hold lost 26% in a day on such a roster and the
+    result read as a normal day."""
+    bare = [{"ticker": "AAA", "sector": "technology", "initial_price": 50,
+             "shares_outstanding": 1e8},
+            {"ticker": "BBB", "sector": "energy", "initial_price": 30,
+             "shares_outstanding": 2e8}]
+    u = mcp.build_universe(instruments=bare)
+    assert u["ok"] is False
+    assert "AAA" in u["error"] and "eps" in u["error"]
+    assert "book_value_per_share" in u["error"]
+    r = mcp.evaluate_strategies({"m": MOMENTUM},
+                                universe={"instruments": bare}, days=1)
+    assert r["ok"] is False and "AAA" in r["error"]
+    fixed = [dict(bare[0], eps=2.5), dict(bare[1], book_value_per_share=20)]
+    assert mcp.build_universe(instruments=fixed)["ok"] is True
+
+
+def test_the_refusal_rests_on_what_the_engine_does_with_a_bare_row():
+    """The measurement behind the refusal above, so that if the engine ever
+    values a bare row some other way this test says the refusal can go.
+    Two names, one day, no agents: the bare roster falls by more than a
+    tenth and the same roster with earnings does not."""
+    import struct
+
+    def day_one(**extra):
+        rows = [pt.Instrument("AAA", "technology", initial_price=50,
+                              shares_outstanding=1e8, **extra),
+                pt.Instrument("BBB", "energy", initial_price=30,
+                              shares_outstanding=2e8, **extra)]
+        engine = pt.Engine(universe=pt.Universe(rows), seed=7)
+        engine.run_days(1)
+        raw = engine.prices()
+        return struct.unpack(f"<{len(raw) // 8}d", raw)
+
+    bare, valued = day_one(), day_one(eps=2.0)
+    assert bare[0] < 50 * 0.9 and bare[1] < 30 * 0.9, bare
+    assert valued[0] > 50 * 0.9 and valued[1] > 30 * 0.9, valued
+
+
+def test_a_horizon_error_does_not_carry_the_statistic_list():
+    r = mcp.check_envelope(horizon_days=0)
+    assert r["ok"] is False
+    assert "'return_acf1'" not in r["error"]
+    r = mcp.check_envelope(horizon_days=20, statistics=["nope"])
+    assert r["ok"] is False
+    assert r["error"].count("'return_acf1'") == 1, "listed once, not twice"
+
+
+def test_every_served_statistic_has_a_detail_line():
+    d = mcp.describe_simulator()["certified"]
+    served = (d["statistics_in_band"] + d["statistics_out_of_band"]
+              + d["statistics_unreadable"])
+    assert len(d["detail"]) == len(served)
+    for name in served:
+        assert any(line.startswith(name + " ") for line in d["detail"]), name
+
+
+def test_describe_simulator_does_not_call_every_roster_balanced():
+    d = mcp.describe_simulator()
+    text = " ".join(d["structural_limitations"])
+    assert "The roster is sector-balanced" not in text
+    assert "Generated rosters are sector-balanced" in text
+
+
+def test_the_cost_figures_are_dated_and_match_the_job_estimate():
+    cost = mcp.describe_simulator()["limits"]["measured_cost"]
+    assert "2026-09-26" in cost
+    at5 = mcp._estimate_seconds("evaluate_strategies",
+                                {"strategies": {"m": {}}, "days": 5})
+    assert f"{at5:.0f}s at 5 days" in cost
+
+
+@pytest.mark.parametrize("top_n", [0, -3])
+def test_a_top_n_below_one_is_refused(top_n):
+    r = mcp.explain_price_move(universe_size=4, top_n=top_n)
+    assert r["ok"] is False and "top_n" in r["error"]

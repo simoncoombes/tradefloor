@@ -842,7 +842,8 @@ def test_route_mcp_runs_strategies_sandboxed(monkeypatch):
                                 universe_size=8),
         mcp.rank_strategies({"m": momentum}, seeds=[1, 2], days=1,
                             universe_size=8),
-        mcp.run_stress_scenario("rate_shock", universe_size=8, days=2),
+        mcp.run_stress_scenario("vix_shock", universe_size=8, days=2,
+                                peak_day=1),
     ]
     assert all(r.get("ok") for r in results), results
     assert calls and all(trusted is False for _, trusted in calls), calls

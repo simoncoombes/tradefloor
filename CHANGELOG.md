@@ -876,6 +876,54 @@ twice in one universe (the second could never be traded), and a negative VIX
 in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
 every known-answer digest is unchanged.
 
+### The MCP server after review
+
+A review of the MCP server over stdio found results that read as answers and
+were not. Every shipped scenario starts on day 30 or later, and each one, run
+through `run_stress_scenario` at the default 20 days, came back `ok` with a
+difference of 0.0 for every entrant. The tool now refuses a run that ends
+before the scenario's first event and says how long a run reaches it, and
+`build_scenario` refuses the same case. A result names the events that start
+after the run or are still under way when it ends, and `list_scenarios` gives
+each document's `first_event_day` and `last_event_day`.
+
+`peak_day` reached `vix_shock` under its own name, which that constructor does
+not take, and the `rate_shock` constructor lost to the shipped document of the
+same name, so neither constructor could be timed. The constructors are now
+`vix_shock` and `rate_ramp`, which calls `Scenario.rate_shock`. `vol_shock`
+still runs `vix_shock` and is no longer listed.
+
+A strategy named after a baseline replaced it, so `versus_buy_and_hold` was
+measured against the caller's own strategy. The run tools refuse the five
+baseline names. An authored instrument with neither `eps` nor
+`book_value_per_share` is refused too, because the model values such a row
+at the one-cent fair-value floor and its price falls toward it every day. On
+a two-name roster buy-and-hold lost 26 per cent on day one.
+
+`start_job` checks a job's arguments against the tool's signature and types
+before the job starts. An unknown argument used to be accepted and fail later,
+and a universe given as JSON text made the estimate raise after the job had
+started, so the caller never saw its id. The estimate counts
+`rank_strategies`' six default seeds and each run's start-up, measured again on
+pt-v20, and `rank_strategies(seeds=[])` is refused. An exception that escapes
+any tool comes back as a refusal with its type and message, where the SDK sent
+only `Error executing tool <name>`.
+
+Provenance carries the preset's `model_fingerprint`, which was an empty
+string, and `tradefloor_version`; `pretium_version` stays for the 0.8 line.
+Every tool parameter has a description in its input schema, `scenario` is typed
+as a name or a document, and `start_job.tool` as the three jobbable tools.
+`check_envelope` takes a mix name for `sector_concentrated` and a
+`macro_regime` flag, and `run_stress_scenario` sets `macro_regime` when a
+scenario drives inflation, growth or the cycle. The concentrated-roster caveat
+points at `check_envelope` instead of an argument no run tool has.
+`explain_price_move` no longer describes seven factors (pt-v20 has eleven).
+
+**What breaks.** A stress run shorter than its scenario's first event, a
+strategy named after a baseline, an authored row with nothing to value it on,
+`rank_strategies(seeds=[])` and `explain_price_move(top_n=0)` are refused.
+`list_scenarios` lists `rate_ramp` and `vix_shock` as the constructors.
+
 ## 0.8.1
 
 **Text only.** No coefficient, default or trajectory changes, and the
