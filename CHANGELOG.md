@@ -722,7 +722,7 @@ transcript recorded under a different preset raises `ReplayMiss`.
 
 <!-- release-note-ends -->
 
-### Snapshots, day numbers, input checks and borrowing (audit of 0.8.5)
+### Found by the 0.8.5 audit
 
 None of these moves a known-answer digest. A run that numbers its days from
 the engine's counter, closes its days with `close_market`, never calls
@@ -736,8 +736,9 @@ and its snapshots gain one key, `session_tick`. Scores of levered agents in
   within thirty days and `set_day(5000)` mid-day moved the next session by
   0.21, with no log entry and the state hash unchanged. The valuation now
   counts the days the engine has run. The label goes into the order log
-  (`open_market` carries `day` when it is not the counter, and `set_day` is
-  an entry of its own), so a replay numbers the days as the run did.
+  (`open_market` carries `day` when a run numbered the day its own way, and
+  `set_day` is an entry of its own), so a replay numbers the days as the run
+  did.
   `open_market` takes `day=`. A negative day is refused.
 - A restore puts back the day stamp and the session tick. After a close the
   restore set the day one ahead of the original, so a pin after it
