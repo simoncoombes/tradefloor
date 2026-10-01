@@ -537,14 +537,14 @@ def _weights(world: World) -> dict[str, float]:
 
 
 def _sides(world: World) -> dict[str, int]:
-    """How many BUY, SELL and HOLD instructions the agent issued after the
-    fork. The behavioural question in its most direct form."""
-    counts = {"BUY": 0, "SELL": 0, "HOLD": 0}
+    """How many BUY, SELL, HOLD and CANCEL instructions the agent issued
+    after the fork. The behavioural question in its most direct form."""
+    counts = {"BUY": 0, "SELL": 0, "HOLD": 0, "CANCEL": 0}
     for entry in world.agent.record:
         if world.fork_step is not None and entry["step"] < world.fork_step:
             continue
         for action in entry["decision"]["actions"]:
-            counts[action["side"]] += 1
+            counts[action["side"]] = counts.get(action["side"], 0) + 1
     return counts
 
 
@@ -570,7 +570,7 @@ def _behaviour(control: World, shock: World) -> str:
     lines += ["", f"  {'instructions after the fork':<26}"
                   f"{'CONTROL':>16}{'RATE SHOCK':>16}",
               "  " + "-" * 68]
-    for side in ("BUY", "SELL", "HOLD"):
+    for side in a_sides:
         lines.append(f"  {side:<26}{a_sides[side]:>16,}{b_sides[side]:>16,}")
     return "\n".join(lines)
 
@@ -625,11 +625,14 @@ def _divergence_story(control: World, shock: World) -> str:
         if not actions:
             lines.append("    no change")
         for action in actions:
-            if action["side"] == "HOLD":
-                lines.append(f"    HOLD {action['symbol']}")
+            if action["side"] in ("HOLD", "CANCEL"):
+                lines.append(f"    {action['side']} {action['symbol']}")
             else:
+                limit = action.get("limit_price")
                 lines.append(f"    {action['side']} "
-                             f"{action['quantity']:,.0f} {action['symbol']}")
+                             f"{action['quantity']:,.0f} {action['symbol']}"
+                             + (f" at {limit:,.2f} or better"
+                                if limit else ""))
         rationale = entry["decision"]["rationale"]
         if rationale:
             lines += ["", f"    \"{rationale}\""]
