@@ -380,6 +380,25 @@ recorded as `liquidity="taker"` against `"mm"`, at the maker's price;
 allowed leverage to enough places that they differ, rather than reading
 "2.00x, above the 2.00x limit".
 
+An agent no longer trades with itself in the settlement book. A persona's
+quoter rested a bid and an offer at 23.66 on AAC, and the next tick matched
+the later sell against the earlier buy, both fills naming the agent: a wash
+trade that added to its trades and turnover. Each tick posts the resting
+orders in arrival order, and one that crosses now passes over its own
+agent's orders and matches the next order behind them. Neither is
+cancelled, so both rest until the flow or another agent fills them, and
+`Engine.book` can show an agent's bid at or above its own offer. Between
+ticks an agent's order already met a book without its own orders. No
+known answer moved: none of their agents rests both sides at one price.
+
+A resting fill can sit below the day's low or above its high, because a
+bar keeps only each tick's last print and the flow can fill the order
+earlier in the tick at its limit, inside the maker's quote. On 40 names
+over four sessions 2% of resting fills did, every one inside the maker's
+quote around the previous print. `tf.Limit`, `History` and
+`docs/MODEL.md` say so, because a check of fills against bars will flag
+them.
+
 The Python surface is `Engine.submit`, `submit_many` (by agent label, then
 list order), `cancel`, `open_orders`, `take_fills`, `take_impacts` and
 `book_live`, all recorded in the order log and replayed. `Portfolio.execute`
@@ -1065,6 +1084,20 @@ None of these moves a known-answer digest or the market.
   The other two read the new `exposure_curve`, gross exposure over net
   worth after each step. `tests/known_answer_traded.py` lists
   `exposure_curve` as read off fields it hashes, and does not hash it.
+- The `Scorecard` repr prints `sharpe=n/a (short run)` for a run of fewer
+  than `Scorecard.SHARPE_MIN_DAYS` (20) scored days, where the standard
+  error of an annualised Sharpe ratio is 3.5 or more. The `sharpe`
+  property still returns the figure.
+- An agent whose `act()` returns something other than a mapping, such as a
+  list of pairs, is reported on an UNUSABLE line with its count and the
+  first seed and step, where it was a RAISED line saying `act()` raised,
+  with no first error. `AgentRecord.unusable` and `first_unusable` hold
+  them, and they are no longer in `AgentRecord.errors`. The REFUSED line
+  no longer ends the refusal's own sentence with a second full stop.
+- A `CallableAgentAdapter` replaying a transcript that names an
+  instructions digest, built with no `AdapterInfo` or one without
+  `instructions_digest`, warns that the check refusing a replay under a
+  changed prompt is off.
 - `from tradefloor.integrations import Transcript` works. It loads
   `integrations.common` when the name is asked for, so importing the
   subpackage still imports no adapter.
