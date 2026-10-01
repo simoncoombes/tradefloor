@@ -237,6 +237,7 @@ impl PyOrderBook {
                 limit_price,
                 post_remainder,
                 order_id,
+                skip_own: false,
             },
         );
         Ok(PyMatchResult {

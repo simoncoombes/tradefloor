@@ -1821,7 +1821,7 @@ uniforms $U_1, \dots, U_4$, whether or not they are used.
 
 Background order flow trades against the book. Its buy probability rises
 with the gap between the model price and the quote, which is zero on pt-v20,
-and with the crowd's lean (`microstructure.rs:720-727`):
+and with the crowd's lean (`microstructure.rs:740-749`):
 
 ```math
 \pi^{\mathrm{buy}}_{i,t} = \mathrm{clip}\Big(0.5 + 40\,\frac{P^{\ast}_{i,t} - \hat P_{i,t}}{\hat P_{i,t}} + 10\,L(s_{i,t}, \mu_{i,d});\ 0.05,\ 0.95\Big)
@@ -1831,7 +1831,7 @@ Four market orders of $\max(1, \lfloor V_{i,t}^{\mathrm{vol}}/4 \rfloor)$
 shares each, where $V^{\mathrm{vol}}$ is the tick's volume below, walk the
 book: order $j$ buys if $U_j < \pi^{\mathrm{buy}}$ and sells otherwise. The
 print is the price of the last fill; if nothing fills, it is $P^{\ast}$
-(`microstructure.rs:729-792`). When every slice fits in the top level, the
+(`microstructure.rs:755-822`). When every slice fits in the top level, the
 print is the ask with probability $\pi^{\mathrm{buy}}$ and the bid otherwise.
 The maker's inventory takes the other side of every fill and never decays
 (`microstructure.rs:495-512`).
@@ -1872,14 +1872,20 @@ against its own book, and their effect on prices lands on the next tick.
 
 An agent trades against a book of its own, built for each order
 (`agent_book.rs`). It holds three kinds of liquidity: the maker's ladder, as
-above, quoted around the last print (`agent_book.rs:546-558`); latent depth;
+above, quoted around the last print (`agent_book.rs:551-563`); latent depth;
 and other agents' resting orders, at their own limits, behind the maker at
 an equal price. An agent never meets its own orders
-(`agent_book.rs:589-597`).
+(`agent_book.rs:604-612`). The same rule holds when its resting orders are
+posted into each tick's settlement book: an order that crosses passes over
+its own agent's orders and matches the next order behind them
+(`order_book.rs:313-325`, `microstructure.rs:695-712`). Neither order is
+cancelled. An agent's bid and offer at one price both rest until the flow or
+another agent fills each of them, so `Engine.book` can show an agent's bid
+at or above its own offer.
 
 Latent depth makes size pay the square-root law. Beside the ladder, each
 side holds a pool whose cumulative size $Q$ is priced at no better than
-(`agent_book.rs:425-489`)
+(`agent_book.rs:430-494`)
 
 ```math
 p^{\mathrm{ask}}(Q) = p^{\mathrm{touch}}\Big(1 + Y\,\sigma_i\Big(\frac{Q}{\bar A_i}\Big)^{\delta}\Big),
@@ -1895,7 +1901,7 @@ cut off.
 
 A walk takes the cheapest liquidity first. What it takes is gone for later
 orders: consumed depth refills with a half-life of $H_B$ ticks
-(`agent_book.rs:501-523`, `agent_book.rs:619-626`),
+(`agent_book.rs:506-528`, `agent_book.rs:624-631`),
 
 ```math
 D_{t+1} = D_t\,2^{-1/H_B}
@@ -1906,8 +1912,8 @@ re-quote (`engine.rs:2779-2798`), and at the open everything resets.
 
 A limit order's remainder rests (`engine.rs:3240-3256`). Each tick it is
 also posted into the settlement book, where the background flow can fill it
-at its limit, as a maker fill (`microstructure.rs:695-734`,
-`microstructure.rs:753-795`). The flow walks no further than the last price
+at its limit, as a maker fill (`microstructure.rs:695-738`,
+`microstructure.rs:757-800`). The flow walks no further than the last price
 the maker quotes in that tick's settlement ladder (`microstructure.rs:677-693`),
 which holds only as many levels as the tick's volume needs, two to ten. So
 an order resting past that ladder waits until the price moves to it, and a
