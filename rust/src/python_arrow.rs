@@ -153,12 +153,21 @@ pub fn bars_batch(
     instruments: usize,
     prices: &[f64],
     volumes: &[f64],
+    volume_base: &[f64],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if prices.len() < rows || volumes.len() < rows {
         return Err(format!(
             "buffer shorter than {ticks} ticks x {instruments} instruments"
         ));
+    }
+    // One tick is a bar of one tick: its own volume, the running total less
+    // the total a tick earlier. See [`bar_volume`].
+    let mut volume_col = Vec::with_capacity(rows);
+    for t in 0..ticks {
+        for i in 0..instruments {
+            volume_col.push(bar_volume(volumes, volume_base, instruments, i, t, t + 1));
+        }
     }
 
     let mut day_col = Vec::with_capacity(rows);
@@ -177,9 +186,41 @@ pub fn bars_batch(
         Arc::new(UInt32Array::from(tick_col)),
         Arc::new(UInt32Array::from(id_col)),
         Arc::new(Float64Array::from(prices[..rows].to_vec())),
-        Arc::new(Float64Array::from(volumes[..rows].to_vec())),
+        Arc::new(Float64Array::from(volume_col)),
     ];
     RecordBatch::try_new(bars_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// The volume traded in ticks `first..last` of one instrument's tape.
+///
+/// The engine keeps volume as a running total that the open resets to zero,
+/// and the tape records that total after each tick. So a bar's volume is the
+/// total at its last tick minus the total before its first, and the bar
+/// grain changes nothing about the rule: one tick, five minutes and a day
+/// are all the same subtraction.
+///
+/// The total before a tape's first tick is not on the tape. It is
+/// `volume_base[i]`, zero after an open and the count so far for a session
+/// that starts part way through a day; an empty `volume_base` reads as zero.
+///
+/// Until 0.8.5 the bucketed bars SUMMED these running totals, which made a
+/// day bar about two hundred times the day's volume and made the five-minute
+/// profile climb all day, and the tick rows served the running total as
+/// though it were the minute's volume.
+pub fn bar_volume(
+    volumes: &[f64],
+    volume_base: &[f64],
+    instruments: usize,
+    i: usize,
+    first: usize,
+    last: usize,
+) -> f64 {
+    let before = if first == 0 {
+        volume_base.get(i).copied().unwrap_or(0.0)
+    } else {
+        volumes[(first - 1) * instruments + i]
+    };
+    volumes[(last - 1) * instruments + i] - before
 }
 
 /// Build the `truth` batch from a session's ground-truth buffers.
@@ -719,7 +760,14 @@ pub struct RecordedDay {
     pub ticks: usize,
     pub instruments: usize,
     pub prices: Vec<f64>,
+    /// Each instrument's running volume total after each tick, reset to
+    /// zero at the open. A bar's own volume is a difference of these; see
+    /// [`bar_volume`].
     pub volumes: Vec<f64>,
+    /// Each instrument's running total before the tape's first tick: zero
+    /// on a day recorded from its open, the count so far on a tape that
+    /// starts later. One per instrument, or EMPTY for zero.
+    pub volume_base: Vec<f64>,
     /// The price each instrument's SESSION opened at, before its first
     /// tick: the engine's `open` mark, taken at `open_market`. One per
     /// instrument, or EMPTY when the recording predates the field, in which
@@ -770,6 +818,8 @@ pub fn ohlc_schema() -> SchemaRef {
 ///
 /// `bucket` is ticks per bar; a bucket at or beyond the day's length produces
 /// exactly one bar, which is the day-grain case.
+///
+/// A bar's volume is what traded inside it; see [`bar_volume`].
 ///
 /// The final bucket is kept even when short. Dropping a partial bar would
 /// silently discard the end of every session whose length is not a multiple of
@@ -830,7 +880,6 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
             let mut high = if session_open.is_nan() { f64::NEG_INFINITY } else { session_open };
             let mut low = if session_open.is_nan() { f64::INFINITY } else { session_open };
             let mut close = f64::NAN;
-            let mut volume = 0.0;
             for t in first..last {
                 let price = day.prices[t * n + i];
                 if t == first && open.is_nan() {
@@ -845,8 +894,8 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
                     low = price;
                 }
                 close = price;
-                volume += day.volumes[t * n + i];
             }
+            let volume = bar_volume(&day.volumes, &day.volume_base, n, i, first, last);
             day_c.push(day.day);
             bar_c.push(bar as u32);
             id_c.push(i as u32);

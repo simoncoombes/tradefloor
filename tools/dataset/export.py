@@ -78,8 +78,8 @@ whatever base column set the installed build ships (``clamp`` beside
 :data:`_UNITS` resolves an unlisted column against every table's own
 schema rather than typing one out, and a build that adds one more
 reaches the card with no edit here. It
-discards intraday volume: ``bars.arrow`` sums each instrument's volume
-to one figure per day, and neither ``truth.arrow`` nor ``prints.arrow``
+discards intraday volume: ``bars.arrow`` holds each instrument's volume
+for the day as one figure, and neither ``truth.arrow`` nor ``prints.arrow``
 carries a volume column at any grain, so how volume distributed across a
 session is not recoverable from this dataset; the card names this gap
 under its ``bars.arrow`` column table. It does not publish anything:

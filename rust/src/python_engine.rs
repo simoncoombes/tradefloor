@@ -590,10 +590,22 @@ impl PyEngine {
     /// Called after EVERY inner `run_session`, so a day made of many sessions
     /// records as one continuous tape. Copies only what was written, which is
     /// less than capacity whenever a stop condition fired.
-    fn accumulate_session(&mut self) {
+    ///
+    /// `volume_base` is each instrument's running volume total just before
+    /// the session's first tick. The tape's `volumes` are running totals, so
+    /// a bar's own volume is its last tick's total minus the total before its
+    /// first, and for the first tick on a tape that earlier total is not on
+    /// the tape. It is zero after an open, which resets the count, and not
+    /// zero for a later session of the same day, or for a session run on a
+    /// restored engine that never opened.
+    fn accumulate_session(&mut self, volume_base: Vec<f64>) {
+        self.session_volume_base = volume_base;
         let ticks = self.buffer.ticks_written;
         if ticks == 0 {
             return;
+        }
+        if self.day_buffer.ticks == 0 {
+            self.day_buffer.volume_base = self.session_volume_base.clone();
         }
         let n = ticks * self.buffer.companies;
         self.day_buffer.companies = self.buffer.companies;
@@ -1091,7 +1103,11 @@ struct DayBuffer {
     ticks: usize,
     companies: usize,
     prices: Vec<f64>,
+    /// Running totals since the open, as the session buffer writes them.
     volumes: Vec<f64>,
+    /// Each instrument's running total before the first tick on this tape.
+    /// See [`PyEngine::accumulate_session`].
+    volume_base: Vec<f64>,
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
@@ -1116,6 +1132,7 @@ impl DayBuffer {
         self.ticks = 0;
         self.prices.clear();
         self.volumes.clear();
+        self.volume_base.clear();
         self.mispricing.clear();
         self.fundamental.clear();
         self.anchor.clear();
@@ -1321,6 +1338,10 @@ pub struct PyEngine {
     /// `prices()` meaning what it has always meant, and costs a copy per
     /// session that only a recording caller pays.
     day_buffer: DayBuffer,
+    /// Each instrument's running volume total before the LAST session's
+    /// first tick: what the un-recorded `bars()` fallback, which reads that
+    /// session alone, subtracts from its first tick.
+    session_volume_base: Vec<f64>,
     /// Whether the market has been opened and not yet closed.
     ///
     /// Exists so a day is opened exactly ONCE however many sessions it is made
@@ -1970,6 +1991,7 @@ impl PyEngine {
             pending_overnight: Vec::new(),
             pending_fair_value: Vec::new(),
             day_buffer: DayBuffer::default(),
+            session_volume_base: Vec::new(),
             market_open: false,
             day_count: 0,
             tickers,
@@ -2288,6 +2310,7 @@ impl PyEngine {
         // converted to Rust types above, and the engine and buffer are plain
         // data. That is the precondition for releasing it, not an optimisation
         // note.
+        let volume_base = self.all_column(PriceField::Volume);
         let inner = &mut self.inner;
         let buffer = &mut self.buffer;
         py.allow_threads(move || {
@@ -2313,7 +2336,7 @@ impl PyEngine {
                 buffer,
             )
         });
-        self.accumulate_session();
+        self.accumulate_session(volume_base);
         if close_at_end {
             // The core ran the close bookkeeping; the daily macro step
             // belongs to the same boundary. Without this the two spellings
@@ -2568,6 +2591,7 @@ impl PyEngine {
         if !self.market_open {
             self.open_market_on(i64::from(self.day_count));
         }
+        let volume_base = self.all_column(PriceField::Volume);
         let outcome = self.inner.run_session(
             &SessionRequest {
                 start: GameTime { hour, minute, day_of_week },
@@ -2589,7 +2613,7 @@ impl PyEngine {
             },
             &mut self.buffer,
         );
-        self.accumulate_session();
+        self.accumulate_session(volume_base);
         Ok(outcome.halted_at)
     }
 
@@ -2678,6 +2702,10 @@ impl PyEngine {
     }
 
     /// The last session's volume path, same shape as `session_prices`.
+    ///
+    /// Each value is the instrument's running total since the open after
+    /// that tick, as the engine counts it. `bars()` reports each bar's own
+    /// volume instead, the difference of these totals.
     fn session_volumes(&self, py: Python<'_>) -> Py<PyBytes> {
         f64_bytes(py, self.written(&self.buffer.volumes))
     }
@@ -5471,6 +5499,7 @@ impl PyEngine {
             instruments: self.day_buffer.companies,
             prices: self.day_buffer.prices.clone(),
             volumes: self.day_buffer.volumes.clone(),
+            volume_base: self.day_buffer.volume_base.clone(),
             // The session's open, the engine's mark from `open_market`,
             // which the close leaves alone, so a record taken on either
             // side of it reads the same value.
@@ -5534,10 +5563,15 @@ impl PyEngine {
     /// they carry real information, so the coarse schema is genuinely wider
     /// rather than the same columns rearranged.
     ///
-    /// At tick grain `volume` is the running total since the day's open, and
-    /// it keeps counting across the sessions a day is split into. The last
-    /// tick of a day holds the day's volume. Take the difference between
-    /// consecutive ticks for each minute's own volume.
+    /// `volume` is the volume traded inside the bar, at every grain: a tick
+    /// row holds that minute's volume, a five-minute bar the five minutes',
+    /// and a day bar the day's. So the tick rows of a day sum to its day bar.
+    /// The engine counts volume as a running total that the open resets to
+    /// zero, and each bar is that total at its last tick minus the total
+    /// before its first. Before 0.8.5 the tick rows held the running total
+    /// itself and the coarser bars summed it, which made a day bar about
+    /// two hundred times the day's volume. For the running total, take the
+    /// cumulative sum of the tick rows per instrument and day.
     ///
     /// Every recorded day is a separate batch, so a year streams rather than
     /// materialising. With nothing recorded it falls back to the last session.
@@ -5560,6 +5594,7 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
+                volume_base: self.session_volume_base.clone(),
                 opens: self.all_column(PriceField::Open),
                 // bars() reads neither, and cloning the ground-truth
                 // buffers to build a table that discards them would be pure
@@ -5610,6 +5645,7 @@ impl PyEngine {
                     batches.push(
                         crate::python_arrow::bars_batch(
                             d.day, d.ticks, d.instruments, &d.prices, &d.volumes,
+                            &d.volume_base,
                         )
                         .map_err(crate::python_arrow::arrow_err)?,
                     );

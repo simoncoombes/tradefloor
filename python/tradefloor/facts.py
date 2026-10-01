@@ -2169,9 +2169,13 @@ SEED_SD = {
     "abs_return_acf5": 0.0567399,
     "abs_return_acf20": 0.0467066,
     "cross_sectional_corr": 0.108444,
-    "volume_abs_return_corr": 0.0415843,
+    # The two volume rows were re-measured on 2026-09-30, on the same
+    # protocol and seeds, when 0.8.5 fixed the day bar's volume (see
+    # `SEED_SD_PROVENANCE["volume_rows"]`). They read 0.0415843 and
+    # 0.0107678 on the day bars before the fix.
+    "volume_abs_return_corr": 0.0143240,
     "leverage_effect": 0.0769232,
-    "volume_change_acf1": 0.0107678,
+    "volume_change_acf1": 0.0119299,
     # These four joined the table on 2026-08-25 on the same protocol as the
     # rest of it. A first draft measured three of them on pt-v3 with the
     # population estimator and was caught by the test that re-derives this
@@ -2271,9 +2275,12 @@ SEED_SD_504 = {
     "abs_return_acf5": 0.04497743519,
     "abs_return_acf20": 0.03579083816,
     "cross_sectional_corr": 0.06981599524,
-    "volume_abs_return_corr": 0.01899405944,
+    # Re-measured 2026-09-30 with the day bar's volume fixed in 0.8.5; they
+    # read 0.01899405944 and 0.008456262085 before. See
+    # `SEED_SD_PROVENANCE["volume_rows"]`.
+    "volume_abs_return_corr": 0.008705719391,
     "leverage_effect": 0.05607850586,
-    "volume_change_acf1": 0.008456262085,
+    "volume_change_acf1": 0.00708637409,
     "corr_asymmetry": 0.1349171341,
     "corr_asymmetry_lagged": 0.09982258299,
     "sector_excess_corr": 0.004748081416,
@@ -2396,6 +2403,29 @@ SEED_SD_PROVENANCE = {
                                  "SEED_SD_504 was, on 2026-09-06, by the "
                                  "protocol above with the horizon changed "
                                  "and nothing else.",
+    # The day bar's volume was the sum of the day's running totals until
+    # 0.8.5, about two hundred times the day's volume and weighted toward
+    # the open, and both volume rows read it. The bar now holds the day's
+    # volume. The other twelve rows read no volume and reproduced to the
+    # committed tables' precision on all thirty seeds at both horizons.
+    "volume_rows": {
+        "date": "2026-09-30",
+        "rows": ("volume_abs_return_corr", "volume_change_acf1"),
+        "reason": "Engine.bars() bar volume fixed in 0.8.5: a bar's volume "
+                  "is the running total at its last tick minus the total "
+                  "before its first",
+        "protocol": "unchanged: pt-v1, the committed panel roster, seeds "
+                    "101-130, 252 and 504 days, sample sd",
+        "before_252": {"volume_abs_return_corr": 0.0415843,
+                       "volume_change_acf1": 0.0107678},
+        "before_504": {"volume_abs_return_corr": 0.01899405944,
+                       "volume_change_acf1": 0.008456262085},
+        "median_252": {"volume_abs_return_corr": (0.5727, 0.7611),
+                       "volume_change_acf1": (-0.4484, -0.4390)},
+        "median_504": {"volume_abs_return_corr": (0.6035, 0.7595),
+                       "volume_change_acf1": (-0.4371, -0.4293)},
+        "median_note": "thirty-seed medians at pt-v1, before and after",
+    },
 }
 
 #: The provenance of the `SEED_SD` entries measured on `LEVEL_PROTOCOL`

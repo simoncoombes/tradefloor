@@ -1003,6 +1003,39 @@ transcript recorded under a different preset raises `ReplayMiss`.
 
 <!-- release-note-ends -->
 
+### Bar volume
+
+`Engine.bars()` reported volume wrongly at every grain coarser than a tick.
+The engine counts each name's volume as a running total that the open
+resets to zero, and the tick rows served that total. `bars(minutes=N)` and
+`bars(grain="day")` then summed it, so a day bar read about two hundred
+times the day's volume and the five-minute profile climbed all day instead
+of forming a U. Two reviewers found it: one seed's day bar read 296 times
+the name's average daily volume while `column("volume")` read 1.5 times.
+
+A bar's volume is now the running total at its last tick minus the total
+before its first, at every grain. A tick row holds that minute's volume, so
+the tick rows of a day add up to its five-minute bars and to its day bar,
+and the day bar equals `column("volume")` at the close. A day run as several
+sessions keeps one count, and with nothing recorded the fallback to the
+last session subtracts what earlier sessions of the day traded. If you read
+the tick column as a running total, take its cumulative sum per name and
+day. `session_volumes()` still returns the running totals.
+
+Prices, the tape and every known-answer digest are unchanged. Two certified
+rows read day-bar volume through `facts.measure`. On pt-v20 over the held
+roster and seeds 101 to 130, `volume_abs_return_corr` moves from 0.508 to
+0.596 at one year and from 0.561 to 0.627 at two, and `volume_change_acf1`
+from -0.254 to -0.268 and from -0.241 to -0.261. All four stay inside their
+ruled bands, the two-year correlation 0.003 under its ceiling of 0.63.
+`envelope.CERTIFIED`, `envelope.MEASURED_504` and `presets/pt-v20.json`
+keep the old readings until the next grade re-measures them.
+`facts.SEED_SD` and `facts.SEED_SD_504` are re-measured for the two rows on
+their own pt-v1 protocol: `volume_abs_return_corr` falls from 0.0416 to
+0.0143 at one year and from 0.0190 to 0.0087 at two, so a distance on that
+row in seed standard deviations is now about 2.9 and 2.2 times larger.
+`volume_change_acf1` moves from 0.0108 to 0.0119 and from 0.0085 to 0.0071.
+
 ### Found by the 0.8.5 audit
 
 None of these moves a known-answer digest. A run that numbers its days from

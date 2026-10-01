@@ -2111,6 +2111,19 @@ the size of the settlement slices, so a volume dial is also a price dial.
 | $c_V$ | `volume_move_cap` | 12 | fitted | a sweep found 8, 12 and 20 alike |
 | $n_V$ | `volume_move_noise` | 0.2 | chosen | reference implementation |
 
+The volume rows these dials were fitted or chosen against,
+`volume_abs_return_corr` and `volume_change_acf1`, are read off day bars.
+Before 0.8.5 a day bar's volume was the sum of the day's running volume
+totals, about two hundred times the day's volume and weighted toward the
+open, and every reading above was taken on those bars. 0.8.5 fixes the bar
+and leaves the dials as they were. On the held roster
+(`Universe.random(40, seed=111)`, seeds 101 to 130) pt-v20 now reads 0.596
+and -0.268 at one year, against 0.508 and -0.254 before, and 0.627 and
+-0.261 at two years, against 0.561 and -0.241. Both rows stay inside their
+ruled bands at both horizons, and the two-year `volume_abs_return_corr` is
+0.003 under its ceiling of 0.63. The certified record is re-measured in the
+next grade.
+
 ## Bonds
 
 A roster can include three bond indices: `UST2Y`, `UST10Y` and `IGCORP`

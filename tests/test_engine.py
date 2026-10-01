@@ -7,6 +7,7 @@ properties a user depends on — determinism, that the fast path is the same
 simulation as the slow one, and that the columnar contract holds.
 """
 
+import itertools
 import math
 import struct
 
@@ -902,10 +903,11 @@ def test_attribution_sums_to_the_change_in_mispricing(preset):
         assert fair_value > 0.5 * noise
 
 
-def test_tick_grain_volume_is_the_running_total_since_the_open():
-    """What the `bars` docstring says about tick volume: a running total
-    that keeps counting across the sessions a day is split into, whose last
-    tick is the day's volume."""
+def test_tick_grain_volume_is_each_minutes_own_volume():
+    """What the `bars` docstring says about tick volume: each row is that
+    minute's volume, the engine's running total less the total a minute
+    earlier, counted across the sessions a day is split into, so the rows
+    add up to the day's volume."""
     import pyarrow as pa
 
     from tradefloor.harness import session_clock
@@ -919,8 +921,10 @@ def test_tick_grain_volume_is_the_running_total_since_the_open():
     rows = pa.table(e.bars()).to_pylist()
     volume = [r["volume"] for r in rows if r["instrument_id"] == 0]
     assert len(volume) == 390
-    assert all(a <= b for a, b in zip(volume, volume[1:]))
-    assert volume[130] > volume[129] > 0
-    assert volume[-1] == arr(e.column("volume"))[0]
-    assert "running total since the day's open" in \
-        tradefloor.Engine.bars.__doc__
+    assert all(v >= 0 for v in volume)
+    running = list(itertools.accumulate(volume))
+    assert running[-1] == pytest.approx(arr(e.column("volume"))[0], rel=1e-12)
+    # The second session's first minute is a minute, not the day so far.
+    assert volume[130] < 0.2 * running[129]
+    assert "volume traded inside the bar" in \
+        " ".join(tradefloor.Engine.bars.__doc__.split())

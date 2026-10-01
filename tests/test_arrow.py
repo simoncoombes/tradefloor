@@ -7,6 +7,7 @@ the reference implementation of the protocol, and skip cleanly without it
 rather than pretending the surface is untested.
 """
 
+import itertools
 import math
 import struct
 
@@ -132,7 +133,13 @@ def test_arrow_and_the_bytes_surface_never_disagree():
     # be lying about a market that only happened once.
     e, _, _ = session()
     assert pa.table(e.bars(day=0)).to_pydict()["close"] == arr(e.session_prices())
-    assert pa.table(e.bars(day=0)).to_pydict()["volume"] == arr(e.session_volumes())
+    # session_volumes() holds the engine's running totals and bars() each
+    # tick's own volume, so the bars are the totals' differences.
+    n = len(e.tickers)
+    running = arr(e.session_volumes())
+    own = [running[k] - (running[k - n] if k >= n else 0.0)
+           for k in range(len(running))]
+    assert pa.table(e.bars(day=0)).to_pydict()["volume"] == own
 
 
 # --------------------------------------------------------------------------
@@ -368,6 +375,134 @@ def test_downsampled_bars_reconcile_with_the_ticks_they_came_from():
     assert daily["high"][0] == max(closes + [daily["open"][0]])
     assert daily["low"][0] == min(closes + [daily["open"][0]])
     assert daily["volume"][0] == pytest.approx(sum(volumes))
+
+
+def _by_instrument_day(table, column):
+    out = {}
+    for d, i, v in zip(table["day"], table["instrument_id"], table[column]):
+        out.setdefault((d, i), []).append(v)
+    return out
+
+
+def _running(e, step_days, ticks, n, sessions=1, bonds=False):
+    """Run `step_days` days of `sessions` equal sessions each, recording
+    each day and keeping the engine's running volume total after every
+    session, keyed by (day, session)."""
+    totals = {}
+    from tradefloor.harness import session_clock
+    for d in range(step_days):
+        e.open_market()
+        per = ticks // sessions
+        for k in range(sessions):
+            e.run_session(*session_clock((9, 30, 3), k, per), per)
+            totals[(d, k)] = arr(e.column("volume"))[:n] if not bonds \
+                else arr(e.column("volume"))
+        e.close_market()
+        e.record(d)
+    return totals
+
+
+def test_a_bar_volume_is_what_traded_inside_the_bar():
+    """Owner decision 1 (2026-09-26). The engine counts volume as a running
+    total that the open resets to zero, and a bar's volume is that total at
+    the bar's last tick minus the total before its first, at every grain.
+
+    Through 0.8.4 the tick rows held the running total and the coarser bars
+    summed it, so a day bar read about two hundred times the day's volume
+    and the five-minute profile climbed all day."""
+    e, days, ticks, n = multiday()
+    tick = _by_instrument_day(pa.table(e.bars()).to_pydict(), "volume")
+    five = _by_instrument_day(pa.table(e.bars(minutes=5)).to_pydict(), "volume")
+    one = _by_instrument_day(pa.table(e.bars(minutes=1)).to_pydict(), "volume")
+    day = _by_instrument_day(pa.table(e.bars(grain="day")).to_pydict(), "volume")
+    for key, per_tick in tick.items():
+        assert len(per_tick) == ticks
+        assert all(v >= 0.0 for v in per_tick), key
+        running = list(itertools.accumulate(per_tick))
+        # A five-minute bar is the running total at its last tick minus the
+        # total before its first, and the minute bars are the tick rows.
+        expected = [running[min(b + 5, ticks) - 1] - (running[b - 1] if b else 0.0)
+                    for b in range(0, ticks, 5)]
+        assert five[key] == pytest.approx(expected, rel=1e-12, abs=1e-6), key
+        assert one[key] == per_tick, key
+        # The tick rows of a day add up to its five-minute bars and to its
+        # day bar, which is the running total at the close.
+        assert math.fsum(five[key]) == pytest.approx(day[key][0], rel=1e-12)
+        assert math.fsum(per_tick) == pytest.approx(day[key][0], rel=1e-12)
+    # The last day's bar is the engine's own count at its close.
+    closing = arr(e.column("volume"))
+    for i in range(n):
+        assert day[(days - 1, i)][0] == closing[i]
+
+
+def test_a_day_bar_reads_near_the_names_average_daily_volume():
+    """The persona check that found the fault: a day bar at 296 times the
+    name's average daily volume while the engine's own volume column read
+    1.5 times. A day's volume is the same order as the average."""
+    u = tradefloor.Universe.random(20, seed=5)
+    e = tradefloor.Engine(seed=1, universe=u)
+    e.run_days(2, record=True)
+    for row in pa.table(e.bars(grain="day")).to_pylist():
+        ratio = row["volume"] / u[row["instrument_id"]].avg_volume
+        assert 0.1 < ratio < 10, (row["day"], row["instrument_id"], ratio)
+
+
+def test_bar_volume_carries_across_the_sessions_of_one_day():
+    """A day split into sessions keeps one running total, so the first tick
+    of a later session is that minute's volume and not the day so far."""
+    u = tradefloor.Universe.random(3, seed=1)
+    e = tradefloor.Engine(seed=5, universe=u)
+    totals = _running(e, 2, 390, 3, sessions=3)
+    tick = _by_instrument_day(pa.table(e.bars()).to_pydict(), "volume")
+    day = _by_instrument_day(pa.table(e.bars(grain="day")).to_pydict(), "volume")
+    for d in range(2):
+        for i in range(3):
+            per_tick = tick[(d, i)]
+            assert len(per_tick) == 390
+            assert all(v >= 0.0 for v in per_tick)
+            # Session two's first tick is a minute's volume, a small share
+            # of the 130 minutes before it.
+            assert per_tick[130] < 0.2 * math.fsum(per_tick[:130])
+            assert math.fsum(per_tick[:130]) == pytest.approx(totals[(d, 0)][i], rel=1e-12)
+            assert math.fsum(per_tick) == pytest.approx(totals[(d, 2)][i], rel=1e-12)
+            assert day[(d, i)][0] == totals[(d, 2)][i]
+
+
+def test_the_unrecorded_fallback_subtracts_what_traded_before_the_session():
+    """With nothing recorded, bars() reads the last session alone. Its first
+    tick is that minute's volume, whatever earlier sessions of the day
+    traded."""
+    u = tradefloor.Universe.random(3, seed=1)
+    e = tradefloor.Engine(seed=5, universe=u)
+    from tradefloor.harness import session_clock
+    e.open_market()
+    e.run_session(*session_clock((9, 30, 3), 0, 130), 130)
+    before = arr(e.column("volume"))
+    e.run_session(*session_clock((9, 30, 3), 1, 130), 130)
+    after = arr(e.column("volume"))
+    tick = _by_instrument_day(pa.table(e.bars()).to_pydict(), "volume")
+    day = _by_instrument_day(pa.table(e.bars(grain="day")).to_pydict(), "volume")
+    for i in range(3):
+        assert len(tick[(0, i)]) == 130
+        assert all(v >= 0.0 for v in tick[(0, i)])
+        assert math.fsum(tick[(0, i)]) == pytest.approx(after[i] - before[i], rel=1e-12)
+        assert day[(0, i)][0] == after[i] - before[i]
+
+
+def test_bar_volume_holds_for_the_rate_indices_too():
+    u = tradefloor.Universe.random(4, seed=101, bonds=True)
+    e = tradefloor.Engine(seed=1, universe=u)
+    totals = _running(e, 2, 390, 4, bonds=True)
+    tick = _by_instrument_day(pa.table(e.bars()).to_pydict(), "volume")
+    day = _by_instrument_day(pa.table(e.bars(grain="day")).to_pydict(), "volume")
+    width = len(totals[(0, 0)])
+    assert width > 4
+    for d in range(2):
+        for i in range(width):
+            assert all(v >= 0.0 for v in tick[(d, i)]), (d, i)
+            assert day[(d, i)][0] == totals[(d, 0)][i], (d, i)
+            assert math.fsum(tick[(d, i)]) == pytest.approx(
+                totals[(d, 0)][i], rel=1e-12, abs=1e-9), (d, i)
 
 
 def test_the_day_bar_opens_at_the_session_open_not_the_first_print():
