@@ -3,14 +3,25 @@
 Run:
 
     pip install "tradefloor[claude]"
-    export ANTHROPIC_API_KEY=...          # or: ant auth login
     python examples/08-claude-agent.py
 
-Without a key, read `integrations/callable/five_days.ipynb` instead. It
-replays a committed Claude recording through the callable adapter, so it
-shows an LLM agent's run end to end with no call made. It also has the
-record-and-replay pattern (`Transcript`) that this file leaves out, which
-you need for tests that run in CI without a key.
+That replays a committed Claude run, `tests/fixtures/claude/example-08.json`,
+with no key and no network. The market re-executes for real and only Claude's
+answers come from the file, each looked up by a digest of the exact prompt
+Claude was sent. If anything in the prompt moves, the lookup misses and the
+run stops at that day with a message naming it. The recording is in the
+repository, not the package, so the replay needs a clone.
+
+To call Claude yourself, opt in and give it a key:
+
+    export TRADEFLOOR_LIVE_EXAMPLES=1
+    export ANTHROPIC_API_KEY=...          # or: ant auth login
+    python examples/08-claude-agent.py            # live, writes nothing
+    python examples/08-claude-agent.py --record   # live, rewrites the fixture
+
+A key in the environment is not enough on its own, because having one is not
+the same as asking to spend it. The opt-in is the one the integration
+examples use (`integrations/callable/five_days.py`).
 
 What makes this worth doing here rather than on real data: the harness knows
 why every price moved. Claude is asked for a portfolio AND for the factor it
@@ -34,31 +45,43 @@ close, and by the last step Claude has seen that day's overnight gap and five
 of its six steps. A decision at the open would see only yesterday's moves and
 be scored on today's.
 
-Cost: one API call per day. The harness steps six times a day by default, so
-the agent gates itself to one decision per day -- without that gate this is six
-times the bill. The default run below is 20 days over 12 instruments, so 20
-calls. At Claude Opus 5 rates ($5/MTok
-in, $25/MTok out) with the system prompt cached, that is roughly $0.30-$0.60.
-Raise `days` and it scales linearly. Nothing here needs a frontier model to
-demonstrate the mechanism -- pass model="claude-haiku-4-5" for a cheap smoke
-test, and expect worse answers.
+A live run costs one API call per day, and a replay costs nothing. The
+harness steps six times a day by default, so the agent gates itself to one
+decision per day -- without that gate this is six times the bill. The run
+below is 20 days over 12 instruments, so 20 calls. At Claude Opus 5 rates
+($5/MTok in, $25/MTok out) with the system prompt cached, that is roughly
+$0.30-$0.60. Raise `DAYS` and it scales linearly. Nothing here needs a
+frontier model to demonstrate the mechanism -- pass model="claude-haiku-4-5"
+for a cheap smoke test, and expect worse answers.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from collections import Counter
+from pathlib import Path
 from typing import Literal
 
 import tradefloor as tf
 from tradefloor.harness import DRIVER_NAMES
+from tradefloor.integrations.common import (
+    ReplayMiss, Transcript, digest, preset_of, replay_response)
 
 try:
-    import anthropic
     from pydantic import BaseModel, Field
 except ImportError:
     sys.exit('This example needs the extra: pip install "tradefloor[claude]"')
+
+#: The market seed and the length of the run, one decision a day.
+SEED, DAYS = 2026, 20
+
+#: The committed recording, found by walking up from this file, and the
+#: variable that must be set before anything here calls Claude.
+FIXTURE_IN_REPO = Path("tests") / "fixtures" / "claude" / "example-08.json"
+LIVE_OPT_IN_VAR = "TRADEFLOOR_LIVE_EXAMPLES"
+MAX_TOKENS = 4000
 
 
 # The factors that move a price, read from the harness's own list. `evaluate`
@@ -131,8 +154,46 @@ correct; equal-weighting everything is a way of declining to have a view.\
 # +0.0239 here, a figure no current preset record carries, until 0.8.0.
 
 
+def refuse_a_different_question(transcript: Transcript) -> None:
+    """Refuse a recording made under another system prompt or answer schema.
+
+    Each answer is keyed by a digest of the day's prompt alone, so a change
+    to `SYSTEM` or to `Decision` would replay every answer against a
+    question Claude was never asked. This says which one moved.
+    """
+    for field, now in (("instructions_digest", digest(SYSTEM)),
+                       ("decision_schema_digest",
+                        digest(Decision.model_json_schema()))):
+        if transcript.meta.get(field) != now:
+            raise ReplayMiss(
+                f"the recording's {field} is {transcript.meta.get(field)} "
+                f"and this file's is {now}: the recorded answers are to a "
+                "different question. Re-record with --record.")
+
+
+def fixture_path() -> Path | None:
+    """The committed recording, or None outside a repository checkout."""
+    for parent in Path(__file__).resolve().parents:
+        if (parent / FIXTURE_IN_REPO).is_file():
+            return parent / FIXTURE_IN_REPO
+    return None
+
+
+def fixture_target() -> Path | None:
+    """Where --record writes: under the checkout's `tests/fixtures/`."""
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "tests" / "fixtures").is_dir():
+            return parent / FIXTURE_IN_REPO
+    return None
+
+
 class ClaudeTrader:
-    """Implements tradefloor's agent protocol: act(), and the optional explain()."""
+    """Implements tradefloor's agent protocol: act(), and the optional explain().
+
+    Given a ``transcript``, it replays Claude's recorded answers and never
+    builds a client. Otherwise it calls Claude, and given a ``recorder`` it
+    writes down every exchange so that the run can be replayed.
+    """
 
     def __init__(
         self,
@@ -141,10 +202,27 @@ class ClaudeTrader:
         effort: str = "medium",
         max_names: int = 12,
         client: "anthropic.Anthropic | None" = None,
+        transcript: Transcript | None = None,
+        recorder: Transcript | None = None,
     ) -> None:
-        # A bare constructor resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN,
-        # or an `ant auth login` profile, in that order. Do not pass a key.
-        self.client = client or anthropic.Anthropic()
+        self.transcript = transcript
+        self.recorder = recorder
+        if transcript is not None:
+            refuse_a_different_question(transcript)
+            model = transcript.meta["model"]
+            effort = transcript.meta["generation"]["effort"]
+            client = None
+        elif client is None:
+            try:
+                import anthropic
+            except ImportError:
+                sys.exit('A live run needs the extra: '
+                         'pip install "tradefloor[claude]"')
+            # A bare constructor resolves ANTHROPIC_API_KEY,
+            # ANTHROPIC_AUTH_TOKEN, or an `ant auth login` profile, in that
+            # order. Do not pass a key.
+            client = anthropic.Anthropic()
+        self.client = client
         self.model = model
         self.effort = effort
         self.max_names = max_names
@@ -201,25 +279,29 @@ class ClaudeTrader:
         if not obs.is_last_step_of_day:
             return {}
 
-        response = self.client.messages.parse(
-            model=self.model,
-            max_tokens=4000,
-            # The rules of the market never change, so they cache. The volatile
-            # market state goes in the user turn, after the breakpoint, or the
-            # cache would be invalidated on every single call.
-            system=[{"type": "text", "text": SYSTEM,
-                     "cache_control": {"type": "ephemeral"}}],
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.effort},
-            messages=[{"role": "user", "content": self._prompt(obs)}],
-            output_format=Decision,
-        )
+        prompt = self._prompt(obs)
+        key = digest(prompt)
+        if self.transcript is not None:
+            # Raises ReplayMiss, which ends the run, if the recording holds
+            # no answer to this exact prompt.
+            answer = json.loads(replay_response(
+                self.transcript, key, step=obs.step, day=obs.day,
+                preset=preset_of(obs)))
+        else:
+            answer = self._ask(prompt)
+            if self.recorder is not None:
+                if not self.recorder.meta:
+                    self.recorder.meta.update(self.provenance(obs))
+                self.recorder.record({
+                    "arm": "claude", "step": obs.step, "day": obs.day,
+                    "digest": key, "prompt": prompt,
+                    "response": json.dumps(answer)})
 
-        if response.stop_reason == "refusal":
+        if answer["stop_reason"] == "refusal":
             # Hold rather than guess. A refused turn is not a flat view.
             return {}
 
-        decision = response.parsed_output
+        decision = Decision.model_validate(answer["output"])
         self._drivers[obs.day] = decision.driver
         self._log.append((obs.day, decision.driver, decision.reasoning))
 
@@ -245,6 +327,46 @@ class ClaudeTrader:
         self._last_prices = {t: obs.price(t) for t in obs.tickers}
         return orders
 
+    def _ask(self, prompt: str) -> dict:
+        """One live call, returned in the form the recording keeps."""
+        response = self.client.messages.parse(
+            model=self.model,
+            max_tokens=MAX_TOKENS,
+            # The rules of the market never change, so they cache. The volatile
+            # market state goes in the user turn, after the breakpoint, or the
+            # cache would be invalidated on every single call.
+            system=[{"type": "text", "text": SYSTEM,
+                     "cache_control": {"type": "ephemeral"}}],
+            thinking={"type": "adaptive"},
+            output_config={"effort": self.effort},
+            messages=[{"role": "user", "content": prompt}],
+            output_format=Decision,
+        )
+        output = (None if response.stop_reason == "refusal"
+                  else response.parsed_output.model_dump())
+        return {"stop_reason": response.stop_reason, "output": output}
+
+    def provenance(self, obs) -> dict:
+        """What the recording's meta says about how it was made.
+
+        The prompt digest keys each answer. These fields cover what the
+        digest does not: the model, the system prompt, the answer schema
+        and the market preset, which `refuse_a_different_question` and
+        `replay_response` check before a replay looks anything up.
+        """
+        return {
+            "framework": "anthropic-sdk", "provider": "anthropic",
+            "model": self.model, "agent_name": "ClaudeTrader",
+            "generation": {"max_tokens": MAX_TOKENS, "effort": self.effort,
+                           "thinking": "adaptive"},
+            "instructions_digest": digest(SYSTEM),
+            "decision_schema_digest": digest(Decision.model_json_schema()),
+            "decision_every_steps": obs.steps_per_day,
+            "seed": SEED, "days": DAYS,
+            "tradefloor_version": tf.__version__,
+            "model_preset": preset_of(obs),
+        }
+
     def explain(self, day: int) -> str | None:
         """The factor Claude named on this day's last step.
 
@@ -257,22 +379,50 @@ class ClaudeTrader:
         return self._drivers.get(day)
 
 
-def main() -> None:
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        print("No API key in the environment. `ant auth login` also works.\n"
-              "Continuing anyway -- the SDK resolves a stored profile if there is one.\n")
+def main(argv: list[str] | None = None) -> None:
+    record = "--record" in (sys.argv[1:] if argv is None else argv)
+    live = bool(os.environ.get(LIVE_OPT_IN_VAR))
+    if record and not live:
+        sys.exit(f"--record calls Claude {DAYS} times and rewrites "
+                 f"{FIXTURE_IN_REPO.as_posix()}. Set {LIVE_OPT_IN_VAR}=1 and "
+                 "ANTHROPIC_API_KEY to ask for that.")
+
+    if live:
+        if not (os.environ.get("ANTHROPIC_API_KEY")
+                or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+            print("No API key in the environment. `ant auth login` also works.\n"
+                  "Continuing anyway -- the SDK resolves a stored profile if there is one.\n")
+        target = fixture_target()
+        if record and target is None:
+            sys.exit("--record writes under the repository's tests/fixtures/, "
+                     "and there is none above this file.")
+        claude = ClaudeTrader(recorder=Transcript() if record else None)
+        print(f"Running Claude against the reference agents. {DAYS} API calls.\n")
+    else:
+        path = fixture_path()
+        if path is None:
+            sys.exit(
+                f"No recording at {FIXTURE_IN_REPO.as_posix()} above this file. "
+                "It is in the tradefloor repository, not in the package, so "
+                "the replay needs a clone. To call Claude instead, set "
+                f"{LIVE_OPT_IN_VAR}=1 and ANTHROPIC_API_KEY.")
+        transcript = Transcript.load(path)
+        claude = ClaudeTrader(transcript=transcript)
+        print(f"Replaying {len(transcript)} answers {claude.model} gave on "
+              f"{transcript.meta.get('recorded_utc', 'an unrecorded date')}, "
+              f"from {FIXTURE_IN_REPO.as_posix()}.\nNo call is made. "
+              f"{LIVE_OPT_IN_VAR}=1 with a key runs it live.\n")
 
     universe = tf.Universe.random(12, seed=7)
-    claude = ClaudeTrader()
-
-    print("Running Claude against the reference agents. 20 API calls.\n")
-
     agents = tf.reference_agents(seed=3)
     agents["claude"] = claude
 
-    scores = tf.evaluate(
-        agents, seed=2026, universe=universe, days=20, max_leverage=2.0,
-    )
+    try:
+        scores = tf.evaluate(
+            agents, seed=SEED, universe=universe, days=DAYS, max_leverage=2.0,
+        )
+    except ReplayMiss as miss:
+        sys.exit(f"The recording no longer matches this run.\n{miss}")
 
     # A run where every decision failed is not a result. Without this the
     # table below reports claude at zero pnl and no explanation accuracy,
@@ -330,6 +480,15 @@ def main() -> None:
     for (claimed, actual), (day, _, why) in list(zip(scored, claude._log))[:5]:
         mark = "right" if claimed == actual else "engine: " + actual
         print("  day %-3d %-18s %-24s %s" % (day, claimed, mark, why[:48]))
+
+    if record:
+        # Every day answered, or nothing written: a recording with a hole
+        # in it would stop every replay at the missing day.
+        if len(claude.recorder) != DAYS:
+            sys.exit(f"Not written: Claude answered {len(claude.recorder)} "
+                     f"of {DAYS} days. The errors are in the scorecard.")
+        claude.recorder.save(target)
+        print(f"\nWrote {len(claude.recorder)} answers to {target}.")
 
     print(
         "\nOne seed ranks the seed, not the agents. Before concluding anything,"

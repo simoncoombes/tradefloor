@@ -969,6 +969,15 @@ instead of two tracebacks. The README says to clone the repository before
 running an example, since `examples/` is not in the package, and says the
 `finrobot` extra installs only on Python 3.11 and only `--live` needs it.
 
+`examples/08-claude-agent.py` replays a recorded Claude run by default
+(owner decision 10), so it runs with no key and no network. The recording is
+`tests/fixtures/claude/example-08.json`, and its `meta` names the model, the
+preset, and digests of the system prompt and the answer schema. With
+`TRADEFLOOR_LIVE_EXAMPLES=1` and a key the example calls Claude, once per
+simulated day, and `--record` rewrites the recording. A replay refuses a
+recording made under another prompt, schema or preset, and stops at the
+first day whose prompt it holds no answer for.
+
 ### Wrong arguments and broken agents
 
 A review of what a new user is told found wrong arguments reaching Python's

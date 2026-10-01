@@ -146,6 +146,17 @@ MARKED = {
          "test_invariance_reports_a_non_matching_renderer_as_unrecorded"),
         ("test_render.py",
          "test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early"),
+        # EXAMPLE 08's RECORDING (owner decision 10). Both read
+        # `tests/fixtures/claude/example-08.json`, a live Claude run of
+        # `examples/08-claude-agent.py`. Each answer is keyed by a digest of
+        # the day's prompt, and the prompt carries every price, so a moved
+        # market or prompt misses at day 0 and only a live re-record
+        # restores it. Until the first recording is committed both skip and
+        # name the command that makes it.
+        ("test_examples.py",
+         "test_the_claude_example_replays_its_committed_recording"),
+        ("test_examples.py",
+         "test_the_claude_example_recording_says_what_made_it"),
     },
 }
 
