@@ -1,3 +1,33 @@
+## 0.8.6
+
+A patch release on the 0.8 long-term support line. No coefficient, default
+or trajectory changes. Every known-answer digest is 0.8.5's, and `pt-v20`
+stays the default.
+
+`envelope.check` still refuses a sector-concentrated roster on pt-v20, and
+now says why. The run behind the pt-v19 grant was repeated on pt-v20 with
+`tools/calibration/roster_shapes.py`: the same four mixes, seeds 101 to 130,
+252 and 504 days. At 252 days every mix held every shape row the bands can
+grade. At 504 days the S&P-like and technology-heavy mixes read
+`volume_abs_return_corr` at 0.6367 and 0.6332 against a ceiling of 0.63,
+where the balanced roster reads 0.6266. The run is committed as
+`measurements/roster-shapes-pt-v20.json`, and the `roster-concentration` gap
+and the refusal quote it. A question that passes `preset="pt-v19"` keeps the
+pt-v19 grant.
+
+<!-- release-note-ends -->
+
+### The dev branch
+
+`dev` carried six commits that `main` never took by merge: the roster mixes
+in `envelope.check`, the claim register read from `tradefloor-docs`, the
+register procedure in `RELEASING.md`, `decay-curve-504.json` under
+`measurements/`, the `forced_flow_threshold` summary, and a 2026-09-08
+re-record of the openai-agents notebook. The first five reached 0.8.5 under
+other commits, and 0.8.5's live re-record replaced the sixth. `dev` is now
+merged into `main` with 0.8.5's files kept, so the merge changes nothing a
+user installs.
+
 ## 0.8.5
 
 0.8.5 is the first long-term support release. The 0.8 line gets fixes that
