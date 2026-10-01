@@ -881,7 +881,7 @@ OpenAI Agents and PydanticAI examples' rule reads `return_5d`, so their
 scorecard rows moved (`examples/integrations/README.md`). Every committed
 LLM recording was made under the old payload and misses at step 0: the
 seven in `tests/fixtures/` need a live re-record, and the 20 tests that
-replay them carry `needs_live_model` until then.
+replay them carry `needs_live_model` and are skipped until then.
 
 ### The gym environment
 

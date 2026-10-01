@@ -359,6 +359,7 @@ def test_the_claude_example_refuses_when_every_decision_fails():
 
 
 @pytest.mark.needs_live_model
+@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_the_liquidity_crisis_study_replays_its_recording():
     """The study's first shared day, replayed from its fixture, NOT behind
     the slow flag.

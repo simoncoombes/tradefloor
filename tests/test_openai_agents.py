@@ -1324,6 +1324,7 @@ needs_fixture = pytest.mark.skipif(
 
 
 @pytest.mark.needs_live_model
+@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_committed_recording_replays_end_to_end():
     """The shipped fixture, replayed through `evaluate` with a model that
