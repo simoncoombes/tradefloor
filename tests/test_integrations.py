@@ -2014,8 +2014,11 @@ def test_the_day_zero_macro_dates_each_fixture_to_the_preset_it_names():
     root = pathlib.Path(__file__).parent / "fixtures"
     checked = 0
     for name, preset in FIXTURE_PRESETS.items():
-        prompt = json.loads((root / name).read_text(
-            encoding="utf-8"))["entries"][0].get("prompt")
+        # Day zero is the earliest step, not the first entry: a saved
+        # transcript is not kept in the order the decisions were made.
+        entries = json.loads((root / name).read_text(
+            encoding="utf-8"))["entries"]
+        prompt = min(entries, key=lambda e: e.get("step", 0)).get("prompt")
         text = prompt if isinstance(prompt, str) else json.dumps(prompt)
         found = re.search(r'"?vix"?["\s:]+([\d.]+)', text)
         if not found:

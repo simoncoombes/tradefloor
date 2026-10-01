@@ -1324,7 +1324,6 @@ needs_fixture = pytest.mark.skipif(
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_committed_recording_replays_end_to_end():
     """The shipped fixture, replayed through `evaluate` with a model that
@@ -1395,12 +1394,15 @@ def test_the_committed_recording_replays_end_to_end():
     # grade passed on (ptv20g6). The values that recording replaced (pt-v20
     # before its graded arm): trades 1, pnl 7042.0, turnover 934500.0,
     # rejected 2.
-    assert card.trades == 3, card.trades
-    assert card.pnl == pytest.approx(57576.0, abs=0.5), card.pnl
-    assert card.turnover == pytest.approx(2825350.0), card.turnover
+    #
+    # And RE-RECORDED for 0.8.5's decision schema 2 (limit orders, CANCEL,
+    # open orders in the payload) and margin charged by default. The values
+    # that recording replaced: trades 3, pnl 57576.0, turnover 2825350.0.
+    assert card.trades == 2, card.trades
+    assert card.pnl == pytest.approx(21509.93, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(1565500.0), card.turnover
 
-    # NO REFUSALS on this recording, which is a fact about this run and not
-    # a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
+    # Refusals are a fact about each recording, not a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
     # pt-v19 as first composed it asked for 2.06x against a 2.00x cap on day
     # 4 and the MARKET refused that leg; on the fourth and fifth
     # compositions, and on 0.8.5's pt-v19 run, it stayed inside the cap
@@ -1410,10 +1412,14 @@ def test_the_committed_recording_replays_end_to_end():
     # it on day 2, peaking at 1.86x, and nothing was refused.
     #
     # Pinned exactly rather than bounded: a replay failure lands in the
-    # errors list, so an empty list is what says every decision replayed.
-    # Previously: rejected 2, the two leverage refusals above.
-    assert card.rejected == 0, card.errors
-    assert card.errors == [], card.errors
+    # errors list, so the list holding only the market's own refusal is
+    # what says every decision replayed. On the schema-2 recording gpt-5.2
+    # asked for 100,000 TECH_B on day 1, which would have taken the book to
+    # 9.34x, and the market refused it. Previously: rejected 0.
+    assert card.rejected == 1, card.errors
+    assert card.errors == [
+        "step 6: trade would take leverage to 9.34x, above the 2.00x limit"
+    ], card.errors
 
 
 @needs_fixture

@@ -597,7 +597,6 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end():
     """The recorded model run, replayed through evaluate() with a function

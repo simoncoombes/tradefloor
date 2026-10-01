@@ -2371,7 +2371,6 @@ def test_an_older_recording_falls_back_to_the_version_it_does_carry():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @pytest.mark.skipif(not FIXTURE.exists(), reason="no recorded FinRobot run")
 def test_the_shipped_fixture_carries_the_digest_of_the_mandate_that_ran_it():
     """The shipped recording is checked strictly, not by the version fallback.
@@ -2453,7 +2452,6 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end(tmp_path):
     """The whole experiment, from the shipped fixture, with no key.

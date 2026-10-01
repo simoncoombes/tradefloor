@@ -403,7 +403,6 @@ def test_a_refusal_does_not_reset_decision_deduplication():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_recorded_finrobot_fixture_matches_its_own_transcript():
     """Two ways of getting a decision list out of the same recording,

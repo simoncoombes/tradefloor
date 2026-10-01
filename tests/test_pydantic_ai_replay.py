@@ -83,7 +83,6 @@ def _load_example():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end():
     """The whole recorded experiment: shared history, fork, one intervention,
@@ -134,7 +133,6 @@ def test_the_recorded_run_replays_end_to_end():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 @needs_fixture
 def test_the_committed_fixture_still_matches_the_shipped_mandate():
     """The last mile of the replay guard, asserted against the real artefact.

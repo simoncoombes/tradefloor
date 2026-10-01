@@ -527,7 +527,6 @@ def test_jsonrenderer_refuses_a_fundamentals_value_it_cannot_encode():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_finrobot_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_finrobot_rate_shock",
                     REPO / "examples" / "integrations" / "finrobot"
@@ -549,15 +548,17 @@ def test_finrobot_default_renderer_replays_the_shipped_fixture():
                  ticks_per_step=example.TICKS_PER_STEP)
     world.run(days=example.WARMUP_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.WARMUP_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.WARMUP_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests, (
         "the default renderer no longer reproduces the shipped fixture's "
         "prompts byte for byte")
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_langgraph_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_langgraph_rate_shock",
                     REPO / "examples" / "integrations" / "langgraph"
@@ -576,13 +577,15 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
                  agent=agent, cash=example.CASH, pins=example.BASE_PINS)
     world.run(days=example.WARMUP_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.WARMUP_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.WARMUP_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_pydantic_ai_rate_shock",
                     REPO / "examples" / "integrations" / "pydantic_ai"
@@ -599,13 +602,15 @@ def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
                  agent=agent, cash=example.CASH, pins=example.PINS)
     world.run(days=example.SHARED_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.SHARED_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.SHARED_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_openai_agents_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_openai_agents_five_days",
                     REPO / "examples" / "integrations" / "openai_agents"
@@ -666,7 +671,6 @@ def test_openai_agents_provenance_carries_the_renderer_key():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_two_identical_renderers_give_identical_decisions_on_the_fixture():
     """`invariance` proper needs a `renderer` attribute and a live fork;
     this is the narrower claim it rests on -- two SEPARATELY CONSTRUCTED
@@ -756,7 +760,6 @@ def test_invariance_fork_agreement_holds_on_a_real_finrobot_adapter():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     """The design note's claim: "against a recorded agent only renderers
     with recordings replay; the others are reported as unrecorded."
@@ -813,7 +816,6 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
     """Round 2, finding 1: asking for `days` more than the transcript
     covers used to catch the exception at the WHOLE `run()` call, so the

@@ -1466,7 +1466,6 @@ def test_the_fixture_labels_both_arms():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_the_recorded_run_replays_end_to_end():
     """The claim the notebook makes, tested: the whole forked experiment
     reproduces from the recording, with no graph object and no network."""
@@ -1488,7 +1487,6 @@ def test_the_recorded_run_replays_end_to_end():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_the_recorded_arms_diverge_at_the_shock():
     """The experiment's result, pinned. If a future edit to the observation
     mapping quietly stopped the agent seeing the policy rate, the notebook
@@ -1509,7 +1507,6 @@ def test_the_recorded_arms_diverge_at_the_shock():
 
 
 @pytest.mark.needs_live_model
-@pytest.mark.skip(reason="awaiting live re-record (decisions 4/11)")
 def test_replay_needs_neither_the_framework_nor_a_key():
     """The strongest version of the claim, and the one that makes the
     notebook readable by someone who has never installed LangGraph.
