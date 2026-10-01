@@ -1,11 +1,13 @@
 # Will a financial AI agent reduce risk in a market crisis?
 
-> **Measured under the 0.8.x harness.** Every number on this page comes from
-> FinRobot runs recorded before 0.8.5, when Tradefloor counted an agent's own
-> orders on every minute of a step instead of once. From 0.8.5 the prices
-> after the first trade differ, so these recordings no longer replay past the
-> first decision, and the results below have not been re-measured. Re-recording
-> the study is a listed follow-up.
+> **Two harnesses on one page.** The canonical run, which the notebook
+> replays, was recorded again live on 0.8.5 (60 calls to
+> `claude-sonnet-4-5-20250929`, 2026-10-01), and the tables below are
+> measured on it. The four replications, the resample and the five-arm
+> decomposition are recorded summaries in `data/`, from runs made before
+> 0.8.5, when Tradefloor counted an agent's own orders on every minute of a
+> step instead of once. They were not recorded again, and under 0.8.5 the
+> agent holds about half the gross exposure it held in any of them.
 
 A [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent
 manages twenty-four real companies and fifty million dollars for twenty
@@ -26,15 +28,16 @@ its usual depth.
 
 | arm | mean gross exposure | the agent's own change | risk words |
 |---|---:|---:|---:|
-| control | 0.859 | +0.122 | 12/20 |
-| crisis | 0.636 | -0.128 | 17/20 |
+| control | 0.359 | +0.027 | 13/20 |
+| crisis | 0.333 | -0.092 | 16/20 |
 
 Gross exposure moves for two reasons, and only one of them is the agent.
 The second column holds the market still: at each decision, exposure
 immediately before the fills and immediately after, at the same arrival
-prices. The sign flips.
+prices. The sign flips. The gap in mean exposure is small, and the crisis
+arm holds less on 17 of the 20 days.
 
-Across four live replications the crisis arm carried less exposure in
+Across four live replications under the 0.8.x harness the crisis arm carried less exposure in
 three. Two observations about the fourth, without reading more into them:
 the crisis values occupy a narrower range than the control values, and run
 4's crisis figure sits among the other crisis figures while its control
@@ -52,12 +55,12 @@ numbers are the same numbers.
 
 | arm | prints | depth reached | median share | negative | mean \|absorbed\| |
 |---|---:|---:|---:|---:|---:|
-| control | 9,360 | 71, or 0.76% | -1.002 | 62 of 71 | 23.3 bps |
-| crisis | 9,360 | 191, or 2.04% | -1.002 | 172 of 191 | 34.7 bps |
+| control | 9,360 | 72, or 0.77% | -1.002 | 63 of 72 | 22.9 bps |
+| crisis | 9,360 | 188, or 2.01% | -1.002 | 169 of 188 | 34.3 bps |
 
 `market.liquidity` at 40% is a claim about depth, and these columns read it
 back off the tape. The crisis changes how OFTEN flow runs out of book
-rather than how far it goes when it does: 2.7 times as many prints reach
+rather than how far it goes when it does: 2.6 times as many prints reach
 the end of the quoted depth, at the same median share. The mean distance
 from the model price to the print rises with that count.
 
@@ -69,8 +72,9 @@ says the deeper book would have moved the price twice as far, since the
 unbounded move is `1 - share` times the printed one.
 
 The absorption column is a distance and is reported as one, because
-absorption is signed with the move and the signed mean cancels to -0.4
-basis points across up and down ticks. It carries the circuit breaker
+absorption is signed with the move and up and down ticks cancel: the
+signed mean is +4.2 basis points on the control arm and +5.4 on the crisis
+arm, against 22.9 and 34.3 for the distance. It carries the circuit breaker
 alongside the book, and the `clamp` column is the breaker's own part of it.
 Neither arm halted a name on this day: `clamp` is zero on all 9,360 rows of
 each, so both figures above are the book alone. The counterfactual prints
@@ -79,7 +83,7 @@ would have done to the tick after.
 
 Measured on day 39, the last day of the post-fork window, over 390 ticks
 and the twenty-four names drawn from `data/edgar-2026-08-31.json`. Seed
-4242, universe seed 4242, preset `pt-v16`, at commit `679ef3d`. The
+4242, universe seed 4242, preset `pt-v16`, at commit `8753546`. The
 notebook prints this table from `ex.depth_readings(worlds)`.
 
 `experiment.py` pins `pt-v16`, and the shipped default from 0.8.5 is
@@ -89,18 +93,11 @@ study stays on the preset it was recorded under.
 ## Reading it
 
 `notebook.ipynb` carries its output, so it reads on GitHub without a
-kernel. That committed copy is the one to read at 0.8.5, because
-re-executing it fails. Every decision the agent took was recorded once,
-live, and is replayed from
-[`tests/fixtures/finrobot/liquidity-crisis.json`](../../../tests/fixtures/finrobot/liquidity-crisis.json),
-and for the reason in the note at the top of this page the replay stops
-matching after the first trade. The run then goes on with the agent holding,
-and the notebook stops with a `StopIteration` at the cell that compares the
-first prompts after the fork, because no decision was replayed there.
-`tests/test_examples.py` skips this notebook for that reason.
-
-Once the recordings are re-recorded, this rebuilds and re-executes it, with
-no model call, no API key and no network:
+kernel. Every decision the agent took in the canonical run was recorded
+once, live, and is replayed from
+[`tests/fixtures/finrobot/liquidity-crisis.json`](../../../tests/fixtures/finrobot/liquidity-crisis.json).
+This rebuilds and re-executes the notebook, with no model call, no API key
+and no network:
 
 ```bash
 pip install "tradefloor[arrow]" matplotlib nbformat nbclient
@@ -134,10 +131,10 @@ ways.
 
 So `at: 0`, and nothing else. Both fingerprints are recorded, and the
 notebook checks that every shock, value and window matches the packaged
-file rather than asking you to believe it. The committed output shows that
-check passing. 0.8.5 recalibrated the packaged file (the VIX goes three and
-a half times rather than two, and earnings fall 15% and recover), so against
-the 0.8.5 package the check reads False. The study keeps the file it was
+file rather than asking you to believe it. 0.8.5 recalibrated the packaged
+file (the VIX goes three and a half times rather than two, and earnings fall
+15% and recover), so against the 0.8.5 package the check reads False, which
+is what the committed output shows. The study keeps the file it was
 recorded under.
 
 `market.liquidity` is the one target here that is not a macro field, and

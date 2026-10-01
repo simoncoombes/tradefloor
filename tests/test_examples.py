@@ -80,15 +80,9 @@ def test_there_are_notebooks_to_check():
 #: replay is keyed to the exact text the agent was sent, so from the first
 #: trade on the prompts differ and the replay misses. Each entry is a
 #: follow-up, not a pass: it names what has to be re-recorded to remove it.
-STALE_RECORDINGS = {
-    EXAMPLES / "experiments" / "liquidity-crisis" / "notebook.ipynb": (
-        "the liquidity-crisis study replays FinRobot runs recorded under the "
-        "0.8.x harness, which counted an agent's fills on every tick of a "
-        "step; since 0.8.5 they reach the market once, every price after the "
-        "first trade moves, and the recorded decisions stop matching. "
-        "Re-record tests/fixtures/finrobot/liquidity-crisis.json (60 calls) "
-        "and the four replications in data/ to remove this skip."),
-}
+#: Empty since 2026-10-01, when the liquidity-crisis study's canonical run
+#: was recorded again live on 0.8.5 and its notebook executes again.
+STALE_RECORDINGS: dict = {}
 
 
 def test_a_stale_study_says_so_where_it_says_how_to_re_execute():

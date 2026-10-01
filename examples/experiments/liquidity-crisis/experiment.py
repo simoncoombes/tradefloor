@@ -567,9 +567,9 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
     )
     # ABSOLUTE, and labelled so everywhere it is reported. Absorption is
     # signed with the move, so up ticks and down ticks cancel and the signed
-    # mean over a session is near zero: -0.4 basis points against 27.0 for
-    # the absolute mean on the control arm. The question is how far a print
-    # sits from the model price, which is a distance.
+    # mean over a session is small: +4.2 basis points against 22.9 for the
+    # absolute mean on the control arm of the 0.8.5 recording. The question
+    # is how far a print sits from the model price, which is a distance.
     absorbed = [abs(v) for v in table["absorbed"]]
     return {
         "day": table["day"][0] if rows else None,
