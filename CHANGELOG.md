@@ -33,8 +33,8 @@ a recession winning back 49 per cent of its fall in a year against 2009's
 
 pt-v20 is pt-v19 with the market-behaviour faults found by the
 mean-reversion investigation fixed (design repository,
-`programme/meanrev-edge-ptv19-2026-09-24.md`; the composition, the registered
-rows and the grade are `programme/ptv20-*.md`). `ModelParams.pt_v20` in
+`programme/meanrev-edge-ptv19-2026-09-24.md`; the registered rows and the
+grade are published in `validation/pt-v20/`). `ModelParams.pt_v20` in
 `rust/src/params.rs` documents every dial, and `python/tradefloor/provenance.py`
 gives each value's derivation or measurement.
 
@@ -649,6 +649,42 @@ for each published release, once the owner switches it on (`RELEASING.md`,
 "DOI (Zenodo)"). `CITATION.cff` asks for the preset beside the version, and
 the README gains a section on citing a version and a preset, with a BibTeX
 entry whose DOI is a placeholder until Zenodo mints one.
+
+### pt-v20's grade in the repository
+
+`tf.preset_record("pt-v20")["long_run"]` named twelve files in the
+project's private design repository, `criteria.py` among them, so nobody
+outside could check the 40 of 40. `validation/pt-v20/` now holds that grade
+(box `ptv20g6`, 2026-09-26): the adopted criteria, the twelfth
+registration, `criteria.py`, `certgrade_box.py` and `v1.py`, the 31 scripts
+and data files the box ran, and every file it wrote except 93 MB of raw
+histories. The files keep the design repository's layout, so the recorded
+commands run unchanged. `scripts-as-run.txt` gives each box file's sha256,
+and they match the archive the box unpacked.
+
+`validation/README.md` says how to check the grade. `criteria.py` needs
+only Python, runs in under a second and writes `criteria-g6.txt`,
+`criteria-g6.json` and the verdict again byte for byte;
+`tests/test_validation.py` runs it on every test run. `certgrade_box.py`
+also reproduces its grade byte for byte on the 0.8.5 tree.
+`validation/pt-v20/run-box.sh` runs the whole grade again on a machine of
+your own: it clones the engine at b89901979e5a, checks the simulation
+digest, runs the jobs and grades the output. It has not been run end to end
+outside the original box, which took 25 minutes on 96 cores.
+
+The `long_run` block in pt-v20's record now names those published paths.
+`tools/presets/record.py --long-run` rewrites a verdict's paths for any box
+in its `PUBLISHED_GRADES` table, and the test holds the record to the
+published verdict. pt-v19's block still names its 2026-09-23 box in the
+design repository, which is not published. `provenance.py` entries that
+cite `criteria.py` or the twelfth registration point at the same files.
+Nothing about the simulation changed; every known-answer digest is the same.
+
+`docs/MODEL.md` gains a section on the reference implementation the engine
+was ported from. It is not published, and it stays unpublished until the
+owner names it, so a value whose source is "reference implementation" has
+no source a reader can check and should be read as an assumption. The
+parity vectors it produced are in `rust/goldens/`; the code is not.
 
 ### 64-bit seeds
 

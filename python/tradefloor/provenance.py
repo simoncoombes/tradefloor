@@ -3719,8 +3719,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "roster (meanrev-edge section 4; ptv20 "
                                      "desk r1-r6)",
                   "5.8x -> 1.3-1.5x": "Roll spread over the quoted spread"},
-        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 4 and "
-                  "programme/ptv20-registration.md (design repository)",
+        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 4 "
+                  "(design repository, unpublished) and "
+                  "validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-24",
     },
     "closing_auction": {
@@ -3739,7 +3740,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                   "cross (ptv20 desk r3, r4), against the "
                                   "certified forty's -1.7, whose closes are "
                                   "auction prices"},
-        "source": "programme/ptv20-registration.md (design repository)",
+        "source": "validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-24",
     },
     "fair_value_news_share": {
@@ -3971,7 +3972,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "DGS10) and the grading boxes ptv20vr4-vr9 (design "
                   "repository)",
         "date": "2026-09-26",
-        "script": "programme/longrun/criteria.py, row R2: the sd of the "
+        "script": "validation/pt-v20/programme/longrun/criteria.py, row "
+                  "R2: the sd of the "
                   "10-year's daily change over the pooled long run",
         "estimator": "the noise at which the model's 10-year daily change "
                      "sd, most of it meeting-day moves toward the policy "
@@ -4034,10 +4036,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "measured",
         "presets": {"pt-v20": 0.2},
         "source": "the grading boxes ptv20vr3b, vr4 and vr9 (design "
-                  "repository, programme/ptv20-registration.md, twelfth "
-                  "registration and 'The graded arm')",
+                  "repository, unpublished); the twelfth registration and "
+                  "'The graded arm' in "
+                  "validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-26",
-        "script": "programme/longrun/criteria.py, row E1: the median fall "
+        "script": "validation/pt-v20/programme/longrun/criteria.py, row "
+                  "E1: the median fall "
                   "of aggregate earnings in a contraction over the pooled "
                   "long run, against Shiller's reported earnings around "
                   "the NBER recessions (median -0.17)",
@@ -4153,8 +4157,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "close of a contraction, and a rule out for 63 sessions after "
             "that drop beat holding in 88 of 90 histories; simulated offline "
             "on grid ptv20e8, the quarterly release takes the GDP rules to "
-            "ahead in at most 36 per cent (design repository, twelfth "
-            "registration)",
+            "ahead in at most 36 per cent (twelfth registration, "
+            "validation/pt-v20/programme/ptv20-registration.md)",
     },
     "unemployment_adjustment_half_life": {
         "kind": "undetermined",
@@ -4168,7 +4172,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "from about 1.2 points to 0.16, 15 per cent of the rise comes in "
             "the first 63 sessions, and on desk seeds 201-212 the "
             "largest-rise rule goes from ahead in 7 of 12 to 0 of 12 "
-            "(design repository, twelfth registration)",
+            "(twelfth registration, "
+            "validation/pt-v20/programme/ptv20-registration.md)",
     },
     "fear_greed_published_inputs": {
         "kind": "derived",
@@ -4185,8 +4190,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                          "grid ptv20e8 with the switch off; "
                                          "desk seeds 201-212 with it on and "
                                          "both publication lags set"},
-        "source": "programme/ptv20-registration.md, twelfth registration "
-                  "(design repository)",
+        "source": "validation/pt-v20/programme/ptv20-registration.md, "
+                  "twelfth registration",
         "date": "2026-09-25",
     },
     "macro_publication_repricing": {
@@ -4204,8 +4209,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                       "all days, off and on (box ratenews1, seeds 601-630)",
                   "+1.90 -> -0.28 points a year": "the audit's rate-news "
                       "agent over holding, ahead in 30 of 30 and 7 of 30"},
-        "source": "pt-v20 audit, finding 3; programme/ptv20-registration.md, "
-                  "twelfth registration, row R7 (design repository)",
+        "source": "pt-v20 audit, finding 3; validation/pt-v20/programme/"
+                  "ptv20-registration.md, twelfth registration, row R7",
         "date": "2026-09-25",
     },
     "earnings_anticipation_half_life": {

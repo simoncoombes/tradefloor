@@ -1,0 +1,881 @@
++ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6
++ BRANCH=fix/ptv20-final
++ dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
+Amazon Linux 2023 repository                     86 MB/s |  79 MB     00:00    
+Amazon Linux 2023 Kernel Livepatch repository   892 kB/s |  80 kB     00:00    
+Package tar-2:1.34-1.amzn2023.0.4.aarch64 is already installed.
+Package gzip-1.12-1.amzn2023.0.1.aarch64 is already installed.
+Package awscli-2-2.33.15-1.amzn2023.0.1.noarch is already installed.
+Dependencies resolved.
+================================================================================
+ Package                   Arch    Version                    Repository   Size
+================================================================================
+Installing:
+ gcc                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  31 M
+ git                       aarch64 2.50.1-1.amzn2023.0.1      amazonlinux  53 k
+ python3.11                aarch64 3.11.16-1.amzn2023.0.1     amazonlinux  28 k
+ python3.11-devel          aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 235 k
+Installing dependencies:
+ annobin-docs              noarch  12.69-1.amzn2023.0.1       amazonlinux  93 k
+ annobin-plugin-gcc        aarch64 12.69-1.amzn2023.0.1       amazonlinux 973 k
+ cpp                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  10 M
+ gc                        aarch64 8.0.4-5.amzn2023.0.2       amazonlinux 102 k
+ gcc-plugin-annobin        aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  37 k
+ git-core                  aarch64 2.50.1-1.amzn2023.0.1      amazonlinux 5.1 M
+ git-core-doc              noarch  2.50.1-1.amzn2023.0.1      amazonlinux 2.8 M
+ glibc-devel               aarch64 2.34-231.amzn2023.0.5      amazonlinux 445 k
+ guile22                   aarch64 2.2.7-2.amzn2023.0.3       amazonlinux 6.4 M
+ kernel6.18-headers        aarch64 1:6.18.48-109.150.amzn2023 amazonlinux 1.5 M
+ libmpc                    aarch64 1.2.1-2.amzn2023.0.2       amazonlinux  63 k
+ libtool-ltdl              aarch64 2.4.7-1.amzn2023.0.3       amazonlinux  38 k
+ libxcrypt-devel           aarch64 4.4.33-7.amzn2023          amazonlinux  32 k
+ make                      aarch64 1:4.3-5.amzn2023.0.2       amazonlinux 530 k
+ mpdecimal                 aarch64 2.5.1-3.amzn2023.0.3       amazonlinux 103 k
+ perl-Error                noarch  1:0.17030-2.amzn2023.0.1   amazonlinux  42 k
+ perl-File-Find            noarch  1.37-477.amzn2023.0.9      amazonlinux  26 k
+ perl-Git                  noarch  2.50.1-1.amzn2023.0.1      amazonlinux  41 k
+ perl-TermReadKey          aarch64 2.38-9.amzn2023.0.3        amazonlinux  36 k
+ perl-lib                  aarch64 0.65-477.amzn2023.0.9      amazonlinux  15 k
+ python3.11-libs           aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 9.7 M
+ python3.11-pip-wheel      noarch  22.3.1-2.amzn2023.0.14     amazonlinux 1.4 M
+ python3.11-setuptools-wheel
+                           noarch  65.5.1-2.amzn2023.0.7      amazonlinux 717 k
+
+Transaction Summary
+================================================================================
+Install  27 Packages
+
+Total download size: 72 M
+Installed size: 269 M
+Downloading Packages:
+(1/27): annobin-docs-12.69-1.amzn2023.0.1.noarc 5.6 MB/s |  93 kB     00:00    
+(2/27): annobin-plugin-gcc-12.69-1.amzn2023.0.1  32 MB/s | 973 kB     00:00    
+(3/27): gc-8.0.4-5.amzn2023.0.2.aarch64.rpm     4.4 MB/s | 102 kB     00:00    
+(4/27): gcc-plugin-annobin-11.5.0-5.amzn2023.0. 1.6 MB/s |  37 kB     00:00    
+(5/27): git-2.50.1-1.amzn2023.0.1.aarch64.rpm   2.4 MB/s |  53 kB     00:00    
+(6/27): cpp-11.5.0-5.amzn2023.0.5.aarch64.rpm    81 MB/s |  10 MB     00:00    
+(7/27): git-core-2.50.1-1.amzn2023.0.1.aarch64.  80 MB/s | 5.1 MB     00:00    
+(8/27): git-core-doc-2.50.1-1.amzn2023.0.1.noar  70 MB/s | 2.8 MB     00:00    
+(9/27): glibc-devel-2.34-231.amzn2023.0.5.aarch  14 MB/s | 445 kB     00:00    
+(10/27): kernel6.18-headers-6.18.48-109.150.amz  64 MB/s | 1.5 MB     00:00    
+(11/27): libmpc-1.2.1-2.amzn2023.0.2.aarch64.rp 2.3 MB/s |  63 kB     00:00    
+(12/27): guile22-2.2.7-2.amzn2023.0.3.aarch64.r  81 MB/s | 6.4 MB     00:00    
+(13/27): libtool-ltdl-2.4.7-1.amzn2023.0.3.aarc 1.4 MB/s |  38 kB     00:00    
+(14/27): libxcrypt-devel-4.4.33-7.amzn2023.aarc 1.4 MB/s |  32 kB     00:00    
+(15/27): make-4.3-5.amzn2023.0.2.aarch64.rpm     20 MB/s | 530 kB     00:00    
+(16/27): mpdecimal-2.5.1-3.amzn2023.0.3.aarch64 5.8 MB/s | 103 kB     00:00    
+(17/27): perl-Error-0.17030-2.amzn2023.0.1.noar 1.7 MB/s |  42 kB     00:00    
+(18/27): perl-File-Find-1.37-477.amzn2023.0.9.n 1.0 MB/s |  26 kB     00:00    
+(19/27): perl-Git-2.50.1-1.amzn2023.0.1.noarch. 1.6 MB/s |  41 kB     00:00    
+(20/27): perl-TermReadKey-2.38-9.amzn2023.0.3.a 1.3 MB/s |  36 kB     00:00    
+(21/27): perl-lib-0.65-477.amzn2023.0.9.aarch64 613 kB/s |  15 kB     00:00    
+(22/27): gcc-11.5.0-5.amzn2023.0.5.aarch64.rpm   81 MB/s |  31 MB     00:00    
+(23/27): python3.11-3.11.16-1.amzn2023.0.1.aarc 370 kB/s |  28 kB     00:00    
+(24/27): python3.11-devel-3.11.16-1.amzn2023.0. 3.8 MB/s | 235 kB     00:00    
+(25/27): python3.11-setuptools-wheel-65.5.1-2.a  35 MB/s | 717 kB     00:00    
+(26/27): python3.11-pip-wheel-22.3.1-2.amzn2023  38 MB/s | 1.4 MB     00:00    
+(27/27): python3.11-libs-3.11.16-1.amzn2023.0.1  81 MB/s | 9.7 MB     00:00    
+--------------------------------------------------------------------------------
+Total                                           126 MB/s |  72 MB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : libmpc-1.2.1-2.amzn2023.0.2.aarch64                   1/27 
+  Installing       : git-core-2.50.1-1.amzn2023.0.1.aarch64                2/27 
+  Installing       : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             3/27 
+  Installing       : cpp-11.5.0-5.amzn2023.0.5.aarch64                     4/27 
+  Installing       : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.    5/27 
+  Installing       : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch    6/27 
+  Installing       : perl-lib-0.65-477.amzn2023.0.9.aarch64                7/27 
+  Installing       : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64          8/27 
+  Installing       : perl-File-Find-1.37-477.amzn2023.0.9.noarch           9/27 
+  Installing       : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           10/27 
+  Installing       : perl-Git-2.50.1-1.amzn2023.0.1.noarch                11/27 
+  Installing       : git-2.50.1-1.amzn2023.0.1.aarch64                    12/27 
+  Installing       : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               13/27 
+  Installing       : python3.11-3.11.16-1.amzn2023.0.1.aarch64            14/27 
+  Installing       : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       15/27 
+  Installing       : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            16/27 
+  Installing       : kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarc   17/27 
+  Installing       : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            18/27 
+  Installing       : glibc-devel-2.34-231.amzn2023.0.5.aarch64            19/27 
+  Installing       : gc-8.0.4-5.amzn2023.0.2.aarch64                      20/27 
+  Installing       : guile22-2.2.7-2.amzn2023.0.3.aarch64                 21/27 
+  Installing       : make-1:4.3-5.amzn2023.0.2.aarch64                    22/27 
+  Installing       : gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Running scriptlet: gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Installing       : annobin-docs-12.69-1.amzn2023.0.1.noarch             24/27 
+  Installing       : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Running scriptlet: annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Installing       : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64     26/27 
+  Installing       : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Running scriptlet: python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Verifying        : annobin-docs-12.69-1.amzn2023.0.1.noarch              1/27 
+  Verifying        : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64       2/27 
+  Verifying        : cpp-11.5.0-5.amzn2023.0.5.aarch64                     3/27 
+  Verifying        : gc-8.0.4-5.amzn2023.0.2.aarch64                       4/27 
+  Verifying        : gcc-11.5.0-5.amzn2023.0.5.aarch64                     5/27 
+  Verifying        : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64      6/27 
+  Verifying        : git-2.50.1-1.amzn2023.0.1.aarch64                     7/27 
+  Verifying        : git-core-2.50.1-1.amzn2023.0.1.aarch64                8/27 
+  Verifying        : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             9/27 
+  Verifying        : glibc-devel-2.34-231.amzn2023.0.5.aarch64            10/27 
+  Verifying        : guile22-2.2.7-2.amzn2023.0.3.aarch64                 11/27 
+  Verifying        : kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarc   12/27 
+  Verifying        : libmpc-1.2.1-2.amzn2023.0.2.aarch64                  13/27 
+  Verifying        : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            14/27 
+  Verifying        : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            15/27 
+  Verifying        : make-1:4.3-5.amzn2023.0.2.aarch64                    16/27 
+  Verifying        : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               17/27 
+  Verifying        : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           18/27 
+  Verifying        : perl-File-Find-1.37-477.amzn2023.0.9.noarch          19/27 
+  Verifying        : perl-Git-2.50.1-1.amzn2023.0.1.noarch                20/27 
+  Verifying        : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64         21/27 
+  Verifying        : perl-lib-0.65-477.amzn2023.0.9.aarch64               22/27 
+  Verifying        : python3.11-3.11.16-1.amzn2023.0.1.aarch64            23/27 
+  Verifying        : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      24/27 
+  Verifying        : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       25/27 
+  Verifying        : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch   26/27 
+  Verifying        : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.   27/27 
+
+Installed:
+  annobin-docs-12.69-1.amzn2023.0.1.noarch                                      
+  annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64                               
+  cpp-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gc-8.0.4-5.amzn2023.0.2.aarch64                                               
+  gcc-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64                              
+  git-2.50.1-1.amzn2023.0.1.aarch64                                             
+  git-core-2.50.1-1.amzn2023.0.1.aarch64                                        
+  git-core-doc-2.50.1-1.amzn2023.0.1.noarch                                     
+  glibc-devel-2.34-231.amzn2023.0.5.aarch64                                     
+  guile22-2.2.7-2.amzn2023.0.3.aarch64                                          
+  kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarch64                         
+  libmpc-1.2.1-2.amzn2023.0.2.aarch64                                           
+  libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64                                     
+  libxcrypt-devel-4.4.33-7.amzn2023.aarch64                                     
+  make-1:4.3-5.amzn2023.0.2.aarch64                                             
+  mpdecimal-2.5.1-3.amzn2023.0.3.aarch64                                        
+  perl-Error-1:0.17030-2.amzn2023.0.1.noarch                                    
+  perl-File-Find-1.37-477.amzn2023.0.9.noarch                                   
+  perl-Git-2.50.1-1.amzn2023.0.1.noarch                                         
+  perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64                                  
+  perl-lib-0.65-477.amzn2023.0.9.aarch64                                        
+  python3.11-3.11.16-1.amzn2023.0.1.aarch64                                     
+  python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64                               
+  python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64                                
+  python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch                            
+  python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.noarch                      
+
+Complete!
+++ date -u
++ echo 'preflight Sat Sep 26 05:29:17 UTC 2026'
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (415 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/PREFLIGHT-S3
++ cat
++ chmod +x /home/ec2-user/stream.sh
++ SCRIPTS_TGZ=in/ptv20g6-scripts.tgz
++ case "$SCRIPTS_TGZ" in
++ aws s3 cp s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/ptv20g6-scripts.tgz /home/ec2-user/scripts.tgz
++ setsid nohup /home/ec2-user/stream.sh s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6
+Completed 256.0 KiB/515.7 KiB (6.3 MiB/s) with 1 file(s) remainingCompleted 512.0 KiB/515.7 KiB (10.9 MiB/s) with 1 file(s) remainingCompleted 515.7 KiB/515.7 KiB (10.9 MiB/s) with 1 file(s) remainingdownload: s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/ptv20g6-scripts.tgz to home/ec2-user/scripts.tgz
++ chown ec2-user:ec2-user /home/ec2-user/scripts.tgz
++ sha256sum /home/ec2-user/scripts.tgz
++ aws s3 cp /home/ec2-user/scripts.tgz s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/scripts-as-run.tgz
+Completed 515.7 KiB/515.7 KiB (49.9 MiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/scripts-as-run.tgz
++ aws s3 cp /tmp/scripts-sha256.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/scripts-sha256.txt
+Completed 93 Bytes/93 Bytes (2.3 KiB/s) with 1 file(s) remainingupload: tmp/scripts-sha256.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/scripts-sha256.txt
++ mkdir -p /home/ec2-user/out
++ chown -R ec2-user:ec2-user /home/ec2-user/out
++ cat
++ sed -i 's|BRANCH_PLACEHOLDER|fix/ptv20-final|' /home/ec2-user/run.sh
++ sed -i 's|JOBS_PLACEHOLDER|longrun/ptv20-grade-jobs.sh|' /home/ec2-user/run.sh
++ sed -i 's|PIN_PLACEHOLDER|b899019|' /home/ec2-user/run.sh
++ chown ec2-user:ec2-user /home/ec2-user/run.sh
++ chmod +x /home/ec2-user/run.sh
++ set +e
++ sudo -u ec2-user bash /home/ec2-user/run.sh
++ cd /home/ec2-user
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ curl -sSf https://sh.rustup.rs
++ sh -s -- -y --profile minimal
+info: downloading installer
+info: profile set to minimal
+info: default host tuple is aarch64-unknown-linux-gnu
+info: syncing channel updates for stable-aarch64-unknown-linux-gnu
+info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+info: downloading 3 components
+info: default toolchain set to stable-aarch64-unknown-linux-gnu
+
+  stable-aarch64-unknown-linux-gnu installed - rustc 1.98.1 (48a229cea 2026-09-01)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, you need to source the
+corresponding env file under $HOME/.cargo.
+
+Consider running the right command for your shell (note the leading DOT):
+. "$HOME/.cargo/env"           # For sh/ash/dash/pdksh/bash
+source "$HOME/.cargo/env.tcsh" # For tcsh
+cargo:rerun-if-env-changed=CC_aarch64-unknown-linux-gnu
+CC_aarch64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_aarch64_unknown_linux_gnu
+CC_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64_unknown_linux_gnu
+CFLAGS_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64-unknown-linux-gnu
+CFLAGS_aarch64-unknown-linux-gnu = None
++ curl -LsSf https://astral.sh/uv/install.sh
++ sh
+downloading uv 0.12.19 aarch64-unknown-linux-gnu
+installing to /home/ec2-user/.local/bin
+  uv
+  uvx
+everything's installed!
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ tar -xzf scripts.tgz -C /home/ec2-user
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
++ export SCR=/home/ec2-user/scripts
++ SCR=/home/ec2-user/scripts
++ export SCRIPTS=/home/ec2-user/scripts
++ SCRIPTS=/home/ec2-user/scripts
++ export OUT=/home/ec2-user/out
++ OUT=/home/ec2-user/out
++ git clone --branch fix/ptv20-final https://github.com/simoncoombes/tradefloor.git src
+Cloning into 'src'...
++ cd src
++ git checkout --detach b899019
+HEAD is now at b899019 Tests re-read on pt-v20's graded arm, where each pinned the value or the behaviour pt-v20 had before it took the eighteen dials. The eight "off on every shipped preset" tests (buyback_yield_cap, cycle_publication_lag, fear_greed_published_inputs, gdp_publication_lag, macro_publication_repricing, fair_value_market_linear, unemployment_adjustment_half_life, fair_value_vix_discount) run on every preset through pt-v19, and a new test beside each holds pt-v20's value. The dial tests whose "off" arm was pt-v20 itself take pt-v20 with that dial at 0 (cycle and GDP lags' snapshot and hash tests and the GDP restore refusal; unemployment's contraction path, snapshot and restore refusal; the market-linear test with the market share at 0); the VIX-discount helper pins the knee at 30 and no smoothing, the values those tests were written on. The perturbation table (test_model_params) is re-measured on the new default, each with the replaced value in its comment: nine rows whose probe value was now pt-v20's own are re-valued (anticipation 63, rate sensitivity 4, the lags 126 and 42, unemployment 42, the fear and greed switch and the repricing back to 0, market-linear 0, the volatility ceiling 0.5); the earnings cycle's depth, upside and half-life and the anticipation are live through the repricing at publication (inert with it off, measured); the knee and half-life rows keep False with the reason restated; fed_liftoff_rule, qe_pe_gain, qe_pe_stock_gain and jump_momentum_share go inert and vix_return_clamp live, because the arm's burn-in at seed 42 opens the probe at fed funds 0.0 with QE inactive; oil_supply_response and oil_opec_symmetry rejoin ECONOMY_STREAM_MOVERS (+34 and -2 economy draws, the market stream unmoved). test_sampled_verification walks the economy's nested gdp_publication block field by field and knows pt-v20's four new conditional economy keys; the Python hash twin covers every one. test_scenario reads the packaged recession's true phase from the snapshot, since pt-v20 publishes it 252 sessions late. test_externality's pinned-VIX yield test stops at session 16, the last before the run's first meeting, which the arm's path brings forward to session 17. test_bonds: the rate shock's 2-year is re-measured (widening each session to the meeting at day 54, then re-anchored at -3.50 per cent), and the leak test's after-close half runs on pt-v19, with the before-close half checked on pt-v20. Three engine unit tests take pt-v19 where they needed a preset without the publication lags (the published phase and growth tests' off arms) or whose two phase ages draw differently (the macro-branch stream test). cargo test: 557 passed, 0 failed. pytest -n 4: 49 failed, 19 of them failing on the merge before any value was set (the LLM replays, pt-v20's record, callable five_days); the other 30 are not pinned values and are left failing for the owner (see the branch's report)
++ ls '/home/ec2-user/scripts/engine-patches/*.patch'
++ git rev-parse HEAD
++ uv venv --python 3.11 .venv
+Using CPython 3.11.16 interpreter at: /usr/bin/python3.11
+Creating virtual environment at: .venv
+Activate with: source .venv/bin/activate
++ export VIRTUAL_ENV=/home/ec2-user/src/.venv
++ VIRTUAL_ENV=/home/ec2-user/src/.venv
++ export PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ uv pip install numpy pyarrow maturin
+Resolved 3 packages in 98ms
+Downloading numpy (15.2MiB)
+Downloading maturin (9.6MiB)
+Downloading pyarrow (44.7MiB)
+ Downloaded maturin
+ Downloaded numpy
+ Downloaded pyarrow
+Prepared 3 packages in 346ms
+Installed 3 packages in 995ms
+ + maturin==1.15.0
+ + numpy==2.4.6
+ + pyarrow==25.0.1
++ maturin build --release --out dist --features python
+    Updating crates.io index
+     Locking 121 packages to latest compatible versions
+      Adding arrow v53.4.1 (available: v60.0.0)
+      Adding chrono v0.4.39 (available: v0.4.45)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding pyo3 v0.22.6 (available: v0.29.2)
+      Adding sha2 v0.10.9 (available: v0.11.0)
+ Downloading crates ...
+  Downloaded windows-link v0.2.1
+  Downloaded windows-implement v0.60.2
+  Downloaded android-tzdata v0.1.1
+  Downloaded android_system_properties v0.1.6
+  Downloaded block-buffer v0.10.4
+  Downloaded atoi v2.0.0
+  Downloaded futures-task v0.3.34
+  Downloaded generic-array v0.14.7
+  Downloaded itoa v1.0.18
+  Downloaded futures-core v0.3.34
+  Downloaded windows-strings v0.5.1
+  Downloaded heck v0.5.0
+  Downloaded iana-time-zone-haiku v0.1.2
+  Downloaded windows-interface v0.59.3
+  Downloaded windows-targets v0.52.6
+  Downloaded wasm-bindgen-shared v0.2.129
+  Downloaded windows-result v0.4.1
+  Downloaded crypto-common v0.1.7
+  Downloaded memoffset v0.9.1
+  Downloaded pyo3-macros v0.22.6
+  Downloaded indoc v2.0.7
+  Downloaded ahash v0.8.12
+  Downloaded num v0.4.3
+  Downloaded num-iter v0.1.46
+  Downloaded zmij v1.0.23
+  Downloaded cpufeatures v0.2.17
+  Downloaded unindent v0.2.4
+  Downloaded wasm-bindgen-macro v0.2.129
+  Downloaded const-random v0.1.18
+  Downloaded const-random-macro v0.1.16
+  Downloaded cfg-if v1.0.5
+  Downloaded crunchy v0.2.4
+  Downloaded lexical-core v1.0.6
+  Downloaded version_check v0.9.5
+  Downloaded windows-core v0.62.2
+  Downloaded arrow-string v53.4.1
+  Downloaded arrow-data v53.4.1
+  Downloaded arrow-ord v53.4.1
+  Downloaded autocfg v1.5.1
+  Downloaded arrow-arith v53.4.1
+  Downloaded arrow-select v53.4.1
+  Downloaded getrandom v0.2.17
+  Downloaded wit-bindgen v0.57.1
+  Downloaded num-integer v0.1.47
+  Downloaded shlex v2.0.1
+  Downloaded slab v0.4.12
+  Downloaded target-lexicon v0.12.16
+  Downloaded pin-project-lite v0.2.17
+  Downloaded num-complex v0.4.6
+  Downloaded wasi v0.11.1+wasi-snapshot-preview1
+  Downloaded pyo3-build-config v0.22.6
+  Downloaded sha2 v0.10.9
+  Downloaded arrow-schema v53.4.1
+  Downloaded quote v1.0.47
+  Downloaded rustversion v1.0.23
+  Downloaded arrow-row v53.4.1
+  Downloaded iana-time-zone v0.1.65
+  Downloaded wasm-bindgen-macro-support v0.2.129
+  Downloaded tiny-keccak v2.0.2
+  Downloaded getrandom v0.3.4
+  Downloaded digest v0.10.7
+  Downloaded lexical-parse-integer v1.0.6
+  Downloaded once_cell v1.21.4
+  Downloaded find-msvc-tools v0.1.14
+  Downloaded unicode-ident v1.0.26
+  Downloaded proc-macro2 v1.0.107
+  Downloaded log v0.4.34
+  Downloaded zerocopy-derive v0.8.59
+  Downloaded arrow-buffer v53.4.1
+  Downloaded bitflags v2.13.2
+  Downloaded lexical-write-integer v1.0.6
+  Downloaded num-traits v0.2.19
+  Downloaded ryu v1.0.23
+  Downloaded arrow v53.4.1
+  Downloaded core-foundation-sys v0.8.7
+  Downloaded r-efi v5.3.0
+  Downloaded serde_core v1.0.229
+  Downloaded num-rational v0.4.2
+  Downloaded wasm-bindgen v0.2.129
+  Downloaded arrow-cast v53.4.1
+  Downloaded base64 v0.22.1
+  Downloaded pyo3-ffi v0.22.6
+  Downloaded bytes v1.12.1
+  Downloaded half v2.7.1
+  Downloaded pyo3-macros-backend v0.22.6
+  Downloaded bumpalo v3.20.3
+  Downloaded serde_derive v1.0.229
+  Downloaded memchr v2.8.3
+  Downloaded serde v1.0.229
+  Downloaded js-sys v0.3.106
+  Downloaded num-bigint v0.4.8
+  Downloaded lexical-util v1.0.7
+  Downloaded lexical-write-float v1.0.6
+  Downloaded typenum v1.20.1
+  Downloaded hashbrown v0.15.5
+  Downloaded zerocopy v0.8.59
+  Downloaded regex v1.13.1
+  Downloaded wasip2 v1.0.4+wasi-0.2.12
+  Downloaded cc v1.5.1
+  Downloaded aho-corasick v1.1.5
+  Downloaded libm v0.2.16
+  Downloaded serde_json v1.0.151
+  Downloaded futures-util v0.3.34
+  Downloaded arrow-array v53.4.1
+  Downloaded lexical-parse-float v1.0.6
+  Downloaded portable-atomic v1.15.0
+  Downloaded chrono v0.4.39
+  Downloaded syn v3.0.6
+  Downloaded syn v2.0.119
+  Downloaded regex-syntax v0.8.11
+  Downloaded windows_aarch64_gnullvm v0.52.6
+  Downloaded windows_x86_64_gnullvm v0.52.6
+  Downloaded windows_i686_gnullvm v0.52.6
+  Downloaded pyo3 v0.22.6
+  Downloaded regex-automata v0.4.18
+  Downloaded libc v0.2.189
+  Downloaded windows_i686_gnu v0.52.6
+  Downloaded windows_x86_64_msvc v0.52.6
+  Downloaded windows_aarch64_msvc v0.52.6
+  Downloaded windows_x86_64_gnu v0.52.6
+  Downloaded windows_i686_msvc v0.52.6
+🍹 Building a mixed python/rust project
+🐍 Found CPython 3.11 at /home/ec2-user/src/.venv/bin/python
+🔗 Found pyo3 bindings with abi3-py3.11 support
+   Compiling autocfg v1.5.1
+   Compiling libm v0.2.16
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling version_check v0.9.5
+   Compiling libc v0.2.189
+   Compiling target-lexicon v0.12.16
+   Compiling cfg-if v1.0.5
+   Compiling zerocopy v0.8.59
+   Compiling getrandom v0.3.4
+   Compiling once_cell v1.21.4
+   Compiling bytes v1.12.1
+   Compiling bitflags v2.13.2
+   Compiling iana-time-zone v0.1.65
+   Compiling hashbrown v0.15.5
+   Compiling lexical-util v1.0.7
+   Compiling typenum v1.20.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling heck v0.5.0
+   Compiling base64 v0.22.1
+   Compiling ryu v1.0.23
+   Compiling indoc v2.0.7
+   Compiling unindent v0.2.4
+   Compiling arrow-schema v53.4.1
+   Compiling ahash v0.8.12
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling memoffset v0.9.1
+   Compiling lexical-parse-integer v1.0.6
+   Compiling lexical-write-integer v1.0.6
+   Compiling lexical-parse-float v1.0.6
+   Compiling pyo3-build-config v0.22.6
+   Compiling aho-corasick v1.1.5
+   Compiling lexical-write-float v1.0.6
+   Compiling syn v2.0.119
+   Compiling lexical-core v1.0.6
+   Compiling cpufeatures v0.2.17
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling pyo3-ffi v0.22.6
+   Compiling pyo3-macros-backend v0.22.6
+   Compiling pyo3 v0.22.6
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling chrono v0.4.39
+   Compiling atoi v2.0.0
+   Compiling regex-automata v0.4.18
+   Compiling num-bigint v0.4.8
+   Compiling num-iter v0.1.46
+   Compiling num-rational v0.4.2
+   Compiling num v0.4.3
+   Compiling zerocopy-derive v0.8.59
+   Compiling regex v1.13.1
+   Compiling pyo3-macros v0.22.6
+   Compiling half v2.7.1
+   Compiling arrow-buffer v53.4.1
+   Compiling arrow-data v53.4.1
+   Compiling arrow-array v53.4.1
+   Compiling arrow-select v53.4.1
+   Compiling arrow-arith v53.4.1
+   Compiling arrow-row v53.4.1
+   Compiling arrow-ord v53.4.1
+   Compiling arrow-string v53.4.1
+   Compiling arrow-cast v53.4.1
+   Compiling arrow v53.4.1
+   Compiling tradefloor v0.8.5 (/home/ec2-user/src/rust)
+warning: unused import: `TickStock`
+  --> src/python_engine.rs:36:85
+   |
+36 | use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+   |                                                                                     ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `PT_V3_BITS` is never used
+    --> src/params.rs:4995:7
+     |
+4995 | const PT_V3_BITS: &[(&str, u64)] = &[
+     |       ^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `PT_V2_BITS` is never used
+    --> src/params.rs:5006:7
+     |
+5006 | const PT_V2_BITS: &[(&str, u64)] = &[
+     |       ^^^^^^^^^^
+
+warning: function `random_noise_index` is never used
+    --> src/python_engine.rs:5662:8
+     |
+5662 | pub fn random_noise_index() -> usize {
+     |        ^^^^^^^^^^^^^^^^^^
+
+warning: `tradefloor` (lib) generated 4 warnings (run `cargo fix --lib -p tradefloor` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 45.90s
+📦 Including files matching "python/tradefloor/py.typed"
+📦 Including files matching "python/tradefloor/_core.pyi"
+📦 Including files matching "python/tradefloor/scenarios/*.yml"
+📦 Including files matching "python/tradefloor/presets/*.json"
+📦 Built wheel for abi3 Python ≥ 3.11 to dist/tradefloor-0.8.5-cp311-abi3-manylinux_2_34_aarch64.whl
++ uv pip install --no-index --find-links dist --force-reinstall tradefloor
+Resolved 1 package in 0.81ms
+Prepared 1 package in 14ms
+Installed 1 package in 111ms
+ + tradefloor==0.8.5
++ python -c 'import numpy, pyarrow, tradefloor; print('\''PREFLIGHT OK'\'', tradefloor.version())'
+PREFLIGHT OK 0.8.5
++ python tests/known_answer.py
++ tee /home/ec2-user/out/known-answer.txt
+pretium known-answer test v28
+  package  0.8.5
+  bytes    16920
+  sha256   ac004feaa3fecaa325073882a82eb2b5870b6c3ce0d86976a1f91146b1758fb7
+  sim      72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e
+  meta     8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165
+  bonds    cac3ff44c713aa1845f18d702b1bf2b2c38e99b516e23aab14053a76109ae13e
+  presets  87f0b185fb8a84a7038b38065c91034c94e26caaf7e820d1959f292b21c43cc0
++ set +e
++ uv pip install pytest pytest-xdist pyyaml
+Resolved 8 packages in 104ms
+Downloading pygments (1.2MiB)
+ Downloaded pygments
+Prepared 8 packages in 78ms
+Installed 8 packages in 353ms
+ + execnet==2.1.2
+ + iniconfig==2.3.0
+ + packaging==26.3
+ + pluggy==1.6.0
+ + pygments==2.21.0
+ + pytest==9.1.1
+ + pytest-xdist==3.8.0
+ + pyyaml==6.0.3
++ FULL_DEPS=1
++ case "$FULL_DEPS" in
++ '[' -n 1 ']'
++ uv pip install pyarrow numpy gymnasium mcp anthropic pydantic openai-agents pydantic-ai-slim langgraph
+Resolved 70 packages in 451ms
+Downloading zstandard (4.8MiB)
+Downloading cryptography (4.5MiB)
+Downloading openai (2.0MiB)
+Downloading pydantic-ai-slim (1.9MiB)
+Downloading pydantic-core (1.9MiB)
+Downloading anthropic (1.3MiB)
+Downloading openai-agents (1.1MiB)
+ Downloaded openai-agents
+ Downloaded pydantic-core
+ Downloaded anthropic
+ Downloaded pydantic-ai-slim
+ Downloaded openai
+ Downloaded cryptography
+ Downloaded zstandard
+Prepared 66 packages in 203ms
+Installed 66 packages in 1.74s
+ + annotated-types==0.8.0
+ + anthropic==1.8.0
+ + anyio==4.15.1
+ + attrs==26.1.0
+ + certifi==2026.7.22
+ + cffi==2.1.1
+ + charset-normalizer==3.5.1
+ + click==8.5.0
+ + cloudpickle==3.1.2
+ + cryptography==50.0.1
+ + distro==1.9.0
+ + docstring-parser==0.18.0
+ + farama-notifications==0.0.6
+ + genai-prices==0.1.9
+ + griffelib==2.3.0
+ + gymnasium==1.3.0
+ + h11==0.16.0
+ + httpcore==1.0.9
+ + httpcore2==2.13.1
+ + httpx==0.28.1
+ + httpx2==2.13.1
+ + idna==3.20
+ + jiter==0.17.0
+ + jsonpatch==1.33
+ + jsonpointer==3.1.1
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ + langchain-core==1.6.5
+ + langchain-protocol==0.0.19
+ + langgraph==1.2.12
+ + langgraph-checkpoint==4.2.0
+ + langgraph-prebuilt==1.1.0
+ + langgraph-sdk==0.4.5
+ + langsmith==0.14.1
+ + logfire-api==5.1.1
+ + mcp==2.2.0
+ + mcp-types==2.2.0
+ + openai==3.19.2
+ + openai-agents==0.22.3
+ + opentelemetry-api==1.45.0
+ + orjson==3.12.0
+ + ormsgpack==1.12.2
+ + pycparser==3.0
+ + pydantic==2.13.5
+ + pydantic-ai-slim==2.51.0
+ + pydantic-core==2.46.5
+ + pydantic-graph==2.51.0
+ + pyjwt==2.15.0
+ + python-multipart==0.0.32
+ + referencing==0.37.0
+ + requests==2.34.2
+ + requests-toolbelt==1.0.0
+ + rpds-py==2026.6.3
+ + sniffio==1.3.1
+ + sse-starlette==3.4.11
+ + starlette==1.7.0
+ + tenacity==9.1.4
+ + truststore==0.10.4
+ + typing-extensions==4.16.0
+ + typing-inspection==0.4.4
+ + urllib3==2.8.0
+ + uuid-utils==0.17.1
+ + uvicorn==0.54.0
+ + websockets==16.1.1
+ + xxhash==4.0.1
+ + zstandard==0.25.0
++ python -c 'import pyarrow, numpy, gymnasium, mcp, agents, pydantic_ai, langgraph; print('\''optional surfaces present'\'')'
+optional surfaces present
++ SKIP_GATE_IF_KAT=72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e
++ case "$SKIP_GATE_IF_KAT" in
+++ python tests/known_answer.py
+++ awk '/^  sim /{print $2}'
++ KAT_SIM=72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e
++ echo 'known-answer sim: 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e'
++ tee /home/ec2-user/out/kat.txt
+known-answer sim: 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e
++ '[' -n 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e ']'
++ '[' -z 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e ']'
++ '[' 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e '!=' 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e ']'
++ PYTEST_RC=0
++ CARGO_RC=0
++ echo 'gate skipped: sim digest matches the gated pin 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e'
++ tee /home/ec2-user/out/gate-pytest.txt
+gate skipped: sim digest matches the gated pin 72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e
++ echo 'pytest=0 cargo=0'
++ set -e
++ export REPO=/home/ec2-user/src
++ REPO=/home/ec2-user/src
++ for kv in WORKERS=90 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 LONGRUN_SEED_LIST=101-130,401-430,701-730 XSEC_SEEDS=101-130,401-430,701-730
++ case "$kv" in
++ export WORKERS=90
++ WORKERS=90
++ echo 'exported WORKERS=90'
+exported WORKERS=90
++ for kv in WORKERS=90 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 LONGRUN_SEED_LIST=101-130,401-430,701-730 XSEC_SEEDS=101-130,401-430,701-730
++ case "$kv" in
++ export LONGRUN_SEEDS=30
++ LONGRUN_SEEDS=30
++ echo 'exported LONGRUN_SEEDS=30'
+exported LONGRUN_SEEDS=30
++ for kv in WORKERS=90 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 LONGRUN_SEED_LIST=101-130,401-430,701-730 XSEC_SEEDS=101-130,401-430,701-730
++ case "$kv" in
++ export LONGRUN_YEARS=21
++ LONGRUN_YEARS=21
++ echo 'exported LONGRUN_YEARS=21'
+exported LONGRUN_YEARS=21
++ for kv in WORKERS=90 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 LONGRUN_SEED_LIST=101-130,401-430,701-730 XSEC_SEEDS=101-130,401-430,701-730
++ case "$kv" in
++ export LONGRUN_SEED_LIST=101-130,401-430,701-730
++ LONGRUN_SEED_LIST=101-130,401-430,701-730
++ echo 'exported LONGRUN_SEED_LIST=101-130,401-430,701-730'
+exported LONGRUN_SEED_LIST=101-130,401-430,701-730
++ for kv in WORKERS=90 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 LONGRUN_SEED_LIST=101-130,401-430,701-730 XSEC_SEEDS=101-130,401-430,701-730
++ case "$kv" in
++ export XSEC_SEEDS=101-130,401-430,701-730
++ XSEC_SEEDS=101-130,401-430,701-730
++ echo 'exported XSEC_SEEDS=101-130,401-430,701-730'
+exported XSEC_SEEDS=101-130,401-430,701-730
+++ tr -cd '\r'
+++ wc -c
++ CR_COUNT=0
++ '[' 0 -gt 0 ']'
++ bash /home/ec2-user/scripts/longrun/ptv20-grade-jobs.sh
++ tee /home/ec2-user/out/jobs.log
+pt-v20 {'quote_model_weight': 1.0, 'closing_auction': 1.0, 'fair_value_news_share': 1.0, 'opening_mispricing_sigma': 0.016, 'opening_market_sigma': 0.001, 'cascade_gain': 0.1, 'earnings_cycle_depth': 0.2, 'market_factor_sigma': 0.006454071, 'corporate_yield_daily': 1.0, 'book_depth_coefficient': 0.75} {'cycle_publication_lag': 252.0, 'gdp_publication_lag': 21.0, 'macro_publication_repricing': 1.0, 'unemployment_adjustment_half_life': 84.0, 'fear_greed_published_inputs': 1.0} default pt-v20 version 0.8.5
+=== longrun measure: 30 seeds x 21 years, base pt-v19, 90 workers  05:30:30
+BUILD {"commit": "b89901979e5ab449446daf1cf8e354667e3f1cec", "branch": "HEAD", "rust_dirty": "", "engine_file": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/__init__.py", "so": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/_core.abi3.so", "so_mtime": "2026-09-26 05:30:18", "version": "0.8.5", "python": "3.11.16"}
+540 tasks, 90 workers, arms ['pt-v19', 'pt-v20']
+missing parts: 0 
+=== longrun report  05:36:06
+   worst month's volatility, %    real  94.501  pt-v19 67.252 [48.393, 92.966] (-1.7)  pt-v20 76.477 [58.037, 97.795] (-1.2)
+   calm volatility, %             real  12.769  pt-v19 13.304 [9.110, 23.001] (+0.1)  pt-v20 12.193 [8.360, 21.012] (-0.1)
+   stock correlation, calm        real   0.300  pt-v19 0.297 [0.190, 0.506] (-0.0)  pt-v20 0.314 [0.172, 0.562] (+0.1)
+   stock correlation, peak        real   0.872  pt-v19 0.739 [0.679, 0.810] (-2.5)  pt-v20 0.784 [0.717, 0.842] (-1.8)
+   VIX tracking error, points     real       -  pt-v19 1.829 [1.530, 2.461]  pt-v20 1.965 [1.606, 2.544]
+=== cert cert 252  05:36:44
+BASE pt-v19
+SHIPPED  vol 22.76 sector 0.0904 dn3 5.424 ar1 0.9337 lever 5.22x  (46s, 46s total)
+pt-v20  vol 20.55 sector 0.1165 dn3 4.262 ar1 0.9302 lever 5.11x  (47s, 93s total)
+=== cert cert 504  05:38:17
+BASE pt-v19
+SHIPPED  vol 22.58 sector 0.0906 dn3 5.308 ar1 0.9455 lever nanx  (25s, 25s total)
+pt-v20  vol 21.11 sector 0.1102 dn3 4.393 ar1 0.9406 lever nanx  (27s, 52s total)
+=== cert heldseeds 252  05:39:11
+BASE pt-v19
+SHIPPED  vol 22.18 sector 0.0840 dn3 nan ar1 0.9314 lever nanx  (6s, 7s total)
+pt-v20  vol 20.05 sector 0.1091 dn3 nan ar1 0.9271 lever nanx  (7s, 14s total)
+=== cert heldu 252  05:39:26
+BASE pt-v19
+SHIPPED  vol 25.07 sector 0.0826 dn3 nan ar1 0.9240 lever nanx  (10s, 10s total)
+pt-v20  vol 22.62 sector 0.1070 dn3 nan ar1 0.9303 lever nanx  (11s, 22s total)
+=== cert crisis extension  05:39:49
+crisis extension: 8 cells, need 10 readings, blocks of 30 from 1001, last 1270, 48 workers, engine b89901979e5ab449446daf1cf8e354667e3f1cec
+  panel_252         SHIPPED: 4 readings from 30 own seeds, extending
+  panel_252         pt-v20: 1 readings from 30 own seeds, extending
+  panel_504         SHIPPED: 9 readings from 30 own seeds, extending
+  panel_504         pt-v20: 2 readings from 30 own seeds, extending
+  heldout_seeds     SHIPPED: 4 readings from 30 own seeds, extending
+  heldout_seeds     pt-v20: 1 readings from 30 own seeds, extending
+  heldout_universe  SHIPPED: 3 readings from 30 own seeds, extending
+  heldout_universe  pt-v20: 2 readings from 30 own seeds, extending
+  panel_252         SHIPPED      own  4  blocks  2  total  13  reached
+  panel_252         pt-v20       own  1  blocks  3  total  10  reached
+  panel_504         SHIPPED      own  9  blocks  1  total  19  reached
+  panel_504         pt-v20       own  2  blocks  2  total  13  reached
+  heldout_seeds     SHIPPED      own  4  blocks  2  total  13  reached
+  heldout_seeds     pt-v20       own  1  blocks  3  total  10  reached
+  heldout_universe  SHIPPED      own  3  blocks  2  total  13  reached
+  heldout_universe  pt-v20       own  2  blocks  3  total  10  reached
+crisis extension done in 117s
+=== edge  05:41:46
+pt-v19: 6044 events, mean |impact| 140bp
+  captured, bp (hit):  t1 +50.4±1.6 (69%)  t5 +10.8±1.4 (55%)  t30 +7.0±1.3 (53%)  t60 +4.0±1.3 (51%)  t120 +2.3±1.2 (50%)  t210 -0.5±1.0 (50%)  t360 +0.9±0.7 (50%)
+  share in price:      t1 0.612  t5 0.891  t15 0.897  t30 0.918  t60 0.939  t210 0.978  t390 0.974  next-day +0.043±0.009
+pt-v20: 6044 events, mean |impact| 140bp
+  captured, bp (hit):  t1 +55.2±1.2 (73%)  t5 +15.8±1.1 (58%)  t30 +9.8±1.1 (55%)  t60 +5.7±1.0 (53%)  t120 +2.4±0.9 (52%)  t210 +0.3±0.8 (51%)  t360 -0.1±0.4 (50%)
+  share in price:      t1 0.601  t5 0.882  t15 0.900  t30 0.924  t60 0.952  t210 0.994  t390 0.998  next-day -0.004±0.008
+=== c4  05:41:54
+pt-v19 C4a: acf1 -0.187 (se 0.003), Roll 56.3 bp over quoted 11.2 bp = 5.03x -> FAIL
+pt-v20 C4a: acf1 -0.016 (se 0.004), Roll 12.0 bp over quoted 10.0 bp = 1.21x -> pass
+pt-v19 C4b mean_reversion_5day_daily  median  -15.26 pts, beats  2/20, beats oracle  0/20  pass
+pt-v19 C4b momentum_1step             median  -71.37 pts, beats  0/20, beats oracle  0/20  pass
+pt-v19 C4b momentum_1day              median  -43.37 pts, beats  0/20, beats oracle  0/20  pass
+pt-v19 C4b momentum_5day_daily        median   +7.87 pts, beats 16/20, beats oracle  0/20  FAIL
+pt-v19 C4b oracle                     median  +27.07 pts, beats 20/20, beats oracle  0/20
+pt-v20 C4b mean_reversion_1step       median  -20.22 pts, beats  1/20, beats oracle  0/20  pass
+pt-v20 C4b mean_reversion_1day        median  -11.00 pts, beats  4/20, beats oracle  2/20  pass
+pt-v20 C4b mean_reversion_5day_daily  median   +0.21 pts, beats 11/20, beats oracle  8/20  pass
+pt-v20 C4b momentum_1step             median  -37.71 pts, beats  0/20, beats oracle  0/20  pass
+pt-v20 C4b momentum_1day              median  -12.25 pts, beats  2/20, beats oracle  2/20  pass
+pt-v20 C4b momentum_5day_daily        median   -0.40 pts, beats  9/20, beats oracle  6/20  pass
+pt-v20 C4b oracle                     median   +1.86 pts, beats 16/20, beats oracle  0/20
+=== xsec  05:42:34
+pt-v19     C4a FAIL  C5 FAIL  C6 FAIL  C7 FAIL  C8 FAIL  E1 FAIL  R1 FAIL  R2 pass  R3 pass  R4 FAIL  B9 FAIL
+           {"C4a_acf1_65m": -0.1705, "C4a_roll_over_quoted": 4.3165, "C5_vr60": 0.6553, "C6_value_ic": 0.3988, "C6_value_ic_0_60": 0.7521, "C7_mom12_1": -0.1772, "C7_mom6_1": -0.1735, "C8_lm1_bps": 12.2126, "B9_first60_sd_pct": 8.4027, "B9_steady60_sd_pct": 9.8387, "B9_startup_ratio": 0.854, "B9_first60_mean_pct": -3.4931, "B9_annual_sd_pct": 9.3165, "B9_annual_n": 1710, "R1_dy2_sd_bp": 3.4626, "R2_dy10_sd_bp": 4.8744, "R3_corr_stock_tsy": 0.0003, "R4_corr_stock_corp": 0.0086, "E1_earnings_fall_median": 0.0, "E1_contractions": 107}
+pt-v20     C4a pass  C5 pass  C6 pass  C7 pass  C8 pass  E1 pass  R1 pass  R2 pass  R3 pass  R4 pass  B9 pass
+           {"C4a_acf1_65m": -0.016, "C4a_roll_over_quoted": 1.1128, "C5_vr60": 0.9498, "C6_value_ic": 0.0003, "C6_value_ic_0_60": 0.0048, "C7_mom12_1": -0.0031, "C7_mom6_1": -0.0013, "C8_lm1_bps": -0.0645, "B9_first60_sd_pct": 8.3181, "B9_steady60_sd_pct": 10.4418, "B9_startup_ratio": 0.7966, "B9_first60_mean_pct": 0.0002, "B9_annual_sd_pct": 16.292, "B9_annual_n": 1710, "R1_dy2_sd_bp": 3.8732, "R2_dy10_sd_bp": 4.9646, "R3_corr_stock_tsy": -0.1357, "R4_corr_stock_corp": 0.1999, "E1_earnings_fall_median": -0.1719, "E1_contractions": 100}
+161s
+=== impact  05:45:15
+  1.000      1.000     |     62.97     84.28        0.407            0.591        0.33     0.573
+fit, 1% and up, both sides: avg cost exponent 0.484 coefficient 0.424; worst price exponent 0.474 coefficient 0.603
+literature: peak Y in [0.5, 1] (Toth et al. 2011); average cost two thirds of that, [0.33, 0.67]
+volatility regimes, VIX held at 15 and 35: realised sigma 139 and 234 bp (ratio 1.68); median average cost
+  f=0.01: 6.69 and 8.62 bp (ratio 1.29)
+  f=0.1: 22.17 and 40.41 bp (ratio 1.82)
+  f=0.3: 38.68 and 70.91 bp (ratio 1.83)
+refill (half-life 27 ticks, gamma 0.314): extra bp a second order pays k ticks after a first, over no first
+  f=0.03 temporary: k=0:  11.07  k=1:   1.87  k=5:   2.11  k=15:   1.60  k=30:   1.36  k=65:   1.07  k=130:   0.64
+  f=0.03 permanent: k=0:   0.00  k=1:   1.43  k=5:   1.43  k=15:   1.43  k=30:   1.43  k=65:   1.43  k=130:   1.43
+  f=0.1 temporary: k=0:  23.27  k=1:  12.96  k=5:  12.85  k=15:  10.98  k=30:   8.11  k=65:   3.84  k=130:   1.94
+  f=0.1 permanent: k=0:   0.00  k=1:   4.78  k=5:   4.78  k=15:   4.78  k=30:   4.78  k=65:   4.77  k=130:   4.76
+  f=0.3 temporary: k=0:  39.93  k=1:  30.37  k=5:  28.08  k=15:  23.44  k=30:  17.51  k=65:   8.72  k=130:   2.72
+  f=0.3 permanent: k=0:   0.00  k=1:  14.35  k=5:  14.35  k=15:  14.34  k=30:  14.33  k=65:  14.31  k=130:  14.27
+=== scenarios  05:45:48
+21s
+rate_shock             paired index 21/63/85/120d:   -3.9   -4.0   -3.8   -4.1 | scen maxdd120  -12.6 (base  -10.8) | vix 20.5->28.5 (base peak 28.7) | corp +208bp policy +200bp | rv63 18.1 vs 16.9
+recession              paired index 21/63/85/120d:   -7.8  -16.0  -21.3  -29.7 | scen maxdd120  -45.0 (base  -10.8) | vix 20.5->87.9 (base peak 28.7) | corp +159bp policy -25bp | rv63 59.3 vs 16.9
+liquidity_crisis       paired index 21/63/85/120d:  -10.2  -13.8   -8.4   -5.6 | scen maxdd120  -40.4 (base  -10.8) | vix 20.5->89.4 (base peak 28.7) | corp +25bp policy +0bp | rv63 64.7 vs 16.9
+geopolitical_conflict  paired index 21/63/85/120d:   -4.5   -0.8   -0.9   -1.1 | scen maxdd120  -15.0 (base  -10.8) | vix 20.5->41.1 (base peak 28.7) | corp +20bp policy +0bp | rv63 28.1 vs 16.9
+oil_price_spike        paired index 21/63/85/120d:   -1.0   -0.8   -0.7   -0.8 | scen maxdd120  -11.7 (base  -10.8) | vix 20.5->28.8 (base peak 28.7) | corp +64bp policy +38bp | rv63 16.0 vs 16.9
+policy_regime_shift    paired index 21/63/85/120d:   -0.0   -0.0   +0.1   +0.0 | scen maxdd120  -11.3 (base  -10.8) | vix 20.5->28.2 (base peak 28.7) | corp +9bp policy +0bp | rv63 15.8 vs 16.9
+24s
+rate_shock             paired index 21/63/85/120d:   -8.0   -8.1   -8.1   -8.3 | scen maxdd120  -12.6 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +205bp policy +200bp | rv63 20.6 vs 15.7
+recession              paired index 21/63/85/120d:  -22.5  -28.1  -34.0  -39.3 | scen maxdd120  -47.0 (base   -9.8) | vix 17.6->70.7 (base peak 25.2) | corp +155bp policy +0bp | rv63 65.9 vs 15.7
+liquidity_crisis       paired index 21/63/85/120d:  -19.8  -14.0  -10.6   -5.8 | scen maxdd120  -38.4 (base   -9.8) | vix 17.6->72.8 (base peak 25.2) | corp +8bp policy +0bp | rv63 68.8 vs 15.7
+geopolitical_conflict  paired index 21/63/85/120d:   -8.4   -1.1   -0.7   -0.5 | scen maxdd120  -14.9 (base   -9.8) | vix 17.6->35.8 (base peak 25.2) | corp +16bp policy +0bp | rv63 29.9 vs 15.7
+oil_price_spike        paired index 21/63/85/120d:   -1.8   -1.9   -1.6   -1.4 | scen maxdd120  -10.1 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +53bp policy +50bp | rv63 14.4 vs 15.7
+policy_regime_shift    paired index 21/63/85/120d:   -0.2   -0.1   +0.1   +0.0 | scen maxdd120   -9.6 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +5bp policy +0bp | rv63 14.0 vs 15.7
+14s
+/home/ec2-user/scripts/longrun/recession_proposed.yml paired index 21/63/85/120d:  -22.5  -28.1  -34.0  -39.3 | scen maxdd120  -47.0 (base   -9.8) | vix 17.6->70.7 (base peak 25.2) | corp +155bp policy +0bp | rv63 65.9 vs 15.7
+12s
+/home/ec2-user/scripts/longrun/liquidity_crisis_proposed.yml paired index 21/63/85/120d:  -19.8  -14.0  -10.6   -5.8 | scen maxdd120  -38.4 (base   -9.8) | vix 17.6->72.8 (base peak 25.2) | corp +8bp policy +0bp | rv63 68.8 vs 15.7
+=== driven2020  05:46:58
+pt-v19     D2a mdd 0.351 pass  D2b recovery 170.0 sessions pass  never 1/90  F1 0.206 in 50.0 sessions  L1 lead -93.5  101-130: 0.351/173.5  401-430: 0.306/144.5  701-730: 0.393/223.5
+pt-v20     D2a mdd 0.374 pass  D2b recovery 120.5 sessions pass  never 21/90  F1 0.307 in 40.0 sessions  L1 lead 10.5  101-130: 0.362/104.5  401-430: 0.364/74.0  701-730: 0.441/183.5
+=== c10  05:47:31
+pt-v19       worst out21_after_gdp_growth_5d_p95_down +0.43 pts/yr, ahead 0.78; drift63 contraction -4.3 recovery +3.8 -> FAIL
+pt-v20       worst out63_after_corporate_bond_yield_p99.9_up +0.12 pts/yr, ahead 0.61; drift63 contraction +5.0 recovery -0.4 -> pass
+=== driven2022  05:47:54
+pt-v19     R5 mdd 0.203 pass  R6 P/E -3.46%/100bp pass
+pt-v20     R5 mdd 0.265 pass  R6 P/E -4.26%/100bp pass
+=== r7  05:48:08
+pt-v19       all-days bar1 +3.52bp | hike n=1000 bar1 -43.5 -> excess -47.0 (bound 5.0) | cut n=517 bar1 +97.8 -> excess +94.2 (bound 15.8) | night hike +0.0 cut +0.0 -> R7a FAIL
+pt-v20       all-days bar1 +2.27bp | hike n=855 bar1 +2.2 -> excess -0.1 (bound 5.0) | cut n=643 bar1 +0.5 -> excess -1.7 (bound 5.0) | night hike -68.1 cut +157.7 -> R7a pass
+pt-v19       rate-news agent: mean excess +1.33 pts/yr (se 0.18), ahead 28/30 -> R7b FAIL
+pt-v20       rate-news agent: mean excess -0.32 pts/yr (se 0.07), ahead 2/30 -> R7b pass
+=== recession  05:53:33
+recession: /home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/scenarios/recession.yml sha256 50d3fad85a8fed2f96e727c55b19aa4c5dd00dd9f888922310f172f39f510cd5
+pt-v19       S1a regain 47% pass | S1b out within 24m 30/30 pass | S2 rise +52.2% pass
+pt-v20       S1a regain 49% pass | S1b out within 24m 30/30 pass | S2 rise +54.6% pass
+=== preset panel, pt-v20  05:54:26
+1 presets, 180 measurements, 48 workers
+  100/180  3.0/s  eta 0.5m
+pt-v20   252:15/15 504:14/14 hoU:15/15 hoS:15/15 vol: 20.5%  lever:5.11x  mech:10/10  centre: 9/14  vixar1(ungraded):0.9302/0.9406  disp(read):1 of 30/2 of 30
+wrote /home/ec2-user/out/preset-panel.json in 62s
++ '[' 0 -ne 0 ']'
++ '[' 0 -ne 0 ']'
++ STATUS=0
++ set -e
+++ ls /home/ec2-user/out/j-box-jobs.json /home/ec2-user/out/j-longrun.json /home/ec2-user/out/j-ptv20-grade.json
+++ wc -l
++ JSONS=3
++ '[' 0 -eq 0 ']'
++ echo 'OK exit=0 jsons=3 branch=fix/ptv20-final pin=b899019'
++ aws s3 cp /var/log/pretium-run.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv20g6/run.log

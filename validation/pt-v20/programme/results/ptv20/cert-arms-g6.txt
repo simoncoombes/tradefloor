@@ -1,0 +1,3 @@
+# ptv20 final grade box (ptv20g6), certification cells: pt-v19 as SHIPPED (the control) and pt-v20 by name.
+SHIPPED:
+pt-v20@pt-v20:

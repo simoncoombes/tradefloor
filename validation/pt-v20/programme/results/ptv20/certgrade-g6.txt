@@ -1,0 +1,42 @@
+=== SHIPPED
+  panel_252         in band 15  misses -
+    crisis_sector_dispersion: own  4 of 30, extension blocks 2 (1001-1060) +9, total  13, median 1.2059, band [0.79, 1.74] -> pass
+  panel_504         in band 14  misses -  unreadable ['corr_persistence_acf1']
+    crisis_sector_dispersion: own  9 of 30, extension blocks 1 (1001-1030) +10, total  19, median 1.2381, band [1.03, 1.66] -> pass
+  heldout_seeds     in band 15  misses -
+    crisis_sector_dispersion: own  4 of 30, extension blocks 2 (1001-1060) +9, total  13, median 1.2059, band [0.79, 1.74] -> pass
+  heldout_universe  in band 15  misses -
+    crisis_sector_dispersion: own  3 of 30, extension blocks 2 (1001-1060) +10, total  13, median 1.1631, band [0.79, 1.74] -> pass
+  certify(panel_252): ruled 14/14; mechanism shown 10, not shown [], reversed []
+  certify(heldout_seeds): ruled 14/14; mechanism shown 9, not shown ['corr_asymmetry_lagged'], reversed []
+  VIX row panel_252      median 0.9337 centre 0.9299 k 18/30 cut 21 -> pass
+  VIX row panel_504      median 0.9455 centre 0.9593 k 10/30 cut 19 -> refused/below
+  VIX row heldout_seeds  median 0.9314 centre 0.9299 k 17/30 cut 21 -> pass
+  VIX rise +0.0143 -> matches
+  crisis lever 90.65 / 17.36 = 5.221x  (tape 6.16x)
+  level index_drift_pct      7.6462  band (1.1, 10.3)  in band
+  level fear_gauge_dn1       1.9427  band (0.39, 3.03)  in band
+  level fear_gauge_dn3       5.4237  band (2.6, 9.58)  in band
+  level index_tail_dn3_pct   1.1421  band (0.64, 2.34)  in band
+
+=== pt-v20
+  panel_252         in band 15  misses -
+    crisis_sector_dispersion: own  1 of 30, extension blocks 3 (1001-1090) +9, total  10, median 1.1904, band [0.79, 1.74] -> pass
+  panel_504         in band 14  misses -  unreadable ['corr_persistence_acf1']
+    crisis_sector_dispersion: own  2 of 30, extension blocks 2 (1001-1060) +11, total  13, median 1.2213, band [1.03, 1.66] -> pass
+  heldout_seeds     in band 15  misses -
+    crisis_sector_dispersion: own  1 of 30, extension blocks 3 (1001-1090) +9, total  10, median 1.1904, band [0.79, 1.74] -> pass
+  heldout_universe  in band 15  misses -
+    crisis_sector_dispersion: own  2 of 30, extension blocks 3 (1001-1090) +8, total  10, median 1.1536, band [0.79, 1.74] -> pass
+  certify(panel_252): ruled 14/14; mechanism shown 10, not shown [], reversed []
+  certify(heldout_seeds): ruled 14/14; mechanism shown 9, not shown ['corr_asymmetry_lagged'], reversed []
+  VIX row panel_252      median 0.9302 centre 0.9299 k 15/30 cut 21 -> pass
+  VIX row panel_504      median 0.9406 centre 0.9593 k 9/30 cut 19 -> refused/below
+  VIX row heldout_seeds  median 0.9271 centre 0.9299 k 15/30 cut 21 -> pass
+  VIX rise +0.0146 -> matches
+  crisis lever 84.57 / 16.55 = 5.110x  (tape 6.16x)
+  level index_drift_pct      7.6957  band (1.1, 10.3)  in band
+  level fear_gauge_dn1       1.6594  band (0.39, 3.03)  in band
+  level fear_gauge_dn3       4.2616  band (2.6, 9.58)  in band
+  level index_tail_dn3_pct   0.8898  band (0.64, 2.34)  in band
+

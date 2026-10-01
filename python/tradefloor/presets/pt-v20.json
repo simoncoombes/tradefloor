@@ -2153,7 +2153,7 @@
     "real": 6.16
   },
   "long_run": {
-    "criteria": "programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24); C5-C8 registered 2026-09-24 in programme/ptv20-registration.md; C10 the eleventh registration, R7, S1 and S2 the twelfth",
+    "criteria": "validation/pt-v20/programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24); C5-C8 registered 2026-09-24 in validation/pt-v20/programme/ptv20-registration.md; C10 the eleventh registration, R7, S1 and S2 the twelfth",
     "verdict": "pass",
     "passed": 40,
     "of": 40,
@@ -2636,27 +2636,27 @@
       "fingerprint": "pt-v20",
       "base": "pt-v20",
       "dials": {},
-      "longrun_report": "programme/results/ptv20/box-g6/longrun-report.json",
-      "certgrade": "programme/results/ptv20/certgrade-g6.json",
-      "c10": "programme/results/ptv20/box-g6/c10.json",
+      "longrun_report": "validation/pt-v20/programme/results/ptv20/box-g6/longrun-report.json",
+      "certgrade": "validation/pt-v20/programme/results/ptv20/certgrade-g6.json",
+      "c10": "validation/pt-v20/programme/results/ptv20/box-g6/c10.json",
       "r7": [
-        "programme/results/ptv20/box-g6/r7-event.json",
-        "programme/results/ptv20/box-g6/r7-eval.json"
+        "validation/pt-v20/programme/results/ptv20/box-g6/r7-event.json",
+        "validation/pt-v20/programme/results/ptv20/box-g6/r7-eval.json"
       ],
-      "recession": "programme/results/ptv20/box-g6/recession.json",
+      "recession": "validation/pt-v20/programme/results/ptv20/box-g6/recession.json",
       "edge": {
-        "source": "programme/results/ptv20/box-g6/edge.json",
+        "source": "validation/pt-v20/programme/results/ptv20/box-g6/edge.json",
         "base": "pt-v19",
         "seeds": 10,
         "first_seed": 101,
         "days": 300
       },
       "c4": {
-        "source": "programme/results/ptv20/box-g6/c4a.json, programme/results/ptv20/box-g6/c4b.json",
+        "source": "validation/pt-v20/programme/results/ptv20/box-g6/c4a.json, validation/pt-v20/programme/results/ptv20/box-g6/c4b.json",
         "tradefloor_version": "0.8.5 at b89901979e5a"
       },
-      "computed_by": "programme/longrun/criteria.py",
-      "note": "computed by programme/longrun/criteria.py from the long-run report, the certification grade and the edge named here"
+      "computed_by": "validation/pt-v20/programme/longrun/criteria.py",
+      "note": "computed by validation/pt-v20/programme/longrun/criteria.py from the long-run report, the certification grade and the edge named here"
     },
     "coefficients": {
       "book_depth_coefficient": 0.75,

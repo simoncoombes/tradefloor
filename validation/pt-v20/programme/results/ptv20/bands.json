@@ -1,0 +1,248 @@
+{
+ "kind": "ptv20.bands",
+ "registered": "2026-09-24, before any box graded pt-v20 (programme/ptv20-registration.md)",
+ "real_panel": "the certified forty, corpus/civ/real_closes.json, 2015-01-02..2025-07-31, 2660 sessions (real_rows.py, real_rows.json); value signal on point-in-time SEC fundamentals (real_value_ic.py, real_value_ic.json)",
+ "rows": {
+  "C4a": {
+   "acf1_floor": -0.05,
+   "roll_ceiling": 2.0,
+   "source": "programme/longrun/CRITERIA.md C4 (E2, e16b8773); graded by c4.py and criteria.py --c4"
+  },
+  "C5": {
+   "what": "idiosyncratic variance ratio at 60 sessions, median name",
+   "real": 0.9242,
+   "real_se": 0.0641,
+   "band": [
+    0.8,
+    1.05
+   ],
+   "rule": "real +/- 2 se (calendar-year block bootstrap, B=200), rounded outward"
+  },
+  "C6": {
+   "what": "rank IC of log(fair value on published fundamentals / price) against the next 20 sessions, every 5 sessions",
+   "real": 0.0093,
+   "real_se": 0.0179,
+   "band": [
+    -0.03,
+    0.05
+   ],
+   "rule": "centre +0.01, half-width 0.04 (about 2.3 se); the upper end is the order of published long-run value ICs (0.02-0.05 at monthly horizons, recalled not measured, as meanrev-edge section 8 records); both the whole-history mean and the first-60-sessions mean must be in"
+  },
+  "C7_12_1": {
+   "what": "rank IC of 12-1 month momentum (252-session formation skipping 21) against the next 20 sessions, monthly",
+   "real": 0.0267,
+   "real_se": 0.034,
+   "band": [
+    -0.04,
+    0.095
+   ],
+   "rule": "real +/- 2 se (the larger of the bootstrap 0.034 and iid 0.029)"
+  },
+  "C7_6_1": {
+   "what": "rank IC of 6-1 month momentum (126 skipping 21) against the next 20 sessions, monthly",
+   "real": 0.0413,
+   "real_se": 0.031,
+   "band": [
+    -0.02,
+    0.1
+   ],
+   "rule": "real +/- 2 se (the larger of the bootstrap 0.021 and iid 0.031), rounded outward"
+  },
+  "C8": {
+   "what": "Lo-MacKinlay one-day contrarian book, $1 a side, next-day return, bps a day (loser minus winner)",
+   "real": -1.7388,
+   "real_se": 2.3367,
+   "band": [
+    -6.4,
+    2.9
+   ],
+   "rule": "real +/- 2 se (iid; the bootstrap reads 2.17)"
+  },
+  "B9_annual": {
+   "what": "sd of annual index log returns: non-overlapping 252-session blocks, years 2-21 of the 30 long-run free histories (cap-weighted certified roster), pooled",
+   "real": 17.4,
+   "real_se": 2.8,
+   "band": [
+    13.9,
+    20.9
+   ],
+   "rule": "within 20% of the tape's calendar-year sd (S&P 500 1990-2024, 35 years; longrun/data/tape.json.gz), as B7 grades daily volatility; bootstrap se over years 2.8"
+  },
+  "B9_startup": {
+   "what": "sd across the 50 markets (30 certified-roster histories, 20 suite markets) of the index log return over the first 60 sessions, over the sd of the same markets' 60-session returns in sessions 250-490 (four windows each)",
+   "real": 1.0,
+   "band": [
+    0.6667,
+    1.5
+   ],
+   "rule": "2/3x to 1.5x, as C1 grades the crash rate's steadiness: the first months must look like any other months of the same markets"
+  },
+  "R1": {
+   "what": "sd of the 2-year Treasury yield's daily change, bp",
+   "real": 5.226,
+   "real_se": 0.787,
+   "band": [
+    3.65,
+    6.8
+   ],
+   "rule": "real +/- 2 se (calendar-year block bootstrap, B=500); FRED DGS2 2015-2025 (real_rates.py)"
+  },
+  "R2": {
+   "what": "sd of the 10-year Treasury yield's daily change, bp",
+   "real": 5.406,
+   "real_se": 0.432,
+   "band": [
+    4.54,
+    6.27
+   ],
+   "rule": "real +/- 2 se; FRED DGS10 2015-2025"
+  },
+  "R3": {
+   "what": "correlation of the index's daily return with minus the 10-year's daily change (a Treasury bond's return)",
+   "real": -0.161,
+   "real_se": 0.096,
+   "band": [
+    -0.36,
+    0.03
+   ],
+   "rule": "real +/- 2 se; SPY against IEF 2015-2025"
+  },
+  "R4": {
+   "what": "correlation of the index's daily return with minus the corporate yield's daily change (an IG bond's return)",
+   "real": 0.272,
+   "real_se": 0.06,
+   "band": [
+    0.15,
+    0.39
+   ],
+   "rule": "real +/- 2 se; SPY against LQD 2015-2025"
+  },
+  "E1": {
+   "what": "the aggregate earnings fall around a contraction: exp of the earnings cycle's lowest in the 504 sessions after a contraction starts over its highest in the 252 before, less one; the median over every contraction in the 30 histories",
+   "real": -0.17,
+   "real_falls_1950_2023_capped": [
+    -0.54,
+    -0.4,
+    -0.34,
+    -0.325,
+    -0.19,
+    -0.17,
+    -0.129,
+    -0.117,
+    -0.072,
+    -0.046,
+    -0.016
+   ],
+   "band": [
+    -0.4,
+    -0.046
+   ],
+   "rule": "the range of S&P earnings falls around the eleven NBER recessions 1953-2020 (Shiller's reported earnings, 2008-09 capped at the operating series' -40 per cent), without the most and the least severe (2001's -54 per cent GAAP and 1953's -1.6); relative to nominal output in the model, which already grows earnings with it"
+  },
+  "C9": {
+   "what": "the cost of size in the agent-facing book: the exponent and coefficient of the median average cost against Q/V (1% of daily volume and up), cost in units of the name's daily sigma; impact_curve.py --base pt-v20, 3 seeds x 40 names, sigma over 60 sessions",
+   "real": {
+    "exponent": 0.5,
+    "average_coefficient": 0.5
+   },
+   "band_exponent": [
+    0.4,
+    0.7
+   ],
+   "band_coefficient": [
+    0.33,
+    0.67
+   ],
+   "rule": "exponent: the square-root law's 0.5 with the range the literature reports (Toth et al. 2011 about 0.5; Almgren et al. 2005 0.6; 0.4 to 0.7); coefficient: Toth et al.'s peak Y in [0.5, 1], two thirds of it for the average cost of reaching that peak under a latent book linear in distance, [0.33, 0.67], as E4's impact_curve.py states it"
+  },
+  "D2a": {
+   "what": "the driven 2020-21 market: the index's maximum drawdown over notebook 09's real macro path with the NBER phases, certified roster cap-weighted, median over histories",
+   "real": 0.339,
+   "band": [
+    0.237,
+    0.441
+   ],
+   "rule": "within 30 per cent of the S&P 500's 2020 drawdown (19 Feb to 23 Mar 2020), as A2 grades the replays"
+  },
+  "D2b": {
+   "what": "the driven 2020-21 market: sessions from the pre-crash high (highest close of the first 40 sessions) back to it, median over histories; never counts as never",
+   "real": 126,
+   "band": [
+    63,
+    252
+   ],
+   "rule": "1/2x to 2x the S&P 500's 126 sessions (19 Feb to 18 Aug 2020), as the B rows grade frequencies"
+  },
+  "F1a": {
+   "what": "the driven 2020 path's fast crash: from the pre-crash high to the lowest close within the 60 sessions after it, median over histories",
+   "real": 0.339,
+   "band": [
+    0.237,
+    0.441
+   ],
+   "rule": "within 30 per cent of the S&P 500's -33.9 per cent (19 Feb to 23 Mar 2020)"
+  },
+  "F1b": {
+   "what": "sessions from the pre-crash high to that low, median over histories",
+   "real": 23,
+   "band": [
+    12,
+    46
+   ],
+   "rule": "1/2x to 2x the S&P 500's 23 sessions"
+  },
+  "L1": {
+   "what": "look-through: sessions from the index's trough to the aggregate earnings level's trough on the driven 2020 path, both within the first 250 sessions, median over histories",
+   "real": 68,
+   "band": [
+    1,
+    136
+   ],
+   "rule": "the price trough leads (positive), and by at most 2x the S&P 500's lead from 23 Mar 2020 to the end of Q2 2020, its operating earnings' trough quarter"
+  },
+  "R5": {
+   "what": "the driven 2022 market: the index's maximum drawdown over 2022, median over histories",
+   "real": 0.254,
+   "band": [
+    0.178,
+    0.33
+   ],
+   "rule": "within 30 per cent of the S&P 500's -25.4 per cent (3 Jan to 12 Oct 2022)"
+  },
+  "R6": {
+   "what": "the driven 2022 market: log change of the market P/E per 100 bp of the corporate yield, regressed on monthly averages January-October 2022, per cent, median over histories",
+   "real": -5.2,
+   "band": [
+    -10.4,
+    -2.6
+   ],
+   "rule": "1/2x to 2x the S&P 500's -4.9 to -5.5 (midpoint -5.2): trailing P/E against Baa over 2022 (Shiller, FRED DBAA)"
+  },
+  "C10a": {
+   "what": "every timing rule on published macro data: median annualised excess over buy-and-hold across the long run's histories, and the share of histories ahead",
+   "band_excess": [
+    -100,
+    1.0
+   ],
+   "band_share": [
+    0,
+    0.6667
+   ],
+   "real": {
+    "unemployment_rule_median_excess": -2.0,
+    "years_ahead": "11 of 34"
+   },
+   "rule": "no better than a real-time public signal on the S&P 500, and C4b's two thirds"
+  },
+  "C10b": {
+   "what": "index log return over 63 sessions after the published entry into a contraction, and into a recovery, less the unconditional mean, points",
+   "contraction_floor": -5.9,
+   "recovery_ceiling": 4.3,
+   "rule": "no larger than the S&P 500's after NBER turns 1990-2020 dated with hindsight"
+  }
+ },
+ "model_protocol": "30 untraded histories of 2660 sessions on Universe.random(40, seed=111), seeds 101-130; closes are prices() after each session's run_session (the last print; under a closing cross, the cross); C5, C6 (whole history), C7, C8 per history, the row is the median over histories; C6's first-60-sessions reading is the mean over the 30 histories and the 20 suite markets (seeds 92001-92020, Universe.random(20, seed=93001-93020), untraded, 81 sessions); value signal -(s + v), which is log(published fair value / model price) and, at a closing cross, log(published fair value / close)",
+ "registered_b9": "2026-09-24, added at the main session's request before any box graded pt-v20 (programme/ptv20-registration.md section B9)",
+ "registered_rates": "2026-09-24, approved by the main session, before the final box (programme/ptv20-registration.md section R)",
+ "registered_e1_c9": "2026-09-24, before the final grading box (programme/ptv20-registration.md sections R, E1, C9)"
+}

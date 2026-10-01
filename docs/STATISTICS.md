@@ -167,8 +167,8 @@ findings. Each row is something a user
 would notice, with a tolerance that is easy to read. The result is in
 `tf.preset_record()["long_run"]`.
 
-pt-v20's rows were registered before the boxes that graded them (design
-repository, `programme/ptv20-registration.md`). The final grade, box
+pt-v20's rows were registered before the boxes that graded them
+(`validation/pt-v20/programme/ptv20-registration.md`). The final grade, box
 `ptv20g6`, pools 90 free-running histories of 21 years (seed sets 101 to
 130, 401 to 430 and 701 to 730), replays 2008 and 2020 with the real VIX,
 drives the real 2020-21 and 2022 macro paths and the packaged recession, and
@@ -177,7 +177,10 @@ runs the late-headline probe, the price-only rules on the published suite of
 and the cost-of-size fit. pt-v20 meets all 40. On the same pooled histories
 pt-v19 fails 16: B9, C4a, C4b, C5, C6, C7, C8, R1, R4, E1, F1, L1, C10, R7a,
 R7b and V1, and C9 and D1 are not scored for it
-(`programme/results/ptv20/criteria-g6.txt`). pt-v19's own record, from an
+(`validation/pt-v20/programme/results/ptv20/criteria-g6.txt`). The scripts
+that graded it and the box's outputs are in the same folder, and
+[`validation/README.md`](https://github.com/simoncoombes/tradefloor/blob/main/validation/README.md)
+says how to check the grade or run it again. pt-v19's own record, from an
 earlier box of 30 histories, carries 17 rows and reads 15 of 17. Records up
 to 0.8.1 carry the first 15, and pt-v18 met 8 of those.
 

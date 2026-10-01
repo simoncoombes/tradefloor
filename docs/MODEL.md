@@ -23,9 +23,12 @@ every equation and value where pt-v19 differs.
 
 pt-v20 was graded before it shipped on the 40 rows of its twelfth
 registration, the long-run rows and the one-year table, and passes all 40
-on the grade seeds (design repository, `programme/ptv20-registration.md`
-and `programme/results/ptv20/`, grade box `ptv20g6`). [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
-lists the rows.
+on the grade seeds (grade box `ptv20g6`). [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
+lists the rows. The registration, the scripts that graded it, their inputs
+and the box's outputs are in
+[`validation/pt-v20/`](https://github.com/simoncoombes/tradefloor/tree/main/validation/pt-v20),
+and [`validation/README.md`](https://github.com/simoncoombes/tradefloor/blob/main/validation/README.md)
+says how to check the grade on a laptop or run it again.
 
 The realism statistics the model is checked against are defined in
 [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
@@ -43,7 +46,7 @@ Every parameter table has a **kind** column. It says how the value was set.
 | measured | estimated on a named data series, with a standard error on record |
 | derived | follows from an identity, from measured inputs or from the model's own structure |
 | fitted | tuned against the realism statistics, one dial or a search over many; calibrated jointly, not one at a time |
-| chosen | set by hand, often inherited from the reference implementation the engine was ported from |
+| chosen | set by hand, often inherited from the unpublished [reference implementation](#the-reference-implementation) the engine was ported from |
 | guard | a bound that keeps the simulation finite; not a claim about real markets |
 
 **Measured** and **derived** values are calibrated. **Fitted** values are
@@ -63,6 +66,20 @@ data series used most often:
 | Reference roster | 40 US large caps across the sectors, daily, 2015-07 to 2025-07; 32 of them from 1987 |
 | NBER and BEA | NBER recession dates and BEA real GDP (GDPC1), 1990 to 2025 |
 | FRED CPI | FRED CPIAUCSL, 2015 to 2025 |
+
+### The reference implementation
+
+The engine is a port of an earlier simulator, which this document calls the
+reference implementation. It is not published, and it stays unpublished
+until the owner names it, so you cannot read its code or check a value
+against it. Where a table gives the reference implementation as a value's
+source, the value was copied from that code and no design note derives it.
+Read it as an assumption, like any other **chosen** value.
+
+The port was checked against it. The Rust parity tests compare the port
+with vectors the reference implementation produced, and those vectors are
+in `rust/goldens/`, so the tests run on a fresh clone. The code that
+produced them is not in this repository.
 
 ### Time
 
@@ -203,8 +220,9 @@ every variance process reads. Everything else in this section matters to
 prices only through those four. The bond indices read the 2- and 10-year
 yields as well; see [Bonds](#bonds).
 
-Most constants in this section are carried over unchanged from the reference
-implementation the engine was ported from, and no design note derives them.
+Most constants in this section are carried over unchanged from the
+[reference implementation](#the-reference-implementation) the engine was
+ported from, which is unpublished, and no design note derives them.
 They are **chosen**. The dials that pt-v19 and pt-v20 moved carry their own entries.
 
 ### The calendar
@@ -593,8 +611,8 @@ macro step at the moment it is published. They answer an independent audit
 of pt-v20, which found that timing rules on the reported macro data beat
 buy-and-hold. Holding the roster and going to cash while
 `macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
-over holding, in 30 of 30 21-year histories (design repository,
-`programme/handover-2026-09-25/audit/pt-v20-audit.md`, finding 1).
+over holding, in 30 of 30 21-year histories (pt-v20 audit, finding 1; the
+audit is in the private design repository and is not published).
 
 | Figure | The true value is read by | The published value is read by |
 |---|---|---|
@@ -967,8 +985,8 @@ the VIX stayed high.
 Why pt-v20 takes it. With every market shock in $s$, the index reverted on
 the mispricing's half-life. The ratio of its five-year variance to five
 times its one-year variance read 0.42 on the leading dials, against 0.87 for
-the S&P 500 over 1871-2023 (pt-v20 audit, major 5; design repository,
-`programme/ptv20-registration.md`, twelfth registration, row V1). With the
+the S&P 500 over 1871-2023 (pt-v20 audit, major 5; twelfth registration,
+row V1, in `validation/pt-v20/programme/ptv20-registration.md`). With the
 plain market draw permanent up to 1.5 times the base sigma, ordinary market
 news is permanent and the excess a fear regime adds reverts, the form the
 evidence takes: mean reversion in index returns concentrates in turbulent
@@ -2355,7 +2373,7 @@ exactly, with `model="pt-v19"`. Every equation above holds for it with the
 values below, except where this section gives pt-v19's own form. pt-v19
 fails 16 of the 40 rows pt-v20 was graded on, and two are not scored on it
 (C9 and D1): B9, C4a, C4b, C5, C6, C7, C8, R1, R4, E1, F1, L1, C10, R7a,
-R7b and V1 (design repository, `programme/results/ptv20/criteria-g6.txt`).
+R7b and V1 (`validation/pt-v20/programme/results/ptv20/criteria-g6.txt`).
 
 | Dial | pt-v19 | pt-v20 |
 |---|---|---|

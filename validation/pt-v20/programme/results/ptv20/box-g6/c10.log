@@ -1,0 +1,2 @@
+pt-v19       worst out21_after_gdp_growth_5d_p95_down +0.43 pts/yr, ahead 0.78; drift63 contraction -4.3 recovery +3.8 -> FAIL
+pt-v20       worst out63_after_corporate_bond_yield_p99.9_up +0.12 pts/yr, ahead 0.61; drift63 contraction +5.0 recovery -0.4 -> pass

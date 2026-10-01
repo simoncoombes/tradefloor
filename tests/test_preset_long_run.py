@@ -1,9 +1,10 @@
 """The `long_run` block of a preset record: written, refused, carried, kept.
 
-A record's `long_run` block is the owner's adopted long-run pass bar (design
-repo `programme/longrun/CRITERIA.md`), graded by
+A record's `long_run` block is the owner's adopted long-run pass bar
+(`programme/longrun/CRITERIA.md`), graded by
 `programme/longrun/criteria.py --verdict` and written by
-`tools/presets/record.py --long-run`. The trading server reads it to say
+`tools/presets/record.py --long-run`. pt-v20's grade, those two files
+included, is published under `validation/pt-v20/`. The trading server reads it to say
 whether the preset passes. These tests run against copies of a committed
 record in a temporary directory; no committed file is touched.
 """

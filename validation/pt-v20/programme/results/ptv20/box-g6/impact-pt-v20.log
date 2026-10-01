@@ -1,0 +1,22 @@
+latent depth Y=0.75 delta=0.5; 3 seeds x 40 names, sigma realised over 60 days
+ f of V   off: filled  |  on: avg bp  worst bp   avg/(s sqrt f)  worst/(s sqrt f)  vol elast   Almgren avg (s units)
+  0.001      1.000     |      5.58      5.58        1.216            1.216        0.56     0.007
+  0.003      1.000     |      5.61      5.67        0.702            0.789        0.54     0.013
+  0.010      1.000     |      6.61      9.50        0.463            0.673        0.48     0.028
+  0.030      1.000     |     11.58     17.55        0.481            0.720        0.38     0.055
+  0.100      1.000     |     21.27     33.00        0.461            0.663        0.35     0.120
+  0.300      1.000     |     37.78     54.11        0.440            0.631        0.33     0.249
+  1.000      1.000     |     62.97     84.28        0.407            0.591        0.33     0.573
+fit, 1% and up, both sides: avg cost exponent 0.484 coefficient 0.424; worst price exponent 0.474 coefficient 0.603
+literature: peak Y in [0.5, 1] (Toth et al. 2011); average cost two thirds of that, [0.33, 0.67]
+volatility regimes, VIX held at 15 and 35: realised sigma 139 and 234 bp (ratio 1.68); median average cost
+  f=0.01: 6.69 and 8.62 bp (ratio 1.29)
+  f=0.1: 22.17 and 40.41 bp (ratio 1.82)
+  f=0.3: 38.68 and 70.91 bp (ratio 1.83)
+refill (half-life 27 ticks, gamma 0.314): extra bp a second order pays k ticks after a first, over no first
+  f=0.03 temporary: k=0:  11.07  k=1:   1.87  k=5:   2.11  k=15:   1.60  k=30:   1.36  k=65:   1.07  k=130:   0.64
+  f=0.03 permanent: k=0:   0.00  k=1:   1.43  k=5:   1.43  k=15:   1.43  k=30:   1.43  k=65:   1.43  k=130:   1.43
+  f=0.1 temporary: k=0:  23.27  k=1:  12.96  k=5:  12.85  k=15:  10.98  k=30:   8.11  k=65:   3.84  k=130:   1.94
+  f=0.1 permanent: k=0:   0.00  k=1:   4.78  k=5:   4.78  k=15:   4.78  k=30:   4.78  k=65:   4.77  k=130:   4.76
+  f=0.3 temporary: k=0:  39.93  k=1:  30.37  k=5:  28.08  k=15:  23.44  k=30:  17.51  k=65:   8.72  k=130:   2.72
+  f=0.3 permanent: k=0:   0.00  k=1:  14.35  k=5:  14.35  k=15:  14.34  k=30:  14.33  k=65:  14.31  k=130:  14.27
