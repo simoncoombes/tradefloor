@@ -16,8 +16,11 @@ and nothing else:
   instrument's book, and the bars of the days the engine has recorded. A
   World run with ``record=True`` records each day as it ends.
   ``evaluate``, ``rank``, ``tca.analyse`` and the gym environment never
-  record, so there :meth:`MarketView.bars` refuses and says how to keep a
-  history
+  record, so there :meth:`MarketView.bars` refuses. Those harnesses, and
+  World, hand the agent ``obs.history`` instead
+  (:class:`tradefloor.History`): a daily bar per name and the published
+  macro for every day the run has closed, and with ``history_days=N`` the
+  N untraded days before day 0
 - the published macro fields (:data:`PUBLISHED_MACRO`, an allowlist) and
   the curve. ``cycle`` there is the phase as published, late, the way the
   NBER dates a turn; the true phase is not served
@@ -257,10 +260,11 @@ _NO_BARS = (
     "tf.rank, tf.tca.analyse and tf.gym.TradingEnv never record. A World "
     "records a day as it ends, and only under run(record=True). With "
     "nothing recorded the engine would hand back the prints of the last "
-    "step alone, labelled day 0 whatever the day. To keep a daily history, "
-    "store what you need as the run goes: obs.prices at each step, and "
-    "obs.engine.column('open'), 'high' and 'low', which hold today's open "
-    "and the high and low so far, as little-endian f64 bytes. "
+    "step alone, labelled day 0 whatever the day. For daily bars, read "
+    "obs.history.bars(ticker), which holds every day the run has closed; "
+    "history_days=N on evaluate, rank or World adds N days before day 0. "
+    "Today's open and the high and low so far are obs.engine.column('open'), "
+    "'high' and 'low', as little-endian f64 bytes. "
     "obs.engine.recorded_days counts the days bars() can serve.")
 
 
@@ -332,8 +336,8 @@ class MarketView:
         to the prints of its last ``run_session``, which inside a harness is
         the last step alone, labelled day 0 whatever the day. So with
         :attr:`recorded_days` at 0 this raises :class:`SandboxError` at
-        every grain, tick included, and the message says how to keep a
-        history of your own.
+        every grain, tick included. ``obs.history`` holds a daily bar per
+        name for every day the run has closed, under every harness.
         """
         engine = _WRAPPED[self]
         if not engine.recorded_days:

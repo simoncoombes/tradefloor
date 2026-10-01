@@ -61,8 +61,8 @@ from ._core import Engine, Instrument, Macro, ModelParams, OrderError, Validatio
 from ._core import check_seed
 from .portfolio import (Cancel, LeverageError, Limit, Portfolio, check_order,
                         order_items)
-from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
-                      declares_hidden_state)
+from .sandbox import (PUBLISHED_MACRO, HiddenState, MarketView,
+                      PortfolioView, TamperGuard, declares_hidden_state)
 from .universe_util import fingerprint_of
 
 if TYPE_CHECKING:
@@ -142,10 +142,10 @@ class Observation:
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
-                 "_adv", "steps_per_day", "hidden")
+                 "_adv", "steps_per_day", "hidden", "history")
 
     def __init__(self, step, day, tickers, prices, portfolio, engine, adv,
-                 steps_per_day=1, hidden=None):
+                 steps_per_day=1, hidden=None, history=None):
         # Run-wide, NOT within-day. See the class docstring: `step_of_day` is
         # the one that resets, and is what a per-day guard wants.
         self.step = step
@@ -168,6 +168,12 @@ class Observation:
         #: Read-only hidden state, for an agent that declared
         #: ``privileged = True``; None for every other agent.
         self.hidden = hidden
+        #: The run's :class:`History`: a daily bar per name and the
+        #: published macro for every day closed so far, the warm-up days
+        #: first. :func:`evaluate`, :func:`tradefloor.rank`,
+        #: :class:`tradefloor.World` and :func:`tradefloor.tca.analyse`
+        #: fill it; an observation built by hand has None.
+        self.history = history
 
     @property
     def step_of_day(self) -> int:
@@ -260,6 +266,154 @@ class Observation:
                 f"step={self.step} of run, n={len(self.tickers)})")
 
 
+#: The public columns a day's bar is read from, in the order a row holds
+#: them. ``price`` before the close is the day's last print, which is the
+#: close ``Engine.bars(grain="day")`` reports, and ``volume`` before the
+#: close is the shares the day has traded, the day bar's volume.
+_BAR_COLUMNS = ("open", "high", "low", "price", "volume")
+_BAR_FIELDS = ("open", "high", "low", "close", "volume")
+
+
+class History:
+    """The days a run has closed: one daily bar per name and the published
+    macro, the warm-up days first.
+
+    Handed to agents as ``obs.history`` by :func:`evaluate`,
+    :func:`tradefloor.rank`, :class:`tradefloor.World` and
+    :func:`tradefloor.tca.analyse`. It needs no extra package, and it is
+    there whether or not the agent was given the live engine.
+
+    A run with ``history_days=N`` runs the market for N days before day 0,
+    with nobody trading, and those N days are here before the agent's first
+    decision, labelled ``-N`` to ``-1``. Each scored day is added after its
+    last step, labelled with its ``obs.day``, so at the open of day 3 the
+    history ends at day 2. The day in progress is never here: read today's
+    open, high and low from ``obs.engine.column(...)``.
+
+    A bar is read from the public columns just before the close: the day's
+    open, its high and low, its last print as the close and its volume in
+    shares. The open, high, low, close and volume are the ones
+    ``Engine.bars(grain="day")`` gives for a recorded day: the volume is
+    the shares traded that day. The macro row is :attr:`MarketView.macro_fields
+    <tradefloor.sandbox.MarketView.macro_fields>` at the same moment, the
+    published figures the day traded under, so ``cycle`` and ``gdp_growth``
+    are the published ones.
+
+    ```python
+    def act(self, obs):
+        bars = obs.history.bars("AAA", last=20)
+        if len(bars) < 20:
+            return {}
+        if obs.price("AAA") > max(bar["high"] for bar in bars):
+            return {"AAA": 100}
+        return {}
+    ```
+    """
+
+    __slots__ = ("_days", "_warmup")
+
+    def __init__(self, warmup_days: int = 0) -> None:
+        # One tuple per closed day: (day, tickers, opens, highs, lows,
+        # closes, volumes, macro items). Tuples, so a row handed out as a
+        # dict is a copy and nothing an agent does to it reaches the next.
+        self._days: list[tuple] = []
+        self._warmup = int(warmup_days)
+
+    @property
+    def warmup_days(self) -> int:
+        """How many days ran before day 0: the run's ``history_days``."""
+        return self._warmup
+
+    def __len__(self) -> int:
+        """The number of days held."""
+        return len(self._days)
+
+    def bars(self, ticker: str | None = None, *,
+             last: int | None = None) -> list[dict[str, Any]]:
+        """Daily bars, oldest first.
+
+        Each row is ``{"day", "ticker", "open", "high", "low", "close",
+        "volume"}``. With ``ticker`` the rows are that name's alone, one a
+        day; without it every name's bar for each day, in roster order.
+        ``last=n`` keeps the last ``n`` days. Empty before any day has
+        closed, which is the first day of a run without ``history_days``.
+        """
+        days = self._last(last)
+        if (ticker is not None and days
+                and not any(ticker in d[1] for d in days)):
+            raise ValidationError(_unknown_ticker(ticker, days[-1][1]))
+        rows = []
+        for day, tickers, *columns, _macro in days:
+            for i, name in enumerate(tickers):
+                if ticker is not None and name != ticker:
+                    continue
+                row: dict[str, Any] = {"day": day, "ticker": name}
+                for field, column in zip(_BAR_FIELDS, columns):
+                    row[field] = column[i]
+                rows.append(row)
+        return rows
+
+    def macro(self, *, last: int | None = None) -> list[dict[str, Any]]:
+        """The published macro figures, one row a day, oldest first.
+
+        Each row is ``{"day": d}`` and the fields of
+        :data:`tradefloor.sandbox.PUBLISHED_MACRO` as they stood before
+        day ``d`` closed. ``last=n`` keeps the last ``n`` days.
+        """
+        return [{"day": day, **dict(items)}
+                for day, *_columns, items in self._last(last)]
+
+    def _last(self, last: int | None) -> list[tuple]:
+        if last is None:
+            return self._days
+        from . import _checks
+        last = _checks.whole_number("last", last)
+        return self._days[-last:]
+
+    def _close(self, engine: Any, day: int) -> None:
+        """Add ``day``'s bars and macro, read from ``engine`` before its
+        close. Called by the harnesses only."""
+        columns = tuple(tuple(_f64(engine.column(field)))
+                        for field in _BAR_COLUMNS)
+        macro = tuple((key, value)
+                      for key, value in engine.macro_fields.items()
+                      if key in PUBLISHED_MACRO)
+        self._days.append((int(day), tuple(engine.tickers), *columns, macro))
+
+    def _copy(self) -> "History":
+        """An independent copy, for a fork or a second agent."""
+        copied = History(self._warmup)
+        copied._days = list(self._days)
+        return copied
+
+    def __repr__(self) -> str:
+        if not self._days:
+            return f"History(no days, warmup_days={self._warmup})"
+        return (f"History(days {self._days[0][0]} to {self._days[-1][0]}, "
+                f"warmup_days={self._warmup})")
+
+
+def _warm_up(engine: Engine, days: int, *, steps_per_day: int,
+            ticks_per_step: int, start: tuple[int, int, int],
+            history: History) -> None:
+    """Run ``days`` untraded days on ``engine`` and add each to ``history``.
+
+    The harness's own day: ``steps_per_day`` sessions of ``ticks_per_step``
+    ticks on the advancing clock, as :func:`_run_untraded` runs a day, so
+    a warm-up day is the day an idle agent would have seen. No scenario
+    applies: a scenario's day 0 is the first scored day.
+    """
+    hour, minute, day_of_week = start
+    for k in range(days):
+        engine.open_market()
+        for step in range(steps_per_day):
+            engine.run_session(*session_clock((hour, minute, day_of_week),
+                                              step, ticks_per_step),
+                               ticks_per_step)
+        history._close(engine, k - days)
+        engine.close_market()
+
+
 class Agent(Protocol):
     """The interface an agent implements.
 
@@ -334,7 +488,7 @@ class Scorecard:
                  "strategy_fingerprint", "model_fingerprint", "trusted",
                  "uses_hidden_state", "tampered", "equity_curve",
                  "max_drawdown_pct", "ruined", "leverage_refusals",
-                 "explanation_baseline", "partial_fills")
+                 "explanation_baseline", "partial_fills", "history_days")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -348,6 +502,7 @@ class Scorecard:
         ruined: bool = False, leverage_refusals: int = 0,
         explanation_baseline: float | None = None,
         partial_fills: list[str] | None = None,
+        history_days: int = 0,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -409,9 +564,16 @@ class Scorecard:
         #: 5,529,929, and the rest did not fill." Kept apart from
         #: ``errors``: the order traded, only less of it than was asked.
         self.partial_fills = list(partial_fills or [])
+        #: How many untraded days ran before day 0 (``history_days``). The
+        #: scored days of a run with a warm-up are later days of the
+        #: seed's market, so the seed alone no longer names them.
+        self.history_days = history_days
 
     def as_dict(self) -> dict[str, Any]:
-        return {slot: getattr(self, slot) for slot in self.__slots__}
+        # `history_days` only when there was a warm-up, so the card of a
+        # run without one is the dict, and the digest, it always was.
+        return {slot: getattr(self, slot) for slot in self.__slots__
+                if slot != "history_days" or self.history_days}
 
     def __repr__(self) -> str:
         flags = "".join(
@@ -420,6 +582,8 @@ class Scorecard:
                                          ("trusted", self.trusted),
                                          ("hidden-state",
                                           self.uses_hidden_state)) if on)
+        if self.history_days:
+            flags += f", history_days={self.history_days}"
         # Counts, so an agent that failed on every step does not print like
         # one that chose to hold cash. The lines are in `errors` and
         # `partial_fills`.
@@ -501,6 +665,7 @@ def evaluate(
     model: str | ModelParams | None = None,
     cash_interest: bool = False,
     trusted_agents: bool = False,
+    history_days: int = 0,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -561,6 +726,18 @@ def evaluate(
     :class:`tradefloor.World`, and what fills later is collected after each
     session.
 
+    ``history_days=N`` runs the market for N days before day 0 with nobody
+    trading, so an agent that needs a lookback has one at its first
+    decision: ``obs.history`` holds those N days' bars and published macro
+    (see :class:`History`), and adds each scored day after it closes. The
+    scored days then continue that market, so on the same seed they are
+    different days from a run without the warm-up, and the scorecard
+    records ``history_days``. The untraded baseline runs the same warm-up.
+    No scenario applies during it: a scenario's day 0 is the first scored
+    day. The reference agents and :class:`tradefloor.StrategySpec`
+    strategies keep their own price history and do not read
+    ``obs.history``. Left at 0, the run is the one it always was.
+
     One exception does end the run.
     :class:`~tradefloor.integrations.common.ReplayMiss` means a recording
     has no answer for this input, usually because the seed, the roster or
@@ -594,6 +771,8 @@ def evaluate(
     days = _checks.whole_number("days", days)
     steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
     ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+    history_days = _checks.whole_number("history_days", history_days,
+                                        minimum=0)
     _checks.number("cash", cash)
     if max_leverage is not None:
         _checks.number("max_leverage", max_leverage)
@@ -622,6 +801,12 @@ def evaluate(
     # a fresh engine has its state hash and runs to the same prices.
     template = Engine(seed=seed, universe=universe, macro_state=macro,
                       model=model)
+    # The warm-up runs once, on the template, so the baseline and every
+    # agent start day 0 from the same market and the same history.
+    warmed = History(history_days)
+    _warm_up(template, history_days, steps_per_day=steps_per_day,
+             ticks_per_step=ticks_per_step,
+             start=(hour, minute, day_of_week), history=warmed)
 
     baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
                              ticks_per_step, hour, minute, day_of_week,
@@ -642,7 +827,7 @@ def evaluate(
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
             cash_interest, bool(trusted_agents),
-            engine=template.fork(1)[0],
+            engine=template.fork(1)[0], history=warmed._copy(),
         )
         _warn_if_every_step_failed(results[name], days * steps_per_day)
     return results
@@ -801,12 +986,15 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
-                  trusted=False, *, engine=None) -> Scorecard:
+                  trusted=False, *, engine=None,
+                  history: History | None = None) -> Scorecard:
     if engine is None:
         engine = Engine(seed=seed, universe=universe, macro_state=macro,
                         model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
                           cash_interest=cash_interest)
+    if history is None:
+        history = History()
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
     # What the agent is handed. Built once: every view reads the live
@@ -848,7 +1036,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             obs = Observation(step, day, list(tickers), _f64(engine.prices()),
                               shown_portfolio, shown_engine,
                               adv if trusted else tuple(adv), steps_per_day,
-                              hidden=hidden)
+                              hidden=hidden, history=history)
             # The within-day tick the fill lands on: agents act at the START of
             # a step, so `ticks_per_step` ticks per completed step have
             # run this day. This is what makes the fills table joinable
@@ -968,6 +1156,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # the close's macro step can move it: earned on a positive balance
         # with `cash_interest` on, charged on a negative one always.
         portfolio.accrue(engine)
+        # The day's bar, read before the close re-marks the prices.
+        history._close(engine, day)
         engine.close_market()
         # Marked after the close, which on pt-v20 re-marks every name, so
         # the last value is the final net worth below.
@@ -1029,6 +1219,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         leverage_refusals=leverage_refusals,
         explanation_baseline=explanation_baseline,
         partial_fills=_partial_fill_lines(portfolio.fills),
+        history_days=history.warmup_days,
     )
 
 

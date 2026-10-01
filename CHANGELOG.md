@@ -762,6 +762,40 @@ on the default `on_refusal="raise"` raises `ValidationError` and ends the
 run. Return `None` or `{}` instead, or build
 the World with `on_refusal="skip"`.
 
+### History before day 0
+
+A 0.8.5 reviewer's 20-day breakout rule sat in cash for the first 21 of 252
+days of every run while buy-and-hold was invested. Every `evaluate` and
+`rank` run started at day 0 with no history, and `obs.engine.bars()` refuses
+when nothing is recorded.
+
+`evaluate`, `rank` and `World` take `history_days=N`, which runs the market
+for N days before day 0 with nobody trading. The observation has a new
+`obs.history` (`tf.History`) holding a daily bar per name and the published
+macro figures for every day the run has closed. A bar's open, high, low and
+close are the ones `Engine.bars(grain="day")` gives for a recorded day, and
+its volume is the day's total in shares. The warm-up days are labelled -N
+to -1 and are there at the first decision, and each scored day joins after
+its close. `history.bars(ticker, last=20)` and `history.macro(last=20)`
+return lists of dicts, so no extra package is needed. `tca.analyse` hands
+agents the same history with no warm-up, and the `bars()` refusal now
+points to it.
+
+The warm-up runs before any scenario, pin or intervention, whose day 0 is
+still the first scored day, and the untraded baseline in `evaluate` runs it
+too. In a `World` the engine's order log holds the warm-up, so a manifest
+rebuilds it, and a fork carries the history. The scored days continue the
+warmed market, so on the same seed they are different days from a run
+without the warm-up. The scorecard records `history_days`, and leaves it
+out of `as_dict()` when it is 0.
+
+With `history_days` at 0, the default, no price moves and the scorecard is
+the one it was, so every known-answer digest and the scorecard digest in
+`tests/test_python_versions.py` are unchanged. The reference agents and
+`StrategySpec` strategies keep their own price history and do not read
+`obs.history`. The MCP tools and the LLM adapters' payload do not carry it.
+`tests/test_history.py` checks the warm-up against a market run by hand.
+
 ### The gym environment
 
 `TradingEnv.reset()` without a seed used to replay the constructor's market

@@ -182,7 +182,7 @@ from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
-from .harness import Observation, session_clock
+from .harness import History, Observation, _warm_up, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
@@ -333,6 +333,16 @@ class World:
     instead. The engine's state hash is compared around every ``act``; a
     change is recorded in :attr:`tampered` under the agent's label, in its
     :meth:`summary` and in :meth:`manifest`. See :mod:`tradefloor.sandbox`.
+
+    ``history_days=N`` runs the market for N days, with nobody trading,
+    when the world is built, so an agent that needs a lookback has one at
+    its first decision. ``obs.history`` (:class:`tradefloor.History`) holds
+    those days' bars and published macro, labelled ``-N`` to ``-1``, and
+    adds each day :meth:`run` closes. ``day``, ``step``, the trace and every
+    scenario, pin and intervention count from the first day after the
+    warm-up, while the engine's own day count and its order log include
+    the warm-up, so a manifest or a replay rebuilds it. A fork carries the
+    history. Left at 0, a world is the one it always was.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
@@ -342,7 +352,7 @@ class World:
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
-                 "trusted_agents", "tampered")
+                 "trusted_agents", "tampered", "history_days", "_history")
 
     def __init__(
         self,
@@ -362,10 +372,13 @@ class World:
         label: str = "",
         on_refusal: str = "raise",
         trusted_agents: bool = False,
+        history_days: int = 0,
     ) -> None:
         from . import _checks
         steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
         ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+        history_days = _checks.whole_number("history_days", history_days,
+                                            minimum=0)
         _checks.number("cash", cash)
         macro = _checks.macro(macro)
         _checks.start_clock(start)
@@ -415,6 +428,14 @@ class World:
         self._expected: dict[int, list[tuple]] = {}
         self.engine = Engine(seed=self.seed, universe=self.universe,
                              macro_state=macro, model=model)
+        #: How many untraded days ran before day 0. See the class docstring.
+        self.history_days = history_days
+        # What every agent is shown as `obs.history`: the warm-up days,
+        # run here, then each day `run` closes.
+        self._history = History(history_days)
+        _warm_up(self.engine, history_days, steps_per_day=self.steps_per_day,
+                 ticks_per_step=self.ticks_per_step, start=start,
+                 history=self._history)
         # One book per label, against the one engine above. `cash` and
         # `max_leverage` are per agent: a cohort is several traders in one
         # market, and pooling their capital would make each one's limit a
@@ -726,6 +747,9 @@ class World:
             for portfolio in self._portfolios.values():
                 if portfolio.cash_interest:
                     portfolio.accrue(self.engine)
+            # The day's bars and published macro for `obs.history`, read
+            # before the close re-marks the prices.
+            self._history._close(self.engine, day)
             if record:
                 self.engine.record(day)
             self.engine.close_market()
@@ -751,11 +775,12 @@ class World:
         if self.trusted_agents:
             return Observation(self._step, day, tickers, prices, portfolio,
                                self.engine, self._adv, self.steps_per_day,
-                               hidden=hidden)
+                               hidden=hidden, history=self._history)
         return Observation(self._step, day, list(tickers), list(prices),
                            PortfolioView(portfolio, self.engine),
                            MarketView(self.engine), tuple(self._adv),
-                           self.steps_per_day, hidden=hidden)
+                           self.steps_per_day, hidden=hidden,
+                           history=self._history)
 
     def _agent_access(self) -> dict[str, Any] | None:
         """How agents were given the market, when that is not the default.
@@ -1242,6 +1267,10 @@ class World:
                           trusted_agents=self.trusted_agents)
             child.tampered = copy.deepcopy(self.tampered)
             child.engine = engine
+            # Built with no warm-up of its own: the arm continues this
+            # world's market, warm-up and all, and its history with it.
+            child.history_days = self.history_days
+            child._history = self._history._copy()
             child._portfolios = {key: copy.deepcopy(book)
                                  for key, book in self._portfolios.items()}
             child._frozen = self._frozen

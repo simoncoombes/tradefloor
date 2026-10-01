@@ -859,6 +859,7 @@ def rank(
     model: str | ModelParams | None = None,
     trusted_agents: bool = False,
     benchmark: str = "buy_and_hold",
+    history_days: int = 0,
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
@@ -896,6 +897,13 @@ def rank(
     had the live engine. An agent whose code changed the market on any seed
     is left out of the table and named in :attr:`Ranking.tampered`.
 
+    ``history_days`` is passed to every :func:`tradefloor.evaluate`: each
+    seed's market runs that many untraded days before day 0, and
+    ``obs.history`` holds them at the first decision, so a rule that reads
+    20 days of bars from it can trade from day 0, as buy-and-hold does.
+    The reference agents and :class:`tradefloor.StrategySpec` strategies
+    keep their own price history and do not read it.
+
     ```python
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(12),
                       universe=u, days=10)
@@ -925,7 +933,7 @@ def rank(
         universe=roster, macro=macro, days=days, steps_per_day=steps_per_day,
         ticks_per_step=ticks_per_step, cash=cash, max_leverage=max_leverage,
         start=start, scenario=scenario, model=model,
-        trusted_agents=trusted_agents,
+        trusted_agents=trusted_agents, history_days=history_days,
     )
 
     # The first seed's agents are built here, before any worker starts, and

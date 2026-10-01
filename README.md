@@ -101,10 +101,17 @@ That result comes from one random market, so it says as much about the seed
 as about the strategy. `tf.rank` runs many seeds and compares strategies with
 a paired sign test.
 
-Every `evaluate` and `rank` run starts at day 0 with no price history, and
-there is no warm-up option yet. A rule that needs 20 days of prices sits out
-the first 20 days while buy-and-hold is invested, which counts against it in
-the comparison.
+Every `evaluate` and `rank` run starts at day 0, so a rule that needs 20
+days of prices would sit out the first 20 days while buy-and-hold is
+invested, which counts against it in the comparison. `history_days=20` runs
+the market for 20 days before day 0 with nobody trading, and
+`obs.history.bars(ticker, last=20)` returns those days' bars at the first
+decision. Each scored day joins the history after its close, and
+`obs.history.macro()` gives the published macro figures for the same days.
+The scored days continue the warmed market, so on the same seed they are
+different days from a run without the warm-up, and the scorecard records
+`history_days`. The reference agents and `StrategySpec` strategies keep
+their own price history and do not read `obs.history`.
 
 Add `tf.baselines.reference_agents()` to the entrants to read a score against
 buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
@@ -121,6 +128,9 @@ A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
 read-only market view: prices, the public columns, each book, the bars of
 days already recorded (a World run with `record=True`; `tf.evaluate` records
 none), the published macro fields, the curve and which names have news today.
+`obs.history` holds a daily bar per name and the published macro for every
+day the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`,
+and needs no extra package.
 `obs.portfolio` reads the agent's own positions and cannot trade. Forking the
 engine, writing to it and reading the hidden state all raise
 `tf.SandboxError`. The hidden state includes the true business-cycle phase;

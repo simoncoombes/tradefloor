@@ -119,7 +119,7 @@ from typing import Any, Sequence
 from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
-from .harness import Observation, session_clock
+from .harness import History, Observation, session_clock
 from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
@@ -447,6 +447,7 @@ def analyse(
                        else PortfolioView(portfolio, engine))
     hidden = HiddenState(engine) if declares_hidden_state(agent) else None
     guard = TamperGuard(engine, (portfolio,), trusted=trusted_agents)
+    history = History()
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
@@ -464,7 +465,7 @@ def analyse(
             obs = Observation(step, day, list(tickers), list(prices),
                               shown_portfolio, shown_engine,
                               adv if trusted_agents else tuple(adv),
-                              steps_per_day, hidden=hidden)
+                              steps_per_day, hidden=hidden, history=history)
             with guard:
                 orders = agent.act(obs)
             if guard.tampered:
@@ -510,6 +511,7 @@ def analyse(
                                fills=portfolio.pending_flow())
             portfolio.clear_flow()
             step += 1
+        history._close(engine, day)
         engine.close_market()
     actual_path.append(_f64(engine.prices()))
 

@@ -424,6 +424,7 @@ def test_bars_refuses_when_the_harness_records_nothing():
     for label, got in agent.got.items():
         assert isinstance(got, str), (label, got)
         assert "never record" in got and "column('open')" in got
+        assert "obs.history.bars(ticker)" in got and "history_days" in got
     assert agent.recorded == 0
 
 
