@@ -1,0 +1,48 @@
+{
+ "kind": "tradefloor.known-answer.traded",
+ "tradedKatVersion": 1,
+ "seed": 20260930,
+ "agentSeed": 5,
+ "preset": "pt-v20",
+ "presetRow": "07ab6e0c1cea8fe42eb5e801afa0c725f7c6e8e6e1e56ba622eaa1efa9577520",
+ "days": 10,
+ "stepsPerDay": 6,
+ "ticksPerStep": 65,
+ "cash": 1000000.0,
+ "maxLeverage": 2.0,
+ "agents": {
+  "buy_and_hold": {
+   "orders": "4d622471e6cf6d420e9fa546ea36174540b4d3bcea6bd046c141083d9f5a706c",
+   "fills": "0ab38749981d688b0e25fca8450c2569e65fdf22e1a5cded306d4dfb6893439a",
+   "scorecard": "d5be0092c49c0ce97ce512c116fb92e8bcc195d0f9ed426d09e4ae710c753ea3"
+  },
+  "random": {
+   "orders": "63e6341fa7c97721853fe95206cadd18bb0c2de8aac690c26f9fbe4d4188286a",
+   "fills": "60cc6e79554649088f581050c5f10de4c3f9d1e5b579a3d80957f6ec48bf1981",
+   "scorecard": "7732714b95763ff1454334bdbca3f3e646b03aa59f3faf2c5e3d95e4af772e87"
+  },
+  "momentum": {
+   "orders": "e7998f820715919e155ee4f3244c68509e87bcb0f843d167da211b9456484961",
+   "fills": "188ef9124ed7addb4e9bedc44605071f19b6888ee26a4ed43d9bf3c4dd5bbd5c",
+   "scorecard": "7b626e154424a0a24db81e550badc3a182f299770be04815338a652f9c8e8f59"
+  },
+  "mean_reversion": {
+   "orders": "6f7a1d38a53607351570dba25f2ea6c1f5b5833f394597237973abe7da4ba186",
+   "fills": "ceca13cb4d3e35c75f61a81374479fcdd7dc6d00dc5d0af12d9cbcdcf623bb96",
+   "scorecard": "e598b0bc0ba361fb9a7e0793ca5b1d57018305e9b32098ff43d8dac9cc932e19"
+  },
+  "oracle": {
+   "orders": "f0e600c005110de39c6323060f146cf7586634a1aeb38a1a0e67e17dc5305729",
+   "fills": "c00a6ce8856fd934cac9c411ed72ecdd22bb22073e9bb0881e9a4d4ac84b516f",
+   "scorecard": "decc1baaea23a8b906e10d79a0b1b87a3d87d602c632974d3ff7e31d8591a754"
+  },
+  "resting": {
+   "orders": "b715bccda1a004f8a200b0c7cb5b12e6dc3318f8eec6d06100125f0ff784543f",
+   "fills": "07fd4cc1e2e5d9529038c3056ed4289bdda41be36f70ad7c3c385775b58dc985",
+   "scorecard": "825954f230993572af6ce40b766162919f4e04c1c9e456ac020fc75c912b3806"
+  }
+ },
+ "bytes": 278161,
+ "sha256": "5b4944ab2860d8bb71ae3fbe722b1e9194040da528d4997ccfa27f07701368d0",
+ "note": "Recorded 2026-09-30 on fix085/traded-known-answer, branched from rel085/candidate at f3eec5a. The reference agents and the scripted limit-order agent through tradefloor.evaluate on pt-v20 as it stood there, whose row in known_answer_presets.json is presetRow. The same digest on Python 3.11.16, 3.12.14 and 3.13.15 on macOS arm64; the five-target determinism workflow is the check on the other platforms. This row moves when pt-v20 moves, when a reference agent changes, or when evaluate scores differently: re-base it then with `python tests/known_answer_traded.py --write` and add a sentence here saying what moved. Re-based 2026-10-01 on rel085/candidate after the 0.8.5 decision merges, pt-v20's row unchanged. Decision 8 asks explain() after the close and scores it on the ten price drivers, so the oracle's order log (its explain answers) and its scorecard moved. Scorecard gained history_days and margin_interest, both now in SCORECARD_FIELDS, so every scorecard digest moved; hashed with the old field list, the other five scorecards are the ones recorded before. No agent's orders or fills moved apart from the oracle's explain answers: every fills digest is the one recorded on fix085/traded-known-answer."
+}

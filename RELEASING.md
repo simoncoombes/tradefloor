@@ -412,6 +412,16 @@ frozen preset, and one that moved is a defect in the change, never a
 baseline to regenerate. The combined `sha256` in that file moves with the
 new row.
 
+`tests/known_answer_traded.json` runs the reference agents through
+`evaluate` on pt-v20 by name, so a new preset leaves it where it was. It
+moves when pt-v20 changes before it ships, when a reference agent changes,
+or when `evaluate` scores differently, and `test_known_answer.py` names the
+agent and the part (orders, fills or scorecard). Re-base it with `python
+tests/known_answer_traded.py --write` and add a sentence to its note saying
+what moved. Its `presetRow` must equal pt-v20's row in
+`known_answer_presets.json`, so re-basing that row fails this test until
+the traded run is re-based too.
+
 **4. Test expectations pinned to the old default.** NEW, and the largest
 unplanned piece of 0.6.0, where six broke in three shapes:
 

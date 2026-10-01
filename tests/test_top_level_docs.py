@@ -181,9 +181,12 @@ def test_the_readme_promises_only_what_a_digest_checks():
 def test_support_says_what_each_digest_covers():
     text = flat(read("docs/SUPPORT.md"))
     for name in ("known_answer.py", "known_answer_presets.py",
-                 "known_answer_book.py"):
+                 "known_answer_book.py", "known_answer_traded.py"):
         assert f"`tests/{name}`" in text, name
-    assert "has no digest yet" in text
+    # A traded evaluate run has had a digest since 0.8.5. Before it, this
+    # page said none did, and that sentence must not come back.
+    assert "has no digest yet" not in text
+    assert "one traded `tf.evaluate` run is pinned on pt-v20" in text
     assert "does not recompute a score" in text
 
 

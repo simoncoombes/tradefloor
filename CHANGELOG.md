@@ -649,6 +649,32 @@ seed is a Number up to `Number.MAX_SAFE_INTEGER` or a BigInt, and a larger
 Number is refused rather than rounded. Draw a sealed seed with
 `secrets.randbits(64)`.
 
+### A digest for a traded run
+
+Until now every known-answer digest covered the engine, and none covered a
+run through `evaluate`. An agent benchmark reports that run.
+`tests/known_answer_traded.py` runs the five reference agents and one
+scripted agent that sends limit orders and cancels them through `evaluate`
+on pt-v20, seed 20260930, a fixed 12-name roster and 10 days of 6 steps. For
+each agent it hashes the order log (what `act()` returned at each step, the
+prices the agent was shown, and what `explain()` answered), every fill with
+the closing prices of that agent's market, and every scorecard field. The
+lines in `errors` and `partial_fills` are hashed as counts, so rewording a
+message moves nothing. `tests/known_answer_traded.json` keeps a digest per
+agent and per part, and `test_known_answer.py` checks them on every wheel
+target, naming the agent and part that moved. `known_answer.py` prints the
+combined digest as its seventh line, so the determinism workflow now
+compares seven digests per platform. The digest is the same on Python 3.11,
+3.12 and 3.13.
+
+The run names pt-v20, so a later default leaves it alone. A change to
+pt-v20 before it ships, to a reference agent or to what `evaluate` scores
+moves it, and is re-based with `python tests/known_answer_traded.py
+--write` and a sentence in the baseline's note. The baseline records
+pt-v20's row from `known_answer_presets.json` and fails when the two
+disagree. Adding it moved none of the simulation digests in
+`known_answer.json`, `known_answer_book.json` or `known_answer_presets.json`.
+
 ### Agents see a read-only market
 
 An independent audit found that every harness handed agents the live engine
