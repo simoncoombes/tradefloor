@@ -1696,6 +1696,32 @@ pub struct ModelParams {
     /// and ^VIX, the long run's tape). One half-life both ways keeps a
     /// contraction's multiplier on well into the recovery.
     pub market_vol_cycle_release_half_life: f64,
+    /// The share `g` of the contraction's excess, in logs, that the
+    /// index's RALLY OFF ITS LOW gives back in a contraction or a trough:
+    /// the phase's target is `ln(k_e) + e (1 - g s) ln(R)`, `e` the phase's
+    /// own share of the excess (1 in a contraction, `1 -
+    /// market_vol_cycle_trough_release` in a trough) and `s` the rally,
+    /// `min(1, (c - L) / market_vol_cycle_recovery_scale)`: `c` the index's
+    /// log level at the last close, `L` its lowest close since its highest
+    /// of the last 252 sessions (the window `fed_drawdown_hold` reads, total
+    /// public market cap). 0.0, every preset, is the multiplier as it was
+    /// and keeps no window. Unread at `market_vol_cycle_ratio` 0.0. In
+    /// [0, 1].
+    ///
+    /// Why. The release reads the market, not the cycle's phase. Real
+    /// volatility falls as the index climbs off its low, which leads the
+    /// NBER trough (2009: the VIX 49.7 at the 9 March low and 26.4 at the
+    /// 30 June trough; 2020: 61.6 at the 23 March low and 34.2 at the April
+    /// trough, Yahoo ^VIX), and a release keyed to the trough phase is a
+    /// release a rule reading the published phase can time: R19V with
+    /// `market_vol_cycle_trough_release` 1.0 levered the published
+    /// contraction and trough ahead of the constant position in 0.689 of
+    /// 270 pooled held-out histories against C10c's 2/3 (sim/r20 screen).
+    pub market_vol_cycle_recovery_release: f64,
+    /// The rally off the low, in log points of the index, at which
+    /// `market_vol_cycle_recovery_release` is fully given back. Read only
+    /// with that dial set, where it must be in (0, 2]; 0.0 on every preset.
+    pub market_vol_cycle_recovery_scale: f64,
     /// The published VIX's stress premium: the gain `g` of a premium the
     /// QUOTE carries over the engine's VIX state while the variance
     /// read-back's memory is high. 0.0, which every preset carries, is
@@ -7108,6 +7134,8 @@ impl ModelParams {
             market_vol_cycle_pin_phase: 0.0,
             market_vol_cycle_trough_release: 0.0,
             market_vol_cycle_release_half_life: 0.0,
+            market_vol_cycle_recovery_release: 0.0,
+            market_vol_cycle_recovery_scale: 0.0,
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
@@ -9534,6 +9562,8 @@ impl ModelParams {
             "market_vol_cycle_pin_phase" => self.market_vol_cycle_pin_phase,
             "market_vol_cycle_trough_release" => self.market_vol_cycle_trough_release,
             "market_vol_cycle_release_half_life" => self.market_vol_cycle_release_half_life,
+            "market_vol_cycle_recovery_release" => self.market_vol_cycle_recovery_release,
+            "market_vol_cycle_recovery_scale" => self.market_vol_cycle_recovery_scale,
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
@@ -9876,6 +9906,8 @@ impl ModelParams {
             "market_vol_cycle_pin_phase" => out.market_vol_cycle_pin_phase = value,
             "market_vol_cycle_trough_release" => out.market_vol_cycle_trough_release = value,
             "market_vol_cycle_release_half_life" => out.market_vol_cycle_release_half_life = value,
+            "market_vol_cycle_recovery_release" => out.market_vol_cycle_recovery_release = value,
+            "market_vol_cycle_recovery_scale" => out.market_vol_cycle_recovery_scale = value,
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
@@ -10682,6 +10714,30 @@ impl ModelParams {
                 "market_vol_cycle_release_half_life is {}. It is a half-life in sessions, in \
                  [0, 2520]; 0 is market_vol_cycle_half_life.",
                 self.market_vol_cycle_release_half_life));
+        }
+        if !(self.market_vol_cycle_recovery_release >= 0.0
+            && self.market_vol_cycle_recovery_release <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_release is {}. It is the share of the contraction's \
+                 volatility multiplier (in logs) the index's rally off its low gives back, in \
+                 [0, 1].",
+                self.market_vol_cycle_recovery_release));
+        }
+        if self.market_vol_cycle_recovery_release != 0.0
+            && !(self.market_vol_cycle_recovery_scale > 0.0
+                && self.market_vol_cycle_recovery_scale <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_scale is {} with market_vol_cycle_recovery_release \
+                 set. It is the rally off the low, in log points of the index, at which the \
+                 release is complete, in (0, 2].",
+                self.market_vol_cycle_recovery_scale));
+        }
+        if !(self.market_vol_cycle_recovery_scale >= 0.0
+            && self.market_vol_cycle_recovery_scale <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_scale is {}. It is a rally in log points of the \
+                 index, in [0, 2].",
+                self.market_vol_cycle_recovery_scale));
         }
         if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
             return Err(format!(
@@ -11530,6 +11586,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_cycle_pin_phase",
         "market_vol_cycle_trough_release",
         "market_vol_cycle_release_half_life",
+        "market_vol_cycle_recovery_release",
+        "market_vol_cycle_recovery_scale",
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
