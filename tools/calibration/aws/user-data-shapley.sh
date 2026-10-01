@@ -15,7 +15,14 @@ shutdown -h +180
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/shapley-v16
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/shapley-v16
 # The branch that carries the tool. feat/mechanism-shapley until its pull
 # request lands on dev, then dev. The `test -f` below turns a branch
 # without the tool into a failure at the clone rather than forty minutes

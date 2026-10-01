@@ -1,6 +1,6 @@
-+ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085
++ BUCKET=s3://<bucket>/pretium-calib/out/envgaps-085
 + BRANCH=integration/0.8.5
-+ SCRIPTS_URL=s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-085-scripts.tgz
++ SCRIPTS_URL=s3://<bucket>/pretium-calib/in/envgaps-085-scripts.tgz
 + dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 Amazon Linux 2023 repository                     86 MB/s |  79 MB     00:00    
 Amazon Linux 2023 Kernel Livepatch repository   832 kB/s |  80 kB     00:00    
@@ -174,14 +174,14 @@ Installed:
 Complete!
 ++ date -u
 + echo 'preflight Sat Sep 26 10:49:38 UTC 2026'
-+ aws s3 cp /tmp/PREFLIGHT-S3 s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/PREFLIGHT-S3
-Completed 39 Bytes/39 Bytes (907 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/PREFLIGHT-S3
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://<bucket>/pretium-calib/out/envgaps-085/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (907 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://<bucket>/pretium-calib/out/envgaps-085/PREFLIGHT-S3
 + cat
 + chmod +x /home/ec2-user/stream.sh
 + mkdir -p /home/ec2-user/out
-+ setsid nohup /home/ec2-user/stream.sh s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085
-+ aws s3 cp s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-085-scripts.tgz /home/ec2-user/scripts.tgz
-Completed 5.8 KiB/5.8 KiB (158.8 KiB/s) with 1 file(s) remainingdownload: s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-085-scripts.tgz to home/ec2-user/scripts.tgz
++ setsid nohup /home/ec2-user/stream.sh s3://<bucket>/pretium-calib/out/envgaps-085
++ aws s3 cp s3://<bucket>/pretium-calib/in/envgaps-085-scripts.tgz /home/ec2-user/scripts.tgz
+Completed 5.8 KiB/5.8 KiB (158.8 KiB/s) with 1 file(s) remainingdownload: s3://<bucket>/pretium-calib/in/envgaps-085-scripts.tgz to home/ec2-user/scripts.tgz
 + tar xzf /home/ec2-user/scripts.tgz -C /home/ec2-user
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
@@ -190,8 +190,8 @@ tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.proven
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
 + '[' '!' -f /home/ec2-user/scripts/jobs.sh ']'
 + sha256sum /home/ec2-user/scripts.tgz
-+ aws s3 cp /home/ec2-user/scripts.tgz s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/scripts-as-run.tgz
-Completed 5.8 KiB/5.8 KiB (123.2 KiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/scripts-as-run.tgz
++ aws s3 cp /home/ec2-user/scripts.tgz s3://<bucket>/pretium-calib/out/envgaps-085/scripts-as-run.tgz
+Completed 5.8 KiB/5.8 KiB (123.2 KiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://<bucket>/pretium-calib/out/envgaps-085/scripts-as-run.tgz
 + chown -R ec2-user:ec2-user /home/ec2-user/scripts /home/ec2-user/scripts.tgz /home/ec2-user/out
 + cat
 + sed -i 's|BRANCH_PLACEHOLDER|integration/0.8.5|' /home/ec2-user/run.sh
@@ -580,59 +580,59 @@ Swap:              0           0           0
 + '[' -f /home/ec2-user/out/macro.json ']'
 + '[' -f /home/ec2-user/out/memory-vs-drift.json ']'
 + echo 'OK exit=0'
-+ aws s3 cp /var/log/pretium-run.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/run.log
-Completed 28.9 KiB/28.9 KiB (588.5 KiB/s) with 1 file(s) remainingupload: var/log/pretium-run.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/run.log
++ aws s3 cp /var/log/pretium-run.log s3://<bucket>/pretium-calib/out/envgaps-085/run.log
+Completed 28.9 KiB/28.9 KiB (588.5 KiB/s) with 1 file(s) remainingupload: var/log/pretium-run.log to s3://<bucket>/pretium-calib/out/envgaps-085/run.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/commit.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 41 Bytes/41 Bytes (1.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/commit.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/commit.txt
++ aws s3 cp /home/ec2-user/out/commit.txt s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 41 Bytes/41 Bytes (1.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/commit.txt to s3://<bucket>/pretium-calib/out/envgaps-085/commit.txt
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/decay.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 21.3 KiB/21.3 KiB (436.9 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/decay.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/decay.json
++ aws s3 cp /home/ec2-user/out/decay.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 21.3 KiB/21.3 KiB (436.9 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/decay.json to s3://<bucket>/pretium-calib/out/envgaps-085/decay.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/decay.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 479 Bytes/479 Bytes (11.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/decay.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/decay.log
++ aws s3 cp /home/ec2-user/out/decay.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 479 Bytes/479 Bytes (11.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/decay.log to s3://<bucket>/pretium-calib/out/envgaps-085/decay.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/driven.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 20.2 KiB/20.2 KiB (478.6 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/driven.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/driven.json
++ aws s3 cp /home/ec2-user/out/driven.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 20.2 KiB/20.2 KiB (478.6 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/driven.json to s3://<bucket>/pretium-calib/out/envgaps-085/driven.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/driven.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 2.2 KiB/2.2 KiB (48.7 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/driven.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/driven.log
++ aws s3 cp /home/ec2-user/out/driven.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 2.2 KiB/2.2 KiB (48.7 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/driven.log to s3://<bucket>/pretium-calib/out/envgaps-085/driven.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/gate.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 98 Bytes/98 Bytes (1.8 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/gate.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/gate.txt
++ aws s3 cp /home/ec2-user/out/gate.txt s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 98 Bytes/98 Bytes (1.8 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/gate.txt to s3://<bucket>/pretium-calib/out/envgaps-085/gate.txt
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/jobs.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 680 Bytes/680 Bytes (14.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/jobs.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/jobs.log
++ aws s3 cp /home/ec2-user/out/jobs.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 680 Bytes/680 Bytes (14.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/jobs.log to s3://<bucket>/pretium-calib/out/envgaps-085/jobs.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/known-answer.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 520 Bytes/520 Bytes (12.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/known-answer.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/known-answer.txt
++ aws s3 cp /home/ec2-user/out/known-answer.txt s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 520 Bytes/520 Bytes (12.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/known-answer.txt to s3://<bucket>/pretium-calib/out/envgaps-085/known-answer.txt
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/long-horizon.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 4.6 KiB/4.6 KiB (90.3 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/long-horizon.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/long-horizon.json
++ aws s3 cp /home/ec2-user/out/long-horizon.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 4.6 KiB/4.6 KiB (90.3 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/long-horizon.json to s3://<bucket>/pretium-calib/out/envgaps-085/long-horizon.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/long.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 3.3 KiB/3.3 KiB (72.7 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/long.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/long.log
++ aws s3 cp /home/ec2-user/out/long.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 3.3 KiB/3.3 KiB (72.7 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/long.log to s3://<bucket>/pretium-calib/out/envgaps-085/long.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/macro-candidates.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 102 Bytes/102 Bytes (2.3 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro-candidates.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/macro-candidates.json
++ aws s3 cp /home/ec2-user/out/macro-candidates.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 102 Bytes/102 Bytes (2.3 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro-candidates.json to s3://<bucket>/pretium-calib/out/envgaps-085/macro-candidates.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/macro.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 672 Bytes/672 Bytes (16.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/macro.json
++ aws s3 cp /home/ec2-user/out/macro.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 672 Bytes/672 Bytes (16.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro.json to s3://<bucket>/pretium-calib/out/envgaps-085/macro.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/macro.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 517 Bytes/517 Bytes (10.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/macro.log
++ aws s3 cp /home/ec2-user/out/macro.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 517 Bytes/517 Bytes (10.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/macro.log to s3://<bucket>/pretium-calib/out/envgaps-085/macro.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/memory-vs-drift.json s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 16.1 KiB/16.1 KiB (294.2 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/memory-vs-drift.json to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/memory-vs-drift.json
++ aws s3 cp /home/ec2-user/out/memory-vs-drift.json s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 16.1 KiB/16.1 KiB (294.2 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/memory-vs-drift.json to s3://<bucket>/pretium-calib/out/envgaps-085/memory-vs-drift.json
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/memory.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 1.2 KiB/1.2 KiB (26.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/memory.log to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/memory.log
++ aws s3 cp /home/ec2-user/out/memory.log s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 1.2 KiB/1.2 KiB (26.1 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/memory.log to s3://<bucket>/pretium-calib/out/envgaps-085/memory.log
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/scripts-sha256.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 93 Bytes/93 Bytes (2.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/scripts-sha256.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/scripts-sha256.txt
++ aws s3 cp /home/ec2-user/out/scripts-sha256.txt s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 93 Bytes/93 Bytes (2.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/scripts-sha256.txt to s3://<bucket>/pretium-calib/out/envgaps-085/scripts-sha256.txt
 + for f in /home/ec2-user/out/*
-+ aws s3 cp /home/ec2-user/out/status.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/
-Completed 66 Bytes/66 Bytes (1.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/status.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/status.txt
-+ aws s3 cp /tmp/DONE s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/DONE
-Completed 10 Bytes/10 Bytes (253 Bytes/s) with 1 file(s) remainingupload: tmp/DONE to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-085/DONE
++ aws s3 cp /home/ec2-user/out/status.txt s3://<bucket>/pretium-calib/out/envgaps-085/
+Completed 66 Bytes/66 Bytes (1.5 KiB/s) with 1 file(s) remainingupload: home/ec2-user/out/status.txt to s3://<bucket>/pretium-calib/out/envgaps-085/status.txt
++ aws s3 cp /tmp/DONE s3://<bucket>/pretium-calib/out/envgaps-085/DONE
+Completed 10 Bytes/10 Bytes (253 Bytes/s) with 1 file(s) remainingupload: tmp/DONE to s3://<bucket>/pretium-calib/out/envgaps-085/DONE
 + shutdown -h now

@@ -12,7 +12,14 @@ shutdown -h +240
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/crisis-survey/shardSHARD_I
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/crisis-survey/shardSHARD_I
 # `dev`, not `main`. Experimental model work lives on `dev` and is merged to
 # `main` in reviewed units; a calibration box should run what is being
 # EXPERIMENTED on. Pointing this at `main` is what forced a merge to main

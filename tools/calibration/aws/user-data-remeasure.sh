@@ -13,7 +13,7 @@
 # BRANCH=<branch>, DEADMAN_MIN=90 and REGISTER_KEY=in/<run>-register.tgz.
 #
 # For 0.8.5 the branch is release/0.8.5 and the run is remeasure-0.8.5, so
-# the box writes to s3://dia-test-101631415962-us-east-2-an/pretium-calib/
+# the box writes to s3://<bucket>/pretium-calib/
 # out/remeasure-0.8.5/. Run it after pt-v20 is merged into release/0.8.5 and
 # pushed (the box clones by branch name), with TRADEFLOOR_DOCS at the docs
 # repository's release/0.8.5 checkout, built for that commit:

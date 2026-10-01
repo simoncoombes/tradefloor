@@ -9,7 +9,14 @@ shutdown -h +100
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/rnd7-converge
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/rnd7-converge
 # `dev`, and the run needs eb44efa or later: gate_batch and macro_range only
 # learned --seed-start there. Without it both silently re-measure on the
 # calibration seeds and the run confirms nothing while looking identical.

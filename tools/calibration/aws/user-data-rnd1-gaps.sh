@@ -9,7 +9,14 @@ shutdown -h +75
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/rnd1-gaps
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/rnd1-gaps
 # `dev`, and the run needs cf9d91f or later: the inventory was repaired there
 # (72 broken locators fixed, 308 figures, zero pointing past end of file) and
 # remeasure.py learned to label a --only run as PARTIAL. Verified with
