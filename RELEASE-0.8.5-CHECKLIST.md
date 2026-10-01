@@ -28,7 +28,8 @@ the 17 tests that replay the five recorded LLM fixtures (see step 1), and
 | `sha256` (known answer) | `ac004fea...` |
 | `metadataSha256` | `8804ef0e...` |
 | `bondsSha256` | `cac3ff44...` |
-| book `sha256` | `81aceb27...` (BOOK_KAT_VERSION 1; `d075094c...` without the state hash) |
+| book `sha256` | `b14d1f50...` (BOOK_KAT_VERSION 2 since `rel085/fix-book`, 2026-10-01; it was `81aceb27...`) |
+| traded `sha256` | `8e032d38...` since `rel085/fix-book`, 2026-10-01; it was `5b4944ab...` |
 | presets, 19 rows | combined `87f0b185...`; pt-v20's row `07ab6e0c...` |
 | 64-bit seed line | `cef62229...` (seed 2**63 + 12345, pt-v19) |
 
@@ -52,6 +53,15 @@ moved no digest.
       before the PR.
 - [ ] **The five LLM fixtures are re-recorded once**, with API keys. Until
       then the 17 tests that replay them fail on this branch.
+- [ ] **The LangGraph fixture is re-recorded live after `rel085/fix-book`**
+      (`TRADEFLOOR_LIVE_EXAMPLES=1 python examples/integrations/langgraph/rate_shock.py --record`, with an
+      Anthropic key). Its recording has a buy limit for HELX at 86.10 that
+      the old flow filled for 1,425 shares on day 1 while HELX traded at
+      87.33 to 87.37, which is the bug that branch fixed. With the fix the
+      order does not fill, the step-12 observation differs and the replay
+      misses. Until then three tests in `tests/test_langgraph.py` and
+      `test_render.py::test_langgraph_default_renderer_replays_the_shipped_fixture`
+      fail on `rel085/candidate`. The other fixtures replay.
 - [x] RELEASING 5b on the final vector: pt-v20's record from the grade
       box's preset panel (ptv20g6), its level block from a paired run on
       this build (`tools/presets/results/level-rows-pt-v20-2026-09-26.json`,

@@ -364,9 +364,9 @@ move. The book's state is absent from the state hash and the snapshot on
 every engine no agent has sent an order to.
 
 The model's flow fills a resting order only at a price inside the maker's
-quote for that tick. In the release candidate, a slice of flow that emptied
-the settlement ladder walked on into whatever rested past it and filled it
-at its own limit. A persona review found a buy at 4% of the bid filling
+quote for that tick. In the pre-release builds, a slice of flow that
+emptied the settlement ladder walked on into whatever rested past it and
+filled it at its own limit. A persona review found a buy at 4% of the bid filling
 thousands of shares, sells at ten times the ask filling on a third of the
 names in a day, an agent scoring +403% in ten days through `evaluate`, and
 the order's price printed on the tape. The flow now stops at the ladder's
@@ -1034,7 +1034,7 @@ twice in one universe (the second could never be traded), and a negative VIX
 in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
 every known-answer digest is unchanged.
 
-### Changes from the third review
+### Changes from the third pre-release review
 
 None of these moves a known-answer digest or the market.
 
