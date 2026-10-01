@@ -250,6 +250,18 @@ class Limit:
     def __repr__(self) -> str:
         return f"Limit({self.quantity:g}, {self.price:g})"
 
+    # A value, compared by what it says. A World's trace holds the orders
+    # each step sent, and `agree` compares two forks' traces: compared by
+    # identity, the copies a fork makes reported every shared history that
+    # held a limit order as DIFFERENT.
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Limit):
+            return NotImplemented
+        return self.quantity == other.quantity and self.price == other.price
+
+    def __hash__(self) -> int:
+        return hash((Limit, self.quantity, self.price))
+
 
 class Cancel:
     """Cancel every waiting order on a ticker: ``{"AAA": tf.Cancel()}``."""
@@ -258,6 +270,14 @@ class Cancel:
 
     def __repr__(self) -> str:
         return "Cancel()"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Cancel):
+            return NotImplemented
+        return True
+
+    def __hash__(self) -> int:
+        return hash(Cancel)
 
 
 class Position:

@@ -723,6 +723,29 @@ def test_a_summary_after_a_resting_limit_order_does_not_raise():
     assert summary["execution_cost"] == 0.0
 
 
+def test_forks_of_a_world_that_sent_a_limit_order_agree():
+    """A trace that holds a `tf.Limit` compares equal to its fork's copy.
+
+    `Limit` compared by identity, and a fork copies the trace, so `agree`
+    reported the shared history of every World that had sent a limit order
+    as DIFFERENT. The PydanticAI notebook printed that at the release check
+    of 2026-10-01, beside a line reading `True` from `bool(agreement)`.
+    """
+    assert tf.Limit(100, 101.25) == tf.Limit(100, 101.25)
+    assert tf.Limit(100, 101.25) != tf.Limit(-100, 101.25)
+    assert hash(tf.Limit(100, 101.25)) == hash(tf.Limit(100, 101.25))
+    assert tf.Cancel() == tf.Cancel() and tf.Cancel() != tf.Limit(1, 1.0)
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: {obs.tickers[0]: tf.Limit(100, obs.book(obs.tickers[0])
+                                              .best_bid)}))
+    world.run(days=2)
+    assert any(isinstance(order, tf.Limit)
+               for row in world.trace for order in row["orders"].values())
+    control, shock = world.fork("control", "shock")
+    agreement = agree(control, shock)
+    assert agreement.identical, agreement.differences
+
+
 @pytest.mark.parametrize("policy", ["raise", "skip"])
 def test_an_unknown_ticker_is_refused_and_the_run_goes_on(policy):
     """World raised on an unknown ticker, even under on_refusal="skip",

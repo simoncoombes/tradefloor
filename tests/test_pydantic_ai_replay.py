@@ -111,7 +111,10 @@ def test_the_recorded_run_replays_end_to_end():
 
     control, shock = world.fork("control", "+200bps")
     control.agent.arm, shock.agent.arm = "control", "+200bps"
-    assert bool(agree(control, shock)), "the arms diverged before the shock"
+    # `.identical`, not the Agreement itself: it has no truth value of its
+    # own, so `bool(agree(...))` is True whatever the checks found.
+    assert agree(control, shock).identical, (
+        "the arms diverged before the shock")
 
     shock.intervene(federal_funds_rate=example.SHOCKED_POLICY_RATE,
                     corporate_bond_yield=example.SHOCKED_DISCOUNT_RATE)
