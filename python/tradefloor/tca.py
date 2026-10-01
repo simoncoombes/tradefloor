@@ -460,6 +460,10 @@ def analyse(
              ticks_per_step=ticks_per_step,
              start=(hour, minute, day_of_week), history=history)
     engine, quiet = template.fork(2)
+    # Dropped so the only engine in this frame is the guarded one: an agent
+    # that walks the stack for an engine would otherwise find the template
+    # and copy it unseen.
+    del template
 
     # -- world A: the trader exists ---------------------------------------
     tickers = engine.tickers
