@@ -2123,8 +2123,9 @@ and leaves the dials as they were. On the held roster
 and -0.268 at one year, against 0.508 and -0.254 before, and 0.627 and
 -0.261 at two years, against 0.561 and -0.241. Both rows stay inside their
 ruled bands at both horizons, and the two-year `volume_abs_return_corr` is
-0.003 under its ceiling of 0.63. The certified record is re-measured in the
-next grade.
+0.003 under its ceiling of 0.63. These are the readings `envelope.CERTIFIED`,
+`envelope.MEASURED_504` and the pt-v20 record carry, re-measured on the
+fixed bars on 2026-10-01.
 
 ## Bonds
 

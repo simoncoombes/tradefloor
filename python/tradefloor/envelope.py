@@ -219,9 +219,14 @@ CERTIFIED: dict[str, float | None] = {
     "abs_return_acf5": 0.0188,
     "abs_return_acf20": 0.0044,
     "cross_sectional_corr": 0.3053,
-    "volume_abs_return_corr": 0.5084,
+    # The two volume rows were re-measured on 2026-10-01 at `ada871e`, after
+    # owner decision 1 fixed bar volume (a day bar had read the sum of the
+    # day's running totals). Same protocol, roster and seeds; every other
+    # row reproduced to the last digit. Before the fix they read 0.5084 and
+    # -0.2540. Artefact: tools/presets/results/volume-remeasure-2026-10-01/.
+    "volume_abs_return_corr": 0.5958,
     "leverage_effect": -0.0341,
-    "volume_change_acf1": -0.2540,
+    "volume_change_acf1": -0.2681,
     "corr_asymmetry": 0.0791,
     "corr_asymmetry_lagged": 0.0860,
     "sector_excess_corr": 0.1165,
@@ -652,9 +657,13 @@ MEASURED_504: dict[str, float | None] = {
     "abs_return_acf5": 0.0246,
     "abs_return_acf20": 0.0092,
     "cross_sectional_corr": 0.3116,
-    "volume_abs_return_corr": 0.5614,
+    # Re-measured on the fixed bars on 2026-10-01, as in `CERTIFIED`. Before
+    # the fix they read 0.5614 and -0.2415. 0.6266 is 0.0034 under the ruled
+    # ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about 0.4 of a
+    # 504-day seed sd, and 13 of the 30 seeds read above 0.63.
+    "volume_abs_return_corr": 0.6266,
     "leverage_effect": -0.0365,
-    "volume_change_acf1": -0.2415,
+    "volume_change_acf1": -0.2606,
     "corr_asymmetry": 0.0489,
     "corr_asymmetry_lagged": 0.0842,
     "sector_excess_corr": 0.1102,

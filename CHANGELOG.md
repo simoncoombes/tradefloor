@@ -1197,7 +1197,14 @@ roster and seeds 101 to 130, `volume_abs_return_corr` moves from 0.508 to
 from -0.254 to -0.268 and from -0.241 to -0.261. All four stay inside their
 ruled bands, the two-year correlation 0.003 under its ceiling of 0.63.
 `envelope.CERTIFIED`, `envelope.MEASURED_504` and `presets/pt-v20.json`
-keep the old readings until the next grade re-measures them.
+now carry these readings, re-measured on the fixed bars in every cell of
+the certification run. The other rows reproduced to the last digit. Held-out
+seeds read 0.612 and -0.266, the held-out universe 0.590 and -0.267, and
+the level protocol 0.603 and -0.267, all inside their ruled bands.
+`volume_abs_return_corr` is no longer at the real centre of 0.536 in the
+mechanism blocks (2.9 to 3.2 standard errors above it), so the at-centre
+count falls from 9 to 8 of 14 on both 252-day cells and from 11 to 10 on
+the level protocol.
 `facts.SEED_SD` and `facts.SEED_SD_504` are re-measured for the two rows on
 their own pt-v1 protocol: `volume_abs_return_corr` falls from 0.0416 to
 0.0143 at one year and from 0.0190 to 0.0087 at two, so a distance on that

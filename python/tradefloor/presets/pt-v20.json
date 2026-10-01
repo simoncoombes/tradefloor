@@ -271,9 +271,9 @@
   "default_since": "0.8.5",
   "measured": {
     "tradefloor_version": "0.8.5",
-    "commit": "b89901979e5ab449446daf1cf8e354667e3f1cec",
-    "workers": 48,
-    "wall_seconds": 61.7,
+    "commit": "ada871ec6f6644406bb301090a3ad489ef1c738b",
+    "workers": 5,
+    "wall_seconds": 306.7,
     "method": {
       "roster": "Universe.random(40, seed=111)",
       "heldout_universe": "Universe.random(60, seed=909)",
@@ -315,9 +315,9 @@
     "abs_return_acf5": 0.018790612377805556,
     "abs_return_acf20": 0.004371874907452167,
     "cross_sectional_corr": 0.3053070585467387,
-    "volume_abs_return_corr": 0.5083589176274725,
+    "volume_abs_return_corr": 0.5957559827755767,
     "leverage_effect": -0.03408630734147653,
-    "volume_change_acf1": -0.25402004190249017,
+    "volume_change_acf1": -0.2680742414842928,
     "corr_asymmetry": 0.07913016551255084,
     "corr_asymmetry_lagged": 0.08604970113916167,
     "sector_excess_corr": 0.11646248225083947,
@@ -332,9 +332,9 @@
     "abs_return_acf5": 0.02464237616436159,
     "abs_return_acf20": 0.009182124973647517,
     "cross_sectional_corr": 0.3115951084568531,
-    "volume_abs_return_corr": 0.5613712030558313,
+    "volume_abs_return_corr": 0.6266212356596669,
     "leverage_effect": -0.03646917706711736,
-    "volume_change_acf1": -0.2414612758950022,
+    "volume_change_acf1": -0.26064701954947683,
     "corr_asymmetry": 0.04891070336470894,
     "corr_asymmetry_lagged": 0.08420972515102017,
     "sector_excess_corr": 0.11024877167474248,
@@ -395,7 +395,7 @@
       },
       "mechanism_shown": 10,
       "mechanism_of": 10,
-      "at_centre": 9,
+      "at_centre": 8,
       "at_centre_of": 14
     },
     "shown": [
@@ -498,13 +498,13 @@
         "n": 30,
         "cut": 21,
         "null": 0.0,
-        "median": 0.5083589176274725,
+        "median": 0.5957559827755767,
         "p": 1.862645149230957e-09,
         "verdict": "shown",
         "at_the_cut": false,
         "counted": true,
-        "z0_normal": 41.91685362403537,
-        "z0_bootstrap": 51.06093065809787,
+        "z0_normal": 50.94877294629883,
+        "z0_bootstrap": 65.0656563351171,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -649,12 +649,12 @@
         "undetermined": null
       },
       "volume_abs_return_corr": {
-        "z_r": -1.3289348853330063,
-        "median": 0.5083589176274725,
+        "z_r": 2.907964557507776,
+        "median": 0.5957559827755767,
         "real_centre": 0.536,
-        "se_m": 0.012127792848840557,
+        "se_m": 0.011693235152169752,
         "se_real": 0.016897714311908982,
-        "at_centre": true,
+        "at_centre": false,
         "undetermined": null
       },
       "leverage_effect": {
@@ -667,10 +667,10 @@
         "undetermined": null
       },
       "volume_change_acf1": {
-        "z_r": 0.11440040604787305,
-        "median": -0.25402004190249017,
+        "z_r": -1.5303406897889107,
+        "median": -0.2680742414842928,
         "real_centre": -0.255,
-        "se_m": 0.005645015642044424,
+        "se_m": 0.005610534976110316,
         "se_real": 0.006442886485346302,
         "at_centre": true,
         "undetermined": null
@@ -768,7 +768,7 @@
       },
       "mechanism_shown": 9,
       "mechanism_of": 10,
-      "at_centre": 9,
+      "at_centre": 8,
       "at_centre_of": 14
     },
     "shown": [
@@ -848,7 +848,7 @@
         "at_the_cut": false,
         "counted": false,
         "z0_normal": 1.5970957478087053,
-        "z0_bootstrap": 1.7511577654159627,
+        "z0_bootstrap": 1.7511577654159625,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -872,13 +872,13 @@
         "n": 30,
         "cut": 21,
         "null": 0.0,
-        "median": 0.5272933056801735,
+        "median": 0.612172460236319,
         "p": 1.862645149230957e-09,
         "verdict": "shown",
         "at_the_cut": false,
         "counted": true,
-        "z0_normal": 32.96129950418583,
-        "z0_bootstrap": 96.66517555620007,
+        "z0_normal": 36.66388880708488,
+        "z0_bootstrap": 103.25014971036495,
         "tolerance": 0.06486,
         "band_windows": 9
       },
@@ -979,7 +979,7 @@
       },
       "return_acf1": {
         "z_r": 1.4658725510542525,
-        "median": 0.011442838383541487,
+        "median": 0.011442838383541485,
         "real_centre": -0.006,
         "se_m": 0.005427304100852631,
         "se_real": 0.010589495004042243,
@@ -1023,12 +1023,12 @@
         "undetermined": null
       },
       "volume_abs_return_corr": {
-        "z_r": -0.3741751936120733,
-        "median": 0.5272933056801735,
+        "z_r": 3.206534015548237,
+        "median": 0.612172460236319,
         "real_centre": 0.536,
-        "se_m": 0.015997345784659108,
+        "se_m": 0.016696877504113083,
         "se_real": 0.016897714311908982,
-        "at_centre": true,
+        "at_centre": false,
         "undetermined": null
       },
       "leverage_effect": {
@@ -1041,10 +1041,10 @@
         "undetermined": null
       },
       "volume_change_acf1": {
-        "z_r": 1.0627849289051037,
-        "median": -0.24623543161144523,
+        "z_r": -1.2910046740142846,
+        "median": -0.265599953328131,
         "real_centre": -0.255,
-        "se_m": 0.005147700965088166,
+        "se_m": 0.005089553237938237,
         "se_real": 0.006442886485346302,
         "at_centre": true,
         "undetermined": null
@@ -1151,7 +1151,7 @@
         },
         "mechanism_shown": 10,
         "mechanism_of": 10,
-        "at_centre": 11,
+        "at_centre": 10,
         "at_centre_of": 14
       },
       "shown": [
@@ -1254,13 +1254,13 @@
           "n": 30,
           "cut": 21,
           "null": 0.0,
-          "median": 0.5134284493317556,
+          "median": 0.6026517973588069,
           "p": 1.862645149230957e-09,
           "verdict": "shown",
           "at_the_cut": false,
           "counted": true,
-          "z0_normal": 42.96204292419595,
-          "z0_bootstrap": 50.27946986032768,
+          "z0_normal": 48.90809381756406,
+          "z0_bootstrap": 67.27055604242403,
           "tolerance": 0.06486,
           "band_windows": 9
         },
@@ -1405,12 +1405,12 @@
           "undetermined": null
         },
         "volume_abs_return_corr": {
-          "z_r": -1.09058734399647,
-          "median": 0.5134284493317556,
+          "z_r": 3.1870477214906208,
+          "median": 0.6026517973588069,
           "real_centre": 0.536,
-          "se_m": 0.011950745690508026,
+          "se_m": 0.012322128104333935,
           "se_real": 0.016897714311908982,
-          "at_centre": true,
+          "at_centre": false,
           "undetermined": null
         },
         "leverage_effect": {
@@ -1423,10 +1423,10 @@
           "undetermined": null
         },
         "volume_change_acf1": {
-          "z_r": 0.12226448687781195,
-          "median": -0.253984551779621,
+          "z_r": -1.3657295947370127,
+          "median": -0.2665036488071142,
           "real_centre": -0.255,
-          "se_m": 0.00524098254749732,
+          "se_m": 0.0054256317801197555,
           "se_real": 0.006442886485346302,
           "at_centre": true,
           "undetermined": null
@@ -1799,7 +1799,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "bfa47670e8d260725ad76177b187c1a5d6c8b332",
+      "commit": "ada871ec6f6644406bb301090a3ad489ef1c738b",
       "protocol": "facts.LEVEL_PROTOCOL, roster varying with the seed",
       "seeds": [
         101,
@@ -1872,7 +1872,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "b89901979e5ab449446daf1cf8e354667e3f1cec",
+      "commit": "ada871ec6f6644406bb301090a3ad489ef1c738b",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
@@ -1943,7 +1943,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "b89901979e5ab449446daf1cf8e354667e3f1cec",
+      "commit": "ada871ec6f6644406bb301090a3ad489ef1c738b",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
@@ -2016,7 +2016,7 @@
     },
     "measured": {
       "tradefloor_version": "0.8.5",
-      "commit": "b89901979e5ab449446daf1cf8e354667e3f1cec",
+      "commit": "ada871ec6f6644406bb301090a3ad489ef1c738b",
       "method": {
         "roster": "Universe.random(40, seed=111)",
         "heldout_universe": "Universe.random(60, seed=909)",
