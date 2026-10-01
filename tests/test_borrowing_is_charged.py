@@ -9,8 +9,9 @@ with free borrowing, against 0.21 points and 57% with the policy rate
 charged. A World booked no interest at all, whatever the portfolio asked
 for.
 
-Idle cash still earns nothing unless `cash_interest` is on, and a World's own
-portfolios still book nothing, so recorded World runs replay.
+Idle cash still earns nothing unless `cash_interest` is on. Decision 11
+(2026-09-26) made a World's own portfolios pay for borrowing too, and gave
+`evaluate`, `rank` and `World` the opt-out `margin_interest=False`.
 """
 
 import pytest
@@ -99,13 +100,73 @@ def test_a_world_books_interest_for_a_portfolio_that_asks_for_it():
     assert world.portfolio.interest < 0
 
 
-def test_a_worlds_own_portfolio_books_no_interest():
-    """Kept as it was: a World's own portfolios leave `cash_interest` off,
-    and an LLM agent's observation shows its cash, so every recorded World
-    run replays only against the cash it was shown. `tf.World`'s docstring
-    says so and names the two ways to charge it."""
+def test_a_worlds_own_portfolio_pays_for_its_borrowing():
+    """Decision 11: margin is charged at the published policy rate by default
+    in World too. Until then a World's own portfolios borrowed for free, so a
+    levered agent's score there was not the score `evaluate` gave it."""
+    world = tf.World(seed=3, universe=UNIVERSE, agent=_Levered(),
+                     steps_per_day=2)
+    world.run(3)
+    assert world.margin_interest
+    assert world.portfolio.cash < 0
+    assert world.portfolio.interest < 0
+    assert "margin_interest" not in world.summary()
+
+
+def test_a_world_charges_what_evaluate_charges():
+    """The same agent, market and cadence: the interest a World books is the
+    interest `evaluate` books, and the market under both is unchanged."""
+    agent = _Levered()
+    card = tf.evaluate({"levered": agent}, seed=3, universe=UNIVERSE, days=3,
+                       steps_per_day=2)["levered"]
     world = tf.World(seed=3, universe=UNIVERSE, agent=_Levered(),
                      steps_per_day=2)
     world.run(3)
     assert world.portfolio.cash < 0
-    assert world.portfolio.interest == 0.0
+    assert world.summary()["final_net_worth"] == pytest.approx(
+        card.final_net_worth, rel=1e-12)
+
+
+def test_margin_interest_false_borrows_for_free_and_says_so():
+    """The opt-out, in all three. It changes cash and scores, never prices."""
+    free = tf.World(seed=3, universe=UNIVERSE, agent=_Levered(),
+                    steps_per_day=2, margin_interest=False)
+    charged = tf.World(seed=3, universe=UNIVERSE, agent=_Levered(),
+                       steps_per_day=2)
+    free.run(3)
+    charged.run(3)
+    assert free.portfolio.cash < 0
+    assert free.portfolio.interest == 0.0
+    assert charged.portfolio.interest < 0
+    assert free.digest() == charged.digest()
+    assert free.summary()["margin_interest"] is False
+    assert free.manifest().agent_access == {"margin_interest": False}
+    (arm,) = free.fork("arm")
+    assert arm.margin_interest is False
+
+    cards = {
+        flag: tf.evaluate({"levered": _Levered()}, seed=3, universe=UNIVERSE,
+                          days=3, steps_per_day=2,
+                          margin_interest=flag)["levered"]
+        for flag in (True, False)}
+    assert cards[False].pnl > cards[True].pnl
+    assert cards[False].margin_interest is False
+    assert "free-borrowing" in repr(cards[False])
+    assert "free-borrowing" not in repr(cards[True])
+
+    ranked = {
+        flag: tf.rank(lambda: {"levered": _Levered()}, seeds=[3, 4],
+                      universe=UNIVERSE, days=3, steps_per_day=2,
+                      margin_interest=flag)
+        for flag in (True, False)}
+    paid = ranked[True].as_dict()["agents"]["levered"]
+    free_rank = ranked[False].as_dict()["agents"]["levered"]
+    assert free_rank != paid
+
+
+def test_a_portfolio_built_without_margin_interest_borrows_for_free():
+    engine = _engine()
+    portfolio = tf.Portfolio(cash=1_000_000.0, margin_interest=False)
+    portfolio.cash = -500_000.0
+    assert portfolio.accrue(engine) == 0.0
+    assert portfolio.cash == -500_000.0

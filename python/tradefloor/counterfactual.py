@@ -300,17 +300,19 @@ class World:
     trades cost more through the book, but arbitrarily large is always
     available and "trade everything" wins.
 
-    Borrowing is free here by default, as it was in :func:`tradefloor.evaluate`
-    until 0.8.5: the portfolios a World builds book no interest, so a
-    negative cash balance costs nothing. That is kept because an LLM agent's
-    observation shows its cash, and every recorded World run (the FinRobot
-    and pydantic-ai fixtures, the liquidity-crisis study) replays only
-    against the cash it was shown. To charge it, give the world a portfolio
-    built with ``cash_interest=True`` (``world.portfolio = Portfolio(...,
-    cash_interest=True)``), which earns the policy rate on cash and pays it
-    on a negative balance before each close. To compare levered strategies
-    on a financed footing, use :func:`tradefloor.evaluate` or
-    :func:`tradefloor.rank`, which charge it.
+    ``margin_interest`` charges borrowing the policy rate, as
+    :func:`tradefloor.evaluate` and :func:`tradefloor.rank` do, and is on by
+    default from 0.8.5. A portfolio whose cash is negative before a close
+    pays a day's interest on the balance at the policy rate the market
+    publishes that day (:meth:`Portfolio.accrue`). It changes cash, net
+    worth and P&L, never a price: the engine runs the same market either
+    way. It does change what a levered agent is shown, because its
+    observation carries its cash, so a run recorded before 0.8.5 replays
+    only with ``margin_interest=False``, which lets every portfolio the
+    world builds borrow for free and is recorded in :meth:`summary` and the
+    manifest. Cash earns nothing unless the world is given a portfolio built
+    with ``cash_interest=True`` (``world.portfolio = Portfolio(...,
+    cash_interest=True)``).
 
     ``on_refusal`` decides what an agent that cannot produce a decision
     costs. ``"raise"`` is the default and ends the run, which is what this
@@ -352,7 +354,8 @@ class World:
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
-                 "trusted_agents", "tampered", "history_days", "_history")
+                 "trusted_agents", "tampered", "history_days", "_history",
+                 "margin_interest")
 
     def __init__(
         self,
@@ -373,6 +376,7 @@ class World:
         on_refusal: str = "raise",
         trusted_agents: bool = False,
         history_days: int = 0,
+        margin_interest: bool = True,
     ) -> None:
         from . import _checks
         steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
@@ -401,6 +405,9 @@ class World:
         #: Agents are handed the live engine and portfolio rather than the
         #: read-only views. Recorded in the summary and the manifest.
         self.trusted_agents = bool(trusted_agents)
+        #: Borrowing pays the policy rate in the portfolios this world
+        #: builds. Recorded in the summary and the manifest when off.
+        self.margin_interest = bool(margin_interest)
         #: Every step on which agent code changed the engine or a portfolio,
         #: by label, as the error line that says what changed. Empty on an
         #: honest run.
@@ -445,7 +452,8 @@ class World:
         # needs a name to attribute a fill to.
         self._portfolios: dict[str, Portfolio] = {
             key: Portfolio(cash=self.cash, max_leverage=max_leverage,
-                           owner=key or "agent")
+                           owner=key or "agent",
+                           margin_interest=self.margin_interest)
             for key in self._agents}
         self.trace: list[dict[str, Any]] = []
         self.rejected: list[str] = []
@@ -738,15 +746,12 @@ class World:
                 self._step += 1
 
             # A day's interest before the close, as `tradefloor.evaluate`
-            # books it, on a portfolio built with `cash_interest=True`: its
-            # cash earns the policy rate and a negative balance pays it.
-            # Until 0.8.5 a World booked no interest on any portfolio,
-            # whatever it asked for. The portfolios a World builds itself
-            # leave it off, so their borrowing stays free (see the class
-            # docstring).
+            # books it: a negative balance pays the policy rate unless the
+            # portfolio was built with `margin_interest=False`, and a
+            # positive one earns it only with `cash_interest=True`. Until
+            # 0.8.5 a World's own portfolios borrowed for free.
             for portfolio in self._portfolios.values():
-                if portfolio.cash_interest:
-                    portfolio.accrue(self.engine)
+                portfolio.accrue(self.engine)
             # The day's bars and published macro for `obs.history`, read
             # before the close re-marks the prices.
             self._history._close(self.engine, day)
@@ -791,6 +796,8 @@ class World:
         access: dict[str, Any] = {}
         if self.trusted_agents:
             access["trusted_agents"] = True
+        if not self.margin_interest:
+            access["margin_interest"] = False
         hidden = [label for label, agent in self._agents.items()
                   if declares_hidden_state(agent)]
         if hidden:
@@ -1266,7 +1273,8 @@ class World:
                           # Carried for the same reason, and the record of
                           # tampering with it: both arms share the history
                           # in which it happened.
-                          trusted_agents=self.trusted_agents)
+                          trusted_agents=self.trusted_agents,
+                          margin_interest=self.margin_interest)
             child.tampered = copy.deepcopy(self.tampered)
             child.engine = engine
             # Built with no warm-up of its own: the arm continues this
@@ -1821,6 +1829,8 @@ class World:
         # honest run's summary is the one it always was.
         if self.trusted_agents:
             out["trusted_agents"] = True
+        if not self.margin_interest:
+            out["margin_interest"] = False
         if declares_hidden_state(self._agents[label]):
             out["uses_hidden_state"] = True
         if self.tampered.get(label):

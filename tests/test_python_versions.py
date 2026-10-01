@@ -38,7 +38,7 @@ PACKAGE = pathlib.Path(tf.__file__).resolve().parent
 #: tests/test_python_versions.py`` and the commit says why. A change on 3.12
 #: or later alone is the bug this file exists for.
 ORDERS_SHA256 = "537488a29c52a5d0"
-SCORECARDS_SHA256 = "1f1a703e3ede2bb7"
+SCORECARDS_SHA256 = "c0638ba5e48738ca"
 
 
 # --------------------------------------------------------------------------

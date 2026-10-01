@@ -659,19 +659,45 @@ def test_leverage_refusals_are_counted_apart_from_other_refusals():
 def test_the_explanation_baseline_is_what_a_constant_answer_scores():
     """Answering "random_noise" every day scored 0.65 on this market with
     nothing beside it to say that is what a constant earns (0.8.5 review:
-    Jordan Okafor)."""
+    Jordan Okafor). Under the price rule (decision 8) it scores 0.95 on seed
+    1, where a closing jump won day 9, and the baseline says so."""
     claims = ("random_noise", "fair_value_shift", "momentum")
-    scores = tradefloor.evaluate({c: Explainer(c) for c in claims}, seed=2026,
+    scores = tradefloor.evaluate({c: Explainer(c) for c in claims}, seed=1,
                                  universe=tradefloor.Universe.random(12, seed=7),
                                  days=20)
     baselines = {card.explanation_baseline for card in scores.values()}
-    assert baselines == {0.65}
-    assert scores["random_noise"].explanation_accuracy == 0.65
+    assert baselines == {0.95}
+    assert scores["random_noise"].explanation_accuracy == 0.95
     for card in scores.values():
         assert card.explanation_accuracy <= card.explanation_baseline
     idle = tradefloor.evaluate({"idle": Idle()}, seed=5, universe=SMALL,
                                days=1)["idle"]
     assert idle.explanation_baseline is None
+
+
+def test_explanations_are_scored_on_what_moved_prices_over_the_whole_day():
+    """Decision 8 (2026-09-26): the rule matches the question agents are
+    asked, which factor moved prices most today.
+
+    The scorer ranked all eleven attribution columns. `fair_value_shift` moves
+    no price: it books the part of a shock that left the mispricing for fair
+    value, and the shock's own column already holds the whole move, so every
+    permanent shock counted twice and `fair_value_shift` was the answer on 9
+    of these 20 days. The scorer also read the attribution before the close,
+    so a jump at the close was never counted and `jump`, which the agent is
+    offered, could never be right. Seed 1 has a closing jump on day 9.
+    """
+    scores = tradefloor.evaluate(
+        {"noise": Explainer("random_noise"), "jump": Explainer("jump"),
+         "oracle": tradefloor.baselines.Oracle()},
+        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20)
+    actual = [answer for _, answer in scores["noise"].explanations]
+    assert set(actual) <= set(harness.DRIVER_NAMES)
+    assert "fair_value_shift" not in harness.DRIVER_NAMES
+    assert actual.count("jump") == 1 and actual[9] == "jump"
+    assert scores["jump"].explanations[9] == ("jump", "jump")
+    # The Oracle reads the same attribution after the close, by its own code.
+    assert scores["oracle"].explanation_accuracy == 1.0
 
 
 def _card(name, pnl, **flags):

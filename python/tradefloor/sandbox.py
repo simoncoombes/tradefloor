@@ -498,6 +498,10 @@ class PortfolioView:
         return _WRAPPED[self][0].cash_interest
 
     @property
+    def margin_interest(self) -> bool:
+        return _WRAPPED[self][0].margin_interest
+
+    @property
     def interest(self) -> float:
         return _WRAPPED[self][0].interest
 
@@ -622,7 +626,8 @@ def _portfolio_state(portfolio: Any) -> tuple:
         for t, p in portfolio.positions.items()))
     flow = tuple(sorted((t, tuple(v)) for t, v in portfolio._flow.items()))
     return (portfolio.cash, portfolio.starting_cash, portfolio.interest,
-            portfolio.max_leverage, portfolio.cash_interest, portfolio.owner,
+            portfolio.max_leverage, portfolio.cash_interest,
+            portfolio.margin_interest, portfolio.owner,
             len(portfolio.fills), positions, flow, portfolio._in_book)
 
 

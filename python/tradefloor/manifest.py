@@ -1457,8 +1457,10 @@ class RunManifest:
         ``agent_access`` records how the run's agents were given the market,
         when that was not the default read-only view: ``trusted_agents``
         (handed the live engine), ``hidden_state`` (the labels that declared
-        the capability) and ``tampered`` (label to the steps on which agent
-        code changed the market). :meth:`World.manifest` fills it. Absent,
+        the capability), ``tampered`` (label to the steps on which agent
+        code changed the market) and ``margin_interest`` (False when the
+        world let its portfolios borrow for free). :meth:`World.manifest`
+        fills it. Absent,
         the key is not written, so every other document is the one it was.
         It sits outside ``fingerprints``: it describes the agents, and the
         market's replay does not depend on it.

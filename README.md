@@ -147,9 +147,11 @@ step: at six steps a day an emulated stop filled a median 26.5 bp past its
 level, 9 bp at 5-minute steps, and 540 bp at the 90th percentile in the
 packaged recession. A trade costs the spread and its impact on the book.
 There are no commissions and no borrow fee on a short. Uninvested cash earns
-nothing by default, and a negative cash balance costs nothing, so leverage up
-to the default `max_leverage=2.0` is free. `cash_interest=True` pays and
-charges the policy rate, which is below a broker's margin rate.
+nothing by default. A negative cash balance pays the policy rate before each
+close in `tf.evaluate`, `tf.rank` and `World`, which is below a broker's
+margin rate, so leverage up to the default `max_leverage=2.0` costs at least
+that. `margin_interest=False` makes borrowing free, as it was before 0.8.5,
+and `cash_interest=True` pays the policy rate on idle cash.
 
 Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
 Python process, on the same seed, so the first agent can leave the price path
@@ -201,8 +203,11 @@ whole to `random_noise` and then taken back out by `fair_value_shift`, so the
 two move against each other (a per-tick correlation of about -0.75 on one
 seed) and should be read together. `engine.explain(ticker, day)` breaks down
 the move in the printed price instead. An agent scored on explaining moves
-gets an `explanation_accuracy`; quote it beside what a constant answer scores
-on the same days, because on pt-v20 two factors win most days.
+gets an `explanation_accuracy`: the share of days on which it named the
+factor that moved prices most, open to close, summed over every name.
+`fair_value_shift` moves no price and is never that answer. Quote the
+accuracy beside `explanation_baseline`, what a constant answer scores on the
+same days, because on pt-v20 `random_noise` wins almost every day.
 
 To drive it from an agent:
 
@@ -268,8 +273,8 @@ the whole curve 200 basis points in one day, which takes about 15% off
 `UST10Y`; `tradefloor.baselines.Balanced` is a 60/40 portfolio with a drift
 band. `evaluate(..., cash_interest=True)` pays uninvested cash the policy
 rate, and is off by default. A negative cash balance is charged the policy
-rate whether it is on or off. A `World` books interest only on a portfolio
-built with `cash_interest=True`, so borrowing there is free unless you ask.
+rate in `evaluate`, `rank` and `World` unless you pass
+`margin_interest=False`.
 
 ## Realism
 
@@ -549,11 +554,14 @@ To show a score was not tuned to its seeds, publish `tf.commit(seeds, salt)`
 before the run and the seeds and salt after it. Draw the seeds with
 `secrets.randbits(64)`. `tf.reveal(commitment, seeds, salt)` checks the pair,
 and `tf.sealed_battery(seeds, salt)` builds the fingerprint battery on those
-seeds. `tf.fingerprint.fingerprint(agent)` hashes
-what an agent ordered across that battery's six fixed markets, so two versions
-of an agent, with a changed prompt or in another framework, can be checked for
-whether they ordered the same things. It says nothing about which of the two
-is better.
+seeds. `tf.fingerprint.fingerprint(agent)` hashes what an agent ordered
+across that battery's fixed markets, so two versions of an agent, with a
+changed prompt or in another framework, can be checked for whether they
+ordered the same things. It says nothing about which of the two is better.
+The default battery is version 2: seven markets, one per shipped scenario,
+each run 120 days so a day-50 shock has seventy days after it.
+`tf.battery(1)`, the six 60-day markets of earlier releases, still builds,
+and a fingerprint compares only against one taken on the same version.
 
 ## License
 

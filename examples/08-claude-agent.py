@@ -21,18 +21,18 @@ right for the right reason. A model can score well on the first by accident.
 Nobody can measure the second on real market data, because nobody knows the
 answer there.
 
-The second score has a floor well above zero. On pt-v20, the default, the
-scored factor is `random_noise` or `fair_value_shift` on nearly every day, so
-an agent that names `random_noise` every day scores about 55 to 70 per cent
-on this market without reading anything. The run prints what that constant
-answer scored on the same days, and Claude's figure means something only
-where it is higher.
+The second score has a floor well above zero. On pt-v20, the default,
+`random_noise` moves prices most on almost every day, so an agent that names
+it every day scores 95 to 100 per cent on this market without reading
+anything (seeds 2026 and 1 to 5; `jump` took one day in twenty on three of
+them). The run prints what that constant answer scored on the same days, and
+Claude's figure means something only where it is higher.
 
 Claude decides once a day, on the day's last step. The harness scores the
-driver against the attribution of the day it was named on, and by the last
-step Claude has seen that day's overnight gap and five of its six steps. A
-decision at the open would see only yesterday's moves and be scored on
-today's.
+driver against the attribution of the whole day it was named on, open to
+close, and by the last step Claude has seen that day's overnight gap and five
+of its six steps. A decision at the open would see only yesterday's moves and
+be scored on today's.
 
 Cost: one API call per day. The harness steps six times a day by default, so
 the agent gates itself to one decision per day -- without that gate this is six
@@ -52,7 +52,7 @@ from collections import Counter
 from typing import Literal
 
 import tradefloor as tf
-from tradefloor.harness import FACTOR_NAMES
+from tradefloor.harness import DRIVER_NAMES
 
 try:
     import anthropic
@@ -61,13 +61,11 @@ except ImportError:
     sys.exit('This example needs the extra: pip install "tradefloor[claude]"')
 
 
-# The components the engine splits every price move into, read from the
-# harness's own list. `evaluate` scores Claude's answer against exactly these
-# names, so a list typed out here can fall behind, and it did three times.
-# The last one missed `fair_value_shift`, which pt-v20 added in 0.8.5 and
-# scores as the answer on about two days in five of this market, so Claude
-# was marked wrong on days it was never offered the right answer.
-Factor = Literal[FACTOR_NAMES]  # type: ignore[valid-type]
+# The factors that move a price, read from the harness's own list. `evaluate`
+# scores Claude's answer against exactly these names, so a list typed out here
+# can fall behind, and it did three times. `fair_value_shift` is not offered:
+# it moves no price, and the harness never scores it as the answer.
+Factor = Literal[DRIVER_NAMES]  # type: ignore[valid-type]
 
 
 class Decision(BaseModel):
@@ -119,16 +117,16 @@ model (%s), which is inside the range real equities show. Momentum is not a \
 free edge here, though it was in earlier versions of this simulator.
 
 You also name the factor that moved prices most today. The engine splits \
-every name's move into these factors: %s. For each factor it adds up the \
-size of its push on every name, up or down alike, and the factor with the \
-largest total is the answer you are scored against. `fair_value_shift` is \
-the part of the day's shocks that changed a company's fair value for good \
-rather than its mispricing.
+every name's price move into these factors: %s. For each factor it adds up \
+the size of its push on every name over the whole day, open to close, up or \
+down alike, and the factor with the largest total is the answer you are \
+scored against. A shock counts at its full size whether it moved the \
+company's fair value or only its mispricing.
 
 Give a portfolio, not a trade list. Concentration is allowed and often \
 correct; equal-weighting everything is a way of declining to have a view.\
 """ % (tf.envelope.CERTIFIED["return_acf1"], tf.envelope.PRESET,
-       ", ".join(FACTOR_NAMES))
+       ", ".join(DRIVER_NAMES))
 # The autocorrelation is read from the envelope rather than typed: it read
 # +0.0239 here, a figure no current preset record carries, until 0.8.0.
 
@@ -250,7 +248,7 @@ class ClaudeTrader:
     def explain(self, day: int) -> str | None:
         """The factor Claude named on this day's last step.
 
-        The harness calls this after the day's last step and checks the
+        The harness calls this after the day's close and checks the
         answer against the engine's attribution for that day, which turns a
         plausible-sounding rationale into a score. None, for a day whose call
         failed or was refused, leaves the day unscored instead of scoring an
@@ -311,7 +309,7 @@ def main() -> None:
         print("\n" + withheld)
 
     # The floor for the why-right column: the best single factor named on
-    # every scored day. On pt-v20 it is `random_noise` at 55 to 70 per cent
+    # every scored day. On pt-v20 it is `random_noise` at 95 to 100 per cent
     # on this market, so a figure near it says Claude read nothing.
     scored = scores["claude"].explanations
     if scored:

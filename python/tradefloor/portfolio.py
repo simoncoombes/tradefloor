@@ -294,18 +294,22 @@ class Portfolio:
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
                  "max_leverage", "_stamp", "cash_interest", "interest",
-                 "owner", "_in_book")
+                 "owner", "_in_book", "margin_interest")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
                  cash_interest: bool = False,
-                 owner: str = "agent") -> None:
+                 owner: str = "agent",
+                 margin_interest: bool = True) -> None:
         """
         ``cash_interest`` makes cash earn the policy rate, one day at a time,
-        when :meth:`accrue` is called; the harness calls it once a day before
-        the close, and a World does for a portfolio with the option on. Off by
-        default, and with it off cash earns nothing. :meth:`accrue` charges a
-        negative balance the policy rate either way. See :meth:`accrue`.
+        when :meth:`accrue` is called; the harness and a World call it once a
+        day before the close. Off by default, and with it off cash earns
+        nothing.
+
+        ``margin_interest`` charges a negative balance, which is borrowing,
+        the same policy rate in the same call. On by default. Pass False to
+        borrow for free, as every run did before 0.8.5. See :meth:`accrue`.
 
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
         defaults to ``None``, meaning unconstrained, because a bare simulator should
@@ -330,6 +334,7 @@ class Portfolio:
             )
         self.max_leverage = max_leverage
         self.cash_interest = bool(cash_interest)
+        self.margin_interest = bool(margin_interest)
         # Interest credited so far, net of any charged on a negative balance.
         self.interest = 0.0
         self._stamp = (0, 0, 0)
@@ -735,18 +740,18 @@ class Portfolio:
 
         A positive balance earns it only with ``cash_interest`` on, and earns
         nothing otherwise. A negative balance, which is borrowing to hold
-        more than the account is worth, is charged it whether the option is
-        on or off. That is cheaper than any broker lends, so a levered
-        strategy's financing cost is a floor here, not an estimate.
+        more than the account is worth, is charged it while
+        ``margin_interest`` is on, which is the default, whatever
+        ``cash_interest`` says. That is cheaper than any broker lends, so a
+        levered strategy's financing cost is a floor here, not an estimate.
 
-        Until 0.8.5 the charge came only with ``cash_interest`` on, which
-        :func:`tradefloor.evaluate` and :func:`tradefloor.rank` leave off, so
-        every levered run there borrowed for free. On the 90 graded pt-v20
-        histories, 1.8 times the index beat the index by 2.33 points a year
-        and was ahead in 64% of one-year windows that way, against 0.21
-        points and 57% with the policy rate charged. A World calls this only
-        for a portfolio with ``cash_interest`` on; see
-        :class:`tradefloor.World` for why its own portfolios leave it off.
+        Until 0.8.5 nothing charged borrowing by default:
+        :func:`tradefloor.evaluate`, :func:`tradefloor.rank` and
+        :class:`tradefloor.World` all let a levered run borrow for free. On
+        the 90 graded pt-v20 histories, 1.8 times the index beat the index
+        by 2.33 points a year and was ahead in 64% of one-year windows that
+        way, against 0.21 points and 57% with the policy rate charged.
+        ``margin_interest=False`` restores free borrowing.
 
         Call it once per trading day. The harness calls it just before the
         close, so the day's interest is at the rate the day traded under and
@@ -756,7 +761,9 @@ class Portfolio:
         higher rate, and a 60/40 portfolio's bond sleeve was compared against
         cash that paid zero.
         """
-        if not self.cash_interest and self.cash >= 0:
+        if self.cash >= 0 and not self.cash_interest:
+            return 0.0
+        if self.cash < 0 and not self.margin_interest:
             return 0.0
         rate = engine.macro_fields["federal_funds_rate"]
         amount = self.cash * rate / 252.0

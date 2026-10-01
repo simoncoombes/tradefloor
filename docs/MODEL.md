@@ -1971,13 +1971,15 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 ### Cash and borrowing
 
 An agent's portfolio pays no commission and no fee to borrow shares for a
-short. With `cash_interest=False`, the default in `tf.evaluate`, cash earns
-nothing and a negative cash balance costs nothing, so leverage up to the
-default `max_leverage` of 2 is free. With `cash_interest=True`,
-`Portfolio.accrue` pays or charges `cash * r_p / 252` a day at the policy
-rate $r^{p}$, which is below any broker's margin rate, so a levered
-strategy's financing cost is a floor. Changing the default would change
-every `evaluate` result, so it waits for a minor release.
+short. Once a day, before the close, `Portfolio.accrue` books
+`cash * r_p / 252` at the policy rate $r^{p}$ the market publishes that
+day. A negative balance, which is borrowing, is charged it by default in
+`tf.evaluate`, `tf.rank` and `World` (`margin_interest=True`). The policy
+rate is below any broker's margin rate, so a levered strategy's financing
+cost is a floor. A positive balance earns it only with `cash_interest=True`,
+which is off by default. `margin_interest=False` makes borrowing free, as
+it was in every run before 0.8.5. The charge changes cash, net worth and
+scores, and never a price.
 
 ## The agent's observation
 

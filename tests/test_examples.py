@@ -429,21 +429,21 @@ def test_the_claude_example_offers_every_factor_the_harness_scores(monkeypatch):
     """The answer Claude may give is the list `evaluate` scores against.
 
     It was a list typed out in the example, and it fell behind the harness
-    three times. The last time it missed `fair_value_shift`, which pt-v20
-    scores as the day's answer on about two days in five of the example's
-    market, so Claude was marked wrong on days it could not give the right
-    answer. The schema Claude is handed and the prompt it reads must both
-    carry every name.
+    three times. The schema Claude is handed and the prompt it reads must
+    both carry every name the harness can score, and no other:
+    `fair_value_shift` moves no price and is never the answer (decision 8),
+    so offering it would only offer a wrong answer.
     """
     import typing
-    from tradefloor.harness import FACTOR_NAMES
+    from tradefloor.harness import DRIVER_NAMES
 
     ex = _load_claude_example(monkeypatch)
-    assert typing.get_args(ex.Factor) == FACTOR_NAMES
+    assert typing.get_args(ex.Factor) == DRIVER_NAMES
     schema = ex.Decision.model_json_schema()["properties"]["driver"]
-    assert schema["enum"] == list(FACTOR_NAMES)
-    missing = [name for name in FACTOR_NAMES if name not in ex.SYSTEM]
+    assert schema["enum"] == list(DRIVER_NAMES)
+    missing = [name for name in DRIVER_NAMES if name not in ex.SYSTEM]
     assert not missing, f"the system prompt never names {missing}"
+    assert "fair_value_shift" not in ex.SYSTEM
 
 
 class _StandInMessages:
@@ -471,7 +471,7 @@ def test_the_claude_example_names_the_driver_of_the_day_it_is_scored_on(
         monkeypatch):
     """Asked on the day's last step, and scored on that day only.
 
-    `evaluate` calls `explain(day)` after the day's last step and checks the
+    `evaluate` calls `explain(day)` after the day's close and checks the
     answer against that day's attribution. The example used to ask Claude at
     the open, when all it could see was yesterday's moves, so its answer was
     about one day and scored on the next. A day whose call failed also
@@ -483,7 +483,7 @@ def test_the_claude_example_names_the_driver_of_the_day_it_is_scored_on(
     import tradefloor as tf
 
     ex = _load_claude_example(monkeypatch)
-    answers = ["fair_value_shift", None, "random_noise"]
+    answers = ["jump", None, "random_noise"]
     messages = _StandInMessages(ex, answers)
     trader = ex.ClaudeTrader(client=types.SimpleNamespace(messages=messages))
     asked_at = []

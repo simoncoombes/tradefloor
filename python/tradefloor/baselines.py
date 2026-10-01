@@ -140,7 +140,7 @@ if TYPE_CHECKING:
 from ._arith import ordered_sum
 from ._core import Engine, GameRng, ValidationError, check_seed
 from ._core import rate_specs as _rate_specs
-from .harness import FACTOR_NAMES, Observation
+from .harness import DRIVER_NAMES, Observation
 from .sandbox import economy_of, hidden_state
 
 # The stream the random baseline draws on. Distinct from the market stream, so
@@ -620,7 +620,7 @@ class Oracle:
         The engine the Oracle remembers for `explain` belongs to the world
         it was reading, and a fork runs a different engine, so the copy
         forgets it and picks its own up at its first `act`. A fork happens
-        between days, and `explain` is asked only after a day's steps, so
+        between days, and `explain` is asked only after a day's close, so
         nothing reads the gap. Until 0.8.5 there was no hook, and the
         world's fallback `copy.deepcopy` raised on the engine.
         """
@@ -762,9 +762,9 @@ class Oracle:
         """
         if self._engine is None:
             return None
-        best: FactorName = FACTOR_NAMES[0]
+        best: FactorName = DRIVER_NAMES[0]
         largest = -1.0
-        for factor in FACTOR_NAMES:
+        for factor in DRIVER_NAMES:
             total = 0.0
             for value in _f64(self._engine.attribution(factor)):
                 total += abs(value)
