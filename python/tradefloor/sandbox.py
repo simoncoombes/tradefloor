@@ -108,10 +108,16 @@ interpreter (``gc``, frame objects, a closure's cells, this module's table)
 reaches the engine. The hash check catches any write and the copy count any
 fork or snapshot, however the engine was reached. Neither sees a read. A
 hidden column read through the reached engine leaves the card clean. So does
-a second engine run ahead after being built from a guessed seed, or rebuilt
-by replaying the live engine's ``order_log``, because neither calls a copy
-method. For code you do not trust, run it out of process against the MCP
-server, where strategies are data and there is no Python to submit.
+a second engine built and run ahead, because building one calls no copy
+method. The agent does not have to guess the seed for this: the harness's
+own frames hold ``seed`` and ``universe`` as locals, and ``sys._getframe``
+walks up to them from inside ``act``. An agent that read them that way,
+built ``tf.Engine(seed=seed, universe=universe)`` and ran it to the end of
+the run earned +3.1% to +8.2% in five days against buy-and-hold's +0.2% to
++2.3% on four seeds, with ``tampered=False`` and no error. Rebuilding by
+replaying the live engine's ``order_log`` is the same route. For code you
+do not trust, run it out of process against the MCP server, where
+strategies are data and there is no Python to submit.
 """
 
 from __future__ import annotations

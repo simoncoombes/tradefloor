@@ -315,6 +315,17 @@ class History:
     published figures the day traded under, so ``cycle`` and ``gdp_growth``
     are the published ones.
 
+    On pt-v20 the close is the day's last print, and it is not the price
+    the next session starts from. The market's close comes after the bar is
+    read and re-marks every name, and the next day's first step shows the
+    re-marked price. On 20 names over 40 days (``Universe.random(20,
+    seed=5)``, seed 3) the next day's first price differed from the bar's
+    close by 14.8 bp at the median and 57.6 bp at most, and never matched
+    it. On presets through pt-v19 the close re-marks nothing and the two
+    are equal. A broker's daily bar closes at the official close, so on
+    pt-v20 an ATR or a breakout level computed from these bars sits a
+    little off one computed from a broker's.
+
     ```python
     def act(self, obs):
         bars = obs.history.bars("AAA", last=20)

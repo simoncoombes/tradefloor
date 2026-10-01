@@ -153,6 +153,59 @@ is a native Tradefloor agent and implements `act` directly.
 
 An async function works too, driven through `common.run_sync`.
 
+### A function that calls a model
+
+When `rule` calls a language model, two arguments decide what a recorded
+run tests in CI.
+
+```python
+import json
+from tradefloor.integrations.callable import callable_agent
+from tradefloor.integrations.common import AdapterInfo, Transcript, digest
+
+PROMPT = "You manage a portfolio..."
+
+def ask_model(payload: dict) -> str:
+    return call_my_model(system=PROMPT, user=json.dumps(payload))
+
+def to_decision(raw: str, payload: dict) -> dict:
+    decision = parse_my_tool_call(raw)
+    return cap_to_buying_power(decision, payload)
+
+info = AdapterInfo(framework="callable", instructions_digest=digest(PROMPT))
+
+# Record once, live.
+recorder = Transcript()
+live = callable_agent(ask_model, postprocess=to_decision, info=info,
+                      mode="live", recorder=recorder)
+tf.evaluate({"copilot": live}, seed=100, universe=roster, days=10)
+recorder.save("copilot.json")
+
+# Replay in CI, with no key and no model function.
+replay = callable_agent(postprocess=to_decision, info=info, mode="replay",
+                        transcript=Transcript.load("copilot.json"))
+```
+
+`postprocess` is the code that runs after the model answers. The transcript
+holds what `ask_model` returned, the raw response, and a replay hands that
+back without calling `ask_model`. `to_decision(raw, payload)` then runs in
+both modes and returns the decision, so a change to the parsing, a risk
+check or the sizing is exercised by every replay. Code of that kind left
+inside `ask_model` is recorded as its output and never runs on replay.
+Without `postprocess`, whatever `ask_model` returns is the decision, as
+before.
+
+`instructions_digest` is the prompt guard. The callable adapter's replay key
+is the payload alone, and the system prompt is not in it, so a replay under
+an edited prompt matches every recorded key and completes. With
+`AdapterInfo(instructions_digest=digest(PROMPT))` on both the recording and
+the replay, the digest is written into the transcript's meta, and a replay
+built with a different one is refused with a `ValidationError` when the
+adapter is built. With no `AdapterInfo`, or one whose `instructions_digest`
+is empty, the replay is not checked. The framework adapters below record
+their own instructions; the callable adapter cannot see inside your
+function, so you have to name the prompt.
+
 ## OpenAI Agents SDK
 
 ```bash
@@ -347,10 +400,21 @@ and no network reached. An experiment that cost real money to record is
 therefore reproducible by anyone, for nothing.
 
 The key derives from the input and never from a step number. Change the
-roster, the seed, the cadence or the instructions and the key goes missing:
-the run stops and names the step it stopped at. Keyed by position, a replay
+roster, the seed or the cadence and the key goes missing: the run stops with
+`ReplayMiss` and names the step it stopped at. Keyed by position, a replay
 would answer the new question with the answer given to the old one, and
 nothing in the output would say so.
+
+Instructions are a separate case, because most adapters do not send them in
+the input the key is computed over. LangGraph renders its `instructions`
+into that input, so changing them moves the key as above. The OpenAI Agents,
+PydanticAI and FinRobot adapters record a digest of their instructions in
+the transcript's meta, and a replay under different instructions is refused
+when the adapter is built, before the market opens. The callable adapter
+checks only when you give it `AdapterInfo(instructions_digest=...)`, as
+[the plain Python section](#a-function-that-calls-a-model) shows. Without
+that, a callable replay under a changed prompt runs to the end on the old
+answers.
 
 ## The agent's own noise floor
 

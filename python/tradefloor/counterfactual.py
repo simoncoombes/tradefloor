@@ -252,7 +252,8 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
             "a World takes agent= or agents=, and exactly one of them. "
             "agent=MyAgent() is one trader with one portfolio; "
             "agents={'a': A(), 'b': B()} is a cohort in one market, each "
-            "with its own portfolio and its own leverage limit.")
+            "with its own portfolio, the same starting cash and the same "
+            "leverage limit.")
     from . import _checks
     if agents is None:
         # Checked here, before an engine is built. A class passed for an
@@ -323,10 +324,12 @@ class World:
 
     ``agents`` is the cohort form, ``{label: agent}``, and exactly one of it
     and ``agent`` is given. Each label gets its own portfolio against this
-    one engine, on the terms the module docstring sets out. ``cash`` and
-    ``max_leverage`` are per agent, so a three-agent cohort starts with
-    three times the capital of a one-agent world and each of the three is
-    capped on its own book.
+    one engine, on the terms the module docstring sets out. Every agent
+    starts with the same cash: ``cash`` is one number, and each label gets
+    that amount in its own account, so a three-agent cohort starts with
+    three times the capital of a one-agent world. There is no per-agent
+    cash; ``cash={"a": 1e6, "b": 5e6}`` is refused. ``max_leverage`` is
+    one setting for the whole cohort, applied to each agent's own book.
 
     Agents are sandboxed as :func:`tradefloor.evaluate` sandboxes them: each
     observation carries a read-only market view and a read-only view of the

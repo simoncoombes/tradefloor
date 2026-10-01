@@ -130,7 +130,10 @@ days already recorded (a World run with `record=True`; `tf.evaluate` records
 none), the published macro fields, the curve and which names have news today.
 `obs.history` holds a daily bar per name and the published macro for every
 day the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`,
-and needs no extra package.
+and needs no extra package. A bar's close is the day's last print. On
+pt-v20 the market's close then re-marks every name, so the next day starts
+from a different price: 15 bp away at the median on a 20-name roster. A
+broker's daily bar closes at the official close.
 `obs.portfolio` reads the agent's own positions and cannot trade. Forking the
 engine, writing to it and reading the hidden state all raise
 `tf.SandboxError`. The hidden state includes the true business-cycle phase;
@@ -157,8 +160,12 @@ Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
 Python process, on the same seed, so the first agent can leave the price path
 in a class variable for a later one, and nothing detects it. The read-only
 view guards against accidents, and an agent written to cheat can get round
-it. To compare agents you did not write, or two that might share state, run
-each in its own process.
+it. One way round it is unflagged: `tf.evaluate`'s own frames hold the
+`seed` and the `universe`, an agent can read them through `sys._getframe`,
+build a second `tf.Engine` from them and run it ahead. The copy count does
+not see a newly built engine, so the card says `tampered=False`. To compare
+agents you did not write, or two that might share state, run each in its own
+process.
 
 In a `World` with several agents, orders placed at the same step execute in
 label order, alphabetical, for the whole run. Two identical buyers of 10% of
@@ -473,6 +480,20 @@ which says what each framework contributes and what tradefloor keeps. They
 run from a clone of this repository, because they read recorded runs from its
 `tests/fixtures/`.
 
+To test your own model-calling function this way, two arguments of
+`callable_agent` matter. `postprocess=to_decision` runs
+`to_decision(raw, payload)` on what the function returned, in a live run and
+in a replay, so the parsing, risk checks and sizing written there are tested
+by every replay. The transcript holds the raw response, and code left inside
+the function after the model call runs live only. The callable adapter's
+replay key is the payload, which does not include your system prompt, so
+pass `info=AdapterInfo(framework="callable", instructions_digest=digest(PROMPT))`
+when you record and when you replay. A replay under a different prompt is
+then refused when the adapter is built. Without it the replay runs on the
+old answers. The "Plain Python" section of
+[`examples/integrations/README.md`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/README.md)
+has the whole pattern.
+
 Some things multi-agent research needs are not supported yet. Every agent in a
 `World` starts with the same cash. There is no
 multi-agent Gymnasium environment, and the Gymnasium reward is the step's
@@ -549,9 +570,10 @@ In the text, say which model you used, for example: "tradefloor 0.8.5,
 preset pt-v20, specified in its docs/MODEL.md". To let a reader rerun a
 result, publish its `RunManifest`: it records the version, preset, seed,
 universe, macro state and scenario, and `reproduce()` stops on a mismatch.
-It checks the market and does not recompute a score: an edited `pnl` in a
-manifest's result block passes, and `tf.evaluate` and `tf.rank` write no
-manifest. A published score has to be rerun to be checked.
+It checks the market and carries no score: its `result` block holds the
+market's `digest`, the number of `days` and `draws_consumed`, and
+`tf.evaluate` and `tf.rank` write no manifest. A published score has to be
+rerun to be checked.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 says which release to pin for a long study.
 

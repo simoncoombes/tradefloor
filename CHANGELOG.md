@@ -746,7 +746,9 @@ they raised on every call.
 
 This is a guard and not a security boundary. Code in the same process can
 still walk the interpreter to the engine, and any write it makes is caught,
-but a second engine it builds from a guessed seed writes nothing and is not.
+but a second engine it builds and runs ahead writes nothing and is not. It
+need not guess the seed: the harness's frames hold `seed` and `universe` as
+locals, and `sys._getframe` reaches them from inside `act`.
 
 **What breaks.** An agent that called anything on `obs.engine` beyond the
 view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
