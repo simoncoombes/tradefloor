@@ -504,7 +504,10 @@ def test_whatever_float_reads_trades_and_a_bool_or_complex_does_not():
     good = {"float": 10.0, "decimal": decimal.Decimal("10"),
             "fraction": fractions.Fraction(10), "array0d": np.array(10.0),
             "float32": np.float32(10)}
-    bad = {"np_bool": (np.bool_(True), "got True (bool_)"),
+    # numpy 2 prints a bool scalar as np.True_ and names its type bool;
+    # numpy 1 prints True and names it bool_. Either is the refusal.
+    np_bool_said = f"got {np.bool_(True)!r} ({type(np.bool_(True)).__name__})"
+    bad = {"np_bool": (np.bool_(True), np_bool_said),
            "bool0d": (np.array(True), "got array(True) (ndarray)"),
            "np_complex": (np.complex128(10), "got (10+0j) (complex128)"),
            "decimal_nan": (decimal.Decimal("NaN"), "must be finite, got nan")}

@@ -7948,7 +7948,7 @@ impl ModelParams {
     /// a non-shipped preset can never present as a standard one.
     ///
     /// The shipped presets' own digests are constants of the build, so they
-    /// are worked out once per process ([`shipped_digests`]) rather than on
+    /// are worked out once per process (in a private table) rather than on
     /// every call. The comparison is the one it was, in the same order.
     pub fn fingerprint(&self) -> String {
         let digest = self.digest();

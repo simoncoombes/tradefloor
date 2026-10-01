@@ -110,7 +110,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.83
       - name: Every target and feature builds on the oldest supported Rust
         working-directory: rust
-        run: cargo check --locked --all-targets --all-features
+        # No --locked: Cargo.lock is not committed (this is a library crate,
+        # and .gitignore lists it), so --locked has no lock file to hold the
+        # build to and stops at once. This resolves fresh, as a user's build
+        # does.
+        run: cargo check --all-targets --all-features
 
   batch:
     name: tests ${{ matrix.batch }}
