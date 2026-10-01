@@ -51,9 +51,10 @@ moved no digest.
       blockers or majors. Any finding goes back to E3 for a fix and a
       regrade, and every step from here is re-run on the fixed vector
       before the PR.
-- [ ] **The five LLM fixtures are re-recorded once**, with API keys. Until
-      then the 17 tests that replay them fail on this branch.
-- [ ] **The LangGraph fixture is re-recorded live after `rel085/fix-book`**
+- [x] **The LLM fixtures are re-recorded** live (2026-10-01): callable,
+      OpenAI Agents, PydanticAI, LangGraph, FinRobot rate-shock and the
+      liquidity-crisis study, plus example 08.
+- [x] **The LangGraph fixture is re-recorded live after `rel085/fix-book`** (done 2026-10-01, 60 calls; its replay tests pass)
       (`TRADEFLOOR_LIVE_EXAMPLES=1 python examples/integrations/langgraph/rate_shock.py --record`, with an
       Anthropic key). Its recording has a buy limit for HELX at 86.10 that
       the old flow filled for 1,425 shares on day 1 while HELX traded at
