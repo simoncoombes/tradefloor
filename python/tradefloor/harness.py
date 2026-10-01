@@ -525,7 +525,11 @@ class Scorecard:
     ``equity_curve``, starting from the cash the agent was given, and are
     annualised over 252 days. Sharpe subtracts no risk-free rate. Both are
     None with fewer than two days, and once net worth has been at or below
-    zero; Sharpe is None too when the returns did not vary.
+    zero; Sharpe is None too when the returns did not vary. The repr prints
+    ``sharpe=n/a (short run)`` for a run of fewer than
+    :attr:`SHARPE_MIN_DAYS` (20) scored days, because a Sharpe ratio from a
+    few days of returns is mostly noise: its standard error is about
+    ``sqrt(252 / days)``, 3.5 at 20 days. The property still returns it.
     ``exposure_curve`` is gross exposure as a multiple of net worth after
     each step's session (infinite once net worth is gone), and the other two
     read it: the share of steps that ended holding any position, and the
@@ -651,6 +655,10 @@ class Scorecard:
         #: zero. Read by `time_in_market` and `avg_gross_exposure`.
         self.exposure_curve = list(exposure_curve or [])
 
+    #: The fewest scored days the repr prints a Sharpe ratio for. Below it
+    #: the repr reads ``sharpe=n/a (short run)``.
+    SHARPE_MIN_DAYS = 20
+
     def _daily_returns(self) -> list[float] | None:
         """Each day's return along ``equity_curve``, from the starting
         cash, or None once net worth has been at or below zero."""
@@ -675,7 +683,8 @@ class Scorecard:
         their sample standard deviation, times the square root of 252, with
         no risk-free rate subtracted. None with fewer than two days, once
         net worth went to zero, or when the returns did not vary (an agent
-        that never traded). Five or ten days give a very noisy figure."""
+        that never traded). Five or ten days give a very noisy figure, so
+        the repr leaves it out below :attr:`SHARPE_MIN_DAYS` days."""
         daily = self._daily_returns()
         if daily is None or len(daily) < 2:
             return None
@@ -764,8 +773,12 @@ class Scorecard:
         if not self.equity_curve:
             return ""
         sharpe, vol = self.sharpe, self.volatility_pct
-        text = (f", sharpe={sharpe:+.2f}" if sharpe is not None
-                else ", sharpe=n/a")
+        if len(self.equity_curve) < self.SHARPE_MIN_DAYS:
+            text = ", sharpe=n/a (short run)"
+        elif sharpe is not None:
+            text = f", sharpe={sharpe:+.2f}"
+        else:
+            text = ", sharpe=n/a"
         if vol is not None:
             text += f", vol={vol:.1f}%"
         held, gross = self.time_in_market, self.avg_gross_exposure

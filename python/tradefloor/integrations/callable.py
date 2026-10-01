@@ -52,7 +52,9 @@ The key is the payload and nothing else, so a new system prompt inside
 ``fn`` does not change it. Put the prompt's digest in the adapter's
 ``AdapterInfo(instructions_digest=digest(PROMPT))`` when recording and when
 replaying, and a replay under a different prompt is refused at
-construction. A recorder whose ``meta`` does not name its instructions yet
+construction. Replaying a transcript that names a prompt digest with an
+adapter that names none (no ``AdapterInfo``, or one without
+``instructions_digest``) warns that this check is off. A recorder whose ``meta`` does not name its instructions yet
 is given the adapter's provenance on its first write, so the digest reaches
 the file without a manual ``meta.update``.
 
@@ -96,6 +98,7 @@ version is that the market still waits for every decision, one at a time.
 from __future__ import annotations
 
 import inspect
+import warnings
 from typing import Any, Callable
 
 from .._core import ValidationError
@@ -180,6 +183,16 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
         self.fn = fn
         self.name = name
         self.postprocess = postprocess
+        recorded = ((transcript.meta or {}).get("instructions_digest")
+                    if mode == "replay" and transcript is not None else None)
+        if recorded and not self.info.instructions_digest:
+            warnings.warn(
+                f"this transcript was recorded under instructions digest "
+                f"{recorded}, and this adapter names no instructions, so the "
+                "check that refuses a replay under a changed prompt is off. "
+                "Pass info=AdapterInfo(framework='callable', "
+                "instructions_digest=digest(PROMPT)) with the prompt fn "
+                "sends to turn it on.", UserWarning, stacklevel=2)
 
     def prepare(self, obs: Any, payload: dict[str, Any]) -> tuple[Any, Any]:
         # The payload IS both the key material and the input: nothing is
