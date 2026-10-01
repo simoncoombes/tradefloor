@@ -929,9 +929,11 @@ class World:
         broken one, and nobody asked for it.
 
         :class:`~tradefloor.integrations.common.DecisionError` only, which
-        covers both stages a decision can fail at -- output that does not
-        parse, and a well-formed order in a symbol this market does not
-        list. A :class:`FrameworkError` is not caught: the call never
+        is output that is not a decision at all. From decision schema 2 a
+        bad action inside a decision (an unknown side, a symbol this market
+        does not list) is refused on its own by the adapter, the rest of
+        the decision trades, and the refusal is in the step's ``decision``
+        rather than here. A :class:`FrameworkError` is not caught: the call never
         completed, the agent produced nothing to judge, and charging it a
         step would score a dropped connection as bad behaviour.
 
@@ -2284,9 +2286,17 @@ def _shape(decision: Any) -> tuple:
     the same answer. The quantity is in, because "buy 2,000" and "buy 200"
     are different decisions and collapsing them would understate the
     spread this function exists to measure.
+
+    A limit order carries its price as a fourth element, because a buy at
+    the market and a buy at a limit are different answers. A market order
+    stays a three-tuple, so every shape recorded before decision schema 2
+    reads as it did.
     """
-    return tuple(sorted((action.symbol, action.side, float(action.quantity))
-                        for action in decision.actions))
+    return tuple(sorted(
+        (action.symbol, action.side, float(action.quantity))
+        + (() if getattr(action, "limit_price", None) is None
+           else (float(action.limit_price),))
+        for action in decision.actions))
 
 
 def _net(decision: Any) -> float:

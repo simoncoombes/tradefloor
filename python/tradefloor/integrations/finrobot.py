@@ -134,9 +134,10 @@ and measures the same thing.
 
 FinRobot ships no structured-output mechanism: no Pydantic response model, no
 schema binding. So the contract is a JSON object requested in the mandate and
-validated here. :func:`parse` is strict and total. Anything it cannot turn
-into a well-formed :class:`Decision` raises :class:`DecisionError`, and the
-caller decides whether that ends the run or costs the agent a step.
+validated here. :func:`parse` is strict and total. A response it cannot
+read as a decision raises :class:`DecisionError`, and the caller decides
+whether that ends the run or costs the agent a step. A bad action inside a
+decision is refused on its own and the rest of the decision trades.
 
 ## Replay
 
@@ -178,9 +179,14 @@ from typing import Any, Sequence
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
 from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
-from .common import (AdapterInfo, FrameworkError, IntegrationError,
-                     MissingDependencyError)
+from .common import (OBSERVATION_SCHEMA_VERSION, AdapterInfo,
+                     FrameworkError, IntegrationError, MissingDependencyError)
+from .common import SIDES as _COMMON_SIDES
+from .common import Action as _CommonAction
+from .common import Decision as _CommonDecision
 from .common import DecisionError as _CommonDecisionError
+from .common import (_actions_from, _orders_from, open_orders_of,
+                     recorded_orders, refusal_lines, refuse_a_changed_payload)
 #: The shared digest, which hashes a mapping as canonical JSON. This module's
 #: own :func:`digest` takes the rendered prompt and is the replay key; it is
 #: deliberately str-only and does not change. This one is for hashing a
@@ -201,9 +207,11 @@ from .common import jsonable as _as_jsonable
 #: itself, so the two cannot drift apart over what a macro experiment covers.
 OBSERVABLE_MACRO = MACRO_FIELDS
 
-#: The sides a decision may name. HOLD carries no quantity and produces no
-#: order, so the agent can decline a decision period.
-SIDES = ("BUY", "SELL", "HOLD")
+#: The sides a decision may name: the shared contract's, so the two parsers
+#: cannot disagree. HOLD carries no quantity and produces no order, so the
+#: agent can decline a decision period. CANCEL withdraws the limit orders
+#: waiting on a symbol.
+SIDES = _COMMON_SIDES
 
 #: The only keys a decision object may carry, and the only keys an action may
 #: carry. Anything else is refused rather than dropped.
@@ -211,18 +219,18 @@ SIDES = ("BUY", "SELL", "HOLD")
 #: Silently ignoring an unknown field executes an instruction the agent did
 #: not give. A model that writes ``stop_loss`` believes it has protection and
 #: sizes accordingly; dropping the field buys at market with none, and the
-#: trace records a decision the agent never made. The two fields a model
-#: reaches for most -- ``order_type`` and ``limit_price`` -- get refusals
-#: naming the missing capability, because Tradefloor executes market sweeps
-#: only: ``Portfolio.execute`` takes a signed share count and sweeps the live
-#: book, and there is no resting order at the agent boundary.
+#: trace records a decision the agent never made. An unknown key at the top
+#: level refuses the decision. An unknown key on an action refuses that
+#: action, and the rest of the decision trades. ``order_type`` and
+#: ``limit_price`` make an action a limit order, from decision schema 2.
 DECISION_FIELDS = ("actions", "rationale")
-ACTION_FIELDS = ("symbol", "side", "quantity")
+ACTION_FIELDS = ("symbol", "side", "quantity", "order_type", "limit_price")
 
-#: Price rows kept for the recent-return and volatility lines. Five days at
-#: the library's six steps a day: long enough for a realised-volatility number
-#: to mean something, short enough to describe recent conditions.
-HISTORY_STEPS = 30
+#: Price rows kept for the recent-return and volatility lines: five days at
+#: the library's six steps a day, plus the row the five-day return starts
+#: from. The shared layer's value, and 30 until 0.8.5 (see
+#: ``common.HISTORY_STEPS``).
+HISTORY_STEPS = 31
 
 #: Fraction of an instrument's average daily volume one order may take.
 #: ``tradefloor.baselines.rebalance`` uses the same 2% for every shipped
@@ -234,8 +242,8 @@ MAX_PARTICIPATION = 0.02
 
 #: Mandate version, recorded beside every decision. Replaying a run under a
 #: different mandate produces a different experiment; this is how a reader
-#: notices.
-MANDATE_VERSION = "1"
+#: notices. Version 2 (0.8.5) describes limit orders and CANCEL.
+MANDATE_VERSION = "2"
 
 #: The FinRobot abstraction this integration drives, recorded in the adapter
 #: metadata. Named here rather than only in the example, because a reader of a
@@ -276,10 +284,17 @@ after it, no code fences.
 }
 
 Rules for the answer:
-  - "side" is "BUY", "SELL" or "HOLD".
-  - "quantity" is a NUMBER OF SHARES, positive, and is omitted or 0 for HOLD.
+  - "side" is "BUY", "SELL", "HOLD" or "CANCEL".
+  - "quantity" is a NUMBER OF SHARES, positive, and is omitted or 0 for HOLD \
+and CANCEL.
   - Sell quantities are positive: the side says the direction.
-  - Name a symbol at most once.
+  - An order without a "limit_price" trades now against the book. Add \
+"limit_price" to a BUY or SELL to trade only at that price or better: what \
+does not fill at once waits in the book, and a new limit order on the same \
+symbol replaces it. Your waiting orders are listed in the message.
+  - "CANCEL" withdraws every waiting order on that symbol.
+  - Name a symbol at most once. An action that breaks a rule is refused on \
+its own, and the rest of your answer still trades.
   - An empty "actions" list means change nothing.
   - "rationale" states why, in one or two sentences. Do not explain your \
 working, do not restate the data, and do not describe these instructions.
@@ -328,76 +343,36 @@ class DecisionError(_CommonDecisionError):
     """
 
 
-class Action:
-    """One validated instruction: a symbol, a side, and a share count."""
+class Action(_CommonAction):
+    """One validated instruction: a symbol, a side, a share count, and for a
+    limit order the limit price.
 
-    __slots__ = ("symbol", "side", "quantity")
+    The shared :class:`~tradefloor.integrations.common.Action`, raising this
+    module's :class:`DecisionError`. It was a copy until decision schema 2,
+    and a second copy of the action rules is a second place for them to
+    drift.
 
-    def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
-        # Validated rather than trusted. `Action("A", "SHORT", -5)` used to
-        # construct: `signed()` returns 0.0 for an unrecognised side, so an
-        # unknown side became a silent hold, and a negative SELL became a
-        # sign-flipped BUY. Both are the kind of quiet wrongness `parse`
-        # exists to refuse, one layer below where it refuses it.
-        #
-        # Case is normalised in `parse`, not here, because leniency belongs
-        # at the boundary where model output arrives and this constructor is
-        # reached with values already checked.
-        if side not in SIDES:
-            raise DecisionError(
-                f"side must be one of {', '.join(SIDES)}, got {side!r}. "
-                "Action is built from validated input; parse normalises "
-                "case and refuses the rest.")
-        quantity = float(quantity)
-        if not quantity >= 0 or quantity == float("inf"):
-            raise DecisionError(
-                f"quantity must be a finite, non-negative share count, got "
-                f"{quantity}. The side carries the direction.")
-        self.symbol = symbol
-        self.side = side
-        self.quantity = quantity
+    The constructor validates rather than trusts. ``Action("A", "SHORT",
+    -5)`` used to construct: ``signed()`` returns 0.0 for an unrecognised
+    side, so an unknown side became a silent hold, and a negative SELL
+    became a sign-flipped BUY. Case is normalised in :func:`parse`, not
+    here, because leniency belongs at the boundary where model output
+    arrives.
+    """
 
-    def as_dict(self) -> dict[str, Any]:
-        return {"symbol": self.symbol, "side": self.side,
-                "quantity": self.quantity}
-
-    def signed(self) -> float:
-        """The share delta this action asks for. HOLD is zero."""
-        if self.side == "BUY":
-            return self.quantity
-        if self.side == "SELL":
-            return -self.quantity
-        return 0.0
-
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, Action) and self.as_dict() == other.as_dict()
-
-    def __repr__(self) -> str:
-        if self.side == "HOLD":
-            return f"HOLD {self.symbol}"
-        return f"{self.side} {self.quantity:,.0f} {self.symbol}"
+    __slots__ = ()
+    _error = DecisionError
 
 
-class Decision:
-    """What FinRobot decided at one decision point, after validation."""
+class Decision(_CommonDecision):
+    """What FinRobot decided at one decision point, after validation.
 
-    __slots__ = ("actions", "rationale")
+    ``refused`` lists the actions that were refused on their own, each with
+    its reason; see the shared
+    :class:`~tradefloor.integrations.common.Decision`.
+    """
 
-    def __init__(self, actions: Sequence[Action], rationale: str = "") -> None:
-        self.actions = list(actions)
-        self.rationale = rationale
-
-    def as_dict(self) -> dict[str, Any]:
-        return {"actions": [a.as_dict() for a in self.actions],
-                "rationale": self.rationale}
-
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, Decision) and self.as_dict() == other.as_dict()
-
-    def __repr__(self) -> str:
-        if not self.actions:
-            return "Decision(no change)"
-        return "Decision(" + ", ".join(repr(a) for a in self.actions) + ")"
+    __slots__ = ()
 
 
 # -- observation -> FinRobot ------------------------------------------------
@@ -490,9 +465,14 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
         "portfolio": {
             "cash": portfolio.cash,
             "net_worth": equity,
-            "gross_exposure": portfolio.leverage(obs.engine),
+            # Gross exposure as a multiple of net worth. Called
+            # `gross_exposure` until 0.8.5, the name of the Portfolio
+            # method that returns dollars.
+            "leverage": portfolio.leverage(obs.engine),
             "max_leverage": limit,
             "buying_power": headroom,
+            # The agent's limit orders still waiting in the book.
+            "open_orders": open_orders_of(obs),
         },
     }
     if detail is not None:
@@ -603,6 +583,13 @@ def parse(text: str) -> Decision:
     Structural validation only: this checks that the answer is a decision.
     Whether the symbols exist and the sizes are executable belongs to
     :func:`orders_from`, which has the observation needed to answer it.
+
+    A response that is not a decision (no JSON object, no ``actions`` list,
+    an unknown top-level key) raises :class:`DecisionError`. A bad action
+    inside a decision does not: from decision schema 2 it is left out and
+    listed in :attr:`Decision.refused` with its reason, and the other
+    actions trade. The action rules are the shared layer's, so FinRobot and
+    every other adapter refuse the same actions.
     """
     if not isinstance(text, str) or not text.strip():
         raise DecisionError(
@@ -678,137 +665,36 @@ def parse(text: str) -> Decision:
         raise DecisionError(
             f"'actions' must be a list, got a {type(actions_raw).__name__}")
 
-    actions: list[Action] = []
-    for i, item in enumerate(actions_raw):
-        if not isinstance(item, dict):
-            raise DecisionError(
-                f"action {i} is a {type(item).__name__}, not an object with "
-                "'symbol' and 'side'")
-        symbol = item.get("symbol")
-        if not isinstance(symbol, str) or not symbol.strip():
-            raise DecisionError(
-                f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
-        side = item.get("side")
-        if not isinstance(side, str) or side.upper() not in SIDES:
-            raise DecisionError(
-                f"action {i} names side {side!r}, which is not one of "
-                f"{', '.join(SIDES)}")
-        side = side.upper()
-
-        # Named refusals for the two a model reaches for most, so the message
-        # says what the market cannot do rather than that a key was unexpected.
-        order_type = item.get("order_type")
-        if order_type is not None and not (isinstance(order_type, str)
-                                           and order_type.lower() == "market"):
-            raise DecisionError(
-                f"action {i} asks for order_type {order_type!r}. Tradefloor "
-                "executes market sweeps only -- Portfolio.execute takes a "
-                "signed share count and sweeps the live book, and there is no "
-                "resting order at the agent boundary -- so only 'market' is "
-                "accepted.")
-        if item.get("limit_price") is not None:
-            raise DecisionError(
-                f"action {i} carries a limit_price, and this market has no "
-                "limit orders at the agent boundary: Portfolio.execute sweeps "
-                "the live book at whatever price it gives. Dropping the field "
-                "silently would execute at market a trade the agent priced as "
-                "protected, so it is refused instead.")
-        unknown = sorted(set(item) - set(ACTION_FIELDS)
-                         - {"order_type", "limit_price"})
-        if unknown:
-            raise DecisionError(
-                f"action {i} carries {', '.join(unknown)}, which this market "
-                "has no execution path for. An action is "
-                f"{', '.join(ACTION_FIELDS)} and nothing else. Ignoring the "
-                "field would execute a trade the agent conditioned on "
-                "something it never got.")
-
-        quantity = item.get("quantity", 0)
-        if quantity is None:
-            quantity = 0
-        if isinstance(quantity, bool) or not isinstance(quantity, (int, float)):
-            raise DecisionError(
-                f"action {i} has quantity {quantity!r}, which is not a number "
-                "of shares")
-        quantity = float(quantity)
-        if quantity != quantity or quantity in (float("inf"), float("-inf")):
-            raise DecisionError(
-                f"action {i} has a non-finite quantity ({quantity})")
-        if quantity < 0:
-            raise DecisionError(
-                f"action {i} has quantity {quantity}, which is negative. The "
-                "side carries the direction, so a sell is SELL with a "
-                "positive quantity; a negative one is ambiguous about which "
-                "of the two the model meant.")
-        if side == "HOLD" and quantity:
-            raise DecisionError(
-                f"action {i} is a HOLD carrying quantity {quantity}. HOLD "
-                "means no trade; a quantity beside it does not say whether "
-                "the model wanted to buy it or to keep it.")
-        actions.append(Action(symbol.strip(), side, quantity))
-
-    seen = [a.symbol for a in actions]
-    duplicated = sorted({s for s in seen if seen.count(s) > 1})
-    if duplicated:
-        raise DecisionError(
-            f"symbols named more than once: {', '.join(duplicated)}. Two "
-            "instructions for one symbol have no defined order, so which one "
-            "reaches the market would depend on dict iteration.")
-
     rationale = raw.get("rationale", "")
     if rationale is None:
         rationale = ""
     if not isinstance(rationale, str):
         raise DecisionError(
             f"'rationale' must be a string, got a {type(rationale).__name__}")
-    return Decision(actions, rationale.strip())
+
+    # Each action on its own, by the shared rules: one that fails is
+    # refused with its reason and the rest of the decision trades.
+    actions, refused = _actions_from(actions_raw, Action)
+    decision = Decision(actions, rationale.strip(), refused)
+    decision.source = _as_jsonable(raw)
+    return decision
 
 
 def orders_from(decision: Decision, obs: Any, *,
                 max_participation: float = MAX_PARTICIPATION,
-                ) -> tuple[dict[str, float], list[str]]:
-    """Validated share deltas, plus a note for anything that was adjusted.
+                refused: list[dict[str, Any]] | None = None,
+                ) -> tuple[dict[str, Any], list[str]]:
+    """The orders to send, plus a note for anything that was adjusted.
 
-    The second half of validation, and the only thing that ever reaches
-    ``World._execute``. An unknown symbol raises: the model is trading an
-    instrument this market does not list, and executing the remaining actions
-    would execute half a plan the agent never made.
-
-    A size above the participation cap does not raise. It is clipped to the
-    cap and the clip comes back as a note. An oversized request is something
-    the agent did, so the trace says so. See ``MAX_PARTICIPATION``.
+    The shared :func:`~tradefloor.integrations.common.orders_from`, raising
+    this module's :class:`DecisionError` for an unlisted symbol when no
+    ``refused`` list is passed. With one, as :meth:`FinRobotAdapter.act`
+    passes it, the unlisted action is refused on its own and the rest
+    trade. A size above the participation cap is clipped and the clip comes
+    back as a note. See ``MAX_PARTICIPATION``.
     """
-    listed = list(obs.tickers)
-    orders: dict[str, float] = {}
-    notes: list[str] = []
-
-    for action in decision.actions:
-        if action.symbol not in listed:
-            raise DecisionError(
-                f"{action.symbol!r} is not listed in this market. The "
-                f"universe is {', '.join(listed)}.")
-        delta = action.signed()
-        if not delta:
-            continue
-        # A cap of zero IS a cap. `if cap > 0` once read "no volume to
-        # participate in" as "no cap at all": with avg_volume or
-        # max_participation at zero, a 1e12-share order passed through whole
-        # with no note, while the payload showed the agent max_order_shares
-        # of exactly 0.0 -- the observation and the enforcement stating
-        # opposite things. Clipped to zero, the order falls out as dust
-        # below and the note says what happened.
-        cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
-        if abs(delta) > cap:
-            notes.append(
-                f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
-                f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
-                "daily volume)")
-            delta = cap if delta > 0 else -cap
-        # Below one share is dust: it generates a trade every step and turns
-        # turnover, which the comparison reports, into noise.
-        if abs(delta) >= 1.0:
-            orders[action.symbol] = delta
-    return orders, notes
+    return _orders_from(decision, obs, max_participation=max_participation,
+                        refused=refused, unlisted=DecisionError)
 
 
 # -- recording and replay ---------------------------------------------------
@@ -1109,6 +995,8 @@ class FinRobotAdapter:
         #: :meth:`state` publishes the parts a fork has to agree on.
         self.record: list[dict[str, Any]] = []
         self._decision: dict[str, Any] | None = None
+        #: The actions refused at the last :meth:`act`; see :meth:`refusals`.
+        self._refusals: list[str] = []
         self._assistant: Any = None
         #: What ran, for ``Transcript.meta`` and for a manifest citation.
         #: Built here rather than at module scope because ``mode`` and
@@ -1175,6 +1063,7 @@ class FinRobotAdapter:
         as the same agent, and the participation cap, which decides what
         "clipped" means in the record."""
         out = self.info.as_dict()
+        out["observation_schema_version"] = OBSERVATION_SCHEMA_VERSION
         out["decision_every_steps"] = self.every
         out["max_participation"] = self.max_participation
         if self.panel:
@@ -1192,17 +1081,19 @@ class FinRobotAdapter:
 
     # -- the agent protocol ----------------------------------------------
 
-    def act(self, obs: Any) -> dict[str, float]:
-        """Share deltas for this step. Empty on the steps between decisions.
+    def act(self, obs: Any) -> dict[str, Any]:
+        """The orders for this step. Empty on the steps between decisions.
 
         The market advances every step; FinRobot is asked every ``every``
         steps. On the steps in between, this records the prices it saw and
         returns nothing. A human manager watches the book continuously and
-        revisits it on a schedule.
+        revisits it on a schedule. Each value is a signed share count, a
+        :class:`tradefloor.Limit` or a :class:`tradefloor.Cancel`.
         """
         self.history.append(list(obs.prices))
         if len(self.history) > HISTORY_STEPS:
             self.history.pop(0)
+        self._refusals = []
 
         if obs.step % self.every:
             return {}
@@ -1241,8 +1132,11 @@ class FinRobotAdapter:
                 f"a decision: {exc}") from exc
 
         decision = parse(response)
+        refused = decision.refused
         orders, notes = orders_from(
-            decision, obs, max_participation=self.max_participation)
+            decision, obs, max_participation=self.max_participation,
+            refused=refused)
+        self._refusals = refusal_lines(refused)
 
         self._decision = {"step": obs.step, **decision.as_dict()}
         self.record.append({
@@ -1263,10 +1157,17 @@ class FinRobotAdapter:
             "prompt": prompt,
             "response": response,
             "decision": decision.as_dict(),
-            "orders": dict(orders),
+            "orders": recorded_orders(orders),
             "clipped": notes,
         })
         return orders
+
+    def refusals(self) -> list[str]:
+        """The actions refused at the last call to :meth:`act`, one line
+        each, which :func:`tradefloor.evaluate` writes to the scorecard's
+        ``errors``. See :meth:`FrameworkAdapter.refusals
+        <tradefloor.integrations.common.FrameworkAdapter.refusals>`."""
+        return list(self._refusals)
 
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
@@ -1351,6 +1252,7 @@ class FinRobotAdapter:
             # mandate for something neither of them did. Shared with the
             # other adapters rather than restated: which market a recording
             # was made in is not a FinRobot question.
+            refuse_a_changed_payload(self.transcript)
             refuse_a_changed_preset(self.transcript, preset_of(obs))
             # `entry_for`, not `response_for`. The latter returns None both
             # for a missing entry and for an entry whose recorded response is

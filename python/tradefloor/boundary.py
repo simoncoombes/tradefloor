@@ -352,9 +352,17 @@ def describe_shape(shape: tuple | None) -> str:
         return "-"
     if not shape:
         return "no change"
-    return "; ".join(f"{side} {quantity:,.0f} {symbol}"
-                     if side != "HOLD" else f"HOLD {symbol}"
-                     for symbol, side, quantity in shape)
+    return "; ".join(_describe_action(*action) for action in shape)
+
+
+def _describe_action(symbol: str, side: str, quantity: float,
+                     limit: float | None = None) -> str:
+    """One element of a shape: ``BUY 100 NOVA``, ``SELL 50 HELX limit 9.5``,
+    ``HOLD NOVA`` or ``CANCEL NOVA``."""
+    if side in ("HOLD", "CANCEL"):
+        return f"{side} {symbol}"
+    text = f"{side} {quantity:,.0f} {symbol}"
+    return text if limit is None else f"{text} limit {limit:g}"
 
 
 def _entry_prompt(arm: World, step: int) -> str | None:

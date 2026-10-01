@@ -57,9 +57,13 @@ change to who the agent is.
 ``output_type`` is ``common.decision_model()``, the shared Pydantic
 rendering of ``common.decision_schema()``, bound in strict mode. The
 provider then constrains generation to the contract: the side enum, the
-non-negative quantity, ``additionalProperties: false`` -- which is what
-stops a model inventing ``order_type`` or ``limit_price``, fields this
-market has no execution path for.
+non-negative quantity, the optional ``order_type`` and ``limit_price`` of a
+limit order, and ``additionalProperties: false``, which stops a model
+inventing a ``stop_loss`` or another field this market has no execution
+path for. The rules a schema cannot state (a limit order needs a price,
+HOLD carries no quantity) are applied by ``parse_decision`` one action at a
+time, so a bad action is refused and the rest of the decision trades
+rather than the SDK failing the whole output.
 
 What binding it does NOT buy, measured rather than assumed: on
 ``openai-agents`` 0.22.0 there is no client-side retry when validation

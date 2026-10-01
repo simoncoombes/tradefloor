@@ -396,7 +396,8 @@ def test_a_schema_violation_is_a_decision_error_carrying_its_cause():
     assert isinstance(excinfo.value.__cause__, UnexpectedModelBehavior)
     assert isinstance(excinfo.value.__cause__.__cause__,
                       PydanticValidationError)
-    assert "'BUY', 'SELL' or 'HOLD'" in str(excinfo.value.__cause__.__cause__)
+    assert "'BUY', 'SELL', 'HOLD' or 'CANCEL'" in str(
+        excinfo.value.__cause__.__cause__)
 
 
 def test_a_text_answer_produces_the_same_message_and_a_different_cause():
@@ -861,9 +862,19 @@ def test_the_mandate_names_both_size_limits():
     assert "max_order_shares" in MANDATE
     assert "buying_power" in MANDATE
     assert "max_leverage" in MANDATE
-    assert MANDATE_VERSION == "2", (
+    assert MANDATE_VERSION == "3", (
         "the mandate changed meaning, so the version must move with it -- a "
         "transcript recorded under the old text is a different experiment")
+
+
+def test_the_mandate_describes_limit_orders_and_cancel():
+    """Version 3: the decision contract accepts limit orders and CANCEL
+    (decision schema 2), so the mandate stops saying there are none, and
+    points at the waiting orders in the payload."""
+    assert "no limit prices" not in MANDATE
+    assert "`limit_price`" in MANDATE
+    assert "CANCEL" in MANDATE
+    assert "`portfolio.open_orders`" in MANDATE
 
 
 def test_a_recording_stamps_what_it_ran_under_without_being_asked():

@@ -339,7 +339,7 @@ def analyse(state: TradeState) -> dict[str, Any]:
     lines = [
         f"policy rate {macro['federal_funds_rate']:.2%}, "
         f"corporate bond yield {macro['corporate_bond_yield']:.2%}",
-        f"equity {book['net_worth']:,.0f}, gross {book['gross_exposure']:.2f}x "
+        f"equity {book['net_worth']:,.0f}, gross {book['leverage']:.2f}x "
         f"of {book['max_leverage']}x, buying power "
         f"{(book['buying_power'] or 0):,.0f}",
     ]

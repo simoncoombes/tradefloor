@@ -187,6 +187,28 @@ def test_default_textrenderer_matches_finrobot_render_with_a_held_position():
     assert TextRenderer().render(payload) == fr.render(payload)
 
 
+def test_the_text_shows_leverage_and_the_waiting_limit_orders():
+    """Observation payload 1 (0.8.5): `leverage` replaces `gross_exposure`,
+    and the agent's waiting limit orders are listed, because an agent that
+    sends them needs to see which are still working. A payload without
+    `open_orders` (built before the key existed) reads "none"."""
+    world = small_world(n=4, days=2)
+    ticker = world.engine.tickers[0]
+    bid = world.engine.book(ticker).best_bid
+    world.portfolio.submit_limit(world.engine, ticker, 200, bid * 0.9)
+    payload = fr.observe(_observation(world), history=[], fundamentals={})
+    text = TextRenderer().render(payload)
+    assert "leverage" in text and "gross exposure" not in text
+    waiting = payload["portfolio"]["open_orders"]
+    assert len(waiting) == 1 and waiting[0]["remaining"] == 200
+    assert "Waiting limit orders:" in text
+    assert f"  {ticker:<8} BUY  200 shares at" in text
+    french = TextRenderer(language="fr").render(payload)
+    assert "Ordres a cours limite en attente :" in french
+    payload["portfolio"].pop("open_orders")
+    assert "Waiting limit orders:\n  none" in TextRenderer().render(payload)
+
+
 def test_default_textrenderer_plus_objective_matches_finrobot_render():
     """The "Objective" section is concatenated by the ADAPTER, not
     rendered -- see `FinRobotAdapter.act`. This is the concatenation
@@ -496,6 +518,7 @@ def test_jsonrenderer_refuses_a_fundamentals_value_it_cannot_encode():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_finrobot_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_finrobot_rate_shock",
                     REPO / "examples" / "integrations" / "finrobot"
@@ -524,6 +547,7 @@ def test_finrobot_default_renderer_replays_the_shipped_fixture():
         "prompts byte for byte")
 
 
+@pytest.mark.needs_live_model
 def test_langgraph_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_langgraph_rate_shock",
                     REPO / "examples" / "integrations" / "langgraph"
@@ -547,6 +571,7 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
+@pytest.mark.needs_live_model
 def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_pydantic_ai_rate_shock",
                     REPO / "examples" / "integrations" / "pydantic_ai"
@@ -628,6 +653,7 @@ def test_openai_agents_provenance_carries_the_renderer_key():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_two_identical_renderers_give_identical_decisions_on_the_fixture():
     """`invariance` proper needs a `renderer` attribute and a live fork;
     this is the narrower claim it rests on -- two SEPARATELY CONSTRUCTED
@@ -716,6 +742,7 @@ def test_invariance_fork_agreement_holds_on_a_real_finrobot_adapter():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     """The design note's claim: "against a recorded agent only renderers
     with recordings replay; the others are reported as unrecorded."
@@ -771,6 +798,7 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     assert other.key() in report.render()
 
 
+@pytest.mark.needs_live_model
 def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
     """Round 2, finding 1: asking for `days` more than the transcript
     covers used to catch the exception at the WHOLE `run()` call, so the

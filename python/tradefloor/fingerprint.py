@@ -369,8 +369,8 @@ def _group_by_cell(
 def _decision_from_shape(shape: Sequence[Sequence[Any]]) -> Decision:
     from .integrations.common import Action, Decision
 
-    return Decision([Action(symbol, side, quantity)
-                     for symbol, side, quantity in shape])
+    # A limit order's shape carries its price as a fourth element.
+    return Decision([Action(*action) for action in shape])
 
 
 # ---------------------------------------------------------------------------

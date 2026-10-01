@@ -426,7 +426,9 @@ def test_the_decision_contract_is_bound_as_the_output_type():
         "contract")
     rendered = json.dumps(schema.json_schema())
     assert "actions" in rendered and "BUY" in rendered
-    assert "order_type" not in rendered and "limit_price" not in rendered
+    # Decision schema 2: limit orders and CANCEL reach the provider as
+    # schema, under strict mode.
+    assert "limit_price" in rendered and "CANCEL" in rendered
 
 
 @needs_sdk
@@ -758,12 +760,16 @@ def test_a_transport_failure_is_a_framework_error_not_a_decision_error():
 
 
 @needs_sdk
-def test_the_bound_model_refuses_a_hold_carrying_a_quantity():
-    """The rule lives in `decision_model`, and this proves it survives the
-    SDK's strict-schema rendering rather than being dropped on the way."""
-    adapter = make_agent(lambda p: answer(act("TECH_A", "HOLD", 500)))
-    with pytest.raises(ci.DecisionError):
-        contract.make_world(adapter).run(days=1)
+def test_a_hold_carrying_a_quantity_is_refused_on_its_own():
+    """Decision schema 2. The bound model used to refuse this, and the SDK
+    makes one call and raises on an invalid response, so one bad action
+    lost the whole decision. The rule moved to `parse_decision`, which
+    refuses the HOLD and lets the BUY beside it trade."""
+    world, adapter = run_world(lambda p: answer(
+        act("TECH_A", "BUY", 2000), act("DEFENSIVE_A", "HOLD", 500)))
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    refused = adapter.record[0]["decision"]["refused"]
+    assert len(refused) == 1 and "HOLD" in refused[0]["reason"]
 
 
 @needs_sdk
@@ -774,12 +780,15 @@ def test_the_bound_model_refuses_a_negative_quantity():
 
 
 @needs_sdk
-def test_an_unlisted_symbol_is_a_market_refusal_not_a_decision_error():
-    """Well-formed output the market cannot take. The SDK validated it
-    happily, because the SDK does not know what is listed here."""
-    adapter = make_agent(lambda p: answer(act("NOT_LISTED", "BUY", 100)))
-    with pytest.raises(ci.MarketRefusalError, match="NOT_LISTED"):
-        contract.make_world(adapter).run(days=1)
+def test_an_unlisted_symbol_is_refused_on_its_own():
+    """Well-formed output the market cannot take. The SDK validated it,
+    because the SDK does not know what is listed here, and the market
+    stage refuses that action alone."""
+    world, adapter = run_world(lambda p: answer(
+        act("NOT_LISTED", "BUY", 100), act("TECH_A", "BUY", 2000)))
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    refused = adapter.record[0]["decision"]["refused"]
+    assert len(refused) == 1 and "NOT_LISTED" in refused[0]["reason"]
 
 
 @needs_sdk

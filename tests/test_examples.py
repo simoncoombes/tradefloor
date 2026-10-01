@@ -358,6 +358,7 @@ def test_the_claude_example_refuses_when_every_decision_fails():
         f"printed the leaderboard for a run Claude was never reached in. Output: {tail}")
 
 
+@pytest.mark.needs_live_model
 def test_the_liquidity_crisis_study_replays_its_recording():
     """The study's first shared day, replayed from its fixture, NOT behind
     the slow flag.
