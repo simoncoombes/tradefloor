@@ -220,6 +220,8 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_cycle_pin_phase": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "market_vol_cycle_trough_release": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "market_vol_cycle_release_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
+    "market_vol_cycle_recovery_release": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_recovery_scale": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 2.0)},
     "vix_stress_premium": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
     "vix_stress_premium_knee": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
     "vix_stress_premium_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},

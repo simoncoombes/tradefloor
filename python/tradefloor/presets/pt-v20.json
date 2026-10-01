@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v20",
   "fingerprint": "pt-v20",
-  "coefficient_digest": "c50db01587fb8ec598b01b7521c459726499bee6ae3b281df477eff689f720f0",
+  "coefficient_digest": "82c6a42a2e294e964d2f96c017d643014a5f10e3d60bfe19b72be76837f2bd75",
   "coefficients": {
     "book_arrival_shuffle": 0.0,
     "book_cross_at_limit": 0.0,
@@ -185,6 +185,8 @@
     "market_vol_cycle_pin_neutral": 0.0,
     "market_vol_cycle_pin_phase": 0.0,
     "market_vol_cycle_ratio": 0.0,
+    "market_vol_cycle_recovery_release": 0.0,
+    "market_vol_cycle_recovery_scale": 0.0,
     "market_vol_cycle_relative": 0.0,
     "market_vol_cycle_relative_calm": 0.0,
     "market_vol_cycle_release_half_life": 0.0,

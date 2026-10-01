@@ -1202,6 +1202,12 @@ PERTURBATIONS = [
     # multiplier on its target and the probe's phase does not change in
     # three sessions, so it never falls. Measured.
     ("market_vol_cycle_release_half_life", 5.0, False),
+    # INERT with the ratio on (its companions): the probe's engine is in
+    # neither a contraction nor a trough, where alone the rally is read; its
+    # window moves no price. Measured.
+    ("market_vol_cycle_recovery_release", 1.0, False),
+    # INERT: read only with the release above set.
+    ("market_vol_cycle_recovery_scale", 0.1, False),
     # INERT on every column this probe reads, at any value: the premium
     # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
     # inside the engine reads the quote, and on this probe's three calm days
@@ -2029,6 +2035,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "market_vol_cycle_pin_phase": {"market_vol_cycle_ratio": 2.0},
     "market_vol_cycle_trough_release": {"market_vol_cycle_ratio": 2.0},
     "market_vol_cycle_release_half_life": {"market_vol_cycle_ratio": 2.0},
+    # The rally's release is refused without its scale, and both are read
+    # only with the ratio on.
+    "market_vol_cycle_recovery_release": {"market_vol_cycle_ratio": 2.0,
+                                          "market_vol_cycle_recovery_scale": 0.1},
+    "market_vol_cycle_recovery_scale": {"market_vol_cycle_ratio": 2.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
