@@ -1,7 +1,7 @@
 """Identifiability, measured instead of argued: the SVD of the scaled Jacobian.
 
-CALIBRATION.md §4.3, built. Reads one or more `jacobian.py` result files
-(chunked runs of one Jacobian are concatenated after verifying they
+The calibration design's identifiability step, built. Reads one or more
+`jacobian.py` result files (chunked runs of one Jacobian are concatenated after verifying they
 share method, seeds and bit-identical base panels — the determinism
 contract makes that concatenation sound, and the check makes it
 checked), assembles the dimensionless sensitivity matrix
@@ -185,7 +185,7 @@ def main() -> None:
             "row_scale": "seed sd s_k measured from the base panels of "
                          "the same run",
             "column_scale": "deviation units (log for scale parameters, "
-                            "raw for bounded; CALIBRATION.md section 6.3)",
+                            "raw for bounded, the calibration loss's convention)",
         },
         "seed_sd": seed_sd,
         "matrix": {

@@ -1,7 +1,7 @@
 """Sweep the GJR asymmetry GAMMA, rebalancing ALPHA/BETA, panel at each point.
 
 The leverage effect is structurally absent from the symmetric GARCH (design
-finding 8; CALIBRATION.md §3.5): the return enters the variance update
+finding 8): the return enters the variance update
 squared, so its sign is destroyed. The GJR term in `rust/src/market/garch.rs`
 restores a sign channel, and this script chooses its coefficient by
 measurement instead of taste. Each sweep point is a (GAMMA, ALPHA, BETA)

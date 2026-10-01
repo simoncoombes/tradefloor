@@ -9,8 +9,8 @@ It is the half the last panel miss needs. `volume_change_acf1` at 504 days
 reads about -0.316 against a band of -0.29 to -0.21 on every preset, and the
 model is too NEGATIVE, as independent per-tick noise does to the
 change in a series. Reaching the band through the COMMON component needs a
-bigger innovation, and that takes `volume_abs_return_corr` out with it
-(CALIBRATION-FOLLOWUPS.md §21 to §23, §73), because a market-wide volume
+bigger innovation, and that takes `volume_abs_return_corr` out with it,
+because a market-wide volume
 multiplier adds volume variance unrelated to any name's own moves.
 
 A per-name state raises each name's own volume autocorrelation without

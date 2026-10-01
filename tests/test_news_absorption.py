@@ -149,9 +149,8 @@ OFF = dict(news_absorption_half_life=0.0, news_absorption_drift_share=0.0,
            news_absorption_drift_half_life=0.0, news_quote_revision=0.0)
 
 #: The presets that price news within minutes, and at what. pt-v19 takes the
-#: derived profile (Christensen, Timmermann and Veliyev's Table 7, design
-#: repository programme/results/news-speed/) with the maker's re-quote since
-#: its fifth composition. Written out, so a preset added without a decision
+#: derived profile (from Christensen, Timmermann and Veliyev's Table 7) with
+#: the maker's re-quote since its fifth composition. Written out, so a preset added without a decision
 #: about these dials fails below.
 NEWS_PRICED = {"pt-v19": dict(news_absorption_half_life=0.6,
                               news_absorption_drift_share=0.12,

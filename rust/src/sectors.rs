@@ -53,9 +53,7 @@ pub struct Sector {
     /// episode. The weights sum to at most one and the remainder is `none`,
     /// a crisis with no epicentre.
     ///
-    /// DERIVED from five crisis episodes on the tape
-    /// (`results/ptv19refine/epicentre-derivation.json` in the design
-    /// repository): per-sector volatility in each episode over each name's
+    /// DERIVED from five crisis episodes on the tape: per-sector volatility in each episode over each name's
     /// own calm-day volatility, median over the 39 real names of the
     /// roster, each sector taken relative to the median sector of that
     /// episode. The rule, stated before the numbers were read: the

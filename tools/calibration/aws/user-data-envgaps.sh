@@ -3,14 +3,15 @@
 # box. Modelled on user-data-remeasure.sh: dead-man switch, S3 preflight,
 # streamed log, build, run, upload, shutdown.
 #
-# Launched by fleet.py in tradefloor-design, which substitutes __BRANCH__,
-# __PIN__, __BUCKET_RUN__, __DEADMAN_MIN__ and __SCRIPTS_KEY__:
+# The project's spot-box launcher fills in __BRANCH__, __PIN__,
+# __BUCKET_RUN__, __DEADMAN_MIN__ and __SCRIPTS_KEY__. To run it:
 #
 #   tar czf scripts.tgz scripts        # jobs.sh, decay.py, driven.py
-#   python fleet.py upload --file scripts.tgz --key in/<run>-scripts.tgz
-#   python fleet.py launch --run <run> --user-data <this file> \
-#       --type c8g.24xlarge --var BRANCH=release/0.8.5 --var PIN=<sha> \
-#       --var DEADMAN_MIN=60 --var SCRIPTS_KEY=in/<run>-scripts.tgz
+#
+# upload scripts.tgz to the run bucket under in/<run>-scripts.tgz, then
+# launch one c8g.24xlarge spot box with this file as its user data and
+# BRANCH=release/0.8.5, PIN=<sha>, DEADMAN_MIN=60 and
+# SCRIPTS_KEY=in/<run>-scripts.tgz.
 #
 # The scripts that ran are kept beside the results in
 # tools/calibration/results/envgaps-pt-v20-2026-09-24/.

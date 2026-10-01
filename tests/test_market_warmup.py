@@ -7,9 +7,8 @@ the level opens from its stationary distribution and every variance state it
 acts THROUGH opens cold.  `market_burn_in_sessions` warms those components
 to the level the run opens on.
 
-The acceptance test is the one `programme/results/level-sigma-horizon.md`
-section 2.1 states and measures, and it needs no model: cut a 504-session
-recording at session 252.  Both halves are 252-session windows of a level
+The acceptance test is the one the level's horizon derivation states and
+measures, and it needs no model: cut a 504-session recording at session 252.  Both halves are 252-session windows of a level
 that is stationary from session one, so stationarity says they must read the
 same.  MEASURED there at `market_vol_level_sigma` 0.085, they do not --
 `sd(log window variance)` reads 0.6938 +/- 0.0602 over the first half and
@@ -35,9 +34,8 @@ from tradefloor import _core
 SLOW = bool(os.environ.get("TRADEFLOOR_SLOW_TESTS")
             or os.environ.get("PRETIUM_SLOW_TESTS"))
 
-#: The registered length, `level-sigma-horizon.md` section 8: the measured
-#: envelope is flat from session 350 and 504 is the next round number past
-#: it.
+#: The registered length. The measured envelope is flat from session 350
+#: and 504 is the next round number past it.
 WARM = 504.0
 
 
@@ -139,8 +137,8 @@ def test_it_is_inert_without_the_level_it_exists_to_warm():
 #: MEASURED, `tools/calibration/warmup_probe.py` at 32 seeds on a 60-name
 #: roster: the regression slope of a 63-session block's mean
 #: `log(factor variance)` on the same block's mean `log L`, averaged over
-#: blocks 3 to 8 -- that is, over the sessions where
-#: `level-sigma-horizon.md` 2.2 measures the envelope to be flat.  It is
+#: blocks 3 to 8 -- that is, over the sessions where the horizon derivation
+#: measures the envelope to be flat.  It is
 #: what "equilibrated" means for this state, as a number.
 EQUILIBRATED_ENVELOPE = 0.78
 
@@ -254,7 +252,7 @@ def _window_log_variance(job) -> tuple[float, float]:
 
 def _sd_and_jackknife(values):
     """`sd` across rosters with a delete-one jackknife error, the estimator
-    `cascade-level.py` uses and `level-sigma-horizon.md` reproduces."""
+    the level's original measurement and its horizon derivation used."""
     import numpy as np
 
     v = np.asarray(values, dtype=float)

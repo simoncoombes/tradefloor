@@ -1,7 +1,7 @@
 """Fear-gap era, screen one (round 127): close the realized-vol loop and
 shape the spike, measured on the era's own targets.
 
-Targets (fear-gap-targets.json, ^VIX/^GSPC 2004-2025, sub-period ranges
+Targets (^VIX/^GSPC 2004-2025, sub-period ranges
 in brackets): rv21-VIX tracking +0.868 [+0.60,+0.92], spike asymmetry
 1.203 [1.12,1.28], AR(1) 0.976 [0.92,0.976], P(VIX>30) 0.082
 [0.004,0.263], same-day corr -0.813 [-0.84,-0.78] (already real at
@@ -9,8 +9,8 @@ shipped; guarded, not chased). Panel guard: 4-seed p252 medians per
 cell, because the u63 lesson says a livelier VIX breaks the calibrated
 panel and the breakage size decides the re-levelling budget.
 
-THE AR(1) TARGET ABOVE IS NOT THIS SCRIPT'S RULER, and saying so is the
-whole of PT-V19-CHARTER section 1.5. 0.976 is the WHOLE-SPAN lag-one
+THE AR(1) TARGET ABOVE IS NOT THIS SCRIPT'S RULER, and pt-v19's charter
+was amended to say so. 0.976 is the WHOLE-SPAN lag-one
 autocorrelation of ^VIX -- one series of 8,960 bars -- and `ar1` here is
 a reading over 1,259 sessions, one run at a time, the median across
 seeds. The same estimator on the same tape reads 0.9299 at a 252-session

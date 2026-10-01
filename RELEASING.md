@@ -166,11 +166,11 @@ partial run now labels itself `PARTIAL RUN: n of N`, and `meta.groups_run` in
 **Run it on AWS, not here.** A 504-day 40-name measurement holds about 1.6 GB
 per worker, so eight workers is roughly 13 GB, and it has taken this machine
 out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
-96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents. It
-is launched with `fleet.py` from `tradefloor-design`, and its header gives the
-three commands. The docs repository is private, so the box gets the register
-from S3, as a tarball holding the register and the data files its bound rows
-read.
+96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
+The project's box launcher fills in the script's placeholders and starts the
+box, and the script's header lists the placeholders and the steps. The docs
+repository is private, so the box gets the register from S3, as a tarball
+holding the register and the data files its bound rows read.
 Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
 the ceiling is how much of the engine releases the GIL, not the core
 count.

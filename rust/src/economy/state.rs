@@ -304,8 +304,8 @@ pub fn phase_characteristics_for(phase: CyclePhase, us: bool) -> PhaseCharacteri
 }
 
 /// The US phase table (`cycle_us_calibration`), DERIVED from NBER recession
-/// dates and BEA real GDP, 1990-2025 (design repository,
-/// programme/results/macro-cycle/, `real_cycle.py`). Durations are months of
+/// dates and BEA real GDP, 1990-2025 (the derivation is in the project's
+/// unpublished design notes). Durations are months of
 /// the macro calendar, so they are real months only on the session calendar
 /// (`macro_calendar_days_per_year` 252).
 ///

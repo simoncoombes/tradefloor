@@ -62,9 +62,9 @@ a recession winning back 49 per cent of its fall in a year against 2009's
 ### pt-v20
 
 pt-v20 is pt-v19 with the market-behaviour faults found by the
-mean-reversion investigation fixed (design repository,
-`programme/meanrev-edge-ptv19-2026-09-24.md`; the registered rows and the
-grade are published in `validation/pt-v20/`). `ModelParams.pt_v20` in
+mean-reversion investigation fixed. The investigation is in the project's
+unpublished design notes; the registered rows and the grade are published
+in `validation/pt-v20/`. `ModelParams.pt_v20` in
 `rust/src/params.rs` documents every dial, and `python/tradefloor/provenance.py`
 gives each value's derivation or measurement.
 
@@ -264,8 +264,8 @@ goes from a third to 0.75 to restore it. That value is calibrated to the
 drift, not measured: it is a buyback yield of about 4.2 per cent against a
 real 1.5 to 2.0. `treasury_10y_noise` goes from 0.025 to 0.038.
 
-pt-v20's values are the twelfth registration's graded arm (design
-repository, `programme/ptv20-registration.md`), chosen on held-out seeds,
+pt-v20's values are the twelfth registration's graded arm
+(`validation/pt-v20/programme/ptv20-registration.md`), chosen on held-out seeds,
 where it passes all 40 registered rows. `python/tradefloor/provenance.py`
 gives each value's kind and source. Every preset before pt-v20 replays and
 hashes as it did.
@@ -343,9 +343,10 @@ Re-measured on the fix: the reference grids in `baselines`, `ranking` and
 `tca` and their docstrings, the notebooks that trade, and the tests that
 pinned a traded number. Tests that asserted the old behaviour as a finding,
 that a round trip recoups its impact and that price-only agents beat the
-Oracle, now assert its absence. C4 is defined in the design repository's
-`programme/longrun/CRITERIA.md`, measured by `programme/longrun/c4.py`, and
-carried on the pt-v19 record's `long_run` block, 17 rows. The ship-bar tests
+Oracle, now assert its absence. C4 is defined in
+`validation/pt-v20/programme/longrun/CRITERIA.md`, measured by
+`validation/pt-v20/programme/longrun/c4.py`, and carried on the pt-v19
+record's `long_run` block, 17 rows. The ship-bar tests
 gate on the fifteen criteria pt-v19 was adopted under and pin C4a and C4b as
 failing.
 
@@ -589,8 +590,7 @@ ran pt-v19, each fixed without moving a digest that had already shipped.
 
 ### Two packaged scenarios recalibrated
 
-The owner's decision, from the design repo's
-`programme/ptv20-scenario-size.md`, measured on pt-v20 on the certified
+The owner's decision, from a measurement on pt-v20 on the certified
 roster, each figure paired against the same seed with no scenario, seeds
 301 to 330 (box ptv20g3).
 
@@ -683,12 +683,12 @@ entry whose DOI is a placeholder until Zenodo mints one.
 ### pt-v20's grade in the repository
 
 `tf.preset_record("pt-v20")["long_run"]` named twelve files in the
-project's private design repository, `criteria.py` among them, so nobody
+project's unpublished design notes, `criteria.py` among them, so nobody
 outside could check the 40 of 40. `validation/pt-v20/` now holds that grade
 (box `ptv20g6`, 2026-09-26): the adopted criteria, the twelfth
 registration, `criteria.py`, `certgrade_box.py` and `v1.py`, the 31 scripts
 and data files the box ran, and every file it wrote except 93 MB of raw
-histories. The files keep the design repository's layout, so the recorded
+histories. The files keep the layout the box ran them in, so the recorded
 commands run unchanged. `scripts-as-run.txt` gives each box file's sha256,
 and they match the archive the box unpacked.
 
@@ -705,8 +705,8 @@ outside the original box, which took 25 minutes on 96 cores.
 The `long_run` block in pt-v20's record now names those published paths.
 `tools/presets/record.py --long-run` rewrites a verdict's paths for any box
 in its `PUBLISHED_GRADES` table, and the test holds the record to the
-published verdict. pt-v19's block still names its 2026-09-23 box in the
-design repository, which is not published. `provenance.py` entries that
+published verdict. pt-v19's block describes its 2026-09-23 grade, which
+is not published. `provenance.py` entries that
 cite `criteria.py` or the twelfth registration point at the same files.
 Nothing about the simulation changed; every known-answer digest is the same.
 
@@ -1185,8 +1185,7 @@ None of these moves a known-answer digest or the market.
   measurements they cited are the engine repository's fleet runs
   envgaps-085 (ba3f020, 2026-09-26, artefacts in
   `tools/calibration/results/envgaps-085-2026-09-26/`) and envgaps-pt-v20
-  (2026-09-24), and the design repository's runs docs080, docs080b and
-  ptv19panel.
+  (2026-09-24), and three earlier runs whose output is not published.
 
 What the gap texts carried before:
 
@@ -1700,8 +1699,7 @@ changes, and pt-v19 still reads below.
 **pt-v19 is recomposed: nine dials return to pt-v18's values, and every
 seeded pt-v19 trajectory changes a third time.** A 2^6 factorial over the
 six dial families that separate pt-v18 from the 2026-09-14 composition
-(design repository, `programme/results/bestof/RESULT.md` and
-`RESULT-504.md`, registered before it ran, 64 cells at 252 and 504 days,
+(registered before it ran, 64 cells at 252 and 504 days,
 both parents reproducing their committed records bit for bit) measured the
 market variance family -- the GJR triple, the slow pole and the stochastic
 level -- away from the tape on volatility level, cross-sectional
@@ -1720,7 +1718,7 @@ for the eighth boundary running. The six dials that return to 0.0 leave
 `DIAL_PROVENANCE` for `OUT_OF_SCOPE` with the gate each names, except
 `jump_idio_vix_decoupled`, which is live on its own and is recorded as
 `undetermined` in `POST_BASELINE`. The derivations the returned values
-replace stay in the design repository. The record, the envelope tables
+replace stay in the project's unpublished design notes. The record, the envelope tables
 and the level block are regenerated on the certification box, and the
 figures above this marker describe the previous vector until they are.
 
@@ -1731,8 +1729,8 @@ now carry `fear_gauge_dn1` at its whole-tape band, (0.39, 3.03) and
 provenance block rather than typed; and `fear_gauge_dn3` at its shipped
 whole-record ruler, (2.60, 9.58) at both horizons, as
 `facts.RULED_FEAR_DN3_BAND`. The first was ruled on 2026-09-15
-(`ruling-nineteen-rows-with-dn3-re-derived`, design-repo verdict ledger)
-and had sat in `RULED_UNREADABLE` since, waiting for a ruling already
+(`ruling-nineteen-rows-with-dn3-re-derived`, in the verdict ledger kept
+in the project's unpublished design notes) and had sat in `RULED_UNREADABLE` since, waiting for a ruling already
 made. The second was ruled on 2026-09-19 on the ruler's own construction
 and power: over 173 retained arm readings the shipped band rejects 8, the
 one section 14 form valid at the project's own window anchor rejects 5,
@@ -1825,8 +1823,8 @@ rows are always available.
 
 **More figures describing an earlier pt-v19 than the one that ships,
 corrected 2026-09-14.** The slow level's `sigma` opened this note as 0.047.
-`cascade-fourth-moment.md` derived that figure and `level-phi.md` then
-found the derivation in error; the shipped value is 0.085, and the `S`
+A derivation of the fourth-moment cascade produced that figure and a
+later study of the level's persistence found the derivation in error; the shipped value is 0.085, and the `S`
 figures quoted beside it were measured at 0.047 and are now labelled as
 such. Two others were corrected outside this file, and both were the same
 mistake. The crisis lever read 5.28x in `README.md` and in `envelope.py`'s
@@ -1838,14 +1836,14 @@ real, and under a third of pt-v18's 6.5258. And the 504-day
 four-dial preset's figure, surviving four regenerations of the table
 beneath it; it reads 23.3899. The paragraphs below this marker are the
 working log of a vector that moved several times, and a figure in one of
-them describes the preset of its own day and not necessarily this one. The
-rule for reading a band result is in `programme/band-count-rule.md` in the
-design repository.**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
+them describes the preset of its own day and not necessarily this one.
+
+**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
 market factor's variance target read the VIX's excursion above the level the
 index's own conditional variance implies, instead of the VIX's level against
 a fixed anchor. Under `vix_level_identity` the old form fed the factor's own
-variance back to itself, which `garch-derive-design.md` finding 4 measured
-as the loop counting its memory twice. Cutting it takes the loop's
+variance back to itself, which the GARCH derivation measured as the loop
+counting its memory twice. Cutting it takes the loop's
 amplification of a standing bias from about 2.7x to about 1.1x, and the
 static map from asymptotically linear to sublinear: `implied(v)/v` at a
 pinned VIX of 80 reads 0.474 against 0.651, and `ratio(80)/ratio(40)` reads
@@ -2119,9 +2117,9 @@ The chain, measured and each step separately:
 - the market factor's variance process makes excursions of twenty to fifty
   times its target lasting tens of sessions, **and they are ordinary**. The
   fast component alone fails the fourth-moment condition -- `3 alpha^2 +
-  2 alpha beta + beta^2` = **1.1035**, a figure already on the record in the
-  design repository's `garch-derive-design.md` -- but that document also
-  says what would otherwise have been got wrong here: the SHIPPED process is
+  2 alpha beta + beta^2` = **1.1035**, a figure already on the record in
+  the GARCH derivation in the project's unpublished design notes, which
+  also says what would otherwise have been got wrong here: the SHIPPED process is
   a 0.65/0.35 mixture, its own condition is the spectral radius of a 4x4
   matrix, and that reads **0.9870**, under one. The shipped factor variance
   has a finite fourth moment. Every dial it depends on is identical from
@@ -2179,7 +2177,7 @@ in `market::index_var`'s module docs: normalise `crash_amplifier`'s
 `factors.rs` weighs, rejects and has already costed, and which
 makes `E[z^2 A^2]` flat in the regime and removes the superlinear term from
 the condition; or recalibrate `market_vol_alpha` and `market_vol_beta`,
-which `garch-derive-design.md` has already derived from the tape (0.1059 and
+which the GARCH derivation has already derived from the tape (0.1059 and
 0.8787 against the shipped 0.28035 and 0.69245) and which every preset from
 pt-v13 on carries; or give `crisis_blend_variance_damp` a moment, which asks for an
 incomplete-gamma integral where the rest of the module needs only `phi` and
@@ -2319,9 +2317,9 @@ and 9.7 times the priced figures and the kurtosis sign flips;
 stays in band. No row leaves its band because of them,
 and the row that is out of band is the tail, which the switch improves.
 
-`programme/results/b4fix1-result.md` in the design repository carries the
-per-roster table, the seven acceptance criteria scored one by one, and the
-full prediction ledger. At that commit three of the seven were met and three
+The project's unpublished design notes carry the per-roster table, the
+seven acceptance criteria scored one by one, and the full prediction
+ledger. At that commit three of the seven were met and three
 were not: there was no fixed point below the ceiling on five rosters, the
 tail row was out of band, and the panel was 17 of 18. Every figure in this
 section describes the preset as it stood then, and three more dials have
@@ -2342,7 +2340,7 @@ occurring, because a size is a second moment of the variance the VIX reads;
 `vix_variance_premium` and `vix_return_gain_up` are read where they were
 not; and `crisis_vix_threshold` is reachable at values the old anchor put
 out of range. `tests/test_model_params.py` carries the traced reason for
-each, and the design repository holds the note.
+each, and the project's unpublished design notes hold the note.
 
 **The VIX anchor is now roster-dependent, and a short run opens above it.**
 pt-v18 anchored every market at 15.98 whatever it held. pt-v19 derives the
@@ -2773,12 +2771,12 @@ is the one path from the night to fair value, found by the merge gate at
 a millionth on a name whose open had gapped, and none from the night
 back to its own size. And `volume_abs_return_corr` goes red at any ratio
 above zero because a gap carries no volume against it. No preset carries
-the dial; the response curve is in the design repository's
-`programme/overnight-process.md`.
+the dial; the response curve is in the project's unpublished design
+notes.
 
 ### One band rule with a named centre
 
-REALISM-BANDS.md's rule for a window-derived band drops "the single most
+The project's rule for a window-derived band drops "the single most
 extreme window" before taking the noise scale, and never said from what.
 Two implementations answered differently: the fear and overnight band tools
 trimmed around the median of the windows, the leave-one-window-out test and

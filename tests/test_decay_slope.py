@@ -1,6 +1,6 @@
 """The decay exponent, which the survey measured the region for and never reported.
 
-CALIBRATION-FOLLOWUPS §56a: `atlas_survey.TRANSFORMED_AXES` already spans
+`atlas_survey.TRANSFORMED_AXES` already spans
 `garch_persistence` over (0.21, 0.99), and a vector at 0.94 moves the decay
 slope more than a third of the way from the shipped preset's -0.95 toward
 real markets' -0.436. Four thousand samples were scored and filed without
@@ -33,9 +33,9 @@ def _panel(a1: float, a5: float, a20: float, days: int = 504) -> dict[str, float
 
 
 def test_it_reproduces_the_shipped_preset_slope() -> None:
-    """pt-v6's own 504-day panel medians, measured at thirty seeds (§54).
+    """pt-v6's own 504-day panel medians, measured at thirty seeds.
 
-    -0.917 was arrived at independently by `decay_curve.py`. The survey's
+    -0.917 was arrived at independently by the decay-curve script. The survey's
     helper has to agree with it or one of the two is measuring something
     else.
     """

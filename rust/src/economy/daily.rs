@@ -2368,8 +2368,8 @@ mod vix_return_shape {
 /// THE FEAR RESPONSE MUST KEEP RISING, and for nine shipped presets it
 /// does not.
 ///
-/// The defect this module makes permanent was measured on 2026-09-06
-/// (`programme/results/wsa17-result.md` in the design repository).
+/// The defect this module makes permanent was measured on 2026-09-06 and
+/// is recorded in the project's unpublished design notes.
 /// `vix_target_shock_cap` is documented as a boundary condition, but at
 /// pt-v16 — [`crate::params::DEFAULT_PRESET_NAME`] — it is 45.0 against a
 /// `vix_return_gain` of 17.0, so it BINDS at 2.647 per cent of session
@@ -2400,7 +2400,7 @@ mod vix_return_shape {
 /// anything this market produces.
 ///
 /// **What made that affordable is one level down.** The cap was not an
-/// arbitrary brake: `loopgain-report.md` §8.2 measured the index realising
+/// arbitrary brake: the loop-gain run measured the index realising
 /// four to five times the variance `V_t` priced above
 /// `crisis_vix_threshold`, so the fear arm had nothing balancing it there
 /// and the cap was holding the divergence. `market::index_var` now prices
@@ -2419,7 +2419,7 @@ mod fear_response_shape {
     /// chosen, and past it the property is not asserted, because past it
     /// there is no real number to compare with.
     ///
-    /// That bucket is the one `wsa17-result.md` records as MISMATCHED: on
+    /// That bucket is the one the 2026-09-06 measurement records as MISMATCHED: on
     /// a pt-v16 arm the model put 336 of 7,560 sessions past -5 per cent
     /// against the tape's 22 of 8,959, at an index sd of 3.135 against
     /// about 1.1. The mismatch makes the bucket useless for comparing a
@@ -2555,8 +2555,8 @@ mod fear_response_shape {
     /// and the up side is CONCAVE in the move and is PROPORTIONAL to the
     /// level, `level_exponent_up` being exactly -1.
     ///
-    /// The measurement is `programme/results/vix-dynamics.md` section 2,
-    /// on 8,959 sessions of ^GSPC: `g_dn` = +0.49 +/- 0.12 with
+    /// The measurement is a fit of the VIX's session change to the index
+    /// return, on 8,959 sessions of ^GSPC: `g_dn` = +0.49 +/- 0.12 with
     /// P(g > 0) = 1.000, `p_dn` = 1.44 +/- 0.08, `g_up` = -0.85 +/- 0.12,
     /// `p_up` = 0.60 +/- 0.04. The level-blind power form is refused
     /// against the free form at F = 118 on 2 dof and the linear
@@ -2836,7 +2836,7 @@ mod fear_response_shape {
     /// 2026-09-14, which is how the level-blind spellings survived the
     /// preset that replaced them.
     ///
-    /// `programme/results/vix-dynamics.md` section 2.4 measures it without
+    /// A second reading of the same tape measures it without
     /// a fit, as conditional medians of `dV` by level tertile within an
     /// `|r|` bin: in the 2 to 3 per cent bin the tape's down response is
     /// 3.32 at a VIX of 18.8, 2.52 at 24.5 and 2.17 at 32.1, and its up
@@ -2859,7 +2859,7 @@ mod fear_response_shape {
             p.vix_return_level_exponent > 0.0,
             "the down response no longer falls with the level. The tape puts g_dn at \
              +0.49 +/- 0.12 with P(g > 0) = 1.000 and refuses the level-blind power form \
-             at F = 118 on 2 dof (vix-dynamics.md 2.1, 2.2)."
+             at F = 118 on 2 dof."
         );
         assert!(
             p.vix_return_level_exponent_up < 0.0,
@@ -3114,7 +3114,7 @@ mod fear_response_shape {
     /// reach a state at the ceiling is `8.83 * 15^1.4483 * 181.3295^-0.4483`
     /// = 43.333 points. So the ceiling is reachable at all only from a
     /// settled read-back above `C - 43.333 + E[S|C]` = 134.74 at sigma 1
-    /// and 133.20 at sigma 3. `ceiling-and-omega.md` section 0 records the
+    /// and 133.20 at sigma 3. The ceiling's derivation records the
     /// headroom as "any settled read-back below 168.74"; that number is the
     /// condition evaluated at the top of the GRADED range, `r` = 6.39,
     /// where the fear term is 12.59, and the domain the update admits runs
@@ -3359,7 +3359,7 @@ mod fear_response_shape {
         }
         // NON-STICKINESS ON THE MAP, which is what the ceiling's `derived`
         // kind rests on. 75.9 is the highest settled `implied(181.3295)` of
-        // the three rosters in `ceiling-and-omega.md` section 4, and this
+        // the three rosters the ceiling's derivation measured, and this
         // drives the largest session the clamp admits from it.
         let worst = vix_after_one_session(c, 75.9, 2.5, -p.vix_return_clamp);
         assert!(
@@ -3380,7 +3380,7 @@ mod fear_response_shape {
     /// read-back at a pin, the level the map sustains when the VIX is held
     /// at `C`; it is not the read-back the state carries on a variance
     /// excursion, and the condition is sufficient for the settled map only
-    /// (`ceiling-derivation-independent.md` sections 8 to 14). What the
+    /// (an independent re-derivation of the ceiling shows this). What the
     /// record shows at gain 0 is a clip rate of zero over 30,240 seed-days
     /// with a highest VIX of 73.9 and a highest read-back of 93.2.
     ///
@@ -3394,8 +3394,8 @@ mod fear_response_shape {
     /// neither preempts the other at any pair of values. A cap under the
     /// ceiling in fact makes the ceiling LESS sticky, which is the
     /// direction the ceiling's own derivation wants.
-    /// `programme/results/ceiling-and-omega.md` sections 2 and 3 establish
-    /// that and `provenance.py` carries the withdrawal.
+    /// The ceiling's derivation establishes that, and `provenance.py`
+    /// carries the withdrawal.
     ///
     /// AND THE CONDITION STOPPED CHOOSING A VALUE, which is the honest
     /// state of the derivation. Re-solved on the shipping law the smallest

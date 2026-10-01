@@ -33,11 +33,11 @@ sets how fast:
     pt-v1     persistence 0.950000   half-life  13.5 d   shock x1.225
     pt-v3     persistence 0.989058   half-life  63.0 d   shock x1.062
 
-Both levers are also far below the real market's x6.16 (measured by
-`real_vix_lever.py`: 17.2% annualised at VIX<12 against 106.1% at VIX 45+),
+Both levers are also far below the real market's x6.16 (measured on the
+forty-name roster: 17.2% annualised at VIX<12 against 106.1% at VIX 45+),
 so "restore pt-v1's lever" was never the right target either.
 
-CALIBRATION-FOLLOWUPS.md §2 established that the 252-day panel cannot
+An earlier measurement established that the 252-day panel cannot
 DISTINGUISH those half-lives -- `L_real` is 0.0000 on all three 252-day
 axes at both 63 and 192 days. So the panel is indifferent to the quantity
 that sets the transient, which is the blind spot this instrument exists
@@ -55,8 +55,8 @@ What this measures, all against the same vector:
 
 Thresholds are deliberately NOT set here. This measurement was taken after
 the regression it describes, so any bar chosen now would be a description of
-a known answer rather than a criterion -- the distinction CALIBRATION-PTV2.md
-§10.1 exists to keep. It reports the numbers and the ratio against a named
+a known answer rather than a criterion, which the pt-v2 calibration set out
+to keep apart. It reports the numbers and the ratio against a named
 reference vector; the owner fixes the bars before it becomes a gate.
 
     ../../.venv/bin/python scenario_response.py \
@@ -306,7 +306,7 @@ def main() -> int:
     # NOT printed as a bare percentage, deliberately. It divides two small
     # excesses over 1.0, so a difference of 0.024 in the shock ratio becomes an
     # eleven-point headline, and it has been quoted that way twice: once as a
-    # 112.1% "gain" (CALIBRATION-FOLLOWUPS §39) and once as pt-v6 retaining
+    # 112.1% "gain" and once as pt-v6 retaining
     # 16.7% against pt-v3's 27.6% (2026-08-25). Both were a real number quoted
     # at a resolution it does not have. Printing the excesses it is built from
     # makes the smallness visible where it is read.
@@ -319,7 +319,7 @@ def main() -> int:
         print(f"  quote the shock ratios: {v['shock_ratio_median']:.3f}x "
               f"against {r['shock_ratio_median']:.3f}x.")
     print("\nNo pass/fail: thresholds are the owner's to fix BEFORE this "
-          "becomes a gate (CALIBRATION-PTV2.md §10.1).")
+          "becomes a gate.")
 
     out["wall_seconds"] = time.perf_counter() - started
     out["method"] = {

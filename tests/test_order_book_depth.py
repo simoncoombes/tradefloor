@@ -96,7 +96,7 @@ def taken(engine: tf.Engine, index: int) -> list[float]:
 
 
 #: The presets that take the book: pt-v20 carries the values the hand-off
-#: suggested (design repository, programme/ptv20-registration.md). Written
+#: suggested (validation/pt-v20/programme/ptv20-registration.md). Written
 #: out, so a preset added without a decision about the book fails below.
 BOOK_ON = {"pt-v20": dict(book_depth_coefficient=0.75, book_depth_exponent=0.5,
                           book_depth_reach=1.0, book_shared=1.0,

@@ -272,8 +272,8 @@ def test_the_pooled_fear_row_is_scored_now_that_its_bootstrap_has_landed():
     windows since 1990 holding at least one qualifying session as blocks,
     all 107 sessions held, 2,000 draws at seed 20260905, sd 0.6539 on 19
     degrees of freedom. Un-blinded, the row is the largest single term on
-    pt-v18 at both horizons (`programme/results/dn3-error-bar.md`), so a
-    table that lost it again would silently drop about a quarter of `S`.
+    pt-v18 at both horizons, so a table that lost it again would silently
+    drop about a quarter of `S`.
 
     The number is pinned with its provenance in the style of the level and
     -1 per cent rows below, and the guard's own behaviour is kept under

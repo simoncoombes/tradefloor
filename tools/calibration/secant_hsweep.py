@@ -1,6 +1,6 @@
 """Verify the noise-free secant claim empirically, before anything trusts it.
 
-CALIBRATION.md §4.2 claims that under common random numbers the secant
+The calibration design claims that under common random numbers the secant
 
     D(h) = [m(theta + h) - m(theta - h)] / dev_distance(h)
 
@@ -254,7 +254,7 @@ def main() -> None:
                         f"seed={lib.PANEL_UNIVERSE_SEED})",
             "workers": args.workers,
             "deviation_units": "log for scale parameters, raw for bounded "
-                               "(CALIBRATION.md section 6.3)",
+                               "(the calibration loss's convention)",
         },
         "wall_seconds": wall,
         "draws_consumed_per_seed": {str(k): v for k, v in draws.items()},

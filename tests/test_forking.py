@@ -1027,8 +1027,8 @@ def _nothing_dormant():
                    crisis_epicentre_extra=1.93,
                    volume_move_jump_share=0.05,
                    # The anchor weight's cap is a multiple of the centre at or
-                   # above one, so a blanket 0.05 is outside its domain; the
-                   # derived 1.76 (vix-law-levels, design repository).
+                   # above one, so a blanket 0.05 is outside its domain, and
+                   # 1.76 is the derived value.
                    vix_anchor_weight_level_cap=1.76,
                    # ... and its below-knee switch is 0.0 or 1.0.
                    vix_anchor_weight_level_below=1.0,

@@ -28,7 +28,7 @@ and every harness here made it until 0.8.5: ``run_session``'s old
 pre-trade book. The agent collected its own impact instead of paying it. A
 buy of 1% of daily volume, sold the next step, beat a one-share control by
 12 to 52 bp in 10 of the 20 names of ``Universe.random(20, seed=93001)`` that
-way (design repo, ``programme/meanrev-edge-ptv19-2026-09-24.md``).
+way, measured on 2026-09-24 on pt-v19.
 ``run_session`` now refuses ``order_flow`` and names the two arguments that
 replace it.
 

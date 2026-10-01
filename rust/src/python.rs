@@ -672,7 +672,7 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// `tradefloor.manifest.era_fingerprint` both hash every value in it, so
 /// growing it moves the committed v8 digest without a simulation change,
 /// exactly what the KAT versioning rule forbids. The FULL preset surface
-/// (CALIBRATION.md Appendix A) lives on `ModelParams.from_preset(name)`
+/// lives on `ModelParams.from_preset(name)`
 /// and `.to_dict()` instead; this function gains `name=` so a preset can
 /// be selected by the string an engine takes, and keeps its legacy shape
 /// until the next KAT bump carries the growth deliberately.

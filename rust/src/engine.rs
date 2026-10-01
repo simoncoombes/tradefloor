@@ -320,8 +320,7 @@ pub struct Engine {
     /// (`tick::sector_sigma_at` squared): the sector's daily variance is
     /// `target * s`, `s` a GARCH(1,1) with unconditional mean 1.0 on the
     /// standardised daily factor. Live when `sector_vol_alpha` or `_beta`
-    /// is set; 0.0 means "not yet seeded" and reads as 1.0. See
-    /// `programme/results/vix-dynamics.md` sections 19 and 19.7.
+    /// is set; 0.0 means "not yet seeded" and reads as 1.0.
     sector_variance: Vec<f64>,
     /// The day's accumulated sector factor per sector key, the shock the
     /// state updates on at the close; reset at each close.
@@ -572,8 +571,8 @@ pub struct Engine {
     /// pt-v18, where `earnings_nominal_growth` is 0.0 and nothing reads
     /// it.
     nominal_output_base: f64,
-    /// The model coefficients this engine runs (the runtime seam,
-    /// CALIBRATION.md §5). [`crate::params::PT_V1`] unless the engine was
+    /// The model coefficients this engine runs (the runtime seam).
+    /// [`crate::params::PT_V1`] unless the engine was
     /// built with [`Engine::with_params`]; immutable for the engine's life,
     /// which is what lets its fingerprint be quoted for the whole run.
     params: ModelParams,
@@ -1091,7 +1090,7 @@ impl Engine {
     /// and the aggregate earnings cycle. It holds all fifteen rows of the
     /// fixed-roster panel at 252 days, fourteen of fourteen at 504, fifteen
     /// on both held-out axes, and all 28 long-run criteria registered for
-    /// it (design repo, programme/ptv20-registration.md). It reads further
+    /// it (`validation/pt-v20/programme/ptv20-registration.md`). It reads further
     /// from real on two rows: the crisis lever is 3.60x against a real
     /// 6.16x (pt-v19 5.22x), and on the level protocol the index returns
     /// +1.14 per cent a year, inside the ruled band of 1.1 to 10.3 at its
@@ -1129,8 +1128,8 @@ impl Engine {
         crate::params::PT_V20
     }
 
-    /// [`Engine::new`] under an explicit model preset (the runtime seam,
-    /// CALIBRATION.md §5). With [`crate::params::PT_V1`] this IS `new`: the
+    /// [`Engine::new`] under an explicit model preset (the runtime seam).
+    /// With [`crate::params::PT_V1`] this IS `new`: the
     /// preset-constructed engine reproduces the const build's trajectories
     /// bit for bit, draw for draw — the phase-1 acceptance gate.
     pub fn with_params(
@@ -1747,8 +1746,8 @@ impl Engine {
     /// The close of the per-sector variance state: a symmetric GARCH(1,1)
     /// per sector on the day's accumulated sector factor, reverting to the
     /// VIX-coupled sigma the stateless draw uses as its long-run level,
-    /// clamped to the per-name multiples. `programme/results/vix-dynamics.md`
-    /// 19.1 measures the tape's sector residual at persistence 0.971 +/-
+    /// clamped to the per-name multiples. On the tape the sector residual
+    /// has persistence 0.971 +/-
     /// 0.018 with a shock share of 0.063 +/- 0.018.
     fn close_sector_state(&mut self) {
         if !self.sector_state_on() {
@@ -4545,7 +4544,8 @@ impl Engine {
                 // They open at the unscaled baseline while the level has
                 // already opened at a stationary draw, and they spend the
                 // first hundred sessions travelling to it. That travel is
-                // what `level-sigma-horizon.md` measures as the whole of
+                // what a measurement of the level sigma by horizon found to
+                // be the whole of
                 // the 252/504 calibration gap.
                 //
                 // A BRANCH at 0.0 sessions, which is every preset through
@@ -7305,8 +7305,7 @@ pub struct SessionRequest<'a> {
     /// agent had filled at the pre-trade book, so the agent never paid its
     /// own permanent impact and collected it instead. A spec mean reversion
     /// rule beat buy-and-hold on 20 of 20 suite markets by a median 42
-    /// points in 60 days on that alone (design repo,
-    /// `programme/meanrev-edge-ptv19-2026-09-24.md`).
+    /// points in 60 days on that alone (measured on pt-v19 on 2026-09-24).
     ///
     /// # When it lands, and who pays for it
     ///

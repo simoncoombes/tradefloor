@@ -35,12 +35,12 @@ each adapter's own choice, not this module's. A :class:`Renderer` renders
 
 :class:`JSONRenderer` is what LangGraph, PydanticAI and OpenAI Agents send
 today: `payload`, `json.dumps`-ed with sorted keys. :class:`TextRenderer`
-is what FinRobot sends today, generalised over the four axes
-`P6-observation-invariance.md` studies -- `detail`, `units`, `order` and
-`language` -- so the same knobs that vary FinRobot's prompt can be turned
-on any adapter's. Neither is privileged by the :class:`Renderer` protocol;
-an adapter's default is whichever reproduces what it already sends, and
-`invariance` takes any object with `render` and `key`.
+is what FinRobot sends today, generalised over four axes of the
+observation (`detail`, `units`, `order` and `language`), so the same knobs
+that vary FinRobot's prompt can be turned on any adapter's. Neither is
+privileged by the :class:`Renderer` protocol; an adapter's default is
+whichever reproduces what it already sends, and `invariance` takes any object
+with `render` and `key`.
 """
 
 from __future__ import annotations

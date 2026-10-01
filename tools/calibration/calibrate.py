@@ -1,8 +1,7 @@
 """The calibration search: a penalised band-distance fit, as a citable run.
 
-CALIBRATION.md §6 (the loss), §7 (the optimiser), §8 (overfitting control)
-and §9 (citability), built on the phase-1 runtime seam and the phase-2
-instrument. Where `falsify.py` asks "can this model class reach these
+The loss, the optimiser, the overfitting control and the citability
+record, built on the phase-1 runtime seam and the phase-2 instrument. Where `falsify.py` asks "can this model class reach these
 statistics at all", this tool asks the calibration question: **what is the
 smallest move from the shipped preset that brings the live targets into
 band without pushing a constraint out** — and it answers with a named
@@ -72,8 +71,8 @@ import instrumentlib as lib
 from falsify import cma_es, compass_polish
 
 #: The searched set, taken from phase 2's MEASURED identifiability
-#: spectrum (CALIBRATION-RESULTS.md §5) rather than from §3.9's
-#: argued-parameter-by-parameter list, which that measurement corrected in
+#: spectrum rather than from the earlier argued parameter-by-parameter
+#: list, which that measurement corrected in
 #: both directions. Column norms are in seed-sds per deviation unit at
 #: pt-v1, from `results/identifiability-pt-v1-2026-08-22.json`.
 #:
@@ -300,7 +299,7 @@ def statistic_flips(train_stats: dict, axis_stats: dict, keys, margin_sd: float,
     statistics that merely landed on the other side of an edge they were
     already sitting on. The constrained jump/volume search was rejected for
     `excess_kurtosis` 0.073 seed-sd below its floor and `abs_return_acf5`
-    0.036 above its ceiling (CALIBRATION-FOLLOWUPS §34). A statistic 0.07 sd
+    0.036 above its ceiling. A statistic 0.07 sd
     outside a band is not distinguishable from one 0.07 sd inside.
 
     Worse, the untolerated form is asymmetric in the direction that punishes
@@ -1390,8 +1389,7 @@ def main() -> None:
     # The fix is to compare like with like: the horizon axis is judged
     # against the same horizon on the TRAINING seeds, which isolates the
     # change of seeds -- the thing §8 is actually about -- from the change
-    # of horizon, which is a property of the problem. See
-    # CALIBRATION-FOLLOWUPS §32.
+    # of horizon, which is a property of the problem.
     horizon_train = axes["candidate"]["train_horizon"]
     overfitting["horizon_train_loss_real"] = horizon_train["loss_real"]
     overfitting["horizon_train_bootstrap_spread"] = \
@@ -1428,7 +1426,8 @@ def main() -> None:
                   "garch_ceiling_multiple": 19.4, "momentum_theta": 0.216}
         degeneracy = {
             "vector": corner,
-            "source": "CALIBRATION-RESULTS.md §6.3 — the zero-memory corner",
+            "source": "phase 2's measured identifiability run, the "
+                      "zero-memory corner",
             "in_calibration_box": all(
                 calibration_box(k, ship[k])[0] <= v
                 <= calibration_box(k, ship[k])[1]
@@ -1471,9 +1470,9 @@ def main() -> None:
             "constraints": list(loss_mod.CONSTRAINTS),
             "structural_excluded": list(loss_mod.STRUCTURAL),
             "searched_parameters": params,
-            "search_space_source": "CALIBRATION-RESULTS.md §5, the measured "
-                                   "identifiability spectrum (not §3.9's "
-                                   "argued list)",
+            "search_space_source": "the measured identifiability "
+                                   "spectrum of phase 2, which replaced the "
+                                   "earlier argued list",
             "column_norms": {p: COLUMN_NORMS.get(p) for p in params},
             "excluded": {
                 "guards_visible_but_off_limits": {
@@ -1503,12 +1502,12 @@ def main() -> None:
                                    "certificate are the shipped function "
                                    "against the TRUE bands "
                                    "(facts.REAL_MARKETS), unshrunk.",
-                "why": "CALIBRATION.md §6.1's band loss is flat inside the "
-                       "band and §6.3's regulariser pulls back until the "
+                "why": "The band loss is flat inside the "
+                       "band and the regulariser pulls back until the "
                        "pull stops paying, which is exactly at a band "
                        "edge; the composition parks every trained-to "
                        "statistic on the least robust point of the "
-                       "feasible set (phase 3, CALIBRATION-PTV2.md §5.1). "
+                       "feasible set (phase 3's calibration of pt-v2). "
                        "The margin moves what the search aims at without "
                        "touching what the verdict is read against.",
                 "zero_case_checked": "at margin_sd = 0 the search loss is "

@@ -536,8 +536,7 @@ pub struct TickInputs<'a> {
     pub sector_keys: &'a [String],
     /// One DAILY sigma per sector key from the engine's per-sector variance
     /// state (`sector_vol_alpha` / `_beta`), or EMPTY, which is the stateless
-    /// draw at `sector_sigma_at` every preset up to pt-v19 runs. See
-    /// `programme/results/vix-dynamics.md` section 19.
+    /// draw at `sector_sigma_at` every preset up to pt-v19 runs.
     pub sector_sigmas: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
     /// Read only by the lagged transmission wire
@@ -639,7 +638,7 @@ pub struct TickInputs<'a> {
     /// `SharedFactors::crisis_epicentre`, which this is copied onto.
     pub crisis_epicentre: Option<&'a str>,
     pub elapsed_days: i64,
-    /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
+    /// The model coefficients (the runtime seam). The
     /// engine passes its own; a caller building `TickInputs` directly
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
     /// bit-identical to the const build.

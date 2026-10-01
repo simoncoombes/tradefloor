@@ -4,7 +4,7 @@ Phase 3 recorded 16 of 482 evaluated vectors moving `draws_consumed`, all
 at the edges of the §6.3 box, all in the screening and CMA stages, and
 called for the trigger to be traced at the write site. This is that trace.
 
-**The claim it tests.** CALIBRATION.md §5.2 says nothing settable may
+**The claim it tests.** The calibration design says nothing settable may
 change how many draws are taken or in what order, and phase 2 asserted it
 across ~7,000 evaluations by comparing `Engine.draws_consumed` — the sum
 over all three generators. The 2026-08 stream split made that sum the
@@ -237,7 +237,7 @@ def main() -> None:
         "claim": {
             "kind": "draw-schedule deviation trace, per stream",
             "source_certificate": args.certificate,
-            "rule": "CALIBRATION.md §5.2 — nothing settable may change how "
+            "rule": "nothing settable may change how "
                     "many draws are taken or in what order",
             "operative_quantity": "Engine.draws_by_stream()['market'], not "
                                   "Engine.draws_consumed: the market "

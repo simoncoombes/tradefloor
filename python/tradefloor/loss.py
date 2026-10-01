@@ -136,17 +136,16 @@ LIVE_TARGETS = (
 #: searches proved it, each removing a real obstacle and finding another
 #: behind it.
 #:
-#: The tail is a GATE property, not a panel property. It is checked by
-#: `decay_curve.py` over thirty seeds, where aggregation kills exactly the
-#: noise that defeats the panel: real markets fit a log-log slope of
-#: -0.436 there and pt-v3, the default at 0.1.0, fit -0.956, which was
-#: unambiguous. pt-v20, the default from 0.8.5, fits -0.676 +/- 0.188 on
-#: the vector that ships (fleet run `envgaps-085`, 2026-09-26), about 1.3
-#: errors steeper than real (pt-v19: -0.515 +/- 0.109, inside one error;
-#: pt-v20's first composition -0.615 +/- 0.129), while reading below real at
-#: every lag, about a quarter of real at lag one (`envelope.DECAY_252`), so
-#: on this default the slope does not clearly separate the two and the level
-#: does.
+#: The tail is a GATE property, not a panel property. It is checked by the
+#: decay-curve measurement over thirty seeds, where aggregation kills exactly
+#: the noise that defeats the panel: real markets fit a log-log slope of -0.436
+#: there and pt-v3, the default at 0.1.0, fit -0.956, which was unambiguous.
+#: pt-v20, the default from 0.8.5, fits -0.676 +/- 0.188 on the vector that
+#: ships (fleet run `envgaps-085`, 2026-09-26), about 1.3 errors steeper than
+#: real (pt-v19: -0.515 +/- 0.109, inside one error; pt-v20's first composition
+#: -0.615 +/- 0.129), while reading below real at every lag, about a quarter of
+#: real at lag one (`envelope.DECAY_252`), so on this default the slope does
+#: not clearly separate the two and the level does.
 CONSTRAINTS = (
     "excess_kurtosis",
     "volume_abs_return_corr",
@@ -909,7 +908,7 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
 # --------------------------------------------------------------------------
 # R6: score both years separately, report both, combine neither
 #
-# Simon, 2026-09-06, `programme/RULINGS-2026-09-06.md` R6. This is not either
+# Simon's ruling R6 of 2026-09-06. This is not either
 # of the two options the design note put up. It is NOT the certified horizon
 # with the other as a feasibility gate, and it is NOT the two summed under a
 # `weight_504` that `dual_horizon_loss` already declines to call a

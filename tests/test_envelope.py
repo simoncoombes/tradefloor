@@ -58,11 +58,11 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     is a decision, not a drift."""
     # GRADED ON THE BASIS, NOT ON `REAL_MARKETS`. This read the shipped
     # decade pair directly, which made the test a band path of its own and
-    # pinned the bar to the ruler `ruling-three-rows.md` R1 superseded. The
-    # row it tripped on was `sector_excess_corr`, whose shipped floor is one
-    # decade's cut on a forty-name roster; on the ruled basis it is in band
-    # and 0.74 scale units below the whole-tape centre. A change to this
-    # count is still a decision -- that decision is R1 and R4.
+    # pinned the bar to the ruler that ruling R1 on the three rows
+    # superseded. The row it tripped on was `sector_excess_corr`, whose
+    # shipped floor is one decade's cut on a forty-name roster; on the ruled
+    # basis it is in band and 0.74 scale units below the whole-tape centre. A
+    # change to this count is still a decision -- that decision is R1 and R4.
     bands, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
     # `certified_panel()` and not `CERTIFIED`, since 2026-09-22: the table
@@ -428,8 +428,8 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     So the `volume-change` gap is retired, and `check` must stop reporting it
     at BOTH horizons. A retired gap that a `check` still returns would deny a
     caller a certification the measurements support, which is the same class
-    of error as granting one they do not (§114 and the two gaps retired at
-    the previous boundary for the same reason).
+    of error as granting one they do not. Two gaps were retired at the
+    previous boundary for the same reason.
     """
     inside = env.check(horizon_days=252, statistics=["volume_change_acf1"])
     assert inside.inside
@@ -445,7 +445,7 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     assert not any(g.id == "volume-change" for g in env.GAPS)
 
     # And the horizon gap's own reason must not claim a row misses while
-    # quoting a number inside the band it prints beside it (§114).
+    # quoting a number inside the band it prints beside it.
     #
     # This asserted `"missing" not in reasons`, which is a PROXY for that
     # property and only holds while no row misses at 504 at all. It was true
@@ -514,7 +514,7 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
 def test_the_stale_sentence_assertion_actually_bites():
     """The control for the assertions in the test above.
 
-    §114's defect was a hardcoded sentence naming a row as missing while
+    The defect was a hardcoded sentence naming a row as missing while
     quoting a number inside the band printed beside it. The sentence is
     computed now, so the assertions that guard it pass by construction, and an
     assertion that cannot fail is not a test. This replays the defect against
@@ -782,8 +782,8 @@ def test_a_panel_that_loses_a_statistic_is_named():
     It halves the dual-horizon objective and is the first vector to close
     the thin-tails gap, which was retired at 0.2.0 when the shipped preset
     closed it too -- and it surrenders `return_acf1` at the certified
-    horizon. It was called a win twice before anyone counted the panel
-    (CALIBRATION-FOLLOWUPS §33), so this is a function now.
+    horizon. It was called a win twice before anyone counted the panel, so
+    this is a function now.
     """
     panel = env.certified_panel()
     low, high = REAL_MARKETS["return_acf1"]

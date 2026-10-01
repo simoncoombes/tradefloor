@@ -1,33 +1,31 @@
 #!/bin/bash
 # The published-figure gate (RELEASING.md step 4) on one spot box.
 #
-# Launched by fleet.py in tradefloor-design, which substitutes __BRANCH__,
-# __BUCKET_RUN__, __DEADMAN_MIN__ and __REGISTER_KEY__ and refuses to launch
-# with a placeholder left over:
+# The project's spot-box launcher fills in __BRANCH__, __BUCKET_RUN__,
+# __DEADMAN_MIN__ and __REGISTER_KEY__, and refuses to launch with a
+# placeholder left over. To run it:
 #
 #   tar czf register.tgz -C "$TRADEFLOOR_DOCS" tools/remeasure/inventory.json \
 #       tools/docs/learn/experiments.json tools/docs/learn/preset-records.json
-#   python fleet.py upload --file register.tgz --key in/<run>-register.tgz
-#   python fleet.py launch --run <run> --user-data <this file> \
-#       --type c8g.24xlarge --var BRANCH=<branch> --var DEADMAN_MIN=90 \
-#       --var REGISTER_KEY=in/<run>-register.tgz
+#
+# upload register.tgz to the run bucket under in/<run>-register.tgz, then
+# launch one c8g.24xlarge spot box with this file as its user data and
+# BRANCH=<branch>, DEADMAN_MIN=90 and REGISTER_KEY=in/<run>-register.tgz.
 #
 # For 0.8.5 the branch is release/0.8.5 and the run is remeasure-0.8.5, so
-# fleet.py writes to s3://dia-test-101631415962-us-east-2-an/pretium-calib/
+# the box writes to s3://dia-test-101631415962-us-east-2-an/pretium-calib/
 # out/remeasure-0.8.5/. Run it after pt-v20 is merged into release/0.8.5 and
 # pushed (the box clones by branch name), with TRADEFLOOR_DOCS at the docs
 # repository's release/0.8.5 checkout, built for that commit:
 #
 #   tar czf register.tgz -C "$TRADEFLOOR_DOCS" tools/remeasure/inventory.json \
 #       tools/docs/learn/experiments.json tools/docs/learn/preset-records.json
-#   python fleet.py upload --file register.tgz \
-#       --key in/remeasure-0.8.5-register.tgz
-#   python fleet.py launch --run remeasure-0.8.5 --user-data <this file> \
-#       --type c8g.24xlarge --var BRANCH=release/0.8.5 --var DEADMAN_MIN=90 \
-#       --var REGISTER_KEY=in/remeasure-0.8.5-register.tgz
-#   python fleet.py status --run remeasure-0.8.5
-#   python fleet.py collect --run remeasure-0.8.5 --out tools/remeasure/out-0.8.5
-#   python fleet.py reap --run remeasure-0.8.5
+#
+# Upload it under in/remeasure-0.8.5-register.tgz, launch with
+# BRANCH=release/0.8.5, DEADMAN_MIN=90 and
+# REGISTER_KEY=in/remeasure-0.8.5-register.tgz, then, when the run is done,
+# collect out/remeasure-0.8.5/ into tools/remeasure/out-0.8.5 and terminate
+# the box.
 #
 # Cost, from the spot floor on 2026-09-24 ($0.913 an hour for c8g.24xlarge
 # in us-east-2c): about 30 minutes of box time, the Rust build and

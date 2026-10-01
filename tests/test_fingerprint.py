@@ -1,8 +1,8 @@
 """Behavioural fingerprints and sealed seeds.
 
-`P7-fingerprints.md` (`tradefloor-design`, `programme/`) sets the
-question: whether two agents, or one agent at two prompts, order the
-same things on a fixed battery of worlds. This file has to prove four
+The project's unpublished design notes set the question: whether two
+agents, or one agent at two prompts, order the same things on a fixed
+battery of worlds. This file has to prove four
 things nothing else checks.
 
 - The canonical decision list, and the digest over it, are a function of

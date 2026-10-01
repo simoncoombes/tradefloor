@@ -64,7 +64,7 @@ JUMPS = Mechanism(
                  "while the market's still follows it. The tape does not "
                  "support a single-name rate that rises with the index's "
                  "implied vol the way the market-wide one does "
-                 "(vix-dynamics.md 19.1), and the two rates shared a "
+                 "(measured on the tape), and the two rates shared a "
                  "scale only because they were written together"),
         DialSpec("jump_idio_excitation", 0.0,
                  "how much a company's own jump raises its arrival rate "

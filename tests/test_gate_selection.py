@@ -33,9 +33,10 @@ rot by is sprawl, so sprawl is what is guarded.
 THE HALF THAT LIVES ELSEWHERE, recorded here because the two are useless
 apart. A green reading that silently deselected tests is the
 `SKIP_GATE_IF_KAT` habit in a new coat, so a recorded run has to carry the
-selection it ran under. `guards.py gate-green-at-pin` takes the expression,
-refuses an entry that does not name its selection, and refuses a pin green
-under one expression when asked about another.
+selection it ran under. The guard that records a green pin, kept with the
+project's unpublished design notes, takes the expression, refuses an entry
+that does not name its selection, and refuses a pin green under one
+expression when asked about another.
 """
 from __future__ import annotations
 
@@ -62,12 +63,11 @@ MARKED = {
         # THE MECHANISM AND STRUCTURAL CERTIFICATES, REPORTED BESIDE THE
         # BAR. Until 2026-09-23 these two were the mechanism half and the
         # second gate's half of the ship bar: non-regression on the shipped
-        # preset's own certificates. The owner's ruling of that day (design
-        # repo `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-
-        # is-what-a-user-would-notice-programme-longrun-criteria`) makes the
-        # pass bar the fifteen long-run criteria plus every ruled band, and
-        # says the mechanism certificate and the VIX persistence rows "are
-        # reported and investigated but do not gate".
+        # preset's own certificates. The owner's ruling of that day makes the
+        # pass bar the fifteen long-run criteria (published in
+        # `validation/pt-v20/programme/longrun/CRITERIA.md`) plus every ruled
+        # band, and says the mechanism certificate and the VIX persistence
+        # rows "are reported and investigated but do not gate".
         #
         # Why they still carry the marker. Each reads the SHIPPED preset's
         # committed record and asserts, beside the certificate it reports,

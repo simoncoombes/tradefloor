@@ -292,7 +292,7 @@ clustering floor, the leverage top) are named on their rows and decide
 no current verdict. One band is marked INDICATIVE (volume-change
 autocorrelation: own measurement only, no published figure for the
 estimator was recoverable). The full derivation record, window tables
-and verdict moves are in tradefloor-design/REALISM-BANDS.md.
+and verdict moves are in the project's unpublished design notes.
 
 ## Why there are fourteen statistics and not four
 
@@ -414,9 +414,9 @@ REAL_MARKETS = {
     "volume_abs_return_corr": (0.46, 0.66),
     "leverage_effect": (-0.16, 0.00),
     "volume_change_acf1": (-0.32, -0.20),
-    # Conditional correlation, added 2026-08-25 (tradefloor-design/REALISM-BANDS.md,
-    # "Conditional correlation"). The unconditional mean over all pairs cannot
-    # see sign, sector or time, and a search cannot preserve what it cannot see.
+    # Conditional correlation, added 2026-08-25. The unconditional mean over
+    # all pairs cannot see sign, sector or time, and a search cannot preserve
+    # what it cannot see.
     "corr_asymmetry": (-0.25, 0.45),
     "corr_asymmetry_lagged": (-0.20, 0.55),
     "sector_excess_corr": (0.11, 0.23),
@@ -519,7 +519,7 @@ REAL_MARKETS = {
 #: Where each band comes from, carried as data so a reader can ask the
 #: library rather than trust a docstring. The full derivation -- the window
 #: table, the retrieved sources with what each actually measured, and the
-#: verdict moves -- is recorded in tradefloor-design/REALISM-BANDS.md.
+#: verdict moves -- is recorded in the project's unpublished design notes.
 #:
 #: The shared derivation, applied blind to every statistic before any
 #: verdict was looked at: the reference panel is 40 US large-cap stocks
@@ -796,7 +796,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.154, 0.083, 0.348),
         "crisis_window": 0.167,
         "sources": (
-            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25; "
+            "the 40-name reference panel measurement, run 2026-08-25; "
             "no literature reconciliation applied, the record carries no "
             "verified exceedance-correlation number for single stocks",
         ),
@@ -814,7 +814,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.092, 0.111, 0.438),
         "crisis_window": 0.074,
         "sources": (
-            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25",
+            "the 40-name reference panel measurement, run 2026-08-25",
         ),
         "admits_the_null": _BAND_ADMITS_NULL + (
             "Measured: a null model passes this band with probability 1.000 "
@@ -840,7 +840,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (0.133, 0.164, 0.199),
         "crisis_window": 0.103,
         "sources": (
-            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25. "
+            "the 40-name reference panel measurement, run 2026-08-25. "
             "Every one of ten windows including the 2020 crisis sits between "
             "+0.10 and +0.20; trimmed noise scale 0.021",
         ),
@@ -852,9 +852,10 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.050, 0.229, 0.402),
         "crisis_window": 0.374,
         "sources": (
-            "tradefloor-design/real_corr_persistence_bands.py, run 2026-08-25, "
-            "same roster and estimator as facts.measure; the 252-day band is "
-            "wide enough to admit every preset and is recorded as such.",
+            "the correlation-persistence measurement on the reference "
+            "panel, run 2026-08-25, same roster and estimator as "
+            "facts.measure; the 252-day band is wide enough to admit "
+            "every preset and is recorded as such.",
         ),
         "admits_the_null": _BAND_ADMITS_NULL + (
             "Measured: a null model passes this band with probability 0.92. "
@@ -942,7 +943,7 @@ REAL_MARKETS_PROVENANCE = {
         # and not to a band: `loss.rule_table` reads `windows[1]` through
         # `real_centre`, so every score on the record is against 2.66 and
         # replacing it reopens all of them. That decision is decision 2 of
-        # `programme/results/ruling-four-level-rows.md` and it is Simon's.
+        # Simon's ruling on the four level rows.
         # The size of the disagreement, recorded here rather than left to be
         # rediscovered: the same estimator over the 33 whole-tape windows
         # gives 1.71 and the pooled median over all 1,124 qualifying
@@ -971,19 +972,18 @@ REAL_MARKETS_PROVENANCE = {
         # own tolerance solve, 200,000 standard-normal draws at seed
         # 20260905 against the nine-window false-alarm target
         # `BAND_RULE_TOLERANCE[9]`, which is the same solve that produced
-        # `certification-bands/universal.json`'s multipliers for the
-        # fourteen shape rows; t(0.975) on 32 degrees of freedom is 2.0369
-        # and nobody should read 2.1310 as one. `band_rule_tolerance(33)`
-        # REFUSES, because the tolerance itself is measured at 4, 5, 7 and 9
-        # windows only, so carrying the nine-window rate to 33 is an
-        # assumption this entry inherits from the universal rule rather than
-        # one it introduces.
+        # the universal band's multipliers for the fourteen shape rows;
+        # t(0.975) on 32 degrees of freedom is 2.0369 and nobody should read
+        # 2.1310 as one. `band_rule_tolerance(33)` REFUSES, because the
+        # tolerance itself is measured at 4, 5, 7 and 9 windows only, so
+        # carrying the nine-window rate to 33 is an assumption this entry
+        # inherits from the universal rule rather than one it introduces.
         #
         # THE WINDOW ANCHOR IS THE FIRST PAIRED SESSION AND NOT THE LAST BAR,
         # which is where this band differs from every other whole-tape object
         # in the project and the difference is named here so it is found
         # rather than assumed. `INDEX_TAIL_WINDOWS` anchors at the tape's last
-        # bar and argues for it; `whole-tape/scripts/panel32.py` walks
+        # bar and argues for it; the whole-tape panel script walks
         # backward from the last bar too, so the universal band's windows end
         # on 2025-07-31. This row's cut runs forward from 1990-01-03 and
         # discards 140 returns at 252 (2025-01-08 to 2025-07-31) and 392 at
@@ -1021,13 +1021,13 @@ REAL_MARKETS_PROVENANCE = {
                       "unrounded": (0.5946097144325069, 2.7253899803917117),
                       "band": (0.59, 2.73)},
             },
-            "source": "programme/results/five-rows/dn1-band.json, "
-                      "bands/to-2025-07-31; derived by "
-                      "five-rows/scripts/derive_dn1.py, which exits non-zero "
-                      "unless it first reproduces the shipped (0.70, 4.03), "
-                      "the recorded triple and universal.json's multipliers, "
-                      "and which opens no preset file. Re-run 2026-09-15 from "
-                      "the same caches: byte-identical output",
+            "source": "the dn1 band derivation on the tape to 2025-07-31, "
+                      "in the project's unpublished design notes; its "
+                      "script exits non-zero unless it first reproduces the "
+                      "shipped (0.70, 4.03), the recorded triple and the "
+                      "universal band's multipliers, and opens no preset "
+                      "file. Re-run 2026-09-15 from the same caches: "
+                      "byte-identical output",
         },
         # The tape side of the scoring rule. The model's row is a per-seed
         # median across a run's sessions aggregated as the median over
@@ -1059,8 +1059,8 @@ REAL_MARKETS_PROVENANCE = {
             "1990 the median is +1.85",
         ),
     },
-    # Added 2026-09-22 with the row itself, under the design note
-    # `crisis-dispersion-row-design-2026-09-22.md` section 2. Every number
+    # Added 2026-09-22 with the row itself, under the row's design of that
+    # day. Every number
     # in this entry is DERIVED at import from
     # `REAL_CRISIS_DISPERSION_WINDOWS`; nothing here is a literal edge, and
     # the readings the derivation runs on are in that table.
@@ -1122,9 +1122,8 @@ REAL_MARKETS_PROVENANCE = {
                          "VIX than a low one, and this row is how unevenly "
                          "that is spread across sectors. A model can hold "
                          "the lever and read 1.0 here",
-        "source": "tradefloor-design/programme/"
-                  "crisis-dispersion-row-design-2026-09-22.md section 2, "
-                  "ruled 2026-09-22; derived by "
+        "source": "the row's design in the project's unpublished design "
+                  "notes, ruled 2026-09-22; derived by "
                   "tools/calibration/crisis_dispersion_row.py",
     },
     "fear_gauge_dn3": {
@@ -1170,7 +1169,7 @@ REAL_MARKETS_PROVENANCE = {
         #
         # [2.16, 7.38] IS THE FRONT-ANCHORED FIGURE. It reproduces to the
         # quantum from the forward cut and from no other. Section 14's rule
-        # runs on `whole-tape/scripts/panel32.py`'s windows, which walk
+        # runs on the whole-tape panel script's windows, which walk
         # backward from the last bar, and `INDEX_TAIL_WINDOWS` anchors the
         # same way. Cut the same tape backward and the five-session
         # condition keeps FIVE windows instead of ten, two of them the
@@ -1205,8 +1204,8 @@ REAL_MARKETS_PROVENANCE = {
         # that it is not a rubber stamp; on this row, at this row's own
         # anchor, it is more of one than the band it replaces. So the
         # re-derivation is RECORDED HERE AND NOT ADOPTED, on the same
-        # construction ground `programme/results/ship-bar-five-rows.md`
-        # section 3 refused it for `index_drift_pct` and
+        # construction ground the ship-bar review of the five rows
+        # refused it on for `index_drift_pct` and
         # `index_tail_dn3_pct`, and the row keeps the spread rule. The
         # decade objection that motivates the universal band never reached
         # this row: it was never a decade object.
@@ -1220,8 +1219,9 @@ REAL_MARKETS_PROVENANCE = {
                        "arm readings where the shipped band rejects 8",
             "rule": "median +/- t(n) * trimmed_sd, each edge rounded "
                     "outward, over the row's own conditioned windows",
-            "anchor_used_by_section_14": "last bar, as panel32.py and "
-                                         "INDEX_TAIL_WINDOWS both cut",
+            "anchor_used_by_section_14": "last bar, as the whole-tape "
+                                         "panel and INDEX_TAIL_WINDOWS "
+                                         "both cut",
             #: `(n, t, centre, trimmed_sd, low, high)` per variant. The
             #: first two are the figure the ruling priced and are FRONT
             #: anchored; the rest are the project's own anchor.
@@ -1246,8 +1246,8 @@ REAL_MARKETS_PROVENANCE = {
                               "and under the shipped band; the fifth "
                               "composition's 252-day reading, 5.4237, is "
                               "IN under all of them too",
-            "source": "programme/results/dn3-rederive.md, and the three "
-                      "scripts under programme/results/dn3-rederive/scripts",
+            "source": "the dn3 re-derivation of 2026-09-15 and its three "
+                      "scripts, in the project's unpublished design notes",
         },
         "ruler": {
             "named": "2026-09-15",
@@ -1319,8 +1319,7 @@ REAL_MARKETS_PROVENANCE = {
         # 0.642, 0.643, 0.646; 10,000 draws give 0.6533.
         #
         # NOT the ten windows the band was built from. That was the form
-        # first written here, and it was run (2026-09-08, `programme/
-        # results/objective-blind-spots.md` section 3.1): sd 0.588 on nine
+        # first written here, and it was run (2026-09-08): sd 0.588 on nine
         # degrees of freedom, but its ten blocks hold 92 of the 107 sessions
         # and it centres at +5.33, 0.40 below the centre -- two thirds of
         # its own sd. The five-session floor is the BAND's condition, so a
@@ -1426,8 +1425,8 @@ REAL_MARKETS_PROVENANCE = {
             "span 4.7 percent, which is why a tail figure is stated as a "
             "percentage of sessions against this band and not as a multiple "
             "of an unnamed real rate",
-            "tradefloor-design/programme/tail-rows-design.md, the design "
-            "note: the estimator ruling, the window table with each window's "
+            "the tail rows' design in the project's unpublished design "
+            "notes: the estimator ruling, the window table with each window's "
             "sd, excess kurtosis and NBER overlap, and the four band forms "
             "that were considered and not adopted",
         ),
@@ -1593,8 +1592,8 @@ FEAR_DN1_WINDOWS: dict[str, Any] = {
     "anchor": "forward from the first paired session; remainder dropped at "
               "the end",
     "crisis_dates": ("1987-10-19", "2008-10-15", "2020-03-16"),
-    "source": "programme/results/five-rows/dn1-band.json, "
-              "bands/to-2025-07-31, re-run 2026-09-15 byte-identical",
+    "source": "the dn1 band derivation on the tape to 2025-07-31, re-run "
+              "2026-09-15 byte-identical",
     #: `(start, end, median, sessions, crisis)`, keyed on the window's
     #: return count.
     "windows": {
@@ -1673,10 +1672,9 @@ def fear_dn1_windows(horizon_days: int, *,
         raise ValidationError(
             f"the fear_gauge_dn1 window table holds no {horizon_days}-session "
             f"windows; measured horizons are "
-            f"{sorted(FEAR_DN1_WINDOWS['windows'])}. Run "
-            "programme/results/five-rows/scripts/derive_dn1.py at that "
-            "horizon and record the windows rather than rescaling a band "
-            "from another one")
+            f"{sorted(FEAR_DN1_WINDOWS['windows'])}. Measure the tape's "
+            "windows at that horizon and record them rather than rescaling "
+            "a band from another one")
     return tuple(median for _, _, median, _, crisis in windows
                  if include_crisis or not crisis)
 
@@ -1693,7 +1691,7 @@ def fear_dn1_windows(horizon_days: int, *,
 #: band derives from that cut and no other. This is the same deviation
 #: `FEAR_DN1_WINDOWS` above records, and until now nothing said so for this
 #: row: `INDEX_TAIL_WINDOWS` anchors at the tape's last bar and argues for
-#: it, `whole-tape/scripts/panel32.py` walks backward from the last bar, and
+#: it, the whole-tape panel script walks backward from the last bar, and
 #: both fear rows walk forward. The remainder is dropped at the END, 162
 #: returns at both horizons.
 #:
@@ -1724,9 +1722,8 @@ FEAR_DN3_WINDOWS: dict[str, Any] = {
                       "the stressed ones leaves a different quantity",
     "error_condition": "at least one qualifying session in the window, which "
                        "is the twenty-block set `centre_se` bootstraps over",
-    "source": "programme/results/dn3-rederive/scripts/emit_table.py, run "
-              "2026-09-15 against the same two caches the band was built "
-              "from",
+    "source": "the dn3 re-derivation's table script, run 2026-09-15 "
+              "against the same two caches the band was built from",
     "windows": {
         252: (
             ("1990-01-03", "1990-12-31", 7.17, 1, False),
@@ -1810,10 +1807,9 @@ def fear_dn3_windows(horizon_days: int, *,
         raise ValidationError(
             f"the fear_gauge_dn3 window table holds no {horizon_days}-session "
             f"windows; measured horizons are "
-            f"{sorted(FEAR_DN3_WINDOWS['windows'])}. Run "
-            "programme/results/dn3-rederive/scripts/emit_table.py at that "
-            "horizon and record the windows rather than rescaling a band "
-            "from another one")
+            f"{sorted(FEAR_DN3_WINDOWS['windows'])}. Measure the tape's "
+            "windows at that horizon and record them rather than rescaling "
+            "a band from another one")
     return tuple(median for _, _, median, sessions, crisis in windows
                  if sessions >= condition and not (drop_crisis and crisis))
 
@@ -1872,7 +1868,8 @@ REAL_MARKETS_WINDOWS = {
     #: assuming a year.
     "horizon_days": 252,
     "roster": "40 US large caps, common to all ten windows",
-    "source": "tradefloor-design/REALISM-BANDS.md, the window table",
+    "source": "the reference panel's window table, in the project's "
+              "unpublished design notes",
     "values": {
         "annualised_vol_pct": (25.9, 18.3, 21.5, 25.7, 45.3, 28.2, 30.7, 29.0, 23.4, 29.9),
         "excess_kurtosis": (5.71, 36.72, 5.64, 11.06, 11.36, 5.60, 10.20, 13.44, 15.13, 13.79),
@@ -1886,11 +1883,11 @@ REAL_MARKETS_WINDOWS = {
         "volume_change_acf1": (-0.221, -0.242, -0.255, -0.259, -0.284, -0.266, -0.238, -0.296, -0.263, -0.239),
         # The four correlation-structure rows, added 2026-09-05 from the same
         # measurements the triples above summarise. The first three come from
-        # tradefloor-design/real_panel_results.json (retrieved 2026-08-25, the
-        # ten windows in this table's order) and the fourth from
-        # tradefloor-design/real-corr-persistence-bands.json (retrieved
-        # 2026-08-25, `horizons.252.windows`, whose window labels and crisis
-        # flag match this table's row for row). SIX decimal places, not the
+        # the reference panel's results (retrieved 2026-08-25, the ten
+        # windows in this table's order) and the fourth from the
+        # correlation-persistence measurement (retrieved 2026-08-25, its
+        # 252-bar windows, whose labels and crisis flag match this table's
+        # row for row). SIX decimal places, not the
         # two or three the rows above carry: at three, rounding the reading
         # and then rounding again for the provenance triple disagrees with
         # the triple in the last place on two of the four rows, and the
@@ -1913,8 +1910,7 @@ REAL_MARKETS_WINDOWS = {
 #: `REAL_MARKETS_WINDOWS` is the 252-bar table and this is its 504-bar twin:
 #: the same forty US large caps, the same estimators, six consecutive
 #: 505-bar windows (504 daily log returns each) covering 2013-07 to 2025-07,
-#: promoted from the design repository's
-#: `realism-bands-504-reference-panel.json` (retrieved 2026-08-29). Until it
+#: promoted from the 504-bar reference panel (retrieved 2026-08-29). Until it
 #: existed the library carried 504-bar BANDS with no windows underneath
 #: them, so `real_centre_se` -- the dispersion of a row across real years at
 #: the window length it is graded at -- was undetermined at 504 on every
@@ -1945,9 +1941,8 @@ REAL_MARKETS_WINDOWS_504 = {
     "crisis_index": 3,
     "horizon_days": 504,
     "roster": "40 US large caps, common to all six windows",
-    "source": "tradefloor-design/realism-bands-504-reference-panel.json, "
-              "the six panels; Yahoo Finance v8 daily bars, retrieved "
-              "2026-08-29",
+    "source": "the 504-bar reference panel, the six panels; Yahoo Finance "
+              "v8 daily bars, retrieved 2026-08-29",
     "values": {
         "annualised_vol_pct": (19.216427, 22.353833, 23.738032, 37.725517, 29.963137, 26.826592),
         "excess_kurtosis": (18.756861, 13.213448, 9.570653, 13.275513, 11.656521, 15.210755),
@@ -1970,13 +1965,13 @@ REAL_MARKETS_WINDOWS_504 = {
 #:
 #: The row is the lag-1 autocorrelation of the mean pairwise correlation over
 #: non-overlapping 21-day SUB-windows, so a 505-bar window holds 24 of them
-#: and the row's evidence base is not the panel's. The design repository
-#: measured it separately (`real-corr-persistence-bands.json`, retrieved
-#: 2026-08-25) over five 504-bar windows rather than six -- its series starts
-#: one window later -- and FOUR of them are non-crisis, which is why
-#: `BAND_WINDOWS_EXCEPTIONS` already records a four-window band for this row
-#: at this horizon. Reading it out of `REAL_MARKETS_WINDOWS_504` would take a
-#: dispersion across six windows of a quantity measured on five.
+#: and the row's evidence base is not the panel's. It was measured
+#: separately (retrieved 2026-08-25) over five 504-bar windows rather than
+#: six -- its series starts one window later -- and FOUR of them are
+#: non-crisis, which is why `BAND_WINDOWS_EXCEPTIONS` already records a
+#: four-window band for this row at this horizon. Reading it out of
+#: `REAL_MARKETS_WINDOWS_504` would take a dispersion across six windows of a
+#: quantity measured on five.
 REAL_PERSISTENCE_WINDOWS_504 = {
     "windows": (
         "2015-07-17..2017-07-18", "2017-07-19..2019-07-22",
@@ -1985,9 +1980,9 @@ REAL_PERSISTENCE_WINDOWS_504 = {
     ),
     "crisis_index": 2,
     "horizon_days": 504,
-    "roster": "the 40 US large caps of real-corr-persistence-bands.json",
-    "source": "tradefloor-design/real-corr-persistence-bands.json, "
-              "horizons.504.windows; retrieved 2026-08-25",
+    "roster": "the 40 US large caps of the reference panel",
+    "source": "the correlation-persistence measurement on the reference "
+              "panel, its 504-bar windows; retrieved 2026-08-25",
     "sub_window": 21,
     "values": {
         "corr_persistence_acf1": (0.248393, 0.428851, 0.360519, 0.356755, 0.265590),
@@ -2008,7 +2003,7 @@ WINDOW_HORIZONS: tuple[int, ...] = (252, 504)
 
 #: The band rule every window-derived band on this panel is built with, as
 #: code rather than as a sentence three tools and a test each paraphrased.
-#: REALISM-BANDS.md states it: over the non-crisis windows, s is the sample sd
+#: The band rules state it: over the non-crisis windows, s is the sample sd
 #: with the single most extreme window dropped, the band is [min - s, max + s]
 #: and each edge is rounded outward at the rule's precision. "Most extreme"
 #: needs a centre, and the sentence never named one. It is the MEDIAN, for the
@@ -2018,7 +2013,7 @@ WINDOW_HORIZONS: tuple[int, ...] = (252, 504)
 #: cluster sits on the other side of it. Two shipped edges sit where the two
 #: centres disagree, the 252-bar `cross_sectional_corr` floor and the 505-bar
 #: `sector_excess_corr` ceiling, and both are the median's. Before this
-#: constant existed the test helper and one design-repo tool trimmed around
+#: constant existed the test helper and one other tool trimmed around
 #: the mean and the two band tools around the median; every band they had
 #: produced was checked against both, and only those two edges differed.
 BAND_RULE = (
@@ -2078,7 +2073,7 @@ def band_from_windows(key: str, values: Sequence[float]) -> tuple[float, float]:
 
 #: Where a shipped 252-bar band departs from `band_from_windows` on its nine
 #: non-crisis windows, and why: `{row: {edge: (shipped value, kind, reason)}}`.
-#: REALISM-BANDS.md allows an edge to move OUTWARD to a retrieved,
+#: The band rules allow an edge to move OUTWARD to a retrieved,
 #: horizon-compatible literature value, and names two INWARD clamps, both sign
 #: corrections every retrieved source supports. This table is those moves as
 #: data, so `tests/test_reference_windows.py` derives every shipped band as
@@ -2188,7 +2183,7 @@ SEED_SD = {
     "corr_asymmetry_lagged": 0.115927,
     "sector_excess_corr": 0.0063937,
     # The largest seed sd of any correlation-type statistic: a twelve-point
-    # acf1 per seed. See CALIBRATION-FOLLOWUPS.md section 64.
+    # acf1 per seed.
     "corr_persistence_acf1": 0.279423,
     # The level row, on its own protocol and at the table's preset: pt-v1
     # on `LEVEL_PROTOCOL`, the roster varying with the seed, seeds 101 to
@@ -2228,12 +2223,12 @@ REAL_MARKETS_504 = {
     "volume_abs_return_corr": (0.48, 0.65),
     "leverage_effect": (-0.13, 0.02),
     "volume_change_acf1": (-0.29, -0.21),
-    # Five non-crisis 505-bar windows, same rule; tradefloor-design/bands-504-conditional-corr.json.
+    # Five non-crisis 505-bar windows, same rule.
     "corr_asymmetry": (-0.04, 0.13),
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
     # Twenty-four sub-windows; four non-crisis windows +0.25 to +0.43,
-    # median +0.31 (tradefloor-design/real-corr-persistence-bands.json).
+    # median +0.31.
     "corr_persistence_acf1": (0.19, 0.49),
 }
 
@@ -2301,8 +2296,9 @@ SEED_SD_504_PROVENANCE = {
     "days": 504,
     "seeds": tuple(range(101, 131)),
     "estimator": "sample standard deviation (n - 1) across seeds",
-    "script": "programme/scripts/hruler-seedsd504.py in the design "
-              "repository, run on the box hruler1",
+    "script": "facts.measure() over the thirty seeds at 504 days on a "
+              "cloud box; the script is in the project's unpublished "
+              "design notes",
     "measured_at_commit": "2bfb2dbf56b2444f25cc78cd2961bcf152e1cd5b",
     # The error bar. An identity for a normal sample and the leading term
     # generally: the relative standard error of a sample sd on n draws is
@@ -2326,9 +2322,8 @@ SEED_SD_504_PROVENANCE = {
     "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
                  "live at 504 days and re-derives the sd from the committed "
                  "per-seed table",
-    "bands": "facts.REAL_MARKETS_504, from tradefloor-design/"
-             "bands-504-noncrisis.json and bands-504-conditional-corr.json, "
-             "five non-crisis 505-bar windows of the same forty-name "
+    "bands": "facts.REAL_MARKETS_504, from the five non-crisis 505-bar "
+             "windows of the same forty-name "
              "reference roster; unchanged by this measurement",
     "supersedes": {
         "date": "2026-08-23",
@@ -2437,10 +2432,8 @@ SEED_SD_LEVEL_PROVENANCE = {
     "rows": ("index_drift_pct",),
     "source": "facts.measure() at pt-v1 on Universe.random(40, seed=s) with "
               "market seed s, 252 days, seeds 101-130, sample sd across "
-              "seeds; the box run era-level of 2026-09-04 on feat/level-row "
-              "at 6326337, four arms through programme/scripts/level-jobs.sh "
-              "in the tradefloor-design repository, of which the pt-v1 arm "
-              "is this one",
+              "seeds; a box run of 2026-09-04 on feat/level-row at "
+              "6326337, four arms, of which the pt-v1 arm is this one",
     "date": "2026-09-04",
     "model_fingerprint": "pt-v1",
     "estimator": "sample standard deviation (n - 1) across seeds",
@@ -2518,7 +2511,7 @@ SEED_SD_LEVEL_PROVENANCE = {
 # real VIX rather than short of it, and `id-v18-d100`'s 0.9763 "MET" was a
 # comparison between two estimators.
 #
-# RULED (`programme/PT-V19-CHARTER.md` section 1.5, 2026-09-06): the ruler is
+# RULED (pt-v19's charter, 2026-09-06): the ruler is
 # the WINDOWED, DEBIASED figure, derived from the tape by the same estimator
 # the model uses, at the same window length as the horizon being graded. Not
 # the whole-span number. A run of `CERTIFIED_HORIZON_DAYS` sessions is the
@@ -2758,12 +2751,11 @@ REAL_VIX_AR1_PROVENANCE = {
                 "carries that residual and the 252 figure does not",
     "not_the_ruler": "the whole-span reading of the same series is 0.9772 "
                      "raw and 0.9777 debiased, 0.047 above this one. It is "
-                     "`REAL_AR1 = 0.976` in the design repository's "
-                     "programme scripts, correctly documented as "
+                     "`REAL_AR1 = 0.976` in the scripts of the project's "
+                     "unpublished design notes, correctly documented as "
                      "whole-span there and compared against 252-day model "
                      "rows anyway",
-    "source": "tradefloor-design/programme/PT-V19-CHARTER.md section 1.5, "
-              "ruled 2026-09-06; derived by "
+    "source": "pt-v19's charter, ruled 2026-09-06; derived by "
               "tools/calibration/vix_ar1_ruler.py",
 }
 
@@ -2918,10 +2910,9 @@ CERTIFIED_HORIZON_DAYS = 252
 #: (`REAL_VIX_AR1` above).
 #:
 #: No 60-day, 180-day or 756-day entry exists because no band set has been
-#: derived at those horizons. `realism_bands_horizon.py` in the design
-#: repository measured real windows at 756, 1260 and 2520 bars on a 32-name
-#: sub-roster, and none of those tables has had the literature reconciliation
-#: applied, so none of them is a shipped ruler.
+#: derived at those horizons. Real windows were measured at 756, 1260 and
+#: 2520 bars on a 32-name sub-roster, and none of those tables has had the
+#: literature reconciliation applied, so none of them is a shipped ruler.
 RULERS_BY_HORIZON: dict[int, dict[str, Any]] = {
     CERTIFIED_HORIZON_DAYS: {
         "bands": REAL_MARKETS,
@@ -3209,8 +3200,7 @@ DISPERSION = (CRISIS_DISPERSION_ROW,)
 #: crosses an integer near the middle, and is unchanged by any seed above it
 #: going from two hits to thirty-three, so it is nearly blind to the
 #: quantity its row names. One run read both ways differed by 3.2x, which is
-#: the finding this kind exists to close
-#: (tradefloor-design/programme/results/tail-estimator.md).
+#: the finding this kind exists to close.
 AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled",
              "index_tail_dn3_pct": "pooled_rate"}
 
@@ -3683,9 +3673,8 @@ def _index_drift_pct(
     That roster opens 0.78 of a population standard deviation above fair
     value, so its LEVEL carries a draw as well as a model: one build reads
     -8.603 on it against +3.989 and +7.050 on rosters 204 and 209. Those
-    three across-roster figures come from the era's roster sweep and are
-    recorded in the design note `programme/index-architecture.md`, which
-    also carries roster 111's +0.038 mean log deviation, the population
+    three across-roster figures come from the era's roster sweep, which
+    also gives roster 111's +0.038 mean log deviation, the population
     mean of -0.002 and the across-roster standard deviation of 0.052 that
     the 0.78 is computed from.
 
@@ -3716,15 +3705,14 @@ def _index_drift_pct(
 
     The certified value is the first 252 sessions from the opening, and it
     is not the level a longer study sees. The era that produced this row
-    was decomposed at both horizons in `programme/terms-by-horizon.md` in
-    the design repository: six of its ten terms are one-off level shifts
-    that work through the mispricing, and `s` is a stationary process at a
-    60-day half-life, so a persistent injection settles at an offset that
-    is bought once and does not compound, with four-year to one-year
+    was decomposed at both horizons: six of its ten terms are one-off level
+    shifts that work through the mispricing, and `s` is a stationary process
+    at a 60-day half-life, so a persistent injection settles at an offset
+    that is bought once and does not compound, with four-year to one-year
     ratios from 0.11 to 0.36. The growth term compounds at 0.88, and the
-    cycle clock is worth nothing inside a year and +1.8 a year over four.
-    So the ranking of the terms inverts with the horizon, and a reader of
-    a multi-year run has to take this row as the first-year figure it is.
+    cycle clock is worth nothing inside a year and +1.8 a year over four. So
+    the ranking of the terms inverts with the horizon, and a reader of a
+    multi-year run has to take this row as the first-year figure it is.
 
     # Measured
 
@@ -3747,13 +3735,11 @@ def _index_drift_pct(
     2.1 points apart on this roster and both are quoted so that neither
     can be read as the other.
 
-    The derivation of the first row is
-    `tradefloor-design/programme/index-drift-investigation.md`, and the
-    terms it names are a down tilt in the market factor, a rising rate
+    The first row comes from the project's investigation of index drift,
+    and the terms it names are a down tilt in the market factor, a rising rate
     path, a negative jump mean, an asymmetric stop cascade and the
     roster's own opening condition. The pt-v18 era gives each of those
-    back and adds a growth term; its own figures are in the design note
-    `programme/index-architecture.md`, and they are in the log convention
+    back and adds a growth term; its own figures are in the log convention
     too, so about 1.9 points is added to each of them to read them in this
     row's convention.
 
@@ -3816,7 +3802,7 @@ def _index_drift_pct(
 
 
 #: Window, in sessions, for the correlation-persistence diagnostic. The
-#: real reference (real-corr-persistence.json) was measured at 21.
+#: real reference was measured at 21.
 CORR_PERSISTENCE_WINDOW = 21
 
 
@@ -3833,7 +3819,7 @@ def _dependence(
 
     Three of them condition the pairwise correlation on something, and exist
     because the unconditional mean over all pairs is blind to the structure
-    that matters (CORRELATION-REVIEW-2026-08-25.md §1): a single scalar cannot
+    that matters (the correlation review of 2026-08-25): a single scalar cannot
     see whether correlation is higher on down days than up days, whether
     same-sector pairs co-move more than cross-sector pairs, or whether either
     varies in time. A search cannot preserve what it cannot see, so these are
@@ -3928,7 +3914,7 @@ def _dependence(
             # non-overlapping 21-day windows, then the lag-1 autocorrelation
             # of that series. Real markets on the 40-name reference roster
             # read 0.388 with a half-life near fifteen days
-            # (tradefloor-design/real-corr-persistence.json, 126 windows).
+            # (126 windows).
             # Non-overlapping windows on purpose; overlapping ones
             # manufacture persistence out of shared days.
             #
@@ -3945,7 +3931,7 @@ def _dependence(
             # the arm with the VIX pinned at its anchor every day reads +0.15
             # on thirty seeds, higher than the free arm's +0.13, and the
             # paired difference across the same seeds is -0.006 with a t of
-            # -0.4 (tradefloor-design/programme/band-form-design.md 5f). So
+            # -0.4 (the band-form measurement of 2026-09-05). So
             # the row certifies that correlation varies WITH MEMORY and says
             # nothing about which channel carries it; attributing it needs a
             # constant-factor-variance arm, whose dial is not identified.
@@ -4104,7 +4090,7 @@ def measure(
     but the factor variance opens at the preset's unconditional level and
     walks to the pinned target at the preset's own
     ``alpha + beta + gamma/2``; a whole-window statistic then averages that
-    walk. `measurement-integrity.md` 1.1 measured it on the crisis lever:
+    walk. The measurement-integrity review measured it on the crisis lever:
     the low pin settles DOWN and the high pin UP, so the ratio of the two is
     biased low by four to eight per cent, by an amount that is a property of
     the preset and not of the lever. A burn is the only reading under which
@@ -4674,8 +4660,8 @@ BAND_RULE_TOLERANCE_PROVENANCE = {
                      "crisis one); five is the count behind the 504-bar "
                      "bands and four behind the 504-bar persistence band "
                      "(REAL_MARKETS_504)",
-    "source": "tradefloor-design/programme/band-form-design.md section 4 "
-              "and results/bandform-measured.md follow-up 7, 2026-09-05",
+    "source": "the band-form design and its measured follow-up, "
+              "2026-09-05, in the project's unpublished design notes",
     "unrounded_note": "the rate is measured on the UNROUNDED band. Outward "
                       "rounding widens a shipped band by up to one quantum "
                       "an edge, so a shipped band is at most this tolerant "
@@ -4691,8 +4677,8 @@ BAND_RULE_TOLERANCE_PROVENANCE = {
 #: table and only that rule's.
 #:
 #: `fixed` is `median +/- t(n) * trimmed_sd` with `t(n)` SOLVED so the rate
-#: is the same at every window count. It is the rule the universal band of
-#: `certification-bands.md` section 14 is built with, adopted under
+#: is the same at every window count. It is the rule the universal band is
+#: built with, adopted under
 #: `ruling-the-ruler-is-the-universal-band`, and under it the rate is an
 #: input rather than an output: the window count improves the ESTIMATE and
 #: does not change the size of the test.
@@ -4765,9 +4751,8 @@ BAND_RULE_FIXED_MULTIPLIER_PROVENANCE = {
                         "BAND_RULE_TOLERANCE at a worst residual of 1e-05, "
                         "which is what earns it the right to extend the "
                         "rule to counts nobody has shipped",
-    "source": "tradefloor-design/programme/results/certification-bands.md "
-              "section 13.1 and results/band-basis-sweep.md section 2, "
-              "2026-09-14",
+    "source": "the certification-band derivation and the band-basis "
+              "sweep, 2026-09-14, in the project's unpublished design notes",
     "why_not_extend_BAND_RULE_TOLERANCE": "because that table measures the "
         "SPREAD rule, whose rate at 35 windows is 0.00688 and at 16 is "
         "0.02535. Adding those keys would leave a table whose name reads "
@@ -4778,8 +4763,8 @@ BAND_RULE_FIXED_MULTIPLIER_PROVENANCE = {
 #:
 #: WHY THIS TABLE EXISTS. Until it landed, `REAL_MARKETS_UNIVERSAL` and
 #: `REAL_MARKETS_UNIVERSAL_504` were fifty-six typed edges with nothing in
-#: this package underneath them. The readings lived in the design
-#: repository's `whole-tape/panel32.json` and were never committed here, so
+#: this package underneath them. The readings lived in the project's
+#: unpublished design notes and were never committed here, so
 #: no test could tell a measured edge from a mistyped one, and a typo in
 #: either table would have shipped green. That is the state `fear_gauge_dn1`
 #: was in until 2026-09-15, one table over, and it is the state any band is
@@ -4819,9 +4804,8 @@ UNIVERSAL_WINDOWS: dict[str, Any] = {
     "common_bars": 9842,
     "anchor": "backward from the last bar; remainder dropped at the start",
     "crisis_dates": ("1987-10-19", "2008-10-15", "2020-03-16"),
-    "source": "tradefloor-design/programme/results/whole-tape/panel32.json, "
-              "promoted 2026-09-15; the bands it derives are "
-              "certification-bands.md section 14's, adopted under "
+    "source": "the whole-tape panel of 32 names, promoted 2026-09-15; the "
+              "bands it derives are the universal band's, adopted under "
               "ruling-the-ruler-is-the-universal-band",
     #: Which band tables these readings are the real side of, per horizon.
     "tables": {252: "facts.REAL_MARKETS_UNIVERSAL",
@@ -5109,7 +5093,7 @@ _Adjustments = dict[str, dict[str, tuple[float, str, str]]]
 #: The Campbell ceiling is ABSENT rather than retired quietly: the rule's own
 #: ceiling at 252 is 41.0, past the 36.0 the shipped decade band was moved
 #: out to, so applying the literature move would round the band INWARD and
-#: REALISM-BANDS.md allows an outward move only.
+#: the band rules allow an outward move only.
 REAL_MARKETS_UNIVERSAL_ADJUSTMENTS: dict[int, _Adjustments] = {
     252: {
         "abs_return_acf1": {
@@ -5142,7 +5126,7 @@ REAL_MARKETS_UNIVERSAL_ADJUSTMENTS: dict[int, _Adjustments] = {
 #: redundant -- the band's own ceiling now reaches 41.0, past the 36.0 the
 #: adjustment moved the shipped edge out to.
 #:
-#: Derived in `certification-bands.md` section 14 and adopted under
+#: Derived in the certification-band derivation and adopted under
 #: `ruling-the-ruler-is-the-universal-band`. THE MODEL IS MEASURED ON
 #: REALISM, NOT AGAINST ARTIFICIAL BANDS THAT MAY NOT BE ACCURATE, and this
 #: table is that sentence as data.
@@ -5213,7 +5197,7 @@ REAL_MARKETS_UNIVERSAL_504: dict[str, tuple[float, float]] = {
 #: disagrees. A name is not a basis. An era, a window count and a rule are.
 #:
 #: Anything that publishes a band verdict stamps the basis, not the symbol,
-#: and `programme/scripts/guards.py` guard 20
+#: and a guard kept with the project's unpublished design notes
 #: (`published-constant-binds-its-vector`) refuses a band named without one.
 BAND_BASIS: dict[str, dict[str, Any]] = {
     "facts.REAL_MARKETS": {
@@ -5345,8 +5329,8 @@ RULED_TAIL_WINDOWS: dict[str, Any] = {
     "threshold_pct": -3.0,
     "anchor": "backward from the last bar; remainder dropped at the start",
     "continues": "facts.INDEX_TAIL_WINDOWS, which holds the 1990 span",
-    "source": "tradefloor-design/programme/results/longest-tape/"
-              "tail-band.json, the 1927 cut; promoted 2026-09-15",
+    "source": "the longest-tape tail band, the 1927 cut; promoted "
+              "2026-09-15",
     "rows": ("index_tail_dn3_pct",),
     "windows": {
         252: (
@@ -5648,10 +5632,9 @@ DRIFT_LEGS: dict[str, dict[str, Any]] = {
             "resolution); each edge printed to one decimal place, which "
             "rounds to NEAREST and not outward as the window-derived bands "
             "do",
-    "source": "tools/calibration/index_band.py; the figures from "
-              "tradefloor-design/programme/results/longest-tape/"
-              "drift-band.json, run 2026-09-14, and the 1950 leg reproduces "
-              "the 2026-09-03 run REAL_MARKETS_PROVENANCE cites",
+    "source": "tools/calibration/index_band.py; the figures from its "
+              "longest-tape drift run of 2026-09-14, and the 1950 leg "
+              "reproduces the 2026-09-03 run REAL_MARKETS_PROVENANCE cites",
 }
 
 
@@ -5709,11 +5692,10 @@ def drift_leg_band(cap_weighted: str, premium: str = "rsp") -> tuple[float, floa
 RULED_DRIFT_BAND: tuple[float, float] = (1.1, 10.3)
 
 #: `fear_gauge_dn1`'s ruled band, per horizon. RULED on 2026-09-15 by
-#: `ruling-nineteen-rows-with-dn3-re-derived` (design-repo verdict ledger),
-#: in terms: "fear_gauge_dn1 on its new whole-tape band, [0.39, 3.03] at
-#: 252 and [0.59, 2.73] at 504". Landed in the composed table on
-#: 2026-09-19; until then the row sat in `RULED_UNREADABLE` waiting for a
-#: ruling that had already been made.
+#: `ruling-nineteen-rows-with-dn3-re-derived`, in terms: "fear_gauge_dn1 on
+#: its new whole-tape band, [0.39, 3.03] at 252 and [0.59, 2.73] at 504".
+#: Landed in the composed table on 2026-09-19; until then the row sat in
+#: `RULED_UNREADABLE` waiting for a ruling that had already been made.
 #:
 #: READ FROM THE ROW'S OWN PROVENANCE BLOCK rather than typed, so the band
 #: the bar grades against is the one `FEAR_DN1_WINDOWS` derives and
@@ -5739,7 +5721,7 @@ RULED_FEAR_DN1_BAND: dict[int, tuple[float, float]] = {
 #: I want the model to dictate the performance, not alter the measurement
 #: to make it appear working." Applied on the desk's own measurement
 #: (`dn3derive-the-corrected-derivation-is-a-weaker-ruler-and-should-not-
-#: be-adopted`, design-repo verdict ledger): over 173 retained arm readings
+#: be-adopted`): over 173 retained arm readings
 #: this band rejects 8; the one section 14 form that is valid at the
 #: project's own last-bar anchor, [0.91, 10.83] and [0.85, 10.36], rejects
 #: 5; the tighter front-anchored [2.16, 7.38] rejects 12 but is cut at an
@@ -5863,12 +5845,12 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "what this entry said until 2026-09-18: a band of [0.82, 1.04] "
             "at 252 and [0.90, 1.01] at 504 was derived off-library and "
             "Simon ruled it this row's ruled band on 2026-09-15 "
-            "(design-repo verdict-ledger.json, ruling-vix-ar1-band-adopted, "
-            "which also publishes the row FLOOR-ONLY under "
-            "ruling-dead-edges-are-not-counted). The blocker this entry "
-            "used to name, vix-ar1-band-not-adopted, was closed the same "
-            "day by closes-vix-ar1-band-not-adopted and must not be quoted "
-            "as live. What is outstanding is the table entry, tracked as "
+            "(ruling-vix-ar1-band-adopted, which also publishes the row "
+            "FLOOR-ONLY under ruling-dead-edges-are-not-counted). The "
+            "blocker this entry used to name, vix-ar1-band-not-adopted, "
+            "was closed the same day by closes-vix-ar1-band-not-adopted "
+            "and must not be quoted as live. What is outstanding is the "
+            "table entry, tracked as "
             "the standing open dn3derive-the-ruling-names-a-vix-ar1-ruler-"
             "the-library-does-not-carry. NO BAND IS INVENTED HERE AND NONE "
             "IS READ: until the entry lands, the row is ungraded. "
@@ -5959,8 +5941,9 @@ _resolve_as_at_252()
 #: because ^VIX is not in the 32-name equity set. This block cited that
 #: derivation as `vix-ar1-band-derivation.md` section 9 until 2026-09-18;
 #: no such note was ever written, in either repository, and the surviving
-#: record of the derivation is the design repo's ledger entry
-#: `ruling-prep-vix-ar1-separately-derived-band`. The ruling the old text
+#: record of the derivation is the ruling-prep entry
+#: `ruling-prep-vix-ar1-separately-derived-band` in the project's
+#: unpublished design notes. The ruling the old text
 #: said was pending has LANDED -- `ruling-vix-ar1-band-adopted`,
 #: 2026-09-15, which adopts the band and publishes the row floor-only --
 #: but the table entry has not, so `RULED_UNREADABLE` still holds the row
@@ -6223,8 +6206,8 @@ MEDIAN_SE_FACTOR = math.sqrt(math.pi / 2)
 #: across-year dispersion for the first, the protocol's own resolution at
 #: thirty seeds for the second. So the panel publishes THREE counts
 #: (`envelope.certify`) and this table is what the second is measured
-#: against. Source: tradefloor-design/programme/band-form-design.md,
-#: sections 2 and 3, 2026-09-05.
+#: against. Source: the band-form design of 2026-09-05, in the project's
+#: unpublished design notes.
 NULLS: dict[str, dict[str, Any]] = {
     "annualised_vol_pct": {
         "value": None, "kind": "undetermined",
@@ -6815,8 +6798,7 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     `scoring_rule` builds its `blind` list with a reason rather than by
     reading an exception's message.
 
-    R7, THE ERROR BARS, ruled by Simon on 2026-09-06 and recorded in
-    `tradefloor-design/programme/RULINGS-2026-09-06.md`: `se` is the
+    R7, THE ERROR BARS, ruled by Simon on 2026-09-06: `se` is the
     WITHIN-DECADE standard error of the 2015-2025 reference panel, and the
     measured disagreement between that decade and the 32-name 1990-2025
     reference -- one to three `se` on three rows, recorded in
@@ -6830,8 +6812,8 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     EVERY VALUE IS DERIVED FROM THE WINDOWS, and no stored summary is read
     from any file. `centre`, `se` and `df` come from `real_centre`,
     `real_centre_se` and `real_centre_df`, which read the window tables and
-    `trimmed_sd` -- the median-centred trim `BAND_RULE` names. The design
-    repository's `bands-504-noncrisis.json` carries a `trimmed_sd` field
+    `trimmed_sd` -- the median-centred trim `BAND_RULE` names. The 504-bar
+    non-crisis band file carries a `trimmed_sd` field
     per row that was written on 2026-08-22 and never regenerated after the
     trim centre was named on 2026-09-04, so its values are the superseded
     mean-centred ones; on `return_acf1` the two drop different windows and
@@ -7092,7 +7074,7 @@ def mechanism_verdict(values: Sequence[float], key: str, *,
 #: 0.4713 per-seed sd, and this row's tape se is 0.010997 -- 1.29 times that
 #: resolution, so the centre's error is NOT small against what the gate can
 #: see, and the gate's false-alarm rate rises with seed count while the
-#: tape's error stays put. `programme/widthless-design.md` derives both
+#: tape's error stays put. The design of the widthless form derives both
 #: numbers and refuses this form as a SOUNDNESS test on three other
 #: candidate rows for exactly that reason. It is admitted here on the one
 #: row whose per-window tape distribution exists, as a NON-REGRESSION gate
@@ -7203,7 +7185,7 @@ def structure_verdict(values: Sequence[float], key: str, *,
 
 #: The tape's RISE in `vix_ar1_debiased` from the one-year window to the
 #: two-year one: the second gate's one verdict since Simon's ruling of
-#: 2026-09-21 (design repo, `ruling-the-second-gate-grades-the-rise-...`).
+#: 2026-09-21 (`ruling-the-second-gate-grades-the-rise-...`).
 #:
 #: WHY A RISE AND NOT TWO CENTRES. The debiased lag-1 autocorrelation of
 #: the real VIX reads `REAL_VIX_AR1[252]` on 35 one-year windows and
@@ -7215,8 +7197,8 @@ def structure_verdict(values: Sequence[float], key: str, *,
 #: `structure_rise_verdict` is that measurement. The per-horizon readings
 #: stay on the record by name.
 #:
-#: WHY THE TAPE'S RISE IS THE PAIRED ONE, corrected 2026-09-21 (design
-#: repo, `ptv19gjr-registration.md`). The model's statistic is PAIRED: each
+#: WHY THE TAPE'S RISE IS THE PAIRED ONE, corrected 2026-09-21 in that
+#: day's registration. The model's statistic is PAIRED: each
 #: seed's two-year reading minus its own first year, because the 504-day
 #: run contains the 252-day one. The tape target this module first carried
 #: was the difference of two INDEPENDENT window medians, and on the tape's

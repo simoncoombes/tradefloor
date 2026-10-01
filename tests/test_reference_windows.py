@@ -125,8 +125,8 @@ def test_the_two_centres_disagree_on_a_shipped_edge_and_the_median_is_the_one_sh
 def test_every_derivable_band_is_the_rule_plus_its_named_adjustment(key):
     """A shipped band is `BAND_RULE` on the windows, or that plus a named move.
 
-    Six rows ship the rule's band exactly. Three carry an adjustment
-    REALISM-BANDS.md names, recorded as data in `REAL_MARKETS_ADJUSTMENTS`;
+    Six rows ship the rule's band exactly. Three carry an adjustment the
+    band rules name, recorded as data in `REAL_MARKETS_ADJUSTMENTS`;
     each must move the edge it names in the direction it claims, so a
     no-op entry or a clamp filed as a widening is caught. Anything else is a
     band nobody can derive, which is what this test exists to refuse.
@@ -517,12 +517,12 @@ def test_the_fear_dn1_windows_are_start_anchored_and_the_table_says_so(horizon):
     correctly and all abut and which simply ends short, silently discarding
     the most recent data and moving every window each time the cache grows".
 
-    This table is that construction. `derive_dn1.py` cuts forward from the
-    first paired session where `panel32.py`, which implements the same
-    whole-tape rule for the fourteen shape rows, walks backward from the
-    last bar. The band was adopted as derived rather than silently re-cut,
-    and the deviation is pinned here so that changing it is a deliberate act
-    with a failing test behind it instead of a quiet edit.
+    This table is that construction. The dn1 derivation cuts forward from the
+    first paired session where the whole-tape panel script, which implements
+    the same whole-tape rule for the fourteen shape rows, walks backward from
+    the last bar. The band was adopted as derived rather than silently
+    re-cut, and the deviation is pinned here so that changing it is a
+    deliberate act with a failing test behind it instead of a quiet edit.
 
     What it costs is measured in the provenance and it moves no verdict on
     the record. What it would cost later is not bounded, which is why this
