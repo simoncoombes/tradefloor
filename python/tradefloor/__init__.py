@@ -20,7 +20,7 @@ from . import _core
 from .portfolio import Cancel, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
-from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
+from .harness import Agent, History, Observation, Scorecard, evaluate, leaderboard
 from . import sandbox
 from .sandbox import HiddenState, MarketView, PortfolioView, SandboxError
 from .replay import replay
@@ -117,7 +117,7 @@ __all__ = [
     "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
-    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "Observation",
+    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "History", "Observation",
     "sandbox", "MarketView", "HiddenState", "PortfolioView", "SandboxError",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "capture_withheld",

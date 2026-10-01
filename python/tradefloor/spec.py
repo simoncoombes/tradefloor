@@ -840,4 +840,5 @@ class _DailyCadence:
         # state a privileged strategy was granted.)
         return self._inner.act(Observation(
             obs.day, obs.day, obs.tickers, obs.prices, obs.portfolio,
-            obs.engine, obs._adv, 1, hidden=getattr(obs, "hidden", None)))
+            obs.engine, obs._adv, 1, hidden=getattr(obs, "hidden", None),
+            history=getattr(obs, "history", None)))
