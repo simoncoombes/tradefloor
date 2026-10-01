@@ -232,8 +232,9 @@ def test_the_roster_grant_is_refused_on_the_default(mix):
 
     The grant the test above asks on pt-v19 is refused on pt-v20, whether
     the caller names it or leaves the default, and the reason says which
-    preset the mixes were measured on. The refusal holds until
-    tools/calibration/roster_shapes.py runs on pt-v20.
+    preset the grant was measured on. The same run on pt-v20 misses a shape
+    row at 504 days for two mixes
+    (`test_the_pt_v20_roster_run_does_not_hold`), so the refusal stays.
     """
     assert env.PRESET == "pt-v20" and ROSTER_PRESET == "pt-v19"
     rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
@@ -368,6 +369,51 @@ def test_the_roster_tables_are_the_committed_measurement():
         got = tuple(round(record["results"][f"{mix}@{h}"]["median"]
                           ["index_drift_pct"], 4) for h in m["horizons"])
         assert got == drift, mix
+
+
+def test_the_pt_v20_roster_run_does_not_hold():
+    """measurements/roster-shapes-pt-v20.json, re-scored with this build.
+
+    The run behind the pt-v19 grant, repeated on pt-v20 at 0.8.6. Its
+    balanced mix reads pt-v20's certified panels to four places, so it is
+    the certified roster on the default. Every concentrated mix holds every
+    shape row the bands can grade at 252 days, and at 504 days the S&P-like
+    and technology-heavy mixes miss `volume_abs_return_corr` on its ceiling.
+    The roster-concentration gap quotes those two readings, and `check`
+    grants no mix on pt-v20 because of them.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    record = json.loads((root / "measurements" / "roster-shapes-pt-v20.json")
+                        .read_text(encoding="utf-8"))
+    assert record["preset"] == env.PRESET == "pt-v20"
+    assert tuple(record["seeds"]) == env.ROSTER_MEASUREMENT["seeds"]
+    assert record["shapes"] == {"balanced": {}, **env.ROSTER_SHAPES}
+    certified = tradefloor.preset_record("pt-v20")
+    for h, panel in ((252, "panel_252"), (504, "panel_504")):
+        med = record["results"][f"balanced@{h}"]["median"]
+        for k in SHAPE:
+            assert round(med[k], 4) == round(certified[panel][k], 4), (h, k)
+
+    misses = {}
+    for mix in env.ROSTER_SHAPES:
+        for h in env.ROSTER_MEASUREMENT["horizons"]:
+            r = record["results"][f"{mix}@{h}"]
+            rows = env.score(r["median"], horizon_days=h,
+                             basis="ruled")["statistics"]
+            out = [k for k in SHAPE
+                   if k in rows and rows[k]["in_band"] is False]
+            if out:
+                misses[(mix, h)] = {k: round(r["median"][k], 4) for k in out}
+    assert misses == {
+        ("sp500_like", 504): {"volume_abs_return_corr": 0.6367},
+        ("tech_heavy", 504): {"volume_abs_return_corr": 0.6332},
+    }
+    detail = {g.id: g for g in env.GAPS}["roster-concentration"].detail
+    for reading in misses.values():
+        assert f"{reading['volume_abs_return_corr']:.4f}" in detail
 
 
 def test_the_volume_change_row_is_now_inside_at_both_horizons():

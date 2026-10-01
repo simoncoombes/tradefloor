@@ -859,7 +859,9 @@ ROSTER_SHAPES: dict[str, dict[str, int]] = {
 #: is not passed, so a new default loses the grant until it is measured
 #: again. Since 0.8.5 the default is pt-v20 and the mixes are pt-v19's, so
 #: a caller whose run names pt-v19 keeps the grant and every other caller
-#: is refused.
+#: is refused. The same run on pt-v20 is kept as
+#: `measurements/roster-shapes-pt-v20.json` and grants nothing: two mixes
+#: miss `volume_abs_return_corr` at 504 days there.
 ROSTER_MEASUREMENT: dict[str, Any] = {
     "preset": "pt-v19",
     "run": "docs080b",
@@ -1327,10 +1329,16 @@ GAPS: tuple[Gap, ...] = (
             "names pt-v19 as its preset (`preset=\"pt-v19\"`), the horizon "
             "is 504 days or less, and every named statistic is a shape row "
             "that mix held at that horizon (`ROSTER_SHAPE_ROWS`). The "
-            "default has been pt-v20 since 0.8.5 and the mixes have not "
-            "been measured on it, so `check` refuses a concentrated roster "
-            "on pt-v20, and on any preset but pt-v19, and says the mixes "
-            "were measured on pt-v19 only. Two limits remain and come back as "
+            "default has been pt-v20 since 0.8.5. The same run on pt-v20 "
+            "(measurements/roster-shapes-pt-v20.json) held "
+            "every shape row the bands could grade at 252 days for all four "
+            "mixes, but at 504 days the S&P-like and technology-heavy mixes "
+            "read volume_abs_return_corr at 0.6367 and 0.6332 against a "
+            "ceiling of 0.63, where the balanced roster reads 0.6266. So the "
+            "mixes do not hold on pt-v20 as they did on pt-v19, and `check` "
+            "refuses a concentrated roster on pt-v20, and on any preset but "
+            "pt-v19, and says the grant is measured on pt-v19 only. Two "
+            "limits remain and come back as "
             "warnings: each mix is one roster draw, and the bands come from "
             "broad real-market windows, so a single-sector portfolio is "
             "graded on a broad market's ruler.\n\n"
@@ -1344,10 +1352,8 @@ GAPS: tuple[Gap, ...] = (
             "concentrated mixes at 252 days, against a ruled band of 1.1 to "
             "10.3 (`ROSTER_INDEX_DRIFT`). sector_excess_corr on an "
             "all-technology roster and corr_persistence_acf1 past 252 days "
-            "were not graded, for the reasons above. The measurement ran no "
-            "horizon past 504 days and no preset but pt-v19. Measuring the "
-            "mixes on pt-v20 is the same run on the new default: thirty "
-            "seeds, five mixes, 252 and 504 days."
+            "were not graded, for the reasons above. Neither run went past "
+            "504 days."
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
@@ -1598,10 +1604,11 @@ def _roster_refusal(shape: str | None, horizon_days: int,
     if preset != m["preset"]:
         return (
             f"the {shape} mix was {_roster_source()}, and the question is "
-            f"on {preset}. The four mixes were measured on {m['preset']} "
-            f"only. Re-run {m['tool']} on {preset} before citing it for a "
-            f"concentrated roster, or pass preset={m['preset']!r} if the "
-            f"run names {m['preset']}")
+            f"on {preset}. The grant is measured on {m['preset']} only "
+            f"(the roster-concentration gap says why pt-v20's run of "
+            f"{m['tool']} is not granted). Measure {preset} before citing it "
+            f"for a concentrated roster, or pass preset={m['preset']!r} if "
+            f"the run names {m['preset']}")
     h = _roster_horizon(horizon_days)
     if h is None:
         return (
