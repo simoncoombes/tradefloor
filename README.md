@@ -317,7 +317,10 @@ the first 17 rows and reads 15 of 17, failing C4a and C4b. On pt-v20 the 2008
 replay falls 45 percent against the real 57, the VIX is above 30 on 5.9
 percent of days against a real 8.2, and the index returns 6.4 percent a year
 over 21 years against a real 6.25. The verdicts ship with the package as
-`tf.preset_record()["long_run"]`.
+`tf.preset_record()["long_run"]`. The scripts that graded pt-v20, their
+inputs and the grading run's output are in `validation/pt-v20/`, and
+[validation/README.md](https://github.com/simoncoombes/tradefloor/blob/main/validation/README.md) says how to check the grade
+in a second or run it again.
 
 Some rows pass near their edges. A timing rule on the published macro data
 uses 92 percent of its tolerance. The price trough leads the earnings trough

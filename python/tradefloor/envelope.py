@@ -434,8 +434,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: 28 held out. The outgoing pt-v18 PASSES on both panels, at k = 20 and
 #: k = 18. The block was first laid down carrying a refusal rather than
 #: withheld until it was green: a row nobody can see is a row nobody fixes.
-#: By the owner's ruling of 2026-09-23 (design repo
-#: `programme/longrun/CRITERIA.md`) the row is REPORTED and investigated and
+#: By the owner's ruling of 2026-09-23
+#: (`validation/pt-v20/programme/longrun/CRITERIA.md`) the row is REPORTED and investigated and
 #: does not gate a preset; the pass bar is the long-run criteria and every
 #: ruled band.
 CERTIFIED_STRUCTURE: dict[str, float] = {

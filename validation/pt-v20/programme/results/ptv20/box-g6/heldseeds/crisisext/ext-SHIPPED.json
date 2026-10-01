@@ -1,0 +1,91 @@
+{
+ "kind": "crisisext",
+ "rule": {
+  "row": "crisis_sector_dispersion",
+  "need": 10,
+  "block": 30,
+  "first": 1001,
+  "blocks": 9,
+  "last_seed": 1270
+ },
+ "label": "heldout_seeds",
+ "cell": "SHIPPED",
+ "cell_file": "/home/ec2-user/out/heldseeds/cells/cell-SHIPPED.json",
+ "days": 252,
+ "base": "pt-v19",
+ "overrides": {},
+ "fingerprint": "pt-v19",
+ "commit": "b89901979e5ab449446daf1cf8e354667e3f1cec",
+ "held_roster": [
+  40,
+  111
+ ],
+ "own_seeds": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30
+ ],
+ "own_readings": 4,
+ "blocks": [
+  {
+   "seeds": [
+    1001,
+    1030
+   ],
+   "readings": {
+    "1005": 1.3933325592106285,
+    "1011": 1.2966797247491582,
+    "1019": 1.0770538870278143,
+    "1022": 1.3843879269274038
+   },
+   "absent": 26,
+   "count_after": 8,
+   "elapsed_s": 52.1
+  },
+  {
+   "seeds": [
+    1031,
+    1060
+   ],
+   "readings": {
+    "1032": 1.1621716332118102,
+    "1042": 1.3037320927673446,
+    "1048": 1.2059435646128929,
+    "1056": 1.1952843669872217,
+    "1060": 1.1947032648221587
+   },
+   "absent": 25,
+   "count_after": 13,
+   "elapsed_s": 45.3
+  }
+ ],
+ "status": "reached",
+ "total_readings": 13
+}

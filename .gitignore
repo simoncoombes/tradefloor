@@ -14,7 +14,8 @@ __pycache__/
 .venv-finrobot/
 
 # Internal design material lives in the private tradefloor-design repo,
-# never in this one. The public documentation lives in the private
+# never in this one. The exception is validation/: the grade the default
+# preset shipped on, published by the owner's decision of 2026-09-26. The public documentation lives in the private
 # tradefloor-docs repo, which Vercel serves as tradefloor.dev.
 
 # Spike artifacts
