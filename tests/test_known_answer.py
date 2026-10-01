@@ -11,6 +11,7 @@ without ever running it.
 This file needs nothing but the installed package.
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ import known_answer  # noqa: E402
 import known_answer_book  # noqa: E402
 import known_answer_presets  # noqa: E402
 import known_answer_seed64  # noqa: E402
+import known_answer_traded  # noqa: E402
 import tradefloor  # noqa: E402
 
 
@@ -170,6 +172,112 @@ def test_a_seed_above_two_to_the_thirty_two_matches_its_baseline():
         "which no release may do, or a platform disagrees.")
 
 
+def _traded_baseline() -> dict:
+    return json.loads(
+        (HERE / "known_answer_traded.json").read_text(encoding="utf-8"))
+
+
+def test_a_traded_run_matches_its_baseline():
+    """A run through `tradefloor.evaluate`, beside the engine's digests.
+
+    Every other digest here covers the engine. This one covers what an
+    agent benchmark reports: the reference agents and a scripted
+    limit-order agent through `evaluate` on pt-v20, with each agent's
+    order log, fills and scorecard hashed (`known_answer_traded.py` says
+    what each covers). It must agree on every platform the determinism
+    workflow builds.
+
+    The failure names the agent and the part that moved. A deliberate
+    change to pt-v20, a reference agent or the scoring is re-based with
+    `python tests/known_answer_traded.py --write`, with a sentence in the
+    baseline's note. A digest that moved on one platform only is never
+    re-based.
+    """
+    baseline = _traded_baseline()
+    k = known_answer_traded
+    assert baseline["tradedKatVersion"] == k.TRADED_KAT_VERSION, (
+        "TRADED_KAT_VERSION changed without regenerating "
+        "known_answer_traded.json.")
+    assert (baseline["seed"], baseline["agentSeed"], baseline["preset"],
+            baseline["days"], baseline["stepsPerDay"], baseline["ticksPerStep"],
+            baseline["cash"], baseline["maxLeverage"]) == (
+        k.SEED, k.AGENT_SEED, k.PRESET, k.DAYS, k.STEPS_PER_DAY,
+        k.TICKS_PER_STEP, k.CASH, k.MAX_LEVERAGE)
+    presets = json.loads(
+        (HERE / "known_answer_presets.json").read_text(encoding="utf-8"))
+    assert baseline["presetRow"] == presets["presets"][k.PRESET], (
+        f"{k.PRESET}'s row in known_answer_presets.json is not the one this "
+        "baseline was recorded on, so the preset changed since. Re-base this "
+        "baseline on the new preset with `python tests/known_answer_traded.py "
+        "--write` and say so in its note.")
+    assert list(baseline["agents"]) == list(k.AGENTS)
+
+    buffers = k.part_buffers(*k.traded_run())
+    measured = k.part_digests(buffers)
+    moved = [f"{name} {part}" for name in k.AGENTS for part in k.PARTS
+             if measured[name][part] != baseline["agents"][name][part]]
+    assert not moved, (
+        f"the traded run moved: {', '.join(moved)}. If pt-v20, a reference "
+        "agent or the scoring changed on purpose, re-base with `python "
+        "tests/known_answer_traded.py --write` and say what moved in the "
+        "note. If only this platform disagrees, that is the failure the "
+        "determinism workflow exists to catch.")
+    data = k.combined_buffer(buffers)
+    assert len(data) == baseline["bytes"]
+    assert hashlib.sha256(data).hexdigest() == baseline["sha256"]
+
+
+def test_the_traded_run_hashes_every_scorecard_field():
+    """A field added to `Scorecard` has to be placed: hashed by value, or
+    by count like the message lines. Left out, the digest would pass while
+    the new field differed between platforms."""
+    k = known_answer_traded
+    placed = set(k.SCORECARD_FIELDS) | set(k.SCORECARD_COUNTED)
+    assert placed == set(tradefloor.Scorecard.__slots__), (
+        "Scorecard's fields and the ones known_answer_traded.py hashes "
+        f"differ: {sorted(placed ^ set(tradefloor.Scorecard.__slots__))}. "
+        "Add the new field to SCORECARD_FIELDS or SCORECARD_COUNTED, then "
+        "re-base with `python tests/known_answer_traded.py --write`.")
+
+
+def test_recording_the_agents_changes_nothing_they_do():
+    """The recorder sits between `evaluate` and each agent. Unwrapped, the
+    same agents must score the same to the bit, or the digest would pin a
+    run nobody else can make."""
+    k = known_answer_traded
+    wrapped, _ = k.traded_run()
+    plain = k.evaluate(k.agents())
+    for name in k.AGENTS:
+        assert wrapped[name].as_dict() == plain[name].as_dict(), name
+
+
+def test_the_traded_run_covers_something():
+    """Guard against a digest that passes because nothing traded.
+
+    Every agent fills, the oracle explains its days, and the scripted agent
+    reaches every part of `evaluate`'s limit path: a limit that rests and
+    fills in a session, one that fills at once, a cancel, and the leverage
+    limit refusing an order late in the run.
+    """
+    k = known_answer_traded
+    scores, recorders = k.traded_run()
+    for name in k.AGENTS:
+        fills = recorders[name].portfolio.fills
+        assert fills and scores[name].trades > 0, name
+        assert not scores[name].tampered, name
+    assert len(scores["oracle"].explanations) == k.DAYS
+    resting = recorders["resting"].portfolio.fills
+    assert any(f.get("liquidity") == "maker" for f in resting)
+    assert any(f.get("limit") is True for f in resting)
+    assert all(recorders["resting"].kinds[kind] > 0 for kind in ("L", "C"))
+    assert recorders["momentum"].kinds["M"] > 0
+    assert scores["resting"].leverage_refusals > 0
+    buffers = k.part_buffers(scores, recorders)
+    for name in k.AGENTS:
+        for part in k.PARTS:
+            assert len(buffers[name][part]) > 64, (name, part)
+
+
 def test_the_preset_digests_tell_the_presets_apart():
     """A harness that gave two presets one digest could not see a change that
     turned one into the other, so every shipped preset's must differ."""
@@ -221,13 +329,13 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
-    # SIX digests, in a fixed order: combined, simulation, metadata, the
+    # SEVEN digests, in a fixed order: combined, simulation, metadata, the
     # session with the simulated rate indices, every shipped preset's
-    # digest combined, and a seed above 2**32. The CI gate greps all of them
-    # and compares the SET across platforms, so the count and the order are
-    # both contractual -- .github/workflows/determinism.yml hashes each
-    # target's file and requires one unique hash, which holds for six as it
-    # did for three.
+    # digest combined, a seed above 2**32, and a traded run through
+    # evaluate. The CI gate greps all of them and compares the SET across
+    # platforms, so the count and the order are both contractual --
+    # .github/workflows/determinism.yml hashes each target's file and
+    # requires one unique hash, which holds for seven as it did for three.
     #
     # It used to be exactly one, and the count was asserted for the same
     # reason it is asserted now: a gate that greps an ambiguous number of
@@ -235,7 +343,7 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     # landed, this test and that workflow had to move together -- leaving the
     # workflow alone would have made it count three digests as three
     # disagreements and fail every green run.
-    assert len(digests) == 6, result.stdout
+    assert len(digests) == 7, result.stdout
     assert digests[0] == known_answer.known_answer_digest()
     assert digests[1] == known_answer.simulation_digest()
     assert digests[2] == known_answer.metadata_digest()
@@ -245,3 +353,6 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
         known_answer_presets.preset_digests())
     # SIX since 0.8.5, when seeds became 64-bit: a seed above 2**32.
     assert digests[5] == known_answer_seed64.high_seed_digest()
+    # SEVEN since 0.8.5: a traded run through evaluate, the reference
+    # agents' orders, fills and scorecards.
+    assert digests[6] == _traded_baseline()["sha256"]

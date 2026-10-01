@@ -155,8 +155,9 @@ venv that holds a build of the final engine commit:
       /tmp/rel/bin/pip install --no-binary :all: tradefloor==0.8.5
 
 - [ ] Reproduce every known-answer digest inside the installed wheel against
-      `tests/known_answer.json`, `known_answer_book.json` and
-      `known_answer_presets.json` from the tag.
+      `tests/known_answer.json`, `known_answer_book.json`,
+      `known_answer_presets.json` and `known_answer_traded.json` from the
+      tag.
 - [ ] docs.rs: `https://docs.rs/tradefloor/0.8.5`.
 - [ ] The docs site: mirror from `v0.8.5`, regenerate against the released
       wheel (`params.py --check --python /tmp/rel/bin/python`),

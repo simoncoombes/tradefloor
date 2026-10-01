@@ -383,8 +383,9 @@ checks that with a digest per shipped preset.
 A run with agent orders in it replays exactly on the same release. Across
 releases the promise is narrower. 0.8.5 changed how an agent's fills reach
 the market, on every preset, so a traded run recorded before 0.8.5 matches up
-to its first trade and differs after it. No digest covers a traded `evaluate`
-or `rank` run yet.
+to its first trade and differs after it. One traded `evaluate` run has a
+digest from 0.8.5, checked on all five platforms: the reference agents on
+`pt-v20`, with their orders, fills and scorecards.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 lists what each digest covers.
 

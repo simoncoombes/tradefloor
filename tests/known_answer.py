@@ -708,3 +708,8 @@ if __name__ == "__main__":
     # 64-bit seeding as well as the 32-bit seeds every line above runs on.
     import known_answer_seed64
     print(f"  highseed {known_answer_seed64.high_seed_digest()}")
+    # A traded run through tradefloor.evaluate (0.8.5): the reference
+    # agents' orders, fills and scorecards, so the cross-target comparison
+    # covers the Python harness as well as the engine.
+    import known_answer_traded
+    print(f"  traded   {known_answer_traded.traded_digest()}")
