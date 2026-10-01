@@ -2310,6 +2310,8 @@ outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
 | | `market_vol_cycle_pin_phase` | 0 | switch | 0 or 1; read only with $R$ set |
 | $g$ | `market_vol_cycle_trough_release` | 0 | | a share in [0, 1]; read only with $R$ set |
 | $h_{r}$ | `market_vol_cycle_release_half_life` | 0 | | sessions, 0 is $h$; read only with $R$ set |
+| $g_{m}$ | `market_vol_cycle_recovery_release` | 0 | | a share in [0, 1]; read only with $R$ set |
+| $x_{m}$ | `market_vol_cycle_recovery_scale` | 0 | | log points of the index in (0, 2]; read only with $g_{m}$ set |
 
 `fair_value_market_vol_cap`'s ceiling is in multiples of the unscaled
 `market_factor_sigma`, so a contraction's higher baseline counts as fear
@@ -2340,6 +2342,46 @@ falls toward a lower target it steps at $h_{r}$ =
 realised volatility peak at the market's low and fall within a quarter of
 it (at the 1990, 2002, 2009 and 2020 lows the VIX read 34, 42, 50 and 62,
 and 27, 26, 30 and 32 sixty-three sessions later).
+
+**The rally off the low.** With $g_{m}$ =
+`market_vol_cycle_recovery_release` the target in a contraction is
+$\ln k_e + (1 - g_{m} s)\ln R$ and in a trough $\ln k_e + (1 - g)(1 - g_{m}
+s)\ln R$, where $s = \min(1, (c - L)/x_{m})$, $c$ the index's log level at the
+last close, $L$ its lowest close since its highest close of the last 252
+sessions (total public market cap, the window `fed_drawdown_hold` reads,
+kept whenever either dial is set) and $x_{m}$ =
+`market_vol_cycle_recovery_scale`. At a new high or a new low $s = 0$. The
+release reads the market and not the phase: a trough release keyed to the
+true phase lowers volatility on dates a rule reading the published phase
+covers, and on R19V with $g = 1$ the rule that levers the published
+contraction and trough beat the exposure-matched constant position in 0.689
+of 270 pooled held-out histories against C10c's 2/3. The market signal does
+not remove that trade-off. Every arm that shortens the storm lowers
+volatility in the true recovery, which the published contraction covers, and
+raises the same rule's share ahead (sim/r20-mktrelease screen, `r14gen` over
+held-out sets A, B and C, 270 histories each, on R20F):
+
+| Arm (on R20F) | VC4f | out_contraction_trough ahead | P(any C10c breach) | PH5 vol use |
+|---|---|---|---|---|
+| R20F | 0.732 | 0.600 | 0.017 | 0.85 |
+| $g_{m}$ 1, $x_{m}$ 0.10 | 0.649 | 0.644 | 0.65 | 0.94 |
+| $g_{m}$ 0.5, $x_{m}$ 0.10 | 0.687 | 0.644 | 0.23 | 1.03 |
+| $g_{m}$ 1, $x_{m}$ 0.20 | 0.678 | 0.663 | 0.55 | 1.08 |
+| return memory 2.5 alone | 0.723 | 0.548 | 0.082 | 0.72 |
+| return memory 2.5, $g_{m}$ 0.3, $x_{m}$ 0.10 | 0.706 | 0.570 | 0.086 | 0.73 |
+| return memory 2.5, $g_{m}$ 0.45, $x_{m}$ 0.10 (R20M) | 0.697 | 0.593 | 0.075 | 0.82 |
+
+P(any C10c breach) is the share of 2000 bootstrap resamples of the 270
+histories in which any of C10c's 384 mirrored rules has a median over +1.0
+or more than 2/3 ahead. The return memory (`market_vol_leverage`) at 2.5 in
+place of 2 is what takes the published-phase rule down (volatility rises
+after a fall and eases in a rally whatever the phase), but alone it puts the
+index's absolute-return autocorrelation at lag 1 on its ceiling (VC4a 0.305
+against 0.305); a rally release of 0.45 brings VC4a back to 0.273 and VC4f
+to 0.697 (band 0.489 to 0.740). On 270 further histories (sets +60000,
++70000 and +80000) R20M reads VC4f 0.708 against R20F's 0.739, the rule
+0.607 ahead, P(any C10c breach) 0.084 and PH5's volatility use 0.88; the
+release of 0.3 there reads VC4f 0.723 and PH5's use 0.91.
 
 **Volatility persistence on R19V** (measured, no dial added; boxes vcp1 to
 vcp6, sim/r18-valopen b93b9999, `r14gen`'s recording over held-out sets A, B
@@ -3390,6 +3432,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
 - **The put's unanswered fall and the drawdown hold** (`fed_put_carry`, `fed_drawdown_hold`): every meeting restarts the put's clock at zero, and only the stress hold's VIX clock holds a rise.
+- **The rally off the low** (`market_vol_cycle_recovery_release`, `market_vol_cycle_recovery_scale`): a contraction and a trough keep their volatility multiplier however far the index has climbed off its low.
 - **The anticipated meeting** (`policy_anticipation`, `policy_anticipation_cut_share`): the curve learns a decision on the day it is published.
 - **Credit's VIX slope and leverage term** (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`, `corporate_spread_equity_half_life`): the corporate spread is the meeting formula's full VIX slope and does not read the index.
 - **The market's fall in the cycle's hazard** (`cycle_equity_hazard`, `cycle_equity_hazard_knee`, `cycle_equity_hazard_opening`): the business cycle does not read the index.

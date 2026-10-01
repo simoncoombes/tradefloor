@@ -371,6 +371,22 @@ autocorrelation at lag 1 0.267 (from 0.277) and at lag 20 0.198 (from 0.218),
 and H4 -0.303 (from -0.278), with no change to the engine's code
 (docs/MODEL.md has the arms and the rows they move).
 
+`market_vol_cycle_recovery_release` and `market_vol_cycle_recovery_scale`
+let a contraction's or a trough's volatility multiplier ease as the index
+climbs off its low, read on the last 252 sessions of total public market
+cap, rather than on the cycle's phase. The trough release keyed to the true
+phase let a rule that levers the published contraction and trough beat the
+constant position in 0.689 of 270 held-out histories, against C10c's 2/3.
+Both dials are 0 on every preset, and every known-answer digest but the
+book's fingerprint is unchanged. The market signal alone does not remove the
+trade-off: at a release of 1 the same rule is ahead in 0.644 of histories.
+With the return memory at 2.5 and a release of 0.45 at a scale of 0.10 on
+top of R20F (arm R20M), VC4f reads 0.697 against R20F's 0.732, the rule is
+ahead in 0.593 of histories, and 0.075 of bootstrap resamples breach any
+C10c rule (sim/r20-mktrelease screen, held-out sets A, B and C; on sets
++60000, +70000 and +80000 VC4f 0.708 against 0.739, the rule 0.607 and
+0.084).
+
 `market_beta_normalise` divides each name's beta by the roster's
 cap-weighted beta when the engine is built, so at 1 every roster's index
 carries one unit of the market factor, as a real index's constituents' betas

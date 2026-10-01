@@ -506,6 +506,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # half-life).
     "market_vol_cycle_trough_release": (0.0, 1.0),
     "market_vol_cycle_release_half_life": (0.0, 126.0),
+    # The share of the contraction's excess the index's rally off its low
+    # gives back, in [0, 1], and the rally, in log points, that completes
+    # it: 5 to 40 per cent off the low.
+    "market_vol_cycle_recovery_release": (0.0, 1.0),
+    "market_vol_cycle_recovery_scale": (0.05, 0.4),
     # The published VIX's stress premium: a gain per unit of the anchor
     # memory above the knee. 2 takes a memory 0.2 above the knee to about
     # the cap; the premium moves only the published quote.

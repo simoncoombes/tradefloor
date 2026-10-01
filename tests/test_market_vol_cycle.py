@@ -33,7 +33,8 @@ DIALS = ("market_vol_cycle_ratio", "market_vol_cycle_expansion",
          "market_vol_cycle_half_life", "market_vol_cycle_relative",
          "market_vol_cycle_relative_calm", "market_vol_cycle_cap_relative",
          "market_vol_cycle_pin_neutral", "market_vol_cycle_pin_phase",
-         "market_vol_cycle_trough_release", "market_vol_cycle_release_half_life")
+         "market_vol_cycle_trough_release", "market_vol_cycle_release_half_life",
+         "market_vol_cycle_recovery_release", "market_vol_cycle_recovery_scale")
 # The setting the bear-dynamics fix recommends for pt-v20.
 CYCLE = {"market_vol_cycle_ratio": 2.5, "market_vol_cycle_expansion": 0.8,
          "market_vol_cycle_half_life": 21.0, "market_vol_cycle_relative": 0.75,
@@ -73,7 +74,9 @@ def test_the_companions_are_unread_without_the_ratio():
                   market_vol_cycle_pin_neutral=1.0,
                   market_vol_cycle_pin_phase=1.0,
                   market_vol_cycle_trough_release=1.0,
-                  market_vol_cycle_release_half_life=5.0) == prices()
+                  market_vol_cycle_release_half_life=5.0,
+                  market_vol_cycle_recovery_release=1.0,
+                  market_vol_cycle_recovery_scale=0.1) == prices()
 
 
 # The bearcycle fix's switches and release (sim/r15-bearcycle).
@@ -155,6 +158,48 @@ def test_the_trough_release_and_the_release_half_life_move_a_turning_market():
     base = run()
     assert run(market_vol_cycle_release_half_life=5.0) != base
     assert run(market_vol_cycle_trough_release=1.0) != base
+
+
+# The rally off the low (sim/r20-mktrelease).
+RALLY = {"market_vol_cycle_recovery_release": 1.0, "market_vol_cycle_recovery_scale": 0.1}
+
+
+def test_the_rally_release_moves_a_contraction_and_keeps_its_window():
+    # Pinned into a contraction for 20 sessions: the index rallies off a
+    # low on some session, the target is read on the rally and the market
+    # moves; held in an expansion the release is never read.
+    def run(pin, **dials):
+        e = engine(**CYCLE, **dials)
+        e.run_days(3, record=False)
+        e.pin_macro(cycle=pin)
+        e.run_days(20, record=False, first_day=3)
+        return floats(e.prices()), e
+    base, _ = run("contraction")
+    on, e = run("contraction", **RALLY)
+    assert on != base
+    assert run("expansion", **RALLY)[0] == run("expansion")[0]
+    # The window is kept with the release alone, as with fed_drawdown_hold.
+    snap = e.state_snapshot()
+    assert "fed_drawdown_returns" in snap and "fed_drawdown_mcap_prev" in snap
+    assert "fed_drawdown_returns" not in engine(**CYCLE).state_snapshot()
+
+
+def test_the_rally_window_is_hashed_and_a_restore_reproduces_the_run():
+    e = engine(**CYCLE, **RALLY)
+    e.run_days(3, record=False)
+    e.pin_macro(cycle="contraction")
+    e.run_days(10, record=False, first_day=3)
+    snap = e.state_snapshot()
+    assert state_hash(snap) == e.state_hash()
+    twin = engine(**CYCLE, **RALLY)
+    twin.restore_state(snap)
+    assert twin.state_hash() == e.state_hash()
+    for x in (e, twin):
+        x.run_days(5, record=False, first_day=13)
+    assert floats(e.prices()) == floats(twin.prices())
+    # An engine with neither the release nor fed_drawdown_hold refuses it.
+    with pytest.raises(Exception):
+        engine(**CYCLE).restore_state(snap)
 
 
 @pytest.mark.parametrize("dials", [
@@ -316,6 +361,12 @@ def test_the_state_hash_is_unchanged_while_off():
     {"market_vol_cycle_trough_release": 1.5},
     {"market_vol_cycle_release_half_life": -1.0},
     {"market_vol_cycle_release_half_life": 3000.0},
+    {"market_vol_cycle_recovery_release": -0.1, "market_vol_cycle_recovery_scale": 0.1},
+    {"market_vol_cycle_recovery_release": 1.5, "market_vol_cycle_recovery_scale": 0.1},
+    {"market_vol_cycle_recovery_release": 1.0},
+    {"market_vol_cycle_recovery_release": 1.0, "market_vol_cycle_recovery_scale": 2.5},
+    {"market_vol_cycle_recovery_scale": -0.1},
+    {"market_vol_cycle_recovery_scale": 3.0},
 ])
 def test_the_ranges(dials):
     with pytest.raises(Exception):

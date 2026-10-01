@@ -1392,13 +1392,21 @@ impl Engine {
         high - level
     }
 
+    /// Whether this engine keeps the drawdown's window of returns (and so
+    /// the snapshot and both state hashes carry it): with
+    /// `fed_drawdown_hold` or `market_vol_cycle_recovery_release` set. Off
+    /// on every preset.
+    pub fn keeps_drawdown_window(&self) -> bool {
+        self.params.fed_drawdown_hold != 0.0 || self.params.market_vol_cycle_recovery_release != 0.0
+    }
+
     /// Book tonight's close into the drawdown's window
     /// (`fed_drawdown_hold`): the log change of total public market cap
     /// since the last close, the oldest session dropped once the window is
     /// full. The first close only records its base. Nothing with the dial
     /// off.
     fn book_drawdown_close(&mut self) {
-        if self.params.fed_drawdown_hold == 0.0 {
+        if !self.keeps_drawdown_window() {
             return;
         }
         let mut mcap = 0.0;
@@ -1890,7 +1898,7 @@ impl Engine {
         // The drawdown hold's window: the copy's returns, so the run's first
         // year reads a full window. Its base is the run's own cap, which the
         // first close records.
-        if self.params.fed_drawdown_hold != 0.0 {
+        if self.keeps_drawdown_window() {
             self.drawdown_returns = pre.drawdown_returns.clone();
         }
         // THE VALUATION STATE, under its own switch: a branch at 0.0, every
@@ -8679,6 +8687,22 @@ impl Engine {
             }
             1.0 / crate::mathx::sqrt(1.0 - s + r * r * s)
         };
+        // THE RALLY OFF THE LOW (`market_vol_cycle_recovery_release`): in a
+        // contraction or a trough the excess is scaled by `1 - g s`, `s`
+        // the index's rise off its low over the drawdown's window. A branch
+        // at 0.0, every preset, that reads nothing.
+        let g_rally = self.params.market_vol_cycle_recovery_release;
+        if g_rally != 0.0
+            && matches!(self.economy.cycle_phase, CyclePhase::Contraction | CyclePhase::Trough)
+        {
+            let share = match self.economy.cycle_phase {
+                CyclePhase::Trough => 1.0 - self.params.market_vol_cycle_trough_release,
+                _ => 1.0,
+            };
+            let s = crate::mathx::min(
+                1.0, self.index_rally_off_low() / self.params.market_vol_cycle_recovery_scale);
+            return crate::mathx::log(ke) + share * (1.0 - g_rally * s) * crate::mathx::log(r);
+        }
         let k = match self.economy.cycle_phase {
             CyclePhase::Contraction => r * ke,
             // The turn: the trough gives back the share
@@ -8695,6 +8719,24 @@ impl Engine {
             _ => ke,
         };
         crate::mathx::log(k)
+    }
+
+    /// The index's log rise from its lowest close since its highest close
+    /// of the last [`DRAWDOWN_WINDOW`] sessions, read on the drawdown's
+    /// window (total public market cap, through the last close booked):
+    /// 0.0 at a new high or a new low, and 0.0 with no window kept.
+    pub fn index_rally_off_low(&self) -> f64 {
+        let (mut level, mut high, mut low) = (0.0, 0.0, 0.0);
+        for r in self.drawdown_returns.iter() {
+            level += r;
+            if level >= high {
+                high = level;
+                low = level;
+            } else if level < low {
+                low = level;
+            }
+        }
+        level - low
     }
 
     /// Step the cycle multiplier toward its phase's value and return it
@@ -9140,7 +9182,7 @@ impl Engine {
     /// The drawdown's window and its base (`fed_drawdown_hold`), for the
     /// snapshot: `Some` only while the dial is set.
     pub fn drawdown_state(&self) -> Option<(Vec<f64>, f64)> {
-        if self.params.fed_drawdown_hold == 0.0 {
+        if !self.keeps_drawdown_window() {
             None
         } else {
             Some((self.drawdown_returns.iter().copied().collect(), self.drawdown_mcap_prev))
@@ -9151,10 +9193,11 @@ impl Engine {
     /// and for a window longer than [`DRAWDOWN_WINDOW`].
     pub fn set_drawdown_state(&mut self, state: Option<(Vec<f64>, f64)>) -> Result<(), String> {
         match state {
-            Some(_) if self.params.fed_drawdown_hold == 0.0 => Err(
+            Some(_) if !self.keeps_drawdown_window() => Err(
                 "this snapshot carries the drawdown hold's window (fed_drawdown_returns), \
-                 which only an engine with fed_drawdown_hold on writes, and this engine's \
-                 model has it off. Restore it into the model it was taken from."
+                 which only an engine with fed_drawdown_hold or \
+                 market_vol_cycle_recovery_release on writes, and this engine's model has \
+                 both off. Restore it into the model it was taken from."
                     .to_string()),
             Some((returns, _)) if returns.len() > DRAWDOWN_WINDOW => Err(format!(
                 "this snapshot's fed_drawdown_returns carries {} sessions; the window is {}.",
@@ -12222,6 +12265,61 @@ mod tests {
             // At 0.0 the trough's target is the contraction's to the bit.
             let mut z = on(2.0, 0.75, 21.0, 1.0);
             z.economy_mut().cycle_phase = CyclePhase::Trough;
+            assert_eq!(z.market_vol_cycle_target_log(), crate::mathx::log(1.5));
+        }
+
+        /// The rally off the low gives back `g s` of the excess in a
+        /// contraction and of the trough's own share in a trough, `s` the
+        /// index's rise off its lowest close since its high over the scale,
+        /// capped at one; outside the two phases, and with the dial at 0.0,
+        /// the target is as it was.
+        #[test]
+        fn the_rally_off_the_low_gives_back_its_share() {
+            let mk = |g: f64, trough: f64| {
+                with(|p| {
+                    p.market_vol_cycle_ratio = 2.0;
+                    p.market_vol_cycle_expansion = 0.75;
+                    p.market_vol_cycle_trough_release = trough;
+                    p.market_vol_cycle_recovery_release = g;
+                    p.market_vol_cycle_recovery_scale = 0.2;
+                })
+            };
+            // Up 0.1 to the high, down 0.3 to the low, up 0.05 off it.
+            let path = [0.05, 0.05, -0.2, -0.1, 0.02, 0.03];
+            let (lk, lr) = (crate::mathx::log(0.75), crate::mathx::log(2.0));
+            for (g, trough) in [(1.0, 0.0), (0.5, 0.0), (1.0, 0.4)] {
+                let mut e = mk(g, trough);
+                assert!(e.keeps_drawdown_window());
+                assert_eq!(e.index_rally_off_low(), 0.0);
+                e.drawdown_returns = path.iter().copied().collect();
+                let rally = e.index_rally_off_low();
+                assert!((rally - 0.05).abs() < 1e-12, "{rally}");
+                let s = rally / 0.2;
+                e.economy_mut().cycle_phase = CyclePhase::Contraction;
+                let want = lk + (1.0 - g * s) * lr;
+                assert!((e.market_vol_cycle_target_log() - want).abs() < 1e-14);
+                e.economy_mut().cycle_phase = CyclePhase::Trough;
+                let want = lk + (1.0 - trough) * (1.0 - g * s) * lr;
+                assert!((e.market_vol_cycle_target_log() - want).abs() < 1e-14);
+                e.economy_mut().cycle_phase = CyclePhase::Expansion;
+                assert_eq!(e.market_vol_cycle_target_log(), lk);
+                // A rally past the scale, still under the high, gives back
+                // all of g.
+                e.drawdown_returns.push_back(0.2);
+                e.economy_mut().cycle_phase = CyclePhase::Contraction;
+                let want = lk + (1.0 - g) * lr;
+                assert!((e.market_vol_cycle_target_log() - want).abs() < 1e-14);
+                // A new high: no rally, the contraction's own target.
+                e.drawdown_returns.push_back(0.5);
+                assert_eq!(e.index_rally_off_low(), 0.0);
+                assert!((e.market_vol_cycle_target_log() - (lk + lr)).abs() < 1e-14);
+            }
+            // At 0.0 no window is kept and a window read changes nothing.
+            let mut z = mk(0.0, 0.0);
+            assert!(!z.keeps_drawdown_window());
+            assert!(z.drawdown_state().is_none());
+            z.drawdown_returns = path.iter().copied().collect();
+            z.economy_mut().cycle_phase = CyclePhase::Contraction;
             assert_eq!(z.market_vol_cycle_target_log(), crate::mathx::log(1.5));
         }
 

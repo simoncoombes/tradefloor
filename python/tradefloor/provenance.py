@@ -1001,6 +1001,17 @@ OUT_OF_SCOPE = {
         "unread while `market_vol_cycle_ratio` is 0.0",
     "market_vol_cycle_release_half_life":
         "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_recovery_release":
+        "inert at 0.0 as shipped, and unread while `market_vol_cycle_ratio` "
+        "is 0.0: a contraction and a trough keep their multiplier. Off zero "
+        "the index's rally off its low over the last 252 sessions gives back "
+        "that share of the excess, so the storm eases as the market climbs "
+        "and not on the cycle's phase, which a rule reading the published "
+        "phase can time. Target: VC4f (ACF1 of log monthly realised vol) "
+        "without C10c's published contraction-and-trough lever (0.8.5 "
+        "fifteenth-round work, sim/r20-mktrelease)",
+    "market_vol_cycle_recovery_scale":
+        "unread while `market_vol_cycle_recovery_release` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "
