@@ -202,3 +202,152 @@ def test_the_readme_states_cpu_time_as_the_examples_pages_do():
         assert stale not in text, stale
     assert "The run takes under five seconds of CPU" in text
     assert "about forty seconds of CPU" in text
+
+
+# ---------------------------------------------------------------------------
+# The third persona round (2026-10-01)
+# ---------------------------------------------------------------------------
+
+def test_support_says_the_liquidity_crisis_run_was_recorded_again():
+    """SUPPORT.md said the study's recordings stopped replaying at the first
+    decision, after the canonical run had been recorded again and replayed."""
+    from tradefloor.integrations.common import Transcript
+
+    text = flat(read("docs/SUPPORT.md"))
+    assert "stop replaying" not in text
+    calls = len(Transcript.load(
+        ROOT / "tests/fixtures/finrobot/liquidity-crisis.json"))
+    assert (f"recorded again, live, on 0.8.5: {calls} model calls, in "
+            "`tests/fixtures/finrobot/liquidity-crisis.json`") in text
+    assert "were not recorded again" in text
+
+
+def test_the_manifest_docs_name_the_result_block_it_writes():
+    """Three pages said an edited `pnl` in the result block passes. There is
+    no pnl there: the block holds the digest, the days and the draws."""
+    universe = tf.Universe.random(3, seed=1)
+    engine = tf.Engine(seed=1, universe=universe)
+    engine.run_days(1)
+    keys = set(tf.RunManifest.of(engine, seed=1, universe=universe).result)
+    assert "pnl" not in keys
+    for name in ("README.md", "docs/SUPPORT.md"):
+        text = flat(read(name))
+        assert "`pnl`" not in text, name
+        assert "`result` block holds" in text, name
+        for key in sorted(keys):
+            assert f"`{key}`" in text, (name, key)
+
+
+_COUNT_WORDS = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12}
+
+
+def test_example_07_counts_the_factors_the_engine_has():
+    text = flat(read("examples/07-research-workflow.py").replace("#", " "))
+    said = re.findall(r"the (\w+) components sum to the change", text)
+    assert said, "example 07 no longer says what the components sum to"
+    for word in said:
+        assert _COUNT_WORDS.get(word) == len(tf.Engine.FACTORS), word
+
+
+def _callable_notebook_prose() -> str:
+    import json
+    nb = json.loads(read("examples/integrations/callable/five_days.ipynb"))
+    return flat(" ".join("".join(cell["source"]) for cell in nb["cells"]
+                         if cell["cell_type"] == "markdown"))
+
+
+@pytest.mark.parametrize("name", ["README.md",
+                                  "examples/integrations/README.md",
+                                  "callable notebook"])
+def test_the_callable_docs_name_postprocess_and_the_prompt_guard(name):
+    """postprocess and AdapterInfo(instructions_digest=...) were documented
+    in the module docstring only, and a CI design rests on both."""
+    text = (_callable_notebook_prose() if name == "callable notebook"
+            else flat(read(name)))
+    assert "postprocess" in text, name
+    assert "instructions_digest" in text, name
+    assert "AdapterInfo" in text, name
+
+
+def test_no_page_says_changed_instructions_make_a_callable_key_go_missing():
+    """The callable key is the payload alone. A changed prompt matches every
+    key, and only an instructions_digest refuses the replay."""
+    text = flat(read("examples/integrations/README.md"))
+    assert "the cadence or the instructions and the key goes missing" not in text
+    assert "Change the observation mapping, the mandate or the market" not in (
+        _callable_notebook_prose())
+
+
+def test_a_callable_replay_refuses_a_changed_prompt_only_with_a_digest():
+    """What the docs above now say, held against the adapter."""
+    from tradefloor.integrations.callable import callable_agent
+    from tradefloor.integrations.common import AdapterInfo, Transcript, digest
+
+    universe = tf.Universe.random(3, seed=1)
+
+    def ask(payload):
+        return {"actions": [], "rationale": "hold"}
+
+    def info(prompt):
+        return AdapterInfo(framework="callable",
+                           instructions_digest=digest(prompt))
+
+    recorder = Transcript()
+    tf.evaluate({"a": callable_agent(ask, info=info("A"), recorder=recorder)},
+                seed=3, universe=universe, days=1)
+    with pytest.raises(tf.ValidationError, match="different instructions"):
+        callable_agent(mode="replay", transcript=recorder, info=info("B"))
+    callable_agent(mode="replay", transcript=recorder)
+
+
+def test_world_says_every_agent_starts_with_the_same_cash():
+    from tradefloor.counterfactual import World
+
+    text = flat(World.__doc__)
+    assert "Every agent starts with the same cash" in text
+    assert "``cash`` and ``max_leverage`` are per agent" not in text
+    with pytest.raises(tf.ValidationError, match="cash must be a number"):
+        World(seed=1, universe=tf.Universe.random(3, seed=1),
+              agents={"a": object(), "b": object()},
+              cash={"a": 1e6, "b": 5e6})
+
+
+def _close_gaps(model: str) -> list[float]:
+    """|next day's first price / history close - 1| for each name and day."""
+    gaps: list[float] = []
+
+    class Reader:
+        def act(self, obs):
+            if obs.step_of_day == 0 and obs.day > 0:
+                for bar in obs.history.bars(last=1):
+                    gaps.append(abs(obs.price(bar["ticker"]) / bar["close"] - 1))
+            return {}
+
+    tf.evaluate({"r": Reader()}, seed=3, universe=tf.Universe.random(4, seed=5),
+                days=3, model=model)
+    return gaps
+
+
+def test_history_says_its_close_is_not_where_the_next_day_starts():
+    """A broker's bar closes at the official close. On pt-v20 obs.history's
+    close is the last print, and the close then re-marks every name."""
+    from tradefloor.harness import History
+
+    text = flat(History.__doc__)
+    assert "not the price the next session starts from" in text
+    assert "On presets through pt-v19 the close re-marks nothing" in text
+    assert "A bar's close is the day's last print" in flat(read("README.md"))
+    assert min(_close_gaps("pt-v20")) > 0
+    assert max(_close_gaps("pt-v19")) == 0
+
+
+def test_the_sandbox_limits_name_the_seed_on_the_call_stack():
+    """The docs called the seed 'guessed'. It is a local in the harness's own
+    frames, and an engine rebuilt from it runs ahead with tampered=False."""
+    from tradefloor import sandbox
+
+    for name, text in (("sandbox", flat(sandbox.__doc__)),
+                       ("README.md", flat(read("README.md"))),
+                       ("CHANGELOG.md", flat(read("CHANGELOG.md")))):
+        assert "guessed seed" not in text, name
+        assert "sys._getframe" in text, name

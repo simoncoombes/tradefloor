@@ -132,9 +132,13 @@ reproduces only on the release that made it.
 They are now applied once, on the next tick, where 0.8.1 fed them in as order
 flow on every tick of the next step. So a traded run recorded before 0.8.5
 replays up to its first trade and differs after it, even on a preset that
-0.8.5 did not change. The recordings in
-`examples/experiments/liquidity-crisis/` stop replaying at the first decision
-for this reason.
+0.8.5 did not change. For this reason the liquidity-crisis study's
+canonical run was recorded again, live, on 0.8.5: 60 model calls, in
+`tests/fixtures/finrobot/liquidity-crisis.json`. Its notebook replays that
+recording on 0.8.5 with no model call. The study's four replications, its
+resample and its five-arm decomposition are summaries in
+`examples/experiments/liquidity-crisis/data/` from runs made before 0.8.5,
+and were not recorded again.
 
 ## Before the first LTS tag
 
@@ -175,8 +179,9 @@ Name all of these, so a reader can rebuild your market:
 
 `RunManifest` records all of them, and `RunManifest.reproduce()` stops on
 the first mismatch. It replays and checks the market, and returns the
-engine. It does not recompute a score, so an edited `pnl` in a manifest's
-result block passes, and `tf.evaluate` and `tf.rank` write no manifest. To
+engine. It does not recompute a score and carries none: its `result`
+block holds the market's `digest`, the number of `days` and
+`draws_consumed`, and `tf.evaluate` and `tf.rank` write no manifest. To
 let a reader check a score, publish the agent, the call that scored it and
 the seeds, and let them rerun it. A manifest that checks a score does not
 exist yet.

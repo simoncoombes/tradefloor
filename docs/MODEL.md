@@ -2022,7 +2022,9 @@ Around each call into agent code the harness compares `Engine.state_hash`,
 the fundamentals, the recording counters and each portfolio's state. A
 difference marks the scorecard `tampered`. So does a sandboxed agent's call
 to `fork`, `state_snapshot` or `restore_state`, which `Engine.copy_count`
-counts, because a copy run ahead is look-ahead that changes no state. The
+counts, because a copy run ahead is look-ahead that changes no state. A
+second engine built from the `seed` and `universe` that the harness's frames
+hold, read through `sys._getframe`, is not a copy and is not caught. The
 comparison only reads, so no digest depends on it.
 
 ## The Oracle baseline
