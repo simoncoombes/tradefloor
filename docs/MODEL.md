@@ -2109,7 +2109,7 @@ the size of the settlement slices, so a volume dial is also a price dial.
 | $\sigma_V$ | `volume_innovation_sigma` | 0.21 | fitted | same sweep |
 | $g_h$ | `volume_idio_variance_gain` | 0.2 | measured | 120-seed paired measurement on `volume_change_acf1`; flat from 0.2 to 0.3 |
 | $f_0$ | `volume_move_floor` | 0.6 | chosen | reference implementation |
-| $r_V$ | `volume_move_response` | 0.6 (1.0) | chosen | pt-v1's value. With less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2); pt-v20 takes pt-v1's 0.6, where the graded arm reads 0.508 at one year and 0.561 at two (`presets/pt-v20.json`) |
+| $r_V$ | `volume_move_response` | 0.6 (1.0) | chosen | pt-v1's value. With less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2); pt-v20 takes pt-v1's 0.6, where the graded arm read 0.508 at one year and 0.561 at two on the bars before 0.8.5's fix, and reads 0.596 and 0.627 on the fixed bars (`presets/pt-v20.json`) |
 | $c_V$ | `volume_move_cap` | 12 | fitted | a sweep found 8, 12 and 20 alike |
 | $n_V$ | `volume_move_noise` | 0.2 | chosen | reference implementation |
 

@@ -1,6 +1,6 @@
 # Published-figure re-measurement
 
-Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 64 workers.
+Commit `8753546`, 2026-10-01 16:57, tradefloor 0.8.5. Full run: 319s wall with 64 workers.
 
 | status | figures |
 |---|---|
@@ -15,19 +15,17 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 118 | engine.truth(): the factor columns sum to the move to within about 1e-16 | any | 1e-16 | 1.26e-17 | - | reproduced |
-| 296 | the test suite runs the numbered examples, and 07-research-workflow.py asserts its own findings | pt-v20 | True | True | - | structural_ok |
+| 187 | engine.truth(): the factor columns sum to the move to within about 1e-16 | any | 1e-16 | 1.26e-17 | - | reproduced |
+| 418 | the test suite runs the numbered examples, and 07-research-workflow.py asserts its own findings | pt-v20 | True | True | - | structural_ok |
 
 ### docs/agents.html
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 176 | separation('mean_reversion', 'momentum') on the twelve-market grid, wins each way (bound) | pt-v20 | 7-5 | 7-5 | - | reproduced |
-| 178 | the sign-test p-value of that separation (bound) | pt-v20 | 0.7744 | 0.7744 | 0 | reproduced |
-| 229 | momentum's mean P&L less buy-and-hold's over the twelve-market grid (bound) | pt-v20 | -35,129 | -35,129 | 0 | reproduced |
-| 229 | mean-reversion's mean P&L less buy-and-hold's over the twelve-market grid (bound) | pt-v20 | -31,797 | -31,797 | 0 | reproduced |
-| 239 | markets on which mean-reversion has the highest P&L of the four ranked agents (bound) | pt-v20 | 1 | 1 | 0 | reproduced |
-| 246 | markets on which mean-reversion out-earns the Oracle (bound) | pt-v20 | 1 | 1 | 0 | reproduced |
+| 215 | separation('mean_reversion', 'momentum') on the twelve-market grid, wins each way (bound) | pt-v20 | 7-5 | 7-5 | - | reproduced |
+| 215 | the sign-test p-value of that separation (bound) | pt-v20 | 0.7744 | 0.7744 | 0 | reproduced |
+| 217 | momentum's mean P&L less buy-and-hold's over the twelve-market grid (bound) | pt-v20 | -35,129 | -35,129 | 0 | reproduced |
+| 217 | mean-reversion's mean P&L less buy-and-hold's over the twelve-market grid (bound) | pt-v20 | -31,797 | -31,797 | 0 | reproduced |
 
 ### docs/api-scenario.html
 
@@ -42,9 +40,9 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 66 | tf.branch(engine, 2, ...) takes under 1 ms on a sixty-day, forty-instrument market | any | 1 | 12.66 | 11.66 | machine_bound |
-| 66 | Checkpoint.resume() takes 2.7 s on the same market | any | 2.7 | 2.251 | -0.4491 | machine_bound |
-| 68 | Checkpoint replay is three orders of magnitude slower than branch | any | 3 | 2.25 | -0.7499 | reproduced |
+| 66 | tf.branch(engine, 2, ...) takes under 1 ms on a sixty-day, forty-instrument market | any | 1 | 12.86 | 11.86 | machine_bound |
+| 66 | Checkpoint.resume() takes 2.7 s on the same market | any | 2.7 | 1.14 | -1.56 | machine_bound |
+| 68 | Checkpoint replay is three orders of magnitude slower than branch | any | 3 | 1.948 | -1.052 | reproduced |
 
 ### docs/conventions.html
 
@@ -69,15 +67,15 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 323 | the three streams draws_by_stream() reports, in order | any | market,economy,external | market,economy,external | - | reproduced |
-| 323 | draws_by_stream() reports three of the streams | any | 3 | 3 | 0 | reproduced |
+| 327 | the three streams draws_by_stream() reports, in order | any | market,economy,external | market,economy,external | - | reproduced |
+| 327 | draws_by_stream() reports three of the streams | any | 3 | 3 | 0 | reproduced |
 
 ### docs/evaluate.html
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 76 | evaluate()'s steps_per_day defaults to 6 | any | 6 | 6 | 0 | reproduced |
-| 249 | reproduce() compares era digests before replaying and refuses a manifest from a build with different arithmetic | any | True | - | - | covered_by_tests |
+| 73 | evaluate()'s steps_per_day defaults to 6 | any | 6 | 6 | 0 | reproduced |
+| 212 | reproduce() compares era digests before replaying and refuses a manifest from a build with different arithmetic | any | True | - | - | covered_by_tests |
 
 ### docs/execution-cost.html
 
@@ -113,6 +111,12 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 | 392 | the crisis threshold before pt-v14: the sector factor blended toward the market above VIX 25.5 | pt-v12 | 25.5 | 25.5 | 0 | reproduced |
 | 408 | a hundred recorded 252-day 100-instrument engines alive at once, GB of raw buffers | any | 110 | 110.1 | 0.0736 | reproduced |
 
+### docs/index.html
+
+| line | figure | preset | published | measured | delta | status |
+|---|---|---|---|---|---|---|
+| 295 | markets on which mean-reversion out-earns the Oracle (bound) | pt-v20 | 1 | 1 | 0 | reproduced |
+
 ### docs/presets.html
 
 | line | figure | preset | published | measured | delta | status |
@@ -127,6 +131,7 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 |---|---|---|---|---|---|---|
 | 202 | momentum's highest per-market P&L less buy-and-hold's on the grid (bound) | pt-v20 | 18,989 | 18,989 | 0 | reproduced |
 | 202 | momentum's lowest per-market P&L less buy-and-hold's on the grid (bound) | pt-v20 | -82,311 | -82,311 | 0 | reproduced |
+| 202 | markets on which mean-reversion has the highest P&L of the four ranked agents (bound) | pt-v20 | 1 | 1 | 0 | reproduced |
 
 ### docs/realism-envelope.html
 
@@ -167,14 +172,14 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 
 | line | figure | preset | published | measured | delta | status |
 |---|---|---|---|---|---|---|
-| 76 | 07-research-workflow.py takes ten to twenty seconds (the upper end is recorded) | any | 20 | 90.26 | 70.26 | machine_bound |
+| 79 | 07-research-workflow.py takes about forty seconds of CPU | any | 40 | 15.4 | -24.6 | machine_bound |
 
 ## Notes
 
-- **readme.residual** (README.md:118): Tool fixed at 0.8.1: the recipe summed seven of the ten factors and graded the median, so it checked a sum no page describes.
+- **readme.residual** (README.md:187): Tool fixed at 0.8.1: the recipe summed seven of the ten factors and graded the median, so it checked a sum no page describes.
 - **presets.custom_model_fp** (docs/glossary.html:208): The digest covers every field, so it moves with each release that adds one; the page names the release it was read on. It read custom-d70ecdf0 on 0.8.0 and 0.8.1, and custom-fa81d418 on 0.8.5, which adds settable dials. It reads custom-a0c09b02 at the 0.8.5 release commit (bc6361c): custom-fa81d418 was read earlier in the 0.8.5 cycle, before the last fields it adds.
 - **groundtruth.residual** (docs/factors.html:67): Tool fixed at 0.8.1: summed seven of the ten factors and graded the median. From 0.8.5 the sum is over eleven factors, fair_value_shift last. The glossary's figure is measured on Universe.random(20, seed=3) (seed 42, five days, 39,000 rows): 1.7e-16 on pt-v19, restated 2026-09-26 as 1.0e-17 on pt-v20. It is judged here at order of magnitude, beside this recipe's random(20, 11), where pt-v20 reads 2.7e-17.
-- **readme.workflow_wall** (examples/README.md:76): A wall clock: reported as machine_bound, never judged. The README this row first cited said five seconds; examples/README.md now says ten to twenty.
+- **readme.workflow_wall** (examples/README.md:79): A wall clock: reported as machine_bound, never judged. The README this row first cited said five seconds; examples/README.md now says ten to twenty.
 - **core.reprice_days** (docs/core-concepts.html:135): Re-keyed at 0.8.1 from reprice_days, which recorded the pt-v12 meeting days (45 and 96). Fair value grows with nominal output from pt-v18.
 - **conv.short_interest_median** (docs/conventions.html:67): Tool fixed at 0.8.1: pooled ten 100-name universes inside a 0.4 band, a different sample from the one the page names.
 - **conv.short_interest_tail** (docs/conventions.html:67): Tool fixed at 0.8.1: measured 'one name in N' over pooled 100-name universes; the page states a percentage over the ticker space.
@@ -185,5 +190,5 @@ Commit `e35ce06`, 2026-09-26 13:05, tradefloor 0.8.5. Full run: 1151s wall with 
 - **scen.drawdiv_zero** (docs/glossary.html:152): Tool fixed at 0.8.1: ran the default preset where the page names pt-v14.
 - **rng.snapshot_nine** (docs/glossary.html:376): Re-keyed at 0.8.1 from the snapshot length, which the page does not print.
 - **rng.presplit_refused** (docs/schemas.html:199): Tool fixed at 0.8.1: cut rng to the 0.1.x one-stream shape. restore_state accepts a short rng on purpose, and what refuses a 0.7.x snapshot is its sixteen draw counts.
-- **agents.sep_mom_mr** (docs/agents.html:176): The snippet also appears at docs/running-a-market.html in the code sample; the build writes both from the same fixture.
+- **agents.sep_mom_mr** (docs/agents.html:215): The snippet also appears at docs/running-a-market.html in the code sample; the build writes both from the same fixture.
 - **realism.crisis_threshold** (docs/glossary.html:392): Tool fixed at 0.8.1: read the CRISIS_VIX_THRESHOLD source constant (25.5), the dial's default, which no preset from pt-v14 uses.
