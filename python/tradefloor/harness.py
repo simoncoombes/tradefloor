@@ -50,6 +50,8 @@ scorecard records all three. See :mod:`tradefloor.sandbox`.
 
 from __future__ import annotations
 
+import math
+import statistics
 import struct
 import warnings
 from collections import Counter
@@ -501,6 +503,21 @@ class Scorecard:
     order is refused once net worth is gone, because leverage over a net
     worth at or below zero is infinite.
 
+    ``sharpe``, ``volatility_pct``, ``time_in_market`` and
+    ``avg_gross_exposure`` are read-only properties computed from the card,
+    and are not in :meth:`as_dict`. The first two read the daily returns of
+    ``equity_curve``, starting from the cash the agent was given, and are
+    annualised over 252 days. Sharpe subtracts no risk-free rate. Both are
+    None with fewer than two days, and once net worth has been at or below
+    zero; Sharpe is None too when the returns did not vary.
+    ``exposure_curve`` is gross exposure as a multiple of net worth after
+    each step's session (infinite once net worth is gone), and the other two
+    read it: the share of steps that ended holding any position, and the
+    mean multiple over the steps with a finite one.
+
+    ``rejected`` counts the orders the market refused and the actions an
+    LLM adapter refused on its own (its ``refusals()``, such as a ticker
+    the roster does not have), each with its line in ``errors``.
     ``leverage_refusals`` is the part of ``rejected`` that the leverage
     limit refused. ``explanation_baseline`` is what always giving the same
     answer to ``explain`` would have scored on the same days: the share of
@@ -521,7 +538,12 @@ class Scorecard:
                  "uses_hidden_state", "tampered", "equity_curve",
                  "max_drawdown_pct", "ruined", "leverage_refusals",
                  "explanation_baseline", "partial_fills", "history_days",
-                 "margin_interest")
+                 "margin_interest", "exposure_curve")
+
+    #: Slots :meth:`as_dict` leaves out. ``exposure_curve`` is the input of
+    #: two read-only properties and is read off the fills and the prices,
+    #: which a traded digest already covers.
+    _NOT_IN_DICT = frozenset({"exposure_curve"})
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -537,6 +559,7 @@ class Scorecard:
         partial_fills: list[str] | None = None,
         history_days: int = 0,
         margin_interest: bool = True,
+        exposure_curve: list[float] | None = None,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -607,6 +630,61 @@ class Scorecard:
         #: a levered score from such a run is not comparable to one that
         #: paid for its leverage.
         self.margin_interest = bool(margin_interest)
+        #: Gross exposure as a multiple of net worth after each step's
+        #: session, in step order; infinite where net worth was at or below
+        #: zero. Read by `time_in_market` and `avg_gross_exposure`.
+        self.exposure_curve = list(exposure_curve or [])
+
+    def _daily_returns(self) -> list[float] | None:
+        """Each day's return along ``equity_curve``, from the starting
+        cash, or None once net worth has been at or below zero."""
+        worth = [self.final_net_worth - self.pnl, *self.equity_curve]
+        if any(w <= 0 for w in worth):
+            return None
+        return [b / a - 1.0 for a, b in zip(worth, worth[1:])]
+
+    @property
+    def volatility_pct(self) -> float | None:
+        """Annualised volatility of the daily returns, in percent: their
+        sample standard deviation times the square root of 252. None with
+        fewer than two days or once net worth went to zero."""
+        daily = self._daily_returns()
+        if daily is None or len(daily) < 2:
+            return None
+        return statistics.stdev(daily) * math.sqrt(252) * 100.0
+
+    @property
+    def sharpe(self) -> float | None:
+        """Annualised Sharpe ratio of the daily returns: their mean over
+        their sample standard deviation, times the square root of 252, with
+        no risk-free rate subtracted. None with fewer than two days, once
+        net worth went to zero, or when the returns did not vary (an agent
+        that never traded). Five or ten days give a very noisy figure."""
+        daily = self._daily_returns()
+        if daily is None or len(daily) < 2:
+            return None
+        sd = statistics.stdev(daily)
+        if sd == 0.0:
+            return None
+        return statistics.fmean(daily) / sd * math.sqrt(252)
+
+    @property
+    def time_in_market(self) -> float | None:
+        """The share of steps that ended with any position open, from 0
+        to 1. None for a card with no ``exposure_curve``."""
+        if not self.exposure_curve:
+            return None
+        held = sum(1 for x in self.exposure_curve if x > 0.0)
+        return held / len(self.exposure_curve)
+
+    @property
+    def avg_gross_exposure(self) -> float | None:
+        """Mean gross exposure as a multiple of net worth, over the steps
+        where net worth was above zero: 1.0 is fully invested, 2.0 is the
+        default leverage limit, 0.0 never held anything. Longs and shorts
+        both add. None for a card with no finite reading."""
+        finite = [x for x in self.exposure_curve if math.isfinite(x)]
+        return statistics.fmean(finite) if finite else None
 
     @property
     def explanation_edge(self) -> float | None:
@@ -622,8 +700,12 @@ class Scorecard:
     def as_dict(self) -> dict[str, Any]:
         # `history_days` only when there was a warm-up, so the card of a
         # run without one is the dict, and the digest, it always was.
+        # The figures computed from the card (`sharpe` and the rest) are
+        # properties and stay out with their input, so a traded known
+        # answer hashes what it always did.
         return {slot: getattr(self, slot) for slot in self.__slots__
-                if slot != "history_days" or self.history_days}
+                if (slot != "history_days" or self.history_days)
+                and slot not in self._NOT_IN_DICT}
 
     def __repr__(self) -> str:
         flags = "".join(
@@ -656,8 +738,26 @@ class Scorecard:
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
-            f"impact={self.impact_bps:+.2f}bps{explained}{counts}{flags})"
+            f"impact={self.impact_bps:+.2f}bps{self._risk_text()}"
+            f"{explained}{counts}{flags})"
         )
+
+    def _risk_text(self) -> str:
+        """Sharpe, volatility, time in market and gross exposure for the
+        repr, or nothing for a card with no equity curve."""
+        if not self.equity_curve:
+            return ""
+        sharpe, vol = self.sharpe, self.volatility_pct
+        text = (f", sharpe={sharpe:+.2f}" if sharpe is not None
+                else ", sharpe=n/a")
+        if vol is not None:
+            text += f", vol={vol:.1f}%"
+        held, gross = self.time_in_market, self.avg_gross_exposure
+        if held is not None:
+            text += f", in_market={held * 100:.0f}%"
+        if gross is not None:
+            text += f", exposure={gross:.2f}x"
+        return text
 
 
 def session_clock(start: tuple[int, int, int], step_within_day: int,
@@ -1103,6 +1203,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
     peak_leverage = 0.0
     explanations: list[tuple[str, str]] = []
     equity_curve: list[float] = []
+    exposure_curve: list[float] = []
 
     step = 0
     for day in range(days):
@@ -1138,8 +1239,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                     # Actions an LLM adapter refused on their own, while
                     # the rest of its decision trades. They never raise, so
                     # they are asked for, and each is an error line.
+                    # Each is counted in `rejected` as well, as a refused
+                    # order is, so `rank` does not read it as a raise.
                     for line in _refusals_of(agent):
                         errors.append(f"step {step}: {line}")
+                        rejected += 1
             except Exception as exc:                      # noqa: BLE001
                 if _is_replay_miss(exc):
                     # A broken recording is a broken experiment. Scored as
@@ -1224,6 +1328,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             leverage = portfolio.leverage(engine)
             if leverage != float("inf"):
                 peak_leverage = max(peak_leverage, leverage)
+            exposure_curve.append(leverage)
             step += 1
 
         # A day's interest on cash at the rate the day traded under, before
@@ -1319,6 +1424,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         partial_fills=_partial_fill_lines(portfolio.fills),
         history_days=history.warmup_days,
         margin_interest=portfolio.margin_interest,
+        exposure_curve=exposure_curve,
     )
 
 

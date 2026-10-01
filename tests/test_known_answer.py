@@ -228,11 +228,13 @@ def test_a_traded_run_matches_its_baseline():
 
 
 def test_the_traded_run_hashes_every_scorecard_field():
-    """A field added to `Scorecard` has to be placed: hashed by value, or
-    by count like the message lines. Left out, the digest would pass while
-    the new field differed between platforms."""
+    """A field added to `Scorecard` has to be placed: hashed by value, by
+    count like the message lines, or listed as read off fields that are
+    hashed. Left out, the digest would pass while the new field differed
+    between platforms."""
     k = known_answer_traded
-    placed = set(k.SCORECARD_FIELDS) | set(k.SCORECARD_COUNTED)
+    placed = (set(k.SCORECARD_FIELDS) | set(k.SCORECARD_COUNTED)
+              | set(k.SCORECARD_DERIVED))
     assert placed == set(tradefloor.Scorecard.__slots__), (
         "Scorecard's fields and the ones known_answer_traded.py hashes "
         f"differ: {sorted(placed ^ set(tradefloor.Scorecard.__slots__))}. "

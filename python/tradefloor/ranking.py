@@ -116,7 +116,9 @@ There `rank` reports no capture at all. :attr:`Ranking.capture_withheld`
 gives the reason, no seed is listed as unmeasurable, and the table sorts on
 each agent's mean P&L over buy-and-hold's in the same market, with the count
 of seeds it came out ahead. The sign test is unchanged, since it never read
-a capture. Every preset through pt-v19 ranks on pooled capture as before.
+a capture. The report names the benchmark by its label, and says that the
+Oracle ran and has no row, with its P&L over the benchmark's. Every preset
+through pt-v19 ranks on pooled capture as before.
 
 Buy-and-hold here is the entrant labelled ``buy_and_hold``. With no entrant
 of that name, `rank` uses the one entrant that is a
@@ -156,6 +158,17 @@ seeds and the first exception. The agent stays in the table, so gate on
 those fields if a raise should fail a run. An LLM integration's reply that
 cannot be parsed into orders raises in `act()`, so it is counted here too.
 
+A seed on which the agent failed at every step and traded nothing has no
+score. Where the table reads against the benchmark, such a seed is left out
+of the agent's excess P&L and its count of seeds ahead, the row says on how
+many seeds it failed, and it cannot win a seed.
+
+An action an LLM adapter refuses on its own, such as a ticker the roster
+does not have, is not a raise: the rest of that decision trades. `evaluate`
+counts it in `Scorecard.rejected`, :attr:`AgentRecord.refused` holds the
+count per seed, and the report names the agent on a REFUSED line with the
+first refusal.
+
 ## A tampered agent is not ranked
 
 `evaluate` compares the engine's state hash around every call into agent
@@ -188,6 +201,18 @@ from ._core import check_seed
 _TAMPER_LINE = re.compile(r"^(?:step \d+|day \d+ explain): tampered: ")
 _EXPLAIN_LINE = re.compile(r"^day \d+ explain: ")
 _ACT_RAISED_LINE = re.compile(r"^step \d+: [A-Za-z_][\w.]*: ")
+#: An action an LLM adapter refused on its own while the rest of its
+#: decision traded (`integrations.common.refusal_lines`). Since 0.8.5 it
+#: is counted in ``Scorecard.rejected`` as well, so it is not a raise.
+_REFUSED_ACTION_LINE = re.compile(r"^step \d+: refused action: ")
+
+
+def _failed_every_step(card: Any, steps: int) -> bool:
+    """Whether nothing traded and every step raised or had its orders
+    refused: the case `evaluate` warns about."""
+    from .harness import _steps_with_errors
+    return (not card.trades and steps > 0
+            and len(_steps_with_errors(card)) >= steps)
 
 
 def _raised(card: Any) -> tuple[int, int, str | None]:
@@ -223,7 +248,8 @@ class AgentRecord:
     __slots__ = ("name", "seeds", "captures", "pnls", "wins",
                  "reference_pnls", "benchmark_pnls", "capture_withheld",
                  "trusted", "uses_hidden_state", "errors", "rejected",
-                 "max_leverage", "first_error", "raised_in_act")
+                 "max_leverage", "first_error", "raised_in_act",
+                 "refused", "first_refusal", "failed_every_step")
 
     def __init__(self, name: str, seeds: list[int],
                  reference_pnls: list[float],
@@ -263,11 +289,26 @@ class AgentRecord:
         #: Whether any of those raises came from ``act()``, which costs
         #: orders, rather than only from ``explain()``, which does not.
         self.raised_in_act = False
+        #: Per seed, how many actions an LLM adapter refused on its own (a
+        #: ticker the roster does not have, say) while the rest of its
+        #: decision traded. Part of :attr:`rejected`, and never a raise.
+        self.refused: list[int] = []
+        #: The first refused-action line, prefixed with its seed, or None.
+        self.first_refusal: str | None = None
+        #: Per seed, whether every step raised or had its orders refused and
+        #: nothing traded. Such a seed has no score, so it is left out of
+        #: :attr:`excess_pnls` rather than read as a P&L of zero.
+        self.failed_every_step: list[bool] = []
 
     @property
     def seeds_with_errors(self) -> int:
         """How many seeds this agent's code raised on at least once."""
         return sum(1 for count in self.errors if count)
+
+    @property
+    def seeds_failed(self) -> int:
+        """How many seeds this agent failed on at every step."""
+        return sum(1 for failed in self.failed_every_step if failed)
 
     @property
     def marks(self) -> str:
@@ -347,25 +388,32 @@ class AgentRecord:
 
     @property
     def excess_pnls(self) -> list[float | None]:
-        """P&L less buy-and-hold's, per seed; None where it did not run."""
-        return [None if base is None else pnl - base
-                for pnl, base in zip(self.pnls, self.benchmark_pnls)]
+        """P&L less the benchmark's, per seed. None where the benchmark did
+        not run, and where this agent failed on every step: its P&L of zero
+        there is no score, and against a falling market it would read as
+        ahead."""
+        failed = self.failed_every_step + [False] * (
+            len(self.pnls) - len(self.failed_every_step))
+        return [None if base is None or lost else pnl - base
+                for pnl, base, lost in zip(self.pnls, self.benchmark_pnls,
+                                           failed)]
 
     @property
     def mean_excess_pnl(self) -> float | None:
-        """Mean P&L over buy-and-hold's across the seeds where both ran.
+        """Mean P&L over the benchmark's across the seeds with a score.
 
         The headline where the Oracle is not a ceiling. A difference in
         currency needs no pooling: every agent starts each seed with the
         same cash, so a seed where the market moved a lot weighs no more
-        here than its difference does. None when buy-and-hold never ran.
+        here than its difference does. None when the benchmark never ran
+        or this agent failed on every step of every seed.
         """
         values = [v for v in self.excess_pnls if v is not None]
         return statistics.fmean(values) if values else None
 
     @property
     def seeds_ahead(self) -> int | None:
-        """Seeds where this agent earned more than buy-and-hold did."""
+        """Seeds where this agent earned more than the benchmark did."""
         values = [v for v in self.excess_pnls if v is not None]
         return sum(1 for v in values if v > 0.0) if values else None
 
@@ -378,6 +426,12 @@ class AgentRecord:
             "max_leverage": list(self.max_leverage),
             **({"first_error": self.first_error}
                if self.first_error is not None else {}),
+            # Only where there is something to say, as with first_error.
+            **({"refused": list(self.refused),
+                "first_refusal": self.first_refusal}
+               if any(self.refused) else {}),
+            **({"failed_every_step": list(self.failed_every_step)}
+               if any(self.failed_every_step) else {}),
             **({"trusted": True} if self.trusted else {}),
             **({"uses_hidden_state": True} if self.uses_hidden_state
                else {}),
@@ -601,22 +655,36 @@ class Ranking:
         if self.capture_withheld is not None:
             for record in self.table():
                 excess, ahead = record.mean_excess_pnl, record.seeds_ahead
+                seeds = len(record.pnls)
+                failed = record.seeds_failed
+                lost = (f"  failed on every step of {failed} of {seeds} "
+                        "seeds" if failed else "")
                 if record.name == self.benchmark:
                     lines.append(f"  {record.name:16s}  the benchmark  "
                                  f"median pnl {record.median_pnl:+12,.0f}  "
-                                 f"wins {record.wins}/{len(record.pnls)}"
+                                 f"wins {record.wins}/{seeds}{lost}"
+                                 f"{record.marks}")
+                    continue
+                if seeds and failed == seeds:
+                    # A P&L of zero from an agent that never placed an
+                    # order is no score, and against a falling market it
+                    # used to print as ahead of the benchmark.
+                    lines.append(f"  {record.name:16s}  no score{lost}"
                                  f"{record.marks}")
                     continue
                 if excess is None or ahead is None:
-                    lines.append(f"  {record.name:16s}  no buy-and-hold to "
+                    lines.append(f"  {record.name:16s}  no benchmark to "
                                  f"compare  median pnl "
-                                 f"{record.median_pnl:+12,.0f}{record.marks}")
+                                 f"{record.median_pnl:+12,.0f}{lost}"
+                                 f"{record.marks}")
                     continue
                 measured = sum(1 for v in record.excess_pnls if v is not None)
+                # Named by its label: the benchmark is whichever entrant
+                # rank(..., benchmark=) chose, not always a buy-and-hold.
                 lines.append(
-                    f"  {record.name:16s}  vs buy-and-hold "
+                    f"  {record.name:16s}  vs {self.benchmark} "
                     f"{excess:+12,.0f} a seed  ahead {ahead}/{measured}  "
-                    f"wins {record.wins}/{len(record.pnls)}{record.marks}"
+                    f"wins {record.wins}/{seeds}{lost}{record.marks}"
                 )
             if self.benchmark_note:
                 lines.append(f"  {self.benchmark_note}")
@@ -625,6 +693,7 @@ class Ranking:
             # The reason is about the Oracle, so it is printed only where
             # one ran. Without one there was never a capture to withhold.
             if self.oracle_entered:
+                lines.append(self._oracle_line())
                 lines.append(f"  {self.capture_withheld}")
             return "\n".join(lines)
         for record in self.table():
@@ -661,6 +730,25 @@ class Ranking:
             )
         return "\n".join(lines)
 
+    def _oracle_line(self) -> str:
+        """Where the capture is withheld, the Oracle ran and has no row:
+        say so, with what it earned over the benchmark."""
+        label = self.oracle
+        pnls = self.reference_pnls
+        bench = (next(iter(self.records.values())).benchmark_pnls
+                 if self.records else [])
+        paired = [o - b for o, b in zip(pnls, bench) if b is not None]
+        if self.benchmark is not None and paired:
+            ahead = sum(1 for v in paired if v > 0.0)
+            earned = (f"Its P&L over {self.benchmark}'s was "
+                      f"{statistics.fmean(paired):+,.0f} a seed, ahead on "
+                      f"{ahead} of {len(paired)} seeds.")
+        else:
+            earned = (f"Its median P&L was "
+                      f"{statistics.median(pnls):+,.0f}." if pnls else "")
+        return (f"  The Oracle {label!r} ran and has no row, because it "
+                f"is not a ceiling on this model (below). {earned}").rstrip()
+
     def _excluded_lines(self) -> list[str]:
         """One line per agent left out for changing the market, in either
         form of the report: with a capture, or against buy-and-hold where
@@ -672,11 +760,23 @@ class Ranking:
             for name, seeds in sorted(self.tampered.items())]
 
     def _error_lines(self) -> list[str]:
-        """One line per ranked agent whose own code raised, in either form
-        of the report. The agent keeps its row; this says what the row
-        is a score of."""
+        """One line per ranked agent whose own code raised, and one per
+        agent whose adapter refused actions, in either form of the report.
+        The agent keeps its row; this says what the row is a score of."""
         lines = []
         for name, record in sorted(self.records.items()):
+            refused = ordered_sum(record.refused)
+            if refused:
+                hit = sum(1 for count in record.refused if count)
+                first = (f", the first on {record.first_refusal}"
+                         if record.first_refusal else "")
+                lines.append(
+                    f"  REFUSED {name}: {refused} refused action"
+                    + ("" if refused == 1 else "s")
+                    + f" on {hit} of {len(record.refused)} seeds{first}. "
+                    "Its adapter turned each one down and traded the rest "
+                    "of the decision, so nothing raised. Each is counted in "
+                    "Scorecard.rejected. See Scorecard.errors.")
             hit = record.seeds_with_errors
             if not hit:
                 continue
@@ -1025,8 +1125,13 @@ def rank(
             unmeasurable.append(seed)
         contenders = {n: c for n, c in scores.items()
                       if n != oracle and n not in tampered}
-        winner = (max(contenders, key=lambda n: (contenders[n].pnl, n))
-                  if contenders else None)
+        # An agent that failed on every step placed no order, so it cannot
+        # win a seed: its P&L of zero is no score.
+        failed = {n for n, c in contenders.items()
+                  if _failed_every_step(c, days * steps_per_day)}
+        scored = {n: c for n, c in contenders.items() if n not in failed}
+        winner = (max(scored, key=lambda n: (scored[n].pnl, n))
+                  if scored else None)
         for name, card in contenders.items():
             record = records.setdefault(
                 name, AgentRecord(name, seed_list, reference_pnls,
@@ -1039,6 +1144,12 @@ def rank(
             in_act, in_explain, first_line = _raised(card)
             record.errors.append(in_act + in_explain)
             record.rejected.append(card.rejected)
+            refusals = [line for line in card.errors
+                        if _REFUSED_ACTION_LINE.match(line)]
+            record.refused.append(len(refusals))
+            if refusals and record.first_refusal is None:
+                record.first_refusal = f"seed {seed}, {refusals[0]}"
+            record.failed_every_step.append(name in failed)
             record.max_leverage.append(card.max_leverage)
             if first_line is not None and record.first_error is None:
                 record.first_error = f"seed {seed}, {first_line}"

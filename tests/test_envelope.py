@@ -147,8 +147,11 @@ def test_every_gap_says_what_it_forbids():
 
 
 def test_a_one_year_question_on_certified_statistics_is_inside():
+    # `abs_return_acf1` stood here until 0.8.5. It is a decay-shape row
+    # now, because the model's lag-1 clustering is about a quarter of real
+    # (`test_persona_round3.py`), so two rows no gap names stand in for it.
     v = env.check(horizon_days=252,
-                  statistics=["return_acf1", "abs_return_acf1"])
+                  statistics=["return_acf1", "cross_sectional_corr"])
     assert v.inside
     assert bool(v) is True
     assert not v.gaps
@@ -193,6 +196,9 @@ def test_a_concentrated_roster_with_no_mix_named_is_outside():
 #: refuses them (`test_the_roster_grant_is_refused_on_the_default`).
 ROSTER_PRESET = env.ROSTER_MEASUREMENT["preset"]
 
+#: The rows the decay-shape gap refuses at any horizon and on any roster.
+DECAY_ROWS = {g.id: g for g in env.GAPS}["decay-shape"].statistics
+
 
 @pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
 def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
@@ -200,17 +206,18 @@ def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
     on the preset it was measured on (pt-v19, named since pt-v20 became the
     default)."""
     held = env.ROSTER_SHAPE_ROWS[mix][252]
-    # The decay-shape gap refuses abs_return_acf20 on every roster, so it
-    # is asked apart from the rest.
-    rows = [k for k in held if k != "abs_return_acf20"]
+    # The decay-shape gap refuses its rows on every roster (lags 1, 5 and
+    # 20 since 0.8.5), so they are asked apart from the rest.
+    rows = [k for k in held if k not in DECAY_ROWS]
     v = env.check(horizon_days=252, statistics=rows, sector_concentrated=mix,
                   preset=ROSTER_PRESET)
     assert v.inside, v.reasons
     assert any(w.startswith(f"the roster is the {mix} mix")
                for w in v.warnings)
-    v = env.check(horizon_days=252, statistics=["abs_return_acf20"],
-                  sector_concentrated=mix, preset=ROSTER_PRESET)
-    assert [g.id for g in v.gaps] == ["decay-shape"]
+    for row in DECAY_ROWS:
+        v = env.check(horizon_days=252, statistics=[row],
+                      sector_concentrated=mix, preset=ROSTER_PRESET)
+        assert [g.id for g in v.gaps] == ["decay-shape"], row
     # Past 252 the horizon gap refuses on any roster. The roster gap does
     # not add itself for a row the mix held at 504.
     v = env.check(horizon_days=504,
@@ -230,7 +237,7 @@ def test_the_roster_grant_is_refused_on_the_default(mix):
     """
     assert env.PRESET == "pt-v20" and ROSTER_PRESET == "pt-v19"
     rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
-            if k != "abs_return_acf20"]
+            if k not in DECAY_ROWS]
     for named in ({}, {"preset": "pt-v20"}):
         v = env.check(horizon_days=252, statistics=rows,
                       sector_concentrated=mix, **named)
