@@ -337,6 +337,9 @@ def test_the_claude_example_refuses_when_every_decision_fails():
     closed local port. Removing the variables alone is not enough -- the
     SDK also resolves a stored `ant auth login` profile, which on a
     developer machine would turn this test into twenty billed calls.
+
+    The example replays its recording unless the live opt-in is set, so
+    this sets it: the refusal under test is the live run's.
     """
     import os
     import subprocess
@@ -346,6 +349,7 @@ def test_the_claude_example_refuses_when_every_decision_fails():
     env = {k: v for k, v in os.environ.items()
            if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
     env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    env["TRADEFLOOR_LIVE_EXAMPLES"] = "1"
     done = subprocess.run([sys.executable, str(script)],
                           capture_output=True, text=True, timeout=300, env=env)
     combined = done.stdout + done.stderr
@@ -509,6 +513,182 @@ def test_the_claude_example_names_the_driver_of_the_day_it_is_scored_on(
     assert [claimed for claimed, _ in card.explanations] == [
         a for a in answers if a is not None], card.explanations
     assert len(card.errors) == 1 and "provider unreachable" in card.errors[0]
+
+
+class _ScriptedMessages(_StandInMessages):
+    """A stand-in that also takes a position, so a replay has P&L to match.
+
+    An answer of "refuse" is a refused turn, which is recorded too.
+    """
+
+    def __init__(self, ex, answers, ticker):
+        super().__init__(ex, answers)
+        self.ticker = ticker
+
+    def parse(self, **kwargs):
+        import types
+        driver = self.answers[self.calls % len(self.answers)]
+        self.calls += 1
+        if driver == "refuse":
+            return types.SimpleNamespace(stop_reason="refusal",
+                                         parsed_output=None)
+        decision = self.ex.Decision(weights={self.ticker: 0.3},
+                                    driver=driver, reasoning="stand-in")
+        return types.SimpleNamespace(stop_reason="end_turn",
+                                     parsed_output=decision)
+
+
+def test_the_claude_example_replays_what_it_recorded(monkeypatch, tmp_path):
+    """Record with a stand-in client, save, load, and replay with no client.
+
+    The replay must give the same scorecard and the same answers, and a
+    replay on another seed must stop at the first day it has no answer
+    for, rather than play an answer to a different prompt. Nothing here
+    calls a model, so it runs on every test run, and the committed
+    recording's own replay below is the only part that waits for one.
+    """
+    import types
+    import tradefloor as tf
+    from tradefloor.integrations.common import ReplayMiss, Transcript
+
+    ex = _load_claude_example(monkeypatch)
+    universe = tf.Universe.random(4, seed=7)
+    messages = _ScriptedMessages(ex, ["jump", "refuse", "random_noise"],
+                                 ticker=list(universe)[0].ticker)
+    recorder = Transcript()
+    live = ex.ClaudeTrader(client=types.SimpleNamespace(messages=messages),
+                           recorder=recorder)
+    first = tf.evaluate({"claude": live}, seed=ex.SEED, universe=universe,
+                        days=4)["claude"]
+    assert messages.calls == 4 and len(recorder) == 4
+    meta = recorder.meta
+    assert meta["model"] == "claude-opus-5"
+    assert meta["model_preset"] == tf.ModelParams.from_preset().fingerprint
+    assert meta["instructions_digest"] and meta["decision_schema_digest"]
+    assert meta["tradefloor_version"] == tf.__version__
+
+    path = tmp_path / "example-08.json"
+    recorder.save(path)
+    replayer = ex.ClaudeTrader(transcript=Transcript.load(path))
+    assert replayer.client is None
+    again = tf.evaluate({"claude": replayer}, seed=ex.SEED, universe=universe,
+                        days=4)["claude"]
+    assert again.pnl == first.pnl and first.trades > 0
+    assert again.explanations == first.explanations
+    assert replayer._log == live._log
+
+    with pytest.raises(ReplayMiss, match="day 0"):
+        tf.evaluate({"claude": ex.ClaudeTrader(
+            transcript=Transcript.load(path))},
+            seed=ex.SEED + 1, universe=universe, days=1)
+
+    moved = Transcript.load(path)
+    moved.meta["instructions_digest"] = "0" * 16
+    with pytest.raises(ReplayMiss, match="instructions_digest"):
+        ex.ClaudeTrader(transcript=moved)
+
+
+def test_the_claude_example_says_how_to_get_a_recording_it_cannot_find(
+        tmp_path):
+    """A copy outside the repository finds no recording and says so.
+
+    It must name the file and the opt-in, with no traceback and no table,
+    and `--record` without the opt-in must refuse before any call.
+    """
+    import os
+    import shutil
+    import subprocess
+    copy = tmp_path / "08-claude-agent.py"
+    shutil.copy(EXAMPLES / "08-claude-agent.py", copy)
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                        "TRADEFLOOR_LIVE_EXAMPLES")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    for args in ([], ["--record"]):
+        done = subprocess.run([sys.executable, str(copy), *args],
+                              capture_output=True, text=True, timeout=120,
+                              env=env)
+        combined = done.stdout + done.stderr
+        assert done.returncode != 0, combined[-1500:]
+        assert "example-08.json" in combined, combined[-1500:]
+        assert "TRADEFLOOR_LIVE_EXAMPLES=1" in combined, combined[-1500:]
+        assert "Traceback" not in combined, combined[-1500:]
+        assert "why-right" not in combined, combined[-1500:]
+
+
+#: The command that makes the committed recording, and the reason a test
+#: that needs it skips while it is missing.
+_RECORD_08 = ("TRADEFLOOR_LIVE_EXAMPLES=1 ANTHROPIC_API_KEY=... "
+              "python examples/08-claude-agent.py --record")
+
+
+def _committed_08_recording() -> Path:
+    path = (Path(__file__).resolve().parent / "fixtures" / "claude"
+            / "example-08.json")
+    if not path.is_file():
+        pytest.skip(f"example 08 has no recording yet at "
+                    f"tests/fixtures/claude/{path.name}; make it with "
+                    f"{_RECORD_08}")
+    return path
+
+
+@pytest.mark.needs_live_model
+def test_the_claude_example_replays_its_committed_recording():
+    """The default run replays the committed recording end to end.
+
+    No key, no opt-in, and the provider pointed at a closed port, so a
+    single live call would fail the run. Every one of the twenty days must
+    come from the recording and the leaderboard must print.
+    """
+    import os
+    import subprocess
+    _committed_08_recording()
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                        "TRADEFLOOR_LIVE_EXAMPLES")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    done = subprocess.run([sys.executable,
+                           str(EXAMPLES / "08-claude-agent.py")],
+                          capture_output=True, text=True, timeout=300,
+                          env=env)
+    combined = done.stdout + done.stderr
+    assert done.returncode == 0, combined[-3000:]
+    assert "Replaying 20 answers" in done.stdout, done.stdout[:500]
+    assert "why-right" in done.stdout
+    assert "Traceback" not in combined
+
+
+@pytest.mark.needs_live_model
+def test_the_claude_example_recording_says_what_made_it(monkeypatch):
+    """The recording names its model, prompt, schema and market.
+
+    Twenty entries, one per day on the day's last step, carrying only the
+    conventional fields and no credential, with meta that matches this
+    build: the default preset, this file's system prompt and answer schema.
+    """
+    import tradefloor as tf
+    from tradefloor.integrations.common import Transcript, digest
+
+    path = _committed_08_recording()
+    ex = _load_claude_example(monkeypatch)
+    recording = Transcript.load(path)
+    meta = recording.meta
+    for field in ("model", "recorded_utc", "tradefloor_version"):
+        assert meta.get(field), f"meta is missing {field}"
+    assert meta["model_preset"] == tf.ModelParams.from_preset().fingerprint
+    assert meta["instructions_digest"] == digest(ex.SYSTEM)
+    assert meta["decision_schema_digest"] == digest(
+        ex.Decision.model_json_schema())
+    assert (meta["seed"], meta["days"]) == (ex.SEED, ex.DAYS)
+    assert sorted(e["day"] for e in recording.entries) == list(range(ex.DAYS))
+    allowed = {"arm", "step", "day", "digest", "prompt", "response"}
+    for entry in recording.entries:
+        assert set(entry) == allowed, set(entry) ^ allowed
+        assert entry["step"] % meta["decision_every_steps"] == (
+            meta["decision_every_steps"] - 1)
+    text = path.read_text(encoding="utf-8")
+    for secret in ("sk-ant-", "Bearer ", "Authorization", "api_key"):
+        assert secret not in text, secret
 
 
 # -- what the pages say about the runs ---------------------------------------

@@ -37,7 +37,7 @@ Start at 00 if you have not used tradefloor before.
 | [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills, and the same orders in a book a scenario has thinned |
 | [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed. Pinned to `pt-v12`, with the same path run on the default at the end |
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
-| [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines. Needs a key; [`integrations/callable/five_days.ipynb`](integrations/callable/five_days.ipynb) replays a recorded Claude run without one |
+| [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines. Replays a recorded Claude run by default, so it needs no key |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
 | [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
 
@@ -83,9 +83,12 @@ own wall-clock total on the last line. It needs
 on the core library alone in its default replay mode; `--live` is the one
 that needs `tradefloor[finrobot]`, Python 3.11 and an API key. The recording
 that replay reads is in the repository's `tests/fixtures/`, so the replay
-needs a clone. `08-claude-agent.py` needs `tradefloor[claude]` and an API
-key, and spends money per decision, so the test suite never lets it reach a
-model.
+needs a clone. `08-claude-agent.py` needs `tradefloor[claude]` and replays
+the Claude run committed at `tests/fixtures/claude/example-08.json`, so it
+also needs a clone and no key. It calls Claude only when
+`TRADEFLOOR_LIVE_EXAMPLES=1` is set and a key is available, at one call per
+simulated day, and `--record` then rewrites the recording. The test suite
+never lets it reach a model.
 
 ## How they're kept working
 
@@ -98,7 +101,8 @@ listed in that file's `RUN_BY` beside the test that executes it, or in
 These run on every test run. `10-forking-a-market.py` and
 `11-scenario-fork.py` run end to end and must print PASS.
 `08-claude-agent.py` must refuse readably, with no API key and no provider
-reachable, rather than print a traceback. The four scripts in
+reachable, rather than print a traceback, and a recording it makes with a
+stand-in client must replay to the same scorecard. The four scripts in
 `integrations/` run when their framework is installed, and what they print
 is read back against the table in their README.
 `tests/test_rate_shock_demo.py` runs `rate-shock/counterfactual.py` and
@@ -120,6 +124,8 @@ copies carry output, and runs `07-research-workflow.py` end to end.
 `08-claude-agent.py` is checked on every run without a key or a bill: it must
 refuse readably when no model answers, offer Claude every factor the harness
 scores, and ask on the day's last step, the one its answer is scored against.
+Two more tests replay its committed recording and check what the recording
+says about the run that made it.
 
 Regenerate the committed output with:
 

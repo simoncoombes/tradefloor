@@ -665,6 +665,11 @@ FIXTURE_KINDS = {
     "langgraph": "recordings",
     "openai_agents": "recordings",
     "pydantic_ai": "recordings",
+    #: Example 08's live Claude run, read by `tests/test_examples.py`. A
+    #: transcript, but its answers are the example's own `Decision` and not
+    #: the adapters' decision schema, so the recordings checks below would
+    #: refuse every one of them.
+    "claude": "example-08-recording",
     #: Four `b4fix7` certification panels, thirty seeds each, read by
     #: `tests/test_scoring_conformance.py`. Per-seed scoring rows, not a
     #: transcript.
