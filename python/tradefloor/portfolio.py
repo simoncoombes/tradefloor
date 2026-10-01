@@ -333,8 +333,10 @@ class Portfolio:
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
-        self.cash_interest = bool(cash_interest)
-        self.margin_interest = bool(margin_interest)
+        from . import _checks
+        self.cash_interest = _checks.flag("cash_interest", cash_interest)
+        self.margin_interest = _checks.flag("margin_interest",
+                                            margin_interest)
         # Interest credited so far, net of any charged on a negative balance.
         self.interest = 0.0
         self._stamp = (0, 0, 0)

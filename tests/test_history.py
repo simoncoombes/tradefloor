@@ -222,6 +222,22 @@ def test_history_days_must_be_a_whole_number_of_days(bad):
         tf.World(seed=SEED, universe=U, agent=Watcher(), history_days=bad)
 
 
+def test_history_days_has_an_upper_bound():
+    """A warm-up runs the whole market for every day of it, so a mistyped
+    252000 is refused before anything runs, with the bound in the message."""
+    limit = tf._checks.MAX_HISTORY_DAYS
+    assert limit == 2520
+    with pytest.raises(tf.ValidationError, match="2520 or fewer"):
+        tf.evaluate({"w": Watcher()}, seed=SEED, universe=U, days=1,
+                    history_days=limit + 1)
+    with pytest.raises(tf.ValidationError, match="2520 or fewer"):
+        tf.World(seed=SEED, universe=U, agent=Watcher(),
+                 history_days=252_000)
+    with pytest.raises(tf.ValidationError, match="2520 or fewer"):
+        tf.rank(lambda: {"w": Watcher()}, seeds=[1], universe=U, days=1,
+                history_days=limit + 1)
+
+
 # -- World, rank and the other routes -----------------------------------------
 
 def test_world_runs_the_warm_up_when_it_is_built():

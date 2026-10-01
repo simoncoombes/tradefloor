@@ -504,12 +504,14 @@ class Scorecard:
     ``leverage_refusals`` is the part of ``rejected`` that the leverage
     limit refused. ``explanation_baseline`` is what always giving the same
     answer to ``explain`` would have scored on the same days: the share of
-    scored days won by the factor that won most often. Read
-    ``explanation_accuracy`` against it. On pt-v20 ``random_noise`` moves
-    prices most on almost every day (294 of 300 days over three rosters
-    and five seeds, with ``jump`` on five), so a constant answer scores
-    close to 1.0 there, and an accuracy means something only where it
-    beats the baseline.
+    scored days won by the factor that won most often.
+    ``explanation_edge`` is ``explanation_accuracy`` minus that baseline,
+    and the repr prints all three together. On pt-v20 a constant answer
+    scores near the top: ``random_noise`` moves prices most on 294 of 300
+    days over three rosters and five seeds, and ``jump`` on five, so
+    answering ``random_noise`` every day scores 0.95 to 1.0. Only the edge
+    says anything about the agent. An accuracy of 0.97 against a baseline
+    of 0.98 is an agent that did worse than naming one factor every day.
     """
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
@@ -606,6 +608,17 @@ class Scorecard:
         #: paid for its leverage.
         self.margin_interest = bool(margin_interest)
 
+    @property
+    def explanation_edge(self) -> float | None:
+        """``explanation_accuracy`` minus ``explanation_baseline``: how much
+        better the agent's answers to ``explain`` scored than naming the
+        most common answer every day. None when the agent has no
+        ``explain`` or answered on no day. On pt-v20 the baseline is 0.95
+        to 1.0, so this is the figure to compare, not the accuracy."""
+        if self.explanation_accuracy is None or self.explanation_baseline is None:
+            return None
+        return self.explanation_accuracy - self.explanation_baseline
+
     def as_dict(self) -> dict[str, Any]:
         # `history_days` only when there was a warm-up, so the card of a
         # run without one is the dict, and the digest, it always was.
@@ -631,10 +644,19 @@ class Scorecard:
             for label, lines in (("errors", self.errors),
                                  ("partial_fills", self.partial_fills))
             if lines)
+        # The accuracy only beside its baseline and the difference: on
+        # pt-v20 a constant answer scores 0.95 to 1.0, so a bare accuracy
+        # of 0.97 reads as good when it is below what naming one factor
+        # every day would have scored.
+        explained = ""
+        if self.explanation_edge is not None:
+            explained = (f", explanation={self.explanation_accuracy:.3f} vs "
+                         f"baseline {self.explanation_baseline:.3f} "
+                         f"(edge {self.explanation_edge:+.3f})")
         return (
             f"Scorecard({self.name!r}, pnl={self.pnl:,.0f}, "
             f"return={self.return_pct:+.2f}%, trades={self.trades}, "
-            f"impact={self.impact_bps:+.2f}bps{counts}{flags})"
+            f"impact={self.impact_bps:+.2f}bps{explained}{counts}{flags})"
         )
 
 
@@ -780,7 +802,7 @@ def evaluate(
     scored days then continue that market, so on the same seed they are
     different days from a run without the warm-up, and the scorecard
     records ``history_days``. The untraded baseline runs the same warm-up.
-    No scenario applies during it: a scenario's day 0 is the first scored
+    N is at most 2520, ten 252-day years. No scenario applies during it: a scenario's day 0 is the first scored
     day. The reference agents and :class:`tradefloor.StrategySpec`
     strategies keep their own price history and do not read
     ``obs.history``. Left at 0, the run is the one it always was.
@@ -818,8 +840,9 @@ def evaluate(
     days = _checks.whole_number("days", days)
     steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
     ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
-    history_days = _checks.whole_number("history_days", history_days,
-                                        minimum=0)
+    history_days = _checks.history_days(history_days)
+    cash_interest = _checks.flag("cash_interest", cash_interest)
+    margin_interest = _checks.flag("margin_interest", margin_interest)
     _checks.number("cash", cash)
     if max_leverage is not None:
         _checks.number("max_leverage", max_leverage)

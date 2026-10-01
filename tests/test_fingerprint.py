@@ -185,6 +185,13 @@ def test_battery_names_one_cell_per_shipped_scenario():
     assert len({cell.roster_seed for cell in b.cells}) == 6
 
 
+@pytest.mark.parametrize("bad", [True, False, "2", 2.0, None])
+def test_battery_version_must_be_a_whole_number(bad):
+    """`True == 1` in Python, so `tf.battery(True)` used to build version 1."""
+    with pytest.raises(tf.ValidationError, match="battery version must be a whole number"):
+        tf.battery(bad)
+
+
 def test_version_two_is_the_default_and_covers_every_shipped_scenario():
     """Decision 9 (2026-09-26): battery v2, longer post-shock windows and
     `curve_shock` included, as a new version rather than an edit to 1."""

@@ -289,11 +289,20 @@ def main() -> None:
             % (len(failures), failures[0])
         )
 
-    print("%-16s %12s %9s %12s" % ("agent", "pnl", "impact", "why-right"))
-    print("-" * 54)
+    # The why-right figure only beside what naming one factor every day
+    # scored and the difference. On pt-v20 a constant answer scores 95 to
+    # 100 per cent, so only the edge says whether an agent read anything.
+    print("%-16s %12s %9s %10s %9s %7s"
+          % ("agent", "pnl", "impact", "why-right", "constant", "edge"))
+    print("-" * 68)
     for s in tf.leaderboard(scores):
-        acc = "     -" if s.explanation_accuracy is None else "%5.0f%%" % (s.explanation_accuracy * 100)
-        print("%-16s %12.0f %9.1f %12s" % (s.name, s.pnl, s.impact_bps, acc))
+        if s.explanation_edge is None:
+            why = "%10s %9s %7s" % ("-", "-", "-")
+        else:
+            why = "%9.0f%% %8.0f%% %+6.0fpt" % (
+                s.explanation_accuracy * 100, s.explanation_baseline * 100,
+                s.explanation_edge * 100)
+        print("%-16s %12.0f %9.1f %s" % (s.name, s.pnl, s.impact_bps, why))
 
     print("\nP&L over buy-and-hold:")
     for name, excess in tf.versus_buy_and_hold(scores).items():

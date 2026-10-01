@@ -205,9 +205,13 @@ seed) and should be read together. `engine.explain(ticker, day)` breaks down
 the move in the printed price instead. An agent scored on explaining moves
 gets an `explanation_accuracy`: the share of days on which it named the
 factor that moved prices most, open to close, summed over every name.
-`fair_value_shift` moves no price and is never that answer. Quote the
-accuracy beside `explanation_baseline`, what a constant answer scores on the
-same days, because on pt-v20 `random_noise` wins almost every day.
+`fair_value_shift` moves no price and is never that answer. On pt-v20 a
+constant answer scores near the top, because `random_noise` wins almost
+every day: answering it every day scores 0.95 to 1.0. So the scorecard
+carries `explanation_baseline`, what a constant answer scores on the same
+days, and `explanation_edge`, the accuracy minus the baseline, and its repr
+prints the three together. Only the edge means anything. Quote it, or all
+three, and never the accuracy alone.
 
 To drive it from an agent:
 

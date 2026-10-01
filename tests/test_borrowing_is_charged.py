@@ -170,3 +170,22 @@ def test_a_portfolio_built_without_margin_interest_borrows_for_free():
     portfolio.cash = -500_000.0
     assert portfolio.accrue(engine) == 0.0
     assert portfolio.cash == -500_000.0
+
+
+@pytest.mark.parametrize("bad", [None, "False", "no", 0, 1])
+def test_the_interest_switches_must_be_true_or_false(bad):
+    """`bool("False")` is True and `bool(None)` is False, so a string or None
+    would have run as something the caller did not write. Every route that
+    takes the switches refuses it before a market runs."""
+    for name in ("margin_interest", "cash_interest"):
+        with pytest.raises(tf.ValidationError, match=f"{name} must be True or False"):
+            tf.Portfolio(cash=1e6, **{name: bad})
+        with pytest.raises(tf.ValidationError, match=f"{name} must be True or False"):
+            tf.evaluate({"b": _Levered()}, seed=3, universe=UNIVERSE, days=1,
+                        **{name: bad})
+    with pytest.raises(tf.ValidationError, match="margin_interest must be True or False"):
+        tf.World(seed=3, universe=UNIVERSE, agent=_Levered(),
+                 margin_interest=bad)
+    with pytest.raises(tf.ValidationError, match="margin_interest must be True or False"):
+        tf.rank(lambda: {"b": _Levered()}, seeds=[1], universe=UNIVERSE,
+                days=1, margin_interest=bad)

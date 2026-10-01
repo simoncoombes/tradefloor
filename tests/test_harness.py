@@ -675,6 +675,28 @@ def test_the_explanation_baseline_is_what_a_constant_answer_scores():
     assert idle.explanation_baseline is None
 
 
+def test_the_accuracy_is_shown_only_beside_the_baseline_and_the_edge():
+    """Owner decision on explanation_accuracy (0.8.5): keep the rule, and
+    never show the accuracy alone, because on pt-v20 a constant answer
+    scores near the top. The edge is the accuracy minus the baseline."""
+    scores = tradefloor.evaluate(
+        {"noise": Explainer("random_noise"), "momentum": Explainer("momentum"),
+         "idle": Idle()},
+        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20)
+    noise, momentum = scores["noise"], scores["momentum"]
+    assert noise.explanation_edge == pytest.approx(
+        noise.explanation_accuracy - noise.explanation_baseline)
+    assert noise.explanation_edge == 0.0
+    assert momentum.explanation_edge < 0
+    assert ("explanation=0.950 vs baseline 0.950 (edge +0.000)"
+            in repr(noise))
+    assert f"(edge {momentum.explanation_edge:+.3f})" in repr(momentum)
+    assert scores["idle"].explanation_edge is None
+    assert "explanation" not in repr(scores["idle"])
+    # A property, so the card's dict and its digest are what they were.
+    assert "explanation_edge" not in noise.as_dict()
+
+
 def test_explanations_are_scored_on_what_moved_prices_over_the_whole_day():
     """Decision 8 (2026-09-26): the rule matches the question agents are
     asked, which factor moved prices most today.

@@ -381,8 +381,8 @@ class World:
         from . import _checks
         steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
         ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
-        history_days = _checks.whole_number("history_days", history_days,
-                                            minimum=0)
+        history_days = _checks.history_days(history_days)
+        margin_interest = _checks.flag("margin_interest", margin_interest)
         _checks.number("cash", cash)
         macro = _checks.macro(macro)
         _checks.start_clock(start)

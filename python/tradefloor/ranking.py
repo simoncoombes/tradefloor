@@ -924,6 +924,8 @@ def rank(
     from .universe_util import as_universe, fingerprint_of
 
     factory = _factory_or_refuse(make_agents)
+    history_days = _checks.history_days(history_days)
+    margin_interest = _checks.flag("margin_interest", margin_interest)
     seed_list = [check_seed(s) for s in _checks.seeds(seeds)]
     if not seed_list:
         raise ValidationError("no seeds given")

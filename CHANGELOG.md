@@ -990,6 +990,11 @@ known-answer digest.
   on 5, so a constant answer scores 0.95 to 1.0, and `explanation_baseline`
   says what it scored on the same days. Example 08 offers Claude the ten
   names and describes the rule.
+- Because a constant answer scores near the top on pt-v20, the accuracy is
+  no longer shown alone. `Scorecard.explanation_edge` is the accuracy minus
+  the baseline. The repr prints all three for an agent with `explain`,
+  such as `explanation=0.967 vs baseline 0.983 (edge -0.016)`, and example
+  08's table has a column for each. The rule itself does not change again.
 - Fingerprint battery version 2 is the default (`tf.BATTERY_VERSION == 2`).
   It has seven cells, one per shipped scenario including `curve_shock`,
   each 120 days long, so a day-50 shock has seventy days after it instead
@@ -1007,7 +1012,11 @@ known-answer digest.
   levered LLM agent is shown in a World, so two recorded runs no longer
   replay: `tests/fixtures/finrobot/rate-shock.json` (from step 228, day 38)
   and `tests/fixtures/pydantic_ai/rate-shock.json` (from step 12, day 2).
-  Their tests are marked as expected failures until they are re-recorded.
+  Their tests are skipped until they are re-recorded.
+- `margin_interest` and `cash_interest` must be True or False. `evaluate`,
+  `rank`, `World` and `Portfolio` refuse None and strings, because
+  `bool("False")` is True. `tf.battery(True)` is refused rather than read as
+  version 1. `history_days` takes at most 2520, ten 252-day years.
 
 ### The MCP server after review
 

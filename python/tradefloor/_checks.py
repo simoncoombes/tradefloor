@@ -52,6 +52,38 @@ def whole_number(name: str, value: Any, *, minimum: int = 1) -> int:
     return int(value)
 
 
+#: The longest warm-up ``history_days`` takes: ten 252-day years. A
+#: warm-up runs the whole market for every day of it with nobody trading.
+#: In ``evaluate`` on twenty names a 252-day warm-up took 1.4 seconds on
+#: an M-series Mac, so ten years is about 14 seconds before the first
+#: scored step, and a mistyped 252000 would run for most of an hour.
+MAX_HISTORY_DAYS = 2520
+
+
+def history_days(value: Any) -> int:
+    """The ``history_days`` argument: a whole number from 0 to
+    :data:`MAX_HISTORY_DAYS`."""
+    days = whole_number("history_days", value, minimum=0)
+    if days > MAX_HISTORY_DAYS:
+        raise ValidationError(
+            f"history_days must be {MAX_HISTORY_DAYS} or fewer (ten 252-day "
+            f"years), got {days}. A warm-up runs the whole market for every "
+            "day of it; a lookback of a year needs history_days=252.")
+    return days
+
+
+def flag(name: str, value: Any) -> bool:
+    """``value`` if it is True or False, or "margin_interest must be True
+    or False, got the string 'no'." A string or None is refused because
+    ``bool("False")`` is True and ``bool(None)`` is False, so either would
+    run as something the caller did not write. A numpy bool is accepted."""
+    if isinstance(value, bool):
+        return value
+    if type(value).__name__ == "bool_" and type(value).__module__ == "numpy":
+        return bool(value)
+    raise ValidationError(f"{name} must be True or False, got {describe(value)}.")
+
+
 def number(name: str, value: Any) -> float:
     """``value`` as a float, or "cash must be a number, got the string
     '1e6'." Range checks stay with the code that owns the value."""

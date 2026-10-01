@@ -171,6 +171,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import numbers
 from typing import TYPE_CHECKING, Any, NamedTuple, Sequence
 
 from ._core import ValidationError, check_seed
@@ -305,8 +306,16 @@ def battery(version: int = BATTERY_VERSION) -> Battery:
     stored as a literal, so it cannot drift from what P6 actually
     considers its default. See the module docstring for what the battery
     pins and what depending on P6 means here.
+
+    ``version`` is a whole number. ``battery(True)`` is refused rather than
+    read as version 1, which is what Python's ``True == 1`` would give.
     """
-    return _build(version)
+    if isinstance(version, bool) or not isinstance(version, numbers.Integral):
+        from ._checks import describe
+        raise ValidationError(
+            f"battery version must be a whole number, such as "
+            f"{BATTERY_VERSION}; got {describe(version)}.")
+    return _build(int(version))
 
 
 # ---------------------------------------------------------------------------
