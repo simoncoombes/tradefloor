@@ -18,9 +18,11 @@ merged into `release/0.8.5`. `release/0.8.5` before it merged
 d1cb9a6, a46575e, fbdcac1, d445d9c; 1c653e7 is superseded). pt-v20 is the
 default, at the vector the grade box ptv20g6 passed 40 of 40 on.
 
-On the integration head the full Python suite (`pytest -n 4`) fails only
-the 17 tests that replay the five recorded LLM fixtures (see step 1), and
-`cargo test` passes 564 with none failing.
+On `rel085/candidate` after `rel085/last-lib` merged (2026-10-01), with
+no API keys set, the full Python suite (`pytest -n 4`) passes 5087 with
+305 skipped and none failing, every recorded LLM fixture replays, and
+`cargo test --release` passes 586 with 20 ignored and none failing.
+`tools/release/check.py --version 0.8.5` reports 0 problems.
 
 | digest | value |
 |---|---|
@@ -63,6 +65,11 @@ moved no digest.
       misses. Until then three tests in `tests/test_langgraph.py` and
       `test_render.py::test_langgraph_default_renderer_replays_the_shipped_fixture`
       fail on `rel085/candidate`. The other fixtures replay.
+- [x] **`rel085/last-lib` is merged** (217e322, 2026-10-01): an agent's
+      resting buy and sell no longer trade with each other in the
+      settlement book, the bar note on resting fills, and the report fixes
+      (non-mapping answers, a short run's Sharpe, an unguarded replay). No
+      digest moved; every one in the table was re-run on the merged build.
 - [x] RELEASING 5b on the final vector: pt-v20's record from the grade
       box's preset panel (ptv20g6), its level block from a paired run on
       this build (`tools/presets/results/level-rows-pt-v20-2026-09-26.json`,
