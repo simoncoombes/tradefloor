@@ -141,8 +141,8 @@
 //! order into its settlement book, an order that crosses passes over its own
 //! agent's orders (`SubmitOptions::skip_own`) and matches the next one behind
 //! them. Neither order is cancelled, so an agent's bid and offer at one price
-//! both rest, each for the flow or another agent to fill. Before 0.8.5 the
-//! settlement matched them with each other: a wash trade on the tape.
+//! both rest, each for the flow or another agent to fill. The 0.8.5
+//! pre-release builds matched them with each other, a wash trade.
 //!
 //! # What the market's own flow sees
 //!
