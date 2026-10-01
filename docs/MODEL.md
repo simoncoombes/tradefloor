@@ -1917,7 +1917,10 @@ at its limit, as a maker fill (`microstructure.rs:695-738`,
 the maker quotes in that tick's settlement ladder (`microstructure.rs:677-693`),
 which holds only as many levels as the tick's volume needs, two to ten. So
 an order resting past that ladder waits until the price moves to it, and a
-fill against the flow is always at a price inside the maker's quote.
+fill against the flow is always at a price inside the maker's quote. A bar
+keeps only each tick's last print, so a resting fill can sit below the day's
+low or above its high when a later slice in the same tick traded on the
+other side. On 40 names over four sessions, 2% of resting fills did.
 `tests/test_order_book_depth.py` checks that a limit past the latent depth
 stays unfilled for the rest of the session and that one 5 bp outside the
 touch still fills.

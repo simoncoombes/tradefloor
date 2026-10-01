@@ -317,6 +317,11 @@ class History:
     published figures the day traded under, so ``cycle`` and ``gdp_growth``
     are the published ones.
 
+    A bar's high and low come from one print a tick, the tick's last trade,
+    so a resting limit order the market's flow filled earlier in a tick can
+    show a fill price below that day's low or above its high, and a check
+    of fills against these bars will disagree with the engine on it.
+
     On pt-v20 the close is the day's last print, and it is not the price
     the next session starts from. The market's close comes after the bar is
     read and re-marks every name, and the next day's first step shows the
