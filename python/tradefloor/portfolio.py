@@ -84,6 +84,24 @@ class LeverageError(OrderError):
     """
 
 
+def _leverage_refusal(projected: float, limit: float) -> str:
+    """The refusal message, with the two leverages printed to as many places
+    as it takes for them to differ.
+
+    At two places a trade projected at 2.004x against a 2.0x limit read
+    "2.00x, above the 2.00x limit". A refusal is only raised when the
+    projection is strictly above the limit, so some precision separates
+    them; past twelve places the shortest repr does.
+    """
+    for places in range(2, 13):
+        shown, allowed = f"{projected:.{places}f}", f"{limit:.{places}f}"
+        if shown != allowed:
+            break
+    else:
+        shown, allowed = repr(float(projected)), repr(float(limit))
+    return f"trade would take leverage to {shown}x, above the {allowed}x limit"
+
+
 def _describe(value: Any) -> str:
     """A short ``repr`` of what an agent sent, with its type."""
     text = repr(value)
@@ -423,10 +441,7 @@ class Portfolio:
             # entering it.
             projected = self._projected_leverage(engine, ticker, filled, price, notional)
             if projected > self.max_leverage:
-                raise LeverageError(
-                    f"trade would take leverage to {projected:.2f}x, above the "
-                    f"{self.max_leverage:.2f}x limit"
-                )
+                raise LeverageError(_leverage_refusal(projected, self.max_leverage))
 
         position = self.positions.setdefault(ticker, Position(ticker))
         self._apply(position, filled, price)
@@ -574,10 +589,7 @@ class Portfolio:
             projected = self._projected_leverage(engine, ticker, filled, price,
                                                  filled * price)
             if projected > self.max_leverage:
-                raise LeverageError(
-                    f"trade would take leverage to {projected:.2f}x, above the "
-                    f"{self.max_leverage:.2f}x limit"
-                )
+                raise LeverageError(_leverage_refusal(projected, self.max_leverage))
         out = engine.submit(self.owner, ticker, quantity, limit_price=limit)
         self._in_book = True
         self._drain(engine, skip_order=out["order_id"])

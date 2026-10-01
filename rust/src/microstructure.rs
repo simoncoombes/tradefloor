@@ -674,6 +674,24 @@ fn settle_inner(
         return no_trade();
     }
 
+    // How far the flow can walk: the deepest price the maker quotes on each
+    // side of this settlement's ladder. Without agents' orders the book IS
+    // that ladder and a slice that empties it stops there, so the bound is
+    // what the flow always met and moves nothing. With them, it stops a
+    // slice that empties the ladder from walking on into an agent's order
+    // resting past it: the market never traded at that price, and before
+    // this bound a bid at 4% of the market filled at its own price whenever
+    // a slice ran the ladder dry. Taken before the orders go in, so an
+    // order's own price can never widen it.
+    let flow_bound = if resting.is_empty() {
+        None
+    } else {
+        Some((
+            book.bids.last().map(|o| o.price),
+            book.asks.last().map(|o| o.price),
+        ))
+    };
+
     // Agents' resting orders, after the guard so no guard reads them. A
     // crossed order trades here, at the ladder's prices, before any flow.
     let mut pre_traded = 0.0;
@@ -738,12 +756,19 @@ fn settle_inner(
         } else {
             Side::Sell
         };
+        // A sell slice walks the bids down to the deepest maker bid, a buy
+        // the asks up to the deepest maker ask. `None` with no orders, which
+        // is the shipped call.
+        let limit_price = flow_bound.and_then(|(deepest_bid, deepest_ask)| match side {
+            Side::Buy => deepest_ask,
+            Side::Sell => deepest_bid,
+        });
         let result = book.submit(
             side,
             slice,
             "flow",
             SubmitOptions {
-                limit_price: None,
+                limit_price,
                 post_remainder: false,
                 order_id: None,
             },
@@ -1443,6 +1468,63 @@ mod tests {
         let f = &fills[0];
         assert!(f.taker);
         assert_eq!((f.price, f.quantity, f.counterparty.as_str()), (ask, 1_000.0, MARKET_MAKER_ID));
+    }
+
+    /// Flow that empties the ladder stops at the ladder's last price. A bid
+    /// resting far below it is not filled, and the print is a price the
+    /// maker quoted. Before the bound, the fourth slice filled 4% of the
+    /// market at the order's own price and printed it.
+    #[test]
+    fn flow_that_empties_the_ladder_does_not_reach_a_bid_past_it() {
+        // 200,000 shares against ten levels of about 10,000: every slice
+        // sells, and the second empties the ladder.
+        let ladder = build_live_book(&company(), &LiveBookOptions::default());
+        let deepest = ladder.bids.last().unwrap().price;
+        let held: f64 = ladder.bids.iter().map(|o| o.remaining).sum();
+        assert!(held < 200_000.0, "the ladder must run dry: {held}");
+        for price in [4.0, deepest * 0.9, deepest - 0.01] {
+            let orders = vec![resting("a-0", Side::Buy, price, 5_000.0)];
+            let (out, fills) = settle_price_through_book_with_orders(
+                &company(), 99.0, 200_000.0, &SettleOptions::default(), &orders,
+                &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+            assert!(fills.is_empty(), "a bid at {price} below the ladder filled: {fills:?}");
+            assert_eq!(out.price, deepest, "the print is the ladder's last price");
+            // The same settlement without the order prints the same.
+            let (bare, _) = settle_price_through_book_with_orders(
+                &company(), 99.0, 200_000.0, &SettleOptions::default(), &[],
+                &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+            assert_eq!(out, bare);
+        }
+    }
+
+    /// The mirror: an offer far above the ladder, against flow that buys
+    /// it dry.
+    #[test]
+    fn flow_that_empties_the_ladder_does_not_reach_an_offer_past_it() {
+        let ladder = build_live_book(&company(), &LiveBookOptions::default());
+        let deepest = ladder.asks.last().unwrap().price;
+        let orders = vec![resting("a-0", Side::Sell, 1_000.0, 5_000.0)];
+        let (out, fills) = settle_price_through_book_with_orders(
+            &company(), 101.0, 200_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.0, 0.0, 0.0, 0.0], 0));
+        assert!(fills.is_empty(), "an offer at 10x filled: {fills:?}");
+        assert_eq!(out.price, deepest);
+    }
+
+    /// An order AT the ladder's last price still fills once the maker's
+    /// size there is gone, at that price: the bound stops the flow past the
+    /// ladder, not at it.
+    #[test]
+    fn a_bid_at_the_ladders_last_price_still_fills_behind_the_maker() {
+        let ladder = build_live_book(&company(), &LiveBookOptions::default());
+        let deepest = ladder.bids.last().unwrap().price;
+        let orders = vec![resting("a-0", Side::Buy, deepest, 5_000.0)];
+        let (_, fills) = settle_price_through_book_with_orders(
+            &company(), 99.0, 200_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+        let q: f64 = fills.iter().map(|f| f.quantity).sum();
+        assert_eq!(q, 5_000.0, "{fills:?}");
+        assert!(fills.iter().all(|f| f.price == deepest && !f.taker));
     }
 
     #[test]
