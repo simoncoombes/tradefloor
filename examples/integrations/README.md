@@ -69,9 +69,9 @@ two adapters:
 
 | example | days | trades | return | impact |
 |---|---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 10 | -1.16% | +0.04 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 10 | -2.18% | +0.95 bps |
+| [`callable/five_days.py`](callable/five_days.py) | 20 | 9 | -1.71% | +0.04 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 9 | -1.71% | +0.04 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 10 | -3.33% | +0.98 bps |
 | [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 1 | +0.64% | +1.24 bps |
 
 These are the figures on pt-v20. The impact column is the end-of-run price
@@ -99,24 +99,29 @@ The payload is a JSON-able dict: the step, the day, the published macro
 fields, and per asset the price, one-day and five-day returns, volatility,
 the best bid and ask, average daily volume, `max_order_shares`, the position
 held and any fundamentals you supplied. Under `portfolio` it carries `cash`,
-`net_worth`, `gross_exposure`, `max_leverage` and `buying_power`.
-`gross_exposure` there is a multiple of net worth, what `Portfolio.leverage`
-returns: 2.02 means positions worth about twice the account. `buying_power`
-is in dollars, the further gross exposure the leverage cap allows.
+`net_worth`, `leverage`, `max_leverage`, `buying_power` and `open_orders`.
+`leverage` is gross exposure as a multiple of net worth, what
+`Portfolio.leverage` returns: 2.02 means positions worth about twice the
+account. `buying_power` is in dollars, the further gross exposure the
+leverage cap allows. `open_orders` lists the agent's limit orders still
+waiting in the book, each with its `symbol`, `side`, `limit_price` and
+`remaining` shares.
 
-What comes back is a list of market orders, each a symbol, a side (BUY, SELL
-or HOLD) and a share count. That is the whole order vocabulary at the
-adapter boundary. `parse_decision` refuses an `order_type` other than
-`market` and any `limit_price`, so an agent built on one of these adapters
-cannot rest a limit order. [The decision boundary](#the-decision-boundary)
-below has the rules.
+This payload is version 1 of the observation contract and is frozen for the
+0.8.x line: no key is added, removed or renamed in a 0.8.x patch release.
+[SUPPORT.md](../../docs/SUPPORT.md#the-agent-payload-and-decision-contract)
+lists every key. Until 0.8.5, `leverage` was called `gross_exposure` and
+there was no `open_orders`.
 
-A native Tradefloor agent, one that implements `act(obs)` itself, returns a
-mapping of ticker to signed share quantity, and it can also put
-`tf.Limit(quantity, price)` and `tf.Cancel()` in that mapping. `World` fills
-what a limit order can take at once and leaves the remainder resting in the
-book. So a strategy that needs limit orders is written as a native agent,
-and the adapters are for frameworks that decide at market.
+What comes back is a list of actions, each a symbol, a side (BUY, SELL, HOLD
+or CANCEL) and a share count. An action is a market order unless it carries
+a `limit_price`, which makes it a `tf.Limit`: it trades at that price or
+better, and what does not fill at once waits in the book until it fills, a
+CANCEL for the symbol withdraws it, or a new limit order on the symbol
+replaces it. CANCEL is a `tf.Cancel()`. These are the orders a native agent
+returns from `act(obs)`, so an LLM agent and a Python agent trade the same
+market. [The decision boundary](#the-decision-boundary) below has the
+rules. Until 0.8.5 (decision schema 1) the adapters sent market orders only.
 
 ## Plain Python
 
@@ -422,24 +427,32 @@ output would say the question had changed.
 A framework returns a decision and never touches engine state.
 
 ```json
-{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": 1200}],
+{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": 1200},
+             {"symbol": "UTIL_B", "side": "SELL", "quantity": 400,
+              "order_type": "limit", "limit_price": 51.25},
+             {"symbol": "FIN_C", "side": "CANCEL"}],
  "rationale": "one line, for the record"}
 ```
 
-`parse_decision` checks that against the shared schema, and `orders_from`
-checks what survives against this market: every symbol against the listed
-universe, every side against BUY, SELL and HOLD, and the size against the
-participation cap, which clips and records the clip. A well-formed decision
-this market cannot take raises `MarketRefusalError`.
+`parse_decision` checks that against the shared schema (decision schema 2),
+and `orders_from` checks what survives against this market: every symbol
+against the listed universe, and the size against the participation cap,
+which clips and records the clip, for a limit order as for a market one.
+`order_type` is optional. A `limit_price` alone makes a limit order, and
+`order_type: "limit"` without one is refused.
 
-Unknown keys are refused by name, at the top level and on an action. A
-silently dropped `stop_loss` would leave an agent believing it has protection
-this market cannot give. There are no order types and no limit prices at this
-boundary either: `Portfolio.execute` sweeps the live book with a signed
-quantity, so an `order_type` other than `market`, or any `limit_price`, is
-refused with a message naming the capability that is missing. Limit orders
-are for native agents, as described under
-[Payload fields and order types](#payload-fields-and-order-types).
+A bad action is refused on its own and the rest of the decision trades. An
+unknown side, a negative quantity, a HOLD or CANCEL with a quantity, a limit
+order with no price, an unlisted symbol, or a symbol named by two actions is
+left out, and the refusal and its reason go into the decision's `refused`
+list, the adapter's `record`, and the scorecard's `errors` under
+`tf.evaluate`. Under decision schema 1 (before 0.8.5) any of them refused
+the whole decision.
+
+Unknown keys are refused by name. A silently dropped `stop_loss` would leave
+an agent believing it has protection this market cannot give, so an action
+carrying one is refused, and an unknown key at the top level refuses the
+whole decision.
 
 A mapping carrying no `actions` key is refused instead of being read as a
 hold. An unwrapped framework envelope would otherwise score as `trades=0`
@@ -452,6 +465,11 @@ that looked at the market and declined.
 The scorecard rows above were re-measured each time the default preset
 moved. The old rows are kept here so a reader comparing against an older
 run can see what it printed.
+
+Before the 0.8.5 payload freeze, the five-day return the rule reads spanned
+29 steps rather than 30, and on pt-v20 callable and openai_agents read 10
+trades -1.16% +0.04 bps and pydantic_ai 10 trades -2.18% +0.95 bps;
+langgraph's row did not move.
 
 On pt-v20 before its graded arm, callable and openai_agents read 9 trades
 -1.31% +0.05 bps, pydantic_ai 9 trades -3.34% +0.96 bps, and langgraph no

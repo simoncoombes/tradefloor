@@ -267,14 +267,16 @@ def test_the_adapters_constructor_keywords_are_the_ones_callers_wrote():
         "rebuilds the agent as type(self)(**keywords)")
 
 
-def test_the_supported_sides_are_the_three_the_mandate_names():
+def test_the_supported_sides_are_the_four_the_mandate_names():
     """`SIDES`, `parse` and the mandate text have to agree. They are three
-    statements of one contract, and a fourth side added to the tuple without
-    the mandate asking for it would be a side no model ever returns."""
-    assert fr.SIDES == ("BUY", "SELL", "HOLD")
+    statements of one contract, and a side added to the tuple without the
+    mandate asking for it would be a side no model ever returns. The same
+    holds for the limit price."""
+    assert fr.SIDES == ("BUY", "SELL", "HOLD", "CANCEL")
     for side in fr.SIDES:
         assert f'"{side}"' in fr.MANDATE, (
             f"{side} is accepted but the mandate never offers it")
+    assert '"limit_price"' in fr.MANDATE
 
 
 # -- the shared adapter contract --------------------------------------------
@@ -466,27 +468,20 @@ def test_a_recorded_transcript_reads_the_same_through_either_class():
             "of its own prompt, so this fixture cannot replay")
 
 
-def test_the_two_action_types_are_not_interchangeable():
-    """A trap worth knowing about, pinned so nobody rediscovers it.
-
-    `Action.__eq__` is an isinstance check, so a `finrobot.Action` and a
-    `common.Action` holding identical fields compare UNEQUAL. Anybody mixing
-    the two modules -- comparing a FinRobot decision against one from another
-    adapter -- has to compare `as_dict()`, not the objects.
-
-    This is the strongest argument for eventually collapsing the two, and
-    until that happens it is the strongest argument for knowing they are
-    separate.
-    """
+def test_the_two_action_types_are_one():
+    """`finrobot.Action` was a copy of `common.Action`, and the two compared
+    UNEQUAL on identical fields. From decision schema 2 it is a subclass
+    that only raises this module's `DecisionError`, so the action rules
+    exist once and the two compare equal."""
     from tradefloor.integrations import common
 
     mine = fr.Action("TECH_A", "BUY", 5.0)
     shared = common.Action("TECH_A", "BUY", 5.0)
-    assert mine.as_dict() == shared.as_dict()
-    assert mine != shared, (
-        "the two Action types now compare equal, which means one of them "
-        "has changed how equality works; check what else that affects")
+    assert isinstance(mine, common.Action)
+    assert mine == shared and shared == mine
     assert fr.Decision([mine]).as_dict() == common.Decision([shared]).as_dict()
+    with pytest.raises(fr.DecisionError):
+        fr.Action("TECH_A", "SHORT", 5.0)
 
 
 # -- the optional dependency ------------------------------------------------
@@ -585,8 +580,9 @@ def test_the_payload_carries_exactly_the_allowlisted_keys():
     # refuses a trade. The payload already named a participation cap worth
     # several times equity; without these an agent sizing to what it was told
     # scores zero fills and reads as a bad agent when it was misled.
-    assert set(payload["portfolio"]) == {"cash", "net_worth", "gross_exposure",
-                                         "max_leverage", "buying_power"}
+    assert set(payload["portfolio"]) == {"cash", "net_worth", "leverage",
+                                         "max_leverage", "buying_power",
+                                         "open_orders"}
 
 
 def test_the_macro_allowlist_is_the_librarys_own():
@@ -1320,38 +1316,38 @@ def test_an_answer_with_no_actions_key_is_refused_not_read_as_a_hold(text,
 @pytest.mark.parametrize("text,match", [
     ('{"actions": [], "confidence": 0.8}', "confidence"),
     ('{"actions": [], "rationale": "x", "notes": "more"}', "notes"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"stop_loss": 95.0}]}', "stop_loss"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"time_in_force": "gtc"}]}', "time_in_force"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"order_type": "limit"}]}', "market sweeps only"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"limit_price": 99.5}]}', "no limit orders"),
 ])
-def test_a_field_the_market_cannot_honour_is_refused_by_name(text, match):
+def test_a_top_level_field_the_contract_does_not_define_is_refused(text,
+                                                                    match):
     """Silently dropping an unknown field executes an instruction the agent
-    did not give.
-
-    A model that writes `stop_loss` believes it has protection and sizes
-    accordingly. Dropping the field buys at market with none, and the trace
-    then records a decision nobody made. `order_type` and `limit_price` get
-    refusals naming the missing capability because they are what a model
-    reaches for first; everything else is refused as unreadable rather than
-    ignored.
-    """
+    did not give, so an unknown key at the top level refuses the response.
+    The same on an action refuses that action
+    (`test_a_bad_action_is_refused_on_its_own`)."""
     with pytest.raises(fr.DecisionError, match=match):
         fr.parse(text)
 
 
 def test_a_market_order_type_is_tolerated_because_it_is_what_happens_anyway():
-    """`order_type: "market"` states the only thing this market does, so it
-    is redundant rather than wrong. Refusing it would fail a model for
-    describing the execution it was going to get."""
+    """`order_type: "market"` states the default, so it is redundant rather
+    than wrong. Refusing it would fail a model for describing the execution
+    it was going to get."""
     decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
                         '"quantity": 5, "order_type": "market", '
                         '"limit_price": null}]}')
     assert decision.actions[0].signed() == 5.0
+    assert decision.refused == []
+
+
+def test_a_limit_order_and_a_cancel_are_accepted():
+    """Decision schema 2: FinRobot can send a limit order and a CANCEL, by
+    the same rules as every other adapter."""
+    decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
+                        '"quantity": 5, "order_type": "limit", '
+                        '"limit_price": 99.5}, {"symbol": "B", '
+                        '"side": "CANCEL"}]}')
+    assert decision.actions == [fr.Action("A", "BUY", 5, 99.5),
+                                fr.Action("B", "CANCEL")]
+    assert decision.refused == []
 
 
 def test_the_refusal_matches_the_shared_validator():
@@ -1419,18 +1415,6 @@ def test_a_fenced_answer_is_accepted():
     ('{"actions": [1,]}', "does not parse"),
     ('[1, 2, 3]', "got a list"),
     ('{"actions": "TECH_A"}', "must be a list"),
-    ('{"actions": [5]}', "not an object"),
-    ('{"actions": [{"side": "BUY", "quantity": 1}]}', "no usable 'symbol'"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "SHORT", "quantity": 1}]}',
-     "not one of"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": -5}]}',
-     "negative"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": "lots"}]}',
-     "not a number"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "HOLD", "quantity": 10}]}',
-     "HOLD"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 1}, '
-     '{"symbol": "A", "side": "SELL", "quantity": 1}]}', "more than once"),
     ('{"actions": [], "rationale": 5}', "must be a string"),
 ])
 def test_invalid_output_is_refused_readably(text, match):
@@ -1438,10 +1422,40 @@ def test_invalid_output_is_refused_readably(text, match):
         fr.parse(text)
 
 
-def test_a_non_finite_quantity_is_refused():
-    with pytest.raises(fr.DecisionError, match="non-finite"):
-        fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
-                 '"quantity": Infinity}]}')
+@pytest.mark.parametrize("bad,match", [
+    ('5', "not an object"),
+    ('{"side": "BUY", "quantity": 1}', "no usable 'symbol'"),
+    ('{"symbol": "TECH_A", "side": "SHORT", "quantity": 1}', "not one of"),
+    ('{"symbol": "TECH_A", "side": "BUY", "quantity": -5}', "negative"),
+    ('{"symbol": "TECH_A", "side": "BUY", "quantity": "lots"}',
+     "not a number"),
+    ('{"symbol": "TECH_A", "side": "HOLD", "quantity": 10}', "HOLD"),
+    ('{"symbol": "A", "side": "BUY", "quantity": Infinity}', "non-finite"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "stop_loss": 95.0}',
+     "stop_loss"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "time_in_force": "gtc"}',
+     "time_in_force"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "order_type": "limit"}',
+     "no limit_price"),
+], ids=["not-object", "no-symbol", "side", "negative", "not-number", "hold",
+        "infinite", "stop-loss", "time-in-force", "limit-without-price"])
+def test_a_bad_action_is_refused_on_its_own(bad, match):
+    """Decision schema 2. Under schema 1 each of these refused the whole
+    response; now the action is refused with its reason and the BUY beside
+    it stands, by the shared layer's rules."""
+    decision = fr.parse('{"actions": [' + bad + ', {"symbol": "B", '
+                        '"side": "BUY", "quantity": 7}]}')
+    assert decision.actions == [fr.Action("B", "BUY", 7)]
+    assert len(decision.refused) == 1
+    assert match in decision.refused[0]["reason"]
+
+
+def test_a_symbol_named_twice_refuses_both_actions():
+    decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
+                        '"quantity": 1}, {"symbol": "A", "side": "SELL", '
+                        '"quantity": 1}]}')
+    assert decision.actions == []
+    assert len(decision.refused) == 2
 
 
 def test_a_decision_error_is_a_validation_error():
@@ -2349,6 +2363,7 @@ def test_an_older_recording_falls_back_to_the_version_it_does_carry():
     fr.FinRobotAdapter(mode="replay", transcript=fr.Transcript())
 
 
+@pytest.mark.needs_live_model
 @pytest.mark.skipif(not FIXTURE.exists(), reason="no recorded FinRobot run")
 def test_the_shipped_fixture_carries_the_digest_of_the_mandate_that_ran_it():
     """The shipped recording is checked strictly, not by the version fallback.
@@ -2429,6 +2444,7 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
     assert sides <= set(fr.SIDES)
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end(tmp_path):
     """The whole experiment, from the shipped fixture, with no key.

@@ -762,6 +762,67 @@ on the default `on_refusal="raise"` raises `ValidationError` and ends the
 run. Return `None` or `{}` instead, or build
 the World with `on_refusal="skip"`.
 
+### Limit orders from LLM agents and the frozen payload
+
+The framework adapters (callable, FinRobot, LangGraph, OpenAI Agents,
+PydanticAI) sent market orders only, and one bad action refused the whole
+decision. A reviewer porting a copilot that quotes at the bid could not
+run it, and a decision with one hallucinated ticker lost every other order
+in it.
+
+Decision schema 2 (`DECISION_SCHEMA_VERSION = "2"`). An action may carry a
+`limit_price`, with or without `order_type: "limit"`, and becomes a
+`tf.Limit`: it trades at that price or better, and what does not fill waits
+in the book until it fills, a new limit order on the symbol replaces it, or
+the agent sends `side: "CANCEL"`, which becomes a `tf.Cancel()`. The
+participation cap clips a limit order as it clips a market order. A bad
+action is refused on its own, the other actions trade, and the refusal and
+its reason are in the decision's `refused` list, the adapter's `record` and
+the World trace. `tf.evaluate` writes each refusal to the scorecard's
+`errors` through a new optional agent method, `refusals()`. A response with
+no JSON object, no `actions` list or an unknown top-level key still refuses
+the step. `decision_model()` no longer checks
+the rules a JSON Schema cannot state, so the OpenAI Agents SDK, which raises
+on the first invalid output, no longer loses a whole decision to one HOLD
+that carries a quantity. FinRobot's `Action` and `Decision` are now
+subclasses of the shared ones, so both parsers apply one set of rules.
+`resample`, `flip` and `fingerprint` compare decisions by shape, and a limit
+order's shape carries its price, so a buy at a limit and a buy at the market
+count as different answers.
+
+Observation payload 1 (`OBSERVATION_SCHEMA_VERSION = "1"`) is frozen for
+the 0.8.x line: `docs/SUPPORT.md` lists every key, and
+`tests/test_integrations.py` pins them. Three changes went in before the
+freeze, and the first is that `portfolio.open_orders` lists the agent's
+waiting limit orders.
+`portfolio.gross_exposure`, a multiple of net worth with the name of the
+`Portfolio` method that returns dollars, is renamed `leverage`. And
+`return_5d` covers 30 step intervals, where the 30-row price memory made it
+29 (4.83 days); the memory is 31 rows. Each recording made from 0.8.5
+carries `observation_schema_version` and `decision_schema_version` in its
+`meta`, and a replay refuses a recording made under another payload
+version, naming both, before it looks anything up. The FinRobot mandate
+(version 2), the PydanticAI mandate (version 3) and the LangGraph
+instructions describe limit orders and CANCEL. The OpenAI Agents brief does
+not change; the bound schema carries the new fields.
+
+None of this changes a price. The traded scorecards of
+`reference_agents` on a fixed seed are byte-identical before and after, and
+every known-answer digest is unchanged.
+
+**What breaks.** Code reading `payload["portfolio"]["gross_exposure"]`
+reads `["leverage"]`. `parse_decision` returns a `Decision` with refused
+actions where it raised `DecisionError` for a bad action, and
+`orders_from` refuses an unlisted symbol into the `refused` list it is
+given (it still raises `MarketRefusalError` when given none). The adapter's
+`act()` may return `tf.Limit` and `tf.Cancel` values, and its `record`
+holds a limit order as `{"quantity", "limit_price"}`. The callable,
+OpenAI Agents and PydanticAI examples' rule reads `return_5d`, so their
+scorecard rows moved (`examples/integrations/README.md`). Every committed
+LLM recording was made under the old payload and misses at step 0: the
+seven in `tests/fixtures/` need a live re-record, and the 20 tests that
+replay them carry `needs_live_model` until then.
+
 ### The gym environment
 
 `TradingEnv.reset()` without a seed used to replay the constructor's market

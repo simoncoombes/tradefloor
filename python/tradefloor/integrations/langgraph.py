@@ -169,16 +169,22 @@ INSTRUCTIONS = (
     "the top of the book, your positions and your cash.\n"
     "\n"
     "Reply with ONE JSON object and nothing else:\n"
-    '  {"actions": [{"symbol": "TICKER", "side": "BUY|SELL|HOLD", '
-    '"quantity": <shares>}], "rationale": "one line"}\n'
+    '  {"actions": [{"symbol": "TICKER", "side": "BUY|SELL|HOLD|CANCEL", '
+    '"quantity": <shares>, "limit_price": <optional price>}], '
+    '"rationale": "one line"}\n'
     "\n"
     "The side carries the direction, so a sell is SELL with a POSITIVE "
-    "quantity. HOLD carries no quantity. Name a symbol at most once. To "
-    "change nothing, return an empty actions list -- that is a decision, "
-    "and it is not the same as returning no actions key.\n"
-    "Orders execute as market sweeps against the live book. There are no "
-    "limit prices and no order types. Do not exceed max_order_shares for a "
-    "name; a larger request is clipped and the clip is recorded against you."
+    "quantity. HOLD and CANCEL carry no quantity. Name a symbol at most "
+    "once. To change nothing, return an empty actions list. That is a "
+    "decision, and it is not the same as returning no actions key.\n"
+    "An order without a limit_price trades now against the live book. A "
+    "BUY or SELL with a limit_price trades only at that price or better, "
+    "and what does not fill at once waits in the book; a new limit order "
+    "on the same symbol replaces it. Your waiting orders are in "
+    "portfolio.open_orders, and CANCEL withdraws every waiting order on a "
+    "symbol. Do not exceed max_order_shares for a name; a larger request is "
+    "clipped and the clip is recorded against you. An action that breaks a "
+    "rule is refused on its own and the rest of the decision still trades."
 )
 
 #: The key an interrupted graph puts its pending questions under. Hard-coded

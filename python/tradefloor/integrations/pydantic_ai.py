@@ -237,9 +237,13 @@ Seek attractive risk-adjusted returns while controlling downside risk. You \
 may buy, sell, resize or maintain positions. You are not required to trade: \
 an empty action list means change nothing, and is a valid answer.
 
-Every order is a market sweep of the live book. There are no limit prices \
-and no order types. Quantities are SHARES, always positive -- the side \
-carries the direction.
+An order without a `limit_price` trades now against the live book. Give a \
+BUY or SELL a `limit_price` to trade only at that price or better: what does \
+not fill at once waits in the book, and a new limit order on the same symbol \
+replaces it. Your waiting orders are in `portfolio.open_orders`, and CANCEL \
+withdraws every waiting order on a symbol. Quantities are SHARES, always \
+positive, because the side carries the direction. An action that breaks a \
+rule is refused on its own and the rest of your decision still trades.
 
 Two separate limits bind your orders, and you must respect BOTH.
 
@@ -280,7 +284,9 @@ class UsageLimitReached(FrameworkError):
 #:    independent agents sized to the stated cap and were refused at the
 #:    unstated one; a mandate that names one of two limits is a trap, and a
 #:    run recorded under version 1 is measuring the trap, not the agent.
-MANDATE_VERSION = "2"
+#: 3: limit orders and CANCEL (decision schema 2, 0.8.5). Version 2 said
+#:    every order was a market sweep and there were no limit prices.
+MANDATE_VERSION = "3"
 
 #: Requests one decision may cost. A decision is normally two model requests
 #: -- one round of tool calls, one final answer -- and eight leaves room for

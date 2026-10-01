@@ -74,6 +74,7 @@ def _load_example():
     return module
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end():
     """The whole recorded experiment: shared history, fork, one intervention,
@@ -123,6 +124,7 @@ def test_the_recorded_run_replays_end_to_end():
         != shock.agent.record[-1]["decision"]
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_committed_fixture_still_matches_the_shipped_mandate():
     """The last mile of the replay guard, asserted against the real artefact.

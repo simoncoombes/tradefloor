@@ -727,6 +727,7 @@ needs_fixture = pytest.mark.skipif(
     reason="no recorded FinRobot run at tests/fixtures/finrobot/")
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
     """Exact replay. A target the prompt shows misses the recording at the
@@ -909,6 +910,7 @@ def test_the_runner_help_renders():
     assert "usage:" in proc.stdout
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_runner_replays_the_recording_and_writes_the_map(tmp_path):
     proc = subprocess.run(

@@ -370,27 +370,79 @@ def test_multiple_orders_execute_from_one_decision():
 # -- refusals ----------------------------------------------------------------
 
 
-def test_an_invalid_schema_is_refused():
+def _with_a_good_buy(bad):
+    """A decision holding one bad action and one good BUY of TECH_A."""
+    return lambda p: {"actions": [bad, {"symbol": "TECH_A", "side": "BUY",
+                                        "quantity": 100}]}
+
+
+@pytest.mark.parametrize("bad,match", [
+    ({"side": "BUY", "quantity": 1}, "symbol"),
+    ({"symbol": "NOT_LISTED", "side": "BUY", "quantity": 10}, "not listed"),
+    ({"symbol": "DEFENSIVE_A", "side": "BUY", "quantity": -5}, "negative"),
+    ({"symbol": "DEFENSIVE_A", "side": "BUY", "quantity": 5,
+      "order_type": "limit"}, "no limit_price"),
+], ids=["no-symbol", "unlisted", "negative", "limit-without-price"])
+def test_a_bad_action_is_refused_and_the_rest_of_the_decision_trades(
+        bad, match):
+    """Decision schema 2. Under schema 1 any one of these ended the World
+    run, or cost evaluate the whole step. Now the bad action is refused on
+    its own, the World's decision record says why, and the BUY beside it
+    trades."""
+    agent = callable_agent(_with_a_good_buy(bad))
+    world = contract.make_world(agent)
+    world.run(days=1)
+    assert world.portfolio.positions["TECH_A"].quantity == 100
+    decision = world.trace[0]["decision"]
+    assert len(decision["refused"]) == 1
+    assert match in decision["refused"][0]["reason"]
+    assert agent.record[0]["decision"]["refused"] == decision["refused"]
+
+    card = tf.evaluate({"mixed": callable_agent(_with_a_good_buy(bad))},
+                       seed=7, universe=contract.universe(), days=1)["mixed"]
+    assert card.trades == 1
+    refused = [e for e in card.errors if "refused action" in e]
+    assert len(refused) == 1 and match in refused[0], card.errors
+    assert refused[0].startswith("step 0: ")
+
+
+def test_output_that_is_not_a_decision_still_refuses_the_step():
     world = contract.make_world(callable_agent(
-        lambda p: {"actions": [{"side": "BUY", "quantity": 1}]}))
-    with pytest.raises(ci.DecisionError, match="symbol"):
+        lambda p: {"orders": [{"symbol": "TECH_A", "side": "BUY"}]}))
+    with pytest.raises(ci.DecisionError, match="no 'actions' key"):
         world.run(days=1)
 
 
-def test_an_unlisted_symbol_is_refused():
-    world = contract.make_world(callable_agent(
-        lambda p: {"actions": [{"symbol": "NOT_LISTED", "side": "BUY",
-                                "quantity": 10}]}))
-    with pytest.raises(ci.MarketRefusalError, match="not listed"):
-        world.run(days=1)
+def test_a_limit_order_waits_in_the_book_and_cancel_withdraws_it():
+    """Decision schema 2: a callable can send what a Python agent sends.
+    A limit buy a tenth under the bid waits; the next decision sees it in
+    `portfolio.open_orders` and cancels it."""
+    seen = []
 
+    def fn(payload):
+        waiting = payload["portfolio"]["open_orders"]
+        seen.append(waiting)
+        asset = payload["assets"][0]
+        if not waiting and payload["day"] == 0:
+            return {"actions": [{"symbol": asset["symbol"], "side": "BUY",
+                                 "quantity": 300, "order_type": "limit",
+                                 "limit_price": round(
+                                     asset["best_bid"] * 0.9, 2)}]}
+        if waiting:
+            return {"actions": [{"symbol": asset["symbol"],
+                                 "side": "CANCEL"}]}
+        return {"actions": []}
 
-def test_a_negative_quantity_is_refused():
-    world = contract.make_world(callable_agent(
-        lambda p: {"actions": [{"symbol": "TECH_A", "side": "BUY",
-                                "quantity": -5}]}))
-    with pytest.raises(ci.DecisionError, match="negative"):
-        world.run(days=1)
+    agent = callable_agent(fn)
+    world = contract.make_world(agent)
+    world.run(days=3)
+    assert seen[0] == []
+    assert seen[1] and seen[1][0]["side"] == "BUY"
+    assert seen[1][0]["remaining"] == 300
+    assert seen[2] == [], "CANCEL left the order waiting"
+    assert world.portfolio.open_orders(world.engine) == []
+    assert agent.record[0]["orders"]["TECH_A"]["quantity"] == 300
+    assert agent.record[1]["orders"] == {"TECH_A": {"cancel": True}}
 
 
 def test_an_exception_in_the_callable_propagates_with_its_chain():
@@ -544,6 +596,7 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
     assert sides <= set(ci.SIDES) and sides
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end():
     """The recorded model run, replayed through evaluate() with a function

@@ -323,6 +323,7 @@ def test_a_refusal_does_not_reset_decision_deduplication():
 # The recorded FinRobot fixture: two independently derived digests agree
 # ---------------------------------------------------------------------------
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_finrobot_fixture_matches_its_own_transcript():
     """Two ways of getting a decision list out of the same recording,

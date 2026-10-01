@@ -58,6 +58,48 @@ that defect. `ModelParams.pt_v20` in `rust/src/params.rs` lists every change.
 - **The random draw schedule.** How many draws are taken, from which stream, in what order.
 - **The public API**: nothing is removed or renamed, no signature changes in a way that breaks a call, and no new features. This covers the Rust crate's public items as well as the Python package, and `cargo semver-checks` checks them before each release (RELEASING.md). The Rust API broke once, between 0.8.1 and 0.8.5, before the line began. CHANGELOG.md lists each change.
 - **Saved formats**: a checkpoint, `RunManifest` or recorded transcript written by one patch release loads in every other patch release of the same line.
+- **What an LLM agent is shown and how it answers.** The observation payload the adapters in `tradefloor.integrations` send (version 1) and the decision contract they accept (version 2) are fixed for the line. See [The agent payload and decision contract](#the-agent-payload-and-decision-contract).
+
+### The agent payload and decision contract
+
+Every adapter in `tradefloor.integrations` (callable, FinRobot, LangGraph,
+OpenAI Agents, PydanticAI) shows its framework the same observation payload
+and accepts the same decision. A recorded run replays only while both stay
+the same, because each replay key is a digest of the payload the model was
+shown. So both are frozen for the 0.8.x line. A 0.8.x patch release adds no
+key, removes none, renames none, and changes the meaning of no value. A
+change to either is a new version, and it ships in a minor release.
+
+Each recording made with 0.8.5 or later carries
+`observation_schema_version` and `decision_schema_version` in its `meta`.
+A replay refuses a recording made under another payload version before it
+looks anything up, and names both versions. A recording made before 0.8.5
+carries neither field, predates this payload, and does not replay on 0.8.5.
+
+**Observation payload, version 1** (`OBSERVATION_SCHEMA_VERSION`, built by
+`serialize_observation`):
+
+- Top level: `step`, `day`, `steps_per_day`, `macro`, `assets`, `portfolio`.
+- `macro`: the fields in `tradefloor.counterfactual.MACRO_FIELDS`.
+- Each entry of `assets`: `symbol`, `price`, `return_1d`, `return_5d`, `volatility`, `best_bid`, `best_ask`, `avg_daily_volume`, `max_order_shares`, `position`, `fundamentals`. `fundamentals` holds whatever the caller supplied for that symbol.
+- `portfolio`: `cash`, `net_worth`, `leverage`, `max_leverage`, `buying_power`, `open_orders`. `leverage` is gross exposure as a multiple of net worth. `cash`, `net_worth` and `buying_power` are dollars.
+- Each entry of `open_orders`, one per limit order of the agent's still waiting in the book: `symbol`, `side`, `limit_price`, `remaining`.
+
+A return or volatility the agent has not yet seen enough prices for is
+`null`. `return_5d` covers 30 steps, five days at six steps a day.
+
+Compared with 0.8.1: `portfolio.gross_exposure` is renamed `leverage` (same
+value), `portfolio.open_orders` is new, and `return_5d` covers five days
+where it covered 4.83.
+
+**Decision contract, version 2** (`DECISION_SCHEMA_VERSION`,
+`decision_schema()`): an `actions` list and an optional `rationale`. Each
+action has a `symbol`, a `side` (`BUY`, `SELL`, `HOLD` or `CANCEL`), a
+`quantity` in shares, and optionally an `order_type` (`market` or `limit`)
+and a `limit_price`. An action with a `limit_price` is a `tf.Limit`, and
+`CANCEL` is a `tf.Cancel`. An action that breaks a rule is refused on its
+own, with the reason in the decision's `refused` list and the scorecard's
+`errors`, and the other actions in the decision trade.
 
 ### Errata for trajectory bugs
 

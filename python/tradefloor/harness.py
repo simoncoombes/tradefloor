@@ -286,6 +286,12 @@ class Agent(Protocol):
     believes drove the largest recent move, one of ``Engine.FACTORS``. That is
     what lets the harness ask whether the agent was right for the right
     reasons, rather than only whether it made money.
+
+    ``refusals`` is optional too. When present, :func:`evaluate` calls it
+    after every ``act`` and writes each string it returns to the
+    scorecard's ``errors``, prefixed with the step. The LLM adapters in
+    :mod:`tradefloor.integrations` use it for an action they refused on its
+    own while the rest of the decision traded.
     """
 
     def act(self, obs: Observation
@@ -785,6 +791,21 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
     return _f64(engine.prices())
 
 
+def _refusals_of(agent: Any) -> list[str]:
+    """The refusal lines an agent reports for the ``act()`` it just ran.
+
+    An agent may define ``refusals()``, returning one string per order it
+    refused on its own during that call. The framework adapters in
+    :mod:`tradefloor.integrations` do: from decision schema 2 they refuse a
+    bad action and trade the rest of the decision, so nothing is raised for
+    the harness to see. An agent without the method reports none.
+    """
+    hook = getattr(agent, "refusals", None)
+    if not callable(hook):
+        return []
+    return [str(line) for line in (hook() or [])]
+
+
 def _is_replay_miss(exc: BaseException) -> bool:
     """Whether ``exc`` is a recording with no answer for this input.
 
@@ -858,6 +879,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             try:
                 with guard:
                     orders = agent.act(obs)
+                    # Actions an LLM adapter refused on their own, while
+                    # the rest of its decision trades. They never raise, so
+                    # they are asked for, and each is an error line.
+                    for line in _refusals_of(agent):
+                        errors.append(f"step {step}: {line}")
             except Exception as exc:                      # noqa: BLE001
                 if _is_replay_miss(exc):
                     # A broken recording is a broken experiment. Scored as

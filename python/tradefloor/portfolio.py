@@ -226,8 +226,8 @@ class Limit:
     a Python agent. :func:`tradefloor.tca.analyse` refuses it, because the
     part that waits fills inside a session, where the untraded market has
     no price to compare it with. The framework adapters in
-    :mod:`tradefloor.integrations` send market orders only: an LLM's
-    decision there has no order type and no limit price.
+    :mod:`tradefloor.integrations` send one for an LLM's action that carries
+    a ``limit_price`` (decision schema 2, from 0.8.5).
     """
 
     __slots__ = ("quantity", "price")

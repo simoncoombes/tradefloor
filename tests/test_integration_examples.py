@@ -257,25 +257,26 @@ def test_the_page_reaches_usage_before_its_history():
 
 
 def test_the_page_states_the_order_vocabulary_and_the_exposure_unit():
-    """What an agent may send, and what `gross_exposure` is measured in.
+    """What an agent may send, and what `leverage` is measured in.
 
-    Two questions a reader had to answer from the source. The page said
-    there were no limit prices at the boundary while `tf.Limit` said it was
-    valid in `act()`, and both are true of different agents. And the
-    payload's `gross_exposure` is a multiple of net worth, while
+    Two questions a reader had to answer from the source. From decision
+    schema 2 an adapter sends what a native agent sends, a market order, a
+    `tf.Limit` or a `tf.Cancel()`, and a bad action is refused on its own.
+    And the payload's `leverage` is a multiple of net worth, while
     `Portfolio.gross_exposure` is dollars.
     """
     text = " ".join(README.read_text(encoding="utf-8").split())
-    for needed in ("tf.Limit(quantity, price)", "tf.Cancel()",
-                   "`parse_decision` refuses", "multiple of net worth"):
+    for needed in ("`limit_price`, which makes it a `tf.Limit`",
+                   "CANCEL is a `tf.Cancel()`", "refused on its own",
+                   "`open_orders`", "multiple of net worth"):
         assert needed in text, f"the page no longer says {needed!r}"
 
 
-def test_the_payload_states_gross_exposure_as_a_multiple():
+def test_the_payload_states_leverage_as_a_multiple():
     """The unit the page states, read off a real payload.
 
     A rule that buys on day 0 and records what it is shown: on day 1 the
-    payload's `gross_exposure` must equal the positions' value over net
+    payload's `leverage` must equal the positions' value over net
     worth, computed from the same payload.
     """
     import tradefloor as tf
@@ -298,5 +299,5 @@ def test_the_payload_states_gross_exposure_as_a_multiple():
     book = later["portfolio"]
     held = sum(abs(a["position"]) * a["price"] for a in later["assets"])
     assert held > 0, "the rule never bought, so this checks nothing"
-    assert book["gross_exposure"] == pytest.approx(held / book["net_worth"],
-                                                   rel=1e-9)
+    assert book["leverage"] == pytest.approx(held / book["net_worth"],
+                                             rel=1e-9)

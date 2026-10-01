@@ -130,8 +130,9 @@ the macro fields carry the phase as published. The gym environment's `env.engine
 In the mapping `act` returns, a plain number is a market order for that many
 shares, negative to sell. A native Python agent can also return
 `tf.Limit(quantity, price)`, which waits in the book for what does not fill,
-and `tf.Cancel()`. The framework adapters send market orders only. There are
-no stop, stop-limit or bracket orders, so a stop has to be checked at each
+and `tf.Cancel()`. The framework adapters can send all three: an LLM's action
+with a `limit_price` becomes a `tf.Limit`, and `side: "CANCEL"` becomes a
+`tf.Cancel()`. There are no stop, stop-limit or bracket orders, so a stop has to be checked at each
 step: at six steps a day an emulated stop filled a median 26.5 bp past its
 level, 9 bp at 5-minute steps, and 540 bp at the 90th percentile in the
 packaged recession. A trade costs the spread and its impact on the book.
@@ -453,8 +454,7 @@ run from a clone of this repository, because they read recorded runs from its
 `tests/fixtures/`.
 
 Some things multi-agent research needs are not supported yet. Every agent in a
-`World` starts with the same cash. The adapters' decision schema is buy, sell
-or hold at market, so an LLM agent cannot post a limit order. There is no
+`World` starts with the same cash. There is no
 multi-agent Gymnasium environment, and the Gymnasium reward is the step's
 change in net worth in dollars. `Ranking.separation` is a sign test with no
 effect size, and `externalities` does not aggregate across seeds.
