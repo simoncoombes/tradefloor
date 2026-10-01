@@ -694,6 +694,9 @@ fn settle_inner(
 
     // Agents' resting orders, after the guard so no guard reads them. A
     // crossed order trades here, at the ladder's prices, before any flow.
+    // It passes over its own agent's orders (`skip_own`): an agent's buy and
+    // sell resting at one price stay in the book, each for someone else to
+    // fill, and never trade with each other.
     let mut pre_traded = 0.0;
     let mut pre_inventory = 0.0;
     for o in resting {
@@ -705,6 +708,7 @@ fn settle_inner(
                 limit_price: Some(o.price),
                 post_remainder: true,
                 order_id: Some(o.id.clone()),
+                skip_own: true,
             },
         );
         for f in &r.fills {
@@ -771,6 +775,7 @@ fn settle_inner(
                 limit_price,
                 post_remainder: false,
                 order_id: None,
+                skip_own: false,
             },
         );
         for f in &result.fills {
@@ -1468,6 +1473,57 @@ mod tests {
         let f = &fills[0];
         assert!(f.taker);
         assert_eq!((f.price, f.quantity, f.counterparty.as_str()), (ask, 1_000.0, MARKET_MAKER_ID));
+    }
+
+    /// An agent's buy and sell resting at one price never trade with each
+    /// other. A persona's quoter on AAC (book 23.65/23.67) rested both at
+    /// 23.66 and the next settlement matched the later sell against the
+    /// earlier buy: a wash trade on the tape. The sell now passes over its
+    /// own bid, both rest, and the flow fills each from its own side.
+    #[test]
+    fn an_agents_buy_and_sell_at_one_price_do_not_trade_together() {
+        let ladder = build_live_book(&company(), &LiveBookOptions::default());
+        let (bid, ask) = (ladder.best_bid().unwrap(), ladder.best_ask().unwrap());
+        let p = ((bid + 0.01) * 100.0).round() / 100.0;
+        assert!(p < ask, "the test needs a spread of two cents: {bid} {ask}");
+        let orders = vec![
+            resting("a-0", Side::Buy, p, 1_000.0),
+            resting("a-1", Side::Sell, p, 1_000.0),
+        ];
+        // One buy slice and one sell slice, so the flow meets both orders.
+        let (_, fills) = settle_price_through_book_with_orders(
+            &company(), 100.0, 4_000.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.0, 0.99, 0.99, 0.99], 0));
+        assert!(fills.iter().all(|f| f.counterparty != "a"), "self-trade: {fills:?}");
+        assert!(fills.iter().all(|f| !f.taker), "neither order crossed anyone else: {fills:?}");
+        let sold: f64 = fills.iter().filter(|f| f.order_id == "a-1").map(|f| f.quantity).sum();
+        let bought: f64 = fills.iter().filter(|f| f.order_id == "a-0").map(|f| f.quantity).sum();
+        assert_eq!((bought, sold), (1_000.0, 1_000.0), "the flow fills both: {fills:?}");
+    }
+
+    /// Passing over its own order, a crossing order still trades with the
+    /// next agent in the queue at that price.
+    #[test]
+    fn a_crossing_order_skips_its_own_and_meets_the_next_agent() {
+        let ladder = build_live_book(&company(), &LiveBookOptions::default());
+        let (bid, ask) = (ladder.best_bid().unwrap(), ladder.best_ask().unwrap());
+        let p = ((bid + 0.01) * 100.0).round() / 100.0;
+        assert!(p < ask);
+        let orders = vec![
+            resting("a-0", Side::Buy, p, 1_000.0),
+            resting("b-0", Side::Buy, p, 600.0),
+            resting("a-1", Side::Sell, p, 1_000.0),
+        ];
+        let (_, fills) = settle_price_through_book_with_orders(
+            &company(), 100.0, 4.0, &SettleOptions::default(), &orders,
+            &mut Fixed([0.99, 0.99, 0.99, 0.99], 0));
+        let crossed: Vec<_> = fills.iter().filter(|f| f.taker).collect();
+        assert_eq!(crossed.len(), 1, "{fills:?}");
+        assert_eq!(
+            (crossed[0].order_id.as_str(), crossed[0].counterparty.as_str(), crossed[0].quantity),
+            ("a-1", "b", 600.0)
+        );
+        assert!(fills.iter().all(|f| f.order_id != "a-0" || f.counterparty != "a"));
     }
 
     /// Flow that empties the ladder stops at the ladder's last price. A bid

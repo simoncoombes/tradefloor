@@ -17,6 +17,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import warnings
 
 import pytest
 
@@ -152,12 +153,33 @@ def test_a_replay_under_a_changed_prompt_is_refused():
         callable_agent(buy, info=_info(PROMPT_B), mode="replay",
                        transcript=recorder)
     # The same prompt replays, and so does an adapter that names no prompt
-    # (it claims nothing, so there is nothing to contradict).
+    # (it claims nothing, so there is nothing to contradict), with a warning
+    # that the check is off.
     for info in (_info(PROMPT_A), None):
-        agent = callable_agent(buy, mode="replay", transcript=recorder,
-                               info=info)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            agent = callable_agent(buy, mode="replay", transcript=recorder,
+                                   info=info)
+        assert any("check that refuses" in str(w.message) for w in caught) \
+            == (info is None)
         contract.make_world(agent).run(days=2)
         assert len(agent.record) == 2
+
+
+def test_a_replay_with_no_adapter_info_warns_that_the_prompt_check_is_off():
+    """A persona's repro: a transcript recorded with a prompt digest,
+    replayed by an adapter built without an AdapterInfo, replayed silently,
+    so a prompt edited since the recording went unnoticed. It still
+    replays, and now says the check is off and how to turn it on."""
+    recorder, _, _ = _recorded(info=_info(PROMPT_A))
+    with pytest.warns(UserWarning, match=r"names no instructions.*"
+                      r"instructions_digest=digest\(PROMPT\)"):
+        CallableAgentAdapter(buy, mode="replay", transcript=recorder)
+    # A recording with no digest has nothing to guard, and says nothing.
+    plain, _, _ = _recorded()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        CallableAgentAdapter(buy, mode="replay", transcript=plain)
 
 
 def test_a_recording_with_no_prompt_digest_is_not_refused():

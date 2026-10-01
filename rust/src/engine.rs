@@ -3164,7 +3164,7 @@ impl Engine {
             side,
             quantity,
             agent,
-            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None },
+            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None, skip_own: true },
         );
         let shared = self.params.book_shared != 0.0;
         if shared {

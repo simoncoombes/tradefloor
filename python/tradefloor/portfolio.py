@@ -240,6 +240,12 @@ class Limit:
     ticker from the same agent replaces the one waiting. A plain number in
     the mapping is a market order, as it always was.
 
+    The part that waits fills at its own price when the market's flow
+    reaches it inside a tick, and a bar keeps only each tick's last print,
+    so a check of fills against bars will find some below the day's low or
+    above its high (2% of resting fills on 40 names over four sessions)
+    that the engine made as docs/MODEL.md describes.
+
     :func:`tradefloor.evaluate` and :class:`tradefloor.World` take it from
     a Python agent. :func:`tradefloor.tca.analyse` refuses it, because the
     part that waits fills inside a session, where the untraded market has

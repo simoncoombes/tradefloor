@@ -205,6 +205,10 @@ _ACT_RAISED_LINE = re.compile(r"^step \d+: [A-Za-z_][\w.]*: ")
 #: decision traded (`integrations.common.refusal_lines`). Since 0.8.5 it
 #: is counted in ``Scorecard.rejected`` as well, so it is not a raise.
 _REFUSED_ACTION_LINE = re.compile(r"^step \d+: refused action: ")
+#: A step whose ``act()`` returned something other than a mapping, such as
+#: a list (`portfolio._shape_message`). Nothing raised in the agent's code,
+#: so it is reported as an unusable answer and not as a raise.
+_UNUSABLE_LINE = re.compile(r"^step \d+: act\(\) must return a mapping ")
 
 
 def _failed_every_step(card: Any, steps: int) -> bool:
@@ -222,15 +226,29 @@ def _raised(card: Any) -> tuple[int, int, str | None]:
     Counted by subtraction rather than by reading each line: every refused
     order wrote exactly one step line and added one to ``rejected``, so the
     step lines left over are the steps where ``act()`` raised, whatever the
-    refusal's text happens to look like.
+    refusal's text happens to look like. Unusable answers (:func:`_unusable`)
+    are taken out first, because nothing raised on them.
     """
     lines = [line for line in card.errors if not _TAMPER_LINE.match(line)]
     in_explain = sum(1 for line in lines if _EXPLAIN_LINE.match(line))
-    in_act = max(0, len(lines) - in_explain - card.rejected)
+    unusable = sum(1 for line in lines if _UNUSABLE_LINE.match(line))
+    in_act = max(0, len(lines) - in_explain - unusable - card.rejected)
     first = next((line for line in lines
                   if (in_explain and _EXPLAIN_LINE.match(line))
                   or (in_act and _ACT_RAISED_LINE.match(line))), None)
     return in_act, in_explain, first
+
+
+def _unusable(card: Any) -> list[str]:
+    """The step lines where ``act()`` returned something other than a
+    mapping: a list of pairs, say. The step traded nothing."""
+    return [line for line in card.errors if _UNUSABLE_LINE.match(line)]
+
+
+def _sentence(text: str) -> str:
+    """``text`` without a closing full stop, so a report can put its own
+    after it. An error message that ends in one printed two."""
+    return text[:-1] if text.endswith(".") and not text.endswith("..") else text
 
 
 class AgentRecord:
@@ -249,7 +267,8 @@ class AgentRecord:
                  "reference_pnls", "benchmark_pnls", "capture_withheld",
                  "trusted", "uses_hidden_state", "errors", "rejected",
                  "max_leverage", "first_error", "raised_in_act",
-                 "refused", "first_refusal", "failed_every_step")
+                 "refused", "first_refusal", "unusable", "first_unusable",
+                 "failed_every_step")
 
     def __init__(self, name: str, seeds: list[int],
                  reference_pnls: list[float],
@@ -295,6 +314,12 @@ class AgentRecord:
         self.refused: list[int] = []
         #: The first refused-action line, prefixed with its seed, or None.
         self.first_refusal: str | None = None
+        #: Per seed, how many steps ``act()`` returned something other than
+        #: a mapping, such as a list. Each traded nothing and none raised,
+        #: so they are not in :attr:`errors`.
+        self.unusable: list[int] = []
+        #: The first unusable-answer line, prefixed with its seed, or None.
+        self.first_unusable: str | None = None
         #: Per seed, whether every step raised or had its orders refused and
         #: nothing traded. Such a seed has no score, so it is left out of
         #: :attr:`excess_pnls` rather than read as a P&L of zero.
@@ -317,7 +342,8 @@ class AgentRecord:
         return "".join(tag for tag, on in (
             ("  [trusted: live engine]", self.trusted),
             ("  [hidden state]", self.uses_hidden_state),
-            ("  [raised: see below]", self.seeds_with_errors > 0)) if on)
+            ("  [raised: see below]", self.seeds_with_errors > 0),
+            ("  [unusable answers: see below]", any(self.unusable))) if on)
 
     @property
     def measured(self) -> list[float]:
@@ -430,6 +456,9 @@ class AgentRecord:
             **({"refused": list(self.refused),
                 "first_refusal": self.first_refusal}
                if any(self.refused) else {}),
+            **({"unusable": list(self.unusable),
+                "first_unusable": self.first_unusable}
+               if any(self.unusable) else {}),
             **({"failed_every_step": list(self.failed_every_step)}
                if any(self.failed_every_step) else {}),
             **({"trusted": True} if self.trusted else {}),
@@ -768,7 +797,7 @@ class Ranking:
             refused = ordered_sum(record.refused)
             if refused:
                 hit = sum(1 for count in record.refused if count)
-                first = (f", the first on {record.first_refusal}"
+                first = (f", the first on {_sentence(record.first_refusal)}"
                          if record.first_refusal else "")
                 lines.append(
                     f"  REFUSED {name}: {refused} refused action"
@@ -777,12 +806,24 @@ class Ranking:
                     "Its adapter turned each one down and traded the rest "
                     "of the decision, so nothing raised. Each is counted in "
                     "Scorecard.rejected. See Scorecard.errors.")
+            unusable = ordered_sum(record.unusable)
+            if unusable:
+                hit = sum(1 for count in record.unusable if count)
+                first = (f", the first on {_sentence(record.first_unusable)}"
+                         if record.first_unusable else "")
+                lines.append(
+                    f"  UNUSABLE {name}: {unusable} unusable answer"
+                    + ("" if unusable == 1 else "s")
+                    + f" on {hit} of {len(record.unusable)} seeds{first}. "
+                    "Nothing raised, and each such step traded nothing, "
+                    "which its score counts as a step with no orders. See "
+                    "Scorecard.errors.")
             hit = record.seeds_with_errors
             if not hit:
                 continue
             total = ordered_sum(record.errors)
             count = f"{total} error" + ("" if total == 1 else "s")
-            first = (f", the first on {record.first_error}"
+            first = (f", the first on {_sentence(record.first_error)}"
                      if record.first_error else "")
             cost = ("Its score counts every step where act() raised as a "
                     "step with no orders" if record.raised_in_act else
@@ -1149,6 +1190,10 @@ def rank(
             record.refused.append(len(refusals))
             if refusals and record.first_refusal is None:
                 record.first_refusal = f"seed {seed}, {refusals[0]}"
+            unusable = _unusable(card)
+            record.unusable.append(len(unusable))
+            if unusable and record.first_unusable is None:
+                record.first_unusable = f"seed {seed}, {unusable[0]}"
             record.failed_every_step.append(name in failed)
             record.max_leverage.append(card.max_leverage)
             if first_line is not None and record.first_error is None:

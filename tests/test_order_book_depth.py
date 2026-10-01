@@ -738,6 +738,43 @@ def test_two_agents_cross_at_the_resting_price():
     assert af["side"] == "buy" and af["quantity"] == 250 and af["counterparty"] == "b"
 
 
+def test_an_agent_never_trades_with_itself_once_its_orders_rest():
+    """A persona's quoter on the default book: a bid and an offer one cent
+    inside the touch on ten names, every ten minutes. On AAC at tick 155
+    (book 23.65/23.67) both rested at 23.66, and the next settlement matched
+    the sell against the buy, both fills naming the agent itself: a wash
+    trade that added to volume. The settlement now passes over an agent's own
+    orders, so both rest until someone else fills them."""
+    u = tf.Universe.random(40, seed=111)
+    names = [c.ticker for c in u][:10]
+    e = tf.Engine(seed=501, universe=u)
+    e.run_days(3)
+    e.open_market()
+    t = 0
+
+    def run(n):
+        nonlocal t
+        minute = 9 * 60 + 30 + t
+        e.run_session(minute // 60, minute % 60, 3, n)
+        t += n
+
+    run(5)
+    fills, both_at_one_price = [], 0
+    while t < 165:
+        for x in names:
+            b = e.book(x)
+            if b.best_ask - b.best_bid > 0.02:
+                bid, ask = round(b.best_bid + 0.01, 2), round(b.best_ask - 0.01, 2)
+                both_at_one_price += bid == ask
+                e.submit("qmm", x, 200, limit_price=bid)
+                e.submit("qmm", x, -200, limit_price=ask)
+        run(10)
+        fills += e.take_fills("qmm")
+    assert both_at_one_price, "the repro must rest a bid and an offer at one price"
+    assert fills, "the quotes must trade with someone"
+    assert [f for f in fills if f["counterparty"] == "qmm"] == []
+
+
 # -- several agents ---------------------------------------------------------------
 
 

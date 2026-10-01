@@ -73,6 +73,47 @@ def test_rank_labels_a_refusal_as_a_refusal_and_not_as_raised():
     assert "2 refused" in line and "seed 100, step 0: refused action" in line
 
 
+def test_a_refused_line_ends_on_one_full_stop():
+    """The refusal's own text ends in a full stop, and the report put a
+    second one after it: "AAE, AAF.. Its adapter"."""
+    ranking = tf.rank(
+        lambda: {"v2": callable_agent(_hallucinating, every=6),
+                 "buy_and_hold": BuyAndHold()},
+        seeds=[100], universe=UNIVERSE, days=2)
+    line = next(x for x in ranking.report().splitlines() if "REFUSED v2" in x)
+    assert ".." not in line, line
+    assert "AAF. Its adapter" in line, line
+
+
+class Lister:
+    """Answers with a list of pairs, which is not an order mapping."""
+
+    def act(self, obs):
+        return [("AAA", 100)]
+
+
+def test_a_list_answer_is_reported_as_unusable_and_not_as_raised():
+    """A persona: an agent returning a list read 'RAISED lister: ... where
+    act() raised', with no first line, though nothing raised."""
+    with pytest.warns(UserWarning, match="failed on all"):
+        ranking = tf.rank(lambda: {"lister": Lister(),
+                                   "buy_and_hold": BuyAndHold()},
+                          seeds=[1, 2], universe=UNIVERSE, days=1)
+    record = ranking.records["lister"]
+    assert record.errors == [0, 0]
+    assert record.unusable == [6, 6]
+    assert record.first_unusable.startswith(
+        "seed 1, step 0: act() must return a mapping"), record.first_unusable
+    assert record.as_dict()["unusable"] == [6, 6]
+    report = ranking.report()
+    assert "RAISED" not in report and "act() raised" not in report, report
+    assert "[unusable answers: see below]" in report, report
+    line = next(x for x in report.splitlines() if "UNUSABLE lister" in x)
+    assert line.startswith("  UNUSABLE lister: 12 unusable answers on 2 of 2 "
+                           "seeds, the first on seed 1, step 0: "), line
+    assert "It returned a list" in line and ".." not in line, line
+
+
 def test_a_real_exception_is_still_reported_as_raised():
     ranking = tf.rank(lambda: {"broken": Broken(),
                                "buy_and_hold": BuyAndHold()},
@@ -147,9 +188,26 @@ def test_the_scorecard_reports_sharpe_volatility_and_exposure():
     assert hold.time_in_market == 1.0
     assert 0.9 < hold.avg_gross_exposure < 1.01
     shown = repr(hold)
-    assert f"sharpe={hold.sharpe:+.2f}" in shown, shown
+    # Five days is under Scorecard.SHARPE_MIN_DAYS, so the repr holds the
+    # figure back; the property still has it.
+    assert "sharpe=n/a (short run)" in shown, shown
     assert f"vol={hold.volatility_pct:.1f}%" in shown, shown
     assert "in_market=100%" in shown and "exposure=" in shown, shown
+
+
+def test_the_repr_prints_no_sharpe_for_a_short_run():
+    """A persona: a 10-day run printed sharpe=+1.99, a figure whose
+    standard error at ten days is about five."""
+    assert tf.Scorecard.SHARPE_MIN_DAYS == 20
+    cards = tf.evaluate({"hold": BuyAndHold(), "flat": Flat()}, seed=3,
+                        universe=UNIVERSE, days=19)
+    hold = cards["hold"]
+    assert hold.sharpe is not None
+    assert "sharpe=n/a (short run)" in repr(hold), repr(hold)
+    assert "sharpe=n/a (short run)" in repr(cards["flat"])
+    long = tf.evaluate({"hold": BuyAndHold()}, seed=3, universe=UNIVERSE,
+                       days=20)["hold"]
+    assert f"sharpe={long.sharpe:+.2f}" in repr(long), repr(long)
 
 
 def test_a_flat_agent_has_no_sharpe_and_no_exposure():

@@ -103,6 +103,11 @@ pub struct SubmitOptions {
     pub post_remainder: bool,
     /// Stable id for the incoming order. Only used when it rests.
     pub order_id: Option<String>,
+    /// Self-trade prevention: pass over resting orders whose owner is the
+    /// taker, leaving them in place, and match the next order behind them.
+    /// Off, the book matches whoever is first in the queue, as the
+    /// reference implementation does.
+    pub skip_own: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -305,14 +310,22 @@ impl OrderBook {
             Side::Sell => Side::Buy,
         };
 
-        while remaining > 0.0 && !self.side(opposite_side).is_empty() {
-            let maker_price = self.side(opposite_side)[0].price;
+        // `at` is the queue position being matched. It stays 0 unless
+        // `skip_own` passes over the taker's own orders, so the reference
+        // path is unchanged.
+        let mut at = 0;
+        while remaining > 0.0 && at < self.side(opposite_side).len() {
+            let maker_price = self.side(opposite_side)[at].price;
             if !Self::crosses(side, limit_price, maker_price) {
                 break;
             }
+            if options.skip_own && self.side(opposite_side)[at].owner_id == taker_id {
+                at += 1;
+                continue;
+            }
 
             let (traded, exhausted, maker_order_id, maker_id) = {
-                let maker = &mut self.side_mut(opposite_side)[0];
+                let maker = &mut self.side_mut(opposite_side)[at];
                 let traded = mathx::min(remaining, maker.remaining);
                 maker.remaining -= traded;
                 (
@@ -335,7 +348,7 @@ impl OrderBook {
 
             self.last_price = Some(maker_price);
             if exhausted {
-                self.side_mut(opposite_side).remove(0);
+                self.side_mut(opposite_side).remove(at);
             }
         }
 
@@ -606,6 +619,34 @@ mod tests {
         assert_eq!(b.last_price, Some(100.0));
     }
 
+    /// With `skip_own`, a taker passes over its own resting orders, leaves
+    /// them whole, and matches the next order in the queue. Without it the
+    /// book matches whoever is first, as the reference does.
+    #[test]
+    fn skip_own_passes_over_the_takers_own_orders() {
+        let mut b = book();
+        b.post_limit(Side::Sell, 100.0, 10.0, "me", Some("me-0".into()));
+        b.post_limit(Side::Sell, 100.0, 4.0, "other", None);
+        b.post_limit(Side::Sell, 101.0, 10.0, "me", Some("me-1".into()));
+        b.post_limit(Side::Sell, 102.0, 10.0, "other", None);
+        let r = b.submit(
+            Side::Buy,
+            20.0,
+            "me",
+            SubmitOptions { limit_price: Some(101.5), skip_own: true, ..Default::default() },
+        );
+        let got: Vec<_> = r.fills.iter().map(|f| (f.price, f.quantity, f.maker_id.as_str())).collect();
+        assert_eq!(got, vec![(100.0, 4.0, "other")]);
+        assert_eq!(r.unfilled, 16.0);
+        let left: Vec<_> = b.asks.iter().map(|o| (o.id.as_str(), o.remaining)).collect();
+        assert_eq!(left[..2], [("me-0", 10.0), ("me-1", 10.0)]);
+
+        let mut plain = book();
+        plain.post_limit(Side::Sell, 100.0, 10.0, "me", None);
+        let r = plain.submit(Side::Buy, 5.0, "me", SubmitOptions::default());
+        assert_eq!(r.fills[0].maker_id, "me", "off, the reference matches the queue as it stands");
+    }
+
     /// Slippage as a consequence of depth rather than a coefficient.
     #[test]
     fn sweeping_multiple_levels_pays_a_worse_average() {
@@ -651,6 +692,7 @@ mod tests {
                 limit_price: Some(100.0),
                 post_remainder: true,
                 order_id: None,
+                skip_own: false,
             },
         );
         assert_eq!(r.unfilled, 0.0);

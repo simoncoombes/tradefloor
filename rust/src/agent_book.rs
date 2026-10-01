@@ -136,8 +136,13 @@
 //! its limit on the first tick whose print reaches it: the traded-range
 //! convention, [`RestMode::Range`].
 //!
-//! An agent never trades against its own resting orders: they are left out
-//! of the book its own order meets, the usual self-trade prevention.
+//! An agent never trades against its own resting orders. They are left out
+//! of the book its own order meets, and when the tick posts every resting
+//! order into its settlement book, an order that crosses passes over its own
+//! agent's orders (`SubmitOptions::skip_own`) and matches the next one behind
+//! them. Neither order is cancelled, so an agent's bid and offer at one price
+//! both rest, each for the flow or another agent to fill. The 0.8.5
+//! pre-release builds matched them with each other, a wash trade.
 //!
 //! # What the market's own flow sees
 //!
