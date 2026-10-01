@@ -5,28 +5,27 @@ leave every known-answer digest unchanged for 24 months from this tag
 (`docs/SUPPORT.md`). `pt-v20` is the default. Its tape follows the model
 price, a stock's own news and the market's plain shocks move fair value for
 good, fear discounts fair value while the VIX is high, and agents trade in a
-book with depth. It passes all 40 rows registered for it. Runs on the
-default will not replay against 0.8.1; `model="pt-v19"` keeps that market,
-and every preset replays as it did.
+book with depth. It passes all 40 rows registered for it.
+`model="pt-v19"` keeps 0.8.1's market; every preset replays as it did.
 
-On pt-v20 the cycle phase and GDP growth are published late, as the agencies
-publish them, and prices read the true state. Agents see a read-only
-`MarketView`, and tampering is flagged. pt-v20 reports no capture ratio;
-read scores against buy-and-hold (`versus_buy_and_hold`). Seeds take any 64-bit integer. An agent's orders
-reach the market once, not on every tick.
+On pt-v20 macro data is published late, as the agencies publish it. Agents
+see a read-only `MarketView` (`trusted_agents=True` gives the live engine),
+and tampering is flagged. pt-v20 reports no capture ratio; use
+`versus_buy_and_hold`. Seeds take any 64-bit integer.
+`Universe.random(n, bonds=True)` adds three rate indices.
 
-`Universe.random(n, bonds=True)` adds three rate indices, and
-`docs/MODEL.md` states the model as equations.
+**What breaks.** Orders reach the market once, not every tick, so traded
+results move; `run_session(order_flow=...)` raises (pass `fills=` or
+`flow_per_tick=`). Borrowing pays the policy rate, and a bar's volume is
+what traded inside it. Older LLM recordings do not replay. The Rust crate
+breaks 0.8.1 code; pin `=0.8.1`.
 
-**What breaks.** `run_session(order_flow=...)` raises, so pass `fills=` or
-`flow_per_tick=`, and every traded result moves. Agent code that needs the
-live engine takes `trusted_agents=True`.
-
-**Nearest the edge.** A macro timing rule at 92 per cent of its tolerance;
-the price trough leading the earnings trough by 10 sessions against a real
-68; the two-year yield's daily move at 3.87 bp against 5.23; a recession
-winning back 49 per cent of its fall in a year against 2009's 62. The crisis
-lever is 5.1x against a real 6.2x.
+**Nearest the edge.** The two-year volume-return correlation at 0.627
+against a ceiling of 0.63; a macro timing rule at 92 per cent of its
+tolerance; the price trough leading the earnings trough by 10 sessions
+against a real 68; the two-year yield's daily move at 3.87 bp against 5.23;
+a recession winning back 49 per cent of its fall in a year against 2009's
+62. The crisis lever is 5.1x against a real 6.2x.
 
 <!-- release-note-ends -->
 
@@ -334,9 +333,10 @@ and `Oracle` now have `fork()`, `GameRng` copies at its position, and a
 The five LLM agent recordings behind the integration examples were
 re-recorded live on the fix, on the models they used before, and their
 notebooks' prose re-read against the new runs. The liquidity-crisis study's
-FinRobot recordings were not: its README and notebook say they were measured
-under the 0.8.x harness, and the slow notebook test skips it with that
-reason until it is re-recorded. `run_sync`, the bridge every adapter uses to
+canonical FinRobot run was recorded again on 2026-10-01 and its notebook
+executes again. Its resample, four replications and five-arm decomposition
+are summaries of runs made under the 0.8.x harness and were not recorded
+again; the README and notebook say so. `run_sync`, the bridge every adapter uses to
 call an async framework, now runs every call on one long-lived event loop,
 so a client a framework caches between calls keeps working; the OpenAI
 Agents SDK's did not, and a live five-day run recorded 3 of 5 decisions.
@@ -866,6 +866,10 @@ version, naming both, before it looks anything up. The FinRobot mandate
 instructions describe limit orders and CANCEL. The OpenAI Agents brief does
 not change; the bound schema carries the new fields.
 
+`tf.Limit` and `tf.Cancel` compare by value. They compared by identity,
+and a fork copies a World's trace, so `agree` reported the shared history of
+any World that had sent a limit order as different.
+
 None of this changes a price. The traded scorecards of
 `reference_agents` on a fixed seed are byte-identical before and after, and
 every known-answer digest is unchanged.
@@ -879,9 +883,14 @@ given (it still raises `MarketRefusalError` when given none). The adapter's
 holds a limit order as `{"quantity", "limit_price"}`. The callable,
 OpenAI Agents and PydanticAI examples' rule reads `return_5d`, so their
 scorecard rows moved (`examples/integrations/README.md`). Every committed
-LLM recording was made under the old payload and misses at step 0: the
-seven in `tests/fixtures/` need a live re-record, and the 20 tests that
-replay them carry `needs_live_model` and are skipped until then.
+LLM recording was made under the old payload and misses at step 0, so a
+recording of your own made before 0.8.5 will not replay. Six of the seven
+in `tests/fixtures/` were recorded again live on this build: the callable,
+OpenAI Agents, PydanticAI and LangGraph runs on pt-v20 and FinRobot's
+rate shock on pt-v20 and liquidity crisis on pt-v16, the study's market.
+`finrobot/rate-ladder.json` was not, because nothing replays it; the
+liquidity-crisis study only reads it as the run that prompted
+`on_refusal`. The 20 tests that replay the fixtures run again.
 
 ### The gym environment
 
@@ -997,6 +1006,115 @@ twice in one universe (the second could never be traded), and a negative VIX
 in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
 every known-answer digest is unchanged.
 
+### Bar volume
+
+`Engine.bars()` reported volume wrongly at every grain coarser than a tick.
+The engine counts each name's volume as a running total that the open
+resets to zero, and the tick rows served that total. `bars(minutes=N)` and
+`bars(grain="day")` then summed it, so a day bar read about two hundred
+times the day's volume and the five-minute profile climbed all day instead
+of forming a U. Two reviewers found it: one seed's day bar read 296 times
+the name's average daily volume while `column("volume")` read 1.5 times.
+
+A bar's volume is now the running total at its last tick minus the total
+before its first, at every grain. A tick row holds that minute's volume, so
+the tick rows of a day add up to its five-minute bars and to its day bar,
+and the day bar equals `column("volume")` at the close. A day run as several
+sessions keeps one count, and with nothing recorded the fallback to the
+last session subtracts what earlier sessions of the day traded. If you read
+the tick column as a running total, take its cumulative sum per name and
+day. `session_volumes()` still returns the running totals.
+
+Prices, the tape and every known-answer digest are unchanged. Two certified
+rows read day-bar volume through `facts.measure`. On pt-v20 over the held
+roster and seeds 101 to 130, `volume_abs_return_corr` moves from 0.508 to
+0.596 at one year and from 0.561 to 0.627 at two, and `volume_change_acf1`
+from -0.254 to -0.268 and from -0.241 to -0.261. All four stay inside their
+ruled bands, the two-year correlation 0.003 under its ceiling of 0.63.
+`envelope.CERTIFIED`, `envelope.MEASURED_504` and `presets/pt-v20.json`
+now carry these readings, re-measured on the fixed bars in every cell of
+the certification run. The other rows reproduced to the last digit. Held-out
+seeds read 0.612 and -0.266, the held-out universe 0.590 and -0.267, and
+the level protocol 0.603 and -0.267, all inside their ruled bands.
+`volume_abs_return_corr` is no longer at the real centre of 0.536 in the
+mechanism blocks (2.9 to 3.2 standard errors above it), so the at-centre
+count falls from 9 to 8 of 14 on both 252-day cells and from 11 to 10 on
+the level protocol.
+`facts.SEED_SD` and `facts.SEED_SD_504` are re-measured for the two rows on
+their own pt-v1 protocol: `volume_abs_return_corr` falls from 0.0416 to
+0.0143 at one year and from 0.0190 to 0.0087 at two, so a distance on that
+row in seed standard deviations is now about 2.9 and 2.2 times larger.
+`volume_change_acf1` moves from 0.0108 to 0.0119 and from 0.0085 to 0.0071.
+
+### Found by the 0.8.5 audit
+
+None of these moves a known-answer digest. A run that numbers its days from
+the engine's counter, closes its days with `close_market`, never calls
+`set_fundamentals` and runs no variance cascade hashes and logs as it did,
+and its snapshots gain one key, `session_tick`. Scores of levered agents in
+`evaluate`, `rank` and `World` move.
+
+- The day number is a label. `run_days(first_day=N)` and `set_day(N)` were
+  documented as labels, but the buyback factor read the same field as its
+  elapsed time, so on pt-v20 `first_day=1000` moved prices by 0.17 in log
+  within thirty days and `set_day(5000)` mid-day moved the next session by
+  0.21, with no log entry and the state hash unchanged. The valuation now
+  counts the days the engine has run. The label goes into the order log
+  (`open_market` carries `day` when a run numbered the day its own way, and
+  `set_day` is an entry of its own), so a replay numbers the days as the run
+  did.
+  `open_market` takes `day=`. A negative day is refused.
+- A restore puts back the day stamp and the session tick. After a close the
+  restore set the day one ahead of the original, so a pin after it
+  re-marked prices off the wrong elapsed time and a fill was stamped day 4
+  tick 0 where the original said day 3 tick 390. Snapshots carry
+  `session_tick`, and `current_day` and `elapsed_days` where they differ
+  from the counter. `session_tick` is not hashed: it moves no price, and
+  hashing it would have moved every ledger leaf already written. A run that
+  closes its sessions with `run_session(close_at_end=True)` leaves the
+  session flag set, so its snapshots now carry the day just closed and its
+  leaves move; the restore set that day one ahead.
+- `set_fundamentals` is in the snapshot and the state hash, once the figures
+  differ from the ones the engine was built with. A restore brought back the
+  construction earnings while the hash check passed, so an earnings shock
+  resumed at day 30 left the index 1.35 times the uninterrupted run twenty
+  sessions later.
+- The variance cascade (`garch_cascade_components` at 1 or more) is in the
+  snapshot and the hash. Off on every shipped preset.
+  `tests/test_restore_dial_sweep.py` restores every dial moved off pt-v20
+  and runs in the slow lane.
+- Inputs that made every price NaN are refused. `pin_macro(vix=...)` takes
+  a level above zero and at most the higher of the model's `vix_ceiling`
+  and the default preset's, 181.33, so presets that clamp at 80 still take
+  the real March 2020 close of 82.69. `run_days`, `run_session` and
+  `run_until` check volatility and day_of_week as `tick` does, and refuse a
+  start at or past 24:00 (a start written as 9:60 still runs, as it always
+  has). `patch_draws` refuses a non-finite normal or a uniform outside
+  [0, 1]; `set_fundamentals` refuses an infinite value. `ModelParams`
+  refuses `price_hard_cap` at or below zero and `buyback_payout_share`
+  outside [0, 1]. A scenario refuses a VIX `set` or `hold` above 181.33,
+  and a relative VIX shock that computes a level above it writes 181.33.
+  A hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400 to
+  800 turned a fear shock into a rally.
+- Borrowing pays the policy rate in `evaluate` and `rank`.
+  `Portfolio.accrue` charged a negative cash balance only with
+  `cash_interest` on, which both leave off, so levered agents borrowed for
+  free. On the 90 graded pt-v20 histories 1.8 times the index beat the
+  index by 2.33 points a year that way, against 0.21 with the rate charged.
+  `accrue` now charges a negative balance whether `cash_interest` is on or
+  off, unless the portfolio was built with `margin_interest=False`. Idle
+  cash still earns nothing unless `cash_interest` is on. Scores of levered
+  agents move and the market does not. A levered agent's cash, which its
+  observation shows, now falls by a day's interest at each close, so a
+  prompt built from it changes once the balance is negative.
+- A `World` never called `accrue`, so its portfolios earned and paid
+  nothing. It now books a day's interest before each close, as `evaluate`
+  does: a negative balance pays the policy rate, which is owner decision
+  11 below, and a positive one earns it only with `cash_interest=True`.
+- `Engine.fundamentals` had `set_avg_volume`'s docstring and
+  `set_avg_volume` had none. `pin_macro`'s docstring says it writes today's
+  value and points to `Scenario.hold` for a hold.
+
 ### Scoring changes from the owner decisions of 26 September
 
 Owner decisions 8, 9 and 11 of 2026-09-26. None of them changes a price or a
@@ -1035,10 +1153,10 @@ known-answer digest.
   take `margin_interest=False` to borrow for free. A scorecard from such a
   run has `margin_interest=False` and its repr says `free-borrowing`; a
   World's summary and manifest record it. The charge changes the cash a
-  levered LLM agent is shown in a World, so two recorded runs no longer
-  replay: `tests/fixtures/finrobot/rate-shock.json` (from step 228, day 38)
-  and `tests/fixtures/pydantic_ai/rate-shock.json` (from step 12, day 2).
-  Their tests are skipped until they are re-recorded.
+  levered LLM agent is shown in a World, so two recorded runs stopped
+  replaying, `tests/fixtures/finrobot/rate-shock.json` from step 228 (day
+  38) and `tests/fixtures/pydantic_ai/rate-shock.json` from step 12 (day
+  2). Both were recorded again, with the other LLM fixtures below.
 - `margin_interest` and `cash_interest` must be True or False. `evaluate`,
   `rank`, `World` and `Portfolio` refuse None and strings, because
   `bool("False")` is True. `tf.battery(True)` is refused rather than read as
@@ -1170,118 +1288,6 @@ transcript recorded under a different preset raises `ReplayMiss`.
 `Engine.crisis_episode`.
 
 <!-- release-note-ends -->
-
-### Bar volume
-
-`Engine.bars()` reported volume wrongly at every grain coarser than a tick.
-The engine counts each name's volume as a running total that the open
-resets to zero, and the tick rows served that total. `bars(minutes=N)` and
-`bars(grain="day")` then summed it, so a day bar read about two hundred
-times the day's volume and the five-minute profile climbed all day instead
-of forming a U. Two reviewers found it: one seed's day bar read 296 times
-the name's average daily volume while `column("volume")` read 1.5 times.
-
-A bar's volume is now the running total at its last tick minus the total
-before its first, at every grain. A tick row holds that minute's volume, so
-the tick rows of a day add up to its five-minute bars and to its day bar,
-and the day bar equals `column("volume")` at the close. A day run as several
-sessions keeps one count, and with nothing recorded the fallback to the
-last session subtracts what earlier sessions of the day traded. If you read
-the tick column as a running total, take its cumulative sum per name and
-day. `session_volumes()` still returns the running totals.
-
-Prices, the tape and every known-answer digest are unchanged. Two certified
-rows read day-bar volume through `facts.measure`. On pt-v20 over the held
-roster and seeds 101 to 130, `volume_abs_return_corr` moves from 0.508 to
-0.596 at one year and from 0.561 to 0.627 at two, and `volume_change_acf1`
-from -0.254 to -0.268 and from -0.241 to -0.261. All four stay inside their
-ruled bands, the two-year correlation 0.003 under its ceiling of 0.63.
-`envelope.CERTIFIED`, `envelope.MEASURED_504` and `presets/pt-v20.json`
-now carry these readings, re-measured on the fixed bars in every cell of
-the certification run. The other rows reproduced to the last digit. Held-out
-seeds read 0.612 and -0.266, the held-out universe 0.590 and -0.267, and
-the level protocol 0.603 and -0.267, all inside their ruled bands.
-`volume_abs_return_corr` is no longer at the real centre of 0.536 in the
-mechanism blocks (2.9 to 3.2 standard errors above it), so the at-centre
-count falls from 9 to 8 of 14 on both 252-day cells and from 11 to 10 on
-the level protocol.
-`facts.SEED_SD` and `facts.SEED_SD_504` are re-measured for the two rows on
-their own pt-v1 protocol: `volume_abs_return_corr` falls from 0.0416 to
-0.0143 at one year and from 0.0190 to 0.0087 at two, so a distance on that
-row in seed standard deviations is now about 2.9 and 2.2 times larger.
-`volume_change_acf1` moves from 0.0108 to 0.0119 and from 0.0085 to 0.0071.
-
-### Found by the 0.8.5 audit
-
-None of these moves a known-answer digest. A run that numbers its days from
-the engine's counter, closes its days with `close_market`, never calls
-`set_fundamentals` and runs no variance cascade hashes and logs as it did,
-and its snapshots gain one key, `session_tick`. Scores of levered agents in
-`evaluate` and `rank` move.
-
-- The day number is a label. `run_days(first_day=N)` and `set_day(N)` were
-  documented as labels, but the buyback factor read the same field as its
-  elapsed time, so on pt-v20 `first_day=1000` moved prices by 0.17 in log
-  within thirty days and `set_day(5000)` mid-day moved the next session by
-  0.21, with no log entry and the state hash unchanged. The valuation now
-  counts the days the engine has run. The label goes into the order log
-  (`open_market` carries `day` when a run numbered the day its own way, and
-  `set_day` is an entry of its own), so a replay numbers the days as the run
-  did.
-  `open_market` takes `day=`. A negative day is refused.
-- A restore puts back the day stamp and the session tick. After a close the
-  restore set the day one ahead of the original, so a pin after it
-  re-marked prices off the wrong elapsed time and a fill was stamped day 4
-  tick 0 where the original said day 3 tick 390. Snapshots carry
-  `session_tick`, and `current_day` and `elapsed_days` where they differ
-  from the counter. `session_tick` is not hashed: it moves no price, and
-  hashing it would have moved every ledger leaf already written. A run that
-  closes its sessions with `run_session(close_at_end=True)` leaves the
-  session flag set, so its snapshots now carry the day just closed and its
-  leaves move; the restore set that day one ahead.
-- `set_fundamentals` is in the snapshot and the state hash, once the figures
-  differ from the ones the engine was built with. A restore brought back the
-  construction earnings while the hash check passed, so an earnings shock
-  resumed at day 30 left the index 1.35 times the uninterrupted run twenty
-  sessions later.
-- The variance cascade (`garch_cascade_components` at 1 or more) is in the
-  snapshot and the hash. Off on every shipped preset.
-  `tests/test_restore_dial_sweep.py` restores every dial moved off pt-v20
-  and runs in the slow lane.
-- Inputs that made every price NaN are refused. `pin_macro(vix=...)` takes
-  a level above zero and at most the higher of the model's `vix_ceiling`
-  and the default preset's, 181.33, so presets that clamp at 80 still take
-  the real March 2020 close of 82.69. `run_days`, `run_session` and
-  `run_until` check volatility and day_of_week as `tick` does, and refuse a
-  start at or past 24:00 (a start written as 9:60 still runs, as it always
-  has). `patch_draws` refuses a non-finite normal or a uniform outside
-  [0, 1]; `set_fundamentals` refuses an infinite value. `ModelParams`
-  refuses `price_hard_cap` at or below zero and `buyback_payout_share`
-  outside [0, 1]. A scenario refuses a VIX `set` or `hold` above 181.33,
-  and a relative VIX shock that computes a level above it writes 181.33.
-  A hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400 to
-  800 turned a fear shock into a rally.
-- Borrowing pays the policy rate in `evaluate` and `rank`.
-  `Portfolio.accrue` charged a negative cash balance only with
-  `cash_interest` on, which both leave off, so levered agents borrowed for
-  free. On the 90 graded pt-v20 histories 1.8 times the index beat the
-  index by 2.33 points a year that way, against 0.21 with the rate charged.
-  `accrue` now charges a negative balance whether the option is on or off.
-  Idle cash still earns nothing unless `cash_interest` is on. Scores of
-  levered agents move and the market does not. A levered agent's cash,
-  which its observation shows, now falls by a day's interest at each close,
-  so a prompt built from it changes once the balance is negative; none of
-  the recorded fixtures reaches that.
-- A `World` never called `accrue`, so a portfolio built with
-  `cash_interest=True` earned and paid nothing there. It now books interest
-  before each close for such a portfolio. The portfolios a World builds
-  itself still book none, so borrowing in a World stays free unless you
-  pass one: an LLM agent's observation shows its cash, and the recorded
-  World runs (the FinRobot and pydantic-ai fixtures, the liquidity-crisis
-  study) replay only against the cash they were shown.
-- `Engine.fundamentals` had `set_avg_volume`'s docstring and
-  `set_avg_volume` had none. `pin_macro`'s docstring says it writes today's
-  value and points to `Scenario.hold` for a hold.
 
 ### Text corrections after 0.8.0
 
