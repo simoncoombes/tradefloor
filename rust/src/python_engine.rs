@@ -6171,7 +6171,10 @@ impl PyEngine {
     /// ``"range"``), ``counterparty`` (``"mm"``, ``"depth"``, ``"flow"``,
     /// ``"range"`` or another agent's label), ``reference``, ``day``,
     /// ``tick`` and ``sequence``. A resting order the model's flow filled
-    /// during a session arrives here, and only here. Recorded in the order
+    /// during a session arrives here, and only here. A resting order the
+    /// maker's re-quote crossed is ``"taker"`` against ``"mm"``, at the
+    /// maker's price: it took the maker's size (docs/MODEL.md, "The
+    /// agent's book"). Recorded in the order
     /// log, because the book no longer owes what was collected.
     #[pyo3(signature = (agent = None))]
     fn take_fills(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {

@@ -406,6 +406,27 @@ def test_a_leverage_refusal_is_an_order_error_of_its_own_kind():
     assert issubclass(LeverageError, tradefloor.OrderError)
 
 
+@pytest.mark.parametrize("notional, shown", [
+    (2_001_000.0, "2.001x, above the 2.000x limit"),
+    (2_000_010.0, "2.00001x, above the 2.00000x limit"),
+    (9_340_000.0, "9.34x, above the 2.00x limit"),
+])
+def test_a_leverage_refusal_never_reads_as_equal_to_its_limit(notional, shown):
+    """A persona review read 'trade would take leverage to 2.00x, above the
+    2.00x limit'. The message prints as many places as separate the two.
+    A buy limit's leverage is checked as though it all filled at its limit,
+    so on a fresh $1M account 20,000 shares at notional / 20,000 project
+    to exactly notional / $1M."""
+    from tradefloor.portfolio import LeverageError
+
+    e = market()
+    p = tradefloor.Portfolio(cash=1e6, max_leverage=2.0)
+    with pytest.raises(LeverageError) as refused:
+        p.submit_limit(e, TICKER, 20_000, notional / 20_000)
+    assert str(refused.value) == f"trade would take leverage to {shown}"
+    assert p.positions == {} and p.fills == []
+
+
 def test_order_items_takes_a_mapping_and_refuses_anything_else():
     from tradefloor.portfolio import order_items
 

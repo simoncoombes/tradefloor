@@ -29,7 +29,7 @@ import struct
 import tradefloor
 
 #: Bumped only when the book's behaviour is meant to change.
-BOOK_KAT_VERSION = 1
+BOOK_KAT_VERSION = 2
 
 SEED = 20260924
 DAYS = 3

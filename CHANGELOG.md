@@ -363,6 +363,23 @@ the same at any setting and the known-answer simulation digest does not
 move. The book's state is absent from the state hash and the snapshot on
 every engine no agent has sent an order to.
 
+The model's flow fills a resting order only at a price inside the maker's
+quote for that tick. In the release candidate, a slice of flow that emptied
+the settlement ladder walked on into whatever rested past it and filled it
+at its own limit. A persona review found a buy at 4% of the bid filling
+thousands of shares, sells at ten times the ask filling on a third of the
+names in a day, an agent scoring +403% in ten days through `evaluate`, and
+the order's price printed on the tape. The flow now stops at the ladder's
+last price. A market with no resting orders settles exactly as before, so
+no untraded digest moved. The book known answer moved (version 2): one of
+its bids filled 0.8% below the last print and set the next print. The
+traded known answer moved for the scripted limit-order agent only, from
+its 148th fill. A resting order the maker's re-quote crosses is still
+recorded as `liquidity="taker"` against `"mm"`, at the maker's price;
+`docs/MODEL.md` says why. The leverage refusal now prints the projected and
+allowed leverage to enough places that they differ, rather than reading
+"2.00x, above the 2.00x limit".
+
 The Python surface is `Engine.submit`, `submit_many` (by agent label, then
 list order), `cancel`, `open_orders`, `take_fills`, `take_impacts` and
 `book_live`, all recorded in the order log and replayed. `Portfolio.execute`

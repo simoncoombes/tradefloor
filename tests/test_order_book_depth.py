@@ -588,6 +588,75 @@ def test_the_models_flow_fills_a_resting_order_at_its_price_in_parts():
     assert first["quantity"] < size, "the first slice filled it only in part"
 
 
+def _rest_everywhere(e, price_of, size=100):
+    """One buy and one sell resting on every name, each at `price_of(book,
+    side)`, under the labels "b" (buys) and "s" (sells)."""
+    for t in e.tickers:
+        book = e.book(t)
+        for agent, side, sign in (("b", "buy", 1), ("s", "sell", -1)):
+            r = e.submit(agent, t, sign * size, limit_price=price_of(book, side))
+            assert r["resting"] == size, r
+
+
+def _rest_of_day_fills(e):
+    e.run_session(10, 35, 3, 390 - 65)
+    return e.take_fills()
+
+
+def _two_days_of_fills(e):
+    fills = _rest_of_day_fills(e)
+    e.close_market()
+    e.open_market()
+    e.run_session(9, 30, 3, 390)
+    return fills + e.take_fills()
+
+
+def test_a_limit_beyond_the_latent_depth_is_never_filled_by_the_flow():
+    """Tomas Herrera's persona review of the 0.8.5 candidate: on pt-v20 a
+    buy limit at 4% of the bid filled thousands of shares at its own price,
+    and a sell at ten times the ask filled on a third of the names in a
+    day. The flow emptied the settlement's ladder and walked on into
+    whatever rested past it. A limit past the deepest price the book shows,
+    latent depth and all, now waits until the market comes to it, which in
+    the rest of the session it does not. (Overnight it may: on this seed
+    the market opens 6% lower the next day and the bids fill there, at the
+    maker's prices, as they should.)"""
+    e = warmed("pt-v20")
+
+    def beyond(book, side):
+        deepest = book.price_levels(side, 4096)[-1].price
+        return round(deepest * (0.97 if side == "buy" else 1.03), 2)
+
+    _rest_everywhere(e, beyond)
+    fills = _rest_of_day_fills(e)
+    assert fills == [], fills[:3]
+    assert len(e.open_orders()) == 2 * len(e.tickers)
+
+
+def test_a_limit_absurdly_far_from_the_market_is_never_filled():
+    """The persona's own prices: a buy at 4% of the bid, a sell at ten
+    times the ask. Both stay unfilled, and the tape never prints near them."""
+    e = warmed("pt-v20")
+    _rest_everywhere(e, lambda book, side: round(
+        book.best_bid * 0.04 if side == "buy" else book.best_ask * 10.0, 2))
+    assert _two_days_of_fills(e) == []
+
+
+def test_a_near_touch_limit_still_fills_and_at_a_price_the_market_printed():
+    """The bound stops the flow past the ladder, not at it. A limit five
+    basis points outside the touch fills on most names within two days, as
+    it did before, and every fill's price is within a few percent of the
+    print before its tick: a price the market could print."""
+    e = warmed("pt-v20")
+    _rest_everywhere(e, lambda book, side: round(
+        book.best_bid * 0.9995 if side == "buy" else book.best_ask * 1.0005, 2))
+    fills = _two_days_of_fills(e)
+    names = {(f["agent"], f["ticker"]) for f in fills}
+    assert len(names) >= len(e.tickers), names
+    for f in fills:
+        assert abs(f["price"] / f["reference"] - 1.0) < 0.05, f
+
+
 def test_a_standing_bid_at_the_ask_takes_the_makers_requote_and_pays_for_it():
     """A buy left resting at the price the maker asks crosses the maker's
     re-quote at the next tick. That is taking liquidity: the fills are the

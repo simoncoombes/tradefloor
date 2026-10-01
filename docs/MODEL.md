@@ -1906,8 +1906,24 @@ re-quote (`engine.rs:2779-2798`), and at the open everything resets.
 
 A limit order's remainder rests (`engine.rs:3240-3256`). Each tick it is
 also posted into the settlement book, where the background flow can fill it
-at its limit, as a maker fill (`microstructure.rs:674-716`,
-`microstructure.rs:740-755`).
+at its limit, as a maker fill (`microstructure.rs:695-734`,
+`microstructure.rs:753-795`). The flow walks no further than the last price
+the maker quotes in that tick's settlement ladder (`microstructure.rs:677-693`),
+which holds only as many levels as the tick's volume needs, two to ten. So
+an order resting past that ladder waits until the price moves to it, and a
+fill against the flow is always at a price inside the maker's quote.
+`tests/test_order_book_depth.py` checks that a limit past the latent depth
+stays unfilled for the rest of the session and that one 5 bp outside the
+touch still fills.
+
+A resting order that the maker's re-quote moves through (a bid at or above
+the new ask) trades against the re-quote before the tick's flow, at the
+maker's prices. Its fills are recorded with `liquidity="taker"` and
+`counterparty="mm"`, although the order was resting. The agent gets the
+maker's price rather than its own limit, and the fills are taker flow that
+pays permanent impact on the next tick, so a standing bid at the ask cannot
+take the maker's fresh size every tick for free. In a study of maker
+rebates or taker fees, count these fills as taken liquidity.
 
 The cost of size in row C9 is this book read for one immediate order.
 `tools/calibration/impact_curve.py` takes every name on 40-name rosters and

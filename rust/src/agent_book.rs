@@ -115,12 +115,22 @@
 //! re-quote steps back behind it after a print through it, which is what a
 //! queue behind a dealer means.
 //!
+//! The flow walks no further than the deepest price the maker quotes in the
+//! settlement's ladder, which holds the levels the tick's volume needs
+//! (`microstructure::settle_price_through_book_with_orders`). An order past
+//! that waits for the price to come to it. Without the bound, a slice that
+//! emptied the ladder went on into whatever rested behind it and filled it
+//! at its own limit: a persona review of the 0.8.5 candidate had a bid at 4%
+//! of the market fill thousands of shares and print its price on the tape.
+//!
 //! A resting order the maker's re-quote leaves crossed (a bid at the price
 //! the maker now asks) trades against the re-quote before the tick's flow,
 //! at the maker's price, and that is taking liquidity: it is taker flow and
 //! pays its permanent impact on the next tick. The maker's inventory skew
 //! then moves its quote away, so a standing bid at the ask takes a few
-//! ticks of the maker's size and stops.
+//! ticks of the maker's size and stops. Its fills say so: `liquidity`
+//! "taker", counterparty the maker, at the maker's price. `docs/MODEL.md`
+//! tells users, because a maker-rebate study would count them otherwise.
 //!
 //! Off, a limit's unfilled part waits outside the book and fills in full at
 //! its limit on the first tick whose print reaches it: the traded-range
