@@ -33,8 +33,16 @@ use crate::economy::{create_initial_central_bank_state, create_initial_economy_s
 use crate::economy::{CyclePhase, ForwardGuidance, InitialEconomyOptions};
 use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
 use crate::engine::{TickOutcome};
-use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany};
 use crate::python::ValidationError;
+
+/// One recorded draw as `draw_log` returns it:
+/// `((stream, kind, index), value, day, site, tag)`.
+type DrawLogRow = ((String, String, u64), f64, i64, String, u32);
+
+/// One order as `submit_many` parses it:
+/// `(agent, position in the call, ticker, quantity, limit, id)`.
+type ParsedOrder = (String, usize, String, f64, Option<f64>, Option<String>);
 
 /// Serialise a column as little-endian f64 bytes.
 ///
@@ -96,10 +104,45 @@ impl PyInstrument {
         beta: f64,
         short_interest: f64,
     ) -> PyResult<Self> {
-        if crate::sectors::by_key(sector).is_none() {
+        if sector == crate::rates::RATE_SECTOR {
+            // A simulated rate index rather than a company. Its duration,
+            // convexity, spread and curve point come from the ticker, so only
+            // the tickers this build prices are accepted, and the company
+            // fields must be absent: a bond index with earnings would be a
+            // universe nobody could have meant.
+            if crate::rates::spec_for(ticker).is_none() {
+                return Err(ValidationError::new_err(format!(
+                    "{ticker:?} is not a rate instrument this build prices. \
+                     Sector \"rates\" takes one of: {}. They are simulated \
+                     constant-maturity indices, not real securities; \
+                     tradefloor.bonds() builds them with their defaults.",
+                    crate::rates::tickers().join(", ")
+                )));
+            }
+            for (name, v) in [
+                ("eps", eps),
+                ("book_value_per_share", book_value_per_share),
+                ("revenue_growth", revenue_growth),
+            ] {
+                if v.is_some() {
+                    return Err(ValidationError::new_err(format!(
+                        "{name} is a company field and {ticker} is a rate index; \
+                         leave it unset."
+                    )));
+                }
+            }
+            if short_interest != 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "short_interest is a company field and {ticker} is a rate \
+                     index; leave it at 0."
+                )));
+            }
+        } else if crate::sectors::by_key(sector).is_none() {
             return Err(ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
+                "{}, or \"{}\" for a simulated rate index ({})",
+                crate::python::unknown_sector(sector),
+                crate::rates::RATE_SECTOR,
+                crate::rates::tickers().join(", ")
             )));
         }
         for (name, v) in [
@@ -189,6 +232,23 @@ impl PyInstrument {
         self.to_core(index)
     }
 
+    /// Whether this is a simulated rate index rather than a company.
+    pub fn is_rate(&self) -> bool {
+        self.sector == crate::rates::RATE_SECTOR
+    }
+
+    /// The rate instrument this describes. Only for `is_rate()`, which the
+    /// constructor has already checked names a priced ticker.
+    fn to_rate(&self) -> crate::rates::RateInstrument {
+        let spec = *crate::rates::spec_for(&self.ticker).expect("validated at construction");
+        crate::rates::RateInstrument::new(
+            spec,
+            self.initial_price,
+            self.avg_volume,
+            self.shares_outstanding,
+        )
+    }
+
     fn to_core(&self, index: usize) -> TickCompany {
         // The mapping is `InstrumentInit::to_tick_company` in the core, so
         // the browser surface starts a market from the same initial state
@@ -225,6 +285,34 @@ pub struct PyMacro {
     pub cycle: String,
 }
 
+/// A snapshot's `economy["gdp_publication"]` block (`gdp_publication_lag`),
+/// every key required.
+fn gdp_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::GdpPublication> {
+    let d = v.downcast::<PyDict>().map_err(|_| {
+        ValidationError::new_err("snapshot economy.gdp_publication is not a dict")
+    })?;
+    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
+        d.get_item(key)?.ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "snapshot economy.gdp_publication has no {key:?} (gdp_publication_lag)"))
+        })
+    };
+    let days: Vec<i64> = need("pending_days")?.extract()?;
+    let values: Vec<f64> = need("pending_values")?.extract()?;
+    if days.len() != values.len() {
+        return Err(ValidationError::new_err(format!(
+            "snapshot economy.gdp_publication has {} pending release days and {} \
+             pending figures (gdp_publication_lag)", days.len(), values.len())));
+    }
+    Ok(crate::engine::GdpPublication {
+        published: need("published")?.extract()?,
+        quarter: need("quarter")?.extract()?,
+        count: need("count")?.extract()?,
+        sum: need("sum")?.extract()?,
+        pending: days.into_iter().zip(values).collect(),
+    })
+}
+
 #[pymethods]
 impl PyMacro {
     #[new]
@@ -233,6 +321,7 @@ impl PyMacro {
         inflation_rate = 0.02, qe_pe_boost = 0.0, qe_assets_ratio = 1.0, fear_greed_index = 50.0,
         cycle = "expansion"
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         vix: f64,
         federal_funds_rate: f64,
@@ -268,6 +357,7 @@ impl PyMacro {
                 )));
             }
         }
+        check_vix(vix)?;
         Ok(Self {
             vix,
             federal_funds_rate,
@@ -366,6 +456,22 @@ impl PyEngine {
         self.tickers.get(pos).cloned()
     }
 
+    /// Why a news item cannot name `ticker`: it is not on the roster, or it
+    /// is a rate index, which the news channels never reach.
+    fn no_news_for(&self, ticker: &str) -> PyErr {
+        if self.inner.rates().index_of(ticker).is_some() {
+            ValidationError::new_err(format!(
+                "{ticker} is a rate index. News moves equities through the \
+                 factor model, which never runs on an index; move a rate index \
+                 by writing the yield it reads with pin_macro."
+            ))
+        } else {
+            ValidationError::new_err(format!(
+                "no instrument with ticker {ticker:?} in this universe"
+            ))
+        }
+    }
+
     fn id_for(&self, ticker: &str) -> Option<String> {
         let pos = self.tickers.iter().position(|t| t == ticker)?;
         self.inner.ids().get(pos).cloned()
@@ -386,11 +492,7 @@ impl PyEngine {
         let mut out = Vec::with_capacity(items.len());
         for n in items {
             let company_id = match n.ticker.as_deref() {
-                Some(t) => Some(self.id_for(t).ok_or_else(|| {
-                    ValidationError::new_err(format!(
-                        "no instrument with ticker {t:?} in this universe"
-                    ))
-                })?),
+                Some(t) => Some(self.id_for(t).ok_or_else(|| self.no_news_for(t))?),
                 None => None,
             };
             // A company-tagged event with no sector is resolved to the
@@ -425,11 +527,7 @@ impl PyEngine {
         let mut out = Vec::with_capacity(items.len());
         for i in items {
             let company_id = match i.ticker.as_deref() {
-                Some(t) => Some(self.id_for(t).ok_or_else(|| {
-                    ValidationError::new_err(format!(
-                        "no instrument with ticker {t:?} in this universe"
-                    ))
-                })?),
+                Some(t) => Some(self.id_for(t).ok_or_else(|| self.no_news_for(t))?),
                 None => None,
             };
             out.push(NewsImpactEntry {
@@ -492,10 +590,22 @@ impl PyEngine {
     /// Called after EVERY inner `run_session`, so a day made of many sessions
     /// records as one continuous tape. Copies only what was written, which is
     /// less than capacity whenever a stop condition fired.
-    fn accumulate_session(&mut self) {
+    ///
+    /// `volume_base` is each instrument's running volume total just before
+    /// the session's first tick. The tape's `volumes` are running totals, so
+    /// a bar's own volume is its last tick's total minus the total before its
+    /// first, and for the first tick on a tape that earlier total is not on
+    /// the tape. It is zero after an open, which resets the count, and not
+    /// zero for a later session of the same day, or for a session run on a
+    /// restored engine that never opened.
+    fn accumulate_session(&mut self, volume_base: Vec<f64>) {
+        self.session_volume_base = volume_base;
         let ticks = self.buffer.ticks_written;
         if ticks == 0 {
             return;
+        }
+        if self.day_buffer.ticks == 0 {
+            self.day_buffer.volume_base = self.session_volume_base.clone();
         }
         let n = ticks * self.buffer.companies;
         self.day_buffer.companies = self.buffer.companies;
@@ -520,6 +630,9 @@ impl PyEngine {
         self.day_buffer
             .clamp
             .extend_from_slice(&self.buffer.clamp[..n]);
+        self.day_buffer
+            .repriced
+            .extend_from_slice(&self.buffer.repriced[..n]);
         // Appended only when the session actually carried the arm, so a day
         // that ran without it holds an EMPTY pair rather than a padded one.
         if !self.buffer.unbounded_print.is_empty() {
@@ -533,6 +646,22 @@ impl PyEngine {
         for k in 0..crate::market::factors::S_COMPONENT_KEYS.len() {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
+        }
+        // The fair-value shift: the tick's own, then on the first row the
+        // close's jump's, beside the jump (below), so the columns sum to the
+        // change in `s` on that row too.
+        let fv = crate::market::factors::FAIR_VALUE_SLOT;
+        let first = self.day_buffer.components[fv].len();
+        self.day_buffer.components[fv]
+            .extend_from_slice(&self.buffer.components[crate::market::factors::TICK_FAIR_VALUE][..n]);
+        self.day_buffer.components[fv].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_fair_value.is_empty() {
+            for (i, v) in self.pending_fair_value.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[fv].get_mut(first + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_fair_value.clear();
         }
         // The eighth series is the daily jump. It happens at the close, so
         // no tick carries it, and the row where its effect is OBSERVED is the
@@ -577,6 +706,10 @@ impl PyEngine {
         if jumps.iter().any(|v| *v != 0.0) {
             self.pending_jump = jumps;
         }
+        let shifts: Vec<f64> = self.inner.jump_fair_value_moves().to_vec();
+        if shifts.iter().any(|v| *v != 0.0) {
+            self.pending_fair_value = shifts;
+        }
     }
 
     /// The daily macro step, run at every day boundary -- the explicit
@@ -587,6 +720,24 @@ impl PyEngine {
         let n = self.buffer.ticks_written * self.buffer.companies;
         let end = if n > buf.len() { buf.len() } else { n };
         &buf[..end]
+    }
+
+    /// One field across every instrument: the equities, then the rate
+    /// instruments. Every per-instrument surface on the Python side is this
+    /// width and in this order, which is the order of `tickers`.
+    fn all_column(&self, field: PriceField) -> Vec<f64> {
+        let mut values = self.inner.column(field);
+        if !self.inner.rates().is_empty() {
+            values.extend(self.inner.rate_column(field));
+        }
+        values
+    }
+
+    /// A per-equity column widened to every instrument, with `fill` in the
+    /// rate instruments' slots.
+    fn padded(&self, mut values: Vec<f64>, fill: f64) -> Vec<f64> {
+        values.resize(values.len() + self.inner.rates().len(), fill);
+        values
     }
 }
 
@@ -602,10 +753,9 @@ pub fn model_params_from(
     if let Ok(name) = value.extract::<String>() {
         return crate::params::ModelParams::preset(&name).ok_or_else(|| {
             ValidationError::new_err(format!(
-                "unknown model preset {name:?}. Shipped presets: {}. For a \
-                 modified model, pass ModelParams.from_preset(name, ...) \
+                "{}. For a modified model, pass ModelParams.from_preset(name, ...) \
                  instead of a string.",
-                crate::params::ModelParams::preset_names().join(", ")
+                crate::python::unknown_preset(&name)
             ))
         });
     }
@@ -630,6 +780,175 @@ pub fn economy_from(
         Some(m) => m.to_core(),
         None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 1.0, 50.0, "expansion")?.to_core(),
     })
+}
+
+/// Refuse a VIX below zero. The rates beside it are range-checked by
+/// `units::check_rate`, and a VIX is an index level that cannot be negative.
+/// There is no upper bound here: a scenario may pin a level above anything
+/// recorded, and the daily step clamps the VIX into its band at the next
+/// close.
+fn check_vix(v: f64) -> PyResult<()> {
+    if v < 0.0 {
+        return Err(ValidationError::new_err(format!(
+            "vix cannot be negative, got {v}. It is the index level, such as 20."
+        )));
+    }
+    Ok(())
+}
+
+/// A universe argument as instruments, or a refusal that says what came
+/// instead.
+///
+/// pyo3's own words for a wrong type named its internals: `None` or a
+/// number read "'int' object is not iterable", and a list of ticker strings
+/// "'str' object cannot be converted to 'Instrument'". The Python side
+/// (`tradefloor.universe_util.as_universe`) refuses the same inputs in the
+/// same words, since `evaluate` reads the roster before any engine does.
+pub(crate) fn universe_from(value: &Bound<'_, PyAny>) -> PyResult<Vec<PyInstrument>> {
+    if !value.is_instance_of::<pyo3::types::PyString>() {
+        if let Ok(instruments) = value.extract::<Vec<PyInstrument>>() {
+            return Ok(instruments);
+        }
+    }
+    Err(ValidationError::new_err(format!(
+        "universe must be a list of instruments, such as \
+         tf.Universe.random(40, seed=1). {}",
+        universe_got(value)
+    )))
+}
+
+/// The "Got ..." half of [`universe_from`]'s refusal.
+fn universe_got(value: &Bound<'_, PyAny>) -> String {
+    if value.is_none() {
+        return "Got None.".to_string();
+    }
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return format!("Got {}.", value);
+    }
+    if let Ok(n) = value.extract::<i64>() {
+        return format!(
+            "Got the number {n}. For {n} random companies use \
+             tf.Universe.random({n}, seed=1)."
+        );
+    }
+    if value.is_instance_of::<pyo3::types::PyString>() {
+        return format!(
+            "Got the string {}. Tickers alone are not enough: the simulator \
+             needs each company's price, shares and sector.",
+            value.repr().map(|r| r.to_string()).unwrap_or_default()
+        );
+    }
+    let kind = value
+        .get_type()
+        .name()
+        .map(|n| n.to_string())
+        .unwrap_or_else(|_| "value".to_string());
+    let Ok(items) = value.iter() else {
+        return format!("Got a {kind}.");
+    };
+    let items: Vec<Bound<'_, PyAny>> = items.filter_map(Result::ok).collect();
+    if !items.is_empty() && items.iter().all(|i| i.is_instance_of::<pyo3::types::PyString>()) {
+        return "Got a list of ticker strings; the simulator needs each \
+                company's price, shares and sector, not only its name. \
+                Universe.from_edgar builds instruments for real companies."
+            .to_string();
+    }
+    match items
+        .iter()
+        .position(|i| i.extract::<PyRef<'_, PyInstrument>>().is_err())
+    {
+        Some(at) => format!(
+            "Got a {kind} holding a {} at position {at}.",
+            items[at]
+                .get_type()
+                .name()
+                .map(|n| n.to_string())
+                .unwrap_or_else(|_| "value".to_string())
+        ),
+        None => format!("Got a {kind}."),
+    }
+}
+
+/// The refusal for a ticker listed twice in one roster.
+fn duplicate_ticker(ticker: &str, first: usize, second: usize) -> String {
+    format!(
+        "ticker {ticker:?} appears twice in the universe (positions {first} and \
+         {second}). Each ticker must be unique: orders and books find a name by \
+         its ticker, so the second one could never be traded."
+    )
+}
+
+/// Split a universe into its equities and its rate instruments.
+///
+/// Rate instruments must come after every equity. The engine keeps the two in
+/// separate blocks, equities first, and every per-instrument surface (tickers,
+/// prices, columns, the tape) lists them in that order; accepting a rate index
+/// in the middle would either reorder the caller's roster, which is
+/// contractual, or put two orders on one market. So the order the caller
+/// wrote must already be that order. `Universe.random(..., bonds=True)` and
+/// `Universe.with_bonds()` append them.
+///
+/// A universe of rate instruments alone is refused: the curve they read is
+/// the economy's, and the economy steps with an equity market.
+pub fn split_roster(
+    universe: &[PyInstrument],
+) -> PyResult<(Vec<PyInstrument>, Vec<PyInstrument>)> {
+    let mut equities = Vec::new();
+    let mut rates: Vec<PyInstrument> = Vec::new();
+    for (position, inst) in universe.iter().enumerate() {
+        // Orders, books and every by-ticker lookup find the first name with
+        // a ticker, so a second one could be priced and never traded or
+        // read. Refused here, where the engine is built, and by
+        // `list_instrument` for a name listed later.
+        if !inst.is_rate() {
+            if let Some(first) = universe[..position].iter().position(|e| e.ticker == inst.ticker) {
+                return Err(ValidationError::new_err(duplicate_ticker(
+                    &inst.ticker,
+                    first,
+                    position,
+                )));
+            }
+        }
+        if inst.is_rate() {
+            if rates.iter().any(|r| r.ticker == inst.ticker) {
+                return Err(ValidationError::new_err(format!(
+                    "{} is listed twice. Each rate index is one instrument; list it once.",
+                    inst.ticker
+                )));
+            }
+            rates.push(inst.clone());
+        } else {
+            if !rates.is_empty() {
+                return Err(ValidationError::new_err(format!(
+                    "{} is an equity listed after the rate instrument {}. Rate \
+                     instruments must come after every equity in the roster, \
+                     because the engine lists them in that order and roster order \
+                     is contractual. Append them: Universe.with_bonds() does.",
+                    inst.ticker, rates[0].ticker
+                )));
+            }
+            equities.push(inst.clone());
+        }
+    }
+    if let Some(clash) = equities
+        .iter()
+        .find(|e| rates.iter().any(|r| r.ticker == e.ticker))
+    {
+        return Err(ValidationError::new_err(format!(
+            "the equity {0} carries the ticker of the rate index {0}. Order flow \
+             and books are found by ticker, so the two would trade as one; rename \
+             the equity.",
+            clash.ticker
+        )));
+    }
+    if equities.is_empty() && !rates.is_empty() {
+        return Err(ValidationError::new_err(
+            "this universe holds rate instruments and no equities. The curve they \
+             are priced off is the economy's, which steps with an equity market; \
+             add equities, for example Universe.random(20, seed=..., bonds=True).",
+        ));
+    }
+    Ok((equities, rates))
 }
 
 impl PyMacro {
@@ -678,6 +997,57 @@ impl PyTickResult {
             self.market_status, self.draws_consumed, self.active
         )
     }
+}
+
+/// The clock and volatility `tick` takes: a time of day, a day of the week
+/// from 0 (Sunday) to 6, and a volatility multiplier that is finite and not
+/// negative.
+fn check_clock(hour: i64, minute: i64, day_of_week: i64, volatility: f64) -> PyResult<()> {
+    if !(0..24).contains(&hour) || !(0..60).contains(&minute) {
+        return Err(ValidationError::new_err(format!(
+            "invalid time {hour:02}:{minute:02}"
+        )));
+    }
+    check_day_and_volatility(day_of_week, volatility)
+}
+
+/// The start a session entry point (`run_session`, `run_days`, `run_until`)
+/// takes. Looser than [`check_clock`] in one way: the minute may carry into
+/// the hour, as the session's own clock does after each tick, so 09:60 is
+/// 10:00. Callers have always passed `30 + i * 30` minutes, and they still
+/// can. The start must fall inside the day, the minute may not be negative,
+/// and the day and volatility are checked as `tick` checks them.
+fn check_session_start(
+    hour: i64,
+    minute: i64,
+    day_of_week: i64,
+    volatility: f64,
+) -> PyResult<()> {
+    let within_day = hour
+        .checked_mul(60)
+        .and_then(|h| h.checked_add(minute))
+        .is_some_and(|m| (0..24 * 60).contains(&m));
+    if hour < 0 || minute < 0 || !within_day {
+        return Err(ValidationError::new_err(format!(
+            "invalid session start {hour:02}:{minute:02}: it must fall \
+             between 00:00 and 23:59 (the minute may carry into the hour)"
+        )));
+    }
+    check_day_and_volatility(day_of_week, volatility)
+}
+
+fn check_day_and_volatility(day_of_week: i64, volatility: f64) -> PyResult<()> {
+    if !(0..7).contains(&day_of_week) {
+        return Err(ValidationError::new_err(format!(
+            "day_of_week must be 0 (Sunday) to 6 (Saturday), got {day_of_week}"
+        )));
+    }
+    if !volatility.is_finite() || volatility < 0.0 {
+        return Err(ValidationError::new_err(format!(
+            "volatility must be finite and not negative, got {volatility}"
+        )));
+    }
+    Ok(())
 }
 
 fn status_name(s: crate::market::MarketStatus) -> &'static str {
@@ -733,7 +1103,11 @@ struct DayBuffer {
     ticks: usize,
     companies: usize,
     prices: Vec<f64>,
+    /// Running totals since the open, as the session buffer writes them.
     volumes: Vec<f64>,
+    /// Each instrument's running total before the first tick on this tape.
+    /// See [`PyEngine::accumulate_session`].
+    volume_base: Vec<f64>,
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
@@ -741,6 +1115,7 @@ struct DayBuffer {
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
+    repriced: Vec<f64>,
     /// Empty on a day whose sessions ran without the depth counterfactual.
     ///
     /// A session that ran with it appends; one that did not appends nothing.
@@ -757,12 +1132,14 @@ impl DayBuffer {
         self.ticks = 0;
         self.prices.clear();
         self.volumes.clear();
+        self.volume_base.clear();
         self.mispricing.clear();
         self.fundamental.clear();
         self.anchor.clear();
         self.shock.clear();
         self.absorbed.clear();
         self.clamp.clear();
+        self.repriced.clear();
         self.unbounded_print.clear();
         self.liquidity_share.clear();
         for column in self.components.iter_mut() {
@@ -877,6 +1254,38 @@ struct Explanations {
     opens: std::collections::BTreeMap<i64, KeptOpen>,
 }
 
+/// How many times Python code has copied this engine or put a copy back:
+/// calls to `fork`, `state_snapshot` and `restore_state`.
+///
+/// Read by `tradefloor.sandbox.TamperGuard` around agent code. A fork run
+/// ahead is look-ahead, and it writes nothing to the engine it came from, so
+/// the state-hash comparison cannot see it; this count can, however the
+/// agent reached the engine. Not market state: the hash, the snapshot and
+/// the log leave it out, and a copy starts its own count at zero, so no
+/// digest moves. Atomic so the engine stays `Sync` for a later PyO3.
+#[derive(Default)]
+struct CopyCount(std::sync::atomic::AtomicU64);
+
+impl CopyCount {
+    fn bump(&self) {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn get(&self) -> u64 {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn set(&self, value: u64) {
+        self.0.store(value, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+impl Clone for CopyCount {
+    fn clone(&self) -> Self {
+        CopyCount::default()
+    }
+}
+
 impl Explanations {
     fn wants(&self, day: i64) -> bool {
         match self.window {
@@ -897,6 +1306,10 @@ pub struct PyEngine {
     /// The overnight move the last open applied to `s`, waiting for the
     /// row where its effect is observed: the first tick of the same day.
     pending_overnight: Vec<f64>,
+    /// The close's jump's `fair_value_shift`, waiting for the row where the
+    /// jump is observed, as `pending_jump` waits. Empty unless the preset
+    /// carries fair-value offsets and a name's jump moved one.
+    pending_fair_value: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -925,6 +1338,10 @@ pub struct PyEngine {
     /// `prices()` meaning what it has always meant, and costs a copy per
     /// session that only a recording caller pays.
     day_buffer: DayBuffer,
+    /// Each instrument's running volume total before the LAST session's
+    /// first tick: what the un-recorded `bars()` fallback, which reads that
+    /// session alone, subtracts from its first tick.
+    session_volume_base: Vec<f64>,
     /// Whether the market has been opened and not yet closed.
     ///
     /// Exists so a day is opened exactly ONCE however many sessions it is made
@@ -952,6 +1369,63 @@ pub struct PyEngine {
     /// What `explain` reaches a day through. Recording only: nothing here is
     /// read by the tick, the snapshot or the hash.
     explanations: Explanations,
+    /// Where this day's last `run_session` left the clock, so a later
+    /// session that starts before it can warn. Read by nothing else: the
+    /// tick, the snapshot and the hash leave it out, so it cannot change a
+    /// run. `None` until the day's first session, which never warns.
+    session_clock: Option<SessionClock>,
+    /// Copies taken of this engine; see [`CopyCount`].
+    copies: CopyCount,
+    /// The log length at the last `restore_state`. What came before it is
+    /// another history, so [`Self::day_is_open`] reads the log from here.
+    /// Bookkeeping for a refusal only: nothing reads it that the tick, the
+    /// snapshot or the hash sees.
+    restored_at: usize,
+}
+
+/// Minutes in a day, the modulus `harness.session_clock` wraps the clock at.
+const MINUTES_PER_DAY: i64 = 24 * 60;
+
+/// The clock one day's sessions have reached.
+///
+/// `end` counts minutes from the midnight before the day's first session,
+/// and it keeps counting past 1,440 instead of wrapping. `harness.
+/// session_clock` wraps a long day's later steps back to 00:00 and keeps the
+/// day of week, so a session at 00:05 straight after one that ran to 00:05
+/// continues the day. The unwrapped count is what tells that apart from a
+/// session that went back to 09:30.
+#[derive(Clone, Copy, Debug)]
+struct SessionClock {
+    day_of_week: i64,
+    end: i64,
+}
+
+impl SessionClock {
+    /// Where a session starting at `start` (minutes after midnight) sits on
+    /// this day's unwrapped clock: in the same 24 hours as `end`.
+    fn place(&self, start: i64) -> i64 {
+        start + self.end.div_euclid(MINUTES_PER_DAY) * MINUTES_PER_DAY
+    }
+}
+
+/// The warning `run_session` raises when a session starts before the day's
+/// previous one ended.
+fn repeated_clock_warning(start: i64, end: i64) -> String {
+    let at = |m: i64| {
+        let m = m.rem_euclid(MINUTES_PER_DAY);
+        format!("{:02}:{:02}", m / 60, m % 60)
+    };
+    format!(
+        "run_session started at {} but this day's previous session ran to {}. \
+         The time of day sets the intraday activity profile, so those minutes \
+         run a second time and the day becomes a different market from one \
+         continuous session. Start each session where the last one ended. \
+         tradefloor.harness.session_clock(start, step, ticks_per_step) returns \
+         that start, or pass (9 + m // 60, m % 60) as hour and minute, where m \
+         is 30 plus the ticks already run today.",
+        at(start),
+        at(end),
+    )
 }
 
 /// The day stamp, kept off the Python surface.
@@ -963,6 +1437,59 @@ pub struct PyEngine {
 /// every method of a `#[pymethods]` block becomes a binding and every
 /// binding has to be declared in the stub.
 impl PyEngine {
+    /// `state_snapshot` for this binding's own reads, which the copy count
+    /// does not see: the ledger's snapshots in `run_days` and `economy`.
+    fn snapshot_uncounted(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let before = self.copies.get();
+        let out = self.state_snapshot(py);
+        self.copies.set(before);
+        out
+    }
+
+    /// Whether a day is open and has not closed, the state in which a
+    /// second open would reopen it.
+    ///
+    /// Not `market_open` alone. `run_session(close_at_end=True)` closes the
+    /// day in the core and leaves that flag set (see `state_hash`), and
+    /// `open_market()` after it is the documented way on to the next day. So
+    /// the day counts as open only when the log since its `open_market`
+    /// holds no session that closed it. With no open in the log since the
+    /// last restore, the state came from a snapshot this engine cannot read
+    /// back, and the answer is no, which is what every call did before 0.8.5.
+    fn day_is_open(&self) -> bool {
+        if !self.market_open {
+            return false;
+        }
+        for entry in self.log.get(self.restored_at..).unwrap_or(&[]).iter().rev() {
+            match entry {
+                crate::python_log::LogEntry::OpenMarket { .. } => return true,
+                crate::python_log::LogEntry::CloseMarket => return false,
+                crate::python_log::LogEntry::RunSession { close_at_end, .. }
+                    if *close_at_end =>
+                {
+                    return false
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// What a call that needs a closed market says when a day is open: which
+    /// day, how far it has run, and `then`, the way out for that call.
+    fn open_day_refusal(&self, then: &str) -> String {
+        let day = self.inner.current_day();
+        let ticks = self.day_buffer.ticks;
+        let run = if ticks == 0 {
+            "is open".to_string()
+        } else if ticks == 1 {
+            "has run 1 tick".to_string()
+        } else {
+            format!("has run {ticks} ticks")
+        };
+        format!("the market is already open: day {day} {run} and has not closed. {then}")
+    }
+
     /// Roll the day's opening marks, numbering the day `day`.
     ///
     /// The day is stamped BEFORE `inner.open_market()`, and the order is the
@@ -1009,15 +1536,29 @@ impl PyEngine {
                 },
             );
         }
-        self.log.push(crate::python_log::LogEntry::OpenMarket);
+        // The label goes into the log only when it is not the counter's, so
+        // a replay numbers the day as this run did and every log of a run
+        // that never passed `first_day` is the one it was.
+        self.log.push(crate::python_log::LogEntry::OpenMarket {
+            day: (day != i64::from(self.day_count)).then_some(day),
+        });
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
         self.day_buffer.clear();
+        // And a new day's clock, so its first session never warns.
+        self.session_clock = None;
         self.market_open = true;
         // The day a draw carries in the draw log is the day whose open it
         // follows, so the jumps, volume and macro draws taken at a close
         // belong to the day they close rather than to the one after.
-        self.inner.set_current_day(day);
+        //
+        // Two numbers, set apart. `day` is a LABEL: the draw log, the day
+        // mark and the book's fill stamps carry it. The valuation's clock is
+        // the days this engine has run, `day_count`, whatever the label. They
+        // were one field until 0.8.5, so `run_days(30, first_day=1000)`
+        // priced every name as though a thousand days had passed.
+        self.inner.set_day_label(day);
+        self.inner.set_elapsed_days(i64::from(self.day_count));
         self.inner.open_market();
         // The overnight move the open applied to `s`, for the tape: booked
         // onto the day's first row, where its effect is observed, as the
@@ -1048,7 +1589,7 @@ impl PyEngine {
         };
         let start = self.log[..end]
             .iter()
-            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket))
+            .rposition(|e| matches!(e, crate::python_log::LogEntry::OpenMarket { .. }))
             .unwrap_or(0);
         for entry in &self.log[start..end] {
             match entry {
@@ -1106,26 +1647,310 @@ impl PyEngine {
     }
 }
 
+/// The agents' half of the binding, kept off the Python surface.
+impl PyEngine {
+    fn submit_one(
+        &mut self,
+        agent: &str,
+        ticker: &str,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    ) -> PyResult<crate::engine::OrderReport> {
+        if !quantity.is_finite() || quantity == 0.0 {
+            return Err(ValidationError::new_err(format!(
+                "quantity must be non-zero and finite, got {quantity}"
+            )));
+        }
+        if !self.tickers.iter().any(|t| t == ticker) {
+            return Err(ValidationError::new_err(format!(
+                "no instrument with ticker {ticker:?} in this universe"
+            )));
+        }
+        let side = if quantity > 0.0 {
+            crate::order_book::Side::Buy
+        } else {
+            crate::order_book::Side::Sell
+        };
+        // Validated by the core before it changes anything, so a refused
+        // order is logged by nobody: it did not happen.
+        let report = self
+            .inner
+            .submit_order(agent, ticker, side, quantity.abs(), limit_price, order_id.clone())
+            .map_err(crate::python_book::OrderError::new_err)?;
+        self.log.push(crate::python_log::LogEntry::Submit {
+            agent: agent.to_string(),
+            ticker: ticker.to_string(),
+            quantity,
+            limit_price,
+            order_id,
+        });
+        Ok(report)
+    }
+}
+
+fn side_str(side: crate::order_book::Side) -> &'static str {
+    match side {
+        crate::order_book::Side::Buy => "buy",
+        crate::order_book::Side::Sell => "sell",
+    }
+}
+
+fn parse_side_str(s: &str) -> PyResult<crate::order_book::Side> {
+    match s {
+        "buy" => Ok(crate::order_book::Side::Buy),
+        "sell" => Ok(crate::order_book::Side::Sell),
+        other => Err(ValidationError::new_err(format!("unknown side {other:?}"))),
+    }
+}
+
+fn fill_to_py(py: Python<'_>, f: &crate::agent_book::AgentFill) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("agent", &f.agent)?;
+    d.set_item("order_id", &f.order_id)?;
+    d.set_item("ticker", &f.ticker)?;
+    d.set_item("side", side_str(f.side))?;
+    d.set_item("quantity", f.quantity)?;
+    d.set_item("price", f.price)?;
+    d.set_item("liquidity", f.liquidity.as_str())?;
+    d.set_item("counterparty", &f.counterparty)?;
+    d.set_item("reference", f.reference)?;
+    d.set_item("day", f.day)?;
+    d.set_item("tick", f.tick)?;
+    d.set_item("sequence", f.sequence)?;
+    Ok(d.into())
+}
+
+fn order_to_py(py: Python<'_>, o: &crate::agent_book::AgentOrder) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("order_id", &o.id)?;
+    d.set_item("agent", &o.agent)?;
+    d.set_item("ticker", &o.ticker)?;
+    d.set_item("side", side_str(o.side))?;
+    d.set_item("limit_price", o.limit)?;
+    d.set_item("quantity", o.quantity)?;
+    d.set_item("remaining", o.remaining)?;
+    d.set_item("sequence", o.sequence)?;
+    d.set_item("mode", o.mode.as_str())?;
+    Ok(d.into())
+}
+
+fn report_to_py(py: Python<'_>, r: &crate::engine::OrderReport) -> PyResult<PyObject> {
+    let d = PyDict::new_bound(py);
+    d.set_item("order_id", &r.order_id)?;
+    d.set_item("agent", &r.agent)?;
+    d.set_item("ticker", &r.ticker)?;
+    d.set_item("side", side_str(r.side))?;
+    d.set_item("requested", r.requested)?;
+    d.set_item("filled", r.filled)?;
+    d.set_item("average_price", r.average_price)?;
+    d.set_item("worst_price", r.worst_price)?;
+    d.set_item("reference", r.reference)?;
+    d.set_item("resting", r.resting)?;
+    d.set_item("unfilled", r.unfilled)?;
+    d.set_item("mode", r.mode.map(|m| m.as_str()))?;
+    let fills: PyResult<Vec<PyObject>> = r.fills.iter().map(|f| fill_to_py(py, f)).collect();
+    d.set_item("fills", fills?)?;
+    Ok(d.into())
+}
+
+/// The snapshot's `book` entry. See `Engine::state_hash`, which hashes the
+/// same fields in the same order.
+fn book_to_py(py: Python<'_>, book: &crate::agent_book::BookState) -> PyResult<Py<PyDict>> {
+    let d = PyDict::new_bound(py);
+    d.set_item("sequence", book.sequence)?;
+    d.set_item("fill_sequence", book.fill_sequence)?;
+    let flat: Vec<f64> = book.taken.iter().flat_map(|row| row.iter().copied()).collect();
+    d.set_item("taken", f64_bytes(py, &flat))?;
+    let orders: PyResult<Vec<PyObject>> = book.orders.iter().map(|o| order_to_py(py, o)).collect();
+    d.set_item("orders", orders?)?;
+    let flow = pyo3::types::PyList::empty_bound(py);
+    for (agent, ticker, bought, sold) in &book.flow {
+        flow.append((agent.as_str(), ticker.as_str(), *bought, *sold))?;
+    }
+    d.set_item("flow", flow)?;
+    let fills: PyResult<Vec<PyObject>> = book.fills.iter().map(|f| fill_to_py(py, f)).collect();
+    d.set_item("fills", fills?)?;
+    let impacts = pyo3::types::PyList::empty_bound(py);
+    for r in &book.impacts {
+        let x = PyDict::new_bound(py);
+        x.set_item("agent", &r.agent)?;
+        x.set_item("ticker", &r.ticker)?;
+        x.set_item("bought", r.bought)?;
+        x.set_item("sold", r.sold)?;
+        x.set_item("permanent", r.permanent)?;
+        x.set_item("day", r.day)?;
+        x.set_item("tick", r.tick)?;
+        impacts.append(x)?;
+    }
+    d.set_item("impacts", impacts)?;
+    Ok(d.into())
+}
+
+fn book_from_py(d: &Bound<'_, PyDict>) -> PyResult<crate::agent_book::BookState> {
+    use crate::agent_book::*;
+    let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+        d.get_item(k)?
+            .ok_or_else(|| ValidationError::new_err(format!("the snapshot's book has no {k:?}")))
+    };
+    let mut state = BookState {
+        sequence: get("sequence")?.extract()?,
+        fill_sequence: get("fill_sequence")?.extract()?,
+        ..Default::default()
+    };
+    let raw: Vec<u8> = get("taken")?.extract()?;
+    if raw.len() % (8 * TAKEN_WIDTH) != 0 {
+        return Err(ValidationError::new_err("the snapshot's book `taken` is not whole rows"));
+    }
+    for row in raw.chunks(8 * TAKEN_WIDTH) {
+        let mut r = [0.0; TAKEN_WIDTH];
+        for (k, bytes) in row.chunks(8).enumerate() {
+            let mut b = [0u8; 8];
+            b.copy_from_slice(bytes);
+            r[k] = f64::from_le_bytes(b);
+        }
+        state.taken.push(r);
+    }
+    for item in get("orders")?.iter()? {
+        let o = item?;
+        let o = o.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            o.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot order has no {k:?}")))
+        };
+        let side: String = g("side")?.extract()?;
+        let mode: String = g("mode")?.extract()?;
+        state.orders.push(AgentOrder {
+            id: g("order_id")?.extract()?,
+            agent: g("agent")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            side: parse_side_str(&side)?,
+            limit: g("limit_price")?.extract()?,
+            quantity: g("quantity")?.extract()?,
+            remaining: g("remaining")?.extract()?,
+            sequence: g("sequence")?.extract()?,
+            mode: RestMode::parse(&mode)
+                .ok_or_else(|| ValidationError::new_err(format!("unknown order mode {mode:?}")))?,
+        });
+    }
+    for item in get("flow")?.iter()? {
+        let (agent, ticker, bought, sold): (String, String, f64, f64) = item?.extract()?;
+        state.flow.push((agent, ticker, bought, sold));
+    }
+    for item in get("fills")?.iter()? {
+        let f = item?;
+        let f = f.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            f.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot fill has no {k:?}")))
+        };
+        let side: String = g("side")?.extract()?;
+        let liquidity: String = g("liquidity")?.extract()?;
+        state.fills.push(AgentFill {
+            agent: g("agent")?.extract()?,
+            order_id: g("order_id")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            side: parse_side_str(&side)?,
+            quantity: g("quantity")?.extract()?,
+            price: g("price")?.extract()?,
+            liquidity: Liquidity::parse(&liquidity).ok_or_else(|| {
+                ValidationError::new_err(format!("unknown liquidity {liquidity:?}"))
+            })?,
+            counterparty: g("counterparty")?.extract()?,
+            reference: g("reference")?.extract()?,
+            day: g("day")?.extract()?,
+            tick: g("tick")?.extract()?,
+            sequence: g("sequence")?.extract()?,
+        });
+    }
+    for item in get("impacts")?.iter()? {
+        let r = item?;
+        let r = r.downcast::<PyDict>()?;
+        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+            r.get_item(k)?
+                .ok_or_else(|| ValidationError::new_err(format!("a snapshot impact has no {k:?}")))
+        };
+        state.impacts.push(AgentImpact {
+            agent: g("agent")?.extract()?,
+            ticker: g("ticker")?.extract()?,
+            bought: g("bought")?.extract()?,
+            sold: g("sold")?.extract()?,
+            permanent: g("permanent")?.extract()?,
+            day: g("day")?.extract()?,
+            tick: g("tick")?.extract()?,
+        });
+    }
+    Ok(state)
+}
+
 #[pymethods]
 impl PyEngine {
     /// Build an engine over a universe.
     ///
     /// `seed` is required, never defaulted. A simulator that seeds itself from
     /// the clock when you forget produces a run nobody can reproduce, and the
-    /// failure is invisible until someone tries.
+    /// failure is invisible until someone tries. It is any integer from 0 to
+    /// `2**64 - 1`; every seed below `2**32` is the market it was when seeds
+    /// were 32-bit, and `rust/src/rng.rs` states how a wider one is derived.
     ///
     /// `model` selects the coefficient set: a shipped preset's name
     /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
     /// deliberately ceremonial, because the fingerprint means an overridden run
     /// can never silently masquerade as the benchmark model (API §3).
+    ///
+    /// Keyword arguments only. `*args` is taken so that `Engine(7, universe)`
+    /// is refused in words that show the call, rather than as pyo3's
+    /// "takes 0 positional arguments but 2 were given". `seed` and
+    /// `universe` then need defaults, and [`crate::python::Given`] keeps
+    /// "left out" (a `TypeError` that shows the call) apart from a value
+    /// that is wrong, `None` included (a `ValidationError` naming it).
     #[new]
-    #[pyo3(signature = (*, seed, universe, macro_state = None, model = None))]
+    #[pyo3(
+        signature = (
+            *args,
+            seed = crate::python::Given::Missing,
+            universe = crate::python::Given::Missing,
+            macro_state = None,
+            model = None
+        ),
+        text_signature = "(*, seed, universe, macro_state=None, model=None)"
+    )]
     fn new(
-        seed: u32,
-        universe: Vec<PyInstrument>,
+        args: &Bound<'_, pyo3::types::PyTuple>,
+        seed: crate::python::Given<'_>,
+        universe: crate::python::Given<'_>,
         macro_state: Option<PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        if !args.is_empty() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Engine takes keyword arguments: Engine(seed=7, universe=universe). \
+                 It was given {} positional argument{}.",
+                args.len(),
+                if args.len() == 1 { "" } else { "s" }
+            )));
+        }
+        let seed = match seed {
+            crate::python::Given::Value(value) => {
+                crate::python::Seed(crate::python::seed_from(&value, "seed")?)
+            }
+            crate::python::Given::Missing => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Engine needs a seed: Engine(seed=7, universe=universe). There is \
+                     no default, because a run seeded from the clock cannot be \
+                     reproduced.",
+                ))
+            }
+        };
+        let universe = match universe {
+            crate::python::Given::Value(value) => universe_from(&value)?,
+            crate::python::Given::Missing => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Engine needs a universe: Engine(seed=7, \
+                     universe=tf.Universe.random(40, seed=1)).",
+                ))
+            }
+        };
         if universe.is_empty() {
             return Err(ValidationError::new_err(
                 "universe is empty - an engine with no instruments has nothing to simulate",
@@ -1143,16 +1968,17 @@ impl PyEngine {
         // macro and the default one look the same.
         let settle_opening = macro_state.is_none();
         let economy = economy_from(macro_state)?;
-        let companies: Vec<TickCompany> = universe
+        let (equities, rates) = split_roster(&universe)?;
+        let companies: Vec<TickCompany> = equities
             .iter()
             .enumerate()
             .map(|(i, inst)| inst.to_core(i))
             .collect();
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
-        Ok(Self {
+        let mut engine = Self {
             inner: Engine::with_params_from_opening(
-                seed,
+                seed.0,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
@@ -1163,7 +1989,9 @@ impl PyEngine {
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),
+            pending_fair_value: Vec::new(),
             day_buffer: DayBuffer::default(),
+            session_volume_base: Vec::new(),
             market_open: false,
             day_count: 0,
             tickers,
@@ -1172,15 +2000,55 @@ impl PyEngine {
             recorded_book: Vec::new(),
             log: Vec::new(),
             explanations: Explanations::default(),
-        })
+            session_clock: None,
+            copies: CopyCount::default(),
+            restored_at: 0,
+        };
+        // After construction, so a settled opening has run its burn-in and
+        // the indices are marked at the curve the run actually starts from.
+        if !rates.is_empty() {
+            engine
+                .inner
+                .set_rate_instruments(rates.iter().map(|i| i.to_rate()).collect());
+        }
+        Ok(engine)
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
     ///
-    /// Numbers the day from the engine's own counter. `run_days` numbers it
-    /// from `first_day` instead, through [`Self::open_market_on`].
-    fn open_market(&mut self) {
-        self.open_market_on(i64::from(self.day_count));
+    /// Numbers the day from the engine's own counter, or `day` when given,
+    /// the way `run_days(first_day=...)` does. The number is a LABEL: the
+    /// draw log, the day marks and the book's fill stamps carry it, and
+    /// nothing that prices reads it. The valuation counts the days this
+    /// engine has run, so a label cannot reprice the market. A label that
+    /// is not the counter's goes into the order log, and a replay opens the
+    /// day under it.
+    ///
+    /// Refused while a day is open. Until 0.8.5 a second call reopened the
+    /// day: it cleared the day's tape, logged a second open and changed the
+    /// state hash, so the run no longer matched one that closed first, and
+    /// nothing said so. Close the day with `close_market()` first. A day
+    /// closed by `run_session(close_at_end=True)` is closed, and opening the
+    /// next one after it works as it always did.
+    #[pyo3(signature = (*, day = None))]
+    fn open_market(&mut self, day: Option<i64>) -> PyResult<()> {
+        if self.day_is_open() {
+            return Err(ValidationError::new_err(self.open_day_refusal(
+                "Call close_market() to end it before opening the next day.",
+            )));
+        }
+        let day = match day {
+            None => i64::from(self.day_count),
+            Some(d) if d < 0 => {
+                return Err(ValidationError::new_err(format!(
+                    "day must be 0 or more, got {d}. It numbers the day for the \
+                     draw log and the fills, and days count from 0."
+                )))
+            }
+            Some(d) => d,
+        };
+        self.open_market_on(day);
+        Ok(())
     }
 
     /// Advance one game-minute.
@@ -1202,21 +2070,7 @@ impl PyEngine {
         news_impacts: Option<Vec<PyNewsImpact>>,
         order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<PyTickResult> {
-        if !(0..24).contains(&hour) || !(0..60).contains(&minute) {
-            return Err(ValidationError::new_err(format!(
-                "invalid time {hour:02}:{minute:02}"
-            )));
-        }
-        if !(0..7).contains(&day_of_week) {
-            return Err(ValidationError::new_err(format!(
-                "day_of_week must be 0 (Sunday) to 6 (Saturday), got {day_of_week}"
-            )));
-        }
-        if !volatility.is_finite() || volatility < 0.0 {
-            return Err(ValidationError::new_err(format!(
-                "volatility must be finite and not negative, got {volatility}"
-            )));
-        }
+        check_clock(hour, minute, day_of_week, volatility)?;
         let news = self.build_news(news)?;
         let impacts = self.build_impacts(news_impacts)?;
         let flow = self.build_flow(order_flow)?;
@@ -1267,9 +2121,54 @@ impl PyEngine {
     /// the same name.
     ///
     /// Returns the number of ticks written.
+    ///
+    /// # Two kinds of order flow, and which one an agent's trades are
+    ///
+    /// `fills` is what a trader filled at the step boundary just before this
+    /// session, `{ticker: (bought, sold)}` in shares, which is what
+    /// `Portfolio.pending_flow()` returns. It reaches the market ONCE, on the
+    /// session's first tick, whatever `ticks` is. That is the argument an
+    /// agent loop wants.
+    ///
+    /// `flow_per_tick` is a standing rate instead: that many shares bought
+    /// and sold on EVERY tick of the session, a program that trades all
+    /// session long. `tf.flow_impact` uses it. Handing an agent's fills to
+    /// it counts one order once a minute for the whole step.
+    ///
+    /// `order_flow` is refused here since 0.8.5, because it was the second
+    /// kind under a name that read as the first: every harness in the
+    /// package passed an agent's fills through it, so one order was counted
+    /// on each of a step's 65 ticks and landed after the fill it came from.
+    /// `tick(order_flow=...)` is unchanged, since a tick is one minute.
+    ///
+    /// # Advance the clock between sessions of one day
+    ///
+    /// `hour` and `minute` are where the session starts, and each tick is
+    /// one minute after the last. The time of day sets the intraday activity
+    /// profile, so a day split into several sessions has to start each one
+    /// where the previous one ended. Passing 9:30 to every session replays
+    /// the opening minutes each time. Measured on 40 names with the day split
+    /// into 78 sessions of 5 ticks, one name returned -25.0% for the day
+    /// where `run_days(1)` gave it +0.6%, and the largest gap in log price
+    /// was 0.29. With the clock advanced, the stepped day's prices match
+    /// `run_days(1)` to the bit.
+    ///
+    /// `tradefloor.harness.session_clock(start, step, ticks_per_step)`
+    /// returns each step's start. By hand, pass `(9 + m // 60, m % 60)` with
+    /// `m = 30 + ticks already run today`.
+    ///
+    /// A session that starts before the day's previous session ended raises
+    /// a `RuntimeWarning` and then runs as asked. The warning writes nothing
+    /// to the log and changes no state. It never fires on a day's first
+    /// session, on a clock that moves forward, or on a day that runs past
+    /// midnight and wraps to 00:00 as `session_clock` does. A change of
+    /// `day_of_week` starts the comparison again. Only `run_session` calls
+    /// are compared, so `tick` and `run_until` neither warn nor move the
+    /// clock it compares against.
     #[pyo3(signature = (
         hour, minute, day_of_week, ticks, *, volatility = 1.0,
-        close_at_end = false, news = None, news_impacts = None, order_flow = None
+        close_at_end = false, news = None, news_impacts = None, fills = None,
+        flow_per_tick = None, order_flow = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn run_session(
@@ -1287,14 +2186,62 @@ impl PyEngine {
         // mean a one-off news item belongs in `tick`, not here.
         news: Option<Vec<PyNews>>,
         news_impacts: Option<Vec<PyNewsImpact>>,
+        fills: Option<std::collections::HashMap<String, (f64, f64)>>,
+        flow_per_tick: Option<std::collections::HashMap<String, (f64, f64)>>,
         order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<usize> {
+        if order_flow.is_some() {
+            // Refused rather than kept under its old meaning, so a caller
+            // still passing `order_flow=portfolio.pending_flow()` is told
+            // rather than left counting one order on every tick. Before any
+            // other check and before anything is logged, so a refused call
+            // leaves no trace.
+            return Err(ValidationError::new_err(
+                "run_session no longer takes order_flow (0.8.5). It held the \
+                 flow on every tick of the session, so an agent's fills passed \
+                 through it were counted once a minute for the whole step. Pass \
+                 an agent's trades as fills=portfolio.pending_flow(), which \
+                 reaches the market once, on the session's first tick. Pass \
+                 flow_per_tick= for a standing rate of shares a minute held for \
+                 the whole session, which is what order_flow= did.",
+            ));
+        }
         if ticks == 0 {
             return Err(ValidationError::new_err("ticks must be greater than zero"));
         }
+        // The checks `tick` makes, except that the minute may carry. Without
+        // them a session started at 99:999 on day 9 with NaN volatility ran
+        // and was logged, and a replay of a log someone sent could carry any
+        // of those.
+        check_session_start(hour, minute, day_of_week, volatility)?;
         let session_news = self.build_news(news)?;
         let session_impacts = self.build_impacts(news_impacts)?;
-        let session_flow = self.build_flow(order_flow)?;
+        let session_flow = self.build_flow(flow_per_tick)?;
+        let session_fills = self.build_flow(fills)?;
+        // A session that starts before the day's previous one ended replays
+        // minutes the day has already run. Warned rather than refused, since
+        // a caller may mean it. After every check that can refuse the call
+        // and before anything is opened or logged, so a warning filter set
+        // to "error" leaves the engine exactly as it was.
+        let start = hour
+            .wrapping_mul(60)
+            .wrapping_add(minute)
+            .rem_euclid(MINUTES_PER_DAY);
+        let placed = match self.session_clock {
+            Some(clock) if self.market_open && clock.day_of_week == day_of_week => {
+                let placed = clock.place(start);
+                if placed < clock.end {
+                    PyErr::warn_bound(
+                        py,
+                        &py.get_type_bound::<pyo3::exceptions::PyRuntimeWarning>(),
+                        &repeated_clock_warning(start, clock.end),
+                        1,
+                    )?;
+                }
+                placed
+            }
+            _ => start,
+        };
         // Open the day here if the caller has not, and exactly once however
         // many sessions the day is made of. Letting `run_session` re-open made
         // attribution and the daily anchor per-STEP; see
@@ -1306,7 +2253,7 @@ impl PyEngine {
         // replayed to different prices, because replaying it opened the market
         // in the middle of the day instead of at the start.
         if !self.market_open {
-            self.open_market();
+            self.open_market_on(i64::from(self.day_count));
         }
         self.log.push(crate::python_log::LogEntry::RunSession {
             hour,
@@ -1326,6 +2273,10 @@ impl PyEngine {
                 })
                 .collect(),
             flow: session_flow
+                .iter()
+                .map(|(t, v)| (t.clone(), v.buy, v.sell))
+                .collect(),
+            fills: session_fills
                 .iter()
                 .map(|(t, v)| (t.clone(), v.buy, v.sell))
                 .collect(),
@@ -1359,6 +2310,7 @@ impl PyEngine {
         // converted to Rust types above, and the engine and buffer are plain
         // data. That is the precondition for releasing it, not an optimisation
         // note.
+        let volume_base = self.all_column(PriceField::Volume);
         let inner = &mut self.inner;
         let buffer = &mut self.buffer;
         py.allow_threads(move || {
@@ -1374,6 +2326,7 @@ impl PyEngine {
                     news: &session_news,
                     news_impact_queue: &session_impacts,
                     order_volumes: &session_flow,
+                    fills: &session_fills,
                     close_at_end,
                     reopen: false,
                     daily_innovations: &innovations,
@@ -1383,7 +2336,7 @@ impl PyEngine {
                 buffer,
             )
         });
-        self.accumulate_session();
+        self.accumulate_session(volume_base);
         if close_at_end {
             // The core ran the close bookkeeping; the daily macro step
             // belongs to the same boundary. Without this the two spellings
@@ -1407,6 +2360,16 @@ impl PyEngine {
             // hashed apart, which is how this surfaced.
             self.record_day_jump();
         }
+        // Where the next session of this day should start. A close ends the
+        // day, and the session after it is the next day's first.
+        self.session_clock = if close_at_end {
+            None
+        } else {
+            Some(SessionClock {
+                day_of_week,
+                end: placed.saturating_add(i64::try_from(ticks).unwrap_or(i64::MAX)),
+            })
+        };
         Ok(self.buffer.ticks_written)
     }
 
@@ -1429,6 +2392,10 @@ impl PyEngine {
     /// 252 days holds 252 leaves and the caller usually wants them beside a
     /// `RunManifest` rather than in a list this method built.
     ///
+    /// `first_day` numbers the days for the record, the draw log and the
+    /// fills, and defaults to the engine's own counter. It is a label and
+    /// prices nothing: the valuation counts the days the engine has run.
+    ///
     /// Returns the number of days run.
     #[pyo3(signature = (
         days, *, hour = 9, minute = 30, day_of_week = 3,
@@ -1439,30 +2406,57 @@ impl PyEngine {
     fn run_days(
         &mut self,
         py: Python<'_>,
-        days: usize,
+        days: i64,
         hour: i64,
         minute: i64,
         day_of_week: i64,
-        ticks_per_day: usize,
+        ticks_per_day: i64,
         volatility: f64,
         record: bool,
         first_day: Option<u32>,
         ledger: Option<Py<PyAny>>,
     ) -> PyResult<usize> {
-        if days == 0 {
-            return Err(ValidationError::new_err("days must be greater than zero"));
+        // Signed, so a negative count is refused in these words rather than
+        // as pyo3's "can't convert negative int to unsigned".
+        if days < 1 {
+            return Err(ValidationError::new_err(format!(
+                "run_days: days must be 1 or more, got {days}"
+            )));
         }
-        if ticks_per_day == 0 {
-            return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
+        if ticks_per_day < 1 {
+            return Err(ValidationError::new_err(format!(
+                "ticks_per_day must be 1 or more, got {ticks_per_day}"
+            )));
         }
+        let days = days as usize;
+        let ticks_per_day = ticks_per_day as usize;
+        // Whole days from a closed market. On an open one each day below
+        // would open again, and until 0.8.5 that reopened the open day: its
+        // tape was cleared, a second open was logged and the run no longer
+        // matched one that closed first.
+        if self.day_is_open() {
+            return Err(ValidationError::new_err(self.open_day_refusal(
+                "run_days runs whole days. Finish this one with run_session(...) \
+                 and close_market(), or call close_market() now, then run_days().",
+            )));
+        }
+        // Before the first day opens, so a bad clock opens nothing.
+        check_session_start(hour, minute, day_of_week, volatility)?;
         // Defaults to the engine's own counter, not to zero. Numbering from
         // zero on every call gave a second run the day numbers of the first:
         // two `run_days(2)` calls on one engine put four simulated days on
         // two numbers, so `draw_log("jumps", 0, 0)` returned two days of
         // draws and `day_marks()` read 0, 1, 0, 1. The counter is what the
         // record and the day marks already advanced on, so following it is
-        // what makes the second call continue the first. A caller that
-        // wants to restart the numbering passes `first_day=0`.
+        // what makes the second call continue the first.
+        //
+        // Another `first_day` renumbers the days and nothing else. It is a
+        // label for the record, the draw log and the fills: the valuation
+        // counts the days this engine has run, so `first_day=1000` prices
+        // the market exactly as the default does, and the order log keeps
+        // the label so a replay numbers the days the same way. Until 0.8.5
+        // the label was the valuation's clock as well, and `first_day=1000`
+        // moved prices by 0.17 in log within thirty days on pt-v20.
         let first_day = first_day.unwrap_or(self.day_count);
         // Asked once rather than per day: whether the ledger wants the
         // predecessor states decides how much a later verification costs, and
@@ -1478,7 +2472,7 @@ impl PyEngine {
             // it, for the reason `open_market_on` gives.
             self.open_market_on((first_day + offset as u32) as i64);
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
-                             false, None, None, None)?;
+                             false, None, None, None, None, None)?;
             // Record BEFORE the close: the close advances the macro chain
             // into the next day, and the macro row for day N must carry the
             // values day N actually traded under, not the ones day N+1 will.
@@ -1492,7 +2486,7 @@ impl PyEngine {
             if let Some(l) = &ledger {
                 let leaf = self.state_hash();
                 let snapshot = if keeps_snapshots {
-                    Some(self.state_snapshot(py)?)
+                    Some(self.snapshot_uncounted(py)?)
                 } else {
                     None
                 };
@@ -1558,6 +2552,7 @@ impl PyEngine {
         if max_ticks == 0 {
             return Err(ValidationError::new_err("max_ticks must be greater than zero"));
         }
+        check_session_start(hour, minute, day_of_week, volatility)?;
         let company = self
             .tickers
             .iter()
@@ -1567,6 +2562,18 @@ impl PyEngine {
                     "no instrument with ticker {ticker:?} in this universe"
                 ))
             })?;
+        // The stop reads an equity's print inside the tick loop. A rate
+        // index moves only when a yield is written, which no session does,
+        // so a band on one could never fire; refused rather than run to
+        // `max_ticks` in silence.
+        if company >= self.inner.len() {
+            return Err(ValidationError::new_err(format!(
+                "{ticker} is a rate index, and run_until stops on an equity's \
+                 print. An index level moves only when a yield is written, \
+                 between sessions or by pin_macro, so a band on it cannot fire \
+                 inside one."
+            )));
+        }
 
         let n = self.inner.len();
         let innovations: Vec<Option<f64>> = vec![None; n];
@@ -1582,8 +2589,9 @@ impl PyEngine {
             .collect();
 
         if !self.market_open {
-            self.open_market();
+            self.open_market_on(i64::from(self.day_count));
         }
+        let volume_base = self.all_column(PriceField::Volume);
         let outcome = self.inner.run_session(
             &SessionRequest {
                 start: GameTime { hour, minute, day_of_week },
@@ -1592,6 +2600,7 @@ impl PyEngine {
                 news: &[],
                 news_impact_queue: &[],
                 order_volumes: &[],
+                fills: &[],
                 close_at_end: false,
                 reopen: false,
                 daily_innovations: &innovations,
@@ -1604,7 +2613,7 @@ impl PyEngine {
             },
             &mut self.buffer,
         );
-        self.accumulate_session();
+        self.accumulate_session(volume_base);
         Ok(outcome.halted_at)
     }
 
@@ -1649,6 +2658,7 @@ impl PyEngine {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
         // The day is over, so the next session opens a new one.
         self.market_open = false;
+        self.session_clock = None;
         // The settle-and-advance is `Engine::close_day` in the core, so the
         // WebAssembly binding runs the same day loop rather than a second
         // implementation of it. This surface keeps only the day COUNTER,
@@ -1663,14 +2673,19 @@ impl PyEngine {
     /// Read it with `numpy.frombuffer(buf, dtype="<f8")`, which adopts the
     /// bytes without copying. Values are in roster order, which is
     /// contractual -- see `tickers`.
+    ///
+    /// Rate instruments come after the equities, as in `tickers`. A field that
+    /// does not exist for an index reads NaN there (`garch_variance`, `beta`,
+    /// `last_daily_return`, `previous_tick_price`); the mispricing fields read
+    /// zero, because an index level is its own fair value.
     fn column(&self, py: Python<'_>, field: &str) -> PyResult<Py<PyBytes>> {
         let f = parse_field(field)?;
-        Ok(f64_bytes(py, &self.inner.column(f)))
+        Ok(f64_bytes(py, &self.all_column(f)))
     }
 
     /// Current price per instrument, as little-endian f64 bytes.
     fn prices(&self, py: Python<'_>) -> Py<PyBytes> {
-        f64_bytes(py, &self.inner.prices())
+        f64_bytes(py, &self.all_column(PriceField::Price))
     }
 
     /// The last session's price path: `ticks_written x instruments`, row-major.
@@ -1687,6 +2702,10 @@ impl PyEngine {
     }
 
     /// The last session's volume path, same shape as `session_prices`.
+    ///
+    /// Each value is the instrument's running total since the open after
+    /// that tick, as the engine counts it. `bars()` reports each bar's own
+    /// volume instead, the difference of these totals.
     fn session_volumes(&self, py: Python<'_>) -> Py<PyBytes> {
         f64_bytes(py, self.written(&self.buffer.volumes))
     }
@@ -1716,7 +2735,27 @@ impl PyEngine {
     /// What IS guaranteed is reproducibility: the generator carries across the
     /// change, so one seed plus the same edits at the same ticks reproduces
     /// the same market exactly. Replay works; invariance was never available.
-    fn list_instrument(&mut self, instrument: PyInstrument) -> usize {
+    ///
+    /// Equities only. A rate index is part of the universe an engine is built
+    /// with, and listing one mid-run is refused.
+    fn list_instrument(&mut self, instrument: PyInstrument) -> PyResult<usize> {
+        if instrument.is_rate() {
+            return Err(ValidationError::new_err(format!(
+                "{} is a rate index; rate instruments are fixed when the engine \
+                 is built. Include it in the universe instead.",
+                instrument.ticker
+            )));
+        }
+        // Refused before it is logged, like every other refusal here.
+        if let Some(first) = self.tickers.iter().position(|t| *t == instrument.ticker) {
+            return Err(ValidationError::new_err(format!(
+                "ticker {:?} is already listed, at position {first}. Each ticker \
+                 must be unique: orders and books find a name by its ticker, so a \
+                 second one could never be traded. Delist the first one, or give \
+                 the new name another ticker.",
+                instrument.ticker
+            )));
+        }
         self.log.push(crate::python_log::LogEntry::ListInstrument {
             ticker: instrument.ticker.clone(),
             sector: instrument.sector.clone(),
@@ -1731,8 +2770,11 @@ impl PyEngine {
         });
         let index = self.inner.len();
         let core = instrument.to_core(index);
-        self.tickers.push(instrument.ticker.clone());
-        self.inner.add_company(core)
+        // Inserted after the last equity, ahead of any rate instruments,
+        // which is where the engine puts it. Without rate instruments that is
+        // the end of the list, as it always was.
+        self.tickers.insert(index, instrument.ticker.clone());
+        Ok(self.inner.add_company(core))
     }
 
     /// Delist the instrument at `index`, returning its ticker.
@@ -1740,6 +2782,13 @@ impl PyEngine {
     /// The tail keeps its relative order and shifts down by one, so any index
     /// a caller is holding past this point is stale. Re-read `tickers`.
     fn delist(&mut self, index: usize) -> PyResult<String> {
+        if index >= self.inner.len() && index < self.inner.instrument_count() {
+            return Err(ValidationError::new_err(format!(
+                "index {index} is the rate index {}; rate instruments are fixed \
+                 when the engine is built and cannot be delisted.",
+                self.tickers[index]
+            )));
+        }
         match self.inner.remove_company(index) {
             Some(c) => {
                 self.tickers.remove(index);
@@ -1787,7 +2836,7 @@ impl PyEngine {
     /// model can never present as a standard one.
     #[getter]
     fn model_fingerprint(&self) -> String {
-        self.inner.params().fingerprint()
+        self.inner.model_fingerprint().to_string()
     }
 
     /// The VIX at which this engine's variance couplings read ONE.
@@ -1935,16 +2984,18 @@ impl PyEngine {
     /// replace, and the result is the value for each. Nothing on any
     /// engine is read or moved; the root seed is an argument because the
     /// derivation is a function of it, the stream and the surgery seed,
-    /// and of nothing else.
+    /// and of nothing else. Both seeds are any integer from 0 to
+    /// `2**64 - 1`.
     #[staticmethod]
     fn surgery_draws(
-        seed: u32,
+        seed: crate::python::Seed,
         stream: &str,
-        surgery_seed: u32,
+        surgery_seed: &Bound<'_, PyAny>,
         kinds: Vec<String>,
     ) -> PyResult<Vec<f64>> {
+        let surgery_seed = crate::python::seed_from(surgery_seed, "surgery_seed")?;
         let id = stream_id(stream)?;
-        let mut rng = crate::rng::GameRng::surgery(seed, id, surgery_seed);
+        let mut rng = crate::rng::GameRng::surgery(seed.0, id, surgery_seed);
         let mut out = Vec::with_capacity(kinds.len());
         for kind in &kinds {
             out.push(match draw_kind(kind)? {
@@ -1969,22 +3020,34 @@ impl PyEngine {
     }
 
     /// The day the draws taken from now on carry in the draw log and the
-    /// day marks. `open_market` stamps the engine's own day counter and
-    /// `run_days` stamps `first_day`, each at the open it labels, so this is
-    /// for a caller that drives the core between an open and a close and
-    /// wants the draws numbered its own way, or an embedder taking draws
-    /// through `draw_uniform` on a closed market.
+    /// day marks, and the day the book stamps fills with. `open_market`
+    /// stamps the engine's own day counter and `run_days` stamps
+    /// `first_day`, each at the open it labels, so this is for a caller that
+    /// drives the core between an open and a close and wants the draws
+    /// numbered its own way, or an embedder taking draws through
+    /// `draw_uniform` on a closed market.
     ///
     /// Stamped between an open and the close that follows it, this moves the
     /// number the rest of that day's draws carry and leaves the day mark on
     /// the number the open stamped.
     ///
-    /// It moves the VALUATION too, under a preset that sets
-    /// `buyback_payout_share`, because the buyback factor reads this number
-    /// as its elapsed time. So a stamp taken to label draws reprices every
-    /// name from the next tick. Nothing in this repository calls it.
-    fn set_day(&mut self, day: i64) {
-        self.inner.set_current_day(day);
+    /// A label only. The valuation counts the days the engine has run, so
+    /// this moves no price. Until 0.8.5 it was the buyback factor's elapsed
+    /// time as well, and `set_day(5000)` mid-day moved the next session's
+    /// prices by 0.21 in log with the state hash unchanged. The call goes
+    /// into the order log, and a label off the counter's goes into the
+    /// snapshot and the state hash, so a replay and a restore stamp the
+    /// fills that follow as this engine does. A negative day is refused.
+    fn set_day(&mut self, day: i64) -> PyResult<()> {
+        if day < 0 {
+            return Err(ValidationError::new_err(format!(
+                "day must be 0 or more, got {day}. It numbers the draws and the \
+                 fills, and days count from 0."
+            )));
+        }
+        self.log.push(crate::python_log::LogEntry::SetDay { day });
+        self.inner.set_day_label(day);
+        Ok(())
     }
 
     /// `(uniforms, normals)` taken so far on each stream, keyed by stream
@@ -2000,10 +3063,30 @@ impl PyEngine {
     /// Install substitutions: `(stream, kind, index, value)` tuples, the
     /// stream and kind by name. The generators still advance at every
     /// address; only the value the consumer receives changes.
+    ///
+    /// A normal must be finite and a uniform must lie in `[0, 1]`, 1.0
+    /// being the value that stops an event from firing. Every patch is
+    /// checked before any is installed, so a refused list installs nothing.
+    /// An infinite normal made every price NaN before this was checked.
     fn patch_draws(&mut self, patches: Vec<(String, String, u64, f64)>) -> PyResult<()> {
+        let mut checked = Vec::with_capacity(patches.len());
         for (stream, kind, index, value) in patches {
             let id = stream_id(&stream)?;
             let kind = draw_kind(&kind)?;
+            let ok = match kind {
+                crate::rng::DrawKind::Uniform => (0.0..=1.0).contains(&value),
+                crate::rng::DrawKind::Normal => value.is_finite(),
+            };
+            if !ok {
+                return Err(ValidationError::new_err(format!(
+                    "the patch at {stream} {} {index} is {value}. A normal must be \
+                     finite and a uniform must lie in [0, 1]; nothing was installed.",
+                    kind.name()
+                )));
+            }
+            checked.push((id, kind, index, value));
+        }
+        for (id, kind, index, value) in checked {
             self.inner.patch_draw(id, kind, index, value);
         }
         Ok(())
@@ -2032,7 +3115,7 @@ impl PyEngine {
     /// `((stream, kind, index), value, day, site, tag)` tuples in the order
     /// they were taken.
     fn draw_log(&self, stream: String, from_day: i64, to_day: i64)
-        -> PyResult<Vec<((String, String, u64), f64, i64, String, u32)>> {
+        -> PyResult<Vec<DrawLogRow>> {
         let id = stream_id(&stream)?;
         Ok(self
             .inner
@@ -2191,6 +3274,14 @@ impl PyEngine {
     /// for rather than handed a tree with no leaves.
     fn explain(slf: &Bound<'_, Self>, ticker: &str, day: i64) -> PyResult<PyObject> {
         let py = slf.py();
+        if slf.borrow().inner.rates().index_of(ticker).is_some() {
+            return Err(ValidationError::new_err(format!(
+                "{ticker} is a rate index, and explain walks the equity factor \
+                 model, which never runs on one. Its move is the repricing formula: \
+                 read rate_attribution(\"carry\" | \"duration\" | \"convexity\" | \
+                 \"flow\")."
+            )));
+        }
         let (sector, window, kept, opened, inputs, before, ops) = {
             let me = slf.borrow();
             let window = me.explanations.window;
@@ -2249,11 +3340,11 @@ impl PyEngine {
 
     #[getter]
     fn len(&self) -> usize {
-        self.inner.len()
+        self.inner.instrument_count()
     }
 
     fn __len__(&self) -> usize {
-        self.inner.len()
+        self.inner.instrument_count()
     }
 
     /// Take one uniform from the engine's EXTERNAL stream.
@@ -2279,6 +3370,11 @@ impl PyEngine {
     /// Rates come back FRACTIONAL, matching what the constructor takes, so a
     /// value read here can be written straight back without a conversion --
     /// which is the whole point of having one denomination at the boundary.
+    ///
+    /// `cycle` is the phase as PUBLISHED: under `cycle_publication_lag`, the
+    /// phase of that many sessions before, so a turn reaches it when it is
+    /// announced. `state_snapshot()["economy"]["cycle_phase"]` is the true
+    /// phase.
     #[getter]
     fn macro_state(&self) -> PyMacro {
         let e = self.inner.economy();
@@ -2290,11 +3386,20 @@ impl PyEngine {
             qe_pe_boost: e.qe_pe_boost,
             qe_assets_ratio: e.qe_assets_ratio,
             fear_greed_index: e.fear_greed_index,
-            cycle: cycle_name(e.cycle_phase).to_string(),
+            // The phase as PUBLISHED: under `cycle_publication_lag` the
+            // phase of that many sessions before, so this `Macro` written
+            // back into a constructor opens where an observer believed the
+            // economy was. `state_snapshot()["economy"]["cycle_phase"]` is
+            // the true phase, for a restore and for an oracle.
+            cycle: cycle_name(self.inner.published_cycle_phase()).to_string(),
         }
     }
 
-    /// Pin one or more macro series to given values.
+    /// Write today's value of one or more macro series. The model moves each
+    /// from the next close, so this is a one-day write rather than a hold:
+    /// a VIX written at 45 drifts back toward the chain's own level over the
+    /// sessions that follow. `tradefloor.Scenario.hold` writes a value every
+    /// day, which is what holding one means.
     ///
     /// # A scenario is a path, not a feature
     ///
@@ -2346,11 +3451,29 @@ impl PyEngine {
     /// free law's own fixed point at that VIX. `tradefloor.Scenario` sets it
     /// on every session it forces the VIX when the scenario asks for it
     /// (`Scenario(vix_sets_variance=True)`), which is the intended way in.
+    ///
+    /// # The treasury curve
+    ///
+    /// `treasury_yield_2y` and `treasury_yield_10y` are FRACTIONAL and write
+    /// the curve the rate instruments read (`UST2Y`, `UST10Y`, and `IGCORP`
+    /// through the 10-year). The chain keeps running from a pinned value: the
+    /// 10-year closes 5% of its gap to the policy rate plus a term premium
+    /// every session. The 2-year follows `0.85 * policy + 0.15 * 10-year`:
+    /// on every preset through pt-v19 it is recomputed as that at every close,
+    /// so a 2-year pinned alone lasts until that close, and on pt-v20
+    /// (`treasury_2y_noise` off zero) it closes 5% of its gap to it each
+    /// session, so a pinned 2-year decays over weeks. A parallel curve shift
+    /// therefore pins the policy rate and
+    /// the 10-year with it, which is what `scenarios/curve_shock.yml` does.
+    /// Equities read neither directly: they are discounted off
+    /// `corporate_bond_yield`, which the next central-bank meeting recomputes
+    /// from the 10-year.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
-        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false
+        oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false,
+        treasury_yield_2y = None, treasury_yield_10y = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -2369,6 +3492,8 @@ impl PyEngine {
         cycle: Option<String>,
         epicentre: Option<String>,
         vix_sets_variance: bool,
+        treasury_yield_2y: Option<f64>,
+        treasury_yield_10y: Option<f64>,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
@@ -2381,6 +3506,8 @@ impl PyEngine {
             ("gdp_growth", gdp_growth),
             ("unemployment_rate", unemployment_rate),
             ("tariff_rate", tariff_rate),
+            ("treasury_yield_2y", treasury_yield_2y),
+            ("treasury_yield_10y", treasury_yield_10y),
         ] {
             if let Some(v) = v {
                 crate::units::check_rate(name, v).map_err(ValidationError::new_err)?;
@@ -2398,6 +3525,39 @@ impl PyEngine {
                         "{name} must be finite, got {v}"
                     )));
                 }
+            }
+        }
+        // The VIX above zero and no higher than the highest ceiling a
+        // shipped chain holds: this model's `vix_ceiling` or the default
+        // preset's (181.33 on pt-v20), whichever is higher. Finite was the
+        // only check, and a pinned -10 or a million made every price NaN; a
+        // hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400
+        // to 800 turned a fear shock into a rally. The default's ceiling
+        // rather than this model's alone, because presets before pt-v19 clamp
+        // at 80 and a pin of the real March 2020 close, 82.69, is a
+        // reasonable thing to ask of them.
+        if let Some(v) = vix {
+            let ceiling = crate::mathx::max(
+                self.inner.params().vix_ceiling,
+                crate::params::ModelParams::preset(crate::params::DEFAULT_PRESET_NAME)
+                    .map_or(0.0, |p| p.vix_ceiling),
+            );
+            // Worded as `Macro` words it (`check_vix`), with the bound this
+            // pin also has.
+            if v < 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "vix cannot be negative, got {v}. It is the index level, \
+                     such as 20, above 0 and at most {ceiling}, the highest \
+                     vix_ceiling of this model and the default preset."
+                )));
+            }
+            if !(v > 0.0 && v <= ceiling) {
+                return Err(ValidationError::new_err(format!(
+                    "vix must be above 0 and at most {ceiling}, the highest \
+                     vix_ceiling of this model and the default preset, got {v}. \
+                     A level past it is one no shipped chain produces, and a \
+                     pin there prices the market off it."
+                )));
             }
         }
         // A price, not a rate, so the fractional band does not apply -- but a
@@ -2460,6 +3620,8 @@ impl PyEngine {
             ("unemployment_rate", unemployment_rate),
             ("tariff_rate", tariff_rate),
             ("oil_price", oil_price),
+            ("treasury_yield_2y", treasury_yield_2y),
+            ("treasury_yield_10y", treasury_yield_10y),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -2472,6 +3634,9 @@ impl PyEngine {
             vix_sets_variance,
         });
 
+        // What the market stands on before the write, for the re-mark
+        // below; `None` with `macro_publication_repricing` off.
+        let marks = self.inner.published_macro_marks();
         let e = self.inner.economy_mut();
         if let Some(v) = vix {
             e.vix = v;
@@ -2506,8 +3671,20 @@ impl PyEngine {
         if let Some(v) = oil_price {
             e.oil_price = v;
         }
+        if let Some(v) = treasury_yield_2y {
+            e.treasury_yield_2y = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = treasury_yield_10y {
+            e.treasury_yield_10y = crate::units::fraction_to_percent(v);
+        }
         if let Some(p) = phase {
             e.cycle_phase = p;
+        }
+        // A pinned corporate yield is the corporate index's yield, including
+        // when the pin repeats yesterday's value. Nothing without rate
+        // instruments.
+        if corporate_bond_yield.is_some() {
+            self.inner.remark_credit_spread();
         }
         if let Some(pin) = epicentre_pin {
             self.inner.set_crisis_epicentre_pin(Some(pin));
@@ -2522,12 +3699,37 @@ impl PyEngine {
         if vix_sets_variance {
             self.inner.set_vix_sets_variance_pending(true);
         }
+        // A PINNED VIX CHARGES THE CREDIT SPREAD NOTHING TONIGHT: the close's
+        // VIX move is the law's reversion from the level written here. Only
+        // turned on, as the mark above is. See `Engine::vix_pinned_today`.
+        // A pinned corporate yield holds through tonight's close.
+        if vix.is_some() {
+            self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
+        }
+        // A pinned phase is news of a turn, which the anticipated earnings
+        // price at once (`earnings_anticipation_half_life`).
+        self.inner.refresh_earnings_anticipation();
+        if corporate_bond_yield.is_some() {
+            self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
+        }
+        // A pin is published the moment it is written, so with
+        // `macro_publication_repricing` on the price takes it now rather
+        // than at the next tick (`Engine::reprice_to_published_macro`).
+        self.inner.reprice_to_published_macro(marks);
         Ok(())
     }
 
     /// Whether tonight's close will SET the market factor's variance from
     /// the VIX, because a scenario forced the VIX today with
     /// `vix_sets_variance` on. Cleared by the close.
+    /// The anticipated earnings level's offset over the earnings cycle's
+    /// current level, which the valuation reads beside it
+    /// (`earnings_anticipation_half_life`); 0.0 with it off.
+    #[getter]
+    fn earnings_anticipation(&self) -> f64 {
+        self.inner.economy().earnings_anticipation
+    }
+
     #[getter]
     fn vix_sets_variance_pending(&self) -> bool {
         self.inner.vix_sets_variance_pending()
@@ -2563,6 +3765,13 @@ impl PyEngine {
     /// denomination `pin_macro` takes: fractional rates, VIX in points,
     /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
     /// write it back.
+    ///
+    /// Two exceptions to "read it back": under `cycle_publication_lag`,
+    /// `cycle` is the phase as PUBLISHED, that many sessions late, so a
+    /// phase pinned today reads back only once it is published; and under
+    /// `gdp_publication_lag`, `gdp_growth` is the last quarter's mean growth
+    /// as released, so a pinned growth reaches it only through its quarter.
+    /// `state_snapshot()["economy"]` holds the true values (in percent).
     #[getter]
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
@@ -2582,9 +3791,13 @@ impl PyEngine {
         )?;
         out.set_item("qe_pe_boost", e.qe_pe_boost)?;
         out.set_item("fear_greed_index", e.fear_greed_index)?;
+        // Growth as published (`gdp_publication_lag`): the last quarter
+        // released, its mean daily growth, the growth the economy runs at
+        // with the dial at 0.0. A pin writes the true growth, which reaches
+        // this only through the quarter it falls in.
         out.set_item(
             "gdp_growth",
-            crate::units::percent_to_fraction(e.gdp_growth),
+            crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
         )?;
         out.set_item(
             "unemployment_rate",
@@ -2595,8 +3808,79 @@ impl PyEngine {
             crate::units::percent_to_fraction(e.tariff_rate),
         )?;
         out.set_item("oil_price", e.oil_price)?;
-        out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        // The phase as published (`cycle_publication_lag`): the phase of that
+        // many sessions before, the phase the economy is in at 0.0. A pin
+        // writes the true phase, which this reports once it is published.
+        out.set_item("cycle", cycle_name(self.inner.published_cycle_phase()))?;
+        out.set_item(
+            "treasury_yield_2y",
+            crate::units::percent_to_fraction(e.treasury_yield_2y),
+        )?;
+        out.set_item(
+            "treasury_yield_10y",
+            crate::units::percent_to_fraction(e.treasury_yield_10y),
+        )?;
         Ok(out.into())
+    }
+
+    /// Every company's three fair-value inputs, in roster order: earnings
+    /// per share, book value per share and revenue growth, NaN where absent.
+    /// The equities only; rate instruments carry no fundamentals.
+    ///
+    /// Returns a tuple of three lists, `(eps, book_value_per_share,
+    /// revenue_growth)`, one value per equity in `tickers` order. It reads
+    /// what the engine is valuing on, which is the published figures: under
+    /// a preset with `fair_value_news_share` or an earnings cycle, the
+    /// valuation scales these by the name's own level and the aggregate
+    /// cycle, and neither is here. `set_fundamentals` writes them.
+    fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        self.inner.fundamentals()
+    }
+
+    /// Replace every company's fair-value inputs, in roster order, NaN to
+    /// clear one. The equities only, one value each.
+    ///
+    /// The embedder's hook for reported earnings, and the one the
+    /// `market.earnings` scenario target writes through. It consumes no
+    /// draws, so it cannot move the generator, and an engine that is never
+    /// told anything values on the figures it was built with, exactly as
+    /// before this was exposed. A change moves every affected fair value, and
+    /// so every price, from the next tick.
+    ///
+    /// Each value is finite, or NaN to clear it, as `Instrument` takes them;
+    /// an infinite one is refused and nothing is written. Once the figures
+    /// differ from the ones the engine was built with, `state_snapshot`
+    /// carries them and `state_hash` covers them, so a restore values on
+    /// what this wrote rather than on the figures the roster started with.
+    fn set_fundamentals(
+        &mut self,
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
+    ) -> PyResult<()> {
+        for (name, values) in [
+            ("eps", &eps),
+            ("book_value_per_share", &book_value_per_share),
+            ("revenue_growth", &revenue_growth),
+        ] {
+            if let Some((i, v)) = values.iter().enumerate().find(|(_, v)| v.is_infinite()) {
+                return Err(ValidationError::new_err(format!(
+                    "{name}[{i}] = {v}. Each value must be finite, or NaN to clear \
+                     it, as Instrument takes it; nothing was written."
+                )));
+            }
+        }
+        self.inner
+            .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
+            .map_err(ValidationError::new_err)?;
+        // Logged once the engine has taken it, so a refused write leaves no
+        // entry a replay would then fail on.
+        self.log.push(crate::python_log::LogEntry::SetFundamentals {
+            eps,
+            book_value_per_share,
+            revenue_growth,
+        });
+        Ok(())
     }
 
     /// Write the `avg_volume` column: one value per instrument, in shares.
@@ -2626,8 +3910,13 @@ impl PyEngine {
     /// through to realised volume, then to half a percent of shares
     /// outstanding, so a zeroed column quietly quotes a book off a different
     /// input rather than a thin one.
+    ///
+    /// One value per instrument in `tickers` order, rate instruments included,
+    /// so a column read with `column("avg_volume")` can be scaled and written
+    /// back whole. A rate index quotes its depth off this column exactly as an
+    /// equity does.
     fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
-        let n = self.inner.len();
+        let n = self.inner.instrument_count();
         if values.len() != n {
             return Err(ValidationError::new_err(format!(
                 "set_avg_volume needs one value per instrument: this engine \
@@ -2648,8 +3937,18 @@ impl PyEngine {
         }
         self.log
             .push(crate::python_log::LogEntry::SetAvgVolume { values: values.clone() });
+        let equities = self.inner.len();
+        for (inst, v) in self
+            .inner
+            .rates_mut()
+            .instruments
+            .iter_mut()
+            .zip(&values[equities..])
+        {
+            inst.avg_volume = *v;
+        }
         self.inner
-            .set_column(PriceField::AvgVolume, &values)
+            .set_column(PriceField::AvgVolume, &values[..equities])
             .map_err(ValidationError::new_err)
     }
 
@@ -2662,22 +3961,48 @@ impl PyEngine {
 
     /// One attribution column across every instrument, as f64 bytes.
     ///
-    /// # Why the simulator can tell you this at all
+    /// # What it labels
     ///
-    /// It knows WHY each price moved, because it computed the reasons. No
-    /// historical dataset carries those labels -- you can observe that a stock
-    /// fell, never that 60% of the fall was order-flow pressure and the rest
-    /// was noise. This is the labelled-dataset output.
+    /// The simulator computed every driver of `mispricing_s`, the log gap
+    /// between the model price and fair value, so it can report how much
+    /// each one moved it. No historical dataset carries these labels. They
+    /// decompose the change in `s` and nothing else: when fair value itself
+    /// moves, on rates, earnings or the VIX, that move is not split up here,
+    /// and on pt-v20 it is most of a price's daily move. For a breakdown that
+    /// sums to the log price move, call `keep_explanations` before the run
+    /// and `explain(ticker, day)` after it, which adds fair value, the book
+    /// and the close's re-mark.
     ///
     /// Accumulated per DAY and reset at `open_market`, so a read after
     /// `close_market` still returns the day just finished.
     ///
-    /// # Nine components, and the same nine the `truth` table carries
+    /// # Eleven components, the same eleven the `truth` table carries
     ///
-    /// Four shocks -- `company_news`, `order_flow_impact`,
-    /// `short_squeeze_effect`, `random_noise` -- and the three pieces of the
-    /// model's own dynamics: `reversion`, `momentum`, `crowd_lean`. Together
-    /// they account for the day's change in `s`.
+    /// In `FACTORS` order. `reversion`, `momentum` and `crowd_lean` are the
+    /// model's own dynamics. `company_news`, `order_flow_impact`,
+    /// `short_squeeze_effect` and `random_noise` are the shocks.
+    /// `circuit_breaker` is the correction when the session breaker clamps a
+    /// price. `jump` is the daily jump and `overnight` the move applied at
+    /// the open. `fair_value_shift` is minus the part of the shocks that
+    /// moved the name's fair value for good instead of `s`.
+    ///
+    /// All eleven sum to the day's change in `mispricing_s`. What that
+    /// change covers depends on the preset. Measured over the first 40 days
+    /// of `Universe.random(40, seed=111)` with seed 101, where the sum matched
+    /// the change in `s` to within 1e-13 on both presets, and "explained" is
+    /// the squared correlation with the day's log price change:
+    ///
+    /// - Through pt-v19, `fair_value_shift` is zero and fair value moves
+    ///   little in a day. The eleven summed to a daily standard deviation of
+    ///   0.0133 against 0.0143 for the log price change, and explained 69% of
+    ///   it.
+    /// - On pt-v20, the default, most of each shock moves fair value
+    ///   instead, so `random_noise` and `fair_value_shift` are both large and
+    ///   mostly cancel (45.3% and 45.6% of the summed absolute
+    ///   contributions). The eleven summed to a standard deviation of 0.0019
+    ///   against 0.0127 and explained 28%. Without `fair_value_shift`, the
+    ///   other ten count each shock at full size, as if fair value had not
+    ///   moved, and they explained 75%.
     ///
     /// This is the DAY grain of exactly what `truth` reports per tick, so
     /// summing a `truth` column over a day reproduces the value here. Two
@@ -2701,7 +4026,101 @@ impl PyEngine {
                     FACTOR_NAMES.join(", ")
                 ))
             })?;
-        Ok(f64_bytes(py, &self.inner.attribution_column(index)))
+        // Zero in every rate instrument's slot: none of these drivers moves
+        // an index. Its move is in `rate_attribution`.
+        Ok(f64_bytes(py, &self.padded(self.inner.attribution_column(index), 0.0)))
+    }
+
+    /// The rate components of today's move, one value per instrument in
+    /// `tickers` order, as f64 bytes. Zero for every equity.
+    ///
+    /// `"carry"`, `"duration"` and `"convexity"` are the terms of the
+    /// repricing formula summed over the day (fractions of the level: see
+    /// `RATE_COMPONENTS`), so `1 + carry + duration + convexity` is the
+    /// day's index return whenever the curve moved once, which is how the
+    /// engine moves it. `"flow"` is the tape's premium over the index level
+    /// right now, `price / level - 1`: the part of a print that is the book's
+    /// response to trading rather than the curve.
+    ///
+    /// Reset at each open, before the open reprices, so the night's move is
+    /// in the day it lands on.
+    fn rate_attribution(&self, py: Python<'_>, component: &str) -> PyResult<Py<PyBytes>> {
+        let rates = &self.inner.rates().instruments;
+        let values: Vec<f64> = match component {
+            "carry" => rates.iter().map(|i| i.day_carry).collect(),
+            "duration" => rates.iter().map(|i| i.day_duration).collect(),
+            "convexity" => rates.iter().map(|i| i.day_convexity).collect(),
+            "flow" => rates.iter().map(|i| i.price / i.level - 1.0).collect(),
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown rate component {other:?}. Valid: {}",
+                    RATE_COMPONENTS.join(", ")
+                )))
+            }
+        };
+        let mut out = vec![0.0; self.inner.len()];
+        out.extend(values);
+        Ok(f64_bytes(py, &out))
+    }
+
+    /// The rate components `rate_attribution` reports, in order.
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn RATE_COMPONENTS() -> Vec<String> {
+        RATE_COMPONENTS.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// The rate instruments this engine holds, one dict each, in `tickers`
+    /// order: the spec (name, curve point, duration, convexity, spread) and
+    /// the state (level, the yield it is marked at, price). Empty without
+    /// them.
+    #[getter]
+    fn rate_instruments<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let mut out = Vec::new();
+        for inst in &self.inner.rates().instruments {
+            let d = PyDict::new_bound(py);
+            d.set_item("ticker", inst.spec.ticker)?;
+            d.set_item("name", inst.spec.name)?;
+            d.set_item("curve_point", inst.spec.point.as_str())?;
+            d.set_item("duration", inst.spec.duration)?;
+            d.set_item("convexity", inst.spec.convexity)?;
+            d.set_item("spread_bps", inst.spec.spread_bps)?;
+            d.set_item("level", inst.level)?;
+            d.set_item("yield", inst.marked_yield)?;
+            d.set_item("price", inst.price)?;
+            d.set_item("avg_volume", inst.avg_volume)?;
+            out.push(d);
+        }
+        Ok(out)
+    }
+
+    /// The curve as the engine holds it now, fractional: the policy rate, the
+    /// 2-year and 10-year treasury yields, the corporate yield equities are
+    /// discounted off, and the yield the corporate index reads (the 10-year
+    /// plus the credit spread last marked, which equals the corporate yield
+    /// whenever the engine has just set it). The last is present only on an
+    /// engine holding rate instruments.
+    #[getter]
+    fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let e = self.inner.economy();
+        let d = PyDict::new_bound(py);
+        d.set_item("policy_rate", crate::units::percent_to_fraction(e.federal_funds_rate))?;
+        d.set_item("treasury_2y", crate::units::percent_to_fraction(e.treasury_yield_2y))?;
+        d.set_item("treasury_10y", crate::units::percent_to_fraction(e.treasury_yield_10y))?;
+        d.set_item("corporate", crate::units::percent_to_fraction(e.corporate_bond_yield))?;
+        let rates = self.inner.rates();
+        if !rates.is_empty() {
+            let spread = if e.corporate_bond_yield != rates.last_corporate {
+                crate::rates::credit_spread(e)
+            } else {
+                rates.ig_spread
+            };
+            d.set_item(
+                "investment_grade",
+                crate::rates::curve_yield(crate::rates::CurvePoint::InvestmentGrade, e, spread),
+            )?;
+        }
+        Ok(d)
     }
 
     /// The day's `random_noise` column split into the three draws it sums,
@@ -2725,7 +4144,7 @@ impl PyEngine {
                 )))
             }
         };
-        Ok(f64_bytes(py, &self.inner.noise_part_column(index)))
+        Ok(f64_bytes(py, &self.padded(self.inner.noise_part_column(index), 0.0)))
     }
 
     /// `count` independent engines at exactly this state.
@@ -2763,16 +4182,51 @@ impl PyEngine {
                 "count must be at least 1, got {count}"
             )));
         }
+        self.copies.bump();
         Ok((0..count).map(|_| self.clone()).collect())
+    }
+
+    /// How many times `fork`, `state_snapshot` or `restore_state` has been
+    /// called on this engine. Not market state, and a fork starts at zero.
+    /// `tradefloor.sandbox.TamperGuard` compares it around agent code,
+    /// because a copy run ahead is look-ahead and changes nothing a hash
+    /// can see.
+    #[getter]
+    fn copy_count(&self) -> u64 {
+        self.copies.get()
+    }
+
+    /// The economy block of [`PyEngine::state_snapshot`], and only that,
+    /// without counting as a copy. The whole snapshot carries the generator
+    /// state, so it counts; this does not, which is what lets
+    /// `tradefloor.sandbox.HiddenState.economy` serve an agent that declared
+    /// hidden state without its scorecard reading as look-ahead.
+    fn economy(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let snapshot = self.snapshot_uncounted(py)?;
+        let economy = snapshot
+            .bind(py)
+            .get_item("economy")?
+            .ok_or_else(|| ValidationError::new_err("the snapshot carried no economy block"))?;
+        Ok(economy.unbind())
     }
 
     /// This market's state as one 64-character hex digest: the ledger leaf.
     ///
-    /// Covers every field [`PyEngine::state_snapshot`] carries, in one fixed
-    /// order, on the canonical-f64 rule `manifest._f64` and
+    /// Covers every field [`PyEngine::state_snapshot`] carries but one, in
+    /// one fixed order, on the canonical-f64 rule `manifest._f64` and
     /// `tests/known_answer.py` share. `crate::engine::Engine::state_hash`
     /// documents the encoding and why the generator states are hashed as
     /// `u64` bit patterns rather than as floats.
+    ///
+    /// The one is `session_tick`, the ticks the day has run. It numbers the
+    /// fills the book stamps and moves no price, and every snapshot of an
+    /// open or a closed day carries a count, so covering it would have moved
+    /// every leaf already written. Two engines that differ only in it hash
+    /// equal until one of them fills an order. The day's label and the
+    /// valuation's clock are covered where they are carried, which is only
+    /// where they are not the day the counter gives, and so are the
+    /// fair-value inputs once `set_fundamentals` has moved them and the
+    /// variance cascade on a model that runs it.
     ///
     /// Two engines whose hashes agree hold the same market state to the bit,
     /// including the macro chain and the generator positions that
@@ -2803,12 +4257,8 @@ impl PyEngine {
     fn state_hash(&self) -> String {
         let bytes = self.inner.state_hash_with_pending(
             self.day_count, self.market_open,
-            &self.pending_jump, &self.pending_overnight);
-        let mut hex = String::with_capacity(64);
-        for byte in bytes {
-            hex.push_str(&format!("{byte:02x}"));
-        }
-        hex
+            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value);
+        crate::params::lower_hex(&bytes)
     }
 
     /// Every column plus the generator position, as one dict.
@@ -2842,6 +4292,7 @@ impl PyEngine {
     /// copies the engine rather than rebuilding one, and it is what
     /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        self.copies.bump();
         let out = PyDict::new_bound(py);
         let columns = PyDict::new_bound(py);
         for name in COLUMN_FIELDS {
@@ -2890,7 +4341,7 @@ impl PyEngine {
         // refuses a mismatch: a snapshot restored onto an engine running
         // other coefficients would continue plausibly and wrongly -- the
         // same failure class as the roster check above, for the model.
-        out.set_item("model_fingerprint", self.inner.params().fingerprint())?;
+        out.set_item("model_fingerprint", self.inner.model_fingerprint())?;
         // The per-DAY accumulators. The columns above are per-company state;
         // these live beside them and were missing, which made a mid-day fork
         // diverge in PRICE -- `attribution` is the day's GARCH innovation at
@@ -2901,7 +4352,7 @@ impl PyEngine {
         let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
+        let flat = |rows: &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
         out.set_item("attribution", f64_bytes(py, &flat10(self.inner.attribution())))?;
@@ -2989,6 +4440,9 @@ impl PyEngine {
         if self.inner.vix_sets_variance_pending() {
             out.set_item("vix_sets_variance_pending", true)?;
         }
+        if self.inner.macro_pins_today() != 0 {
+            out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
+        }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
         // and carried for the reason the two above are: an engine restored
@@ -3016,6 +4470,15 @@ impl PyEngine {
         // preset through pt-v18 actually held.
         out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
         out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The fair-value levels pt-v20 turned on. Their own key, and only
+        // when the model can move them, so every earlier preset's snapshot
+        // is the one it was.
+        if self.inner.carries_fair_value_offsets() {
+            out.set_item("fair_value_offset", f64_bytes(py, &self.inner.fair_value_offsets()))?;
+            // The opening draws the hash covers beside the levels: empty once
+            // the market has opened, the roster's plus one before it.
+            out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
+        }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
         // mid-day needs the day's accumulated sector factor and the
@@ -3042,6 +4505,11 @@ impl PyEngine {
         // `test_forking.py` names them rather than seeing them move a market.
         out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
         out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
+        // A key only while non-empty, so every snapshot of an engine without
+        // fair-value offsets is the one it was.
+        if !self.pending_fair_value.is_empty() {
+            out.set_item("pending_fair_value", f64_bytes(py, &self.pending_fair_value))?;
+        }
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
         // omitting it made a mid-day restore run the rest of the day with the
@@ -3091,6 +4559,46 @@ impl PyEngine {
         );
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        // The published-phase history, oldest first, only while
+        // `cycle_publication_lag` keeps one, so every other snapshot is the
+        // dict it was. A restore without it re-seeds from the true phase.
+        if self.inner.params().cycle_publication_lag != 0.0 {
+            let history: Vec<&str> =
+                self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
+            econ.set_item("cycle_history", history)?;
+        }
+        // Unemployment's impulse, in percentage points a month, only while
+        // `unemployment_adjustment_half_life` is set. A restore without it
+        // re-seeds from the economy restored.
+        if self.inner.params().unemployment_adjustment_half_life != 0.0 {
+            econ.set_item("unemployment_impulse", economy.unemployment_impulse)?;
+        }
+        // The published GDP growth figure's state, in the economy's percent,
+        // only while `gdp_publication_lag` is set, so every other snapshot is
+        // the dict it was. `gdp_growth` above is the TRUE daily growth. A
+        // restore without this block re-seeds from the growth restored.
+        if self.inner.params().gdp_publication_lag != 0.0 {
+            let p = self.inner.gdp_publication();
+            let block = PyDict::new_bound(py);
+            block.set_item("published", p.published)?;
+            block.set_item("quarter", p.quarter)?;
+            block.set_item("count", p.count)?;
+            block.set_item("sum", p.sum)?;
+            let days: Vec<i64> = p.pending.iter().map(|&(d, _)| d).collect();
+            let values: Vec<f64> = p.pending.iter().map(|&(_, v)| v).collect();
+            block.set_item("pending_days", days)?;
+            block.set_item("pending_values", values)?;
+            econ.set_item("gdp_publication", block)?;
+        }
+        // The aggregate earnings cycle, only when the model moves it, so
+        // every earlier preset's snapshot is the dict it was.
+        if self.inner.params().earnings_cycle_depth != 0.0 {
+            econ.set_item("earnings_cycle", economy.earnings_cycle)?;
+        }
+        // The volatility feedback's smoothed exposure, on the same rule.
+        if self.inner.carries_vix_feedback() {
+            econ.set_item("vix_feedback", economy.vix_feedback)?;
+        }
         out.set_item("economy", econ)?;
 
         let bank = self.inner.central_bank();
@@ -3106,6 +4614,72 @@ impl PyEngine {
         out.set_item("central_bank", cb)?;
 
         out.set_item("day_count", self.day_count)?;
+        // The rate instruments, only when the engine holds any, so every
+        // snapshot of an engine without them is the one it always was. Each
+        // instrument's state by name, in `RATE_STATE_FIELDS` order, which is
+        // the order the state hash walks.
+        let rates = self.inner.rates();
+        if !rates.is_empty() {
+            let block = PyDict::new_bound(py);
+            let items = pyo3::types::PyList::empty_bound(py);
+            for inst in &rates.instruments {
+                let item = PyDict::new_bound(py);
+                item.set_item("ticker", inst.spec.ticker)?;
+                for (name, value) in RATE_STATE_FIELDS.iter().zip(rate_state(inst)) {
+                    item.set_item(*name, value)?;
+                }
+                items.append(item)?;
+            }
+            block.set_item("instruments", items)?;
+            block.set_item("ig_spread", rates.ig_spread)?;
+            block.set_item("last_corporate", rates.last_corporate)?;
+            block.set_item("closed_since_open", rates.closed_since_open)?;
+            out.set_item("rates", block)?;
+        }
+        // The agent-facing book, only once it has been used, so every
+        // snapshot of a run that never saw an agent's order is the dict it
+        // was before the book existed. `manifest.state_hash` accepts it
+        // exactly when it is here.
+        if !self.inner.book_state().is_pristine() {
+            out.set_item("book", book_to_py(py, self.inner.book_state())?)?;
+        }
+        // THE DAY'S TWO NUMBERS, each only where it is not the day
+        // `day_count` and the session flag give (`engine::default_day`), so
+        // every snapshot of a run that numbered its days from the counter is
+        // the dict it was. `current_day` is the label the draws and the fills
+        // carry; `elapsed_days` is the valuation's clock. A restore set the
+        // label to `day_count` until 0.8.5, a day ahead of the original after
+        // a close, and a fill after it was stamped with the wrong day.
+        let usual = crate::engine::default_day(self.day_count, self.market_open);
+        if self.inner.current_day() != usual {
+            out.set_item("current_day", self.inner.current_day())?;
+        }
+        if self.inner.elapsed_days() != usual {
+            out.set_item("elapsed_days", self.inner.elapsed_days())?;
+        }
+        // The ticks the day has run, which is the tick the book stamps a
+        // fill with. Recording state, like the pending tape buffers, and the
+        // one key here the state hash does not cover: every snapshot of an
+        // open or a closed day carries a count, so hashing it would have
+        // moved every leaf already written, and it moves no price.
+        out.set_item("session_tick", self.inner.session_ticks())?;
+        // The fair-value inputs, once `set_fundamentals` has moved them off
+        // the figures each company was built or listed with. Absent, a
+        // restore puts those figures back.
+        if self.inner.fundamentals_changed() {
+            let (eps, book, growth) = self.inner.fundamentals();
+            let block = PyDict::new_bound(py);
+            block.set_item("eps", f64_bytes(py, &eps))?;
+            block.set_item("book_value_per_share", f64_bytes(py, &book))?;
+            block.set_item("revenue_growth", f64_bytes(py, &growth))?;
+            out.set_item("fundamentals", block)?;
+        }
+        // The variance cascade's components, only on a model that runs it
+        // (`garch_cascade_components` at 1 or more; off on every shipped
+        // preset), for the reason `fair_value_offset` is carried.
+        if self.inner.carries_garch_cascade() {
+            out.set_item("garch_cascade", f64_bytes(py, &self.inner.garch_cascade()))?;
+        }
         Ok(out.into())
     }
 
@@ -3129,10 +4703,15 @@ impl PyEngine {
     /// the universe the snapshot came from; this guard catches a re-ordered or
     /// resized roster, not a substituted one.
     fn restore_state(&mut self, snapshot: &Bound<'_, PyDict>) -> PyResult<()> {
+        self.copies.bump();
         let tickers: Vec<String> = snapshot
             .get_item("tickers")?
             .ok_or_else(|| ValidationError::new_err("snapshot has no 'tickers'"))?
             .extract()?;
+        // The economy block's published-GDP state, read with the economy and
+        // applied after `day_count`: `None` with no economy block, `Some(None)`
+        // for one without the state.
+        let mut gdp_publication: Option<Option<crate::engine::GdpPublication>> = None;
         if tickers != self.inner.ids() {
             return Err(ValidationError::new_err(
                 "snapshot roster does not match this engine. Columns are                  positional, so restoring across rosters would attach every                  value to the wrong instrument.",
@@ -3146,7 +4725,7 @@ impl PyEngine {
         // the caller vouches for the context, as with the universe.
         if let Some(recorded) = snapshot.get_item("model_fingerprint")? {
             let recorded: String = recorded.extract()?;
-            let ours = self.inner.params().fingerprint();
+            let ours = self.inner.model_fingerprint();
             if recorded != ours {
                 return Err(ValidationError::new_err(format!(
                     "this snapshot was taken under model {recorded:?} and \
@@ -3347,6 +4926,10 @@ impl PyEngine {
             // so it prices differently from the parent it forked from.
             self.market_open = flag.extract()?;
         }
+        // The snapshot carries no clock, so the restored engine's next
+        // session is treated as the day's first and does not warn.
+        self.session_clock = None;
+        self.restored_at = self.log.len();
         if let Some(raw) = snapshot.get_item("volume_state")? {
             self.inner.set_volume_state(raw.extract::<f64>()?);
         }
@@ -3367,6 +4950,17 @@ impl PyEngine {
                 }
             }
         }
+        // Absent means no jump's fair-value shift was waiting.
+        self.pending_fair_value = match snapshot.get_item("pending_fair_value")? {
+            Some(raw) => {
+                let bytes: &[u8] = raw.extract()?;
+                bytes
+                    .chunks_exact(8)
+                    .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                    .collect()
+            }
+            None => Vec::new(),
+        };
         if let Some(raw) = snapshot.get_item("volume_idio")? {
             let bytes: &[u8] = raw.extract()?;
             let values: Vec<f64> = bytes
@@ -3403,6 +4997,26 @@ impl PyEngine {
                 .set_sector_day(&values, target)
                 .map_err(ValidationError::new_err)?;
         }
+        if let Some(raw) = snapshot.get_item("fair_value_offset")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_fair_value_offsets(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(raw) = snapshot.get_item("opening_z")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_opening_z(&values)
+                .map_err(ValidationError::new_err)?;
+        }
         for (key, sector) in [("sector_variance", true), ("jump_excitation", false)] {
             let Some(raw) = snapshot.get_item(key)? else { continue };
             let bytes: &[u8] = raw.extract()?;
@@ -3427,7 +5041,7 @@ impl PyEngine {
             for item in items.iter() {
                 let d = item.downcast::<PyDict>()?;
                 let get = |key: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
-                    Ok(d.get_item(key)?)
+                    d.get_item(key)
                 };
                 events.push(NewsEvent {
                     company_id: match get("ticker")? {
@@ -3497,6 +5111,12 @@ impl PyEngine {
             None => false,
         };
         self.inner.set_vix_sets_variance_pending(pending);
+        // Absent means no pin was standing today when it was taken.
+        let pins: u8 = match snapshot.get_item("macro_pins_today")? {
+            Some(v) => v.extract()?,
+            None => 0,
+        };
+        self.inner.set_macro_pins_today(pins);
         // Restore the growth term's base. Absent means a snapshot from a
         // build without the term, whose preset carries the dial at 0.0.
         if let Some(raw) = snapshot.get_item("nominal_output_base")? {
@@ -3568,6 +5188,12 @@ impl PyEngine {
                 fiscal_stimulus, government_debt_to_gdp,
                 months_in_current_phase, phase_gdp_target, recession_probability,
             );
+            if let Some(v) = d.get_item("earnings_cycle")? {
+                economy.earnings_cycle = v.extract()?;
+            }
+            if let Some(v) = d.get_item("vix_feedback")? {
+                economy.vix_feedback = v.extract()?;
+            }
             if let Some(v) = d.get_item("gdp_trend")? {
                 let trend: Vec<f64> = v.extract()?;
                 if trend.len() != 4 {
@@ -3584,6 +5210,50 @@ impl PyEngine {
                     ValidationError::new_err(format!("unknown cycle phase {name:?}"))
                 })?;
             }
+            // Derived from the phase and the level just restored.
+            self.inner.refresh_earnings_anticipation();
+            // The published-phase history (`cycle_publication_lag`). A
+            // snapshot without it, under the dial, re-seeds from the phase
+            // just restored: the phase is then published as it stands.
+            match d.get_item("cycle_history")? {
+                Some(v) => {
+                    let names: Vec<String> = v.extract()?;
+                    let mut history = Vec::with_capacity(names.len());
+                    for name in &names {
+                        history.push(CyclePhase::from_name(name).ok_or_else(|| {
+                            ValidationError::new_err(format!("unknown cycle phase {name:?}"))
+                        })?);
+                    }
+                    self.inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
+                }
+                None => self.inner.seed_cycle_history(),
+            }
+            // Unemployment's impulse (`unemployment_adjustment_half_life`).
+            // Refused where the dial is off; re-seeded from the economy just
+            // restored where the snapshot carries none.
+            match d.get_item("unemployment_impulse")? {
+                Some(v) => {
+                    if self.inner.params().unemployment_adjustment_half_life == 0.0 {
+                        return Err(ValidationError::new_err(
+                            "this snapshot carries an unemployment impulse, and this \
+                             engine's unemployment_adjustment_half_life is 0, so it keeps none"));
+                    }
+                    let impulse: f64 = v.extract()?;
+                    if !impulse.is_finite() {
+                        return Err(ValidationError::new_err(
+                            "this snapshot's unemployment_impulse is not finite"));
+                    }
+                    self.inner.economy_mut().unemployment_impulse = impulse;
+                }
+                None => self.inner.seed_unemployment_impulse(),
+            }
+            // The published GDP growth figure (`gdp_publication_lag`), put
+            // back once `day_count` is: a snapshot without it re-seeds from
+            // the growth just restored, as of the day it was taken.
+            gdp_publication = Some(match d.get_item("gdp_publication")? {
+                Some(v) => Some(gdp_publication_from(&v)?),
+                None => None,
+            });
         }
         if let Some(raw) = snapshot.get_item("central_bank")? {
             let d = raw.downcast::<PyDict>()?;
@@ -3625,21 +5295,186 @@ impl PyEngine {
         // reported marks for 0, 1, 3 and 4.
         self.inner.clear_day_marks();
         if let Some(v) = snapshot.get_item("day_count")? {
-            self.day_count = v.extract()?;
+            let count: i64 = v.extract()?;
+            self.day_count = u32::try_from(count).map_err(|_| {
+                ValidationError::new_err(format!(
+                    "this snapshot's day_count is {count}. It counts the days \
+                     the engine has closed, from 0."
+                ))
+            })?;
         }
-        // The core's own day, pushed rather than left where construction put
-        // it. `open_market` sets it from `day_count` at every open, so the
-        // two agree at every point a snapshot can be taken; a restore that
-        // stops before the next open is the one path where they part.
+        // The core's two day numbers, pushed rather than left where
+        // construction put them: the label the draws and the fills carry,
+        // and the valuation's clock, which the buyback factor reads as
+        // elapsed time. A restore that stops before the next open reads
+        // both, so a market restored MID-DAY priced its next tick as though
+        // the run had just begun until this was pushed.
         //
-        // That path used to reach nothing. It reaches the valuation now,
-        // because the buyback factor is `exp(yield * elapsed / 252)` and
-        // elapsed is this number, so a market restored MID-DAY priced its
-        // next tick as though the run had just begun. The forking guard
-        // caught it as a divergence in every column, which is what it is
-        // for: something the engine carries drove the market and was not
-        // restored with it.
-        self.inner.set_current_day(i64::from(self.day_count));
+        // Each from the snapshot when it carries one, and otherwise the day
+        // the counter and the session flag give. This set both to
+        // `day_count` until 0.8.5, which is a day ahead of the original after
+        // a close: a pin after a boundary restore re-marked the prices off
+        // the wrong elapsed time, and a fill was stamped with the wrong day.
+        let usual = crate::engine::default_day(self.day_count, self.market_open);
+        let label: i64 = match snapshot.get_item("current_day")? {
+            Some(v) => v.extract()?,
+            None => usual,
+        };
+        let elapsed: i64 = match snapshot.get_item("elapsed_days")? {
+            Some(v) => v.extract()?,
+            None => usual,
+        };
+        if label < 0 || elapsed < 0 {
+            return Err(ValidationError::new_err(format!(
+                "this snapshot's day numbers are {label} (current_day) and \
+                 {elapsed} (elapsed_days). Days count from 0."
+            )));
+        }
+        self.inner.set_day_label(label);
+        self.inner.set_elapsed_days(elapsed);
+        // The ticks the day had run, for the fills stamped before the next
+        // open. Absent means a snapshot from before it was carried, which
+        // restored to no count at all, and so does this.
+        if let Some(v) = snapshot.get_item("session_tick")? {
+            self.inner.set_session_ticks(v.extract()?);
+        }
+        // The fair-value inputs. Absent means a snapshot of an engine whose
+        // inputs had not moved, so the figures each company was built with
+        // go back, whatever this engine was told since.
+        match snapshot.get_item("fundamentals")? {
+            Some(raw) => {
+                let block = raw.downcast::<PyDict>()?;
+                let column = |key: &str| -> PyResult<Vec<f64>> {
+                    let raw = block.get_item(key)?.ok_or_else(|| {
+                        ValidationError::new_err(format!(
+                            "this snapshot's fundamentals carry no {key:?}"
+                        ))
+                    })?;
+                    let bytes: &[u8] = raw.extract()?;
+                    Ok(bytes
+                        .chunks_exact(8)
+                        .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                        .collect())
+                };
+                let (eps, book, growth) = (
+                    column("eps")?,
+                    column("book_value_per_share")?,
+                    column("revenue_growth")?,
+                );
+                if eps.iter().chain(&book).chain(&growth).any(|v| v.is_infinite()) {
+                    return Err(ValidationError::new_err(
+                        "this snapshot's fundamentals hold an infinite value. Each \
+                         is finite, or NaN where the company has none.",
+                    ));
+                }
+                self.inner
+                    .set_fundamentals(&eps, &book, &growth)
+                    .map_err(ValidationError::new_err)?;
+            }
+            None => self.inner.reset_fundamentals(),
+        }
+        // The variance cascade. Absent means a snapshot of a model that does
+        // not run it, where the components are never read.
+        if let Some(raw) = snapshot.get_item("garch_cascade")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_garch_cascade(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        match gdp_publication {
+            Some(Some(state)) => {
+                self.inner.set_gdp_publication(state).map_err(ValidationError::new_err)?
+            }
+            Some(None) => self.inner.seed_gdp_publication(i64::from(self.day_count)),
+            None => {}
+        }
+
+        // The rate instruments. Required exactly when this engine holds them,
+        // and for the same tickers in the same order: a snapshot restored
+        // without them would leave the indices at this engine's own levels
+        // under a restored curve, and they would reprice by the difference at
+        // the next open.
+        let held: Vec<&str> = self
+            .inner
+            .rates()
+            .instruments
+            .iter()
+            .map(|i| i.spec.ticker)
+            .collect();
+        match snapshot.get_item("rates")? {
+            None if held.is_empty() => {}
+            None => {
+                return Err(ValidationError::new_err(format!(
+                    "this engine holds the rate instruments {} and the snapshot \
+                     carries none. It was taken on a roster without them.",
+                    held.join(", ")
+                )))
+            }
+            Some(block) => {
+                let block = block.downcast::<PyDict>()?;
+                let items: Vec<Bound<'_, PyDict>> = block
+                    .get_item("instruments")?
+                    .ok_or_else(|| ValidationError::new_err("snapshot rates has no 'instruments'"))?
+                    .extract()?;
+                let mut tickers = Vec::with_capacity(items.len());
+                for item in &items {
+                    let t: String = item
+                        .get_item("ticker")?
+                        .ok_or_else(|| ValidationError::new_err("a rate instrument has no 'ticker'"))?
+                        .extract()?;
+                    tickers.push(t);
+                }
+                if tickers != held {
+                    return Err(ValidationError::new_err(format!(
+                        "the snapshot's rate instruments are [{}] and this engine \
+                         holds [{}]. Columns are positional, so they must match.",
+                        tickers.join(", "),
+                        held.join(", ")
+                    )));
+                }
+                fn get<'py>(d: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+                    d.get_item(key)?.ok_or_else(|| {
+                        ValidationError::new_err(format!("snapshot rates is missing {key:?}"))
+                    })
+                }
+                let mut values: Vec<[f64; RATE_STATE_FIELDS.len()]> = Vec::new();
+                for item in &items {
+                    let mut row = [0.0; RATE_STATE_FIELDS.len()];
+                    for (k, name) in RATE_STATE_FIELDS.iter().enumerate() {
+                        row[k] = get(item, name)?.extract()?;
+                    }
+                    values.push(row);
+                }
+                let ig_spread: f64 = get(block, "ig_spread")?.extract()?;
+                let last_corporate: f64 = get(block, "last_corporate")?.extract()?;
+                let closed: bool = get(block, "closed_since_open")?.extract()?;
+                let book = self.inner.rates_mut();
+                for (inst, row) in book.instruments.iter_mut().zip(values) {
+                    set_rate_state(inst, &row);
+                }
+                book.ig_spread = ig_spread;
+                book.last_corporate = last_corporate;
+                book.closed_since_open = closed;
+            }
+        }
+        // The book is part of the state: restored when the snapshot carries
+        // it, and pristine when it does not, so a restore never keeps the
+        // orders or the consumed depth of the market it replaced.
+        let book = match snapshot.get_item("book")? {
+            Some(raw) => book_from_py(raw.downcast::<PyDict>()?)?,
+            None => crate::agent_book::BookState::default(),
+        };
+        self.inner.set_book_state(book).map_err(ValidationError::new_err)?;
+        // What was written to each price since its last print is tape, not
+        // state: the snapshot does not carry it, and the engine restored
+        // into must not keep its own. So the next print's `repriced` reads
+        // NaN, not known, on a model that can write a price between prints,
+        // and zero on one that cannot.
+        self.inner.forget_repriced();
         Ok(())
     }
 
@@ -3664,10 +5499,11 @@ impl PyEngine {
             instruments: self.day_buffer.companies,
             prices: self.day_buffer.prices.clone(),
             volumes: self.day_buffer.volumes.clone(),
+            volume_base: self.day_buffer.volume_base.clone(),
             // The session's open, the engine's mark from `open_market`,
             // which the close leaves alone, so a record taken on either
             // side of it reads the same value.
-            opens: self.inner.column(PriceField::Open),
+            opens: self.all_column(PriceField::Open),
             mispricing: self.day_buffer.mispricing.clone(),
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
@@ -3675,6 +5511,7 @@ impl PyEngine {
             shock: self.day_buffer.shock.clone(),
             absorbed: self.day_buffer.absorbed.clone(),
             clamp: self.day_buffer.clamp.clone(),
+            repriced: self.day_buffer.repriced.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
         });
@@ -3689,7 +5526,9 @@ impl PyEngine {
             corporate_bond_yield: crate::units::percent_to_fraction(e.corporate_bond_yield),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
             unemployment_rate: crate::units::percent_to_fraction(e.unemployment_rate),
-            gdp_growth: crate::units::percent_to_fraction(e.gdp_growth),
+            // As published (`gdp_publication_lag`), as `macro_fields`
+            // reports it: the true daily growth with the dial at 0.0.
+            gdp_growth: crate::units::percent_to_fraction(self.inner.published_gdp_growth()),
             qe_pe_boost: e.qe_pe_boost,
             fear_greed_index: e.fear_greed_index,
             universe_stress: self.inner.universe_stress(),
@@ -3724,6 +5563,16 @@ impl PyEngine {
     /// they carry real information, so the coarse schema is genuinely wider
     /// rather than the same columns rearranged.
     ///
+    /// `volume` is the volume traded inside the bar, at every grain: a tick
+    /// row holds that minute's volume, a five-minute bar the five minutes',
+    /// and a day bar the day's. So the tick rows of a day sum to its day bar.
+    /// The engine counts volume as a running total that the open resets to
+    /// zero, and each bar is that total at its last tick minus the total
+    /// before its first. Before 0.8.5 the tick rows held the running total
+    /// itself and the coarser bars summed it, which made a day bar about
+    /// two hundred times the day's volume. For the running total, take the
+    /// cumulative sum of the tick rows per instrument and day.
+    ///
     /// Every recorded day is a separate batch, so a year streams rather than
     /// materialising. With nothing recorded it falls back to the last session.
     ///
@@ -3745,7 +5594,8 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
-                opens: self.inner.column(PriceField::Open),
+                volume_base: self.session_volume_base.clone(),
+                opens: self.all_column(PriceField::Open),
                 // bars() reads neither, and cloning the ground-truth
                 // buffers to build a table that discards them would be pure
                 // copying. truth() has its own path below.
@@ -3756,6 +5606,7 @@ impl PyEngine {
                 shock: Vec::new(),
                 absorbed: Vec::new(),
                 clamp: Vec::new(),
+                repriced: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
             }]
@@ -3794,6 +5645,7 @@ impl PyEngine {
                     batches.push(
                         crate::python_arrow::bars_batch(
                             d.day, d.ticks, d.instruments, &d.prices, &d.volumes,
+                            &d.volume_base,
                         )
                         .map_err(crate::python_arrow::arrow_err)?,
                     );
@@ -3857,6 +5709,8 @@ impl PyEngine {
                 &std::array::from_fn(|k| {
                     if k < crate::market::factors::S_COMPONENT_KEYS.len() {
                         self.written(&self.buffer.components[k]).to_vec()
+                    } else if k == crate::market::factors::FAIR_VALUE_SLOT {
+                        self.written(&self.buffer.components[crate::market::factors::TICK_FAIR_VALUE]).to_vec()
                     } else {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
                     }
@@ -3923,9 +5777,18 @@ impl PyEngine {
     /// The `prints` table: how each print was arrived at.
     ///
     /// `truth` says what moved fair value. This says what happened between
-    /// fair value and the tape: `shock` is the log distance from the last
-    /// print to the model price, `absorbed` is the log distance from the
-    /// model price to the print, and the two sum to the print's own log move.
+    /// fair value and the tape: `shock` is the log distance from the price
+    /// the tick started from to the model price, `absorbed` is the log
+    /// distance from the model price to the print, and `repriced` is the
+    /// log distance from the last print to the price the tick started from.
+    /// The three sum to the print's own log move. `repriced` is zero except
+    /// where something wrote the price between two prints: the close's
+    /// re-mark to the macro state it publishes and a `pin_macro`'s
+    /// (`macro_publication_repricing`, pt-v20), and the overnight opening
+    /// print (`overnight_variance_ratio`). It is NaN on the first print
+    /// after `restore_state` on
+    /// a model that can write a price between prints, because the snapshot
+    /// does not carry it.
     ///
     ///   `prints()`        every recorded day, one batch each
     ///   `prints(day=N)`   that day alone
@@ -3994,6 +5857,7 @@ impl PyEngine {
                     self.written(&self.buffer.shock),
                     self.written(&self.buffer.absorbed),
                     self.written(&self.buffer.clamp),
+                    self.written(&self.buffer.repriced),
                     self.written(&self.buffer.unbounded_print),
                     self.written(&self.buffer.liquidity_share),
                     depth,
@@ -4038,6 +5902,7 @@ impl PyEngine {
                         &d.shock,
                         &d.absorbed,
                         &d.clamp,
+                        &d.repriced,
                         &d.unbounded_print,
                         &d.liquidity_share,
                         depth,
@@ -4056,9 +5921,24 @@ impl PyEngine {
 
     /// The `macro` table: one row per recorded day.
     ///
-    /// Keyed by the same `day` as `bars` and `truth`, so aligning a macro
-    /// signal with prices is a join rather than a hand-rolled accumulation
-    /// loop. Rates are fractional, as everywhere else.
+    /// Row `d` holds the values day `d` traded under. `run_days`, and every
+    /// day loop in the package, records a day before closing it, and the
+    /// close is where the macro chain steps. So row `d` is what day `d - 1`'s
+    /// close produced, plus any pin made before the record, and what day
+    /// `d`'s own close produced is in row `d + 1`. If you call `record`
+    /// yourself after `close_market`, row `d` holds day `d`'s close instead.
+    ///
+    /// A join on `day` with `bars` therefore pairs each day's return with the
+    /// macro move that came before it. To pair a return with the move it
+    /// caused, compare row `d + 1` with row `d`. Measured on 40 names over 5
+    /// days (seed 101), `macro_state.vix` after each close read 17.005,
+    /// 15.853, 17.849, 19.312 and 23.060, and rows 0 to 4 read 17.660,
+    /// 17.005, 15.853, 17.849 and 19.312.
+    ///
+    /// The values after the last recorded close are not in the table. Read
+    /// them from `macro_state` or `macro_fields`.
+    ///
+    /// Rates are fractional, as everywhere else.
     fn macro_table(&self) -> PyResult<crate::python_arrow::PyArrowStream> {
         let batch = crate::python_arrow::macro_batch(&self.recorded_macro)
             .map_err(crate::python_arrow::arrow_err)?;
@@ -4083,10 +5963,11 @@ impl PyEngine {
     /// Worth being explicit, because the opposite is easy to assume. The book
     /// is rebuilt per call from current state, so the object returned is
     /// detached: filling against it tells you your execution price, but the
-    /// market only learns about your trading through `order_flow` on the next
-    /// tick. Those are two separate channels on purpose -- one prices your
-    /// fill, the other applies your pressure -- and a harness that wants both
-    /// must do both.
+    /// market only learns about your trading through `fills` on the next
+    /// `run_session` (or `order_flow` on the next `tick`). Those are two
+    /// separate channels on purpose -- one prices your fill, the other
+    /// applies your pressure, once -- and a harness that wants both must do
+    /// both.
     fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
         let index = self.tickers.iter().position(|t| t == ticker).ok_or_else(|| {
             ValidationError::new_err(format!(
@@ -4129,7 +6010,7 @@ impl PyEngine {
             return Err(ValidationError::new_err("levels must be at least 1"));
         }
         let before = self.recorded_book.len();
-        for index in 0..self.inner.len() {
+        for index in 0..self.inner.instrument_count() {
             let Some(book) = self.inner.book_for(index) else {
                 continue;
             };
@@ -4176,6 +6057,170 @@ impl PyEngine {
         self.recorded_book.len()
     }
 
+    // ── Agents' orders ────────────────────────────────────────────────────
+
+    /// Send one agent's order to this market's book.
+    ///
+    /// ``quantity`` is signed, positive to buy, as ``Portfolio.execute``
+    /// takes it. ``limit_price=None`` is a market order: it takes what the
+    /// book holds and the rest is reported ``unfilled``. A limit order takes
+    /// what the book holds at its limit or better, and its remainder waits,
+    /// in the book's queue with ``book_resting`` on, or for the traded range
+    /// with it off; ``resting`` says how much. ``order_id`` is optional and
+    /// must be unique among waiting orders; the engine assigns
+    /// ``"{agent}-{n}"`` otherwise.
+    ///
+    /// Every share taken is taker flow: it reaches the market once, on the
+    /// next tick that is not closed, with every other agent's, and the fills
+    /// are reported both here and in ``take_fills``. Orders are processed in
+    /// the order they arrive; ``submit_many`` fixes that order for a step.
+    ///
+    /// Returns a dict: ``order_id``, ``agent``, ``ticker``, ``side``,
+    /// ``requested``, ``filled``, ``average_price``, ``worst_price``,
+    /// ``reference`` (the mid the order met), ``resting``, ``unfilled``,
+    /// ``mode`` (``"queue"``, ``"range"`` or None) and ``fills``.
+    ///
+    /// Recorded in the order log, so a replay and a fork carry it.
+    #[pyo3(signature = (agent, ticker, quantity, *, limit_price = None, order_id = None))]
+    fn submit(
+        &mut self,
+        py: Python<'_>,
+        agent: &str,
+        ticker: &str,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    ) -> PyResult<PyObject> {
+        let report = self.submit_one(agent, ticker, quantity, limit_price, order_id)?;
+        report_to_py(py, &report)
+    }
+
+    /// Send several agents' orders for one step, in a fixed order.
+    ///
+    /// ``orders`` is a list of dicts with ``agent``, ``ticker``,
+    /// ``quantity`` and optionally ``limit_price`` and ``order_id``. They
+    /// are processed sorted by agent label, and within one agent in the
+    /// order the list gives: the arrival order of a step is a property of
+    /// who sent what, never of how the caller happened to build the list,
+    /// so the same orders give the same market. Each one meets the book the
+    /// ones before it left, so an agent later in the order pays for the
+    /// levels an earlier one took and can hit an earlier one's resting
+    /// order.
+    ///
+    /// Returns one report per order, in the order they were processed. An
+    /// order the engine refuses raises, and the orders before it stand.
+    fn submit_many(&mut self, py: Python<'_>, orders: Vec<Bound<'_, PyDict>>) -> PyResult<Vec<PyObject>> {
+        let mut parsed: Vec<ParsedOrder> = Vec::new();
+        for (i, d) in orders.iter().enumerate() {
+            let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
+                d.get_item(k)?.ok_or_else(|| {
+                    ValidationError::new_err(format!("order {i} has no {k:?}"))
+                })
+            };
+            let agent: String = get("agent")?.extract()?;
+            let ticker: String = get("ticker")?.extract()?;
+            let quantity: f64 = get("quantity")?.extract()?;
+            let limit: Option<f64> = match d.get_item("limit_price")? {
+                Some(v) if !v.is_none() => Some(v.extract()?),
+                _ => None,
+            };
+            let id: Option<String> = match d.get_item("order_id")? {
+                Some(v) if !v.is_none() => Some(v.extract()?),
+                _ => None,
+            };
+            parsed.push((agent, i, ticker, quantity, limit, id));
+        }
+        // Stable on the list position, so one agent's orders keep theirs.
+        parsed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut out = Vec::with_capacity(parsed.len());
+        for (agent, _, ticker, quantity, limit, id) in parsed {
+            let report = self.submit_one(&agent, &ticker, quantity, limit, id)?;
+            out.push(report_to_py(py, &report)?);
+        }
+        Ok(out)
+    }
+
+    /// Cancel a waiting order. With ``agent``, only that agent's. Returns
+    /// whether one was removed. Recorded in the order log.
+    #[pyo3(signature = (order_id, *, agent = None))]
+    fn cancel(&mut self, order_id: &str, agent: Option<String>) -> bool {
+        self.log.push(crate::python_log::LogEntry::Cancel {
+            order_id: order_id.to_string(),
+            agent: agent.clone(),
+        });
+        self.inner.cancel_order(order_id, agent.as_deref())
+    }
+
+    /// Waiting orders, in arrival order, for one agent or all: dicts with
+    /// ``order_id``, ``agent``, ``ticker``, ``side``, ``limit_price``,
+    /// ``quantity``, ``remaining``, ``sequence`` and ``mode``. A read.
+    #[pyo3(signature = (agent = None))]
+    fn open_orders(&self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.inner
+            .open_orders(agent.as_deref())
+            .iter()
+            .map(|o| order_to_py(py, o))
+            .collect()
+    }
+
+    /// Collect the fills the book holds for one agent, or for all, in the
+    /// order they happened, and forget them.
+    ///
+    /// Each is a dict: ``agent``, ``order_id``, ``ticker``, ``side``,
+    /// ``quantity``, ``price``, ``liquidity`` (``"taker"``, ``"maker"`` or
+    /// ``"range"``), ``counterparty`` (``"mm"``, ``"depth"``, ``"flow"``,
+    /// ``"range"`` or another agent's label), ``reference``, ``day``,
+    /// ``tick`` and ``sequence``. A resting order the model's flow filled
+    /// during a session arrives here, and only here. A resting order the
+    /// maker's re-quote crossed is ``"taker"`` against ``"mm"``, at the
+    /// maker's price: it took the maker's size (docs/MODEL.md, "The
+    /// agent's book"). Recorded in the order
+    /// log, because the book no longer owes what was collected.
+    #[pyo3(signature = (agent = None))]
+    fn take_fills(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.log.push(crate::python_log::LogEntry::TakeFills { agent: agent.clone() });
+        self.inner
+            .take_fills(agent.as_deref())
+            .iter()
+            .map(|f| fill_to_py(py, f))
+            .collect()
+    }
+
+    /// Collect each agent's permanent impact, one row per agent, name and
+    /// tick its flow reached the market, and forget them.
+    ///
+    /// ``permanent`` is the change to the name's ``s`` the agent's fills
+    /// made, in log units: exact under ``fill_impact_coefficient``, whose
+    /// law is linear and additive, and the tick's flow impact shared pro
+    /// rata by signed shares under the imbalance law. Recorded in the log.
+    #[pyo3(signature = (agent = None))]
+    fn take_impacts(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
+        self.log.push(crate::python_log::LogEntry::TakeImpacts { agent: agent.clone() });
+        self.inner
+            .take_impacts(agent.as_deref())
+            .iter()
+            .map(|r| {
+                let d = PyDict::new_bound(py);
+                d.set_item("agent", &r.agent)?;
+                d.set_item("ticker", &r.ticker)?;
+                d.set_item("bought", r.bought)?;
+                d.set_item("sold", r.sold)?;
+                d.set_item("permanent", r.permanent)?;
+                d.set_item("day", r.day)?;
+                d.set_item("tick", r.tick)?;
+                Ok(d.into())
+            })
+            .collect()
+    }
+
+    /// Whether an agent's order executes in this engine rather than being
+    /// priced off a snapshot of the book: ``book_shared`` or
+    /// ``book_resting`` is on. ``Portfolio.execute`` reads this.
+    #[getter]
+    fn book_live(&self) -> bool {
+        self.inner.book_live()
+    }
+
     /// Every input that crossed into this engine, in order.
     ///
     /// # A seed alone does not reproduce a run
@@ -4201,7 +6246,7 @@ impl PyEngine {
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",
-            self.inner.len(),
+            self.inner.instrument_count(),
             self.inner.draws_consumed()
         )
     }
@@ -4229,19 +6274,26 @@ pub fn market_status(hour: i64, minute: i64, day_of_week: i64) -> PyResult<Strin
 /// `seed` is the UNIVERSE seed and is independent of any simulation seed, so
 /// "same universe, different market draws", the standard design for variance
 /// estimation, is expressible. Generation draws from its own stream and
-/// consumes nothing from an engine's.
+/// consumes nothing from an engine's. Any integer from 0 to `2**64 - 1`.
 #[pyfunction]
-#[pyo3(signature = (n = 108, *, seed = 0))]
-pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
-    if n == 0 {
-        return Err(ValidationError::new_err("n must be greater than zero"));
+#[pyo3(signature = (n = 108, *, seed = crate::python::Seed(0)),
+       text_signature = "(n=108, *, seed=0)")]
+pub fn random_instruments(n: i64, seed: crate::python::Seed) -> PyResult<Vec<PyInstrument>> {
+    // Signed, so a negative count is refused in these words rather than as
+    // pyo3's "can't convert negative int to unsigned".
+    if n < 1 {
+        return Err(ValidationError::new_err(format!(
+            "Universe.random needs a number of companies of 1 or more, got {n}"
+        )));
     }
     if n > 26 * 26 * 26 {
         return Err(ValidationError::new_err(format!(
-            "n must be at most {} - tickers are three letters", 26 * 26 * 26
+            "Universe.random makes at most 17,576 companies, since tickers are \
+             three letters; got {n}. For more, run several universes."
         )));
     }
-    Ok(crate::universe::random_universe(n, seed)
+    let n = n as usize;
+    Ok(crate::universe::random_universe(n, seed.0)
         .into_iter()
         .map(|g| PyInstrument {
             ticker: g.ticker,
@@ -4256,6 +6308,64 @@ pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
             short_interest: g.short_interest,
         })
         .collect())
+}
+
+/// The rate instruments this build prices, as instruments with their
+/// default level, depth and size, in the order given.
+///
+/// `tickers` defaults to all of them. `tradefloor.bonds()` wraps this, and
+/// `Universe.random(..., bonds=True)` appends the result. Every number comes
+/// from `crate::rates::RATE_SPECS`, so the defaults have one home.
+#[pyfunction]
+#[pyo3(signature = (tickers = None))]
+pub fn rate_instruments(tickers: Option<Vec<String>>) -> PyResult<Vec<PyInstrument>> {
+    let wanted: Vec<String> = match tickers {
+        Some(t) => t,
+        None => crate::rates::tickers().iter().map(|t| t.to_string()).collect(),
+    };
+    let mut out = Vec::with_capacity(wanted.len());
+    for ticker in &wanted {
+        let spec = crate::rates::spec_for(ticker).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "{ticker:?} is not a rate instrument this build prices. Valid: {}",
+                crate::rates::tickers().join(", ")
+            ))
+        })?;
+        out.push(PyInstrument {
+            ticker: spec.ticker.to_string(),
+            sector: crate::rates::RATE_SECTOR.to_string(),
+            initial_price: spec.initial_price,
+            shares_outstanding: spec.units_outstanding,
+            eps: None,
+            book_value_per_share: None,
+            revenue_growth: None,
+            avg_volume: spec.avg_volume,
+            beta: 0.0,
+            short_interest: 0.0,
+        });
+    }
+    Ok(out)
+}
+
+/// Each rate instrument's fixed terms, one dict per ticker: name, curve
+/// point, duration, convexity, spread and the default depth and level.
+#[pyfunction]
+pub fn rate_specs(py: Python<'_>) -> PyResult<Vec<Py<PyDict>>> {
+    let mut out = Vec::new();
+    for spec in crate::rates::RATE_SPECS.iter() {
+        let d = PyDict::new_bound(py);
+        d.set_item("ticker", spec.ticker)?;
+        d.set_item("name", spec.name)?;
+        d.set_item("curve_point", spec.point.as_str())?;
+        d.set_item("duration", spec.duration)?;
+        d.set_item("convexity", spec.convexity)?;
+        d.set_item("spread_bps", spec.spread_bps)?;
+        d.set_item("avg_volume", spec.avg_volume)?;
+        d.set_item("units_outstanding", spec.units_outstanding)?;
+        d.set_item("initial_price", spec.initial_price)?;
+        out.push(d.into());
+    }
+    Ok(out)
 }
 
 fn cycle_name(p: CyclePhase) -> &'static str {
@@ -4304,10 +6414,7 @@ impl PyNews {
         }
         if let Some(s) = sector.as_deref() {
             if crate::sectors::by_key(s).is_none() {
-                return Err(ValidationError::new_err(format!(
-                    "unknown sector {s:?}. Valid sectors: {}",
-                    crate::sectors::keys().join(", ")
-                )));
+                return Err(ValidationError::new_err(crate::python::unknown_sector(s)));
             }
         }
         Ok(Self { ticker, sector, price_impact })
@@ -4358,10 +6465,7 @@ impl PyNewsImpact {
         let sectors = sectors.unwrap_or_default();
         for s in sector.iter().chain(sectors.iter()) {
             if crate::sectors::by_key(s).is_none() {
-                return Err(ValidationError::new_err(format!(
-                    "unknown sector {s:?}. Valid sectors: {}",
-                    crate::sectors::keys().join(", ")
-                )));
+                return Err(ValidationError::new_err(crate::python::unknown_sector(s)));
             }
         }
         Ok(Self { ticker, sector, sectors, remaining_impact, reversal_phase })
@@ -4392,24 +6496,46 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::S_COMPONENT_KEYS[7],
     crate::market::factors::JUMP_COMPONENT_KEY,
     crate::market::factors::OVERNIGHT_COMPONENT_KEY,
+    crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
 ];
 
-/// Every field `column()` accepts, in one place.
-///
-/// Declared once so the error message cannot drift from the match arms above
-/// it -- a list of valid names that omits a name it accepts is worse than no
-/// list, because it sends the reader looking for a different mistake.
-/// Index of `random_noise` in the engine's component order.
-///
-/// Found in the engine's own key list rather than written as a literal. Every
-/// component is an f64, so a hard-coded index would keep compiling and start
-/// feeding GARCH the crowd lean the day a component is inserted.
-pub fn random_noise_index() -> usize {
-    FACTOR_NAMES
-        .iter()
-        .position(|name| *name == "random_noise")
-        .expect("random_noise is one of the components")
+/// A rate instrument's state in a snapshot, in the order the state hash
+/// walks it (`Engine::state_hash_with_pending`, `manifest.state_hash`).
+pub const RATE_STATE_FIELDS: [&str; 14] = [
+    "level", "marked_yield", "price", "previous_close", "open", "high", "low",
+    "volume", "avg_volume", "units_outstanding", "maker_inventory", "day_carry",
+    "day_duration", "day_convexity",
+];
+
+fn rate_state(inst: &crate::rates::RateInstrument) -> [f64; 14] {
+    [
+        inst.level, inst.marked_yield, inst.price, inst.previous_close, inst.open,
+        inst.high, inst.low, inst.volume, inst.avg_volume, inst.units_outstanding,
+        inst.maker_inventory, inst.day_carry, inst.day_duration, inst.day_convexity,
+    ]
 }
+
+fn set_rate_state(inst: &mut crate::rates::RateInstrument, row: &[f64; 14]) {
+    let [level, marked_yield, price, previous_close, open, high, low, volume, avg_volume,
+         units_outstanding, maker_inventory, day_carry, day_duration, day_convexity] = *row;
+    inst.level = level;
+    inst.marked_yield = marked_yield;
+    inst.price = price;
+    inst.previous_close = previous_close;
+    inst.open = open;
+    inst.high = high;
+    inst.low = low;
+    inst.volume = volume;
+    inst.avg_volume = avg_volume;
+    inst.units_outstanding = units_outstanding;
+    inst.maker_inventory = maker_inventory;
+    inst.day_carry = day_carry;
+    inst.day_duration = day_duration;
+    inst.day_convexity = day_convexity;
+}
+
+/// The components `Engine.rate_attribution` reports.
+pub const RATE_COMPONENTS: [&str; 4] = ["carry", "duration", "convexity", "flow"];
 
 pub const COLUMN_FIELDS: [&str; 18] = [
     "price",
@@ -4445,10 +6571,7 @@ pub fn sector_volatility(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
         .map(|s| s.volatility)
         .ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
-            ))
+            ValidationError::new_err(crate::python::unknown_sector(sector))
         })
 }
 
@@ -4462,10 +6585,7 @@ pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
         .map(|s| s.daily_sigma)
         .ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "unknown sector {sector:?}. Valid sectors: {}",
-                crate::sectors::keys().join(", ")
-            ))
+            ValidationError::new_err(crate::python::unknown_sector(sector))
         })
 }
 

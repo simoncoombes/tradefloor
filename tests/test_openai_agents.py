@@ -426,7 +426,9 @@ def test_the_decision_contract_is_bound_as_the_output_type():
         "contract")
     rendered = json.dumps(schema.json_schema())
     assert "actions" in rendered and "BUY" in rendered
-    assert "order_type" not in rendered and "limit_price" not in rendered
+    # Decision schema 2: limit orders and CANCEL reach the provider as
+    # schema, under strict mode.
+    assert "limit_price" in rendered and "CANCEL" in rendered
 
 
 @needs_sdk
@@ -758,12 +760,16 @@ def test_a_transport_failure_is_a_framework_error_not_a_decision_error():
 
 
 @needs_sdk
-def test_the_bound_model_refuses_a_hold_carrying_a_quantity():
-    """The rule lives in `decision_model`, and this proves it survives the
-    SDK's strict-schema rendering rather than being dropped on the way."""
-    adapter = make_agent(lambda p: answer(act("TECH_A", "HOLD", 500)))
-    with pytest.raises(ci.DecisionError):
-        contract.make_world(adapter).run(days=1)
+def test_a_hold_carrying_a_quantity_is_refused_on_its_own():
+    """Decision schema 2. The bound model used to refuse this, and the SDK
+    makes one call and raises on an invalid response, so one bad action
+    lost the whole decision. The rule moved to `parse_decision`, which
+    refuses the HOLD and lets the BUY beside it trade."""
+    world, adapter = run_world(lambda p: answer(
+        act("TECH_A", "BUY", 2000), act("DEFENSIVE_A", "HOLD", 500)))
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    refused = adapter.record[0]["decision"]["refused"]
+    assert len(refused) == 1 and "HOLD" in refused[0]["reason"]
 
 
 @needs_sdk
@@ -774,12 +780,15 @@ def test_the_bound_model_refuses_a_negative_quantity():
 
 
 @needs_sdk
-def test_an_unlisted_symbol_is_a_market_refusal_not_a_decision_error():
-    """Well-formed output the market cannot take. The SDK validated it
-    happily, because the SDK does not know what is listed here."""
-    adapter = make_agent(lambda p: answer(act("NOT_LISTED", "BUY", 100)))
-    with pytest.raises(ci.MarketRefusalError, match="NOT_LISTED"):
-        contract.make_world(adapter).run(days=1)
+def test_an_unlisted_symbol_is_refused_on_its_own():
+    """Well-formed output the market cannot take. The SDK validated it,
+    because the SDK does not know what is listed here, and the market
+    stage refuses that action alone."""
+    world, adapter = run_world(lambda p: answer(
+        act("NOT_LISTED", "BUY", 100), act("TECH_A", "BUY", 2000)))
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    refused = adapter.record[0]["decision"]["refused"]
+    assert len(refused) == 1 and "NOT_LISTED" in refused[0]["reason"]
 
 
 @needs_sdk
@@ -1371,26 +1380,46 @@ def test_the_committed_recording_replays_end_to_end():
     # the first: trades 8, pnl 24410.0, turnover 2611910.0. And the ones
     # the fourth composition replaced before them: trades 7, pnl 14495.0,
     # turnover 2566815.0.
-    assert card.trades == 7, card.trades
-    assert card.pnl == pytest.approx(22490.0), card.pnl
-    assert card.turnover == pytest.approx(1939890.0), card.turnover
-
-    # AND THE REFUSAL STAYS GONE, which is a fact about this market and
-    # not a bug. gpt-5.2 sized inside the limits on pt-v18's market and the
-    # pt-v18 recording had nothing to refuse; on pt-v19 as first composed it
-    # asked for 2.06x against a 2.00x cap on day 4 and the MARKET refused
-    # that leg; on the fourth and fifth compositions it stayed inside the
-    # cap every day and there is nothing to refuse. Each of those is the
-    # environment doing its job on a decision the agent made, not a replay
-    # failure.
     #
-    # Pinned exactly rather than bounded, and the reason both lines exist:
-    # a replay failure lands in this same list, so counting the refusals is
-    # not enough -- the second assertion says the list is EMPTY, which a
-    # missing-digest error would not leave it. Previously: rejected 1, one
-    # leverage refusal.
-    assert card.rejected == 0, card.errors
-    assert card.errors == [], card.errors
+    # RE-RECORDED again for 0.8.5, when an agent's fills started reaching
+    # the market once instead of on every tick of the step. The market the
+    # model saw after its first trade moved, so the digests did. The values
+    # the flow fix replaced: trades 7, pnl 22490.0, turnover 1939890.0.
+    #
+    # And RE-RECORDED once more for 0.8.5, when pt-v20 became the default.
+    # The values the pt-v20 recording replaced (pt-v19, fills applied
+    # once): trades 10, pnl 18930.0, turnover 2257400.0.
+    #
+    # And RE-RECORDED once more for 0.8.5, when pt-v20 took the vector its
+    # grade passed on (ptv20g6). The values that recording replaced (pt-v20
+    # before its graded arm): trades 1, pnl 7042.0, turnover 934500.0,
+    # rejected 2.
+    #
+    # And RE-RECORDED for 0.8.5's decision schema 2 (limit orders, CANCEL,
+    # open orders in the payload) and margin charged by default. The values
+    # that recording replaced: trades 3, pnl 57576.0, turnover 2825350.0.
+    assert card.trades == 2, card.trades
+    assert card.pnl == pytest.approx(21509.93, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(1565500.0), card.turnover
+
+    # Refusals are a fact about each recording, not a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
+    # pt-v19 as first composed it asked for 2.06x against a 2.00x cap on day
+    # 4 and the MARKET refused that leg; on the fourth and fifth
+    # compositions, and on 0.8.5's pt-v19 run, it stayed inside the cap
+    # every day. On pt-v20 before its graded arm it asked for 3.26x equity
+    # on day 4 and the market refused two of three orders, at 2.11x and
+    # 2.08x. On the graded arm it bought TECH_B on days 1 and 4 and trimmed
+    # it on day 2, peaking at 1.86x, and nothing was refused.
+    #
+    # Pinned exactly rather than bounded: a replay failure lands in the
+    # errors list, so the list holding only the market's own refusal is
+    # what says every decision replayed. On the schema-2 recording gpt-5.2
+    # asked for 100,000 TECH_B on day 1, which would have taken the book to
+    # 9.34x, and the market refused it. Previously: rejected 0.
+    assert card.rejected == 1, card.errors
+    assert card.errors == [
+        "step 6: trade would take leverage to 9.34x, above the 2.00x limit"
+    ], card.errors
 
 
 @needs_fixture
@@ -1600,3 +1629,86 @@ def test_the_brief_names_no_ground_truth_and_no_arm():
         "is usually the funding cap, and an agent told to size against the "
         "wrong limit is refused at a limit nothing pointed it at. That cost "
         "a live recording an order.")
+
+
+# -- one bridge loop, against the real SDK client -----------------------------
+
+
+def _local_chat_completions_server():
+    """An HTTP/1.1 keep-alive server that answers every chat completion
+    with "ok". Keep-alive is the point: the client's pooled connection is
+    what binds it to the loop that opened it."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("content-length", 0)))
+            body = json.dumps({
+                "id": "c", "object": "chat.completion", "created": 0,
+                "model": "m",
+                "choices": [{"index": 0, "finish_reason": "stop",
+                             "message": {"role": "assistant",
+                                         "content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1,
+                          "total_tokens": 2}}).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_the_sdks_client_survives_consecutive_decisions():
+    """The live re-record of 2026-09-24 recorded 3 of 5 decisions on every
+    attempt: "Event loop is closed" at steps 6 and 18. The SDK's client
+    holds a connection pool bound to the loop that first used it, and the
+    bridge gave every call a fresh loop and closed it.
+
+    Reproduced here with the real SDK and a real ``AsyncOpenAI`` client
+    against a local server, no network and no key: one ``asyncio.run`` per
+    call fails the second call, and ``run_sync``, one loop per process,
+    passes all three."""
+    import asyncio
+
+    agents = pytest.importorskip("agents")
+    openai = pytest.importorskip("openai")
+    server = _local_chat_completions_server()
+    try:
+        def agent():
+            client = openai.AsyncOpenAI(
+                base_url=f"http://127.0.0.1:{server.server_port}/v1",
+                api_key="not-a-key")
+            model = agents.OpenAIChatCompletionsModel(
+                model="m", openai_client=client)
+            return agents.Agent(name="probe", instructions="x", model=model)
+
+        config = agents.RunConfig(tracing_disabled=True)
+
+        fresh, outcomes = agent(), []
+        for _ in range(3):
+            try:
+                outcomes.append(asyncio.run(agents.Runner.run(
+                    fresh, "hi", run_config=config)).final_output)
+            except RuntimeError as exc:
+                outcomes.append(str(exc))
+        assert outcomes[0] == "ok"
+        assert "Event loop is closed" in outcomes, (
+            "the fresh-loop control no longer fails; this test would pass "
+            "without the bridge doing anything")
+
+        bridged = agent()
+        assert [ci.run_sync(agents.Runner.run(bridged, "hi",
+                                              run_config=config)).final_output
+                for _ in range(3)] == ["ok", "ok", "ok"]
+    finally:
+        server.shutdown()

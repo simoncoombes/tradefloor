@@ -23,7 +23,10 @@ comes from there.
 
 **The information channel.** Order imbalance feeds the factor model as a
 signal, moving the mispricing itself. This one PERSISTS: the book recovers as
-liquidity replenishes, but a shift in `s` is a new level.
+liquidity replenishes, but a shift in `s` is a new level. A step's fills reach
+it once, on the tick after they filled (``fills=`` on ``run_session``); until
+0.8.5 they were held on every tick of the step, which counted each order 65
+times at six steps a day.
 
 The split matters because they decay differently, and every serious execution
 model is built on the distinction. Elsewhere it is fitted from data with
@@ -54,8 +57,16 @@ identical numbers. Measured on this build, with ``analyse`` and a single
 first-step buy of the first name of ``Universe.random(20, seed=7)``, sim
 seed 2026, one six-step day, reading ``impact_bps`` on that name: requests of 20x
 and 100x the average minute volume (498 and 2,490 shares) both fill the
-same 483 shares and land exactly the same 201.52 bps of end-of-run impact.
-The response is linear in what actually fills, not in what you ask for.
+same 483 shares and land exactly the same 74.79 bps of end-of-run impact
+(315.00 under 0.8.1, which held the flow on every tick of the step). The
+response is a function of what actually fills, not of what you ask for.
+
+Most of that 74.79 is not the buy's permanent impact, which moves `s` by
+about 3 bps here. It is the tape: the print chases the model price with a
+gap of tens of basis points, so any change to the model price, however
+small, re-deals where the print sits inside that gap from then on. Read a
+single run's ``impact_bps`` as permanent impact plus that noise, and read
+the permanent part from ``Engine.attribution("order_flow_impact")``.
 
 ## What the number means
 
@@ -68,36 +79,36 @@ shortfall. So does a seller who received less. Reporting a signed difference
 and leaving the reader to work out which direction hurt is how sign errors get
 into published numbers.
 
-## This is an execution measure, not a strategy P&L, and a round trip shows why
+## This is an execution measure, not a strategy P&L
 
 Measured on this build, on the first instrument of ``Universe.random(20,
 seed=7)``, one six-step day, buying 1% of ADV (97 shares) at the first
-step: holding costs **+16.71 bps**, identically on every one of the eight
+step: holding costs **+20.18 bps**, identically on every one of the eight
 suite seeds (2026, 1, 2, 3, 4, 5, 7, 11), because the entry lands at step
 zero, before the two worlds can diverge. Selling the same 97 shares three
-steps later ends anywhere between **-13.25 and +5.76 bps** across those
-seeds, negative on six of the eight, median -8.4. An earlier version of
-this docstring quoted a single round-trip figure (-13.57, at sim seed
-2026, pre-GJR); that same seed now reads +5.76, and the sign genuinely
-flips with the seed, so the seed range is the honest number where the
-entry gets one figure.
+steps later costs again: the round trip ends between **+12.7 and +28.8
+bps** of the notional it traded across those seeds, median +18.0, positive
+on all eight.
 
-Nothing is wrong where the round trip comes back negative. The entry pushed
-the price up, part of that impact persisted, and the exit sold into it. On
-that leg the agent really did transact at prices better than the untraded
-world offered. How much impact survives three steps is the market's call,
-so this is quoted as a range.
+Until 0.8.5 the same round trip came back NEGATIVE on seven of the eight,
+median -6.2 bps, and this docstring called that correct: the entry pushed
+the price up, the impact persisted, and the exit sold into it. What
+persisted was the harness counting the entry's flow on every tick of the
+step, so the exit sold into 65 times the impact the order made. An agent
+cannot sell into more of its own impact than its order causes, and a
+single order's permanent impact is smaller than what the book charges to
+trade it, so a round trip against its own footprint is a cost.
 
-What it means is that shortfall answers "what did each execution cost against a
-market where I never traded", which is the execution desk's question. It does
-not answer "did this strategy make money". For that, read `pnl` from
+Shortfall answers "what did each execution cost against a market where I
+never traded", which is the execution desk's question. It does not answer
+"did this strategy make money". For that, read `pnl` from
 :func:`tradefloor.evaluate`, which marks the portfolio to the market the agent
-actually created. A strategy that round-trips can show a negative shortfall and
-still lose, and the two numbers are not in conflict because they are answers to
-different questions.
+actually created. A strategy can pay a positive shortfall on every trade
+and still profit, from the market's own moves, and the two numbers are not
+in conflict because they are answers to different questions.
 
-Use :meth:`Execution.by_step` when the split matters: it shows the entry paying
-and the exit recouping, rather than one netted figure that hides both.
+Use :meth:`Execution.by_step` when the split matters: it shows each leg's
+cost rather than one netted figure.
 """
 
 from __future__ import annotations
@@ -105,10 +116,13 @@ from __future__ import annotations
 import struct
 from typing import Any, Sequence
 
+from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
-from .harness import Observation, session_clock
-from .portfolio import Portfolio
+from .harness import History, Observation, _warm_up, session_clock
+from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
+from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
+                      declares_hidden_state)
 from .universe_util import as_universe, fingerprint_of
 
 
@@ -121,11 +135,12 @@ class Execution:
 
     __slots__ = ("tickers", "fills", "baseline_path", "actual_path",
                  "baseline_final", "actual_final", "seed", "portfolio",
-                 "steps", "universe_fingerprint", "model_fingerprint")
+                 "steps", "universe_fingerprint", "model_fingerprint",
+                 "history_days")
 
     def __init__(self, *, tickers, fills, baseline_path, actual_path, seed,
                  portfolio, steps, universe_fingerprint="",
-                 model_fingerprint=""):
+                 model_fingerprint="", history_days=0):
         self.tickers = list(tickers)
         self.fills = list(fills)
         # One cross-section per decision step, in both worlds. The path rather
@@ -149,6 +164,9 @@ class Execution:
         # coefficient set can never present as one paid in the benchmark
         # market.
         self.model_fingerprint = model_fingerprint
+        #: How many untraded days both worlds ran before day 0. The traded
+        #: days of a run with a warm-up are later days of the seed's market.
+        self.history_days = history_days
 
     # -- shortfall --------------------------------------------------------
 
@@ -174,7 +192,7 @@ class Execution:
         Currency alone is not comparable between a $10m programme and a
         $100k one, and bps is the unit every execution desk already reads.
         """
-        notional = sum(
+        notional = ordered_sum(
             abs(f["notional"]) for f in self.fills
             if ticker is None or f["ticker"] == ticker
         )
@@ -202,9 +220,10 @@ class Execution:
     def by_step(self) -> list[tuple[int, float]]:
         """Shortfall per decision step, in currency.
 
-        A single netted figure hides the structure that matters: entering
-        pays, and unwinding into your own impact recoups. Both are visible
-        here and neither is visible in the total.
+        A single netted figure hides the structure that matters: what the
+        entry cost and what the exit cost, which differ because the exit
+        trades into a market the entry moved. Both are visible here and
+        neither is visible in the total.
         """
         buckets: dict[int, float] = {}
         for fill in self.fills:
@@ -254,12 +273,19 @@ class Execution:
         afraid of the trading: the fear gauge reacts same-day to the
         cap-weighted market return, VIX sets the shared factor's variance
         target, and the nudge reaches every name's volatility two closes
-        later. Measured on this build, with ``analyse(Momentum(), seed=7,
+        later. Measured under pt-v12, with ``analyse(Momentum(), seed=7,
         universe=Universe.random(60, seed=11), days=10)``, defaults
         otherwise: 57 names traded, and all three it never touched moved,
         by -10.72, +2.00 and +1.97 bps, against a 9.71 bps median
-        ``|impact_bps|`` across the traded names that moved. Read that
-        ordering carefully. The largest ripple is bigger than the median
+        ``|impact_bps|`` across the traded names that moved. Under 0.8.1
+        (pt-v19) the same run traded 54 and five of the six untouched names
+        moved, the largest by -15.82 bps. Since 0.8.5, which applies each
+        step's fills once rather than on every tick of the step, it trades
+        57 and none of the three untouched names moves at all: one agent's
+        flow no longer moves the index far enough to reach the gauge. The
+        channel is still there for flow that does, a standing
+        ``flow_impact`` programme for instance. Read the pt-v12 ordering
+        carefully. The largest ripple was bigger than the median
         direct impact, so this is not a rounding-error channel: on pt-v12
         ``vix_return_source`` is 1.0, so the fear gauge reads the whole
         day's cap-weighted index return rather than the closing minute
@@ -274,13 +300,29 @@ class Execution:
         (``rust/src/economy/daily.rs``), which no ordinary close comes
         near, and the +/-0.03% clamp that once made the channel
         intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
-        structurally immune, its final prices predating the first repriced
-        variance target, so ``test_tca.py`` can still assert
-        emptiness there. When the untouched names must be byte-exact, pin
-        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``,
-        verified empty on the ten-day run above. Anything here that was not
-        traded and survives a pinned VIX means something genuinely leaked
-        between the worlds.
+        immune to that channel, its final prices predating the first
+        repriced variance target. On pt-v20, the default from 0.8.5, a
+        faster form of it arrives at the first close: the close's macro
+        step reads the session's index return (the VIX, the 10-year's
+        flight to quality, the corporate yield that follows it), and
+        ``macro_publication_repricing`` re-marks every name to that step
+        before the final prices are read. On ``test_tca.py``'s one-day
+        buy of 1 per cent of ADV it moves 18 of 19 untouched names by at
+        most 3.4e-5 bps, against +0.80 on the traded name; every
+        cross-section before the close is identical on them, and the
+        pins below take the final one back to identical, which is what
+        ``test_tca.py`` asserts. When the untouched names must be
+        byte-exact, pin
+        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
+        on pt-v20, the default from 0.8.5, the corporate bond yield too:
+        its flight to quality moves the 10-year with the session's index
+        return, and the corporate yield follows the 10-year every session
+        (``flight_to_quality_day``, ``corporate_yield_daily``). A pinned
+        corporate yield holds through the close. ``hold(vix=15.0,
+        corporate_bond_yield=0.055)``, verified empty on the ten-day run
+        above, where the VIX alone leaves one name 5e-6 bps apart. Anything
+        here that was not traded and survives both pins means something
+        genuinely leaked between the worlds.
         """
         out = {}
         for i, ticker in enumerate(self.tickers):
@@ -291,9 +333,14 @@ class Execution:
     def untouched_moved(self) -> list[str]:
         """Names the trader never touched whose final price still differs.
 
-        Empty on a one-day analysis and under a pinned VIX; on a multi-day
-        run a small remainder is the fear-gauge channel, not a leak. See
-        :meth:`moved` for the measurement and the bounds.
+        Empty under a pinned VIX and, on pt-v20, a pinned corporate bond
+        yield, over any horizon. Without the pins, empty on a one-day
+        analysis only where the close writes no price (every preset
+        through pt-v19): pt-v20's close re-marks every name to the macro
+        step the trade moved, so a one-day analysis carries that close's
+        share of the fear-gauge and credit channel, and a multi-day one the
+        rest. Either way a small remainder is that channel, not a leak.
+        See :meth:`moved` for the measurement and the bounds.
         """
         traded = {f["ticker"] for f in self.fills}
         return sorted(t for t in self.moved() if t not in traded)
@@ -305,9 +352,12 @@ class Execution:
             "universe_fingerprint": self.universe_fingerprint,
             "model_fingerprint": self.model_fingerprint,
             "steps": self.steps,
+            # Only with a warm-up, so a run without one is the dict it was.
+            **({"history_days": self.history_days}
+               if self.history_days else {}),
             "fills": len(self.fills),
             "traded": traded,
-            "notional": sum(abs(f["notional"]) for f in self.fills),
+            "notional": ordered_sum(abs(f["notional"]) for f in self.fills),
             "shortfall": self.shortfall(),
             "shortfall_bps": self.shortfall_bps(),
             "impact_bps": {t: self.impact_bps(t) for t in traded},
@@ -336,6 +386,8 @@ def analyse(
     start: tuple[int, int, int] = (9, 30, 3),
     scenario: Any = None,
     model: str | ModelParams | None = None,
+    trusted_agents: bool = False,
+    history_days: int = 0,
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
@@ -355,26 +407,72 @@ def analyse(
     under a different model would measure the model gap, not the trading.
     The :class:`Execution` records ``model_fingerprint``.
 
+    The agent is sandboxed as :func:`tradefloor.evaluate` sandboxes it: a
+    read-only market view and portfolio view, ``obs.hidden`` for a
+    ``privileged`` agent, and the live engine only under
+    ``trusted_agents=True``. An agent that changes the market from inside
+    ``act`` is refused with a :class:`ValidationError`, because a shortfall
+    against a market the agent rewrote measures nothing.
+
+    ``act`` returns what it returns to :func:`tradefloor.evaluate`, with
+    one difference. A :class:`tradefloor.Limit` is refused with a
+    :class:`ValidationError` naming the step, because the part of a limit
+    order that waits fills inside a session, and the untraded world has a
+    price for the step's start and none for the minute it filled. Send
+    market orders here, or run the agent in :class:`tradefloor.World`,
+    whose trace records each limit order's fills. A return that is not an
+    order mapping raises the same way. An entry the market refuses,
+    including a quantity that is not a number, is skipped, as a refused
+    trade always has been here.
+
+    ``history_days=N`` runs the market for N days before day 0 with nobody
+    trading, as :func:`tradefloor.evaluate` does, so an agent that needs a
+    lookback has ``obs.history`` filled at its first decision. Both worlds
+    start day 0 from that warmed market, and the :class:`Execution` records
+    ``history_days``. No scenario applies during the warm-up. Left at 0,
+    the run is the one it always was.
+
+    Both worlds are copies (:meth:`Engine.fork`) of one engine built once,
+    which on pt-v20 saves one 755-day macro burn-in per call.
+
     Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
     TCA cannot make, because the benchmark it compares against is a market
     that never happened.
     """
     universe = as_universe(universe)
-    if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
-        raise ValidationError("days, steps_per_day and ticks_per_step must be >= 1")
-
-    hour, minute, day_of_week = start
+    from . import _checks
+    days = _checks.whole_number("days", days)
+    steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
+    ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+    hour, minute, day_of_week = _checks.start_clock(start)
+    history_days = _checks.history_days(history_days)
     tickers = None
     adv = [instrument.avg_volume for instrument in universe]
 
-    def fresh():
-        return Engine(seed=seed, universe=universe, macro_state=macro,
+    # One construction, two copies of it. A copy of a fresh engine is the
+    # same market to the bit, and on pt-v20 construction is the 755-day
+    # macro burn-in. The warm-up runs once, before the copies, so both
+    # worlds start day 0 from the same market.
+    template = Engine(seed=seed, universe=universe, macro_state=macro,
                       model=model)
+    history = History(history_days)
+    _warm_up(template, history_days, steps_per_day=steps_per_day,
+             ticks_per_step=ticks_per_step,
+             start=(hour, minute, day_of_week), history=history)
+    engine, quiet = template.fork(2)
+    # Dropped so the only engine in this frame is the guarded one: an agent
+    # that walks the stack for an engine would otherwise find the template
+    # and copy it unseen.
+    del template
 
     # -- world A: the trader exists ---------------------------------------
-    engine = fresh()
     tickers = engine.tickers
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
+    shown_engine = engine if trusted_agents else MarketView(engine)
+    shown_portfolio = (portfolio if trusted_agents
+                       else PortfolioView(portfolio, engine))
+    hidden = HiddenState(engine) if declares_hidden_state(agent) else None
+    guard = TamperGuard(engine, (portfolio,), trusted=trusted_agents)
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
@@ -389,10 +487,41 @@ def analyse(
             # run this day. This is what makes the fills table joinable
             # to bars and truth on (day, tick, instrument_id).
             portfolio.stamp(day, step, (step % steps_per_day) * ticks_per_step)
-            obs = Observation(step, day, tickers, prices, portfolio, engine,
-                              adv, steps_per_day)
-            for ticker, quantity in (agent.act(obs) or {}).items():
-                if not quantity:
+            obs = Observation(step, day, list(tickers), list(prices),
+                              shown_portfolio, shown_engine,
+                              adv if trusted_agents else tuple(adv),
+                              steps_per_day, hidden=hidden, history=history)
+            with guard:
+                orders = agent.act(obs)
+            if guard.tampered:
+                raise ValidationError(
+                    f"step {step}: the agent changed or copied the market "
+                    f"during act() "
+                    f"({guard.what}), so there is no execution to price. "
+                    "See tradefloor.sandbox.")
+            try:
+                entries = order_items(orders)
+            except ValidationError as exc:
+                raise ValidationError(f"step {step}: {exc}") from None
+            for ticker, value in entries:
+                try:
+                    quantity = check_order(ticker, value)
+                except ValidationError:
+                    # Not an order, so not an execution: skipped like a
+                    # refused one.
+                    continue
+                if isinstance(quantity, Limit):
+                    raise ValidationError(
+                        f"step {step}: the agent sent {quantity!r} for "
+                        f"{ticker!r}, and analyse() prices market orders "
+                        "only. The part of a limit order that waits fills "
+                        "inside a session, and the untraded world has no "
+                        "price for the minute it filled. Send a number of "
+                        "shares, or run the agent in tradefloor.World, whose "
+                        "trace records each limit order's fills.")
+                if quantity is None or isinstance(quantity, Cancel):
+                    # A Cancel has nothing to cancel: no limit order is
+                    # ever sent from here.
                     continue
                 try:
                     portfolio.execute(engine, ticker, quantity)
@@ -404,16 +533,16 @@ def analyse(
                                               step % steps_per_day,
                                               ticks_per_step),
                                ticks_per_step,
-                               order_flow=portfolio.pending_flow())
+                               fills=portfolio.pending_flow())
             portfolio.clear_flow()
             step += 1
+        history._close(engine, day)
         engine.close_market()
     actual_path.append(_f64(engine.prices()))
 
     # -- world B: nobody trades -------------------------------------------
     #
     # Run second, so an agent that raises does so before this work is spent.
-    quiet = fresh()
     baseline_path: list[list[float]] = []
     for day in range(days):
         if scenario is not None:
@@ -439,4 +568,5 @@ def analyse(
         steps=step,
         universe_fingerprint=fingerprint_of(universe),
         model_fingerprint=engine.model_fingerprint,
+        history_days=history_days,
     )

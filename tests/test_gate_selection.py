@@ -99,6 +99,64 @@ MARKED = {
          "test_the_committed_recording_replays_end_to_end"),
         ("test_render.py",
          "test_openai_agents_default_renderer_replays_the_shipped_fixture"),
+        # THE 0.8.5 CONTRACT FREEZE. Every test below replays one of the
+        # seven LLM recordings in `tests/fixtures/` (callable/five-days,
+        # finrobot/{liquidity-crisis,rate-ladder,rate-shock},
+        # langgraph/rate-shock, openai_agents/five-days,
+        # pydantic_ai/rate-shock), and all seven miss at step 0 by
+        # construction. Decision schema 2 and observation payload 1 changed
+        # the text every model is sent: the payload gained
+        # `portfolio.open_orders`, renamed `portfolio.gross_exposure` to
+        # `leverage`, and widened `return_5d` from 29 to 30 step intervals,
+        # and the FinRobot, LangGraph and PydanticAI instructions now
+        # describe limit orders and CANCEL. A replay key is a digest of that
+        # text, and the instructions digest is checked at construction, so
+        # only a live re-record restores them. The two FinRobot mandate and
+        # PydanticAI mandate checks compare a recording's stamped
+        # instructions digest with the shipped text, which moved on purpose.
+        ("test_boundary.py",
+         "test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider"),
+        ("test_boundary.py",
+         "test_the_runner_replays_the_recording_and_writes_the_map"),
+        ("test_callable.py", "test_the_recorded_run_replays_end_to_end"),
+        ("test_examples.py",
+         "test_the_liquidity_crisis_study_replays_its_recording"),
+        ("test_fingerprint.py",
+         "test_the_recorded_finrobot_fixture_matches_its_own_transcript"),
+        ("test_finrobot.py", "test_the_recorded_run_replays_end_to_end"),
+        ("test_finrobot.py",
+         "test_the_shipped_fixture_carries_the_digest_of_the_mandate_that_ran_it"),
+        ("test_langgraph.py", "test_the_recorded_run_replays_end_to_end"),
+        ("test_langgraph.py", "test_the_recorded_arms_diverge_at_the_shock"),
+        ("test_langgraph.py",
+         "test_replay_needs_neither_the_framework_nor_a_key"),
+        ("test_pydantic_ai_replay.py",
+         "test_the_committed_fixture_still_matches_the_shipped_mandate"),
+        ("test_pydantic_ai_replay.py",
+         "test_the_recorded_run_replays_end_to_end"),
+        ("test_render.py",
+         "test_finrobot_default_renderer_replays_the_shipped_fixture"),
+        ("test_render.py",
+         "test_langgraph_default_renderer_replays_the_shipped_fixture"),
+        ("test_render.py",
+         "test_pydantic_ai_default_renderer_replays_the_shipped_fixture"),
+        ("test_render.py",
+         "test_two_identical_renderers_give_identical_decisions_on_the_fixture"),
+        ("test_render.py",
+         "test_invariance_reports_a_non_matching_renderer_as_unrecorded"),
+        ("test_render.py",
+         "test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early"),
+        # EXAMPLE 08's RECORDING (owner decision 10). Both read
+        # `tests/fixtures/claude/example-08.json`, a live Claude run of
+        # `examples/08-claude-agent.py`. Each answer is keyed by a digest of
+        # the day's prompt, and the prompt carries every price, so a moved
+        # market or prompt misses at day 0 and only a live re-record
+        # restores it. Until the first recording is committed both skip and
+        # name the command that makes it.
+        ("test_examples.py",
+         "test_the_claude_example_replays_its_committed_recording"),
+        ("test_examples.py",
+         "test_the_claude_example_recording_says_what_made_it"),
     },
 }
 

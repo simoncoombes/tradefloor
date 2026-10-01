@@ -1,11 +1,13 @@
 {
+  "bondsNote": "Re-based 2026-09-24 on fix/ptv20-core: the session pins the corporate yield on day 2, and on pt-v20, the default, a pinned corporate yield now holds through the close (before, corporate_yield_daily moved it at the close by the 10-year's change, so it was not the pinned value overnight). A traded, pinned session; the simulation, metadata and per-preset digests are unchanged. Re-based again 2026-09-26 with the default trajectory when pt-v20 took its graded arm (see note).",
+  "bondsSha256": "cac3ff44c713aa1845f18d702b1bf2b2c38e99b516e23aab14053a76109ae13e",
   "bytes": 16920,
   "days": 250,
-  "katVersion": 27,
+  "katVersion": 28,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Re-based 2026-09-23 for the fifth composition of pt-v19: the long-run VIX law (LAWC-D), the macro session clock and US-calibrated cycle, news priced within minutes and the calm-regime variance target, adopted on the owner's long-run pass bar (design repo, programme/longrun/CRITERIA.md; programme/results/ptv19-fifth/RESULT.md). Every seeded pt-v19 trajectory changes; named presets before it replay exactly.",
+  "note": "Re-based 2026-09-24 for 0.8.5, where pt-v20 becomes the default: the tape follows the model price, a closing cross, every stock- and sector-specific shock in fair value, the agent-facing book, the curve dials and the aggregate earnings cycle, taken on all 28 rows registered for it (design repo, programme/ptv20-registration.md, box ptv20g3). Every seeded default trajectory changes; pt-v19 and every preset before it replay exactly (tests/known_answer_presets.json). Produced on macOS arm64 (M-series) first; the five-target determinism workflow is the second architecture. Re-based again 2026-09-24 on fix/ptv20-core: pt-v20, the default, responds to a move with volume at 0.6 rather than 0.8, which moves every seeded default trajectory; named presets before it replay exactly. Re-based again 2026-09-26 on fix/ptv20-final: pt-v20, the default, takes the eighteen dials of the twelfth registration's graded arm (design repo, programme/ptv20-registration.md, 'The graded arm'; box ptv20vr9), which moves every seeded default trajectory: simulationSha256 b644d9ae to 72485a9f, sha256 1a0bd15d to ac004fea, bondsSha256 47e65c9d to cac3ff44. metadataSha256 does not move. Named presets before pt-v20 replay exactly; pt-v20 has not shipped in a tagged release, so KAT_VERSION stays 28.",
   "seed": 20260820,
-  "sha256": "c22d4a029b402fe395a9d2be1fec10194a3c28d89f93e7717db33696fc80b6af",
-  "simulationSha256": "1e683b96f75dc5693a0dedcb3b44ee73adce8ad1a063c4614fc0766299df5d7c"
+  "sha256": "ac004feaa3fecaa325073882a82eb2b5870b6c3ce0d86976a1f91146b1758fb7",
+  "simulationSha256": "72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e"
 }

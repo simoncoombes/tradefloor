@@ -287,11 +287,13 @@ def _manifest_filename(statistic: str) -> str:
 #: statistic name matches, because this search cannot be the finding they
 #: describe.
 #:
-#: `roster-concentration`'s three statistics name what a SECTOR-CONCENTRATED
-#: roster costs beyond one year; every cell here runs on a balanced
-#: `Universe.random()` draw (its own docstring: sectors assigned round-
-#: robin), so a miss on one of its three statistics is not that gap's
-#: finding, whatever the horizon.
+#: `roster-concentration`'s statistics name the rows a SECTOR-CONCENTRATED
+#: roster is still refused on: the level and crisis rows, and
+#: `sector_excess_corr` on an all-technology roster. Every cell here runs
+#: on a balanced `Universe.random()` draw (its own docstring: sectors
+#: assigned round-robin), so a miss on one of those statistics is not that
+#: gap's finding, whatever the horizon. Until 2026-09-24 the gap named
+#: three shape rows instead, `cross_sectional_corr` among them.
 #:
 #: `scenario-magnitude` and `macro-range` carry `statistics=()` in
 #: `envelope.GAPS` -- they gate on a boolean a caller asserts

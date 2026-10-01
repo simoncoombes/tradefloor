@@ -171,7 +171,7 @@ BASELINE = "pt-v1"
 #: RESULT.md in the design repository). Fifteen of those dials left
 #: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
 #: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
-REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19")
+REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20")
 
 KINDS = ("derived", "measured", "undetermined")
 
@@ -212,6 +212,16 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
+    "earnings_cycle_half_life":
+        "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
+        "how fast earnings reach the phase's level. Unread while "
+        "`earnings_cycle_depth` is 0.0, as it ships through pt-v19; LIVE on "
+        "pt-v20, which ships the default 60 sessions unsearched",
+    "earnings_cycle_sigma":
+        "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
+        "the level's own daily noise. Unread while `earnings_cycle_depth` "
+        "is 0.0, as it ships through pt-v19; LIVE on pt-v20, where 0.0 is "
+        "a choice (the phase path alone)",
     "jump_idio_vix_decoupled":
         "added at 0.8.0 for the idiosyncratic arrival rate under the "
         "identity; pt-v19 carried 1.0 from 2026-09-14 until the 2026-09-20 "
@@ -344,6 +354,7 @@ RETURNED_TO_BASELINE = {
                   "returns it to 1.0 as one of the four dials measured at "
                   "120 seeds against pt-v18, whose 0.6 is the paired control "
                   "(DIAL_PROVENANCE entry)",
+        "pt-v20": "inherits pt-v19's return to 1.0 unchanged",
     },
 }
 
@@ -360,6 +371,15 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    "market_beta_down_asym_lag_recentre":
+        "inert at 0.0 as shipped: the recentring offset is not scaled on a "
+        "lagged session, and the lagged tilt's mean (about -8 per cent a "
+        "year of the market input on pt-v20) sits in `s` as a constant "
+        "discount while `fair_value_market_share` is 0.0, or while "
+        "`fair_value_market_linear` is 1.0 as pt-v20 ships it, which keeps "
+        "the tilt and the recentring in `s` and makes only the plain market "
+        "draw permanent (0.8.5, pt-v20 work: audit major 5, the long-horizon "
+        "reversion)",
     # RETURNED TO 0.0 BY THE FIFTH COMPOSITION (2026-09-23). pt-v19 carried
     # the excursion form for two days with a derivation this table held;
     # the entry is in this file as of the composition commit (4d8f9cf) and
@@ -663,7 +683,7 @@ OUT_OF_SCOPE = {
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "vix_ceiling": {
         "kind": "derived",
-        "presets": {"pt-v19": 181.3295},
+        "presets": {"pt-v19": 181.3295, "pt-v20": 181.3295},
         "identity": "a VIX already at C must come off it on a session at "
                     "the top of the graded range: `C - implied(C) >= F(C)`, "
                     "where `implied(C)` is the settled read-back the map "
@@ -870,7 +890,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_persistence": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.9979},
+        "presets": {"pt-v19": 0.9979, "pt-v20": 0.9979},
         "identity": "the year-to-year persistence of the tape's VIX regime, "
                     "as a daily AR(1): the lag-one autocorrelation of the 35 "
                     "yearly medians of log VIX (1990-2024) is 0.590, and "
@@ -891,7 +911,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.0181},
+        "presets": {"pt-v19": 0.0181, "pt-v20": 0.0181},
         "identity": "the era spread the level must add to what the loop "
                     "makes on its own: sigma = sqrt((V* - V0) / A) * "
                     "sqrt(1 - 0.9979^2) = 0.0181, the innovation of a daily "
@@ -927,7 +947,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "garch_vix_exponent": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0},
+        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0, "pt-v20": 2.0},
         "what_would_determine_it": "a box on the PAIR this dial belongs "
                                    "to, because the shipped 2.0 is the "
                                    "market factor's exponent borrowed for "
@@ -979,7 +999,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0},
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0},
         "what_would_determine_it": "a derivation of how the idiosyncratic "
                                    "jump arrival rate should couple to the "
                                    "VIX. The 2026-09-20 factorial's idio "
@@ -1059,7 +1079,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "corr(gamma, beta) -0.21, "
                                      "corr(alpha, beta) -0.48",
         },
-        "presets": {"pt-v19": 0.1556},
+        "presets": {"pt-v19": 0.1556, "pt-v20": 0.1556},
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
                     "of 2 * 152.5 = 305 on one degree of freedom. Same "
                     "tape, same window, same estimator:\n"
@@ -1109,7 +1129,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # describes anything that ships, so it is kept in `superseded` and
         # the entry records what 4.0 is: a ladder reading, not a derivation.
         "kind": "undetermined",
-        "presets": {"pt-v19": 4.0},
+        "presets": {"pt-v19": 4.0, "pt-v20": 4.0},
         "what_would_determine_it": (
             "the anchor form's own identity against the tape's crisis lever, "
             "the analogue of the excursion form's `e = 2 s / (2 - s)` below. "
@@ -1140,7 +1160,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_loop_gain": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.79},
+        "presets": {"pt-v19": 1.79, "pt-v20": 1.79},
         "identity": "the running loop's transmission of the level into the "
                     "VIX at the derived spread. The transmission rises with "
                     "the spread, so the gain is the self-consistent solution "
@@ -1172,7 +1192,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_epicentre_extra": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.93},
+        "presets": {"pt-v19": 1.93, "pt-v20": 1.93},
         "identity": "the median of the tape's three epicentre episodes: the "
                     "epicentre sector's episode volatility over the median "
                     "sector's, per-sector volatility being the median over the "
@@ -1265,7 +1285,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "target would put it, and nothing checks the two "
                         "against each other",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.0066},
+                    "pt-v19": 0.0066, "pt-v20": 0.0066},
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
                     "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
@@ -1341,7 +1361,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "is the reason this is recorded rather than "
                         "adopted",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.8946},
+                    "pt-v19": 0.8946, "pt-v20": 0.8946},
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
                     "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
@@ -1366,7 +1386,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crash_amplifier_conditional_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the VIX loop's stability condition. Under "
                     "`vix_level_identity` the deterministic map is "
                     "`v -> implied(v)`, the state lives on "
@@ -1456,7 +1476,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_blend_gain": {
         "kind": "derived",
-        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0},
+        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0, "pt-v20": 0.0},
         "identity": "zero, the identity: the tape supports no loading lift. "
                     "Three measured facts, none needing the model. (1) The "
                     "tape's VIX has no crisis attractor: its conditional "
@@ -1526,7 +1546,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_target_shock_cap": {
         "kind": "derived",
-        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524},
+        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524, "pt-v20": 158.8524},
         "identity": "the SUPREMUM of the return spike over the domain the "
                     "update admits, which is the image of `vix_return_clamp` "
                     "evaluated at the VIX floor: `vix_return_gain * clamp ** "
@@ -1640,7 +1660,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_supply_response": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the value at which supply equals demand in expectation, "
                     "so inventory_change is the noise term alone and "
                     "inventory is driftless",
@@ -1662,7 +1682,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0},
+        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.75},
         "what_would_determine_it": "the dispersion of net buyback yield "
                                    "across the US large-cap filing record "
                                    "the value is taken from. The point "
@@ -1673,6 +1693,23 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "declared_chosen_in_source": True,
         "source": "rust/src/params.rs, pt_v18, 'The one CHOSEN constant in "
                   "this era'",
+        # pt-v20's value has a different source and a different kind of
+        # claim, and the entry says so rather than letting the filing record
+        # above stand behind it.
+        "pt_v20": "0.75 is a CALIBRATION to the index's one-year drift, not "
+                  "a measurement of buybacks. The earnings anticipation and "
+                  "the rate sensitivity cost the drift about 0.7 and 0.8 "
+                  "points a year; at a third no arm of grid ptv20e6 held "
+                  "the level band's floor of 1.1, and the desk read 1.04 at "
+                  "0.6 and 1.79 at 0.75 on H126 rate 3 (30 rosters). Grid "
+                  "ptv20e7 then passed its 33 rows at 0.75, and the graded "
+                  "arm keeps it (box ptv20vr9, B8 the long-run return 7.2 "
+                  "against 6.25 plus or minus 2). At the model's median "
+                  "earnings yield of 0.0555 it is a buyback yield of about "
+                  "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
+                  "value record; the model pays no dividends (design "
+                  "repository, programme/ptv20-registration.md, tenth and "
+                  "eleventh registrations and 'The graded arm')",
     },
     "sector_factor_sigma": {
         # A DERIVATION EXISTS AND IT IS NOT FOR THIS VALUE. ws-b derived
@@ -1686,7 +1723,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # derived on a model whose sector volatility does not run, so
         # whether any value is needed is itself open.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614},
+        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614, "pt-v20": 0.008583053614},
         "what_would_determine_it": "the same inversion run against the "
                                    "SHIPPED value, or the shipped value "
                                    "replaced by the derived one. A residual "
@@ -1732,7 +1769,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # argument for reading the record and the table against each other
         # rather than either alone.
         "kind": "derived",
-        "presets": {"pt-v19": 0.7905},
+        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905},
         "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
                     "persistence identity solved for beta at the SHIPPED "
                     "alpha and gamma, with rho the tape's own per-name "
@@ -1834,7 +1871,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # not be the response ratio, and nobody has measured the shipped
         # one.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049, "pt-v20": 0.049},
         "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
                                    "per cent, measured the way the tape's "
                                    "0.848 was, and a value for this dial "
@@ -1849,7 +1886,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_slow_gain": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05},
+        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05, "pt-v20": 0.05},
         "what_would_determine_it": "a measured slow-component gain. ws-b "
                                    "withdrew this dial as undetermined "
                                    "rather than deriving it; 0.05 is a "
@@ -1862,7 +1899,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this table could not see. Found by the same audit as `garch_beta`
         # above and added on the same day.
         "kind": "derived",
-        "presets": {"pt-v19": 0.9913},
+        "presets": {"pt-v19": 0.9913, "pt-v20": 0.9913},
         "identity": "the SLOW POLE of the tape's own variance impulse "
                     "response, read off a two-component fit and carried "
                     "into the mixture as its persistence. One exponential "
@@ -1961,7 +1998,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this quantity reads 1.076 pooled over one history and 1.252 per
         # calendar year, and the panel's own statistic is a per-window one.
         "kind": "measured",
-        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252},
+        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252, "pt-v20": 0.252},
         "source": "^GSPC and ^VIX adjusted closes, 1990-01-03 to "
                   "2025-07-30, 8,959 aligned sessions with a return; "
                   "per-calendar-year estimator over 35 years",
@@ -2027,7 +2064,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "the level-blind form is REFUSED at F = 118, so the "
                     "level exponent is not an optional refinement of it",
         },
-        "presets": {"pt-v19": 1.4483},
+        "presets": {"pt-v19": 1.4483, "pt-v20": 1.4483},
         "identity": "the down-side response is `gain * |r|^p * V^-g` with "
                     "`g = p - 1`, the one-parameter-fewer standardised "
                     "form; the free fit's g of 0.49 +/- 0.12 contains "
@@ -2062,7 +2099,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # ======================================================================
     "vix_return_level_exponent": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.4483},
+        "presets": {"pt-v19": 0.4483, "pt-v20": 0.4483},
         "identity": "`p - 1` where p is `vix_return_exponent` 1.4483. The "
                     "engine runs the standardised form of the down-side "
                     "law, in which the level exponent is not free: fixing "
@@ -2090,12 +2127,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "CONCAVE in the move, against the down side's convex "
                     "1.4483: the two sides are not one law with a sign",
         },
-        "presets": {"pt-v19": 0.5433},
+        "presets": {"pt-v19": 0.5433, "pt-v20": 0.5433},
         "identity": "the up-side response is `gain * |r|^p_up * V^-g_up`",
     },
     "vix_return_level_exponent_up": {
         "kind": "derived",
-        "presets": {"pt-v19": -1.0},
+        "presets": {"pt-v19": -1.0, "pt-v20": -1.0},
         "identity": "the RATIO form in the level: an up-side response "
                     "proportional to the VIX is `V^-g_up` with g_up = -1. "
                     "The free fit reads -0.85 +/- 0.12, which is 1.2 "
@@ -2126,7 +2163,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "VIX's own innovation is the variance forecast's, "
                     "which is why the tape's residual persists",
         },
-        "presets": {"pt-v19": 0.0175},
+        "presets": {"pt-v19": 0.0175, "pt-v20": 0.0175},
         "identity": "the residual a level-aware law leaves, which a "
                     "level-blind law books as innovation and which the "
                     "`vix_dlog_innovation_sd` row of new-rows.md reads",
@@ -2152,14 +2189,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "caps the VIX fourth moment below it. The dial is not "
                     "what is short",
         },
-        "presets": {"pt-v19": 1.700},
+        "presets": {"pt-v19": 1.700, "pt-v20": 1.7},
         "identity": "the jump size in LEVEL units, which is what makes the "
                     "response scale-free; 0.0 selects the points of "
                     "`vix_jump_scale` instead",
     },
     "vix_jump_return_intensity": {
         "kind": "derived",
-        "presets": {"pt-v19": 6.199},
+        "presets": {"pt-v19": 6.199, "pt-v20": 6.199},
         "identity": "the derived 2.24 arrivals a year spread over the "
                     "down-return distribution as `max(0, -r)`: a rate per "
                     "year per percentage point of down move, which "
@@ -2195,7 +2232,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "same state was measured on vixdyn8 and is worse at "
                     "504 by 2.68 against a paired error bar of 1.60",
         },
-        "presets": {"pt-v19": 0.067},
+        "presets": {"pt-v19": 0.067, "pt-v20": 0.067},
         "identity": "the shock share of the sector variance state",
     },
     "sector_vol_beta": {
@@ -2213,7 +2250,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "estimate": 0.904,
             "standard_error": 0.069,
         },
-        "presets": {"pt-v19": 0.837},
+        "presets": {"pt-v19": 0.837, "pt-v20": 0.837},
         "identity": "the carry-over of the sector variance state. The "
                     "state is a ratio with fixed point 1.0, so beta alone "
                     "with alpha at 0.0 leaves it there forever, which is "
@@ -2234,7 +2271,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # that both halves of the opening ship together without fixing the
         # length.
         "kind": "undetermined",
-        "presets": {"pt-v18": 755.0, "pt-v19": 755.0},
+        "presets": {"pt-v18": 755.0, "pt-v19": 755.0, "pt-v20": 755.0},
         "what_would_determine_it": "the burn-in table re-run across the "
                                    "certified seed cohort, reporting the "
                                    "dispersion of the day each field "
@@ -2255,7 +2292,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # 2026-09-05. So the sentence that would BE the derivation is about
         # a value the default does not use.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025},
+        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025, "pt-v20": 0.025},
         "what_would_determine_it": "a daily-scale measurement of what 0.025 "
                                    "does. The recorded argument for this "
                                    "dial says a per-tick tilt is CLT-washed "
@@ -2279,7 +2316,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # an entry that records only the identity overstates it.
     "market_beta_down_asym_lag": {
         "kind": "measured",
-        "presets": {"pt-v18": 0.375, "pt-v19": 0.46},
+        "presets": {"pt-v18": 0.375, "pt-v19": 0.46, "pt-v20": 0.46},
         "source": "the certified panel plus index drift, the fear gauge and "
                   "the VIX's own persistence, scored by `loss.rule_table` at "
                   "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
@@ -2376,7 +2413,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # and the readings are in `ruling` below. The gap is in the
         # ARGUMENT, not in the choice.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27},
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27, "pt-v20": 0.27},
         "what_would_determine_it": "a JOINT re-solve of the three "
                                    "constraints of `vix-dynamics.md` 10.3 "
                                    "with the read-back constant c_d "
@@ -2487,7 +2524,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # on a curve is the defect in the module note's first paragraph with
         # the paragraph already written.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83, "pt-v20": 8.83},
         "what_would_determine_it": "the same joint re-solve "
                                    "`vix_mean_reversion` names -- this dial "
                                    "is the other unknown in it. A tape "
@@ -2546,7 +2583,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # such.
     "vix_level_identity": {
         "kind": "measured",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "source": "the nineteen-row scoring rule over ONE HUNDRED AND TWENTY "
                   "seeds (101-220) on roster 40 @ seed 111 at both certified "
                   "horizons, pt-v18 as the paired control in the same run; "
@@ -2623,7 +2660,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_decay_ratio": {
         "kind": "measured",
-        "presets": {"pt-v16": 0.6, "pt-v18": 0.6, "pt-v19": 1.0},
+        "presets": {"pt-v16": 0.6, "pt-v18": 0.6, "pt-v19": 1.0, "pt-v20": 1.0},
         "source": "the same 120-seed paired run and the same varying-roster "
                   "certification as `vix_level_identity` above: the two were "
                   "composed and measured together and are one regime. "
@@ -2693,7 +2730,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because at read time the two are indistinguishable, which is the
         # sentence this module opens with.
         "kind": "measured",
-        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60},
+        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60, "pt-v20": 0.6},
         "source": "MEASURED ON THE COMPOSED BASE. transmit1 varied the "
                   "level and the loading in ONE box for the first time: two "
                   "ladders over `sector_loading` 0.55, 0.60, 0.65 and 0.70, "
@@ -2836,7 +2873,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "volume_idio_variance_gain": {
         "kind": "measured",
-        "presets": {"pt-v19": 0.20},
+        "presets": {"pt-v19": 0.20, "pt-v20": 0.2},
         "source": "`volume_change_acf1` traced (volume-acf-result.md section "
                   "1) to a per-name volume-variance channel every earlier "
                   "preset ships at 0.0 -- a name's volume following its OWN "
@@ -2916,7 +2953,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_recentre": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "`E[f 1{f<0}] = -s / sqrt(2 pi)` for `f ~ N(0, s^2)`. "
                     "Scaling one side of a zero-mean draw moves its mean, so "
                     "the tilt adds `a * beta * -s / sqrt(2 pi)` to every name "
@@ -2973,7 +3010,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_opec_symmetry": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "at 1.0 both branches of the OPEC rule use one "
                     "probability and one magnitude range, so the expected "
                     "impact is equal and opposite either side of the 80 "
@@ -3020,7 +3057,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_seasonality_target": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "the amplitude is SPLIT, `1 + g*a` on the reversion "
                     "target against `1 + (1-g)*a` on the price level, so the "
                     "total is conserved at every `g` and the level carries "
@@ -3064,7 +3101,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_hazard_per_month": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "`weibull_hazard` returns `(shape/scale) * "
                     "pow(months/scale, shape-1)` and every scale in "
                     "`cycle_hazard_params` is in MONTHS -- 36 for an "
@@ -3131,7 +3168,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "jump_mean_compensated": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a jump arriving with probability `lambda` and mean `m` "
                     "contributes `lambda * m` to the expected return every "
                     "day whether it fires or not. Subtracting `lambda * m` is "
@@ -3176,7 +3213,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_nominal_growth": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "price is `fair_value * exp(s)` with `s` a stationary "
                     "AR(2) around zero and `eps` fixed when an instrument is "
                     "built, so the only time variation in fair value is the "
@@ -3246,7 +3283,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "neutral_discount_rate": {
         "kind": "derived",
-        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482},
+        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482, "pt-v20": 0.0482},
         "identity": "`compute_target_pe` compresses the multiple by "
                     "`(discount - neutral) * RATE_PE_SENSITIVITY * duration` "
                     "(fair_value.rs:189), so a name is valued exactly on its "
@@ -3318,7 +3355,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because the neighbouring entries are would be exactly the
         # inherited authority this module exists to refuse.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
         "what_would_determine_it": "the ladder's expected contribution "
                                    "measured at 1.0 over the returns this "
                                    "engine actually produces. The drift "
@@ -3375,7 +3412,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # are `derived` and say so.
     "vix_anchor_weight": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.375},
+        "presets": {"pt-v19": 0.375, "pt-v20": 0.375},
         "identity": "theta = (1 - a) k: the VIX's elasticity to realised "
                     "volatility is the anchor weight's complement times the "
                     "loop's transmission, the slow equilibrium of the memory "
@@ -3405,7 +3442,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_memory": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 0.05555555555555555},
+        "presets": {"pt-v19": 0.05555555555555555, "pt-v20": 0.05555555555555555},
         "what_would_determine_it": "a tape reading of how long a deviation "
             "of the VIX from the level realised variance implies persists "
             "before it is pulled back. FITTED: 1/18 was read off a ladder "
@@ -3416,7 +3453,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_centre": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.1515},
+        "presets": {"pt-v19": 0.1515, "pt-v20": 0.1515},
         "identity": "c = ln(1.252 / 1.076): the anchor pulls to `L * anchor "
                     "* exp(-c)`, the VIX's MEAN level (the pooled premium on "
                     "the pooled variance) rather than the per-window premium "
@@ -3434,7 +3471,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "eta in `1 - a(x) = (1 - a) (K / clamp(x, K, r K))^eta`: "
                     "the log-slope of the held read-back's gain g(x) between "
                     "VIX 18.5 and 30, so the loop's local gain `(1 - a(x)) "
@@ -3451,7 +3488,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_knee": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.3888},
+        "presets": {"pt-v19": 0.3888, "pt-v20": 0.3888},
         "identity": "k' = k + ln((1 - a') / (1 - a)) / eta: the crisis side "
                     "of the weight, (1 - a)(K / x)^eta, held while the base "
                     "weight moves from 0.45 to a' = 0.375: 0.2609 + "
@@ -3469,7 +3506,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_cap": {
         "kind": "derived",
-        "presets": {"pt-v19": 2.2159},
+        "presets": {"pt-v19": 2.2159, "pt-v20": 2.2159},
         "identity": "r' = r (1 - a') / (1 - a): the cap held at the same VIX "
                     "as the knee moves, 1.95 * 0.625 / 0.55 = 2.2159",
         "terms": {"r 1.95": "36 / 18.5, where the held map's gain reaches 95 "
@@ -3483,7 +3520,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_vix_exponent_below": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 2.5},
+        "presets": {"pt-v19": 2.5, "pt-v20": 2.5},
         "what_would_determine_it": "a single tape target where today there "
             "is a window. CHOSEN, not derived: below the anchor the tape's "
             "shared variance scales as VIX^2.25 [1.95, 2.57] and its calm "
@@ -3497,7 +3534,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_lag_live": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "what_would_determine_it": "the diagnostic registered in "
             "programme/results/corr-asymmetry-repair.md section 8 (design "
             "repository), which would rule on the form and is unrun. A FORM "
@@ -3510,7 +3547,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_compound_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
         "identity": "the economy steps once per trading session, so a year "
                     "of compounding is 252 steps; at 365 a trading year "
                     "received 252/365 of its annual GDP and CPI growth",
@@ -3524,7 +3561,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_calendar_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
         "identity": "the session calendar: a 21-step month, a 63-step "
                     "quarter and every calendar-day span scaled by 252 / 365 "
                     "and rounded, because the economy steps once per session",
@@ -3536,7 +3573,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_us_calibration": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: 1.0 reads the "
                     "phase table derived from NBER recession dates and BEA "
                     "real GDP, 1990-2025, with the Weibull scales solved "
@@ -3555,7 +3592,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fed_liftoff_rule": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: the ladder's own "
                     "cut branch mirrored (its 50 bp trigger and 25 bp steps), "
                     "so the rate lifts off zero on its Taylor rule instead "
@@ -3568,7 +3605,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_pe_buybacks": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: market_pe divides "
                     "by the same buyback-scaled earnings the valuation "
                     "already applies, so the multiple no longer rises by the "
@@ -3581,7 +3618,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_stationary_opening": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: 1.0 draws day "
                     "zero's phase AND age from the cycle's own stationary "
                     "law, `P(i, a) = S_i(a + 1) / sum_j E[T_j]`, every term "
@@ -3603,7 +3640,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_half_life": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.6},
+        "presets": {"pt-v19": 0.6, "pt-v20": 0.6},
         "identity": "h solving A(1) = the share of an earnings move priced "
                     "one minute after the release, with A(n) = (1 - d)(1 - "
                     "2^(-n/h)) / (1 - 2^(-390/h)) + d (1 - 2^(-n/h_d)) / (1 "
@@ -3625,7 +3662,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_share": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.12},
+        "presets": {"pt-v19": 0.12, "pt-v20": 0.12},
         "identity": "d = 1 - 1.58 / 1.80 = 0.122: the share of the move "
                     "that arrives after five minutes",
         "terms": {"1.58, 1.80": "per cent earned by five minutes and by the "
@@ -3637,7 +3674,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 42.0},
+        "presets": {"pt-v19": 42.0, "pt-v20": 42.0},
         "what_would_determine_it": "an intraday event study that resolves "
             "the timescale of the drift after five minutes. CHOSEN: 42 ticks "
             "is a 60-minute mean life (60 ln 2 = 41.6), which lands 92 per "
@@ -3648,7 +3685,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_quote_revision": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
         "identity": "a switch whose identity is the value: the maker "
                     "re-quotes by the tick's news term, so the traded tape "
                     "carries the absorption profile. With it the tape holds "
@@ -3662,6 +3699,638 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "repository)",
         "date": "2026-09-23",
     },
+    # pt-v20 (2026-09-24): the tape, the closing cross, the fair-value share,
+    # the stationary opening and the stop ladder's scale. Rows, bands and
+    # predictions registered before the grading box in the design
+    # repository's programme/ptv20-registration.md; the desk runs behind
+    # every figure below are programme/results/ptv20/desk/.
+    "quote_model_weight": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a weight whose identity is the value: at 1.0 the "
+                    "maker's book is centred on the efficient price (the "
+                    "model price) every tick, which is what quotes that "
+                    "track the efficient price means (Roll 1984), and the "
+                    "print's noise around it is then the bid-ask bounce. At "
+                    "0.0 the print chased the model price and the inventory "
+                    "skew carried it past",
+        "terms": {"-0.135 -> -0.03": "lag-one autocorrelation of 65-minute "
+                                     "print returns, median name, certified "
+                                     "roster (meanrev-edge section 4; ptv20 "
+                                     "desk r1-r6)",
+                  "5.8x -> 1.3-1.5x": "Roll spread over the quoted spread"},
+        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 4 "
+                  "(design repository, unpublished) and "
+                  "validation/pt-v20/programme/ptv20-registration.md",
+        "date": "2026-09-24",
+    },
+    "closing_auction": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: a closing cross "
+                    "clears at the efficient price, so the session's close "
+                    "is the model price and the close-to-close return "
+                    "carries no bid-ask bounce. Without it the 15:59 print "
+                    "sat 14 bp (sd) off the model price on the certified "
+                    "roster's large names and 45 bp on its small ones, the "
+                    "intraday volume curve being at its peak there, and the "
+                    "noise reverted the next day",
+        "terms": {"+13 -> -1 bp": "daily Lo-MacKinlay one-day book on the "
+                                  "roster's large names, with and without the "
+                                  "cross (ptv20 desk r3, r4), against the "
+                                  "certified forty's -1.7, whose closes are "
+                                  "auction prices"},
+        "source": "validation/pt-v20/programme/ptv20-registration.md",
+        "date": "2026-09-24",
+    },
+    "fair_value_news_share": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "every stock- and sector-specific shock -- the "
+                    "idiosyncratic and sector noise draws, the company's "
+                    "own, peer and sector news, its own jump -- is news "
+                    "about the company's value and not about how the market "
+                    "prices it, so all of it moves fair value for good; the "
+                    "mispricing keeps the market-wide part. The end point "
+                    "of the dial is the statement, and it is not tuned: the "
+                    "cross-sectional rows land on the real panel at it",
+        "terms": {"0.59 -> 0.95": "60-session idiosyncratic variance ratio, "
+                                  "median name (real 0.924; C5)",
+                  "+0.40 -> 0.00": "rank IC of the value signal on "
+                                   "published fundamentals against the next "
+                                   "20 sessions (real +0.009; C6)",
+                  "-0.17 -> -0.01": "12-1 month momentum rank IC (real "
+                                    "+0.027; C7)"},
+        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 8 and "
+                  "programme/ptv20-registration.md; ptv20 desk r1-r6 "
+                  "(design repository)",
+        "date": "2026-09-24",
+    },
+    "opening_mispricing_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.016},
+        "source": "programme/results/ptv20/desk/r5.json and r6b.json "
+                  "(design repository)",
+        "date": "2026-09-24",
+        "script": "programme/results/ptv20/desk.py, row s_xsd_stationary",
+        "estimator": "the cross-sectional sd of s after the cross-sectional "
+                     "mean is taken out, averaged over sessions 250-2660, "
+                     "certified roster, untraded, seeds 201-212, at the "
+                     "shipped vector's tape, cross and fair-value share",
+        "residual": "0.0155 to 0.0165 across cascade_gain 0.2 to 0.4 "
+                    "(seeds 201-206), 0.012 at 0.1 (seeds 207-212); the "
+                    "value moves the opening only, and C6's first-60 "
+                    "reading is 0.00 to 0.015 across it",
+    },
+    "fair_value_market_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 1.0},
+        "what_would_determine_it": "a tape estimate of the permanent share "
+            "of a market-wide shock, with its error: the long-horizon "
+            "variance ratio V1 reads it only jointly with the volatility "
+            "ceiling and the earnings cycle. FITTED, at the end point: the "
+            "grids ptv20vr1-vr4 tried 0.6, 0.75, 0.85 and 1.0; 0.85 failed "
+            "B5 and B7 without a ceiling (box ptv20vr4), and 1.0 with "
+            "`fair_value_market_linear` and a ceiling of 1.5 is the graded "
+            "arm, passing all 40 rows on held-out seeds (ptv20vr9) with V1 "
+            "at 0.80 (2y/1y, band 0.75 to 1.15) and 0.66 (5y/1y, band 0.55 "
+            "to 1.20), where the leading arm without it read 0.70 and 0.42 "
+            "(design repository, programme/ptv20-registration.md, twelfth "
+            "registration, V1 and 'The graded arm')",
+        "superseded": "0.0 on every preset until 2026-09-26, recorded in "
+                      "POST_BASELINE as a choice with a measured cost (B9) "
+                      "for the owner to rule on",
+    },
+    "opening_market_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.001},
+        "what_would_determine_it": "the estimator that set 0.1 (below), "
+            "re-run on the graded arm's vector: the sd over sessions "
+            "250-2660 of the cap-weighted s, certified roster, untraded. "
+            "Not run. CHOSEN: with `fair_value_market_share` 1.0 the plain "
+            "market draw is permanent and the market's own mispricing "
+            "carries only the excess above the volatility ceiling, so its "
+            "stationary spread is small; the grids carried the opening down "
+            "with the transient share (0.04 at a share of 0.6, 0.025 at "
+            "0.75, 0.015 at 0.85; boxes ptv20vr1-vr4), and 0.001 at 1.0 is "
+            "the smallest opening that keeps the stationary form, where 0.0 "
+            "would adopt the roster's day-zero premium",
+        "superseded": {
+            "value": 0.1,
+            "kind": "measured",
+            "source": "programme/results/ptv20/ (desk, mkts.py; design "
+                      "repository), 2026-09-24",
+            "estimator": "the stationary spread of the market's own "
+                         "mispricing: the sd over sessions of the "
+                         "cap-weighted s, certified roster, untraded, seeds "
+                         "201-203, when every market shock sat in s",
+            "residual": "0.148, 0.105 and 0.042 on the three seeds (mean "
+                        "0.099)",
+        },
+    },
+    # The agent-facing book (E4, feature/order-book-depth), taken by pt-v20.
+    # Read only on an agent's path, so no untraded statistic moves with any
+    # of them; tools/calibration/impact_curve.py measures what they buy.
+    "book_depth_coefficient": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.75},
+        "source": "tools/calibration/impact_curve.py (feature/order-book-depth; "
+                  "pt-v20's run in the design repository, programme/results/ptv20/)",
+        "date": "2026-09-24",
+        "script": "tools/calibration/impact_curve.py --base pt-v20",
+        "estimator": "the latent depth's scale at which the median average cost "
+                     "of an immediate order of Q = f V, in the name's daily "
+                     "sigma, meets two thirds of Toth et al.'s (2011) peak Y in "
+                     "[0.5, 1]: fitted 0.469 sigma (Q/V)^0.495 from 1 per cent "
+                     "of daily volume up, 3 seeds x 40 names",
+        "residual": "average coefficient 0.469 against the band 0.33-0.67; "
+                    "peak 0.672 against 0.5-1; matches Almgren et al. (2005) "
+                    "at 10 and 30 per cent of daily volume",
+    },
+    "book_depth_exponent": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.5},
+        "identity": "the square-root law's exponent: latent depth growing "
+                    "linearly with distance gives a cost in sqrt(Q/V)",
+        "terms": {"0.495": "fitted exponent of the average cost, pt-v20"},
+        "source": "Toth et al., Physical Review X 1, 021006 (2011); "
+                  "tools/calibration/impact_curve.py",
+        "date": "2026-09-24",
+    },
+    "book_depth_reach": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "the latent book reaches a whole day's volume, so an order "
+                    "up to 100 per cent of V walks it rather than being cut off",
+        "terms": {"1.0": "one day's volume"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_shared": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: agents consume one "
+                    "book, so one agent's fill is liquidity the next does not get",
+        "terms": {"1.0": "on"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_resting": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: an agent's limit "
+                    "order rests in the book with queue priority",
+        "terms": {"1.0": "on"},
+        "source": "feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    "book_refill_half_life": {
+        # DERIVED, not measured: 27 ticks was chosen inside the literature's
+        # resilience range and the refill arm then measured what it gives,
+        # which is a consequence of the value rather than an estimate of it.
+        "kind": "derived",
+        "presets": {"pt-v20": 27.0},
+        "identity": "a refill half-life inside the resilience the literature "
+                    "reports for large-cap US equities, minutes to an hour; "
+                    "27 one-minute ticks. The refill arm of "
+                    "tools/calibration/impact_curve.py measures what it gives: "
+                    "at 10 per cent of V a second order pays 23.1 bp more at "
+                    "k=0, 9.7 at 30 ticks and 1.6 at 130 (pt-v20 run)",
+        "terms": {"27.0": "ticks, one tick a simulated minute"},
+        "source": "feature/order-book-depth hand-off (E4); "
+                  "tools/calibration/impact_curve.py (refill)",
+        "date": "2026-09-24",
+    },
+    "fill_impact_coefficient": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.314},
+        "identity": "Almgren, Thum, Hauptmann and Li (Risk 18(7), 2005)'s "
+                    "permanent impact gamma: 0.314 sigma X / V, the linear "
+                    "permanent law, attributed per agent",
+        "terms": {"0.314": "gamma, US equity program trades"},
+        "source": "Almgren et al. 2005; feature/order-book-depth hand-off (E4)",
+        "date": "2026-09-24",
+    },
+    # Two dials pt-v20 FITTED on the design repo's co-tune grid (box
+    # ptv20e4, 90 pooled 21-year histories; programme/ptv20-registration.md)
+    # and graded by name on box ptv20g3. The ledger has no `fitted` kind, so
+    # they are entered as measured: the estimator is the grid's selection
+    # rule and the residual is what the grid read. The pt-v16 to pt-v19
+    # value is the one those presets were certified with, carried as the
+    # grid's paired control and unmeasured beyond that.
+    "market_factor_sigma": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.007593024924589399,
+                    "pt-v18": 0.007593024924589399,
+                    "pt-v19": 0.007593024924589399, "pt-v20": 0.006454071},
+        "source": "programme/ptv20-registration.md, the co-tune grid; "
+                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "date": "2026-09-24",
+        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): 17 arms of "
+                  "pt-v20 with the earnings cycle, crossed with this dial at "
+                  "x1.0, x0.85 and x0.70 of pt-v19's, 90 pooled histories",
+        "estimator": "FITTED: the arm that passes every long-run row and B9's "
+                     "annual spread with the most room, D35m85j50, takes 0.85 "
+                     "of pt-v19's value",
+        "residual": "without the 0.85 cut every earnings depth fails B3, 2.43 "
+                    "to 2.49 bear markets a decade against a ceiling of 2.24; "
+                    "at 0.85 with the half jump rate B3 reads 2.07; the 0.70 "
+                    "cut fails B1 (2.6 per cent of sessions above VIX 30)",
+    },
+    "jump_intensity_market": {
+        "kind": "measured",
+        "presets": {"pt-v16": 0.0565753337, "pt-v18": 0.0565753337,
+                    "pt-v19": 0.0565753337, "pt-v20": 0.02828766685},
+        "source": "programme/ptv20-registration.md, the co-tune grid; "
+                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "date": "2026-09-24",
+        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): the market jump "
+                  "rate at x1.0 and x0.5 of pt-v19's, crossed with the grid's "
+                  "other levers, 90 pooled histories",
+        "estimator": "FITTED: the chosen arm D35m85j50 halves the rate",
+        "residual": "B3 2.07 and B9's annual spread 16.78 at x0.5, against "
+                    "2.14 and 15.89 on the same arm at x1.0 (D35m85); B1 6.0 "
+                    "to 5.8 per cent",
+    },
+    "treasury_2y_noise": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.022},
+        "source": "programme/results/ptv20/real_rates.json and the desk curve "
+                  "runs (design repository)",
+        "date": "2026-09-24",
+        "script": "the desk's rates.py: sd of the daily change of the 2-year, "
+                  "certified roster, seeds 204-209, 1008 sessions; the tape's "
+                  "from FRED DGS2 2015-2025 (real_rates.py)",
+        "estimator": "the noise at which the model's 2-year daily change sd "
+                     "meets the tape's 5.23 bp",
+        "residual": "5.33 bp against 5.23 at 0.022; 5.73 at 0.028",
+    },
+    "treasury_10y_noise": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.038},
+        "source": "programme/results/ptv20/real_rates.json (the tape, FRED "
+                  "DGS10) and the grading boxes ptv20vr4-vr9 (design "
+                  "repository)",
+        "date": "2026-09-26",
+        "script": "validation/pt-v20/programme/longrun/criteria.py, row "
+                  "R2: the sd of the "
+                  "10-year's daily change over the pooled long run",
+        "estimator": "the noise at which the model's 10-year daily change "
+                     "sd, most of it meeting-day moves toward the policy "
+                     "target, meets the tape's 5.41 bp, on the graded arm's "
+                     "vector. One value was tried on that family: 0.025 "
+                     "read 4.16 to 4.25 bp on every arm of boxes ptv20vr4 "
+                     "to vr7 and failed R2, and 0.038 was set once and "
+                     "carried through vr6 to vr9. 0.03 through pt-v19 is "
+                     "the reference literal, unmeasured",
+        "residual": "5.12 bp against 5.41 at 0.038 on 90 held-out histories "
+                    "(box ptv20vr9, arm K40g35h5); 5.15 and 5.16 on the "
+                    "arms of vr6 to vr8",
+        "superseded": "0.025 (2026-09-24, desk rates.py, seeds 204-209): "
+                      "6.1 bp at 0.03 with the flight to quality on, "
+                      "against 5.41; 0.025 trimmed it",
+    },
+    "flight_to_quality_gain": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.008},
+        "source": "programme/results/ptv20/real_rates.json and the desk curve "
+                  "runs (design repository)",
+        "date": "2026-09-24",
+        "script": "the desk's rates.py: correlation of the roster index's "
+                  "daily return with minus the 10-year's change",
+        "estimator": "the gain at which that correlation meets the tape's "
+                     "-0.16 (SPY against IEF, 2015-2025). 0.02 through "
+                     "pt-v19 is the reference literal, which never fired",
+        "residual": "-0.19 to -0.20 at 0.008 on seeds 204-209, -0.11 at "
+                    "0.005, -0.60 at 0.02",
+    },
+    "flight_to_quality_day": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the yield the "
+                    "step writes after the close is that session's close, so "
+                    "the move it answers is that session's return. The "
+                    "shipped rule read the previous session's closing minute "
+                    "behind a 0.5 per cent gate that minute never crosses",
+        "terms": {"+0.02 -> -0.20": "correlation of the index's daily return "
+                                    "with minus the 10-year's change (tape "
+                                    "-0.16)"},
+        "source": "programme/results/ptv20/ (design repository)",
+        "date": "2026-09-24",
+    },
+    "corporate_yield_daily": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the meeting "
+                    "formula's own terms (the 10-year plus a spread of 2 bp a "
+                    "VIX point times the cycle multiplier) applied to each "
+                    "session's changes, so the level between meetings is the "
+                    "formula's and the next meeting re-anchors it",
+        "terms": {"+0.03 -> +0.22": "correlation of the index's daily return "
+                                    "with minus the corporate yield's change "
+                                    "(tape +0.27, SPY against LQD)"},
+        "source": "programme/results/ptv20/ (design repository)",
+        "date": "2026-09-24",
+    },
+    "earnings_cycle_depth": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.2},
+        "source": "the grading boxes ptv20vr3b, vr4 and vr9 (design "
+                  "repository, unpublished); the twelfth registration and "
+                  "'The graded arm' in "
+                  "validation/pt-v20/programme/ptv20-registration.md",
+        "date": "2026-09-26",
+        "script": "validation/pt-v20/programme/longrun/criteria.py, row "
+                  "E1: the median fall "
+                  "of aggregate earnings in a contraction over the pooled "
+                  "long run, against Shiller's reported earnings around "
+                  "the NBER recessions (median -0.17)",
+        "estimator": "the depth at which E1 meets the real -0.170 once the "
+                     "market's own shocks are permanent "
+                     "(`fair_value_market_share` 1.0), so the cycle no "
+                     "longer has to carry the index's yearly spread. E1 "
+                     "reads -0.280 at 0.35, -0.173 at 0.2 and -0.132 at 0.15 "
+                     "(box ptv20vr4), and B9 stays in band at 0.2 (18.1 "
+                     "against 17.4 on ptv20vr9). The real figure is a median "
+                     "over recessions whose falls run 2 to 54 per cent, and "
+                     "no error bar is recorded for it",
+        "residual": "-0.173 against -0.170 on 90 held-out histories (box "
+                    "ptv20vr9, arm K40g35h5)",
+        "superseded": {
+            "value": 0.35,
+            "date": "2026-09-24",
+            "source": "box ptv20e4, row B9 at pt-v19's transient market "
+                      "shocks: 16.8 against 17.4, standard error of the "
+                      "depth 0.14",
+        },
+    },
+    "earnings_cycle_upside": {
+        "kind": "derived",
+        "presets": {"pt-v20": 0.09},
+        "identity": "upside = q / (1 - q), where q is the share of the cycle "
+                    "spent in contraction and trough, so the pull toward "
+                    "-depth there and +depth * upside elsewhere averages to "
+                    "zero and the cycle moves earnings around the nominal-"
+                    "output path without shifting it",
+        "terms": {"q = 9 / 108": "contraction plus trough, 9.0 months of a "
+                                 "108-month cycle, the US phase table's "
+                                 "targets (rust/src/economy/state.rs, "
+                                 "us_phase_characteristics; NBER 1990-2025)",
+                  "9 / 99 = 0.0909": "rounded to 0.09"},
+        "source": "rust/src/economy/state.rs, us_phase_characteristics",
+    },
+    "earnings_cycle_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 60.0, "pt-v18": 60.0, "pt-v19": 60.0,
+                    "pt-v20": 60.0},
+        "what_would_determine_it": "the lag of S&P earnings behind the NBER "
+                                   "turning points in Shiller's monthly "
+                                   "series, read as the half-life of a pull "
+                                   "toward the phase's level. The co-tune "
+                                   "grid held it at the default; the "
+                                   "calibration box ptv20e1 found the market "
+                                   "mispricing's half-life at 40 or 90 did "
+                                   "not help B9, and this one was not "
+                                   "searched. Unread on pt-v16 to pt-v19",
+    },
+    "earnings_cycle_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0,
+                    "pt-v20": 0.0},
+        "what_would_determine_it": "the within-phase sd of twelve-month "
+                                   "earnings growth in Shiller's series "
+                                   "once the phase means are taken out. "
+                                   "0.0 takes no draw, so the cycle moves "
+                                   "earnings only through the phase path. "
+                                   "Unread on pt-v16 to pt-v19",
+    },
+    "cascade_gain": {
+        "kind": "measured",
+        "presets": {"pt-v20": 0.1},
+        "source": "programme/results/ptv20/desk/r4.json, r5.json (design "
+                  "repository)",
+        "date": "2026-09-24",
+        "script": "programme/results/ptv20/desk.py, row lm1_bps",
+        "estimator": "the daily Lo-MacKinlay one-day contrarian book on the "
+                     "certified roster's closes, median over histories of "
+                     "2660 sessions, against the certified forty's -1.74; "
+                     "the reading moves about -8.5 bp a day per unit of gain "
+                     "from about -0.7 at zero, so -1.74 puts the gain at "
+                     "0.12",
+        # The bar of the estimate: the desk median's se over six histories
+        # (about 0.95 bp) over the slope. It is as large as the value, which
+        # is the honest reading: the ladder's scale is not distinguishable
+        # from zero on the daily row, and 0.1 keeps a tenth of the crash
+        # continuation it carries rather than deleting a mechanism on a
+        # reading that cannot tell the two apart.
+        "standard_error": 0.11,
+        "estimate": 0.12,
+    },
+    # pt-v20's graded arm (2026-09-26): the design repository's twelfth
+    # registration, programme/ptv20-registration.md, "The graded arm", with
+    # the grids behind each value (ptv20e6-e8 for the valuation, ptv20vr1-vr9
+    # for the market's long horizon, chosen on held-out seeds 201-230,
+    # 501-530 and 801-830). The grade seeds had not been run on it when
+    # these were written.
+    "cycle_publication_lag": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 252.0},
+        "what_would_determine_it": "the NBER's announcement delays over the "
+            "post-war turns, as a distribution the one lag stands for; it "
+            "announced the December 2007 peak on 1 December 2008 and the "
+            "June 2009 trough on 20 September 2010. CHOSEN by the owner "
+            "(2026-09-25): the phase is published about a year late, as the "
+            "NBER dates a recession. With the phase in real time no arm of "
+            "grid ptv20e8 passed C10 (out in peak and contraction beat "
+            "holding by +0.2 to +1.3 points a year); read 252 sessions late, "
+            "every arm did (design repository, programme/ptv20-registration.md, "
+            "eleventh registration)",
+    },
+    "gdp_publication_lag": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 21.0},
+        "what_would_determine_it": "the BEA's release calendar read as "
+            "sessions after each quarter's end. CHOSEN by the owner "
+            "(2026-09-25): a quarterly figure, the quarter's mean, released "
+            "21 sessions after the quarter, about the advance estimate's "
+            "month. The daily figure stepped about -3 points at the first "
+            "close of a contraction, and a rule out for 63 sessions after "
+            "that drop beat holding in 88 of 90 histories; simulated offline "
+            "on grid ptv20e8, the quarterly release takes the GDP rules to "
+            "ahead in at most 36 per cent (twelfth registration, "
+            "validation/pt-v20/programme/ptv20-registration.md)",
+    },
+    "unemployment_adjustment_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 84.0},
+        "what_would_determine_it": "a fit of the partial adjustment's "
+            "half-life to FRED UNRATE's monthly path over the NBER "
+            "recessions, with its error. FITTED to two recessions, "
+            "not estimated: 84 sessions matches 2001 (4.3 to 5.5 per cent) "
+            "and 2007-09 (5.0 to 9.5), where the first month rose 0.1 to 0.3 "
+            "points; the model's first monthly rise of a contraction goes "
+            "from about 1.2 points to 0.16, 15 per cent of the rise comes in "
+            "the first 63 sessions, and on desk seeds 201-212 the "
+            "largest-rise rule goes from ahead in 7 of 12 to 0 of 12 "
+            "(twelfth registration, "
+            "validation/pt-v20/programme/ptv20-registration.md)",
+    },
+    "fear_greed_published_inputs": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the real index is "
+                    "built from market data and knows no recession dating, "
+                    "so what it may read of the economy is what has been "
+                    "published. Off, its target read the true phase and "
+                    "growth and fell 34.6 points in the five sessions "
+                    "entering a contraction, 7.9 times a normal spread",
+        "terms": {"84 of 90 -> 1 of 12": "histories where a rule out for 63 "
+                                         "sessions after a five-session fall "
+                                         "above 20 points beats holding: "
+                                         "grid ptv20e8 with the switch off; "
+                                         "desk seeds 201-212 with it on and "
+                                         "both publication lags set"},
+        "source": "validation/pt-v20/programme/ptv20-registration.md, "
+                  "twelfth registration",
+        "date": "2026-09-25",
+    },
+    "macro_publication_repricing": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: a decision "
+                    "readable after the close is priced when it is "
+                    "published, as event studies find the S&P 500's whole "
+                    "response to an FOMC statement inside about 30 minutes "
+                    "(Gurkaynak, Sack and Swanson 2005; Bernanke and "
+                    "Kuttner 2005); the drift around a decision comes "
+                    "before it, not after (Lucca and Moench 2015)",
+        "terms": {"-62.2 / +162.9 bp -> +0.6 / +3.9": "the index's first "
+                      "65-minute bar after a published hike and cut, less "
+                      "all days, off and on (box ratenews1, seeds 601-630)",
+                  "+1.90 -> -0.28 points a year": "the audit's rate-news "
+                      "agent over holding, ahead in 30 of 30 and 7 of 30"},
+        "source": "pt-v20 audit, finding 3; validation/pt-v20/programme/"
+                  "ptv20-registration.md, twelfth registration, row R7",
+        "date": "2026-09-25",
+    },
+    "earnings_anticipation_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 126.0},
+        "what_would_determine_it": "a tape estimate of the horizon over "
+            "which the market prices the earnings cycle's expected path. "
+            "FITTED on grids ptv20e6 to e8 over 0, 42, 63, 84, 126, 168, "
+            "189, 252 and 504 sessions: without it the price trough does "
+            "not lead the earnings trough (L1 fails), at 252 and longer the "
+            "driven 2020 fall is too shallow (F1), and 126 with a rate "
+            "sensitivity of 3 and a buyback share of 0.75 passed all 33 "
+            "rows of grid e7. On the graded arm L1 reads +20 sessions "
+            "against the real +68 (box ptv20vr9) (design repository, "
+            "eighth to eleventh registrations)",
+    },
+    "rate_pe_sensitivity": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 3.0},
+        "what_would_determine_it": "a regression of the market P/E on the "
+            "corporate yield with its error. The one reading is 2022: the "
+            "S&P 500's trailing P/E fell 4.9 to 5.5 per cent per 100 bp of "
+            "Baa (row R6, -5.2), where the constant 1.5 gives about 2 per "
+            "cent of fair value at the median duration and read -1.17 on "
+            "the driven 2022 path. FITTED below that reading: 4 read -4.69 "
+            "but failed B3 on grid ptv20e6, and at 3 the arm with H126 and "
+            "buybacks 0.75 passed all 33 rows of grid e7; the graded arm reads R6 at -4.02 against a band of "
+            "-10.4 to -2.6 (box ptv20vr9). It costs the one-year drift "
+            "about 0.8 points a year at 3 (design repository, "
+            "programme/ptv20-scenario-size.md section 5; eighth to "
+            "eleventh registrations)",
+        "superseded": "1.5 on every preset through pt-v19, the constant "
+                      "that stood before it was a dial, which no record "
+                      "derives",
+    },
+    "fair_value_market_linear": {
+        "kind": "derived",
+        "presets": {"pt-v20": 1.0},
+        "identity": "a switch whose identity is the value: the plain loading "
+                    "on the market draw, beta F, has zero mean in every "
+                    "regime and is news about value, so it is the part made "
+                    "permanent. The down-tick tilt, the lagged wire, the "
+                    "crisis injection, the crash amplifier and the "
+                    "recentring are not zero-mean at a high VIX (the "
+                    "amplifier fires on a threshold in baseline sigmas), so "
+                    "made permanent they are a drift that runs while fear "
+                    "lasts; in s they are a discount that reverts",
+        "terms": {"about -0.45": "the cap-weighted fair-value level's fall "
+                                 "in the hundred sessions after the VIX "
+                                 "peak on the driven 2020 path at a market "
+                                 "share of 1.0 without the switch (desk, "
+                                 "seed 101)"},
+        "source": "rust/src/params.rs, ModelParams::fair_value_market_linear; "
+                  "engine commit 2b6a93c (fix/ptv20-vr)",
+        "date": "2026-09-25",
+    },
+    "fair_value_market_vol_cap": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 1.5},
+        "what_would_determine_it": "the market volatility above which real "
+            "index shocks stop being permanent, from a regime-switching "
+            "estimate of the variance ratio with its error. The form follows "
+            "the evidence that mean reversion concentrates in turbulent "
+            "periods (Poterba and Summers 1988; Kim, Nelson and Startz 1991; "
+            "Spierdijk, Bikker and van den Hoek 2012); the level is FITTED: "
+            "on the driven 2020 path the trough's lead over earnings reads "
+            "+3.0 sessions at ceilings of 1 and 1.5 against -5.5 without "
+            "(desk, seeds 101-116), and a ceiling of 2 took B7, the index "
+            "volatility, to 27.9 against 18.1 (box ptv20vr4) where 1.5 "
+            "reads 20.6",
+    },
+    "fair_value_vix_discount": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.35},
+        "what_would_determine_it": "a tape estimate of the volatility "
+            "feedback's elasticity, the price response to expected "
+            "volatility above the knee (French, Schwert and Stambaugh 1987; "
+            "Campbell and Hentschel 1992 give the sign and the mechanism, "
+            "not this number). FITTED on held-out grids ptv20vr6-vr9 over "
+            "0.1 to 0.35: without it the driven 2020 fast crash is 0.192 in "
+            "41 sessions and fails F1 (real 0.339 in 23); the graded arm "
+            "reads 0.266 in 35.5 and passes all 40 rows (box ptv20vr9, arm "
+            "K40g35h5), where K40g30h3 at 0.3 passed as well",
+    },
+    "fair_value_vix_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 40.0},
+        "what_would_determine_it": "the VIX level at which the feedback "
+            "starts, from the same estimate. FITTED: at a knee of 30 or 35 "
+            "every smoothed arm tried put the sessions under -5 per cent past twice "
+            "the tape's 6.2 a decade (B5, 12.6 to 14.1; boxes ptv20vr8 and "
+            "vr9), and at 40 the two arms read 11.7 and 11.5",
+    },
+    "fair_value_vix_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 5.0},
+        "what_would_determine_it": "how fast the market prices a change "
+            "in the volatility regime, from a tape estimate. FITTED: read "
+            "unsmoothed, the discount's whole daily change landed with the "
+            "VIX's move and took the sessions under -5 per cent from 10.6 "
+            "to 18 to 25 a decade and the 2008 replay's worst month to 109 "
+            "to 137 against 84 (grids ptv20vr6-vr7); at 3 and 5 sessions "
+            "on the knee of 30 B5 read 14.1 and 12.7 at a gain of 0.25 "
+            "(ptv20vr8), and the graded arm at 5 reads 11.5 (ptv20vr9)",
+    },
+    "buyback_yield_cap": {
+        "kind": "undetermined",
+        "presets": {"pt-v20": 0.15},
+        "what_would_determine_it": "nothing on the tape: a GUARD, not a "
+            "claim about markets. The buyback term compounds the yield at "
+            "today's price over every elapsed year, so a name near the "
+            "0.01 price floor read a yield in the hundreds and the close's "
+            "re-mark diverged (a name from 0.10 to 38,220 in one close, the "
+            "index 86-fold, seed 821, session 4851, grid ptv20vr6; 1 of 90 "
+            "held-out histories without the feedback too). At 0.15 the same "
+            "session moves the index 1 per cent. CHOSEN: at pt-v20's "
+            "buyback share of 0.75 it binds only on a profitable name "
+            "priced under 5 times earnings",
+    },
+
 }
 
 #: Dials in scope that carry NO entry.
@@ -3704,6 +4373,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 #: what the record measured about that value (the paired control; a
 #: plateau) rather than leaving it here.
 UNPROVENANCED = (
+    # `rate_pe_sensitivity` left on 2026-09-26: it became a dial at 0.8.5 at
+    # the constant that stood, 1.5, and sat here while no preset moved it;
+    # pt-v20's graded arm sets 3.0 and its entry says where that came from.
     # `macro_calendar_days_per_year`, `macro_compound_days_per_year` and
     # `cycle_stationary_opening` left on 2026-09-23 with pt-v19's fifth
     # composition, which moves all three and carries an entry for each: the
@@ -3734,13 +4406,11 @@ UNPROVENANCED = (
     "inflation_reversion",
     "informed_flow_fraction",
     "jump_intensity_idio",
-    "jump_intensity_market",
     "jump_mean_market",
     "jump_momentum_share",
     "jump_sigma_idio",
     "jump_sigma_market",
     "jump_vix_coupling",
-    "market_factor_sigma",
     "market_vol_ceiling_multiple",
     "market_vol_floor_multiple",
     "market_vol_slow_vix_damp",
@@ -3770,6 +4440,11 @@ UNPROVENANCED = (
     "volume_move_cap",
     "volume_move_floor",
     "volume_move_noise",
+    # pt-v20 returned `volume_move_response` to 0.6, pt-v1's own value, on
+    # the D1 screen and grid ptv20e5 (the volume-return correlation crossed
+    # its ceiling from 1,260 sessions at 0.8), so the difference rule no
+    # longer asks about pt-v20 here, and pt-v16 to pt-v19's 1.0 stays as it
+    # was.
     "volume_move_response",
     "volume_persistence",
     "volume_variance_gain",

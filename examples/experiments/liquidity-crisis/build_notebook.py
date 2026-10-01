@@ -44,6 +44,17 @@ def C(text, alt=None):
 M("""
 # Will a financial AI agent reduce risk in a market crisis?
 
+> **Two harnesses on one page.** The canonical run, the one this notebook
+> replays, was recorded again live on 0.8.5 (60 calls to
+> `claude-sonnet-4-5-20250929`, 2026-10-01), so every number the notebook
+> computes from it describes the 0.8.5 harness. The resample, the four
+> replications and the five-arm decomposition are recorded summaries in
+> `data/`, from runs made before 0.8.5, when Tradefloor counted an agent's own
+> orders on every minute of a step instead of once. They were not recorded
+> again and are not re-measured here. Read them as the 0.8.x study's
+> evidence, not as checks on the canonical run: under 0.8.5 the agent holds
+> about half the gross exposure it held in any of them.
+
 This runs [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 inside [Tradefloor](https://tradefloor.dev), copies the market it is
 trading, and drops a liquidity crisis on one copy.
@@ -59,20 +70,21 @@ The agent is never told there is a crisis. No word in its observation says
 so. It reads a volatility number, a credit spread, and a book with 40% of
 its usual depth.
 
-**What it did.** Mean gross exposure of 0.64 in the crisis arm against 0.86
-in control. The agent's own contribution -- exposure measured immediately
-before and after its fills, at the same prices -- is -0.13 in the crisis
-arm and +0.12 in control. The sign flips, so this is the agent trading and
-not prices moving.
+**What it did.** Mean gross exposure of 0.333 in the crisis arm against
+0.359 in control, a small gap. The agent's own contribution -- exposure
+measured immediately before and after its fills, at the same prices -- is
+-0.09 in the crisis arm and +0.03 in control. The sign flips, so this is
+the agent trading and not prices moving.
 
-**Check one, the resample.** Ask each arm the same fork-step question eight
+**Check one, the resample**, from the 0.8.x runs. Ask each arm the same fork-step question eight
 times. Eight identical calls per arm, with every byte of the input the
 same, so the spread between the answers is the agent's own. Re-asking the
 exact same fork-step question produced substantial variation. The first
 decision alone did not give us a clean answer, and the ratios it produces
 are in the notebook rather than in the headline.
 
-**Check two, replication.** Run the whole experiment four times. The crisis
+**Check two, replication**, from the 0.8.x runs. Run the whole experiment
+four times. The crisis
 arm carried less exposure in three of them. The gap averages 1.21 times the
 between-run spread.
 
@@ -98,7 +110,7 @@ Every price, spread, fill and order-book state after step zero is generated
 by Tradefloor under the `pt-v16` preset.
 
 `experiment.py` pins `pt-v16`. The shipped default has moved on since the
-recording was made (it is `pt-v19` from 0.8.0), and a replay is keyed to
+recording was made (it is `pt-v20` from 0.8.5), and a replay is keyed to
 the exact text the agent was sent, so it only replays in the market it was
 recorded in. Every earlier preset stays selectable, which is what lets this
 run reproduce. The numbers below describe `pt-v16`.
@@ -200,7 +212,11 @@ print(f"recorded run: {len(transcript)} interactions, "
       f"{transcript.meta.get('model')} at temperature "
       f"{transcript.meta.get('temperature')}")
 
-sample = transcript.entries[0]["prompt"]
+# The saved transcript is not kept in decision order, so take the first
+# decision the shared history asked for.
+first = min((e for e in transcript.entries if e["arm"] == "shared"),
+            key=lambda e: e["step"])
+sample = first["prompt"]
 print()
 print(sample[:sample.index("Assets")].rstrip())
 """)
@@ -214,8 +230,11 @@ execute. The earlier recording of this experiment contains one: a
 rather than dropping the unknown field and executing a trade the agent
 believed was conditioned on something else.
 
-`World(on_refusal="skip")` costs the agent that decision and counts it. No
-repair, no retry, no trade. The count is kept apart from the market-side
+Since 0.8.5 an action like that is refused on its own, and the rest of the
+decision trades. An answer with no decision in it at all, with no JSON
+object or no `actions` list, still costs the agent the step:
+`World(on_refusal="skip")` counts it and moves on. No repair, no retry, no
+trade. The count is kept apart from the market-side
 `refused`, because an agent that could not format an answer and a market
 that rejected an order are different failures.
 
@@ -229,29 +248,32 @@ it.
 
 C("""
 def unusable(entries):
-    \"\"\"Responses this market has no execution path for.\"\"\"
+    \"\"\"Responses, or actions in them, this market has no execution path for.\"\"\"
     out = []
     for entry in entries:
         try:
-            parse(entry["response"])
+            decision = parse(entry["response"])
         except DecisionError as exc:
-            out.append((entry, exc))
+            out.append((entry, str(exc)))
+            continue
+        out.extend((entry, item["reason"]) for item in decision.refused)
     return out
 
 
 bad = unusable(transcript.entries)
-print(f"this recording: {len(bad)} of {len(transcript)} responses unusable")
+print(f"this recording: {len(bad)} unusable answers or actions "
+      f"in {len(transcript)} responses")
 
 # The one that prompted the refusal policy, from the earlier recording of
 # this experiment. Shown because a rate of one in eighty is worth seeing
 # rather than being told.
 older = Transcript.load(ex.LEGACY_FIXTURE)
 was_bad = unusable(older.entries)
-print(f"the earlier recording: {len(was_bad)} of {len(older)}")
+print(f"the earlier recording: {len(was_bad)} in {len(older)}")
 print()
 if was_bad:
-    entry, exc = was_bad[0]
-    print(str(exc)[:200])
+    entry, reason = was_bad[0]
+    print(reason[:200])
     print()
     print(entry["response"][:380].rstrip() + " ...")
 """)
@@ -331,7 +353,8 @@ them the file states one ASSUMPTION, that credit widens fifty basis points.
 Nothing in the simulator derives that third number, which is exactly why it
 sits under a different heading.
 
-The file here differs from the packaged one in a single field. Every
+The file here is the packaged one as 0.8.1 shipped it, with a single field
+changed. Every
 packaged scenario fires `at: 50`, because they are written for a single
 market with fifty days of warmup, and `World.apply` rebases `at` onto the
 day it is applied on -- so handing the packaged file to an arm forked on day
@@ -339,6 +362,11 @@ day it is applied on -- so handing the packaged file to an arm forked on day
 fifty days of the two arms drifting apart on nothing but the agent
 answering the same question two ways, and the crisis would then land on two
 markets that are no longer comparable. So `at: 0`, and nothing else.
+
+0.8.5 recalibrated the packaged file: the VIX goes three and a half times
+rather than two, and earnings fall 15% and recover. Against the package in
+this wheel the check below therefore reads False. The study keeps the file
+it was recorded under, and the shocks it prints are that file's.
 """)
 
 C("""
@@ -564,7 +592,7 @@ tick's flow can reach, and ordinary flow does not leave the top level or
 two.
 
 The crisis changes the FREQUENCY and not the size. Flow runs out of book
-2.7 times as often in the crisis arm, and the median share is the same in
+2.6 times as often in the crisis arm, and the median share is the same in
 both, so each event is the same shape and there are more of them. The mean
 distance from the model price to the print rises with the count.
 
@@ -796,15 +824,19 @@ Every number here is above one and none is far above it.
 
 The three checks answer different questions. Re-asking the exact same
 fork-step question produced substantial variation, and the first decision
-alone did not give us a clean answer. The canonical trajectory shows a
-clear separation over twenty decisions, but its days are not independent
-samples. The four live replications are the strongest check here, and the
-direction held in three of them.
+alone did not give us a clean answer. The canonical trajectory, recorded
+on 0.8.5, separates on 17 of 20 days, by 0.026 of gross exposure on
+average, and its days are not independent samples. The four live
+replications are the strongest check here, and the direction held in three
+of them, but they were recorded under the 0.8.x harness and their agent
+held about twice the exposure, so they are not a sample this run belongs
+to.
 
 What the run supports: in the canonical trajectory the agent reduced gross
 exposure in the crisis branch and increased it in control, the agent-only
 measure attributes that to its trades rather than to prices, and across
-four live repeats the crisis branch was lower in three.
+four live repeats under the 0.8.x harness the crisis branch was lower in
+three.
 
 The paths suggest why the first decision did not tell the whole story. The
 agent adjusts at each decision rather than reacting once and holding, so a
@@ -836,7 +868,7 @@ M("""
   envelope.
 - **Risk language is counted, not read.** A regular expression counts
   decisions whose rationale contains one of a fixed list of words. In the
-  canonical run that is 17 of 20 decisions in the crisis branch and 12 of
+  canonical run that is 16 of 20 decisions in the crisis branch and 13 of
   20 in control. It is a difference in how often those words appear, and
   nothing about what the agent meant by them.
 - **The scenario moves three targets at once.** Depth, volatility and the

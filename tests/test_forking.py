@@ -92,7 +92,7 @@ STATE_COLUMNS = (
 def day(engine, index, *, flow=FLOW, record=True):
     """One step of the canonical scenario."""
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=flow)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=flow)
     if record:
         engine.record(index)
     engine.close_market()
@@ -333,7 +333,7 @@ def test_fork_initial_state_matches_source_mid_day():
     engine = fresh()
     run(engine, 3)
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     fork, = tf.branch(engine, 1)
     assert differences(state(fork), state(engine)) == []
@@ -646,7 +646,7 @@ def test_a_checkpoint_survives_the_process(tmp_path):
         for i in range(30, 45):
             engine.open_market()
             engine.run_session(9, 30, 3, {TICKS_PER_DAY},
-                               order_flow={FLOW!r})
+                               flow_per_tick={FLOW!r})
             engine.record(i)
             engine.close_market()
         print(json.dumps({{"digest": market_digest(engine),
@@ -862,11 +862,11 @@ def test_a_mid_day_fork_keeps_the_days_endogenous_news():
     model = tf.ModelParams.from_preset("pt-v14", endogenous_news_intensity=0.9)
     parent = fresh(model=model)
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     fork, = tf.branch(parent, 1)
-    parent.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    fork.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    fork.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
 
     gap = differences(state(fork), state(parent))
     assert gap == [], f"the fork lost the day's news: {gap}"
@@ -875,8 +875,8 @@ def test_a_mid_day_fork_keeps_the_days_endogenous_news():
     quiet = tf.ModelParams.from_preset("pt-v14", endogenous_news_intensity=0.0)
     newsless = fresh(model=quiet)
     newsless.open_market()
-    newsless.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    newsless.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    newsless.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    newsless.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     assert newsless.prices() != parent.prices()
 
 
@@ -894,11 +894,11 @@ def test_a_mid_day_fork_keeps_the_days_recorded_ticks():
     """
     parent = fresh()
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     fork, = tf.branch(parent, 1)
 
     for engine in (parent, fork):
-        engine.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+        engine.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
         engine.record(0)
         engine.close_market()
 
@@ -1047,9 +1047,41 @@ def _nothing_dormant():
                    # could not see `session_news`. The 42-tick drift keeps
                    # the news priced all day.
                    news_quote_revision=1.0,
+                   # pt-v20's closing cross and curve switches are
+                   # switches as well.
+                   closing_auction=1.0,
+                   flight_to_quality_day=1.0,
+                   corporate_yield_daily=1.0,
+                   # The close's macro step priced as it is published, a
+                   # switch too.
+                   macro_publication_repricing=1.0,
                    news_absorption_half_life=0.6,
                    news_absorption_drift_share=0.12,
-                   news_absorption_drift_half_life=42.0)
+                   news_absorption_drift_half_life=42.0,
+                   # The agent-facing book's two switches are 0.0 or 1.0,
+                   # and its depth dials carry the values suggested for
+                   # pt-v20. They move nothing an untraded market carries;
+                   # `test_order_book_depth.py` guards the book's own state
+                   # across a restore, with agents in the market.
+                   book_shared=1.0,
+                   book_resting=1.0,
+                   book_depth_coefficient=0.75,
+                   book_depth_exponent=0.5,
+                   book_depth_reach=1.0,
+                   book_refill_half_life=27.0,
+                   fill_impact_coefficient=0.314,
+                   # A whole number of sessions, and short enough that the
+                   # published-phase history turns over inside the run.
+                   cycle_publication_lag=5.0,
+                   # A whole number of sessions, as pt-v20 would carry it;
+                   # tests/test_gdp_publication_lag.py carries the figure
+                   # across a restore through its releases.
+                   gdp_publication_lag=21.0,
+                   # A few months, so the impulse is well short of its drive
+                   # and a restore that lost it would move the next release.
+                   unemployment_adjustment_half_life=84.0,
+                   # A switch.
+                   fear_greed_published_inputs=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1098,7 +1130,7 @@ def _mid_day_parent(model, macro):
                        model=model)
     run(engine, 4)
     engine.open_market()
-    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     return engine
 
 
@@ -1112,7 +1144,7 @@ CONTINUE_DAYS = 25
 
 def _continue(engine):
     """Finish the open day, then run on."""
-    engine.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     engine.record(SPLIT_DAY)
     engine.close_market()
     run(engine, CONTINUE_DAYS, first=SPLIT_DAY + 1)
@@ -1232,6 +1264,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
     "pending_overnight":
         "the overnight move, waiting for the same row and for the same "
         "reason as pending_jump.",
+    "opening_z":
+        "the opening draws not yet applied. This guard forks mid-day, after "
+        "the first open has taken the draws, so the snapshot carries an "
+        "empty buffer and an engine restored without it holds the same "
+        "empty one. tests/test_sampled_verification.py::test_a_pre_open_"
+        "pt_v20_snapshot_restores_its_opening_draws forks before the open, "
+        "where a snapshot without them opened at the other engine's draws.",
     "crisis_in_episode":
         "the crisis episode, and this scenario cannot reach it because its "
         "macro is FIXED: `CRISIS` holds VIX at 45, above the 30.88 threshold, "
@@ -1249,6 +1288,12 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "session under the threshold and this scenario has none.",
     "crisis_epicentre":
         "the same episode, for the same reason.",
+    "session_tick":
+        "the ticks the day has run, which is the tick the book stamps a fill "
+        "with and nothing else. This scenario sends no order, so no fill is "
+        "stamped and no price reads it. tests/test_restore_state_carries.py::"
+        "test_restore_mid_session_then_submit_carries_the_tick submits after "
+        "a mid-session restore, where a snapshot without it stamped tick 0.",
     "crisis_epicentre_pin":
         "the scenario's pin, and this scenario sets none, so there is nothing "
         "to drop. tests/test_crisis_epicentre.py pins one and asserts the "
@@ -1392,10 +1437,10 @@ def test_the_fork_guarantees_hold_on_every_shipped_preset(preset):
 
     # A mid-day fork continues the parent exactly.
     parent.open_market()
-    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     fork, = tf.branch(parent, 1)
-    parent.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
-    fork.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    parent.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
+    fork.run_session(10, 30, 3, TICKS_PER_DAY, flow_per_tick=FLOW)
     assert differences(state(fork), state(parent)) == [], preset
     for engine in (parent, fork):
         engine.record(4)

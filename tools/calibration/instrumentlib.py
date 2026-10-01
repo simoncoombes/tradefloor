@@ -158,6 +158,13 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "fair_value_market_linear": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "fair_value_market_vol_cap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 32.0)},
+    "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
+    "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down
@@ -631,6 +638,61 @@ PARAM_SPECS: dict[str, dict] = {
                                         "hard_range": (0.0, 120.0), "derived": True},
     "news_quote_revision": {"kind": "abs", "step_unit": 1.0,
                             "hard_range": (0.0, 1.0), "derived": True},
+    # pt-v20 (2026-09-24, design repository programme/ptv20-registration.md).
+    # The two tape switches and the fair-value share are derived as the
+    # values that make the mechanism what it says (1.0 each); the opening
+    # spread and the ladder's scale are measured.
+    "quote_model_weight": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": True},
+    "closing_auction": {"kind": "abs", "step_unit": 1.0,
+                        "hard_range": (0.0, 1.0), "derived": True},
+    "fair_value_news_share": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "opening_mispricing_sigma": {"kind": "abs", "step_unit": 0.002,
+                                 "hard_range": (0.0, 0.3)},
+    "opening_market_sigma": {"kind": "abs", "step_unit": 0.005,
+                             "hard_range": (0.0, 0.3)},
+    "fair_value_market_share": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 1.0)},
+    "treasury_10y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "treasury_2y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "flight_to_quality_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
+    "flight_to_quality_day": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "earnings_cycle_depth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "earnings_cycle_upside": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "earnings_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (1.0, 2520.0)},
+    "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
+    "earnings_anticipation_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 5040.0)},
+    "rate_pe_sensitivity": {"kind": "rel", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": False},
+    # A switch whose identity is the value: 1.0 prices a macro decision the
+    # moment it is readable (pt-v20 audit finding 3).
+    "macro_publication_repricing": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": True},
+    "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
+    # on an agent's path, so no untraded statistic moves with any of them.
+    "book_depth_coefficient": {"kind": "abs", "step_unit": 0.05,
+                               "hard_range": (0.0, 10.0), "derived": False},
+    "book_depth_exponent": {"kind": "abs", "step_unit": 0.05,
+                            "hard_range": (0.0, 1.0), "derived": False},
+    "book_depth_reach": {"kind": "abs", "step_unit": 0.25,
+                         "hard_range": (0.0, 10.0), "derived": False},
+    "book_shared": {"kind": "abs", "step_unit": 1.0,
+                    "hard_range": (0.0, 1.0), "derived": False},
+    "book_refill_half_life": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 390.0), "derived": True},
+    "book_resting": {"kind": "abs", "step_unit": 1.0,
+                     "hard_range": (0.0, 1.0), "derived": False},
+    "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
+                                "hard_range": (0.0, 5.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,

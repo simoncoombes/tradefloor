@@ -82,6 +82,29 @@ SEEDS = 30
 #: substitution would change a count, which is itself worth knowing.
 CHEAP = {"bootstrap_draws": 2}
 
+#: The long-run criteria added on 2026-09-24, after the fifteen the shipped
+#: preset was adopted under: no price-only edge, on the tape and through
+#: `tf.evaluate` on the published suite.
+PRICE_ONLY_EDGE = ("C4a", "C4b")
+
+#: The fifteen long-run criteria adopted on 2026-09-23, which pt-v19 was
+#: adopted under (design repo `programme/longrun/CRITERIA.md`).
+ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
+           "C1", "C2", "C3", "D1")
+
+#: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
+#: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
+#: fifth registration) and eleven from the twelfth registration, graded on
+#: box ptv20g6 (the record's `criteria` field names design repo
+#: `programme/ptv20-registration.md`). pt-v20's record carries all forty;
+#: pt-v19's carries the other seventeen.
+REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
+                     "R4", "E1", "D2",
+                     # The twelfth registration's eleven more, graded on
+                     # pt-v20's arm (box ptv20g6, 40 of 40).
+                     "C10", "F1", "L1", "R5", "R6", "R7a", "R7b", "S1a",
+                     "S1b", "S2", "V1")
+
 
 def counted_rows(horizon_days: int = 252) -> list[str]:
     """The mechanism rows this horizon GRADES, diagnostics excluded."""
@@ -1127,8 +1150,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     So what is asserted is what the ruling asks of the record: it CARRIES
     both panels' certificates, readable by the bar and rendered in the line
     a reader sees; the reading is pinned so it cannot change in silence; and
-    beside it sit the two things that do gate -- the long-run verdict, which
-    passes, and every ruled band in on all four protocols.
+    beside it sit the two things that do gate -- the long-run criteria,
+    which pass, and every ruled band in on all four protocols. The record
+    is pt-v20's since 0.8.5.
     """
     rec = record(envelope.PRESET)
     for panel in envelope.MECHANISM_BAR_PANELS:
@@ -1143,7 +1167,8 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
 
     # The reading the release carries, REPORTED: 10 of 10 at 252 and 9 of 10
     # held out since the fifth composition of 2026-09-23, the held-out miss
-    # being `corr_asymmetry_lagged` at 20 of 30 against a cut of 21. The
+    # being `corr_asymmetry_lagged` at 20 of 30 against a cut of 21. pt-v20
+    # reads the same counts and the same miss, also at 20 of 30. The
     # fourth composition read 9 and 9 with `corr_asymmetry` the miss on both;
     # the test below reads the two records against each other.
     assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 10
@@ -1154,10 +1179,22 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     assert rec["mechanism_252"]["reversed"] == []
     assert rec["mechanism_heldout_seeds"]["reversed"] == []
 
-    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
+    # record carries forty: the fifteen pt-v19 was adopted under on
+    # 2026-09-23, C4a and C4b (added 2026-09-24, design repo
+    # `programme/longrun/CRITERIA.md`, section C4), and the twenty-three more
+    # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
+    # became the default. pt-v19's record reads 15 of 17 with the verdict
+    # "fail": it passes the fifteen and fails C4a and C4b, the tape's
+    # 65-minute reversal and two price-only rules on the published suite,
+    # which the brief that added them gave to pt-v20 to pass.
     lr = rec["long_run"]
-    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
-    assert all(row["pass"] for row in lr["rows"])
+    ids = [r["id"] for r in lr["rows"]]
+    assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
+    assert all(r["pass"] for r in lr["rows"]), [
+        r["id"] for r in lr["rows"] if not r["pass"]]
+    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
+    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
     assert lr["measured"]["fingerprint"] == envelope.PRESET
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
@@ -1187,8 +1224,11 @@ def test_the_fifth_composition_loses_a_held_out_mechanism_and_it_is_reported():
     assert verdict["panels"]["mechanism_252"]["gained"] == ["corr_asymmetry"]
     assert verdict["panels"]["mechanism_heldout_seeds"]["passed"] is False
     assert "mechanism_heldout_seeds" in verdict["reason"]
-    # And the long-run verdict that does gate passes all the same.
-    assert fifth["long_run"]["verdict"] == "pass"
+    # And the long-run criteria that gate pass all the same: the fifteen it
+    # was adopted under. C4a and C4b, added a day later, it fails, and the
+    # ship-bar test above says why they do not stop it.
+    assert all(r["pass"] for r in fifth["long_run"]["rows"]
+               if r["id"] not in PRICE_ONLY_EDGE)
 
 
 def test_a_record_missing_ONE_of_the_two_panels_is_refused_on_that_panel():

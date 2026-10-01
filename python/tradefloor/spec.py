@@ -87,7 +87,8 @@ import json
 import math
 from typing import Any, Mapping, Sequence
 
-from ._core import GameRng, ValidationError
+from ._arith import ordered_sum
+from ._core import GameRng, ValidationError, check_seed
 
 #: Bumped when the MEANING of a spec changes, never for additive growth. A new
 #: signal kind or cadence value extends the grammar and old specs keep meaning
@@ -110,7 +111,9 @@ CADENCES = ("step", "daily")
 
 #: The kinds that produce a ranking and therefore take ``top_k``. ``hold``
 #: owns the whole roster and ``random`` weights every name by its draw, so a
-#: concentration parameter on either would describe nothing.
+#: concentration parameter on either would describe nothing. A run takes at
+#: most half the universe on each side, so ``top_k`` above that runs as half
+#: the universe, and :func:`tradefloor.evaluate` warns when it does.
 _RANKED = ("momentum", "mean_reversion", "oracle", "blend")
 
 #: The kinds a blend may combine. ``hold`` ranks nothing, so blending it is
@@ -264,7 +267,7 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
     # the weight vector, so 1.2/0.8 and 0.6/0.4 build bit-identical agents,
     # and an unnormalised form would hash equal strategies apart. Signs and
     # ratios survive, so a net-short-signal tilt is still expressible.
-    total = sum(abs(c["weight"]) for c in merged.values())
+    total = ordered_sum(abs(c["weight"]) for c in merged.values())
     ordered = sorted(merged.values(), key=_identity_of)
     for component in ordered:
         component["weight"] = component["weight"] / total
@@ -362,13 +365,11 @@ class StrategySpec:
                     "without one the strategy is not reproducible, which is "
                     "the one property a spec exists to provide"
                 )
-            seed = _integer("seed", seed, minimum=0)
-            if seed > 0xFFFF_FFFF:
-                # The RNG's seed is 32-bit. Caught here, where the spec is
-                # written, rather than at build time inside an evaluation.
-                raise ValidationError(
-                    f"seed must fit in 32 bits (0..4294967295), got {seed}"
-                )
+            # The RNG's seed is 64-bit from 0.8.5. Its range is checked here,
+            # where the spec is written, rather than at build time inside an
+            # evaluation. An integral float is the integer it holds, as for
+            # every other integer field of a spec.
+            seed = check_seed(_integer("seed", seed, minimum=0))
         elif seed is not None:
             raise ValidationError(
                 "seed applies only to specs containing the 'random' signal. "
@@ -390,6 +391,16 @@ class StrategySpec:
             "StrategySpec is immutable: a fingerprint of a mutable spec "
             "would be a lie. Construct a new one."
         )
+
+    # Immutable, so a copy is the object itself. Without these `copy` rebuilt
+    # a spec through `__setattr__`, which refuses, and every agent carrying
+    # its `.spec` inside a wrapper -- a daily-cadence build, say -- could not
+    # be deep-copied, so `World.fork` raised on it (found 2026-09-24).
+    def __copy__(self) -> "StrategySpec":
+        return self
+
+    def __deepcopy__(self, memo: dict) -> "StrategySpec":
+        return self
 
     # -- named constructors ----------------------------------------------
 
@@ -415,7 +426,8 @@ class StrategySpec:
         ``seed`` seeds the strategy's own draws, on its own stream, exactly
         as :class:`tradefloor.baselines.RandomTrader` does. It is deliberately
         separate from the market seed and it is recorded in the spec, because
-        a noise floor that cannot be reproduced is not a floor.
+        a noise floor that cannot be reproduced is not a floor. Any integer
+        from 0 to ``2**64 - 1``.
         """
         return cls({"kind": "random"}, portfolio={"gross": gross},
                    execution={"max_participation": max_participation,
@@ -462,8 +474,9 @@ class StrategySpec:
         disclosure into the uncitable escape hatch. Its ``top_k`` moves the
         denominator of every capture ratio the library quotes, so a ratio
         published without the oracle's spec fingerprint beside it is not a
-        number anyone can compare. See :class:`tradefloor.baselines.Oracle` for
-        the measurements.
+        number anyone can compare. On pt-v20 the library quotes none
+        (``baselines.ORACLE_NOT_A_CEILING``). See
+        :class:`tradefloor.baselines.Oracle` for the measurements.
         """
         return cls({"kind": "oracle"},
                    portfolio={"top_k": top_k, "gross": gross},
@@ -700,7 +713,7 @@ class _BlendAgent:
         self.max_participation = float(max_participation)
         self._history: list[list[float]] = []
         self._lookbacks: list[int | None] | None = None
-        self._rng = (GameRng(int(seed), RANDOM_AGENT_STREAM)
+        self._rng = (GameRng(check_seed(seed), RANDOM_AGENT_STREAM)
                      if any(c["kind"] == "random" for c in self._components)
                      else None)
         if any(c["kind"] == "oracle" for c in self._components):
@@ -755,9 +768,23 @@ class _BlendAgent:
                 if kind == "mean_reversion":
                     attractiveness = [-a for a in attractiveness]
             elif kind == "oracle":
-                s = struct.unpack(
-                    "<%dd" % n, obs.engine.column("mispricing_s"))
-                attractiveness = [-x for x in s]
+                # The same dial-chosen reading the Oracle trades on
+                # (`baselines.Oracle.cross_sectional`): minus the mispricing
+                # where the cross-section carries the edge, and otherwise
+                # each name's expected return over the session. A blend is a
+                # ranked, dollar-neutral book, so the common drift the bare
+                # Oracle also trades as a net position ranks nothing here.
+                from .baselines import Oracle
+                from .sandbox import hidden_state
+                truth = hidden_state(obs)
+                model = dict(truth.model_params)
+                if Oracle.cross_sectional(model):
+                    s = struct.unpack(
+                        "<%dd" % n, truth.column("mispricing_s"))
+                    attractiveness = [-x for x in s]
+                else:
+                    own, _ = Oracle().expected_returns(truth, model)
+                    attractiveness = [own.get(i, 0.0) for i in range(n)]
             else:  # random: a uniformly random ranking, one draw per name
                 attractiveness = [self._rng.next_float() for _ in range(n)]
 
@@ -809,7 +836,9 @@ class _DailyCadence:
         # wrapped agent's "one-day lookback" resolves to one daily
         # observation rather than to however many steps the harness runs.
         # (`_adv` is the harness's own field; this wrapper is part of the
-        # same package and hands it on unchanged.)
+        # same package and hands it on unchanged, as it does the hidden
+        # state a privileged strategy was granted.)
         return self._inner.act(Observation(
             obs.day, obs.day, obs.tickers, obs.prices, obs.portfolio,
-            obs.engine, obs._adv, 1))
+            obs.engine, obs._adv, 1, hidden=getattr(obs, "hidden", None),
+            history=getattr(obs, "history", None)))

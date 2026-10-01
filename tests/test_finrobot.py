@@ -32,6 +32,13 @@ import tradefloor as tf
 from tradefloor.counterfactual import World, agree, compare
 from tradefloor.integrations import finrobot as fr
 
+
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (step 228, day 38).
+#: Its replay tests are skipped with the other fixtures that wait on a
+#: live re-record (decisions 4 and 11).
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "integrations" / "finrobot" / "rate_shock.py"
@@ -122,12 +129,13 @@ class Recorded(fr.FinRobotAdapter):
         return self.script(prompt) if callable(self.script) else self.script
 
 
-def one_observation(agent=None, *, days: int = 1) -> tuple[World, object]:
+def one_observation(agent=None, *, days: int = 1,
+                    model: str | None = None) -> tuple[World, object]:
     """Run a world far enough to have an observation with some history."""
     agent = agent or Scripted(answer())
     world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0,
                   pins={"federal_funds_rate": 0.04,
-                        "corporate_bond_yield": 0.055})
+                        "corporate_bond_yield": 0.055}, model=model)
     world.run(days=days)
     return world, agent
 
@@ -266,14 +274,16 @@ def test_the_adapters_constructor_keywords_are_the_ones_callers_wrote():
         "rebuilds the agent as type(self)(**keywords)")
 
 
-def test_the_supported_sides_are_the_three_the_mandate_names():
+def test_the_supported_sides_are_the_four_the_mandate_names():
     """`SIDES`, `parse` and the mandate text have to agree. They are three
-    statements of one contract, and a fourth side added to the tuple without
-    the mandate asking for it would be a side no model ever returns."""
-    assert fr.SIDES == ("BUY", "SELL", "HOLD")
+    statements of one contract, and a side added to the tuple without the
+    mandate asking for it would be a side no model ever returns. The same
+    holds for the limit price."""
+    assert fr.SIDES == ("BUY", "SELL", "HOLD", "CANCEL")
     for side in fr.SIDES:
         assert f'"{side}"' in fr.MANDATE, (
             f"{side} is accepted but the mandate never offers it")
+    assert '"limit_price"' in fr.MANDATE
 
 
 # -- the shared adapter contract --------------------------------------------
@@ -465,27 +475,20 @@ def test_a_recorded_transcript_reads_the_same_through_either_class():
             "of its own prompt, so this fixture cannot replay")
 
 
-def test_the_two_action_types_are_not_interchangeable():
-    """A trap worth knowing about, pinned so nobody rediscovers it.
-
-    `Action.__eq__` is an isinstance check, so a `finrobot.Action` and a
-    `common.Action` holding identical fields compare UNEQUAL. Anybody mixing
-    the two modules -- comparing a FinRobot decision against one from another
-    adapter -- has to compare `as_dict()`, not the objects.
-
-    This is the strongest argument for eventually collapsing the two, and
-    until that happens it is the strongest argument for knowing they are
-    separate.
-    """
+def test_the_two_action_types_are_one():
+    """`finrobot.Action` was a copy of `common.Action`, and the two compared
+    UNEQUAL on identical fields. From decision schema 2 it is a subclass
+    that only raises this module's `DecisionError`, so the action rules
+    exist once and the two compare equal."""
     from tradefloor.integrations import common
 
     mine = fr.Action("TECH_A", "BUY", 5.0)
     shared = common.Action("TECH_A", "BUY", 5.0)
-    assert mine.as_dict() == shared.as_dict()
-    assert mine != shared, (
-        "the two Action types now compare equal, which means one of them "
-        "has changed how equality works; check what else that affects")
+    assert isinstance(mine, common.Action)
+    assert mine == shared and shared == mine
     assert fr.Decision([mine]).as_dict() == common.Decision([shared]).as_dict()
+    with pytest.raises(fr.DecisionError):
+        fr.Action("TECH_A", "SHORT", 5.0)
 
 
 # -- the optional dependency ------------------------------------------------
@@ -584,8 +587,9 @@ def test_the_payload_carries_exactly_the_allowlisted_keys():
     # refuses a trade. The payload already named a participation cap worth
     # several times equity; without these an agent sizing to what it was told
     # scores zero fills and reads as a bad agent when it was misled.
-    assert set(payload["portfolio"]) == {"cash", "net_worth", "gross_exposure",
-                                         "max_leverage", "buying_power"}
+    assert set(payload["portfolio"]) == {"cash", "net_worth", "leverage",
+                                         "max_leverage", "buying_power",
+                                         "open_orders"}
 
 
 def test_the_macro_allowlist_is_the_librarys_own():
@@ -827,19 +831,26 @@ def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
         book_value_per_share=f["book_value_per_share"],
         federal_funds_rate=macro["federal_funds_rate"],
         corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+    # The macro the engine actually holds, not the pins: from 0.8.5 the
+    # default preset (pt-v20) moves the corporate yield every session
+    # (`corporate_yield_daily`), so two days in it reads 5.537% under a pin
+    # of 5.5%. The payload carries the engine's value, which is the point.
+    held = world.engine.macro_state
     direct = tf.fair_value(
         eps=3.0, sector="technology", revenue_growth=0.30,
-        book_value_per_share=15.0, federal_funds_rate=0.04,
-        corporate_bond_yield=0.055).fair_value
+        book_value_per_share=15.0,
+        federal_funds_rate=held.federal_funds_rate,
+        corporate_bond_yield=held.corporate_bond_yield).fair_value
     assert reconstructed == direct, (
         "fair_value is a pure function of six inputs and the payload carries "
         "all six, so this is an equality and not an approximation")
 
 
-#: How close `log(price / fair_value)` lands to the engine's `mispricing_s`.
-#: Measured, not chosen: the error is roster- and moment-dependent, so this
-#: is a ceiling generous enough not to be flaky and tight enough to fail if
-#: the relationship stops holding at all.
+#: How close `log(price / fair_value)` lands to the engine's `mispricing_s`
+#: on a preset whose fair value IS the public function: pt-v19 and earlier.
+#: Measured, not chosen: on this roster pt-v19 misses by 0.019, 0.024 and
+#: 0.025 after 2, 4 and 10 days, so this is a ceiling generous enough not to
+#: be flaky and tight enough to fail if the relationship stops holding.
 #:
 #: It lives here rather than in a docstring for a reason. Three people
 #: measured this claim and produced three numbers -- "exact", "a tenth of a
@@ -851,17 +862,88 @@ def test_the_valuation_is_reconstructible_from_what_the_caller_supplies():
 MISPRICING_TOLERANCE = 0.05
 
 
+def _public_inversion_errors(model: str, days: int = 4) -> list[float]:
+    """|log(price / public fair value) - mispricing_s| for every name on the
+    roster, in roster order, from the fundamentals each was built with and
+    the two rates the world pins."""
+    import math
+    import struct
+
+    world, _agent = one_observation(days=days, model=model)
+    engine = world.engine
+    n = len(engine.tickers)
+    prices = list(struct.unpack("<%dd" % n, engine.prices()))
+    truth = list(struct.unpack("<%dd" % n, engine.column("mispricing_s")))
+    payload = fr.observe(_observation(world), history=[], fundamentals={
+        i.ticker: {"sector": i.sector, "eps": i.eps,
+                   "book_value_per_share": i.book_value_per_share,
+                   "revenue_growth": i.revenue_growth}
+        for i in world.universe})
+    macro = payload["macro"]
+    out = []
+    for k, instrument in enumerate(world.universe):
+        value = tf.fair_value(
+            eps=instrument.eps, sector=instrument.sector,
+            revenue_growth=instrument.revenue_growth,
+            book_value_per_share=instrument.book_value_per_share,
+            federal_funds_rate=macro["federal_funds_rate"],
+            corporate_bond_yield=macro["corporate_bond_yield"]).fair_value
+        out.append(abs(math.log(prices[k] / value) - truth[k]))
+    return out
+
+
+def _rms(values: list[float]) -> float:
+    import math
+    return math.sqrt(sum(v * v for v in values) / len(values))
+
+
+def test_from_pt_v20_the_anchor_is_not_the_public_valuation():
+    """pt-v20, the default from 0.8.5, gives fair value a level of its own:
+    the part of each name's opening premium the published fundamentals do
+    not explain (`opening_mispricing_sigma`), news and market moves that
+    move it for good (`fair_value_news_share`, `fair_value_market_share`)
+    and the valuation terms the public function does not carry (the
+    buyback yield, the rate sensitivity, the earnings cycle and its
+    anticipation). So the public `fair_value` is no longer the engine's
+    anchor, and inverting it misses `mispricing_s` by more than the pt-v19
+    tolerance. That is the change pt-v20 was built to make, since a value
+    screen that reconstructs the anchor is an edge real markets do not
+    offer.
+
+    Measured over the roster rather than on one name, and why. The miss on
+    a name is its fair-value level, and that level is a random walk: the
+    permanent share of every shock the name takes. TECH_A's offset reads
+    0.089, 0.090 and 0.064 after 2, 4 and 10 days on this build, beside a
+    near-constant -0.026 from the valuation terms, so its own miss reads
+    0.061, 0.062 and 0.039, and on day 10 the walk had drifted under the
+    bar. That is a draw of the walk and not a defect: the inversion reads
+    the two rates the world pins (published and true are one value there,
+    and no lagged field enters `fair_value`), and the close's re-mark moves
+    it by 0.0002. The bar is unchanged; the statistic is the root mean
+    square miss over the roster's names, 0.116, 0.123 and 0.094 on pt-v20
+    against 0.016, 0.019 and 0.017 on pt-v19, which is the property the
+    preset changed rather than one name's path.
+    """
+    for days in (2, 4, 10):
+        v20 = _rms(_public_inversion_errors("pt-v20", days))
+        v19 = _rms(_public_inversion_errors("pt-v19", days))
+        assert v20 > MISPRICING_TOLERANCE, (days, v20)
+        assert v19 < MISPRICING_TOLERANCE, (days, v19)
+
+
 def test_the_state_variable_is_approximable_but_not_recoverable():
-    """The other half, and the half that is NOT exact.
+    """The other half, and the half that is NOT exact, on pt-v19.
 
     `mispricing_s` is a state variable, not a ratio that can be read off a
     price. The traded price carries microstructure on top of the anchor, so
-    even the correct inversion lands near rather than on it.
+    even the correct inversion lands near rather than on it. Pinned to
+    pt-v19, the last preset whose anchor is the public function; see the
+    test above for pt-v20.
     """
     import math
     import struct
 
-    world, _agent = one_observation(days=4)
+    world, _agent = one_observation(days=4, model="pt-v19")
     engine = world.engine
     n = len(engine.tickers)
     prices = list(struct.unpack("<%dd" % n, engine.prices()))
@@ -922,8 +1004,12 @@ def test_no_hidden_value_appears_in_the_text_finrobot_receives():
         blob = world.engine.attribution(factor)
         hidden += list(struct.unpack("<%dd" % (len(blob) // 8), blob))
 
+    # Only a value whose four-place rendering carries a digit can leak
+    # that way. Under 5e-5 it renders as 0.0000, which the text holds for
+    # its own reasons: on pt-v20 a `company_news` attribution of 4.1e-6
+    # "matched" a zero in the block.
     leaked = [v for v in hidden
-              if v and abs(v) > 1e-9 and f"{v:.4f}" in text]
+              if abs(v) >= 5e-5 and f"{v:.4f}" in text]
     assert not leaked, (
         f"values only the simulator knows appear in the FinRobot input: "
         f"{leaked}")
@@ -1237,38 +1323,38 @@ def test_an_answer_with_no_actions_key_is_refused_not_read_as_a_hold(text,
 @pytest.mark.parametrize("text,match", [
     ('{"actions": [], "confidence": 0.8}', "confidence"),
     ('{"actions": [], "rationale": "x", "notes": "more"}', "notes"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"stop_loss": 95.0}]}', "stop_loss"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"time_in_force": "gtc"}]}', "time_in_force"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"order_type": "limit"}]}', "market sweeps only"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 5, '
-     '"limit_price": 99.5}]}', "no limit orders"),
 ])
-def test_a_field_the_market_cannot_honour_is_refused_by_name(text, match):
+def test_a_top_level_field_the_contract_does_not_define_is_refused(text,
+                                                                    match):
     """Silently dropping an unknown field executes an instruction the agent
-    did not give.
-
-    A model that writes `stop_loss` believes it has protection and sizes
-    accordingly. Dropping the field buys at market with none, and the trace
-    then records a decision nobody made. `order_type` and `limit_price` get
-    refusals naming the missing capability because they are what a model
-    reaches for first; everything else is refused as unreadable rather than
-    ignored.
-    """
+    did not give, so an unknown key at the top level refuses the response.
+    The same on an action refuses that action
+    (`test_a_bad_action_is_refused_on_its_own`)."""
     with pytest.raises(fr.DecisionError, match=match):
         fr.parse(text)
 
 
 def test_a_market_order_type_is_tolerated_because_it_is_what_happens_anyway():
-    """`order_type: "market"` states the only thing this market does, so it
-    is redundant rather than wrong. Refusing it would fail a model for
-    describing the execution it was going to get."""
+    """`order_type: "market"` states the default, so it is redundant rather
+    than wrong. Refusing it would fail a model for describing the execution
+    it was going to get."""
     decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
                         '"quantity": 5, "order_type": "market", '
                         '"limit_price": null}]}')
     assert decision.actions[0].signed() == 5.0
+    assert decision.refused == []
+
+
+def test_a_limit_order_and_a_cancel_are_accepted():
+    """Decision schema 2: FinRobot can send a limit order and a CANCEL, by
+    the same rules as every other adapter."""
+    decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
+                        '"quantity": 5, "order_type": "limit", '
+                        '"limit_price": 99.5}, {"symbol": "B", '
+                        '"side": "CANCEL"}]}')
+    assert decision.actions == [fr.Action("A", "BUY", 5, 99.5),
+                                fr.Action("B", "CANCEL")]
+    assert decision.refused == []
 
 
 def test_the_refusal_matches_the_shared_validator():
@@ -1336,18 +1422,6 @@ def test_a_fenced_answer_is_accepted():
     ('{"actions": [1,]}', "does not parse"),
     ('[1, 2, 3]', "got a list"),
     ('{"actions": "TECH_A"}', "must be a list"),
-    ('{"actions": [5]}', "not an object"),
-    ('{"actions": [{"side": "BUY", "quantity": 1}]}', "no usable 'symbol'"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "SHORT", "quantity": 1}]}',
-     "not one of"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": -5}]}',
-     "negative"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": "lots"}]}',
-     "not a number"),
-    ('{"actions": [{"symbol": "TECH_A", "side": "HOLD", "quantity": 10}]}',
-     "HOLD"),
-    ('{"actions": [{"symbol": "A", "side": "BUY", "quantity": 1}, '
-     '{"symbol": "A", "side": "SELL", "quantity": 1}]}', "more than once"),
     ('{"actions": [], "rationale": 5}', "must be a string"),
 ])
 def test_invalid_output_is_refused_readably(text, match):
@@ -1355,10 +1429,40 @@ def test_invalid_output_is_refused_readably(text, match):
         fr.parse(text)
 
 
-def test_a_non_finite_quantity_is_refused():
-    with pytest.raises(fr.DecisionError, match="non-finite"):
-        fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
-                 '"quantity": Infinity}]}')
+@pytest.mark.parametrize("bad,match", [
+    ('5', "not an object"),
+    ('{"side": "BUY", "quantity": 1}', "no usable 'symbol'"),
+    ('{"symbol": "TECH_A", "side": "SHORT", "quantity": 1}', "not one of"),
+    ('{"symbol": "TECH_A", "side": "BUY", "quantity": -5}', "negative"),
+    ('{"symbol": "TECH_A", "side": "BUY", "quantity": "lots"}',
+     "not a number"),
+    ('{"symbol": "TECH_A", "side": "HOLD", "quantity": 10}', "HOLD"),
+    ('{"symbol": "A", "side": "BUY", "quantity": Infinity}', "non-finite"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "stop_loss": 95.0}',
+     "stop_loss"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "time_in_force": "gtc"}',
+     "time_in_force"),
+    ('{"symbol": "A", "side": "BUY", "quantity": 5, "order_type": "limit"}',
+     "no limit_price"),
+], ids=["not-object", "no-symbol", "side", "negative", "not-number", "hold",
+        "infinite", "stop-loss", "time-in-force", "limit-without-price"])
+def test_a_bad_action_is_refused_on_its_own(bad, match):
+    """Decision schema 2. Under schema 1 each of these refused the whole
+    response; now the action is refused with its reason and the BUY beside
+    it stands, by the shared layer's rules."""
+    decision = fr.parse('{"actions": [' + bad + ', {"symbol": "B", '
+                        '"side": "BUY", "quantity": 7}]}')
+    assert decision.actions == [fr.Action("B", "BUY", 7)]
+    assert len(decision.refused) == 1
+    assert match in decision.refused[0]["reason"]
+
+
+def test_a_symbol_named_twice_refuses_both_actions():
+    decision = fr.parse('{"actions": [{"symbol": "A", "side": "BUY", '
+                        '"quantity": 1}, {"symbol": "A", "side": "SELL", '
+                        '"quantity": 1}]}')
+    assert decision.actions == []
+    assert len(decision.refused) == 2
 
 
 def test_a_decision_error_is_a_validation_error():
@@ -1419,9 +1523,12 @@ def test_importing_the_adapter_still_needs_no_framework_after_the_rebase():
     # it inside the method. `datetime` joined it when `save` began stamping
     # `recorded_utc`. `warnings` joined it when `refuse_a_changed_preset`
     # began saying out loud that a pre-0.8.0 recording names no preset.
+    # `atexit`, `os` and `threading` joined it at 0.8.5, when `run_sync`
+    # began running every call on one long-lived loop on its own thread.
     allowed = {"copy", "hashlib", "importlib", "json", "re", "statistics",
                "typing", "asyncio", "inspect", "concurrent", "pathlib",
-               "datetime", "warnings", "__future__"}
+               "datetime", "warnings", "__future__", "atexit", "os",
+               "threading"}
     assert imported <= allowed, (
         f"common.py imports {sorted(imported - allowed)} at module scope. "
         "finrobot.py imports common at module scope, so anything common "
@@ -2263,6 +2370,7 @@ def test_an_older_recording_falls_back_to_the_version_it_does_carry():
     fr.FinRobotAdapter(mode="replay", transcript=fr.Transcript())
 
 
+@pytest.mark.needs_live_model
 @pytest.mark.skipif(not FIXTURE.exists(), reason="no recorded FinRobot run")
 def test_the_shipped_fixture_carries_the_digest_of_the_mandate_that_ran_it():
     """The shipped recording is checked strictly, not by the version fallback.
@@ -2343,6 +2451,7 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
     assert sides <= set(fr.SIDES)
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end(tmp_path):
     """The whole experiment, from the shipped fixture, with no key.

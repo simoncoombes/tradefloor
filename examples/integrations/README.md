@@ -41,15 +41,24 @@ python examples/integrations/pydantic_ai/rate_shock.py
 python examples/integrations/langgraph/rate_shock.py
 ```
 
-Each finishes in a few seconds with no API key, no provider account and no
-network. The three framework examples drive the real framework, with a
-deterministic function standing where a model would sit, so what runs offline
-is the adapter and the framework and not a mock of either.
+Each takes 2 to 6 seconds of CPU and needs no API key, no provider account
+and no network. The three framework examples drive the real framework, with
+a deterministic function standing where a model would sit, so what runs
+offline is the adapter and the framework and not a mock of either.
 
 All four have the same shape with one part swapped: build a market, ask the
-agent once a simulated day for five days, print the scorecard and the
-decision record. The rule is the same five-day mean-reversion rule in every
-one, so the part that changes is who reads the payload and answers.
+agent once a simulated day, print the scorecard and the decision record. The
+rule is the same five-day mean-reversion rule in every one, so the part that
+changes is who reads the payload and answers.
+
+Three of them run twenty simulated days, although two are named
+`five_days.py`. The rule buys a name that fell more than two per cent over
+five days, and on pt-v20, the default, no name on their roster does that
+until day 7, so a five-day run would trade nothing. The names are older
+than that, and renaming the files would break every link to them. The
+LangGraph example runs five days on its own roster. The recorded model runs
+in the notebooks use five days too, because a language model reads the
+observation instead of waiting for a window.
 
 The market is where they diverge, deliberately. Each example sizes its own
 book to show something its own section explains, and the LangGraph one runs
@@ -58,47 +67,61 @@ roster the other three use. The scorecards differ accordingly, and a
 difference between two rows here is a fact about two markets and not about
 two adapters:
 
-| example | trades | return | impact |
-|---|---|---|---|
-| [`callable/five_days.py`](callable/five_days.py) | 3 | +1.60% | -1.10 bps |
-| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 3 | +1.60% | -1.10 bps |
-| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 3 | +6.28% | +2.51 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 0 | +0.00% | +0.00 bps |
+| example | days | trades | return | impact |
+|---|---|---|---|---|
+| [`callable/five_days.py`](callable/five_days.py) | 20 | 9 | -1.71% | +0.04 bps |
+| [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 9 | -1.71% | +0.04 bps |
+| [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 10 | -3.33% | +0.98 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 1 | +0.64% | +1.24 bps |
 
-Re-measured at 0.8.0, where the default preset moved to pt-v19 and every
-price in these markets moved with it -- and measured again each time pt-v19
-was recomposed, most recently at the fifth composition. The rows replaced
-there were callable and openai_agents 2 trades +1.20% +0.47 bps,
-pydantic_ai 2 trades +4.77% -0.27 bps, and langgraph 1 trade +0.63%
-+25.71 bps; at the fourth composition before that, callable and
-openai_agents 3 trades +1.47%, pydantic_ai 3 trades +5.78% +1.55 bps, and
-langgraph +0.62% +18.99 bps. The langgraph row now reads no trades at all:
-it runs five days, not ten, and on this market no name in its roster falls
-more than two per cent over five days on any of them -- the deepest, HELX,
-falls 1.83 per cent on day 1 -- so the rule buys nothing, has nothing to
-trim, and holds every day. Nothing
-else about these examples changed: the rule, the rosters, the seed and the
-horizons are the ones 0.7.0 shipped, so every difference in the table
-above is the market and not the demonstration.
-
-The three offline examples run ten days rather than five, which is a
-choice 0.7.0 made and this release keeps. They share one mean-reversion
-rule that acts on a five-day move past two per cent, and on a five-day run
-it gets a single usable reading -- which was enough on pt-v16's market and
-was not on pt-v18's, whose worst five-day fall over this roster is 1.85 per
-cent. Measured again on the fifth composition of pt-v19: five days
-trades not at all, ten days three times, so ten still gives the rule the
-readings five does not. The rule is
-untouched, because lowering its trigger until this market tripped it would
-be fitting the demonstration to the market, and the trigger is the thing
-being demonstrated. The two recorded MODEL runs still use five days: a
-language model reads the observation rather than waiting for a window.
+These are the figures on pt-v20. The impact column is the end-of-run price
+against the untraded run, and at these sizes it is mostly which way the
+tape's noise fell. `tests/test_integration_examples.py` runs all four and
+fails when a row stops matching what the example prints. The rows moved
+with every preset; [History](#history) at the end of this page has the old
+ones.
 
 Comparing two frameworks means holding the market fixed, which is what the
 shared contract checks in `tests/test_integrations.py` do.
-`tests/test_integration_examples.py` runs all four examples and asserts the
-table above against what they print, since a table nothing executes is a
-table that goes stale.
+
+Copied out of the repository, `callable/five_days.py` still runs, because
+its `main()` reads no recording. The recorded model runs the notebooks
+replay are in the repository's `tests/fixtures/` and are not installed with
+the package, so the notebooks and the FinRobot study's default replay need a
+clone. The callable example and the FinRobot study say so when they are run
+without one. The OpenAI Agents, PydanticAI and LangGraph examples still look
+for the repository as they are imported, so for now they run only from a
+clone.
+
+## Payload fields and order types
+
+The payload is a JSON-able dict: the step, the day, the published macro
+fields, and per asset the price, one-day and five-day returns, volatility,
+the best bid and ask, average daily volume, `max_order_shares`, the position
+held and any fundamentals you supplied. Under `portfolio` it carries `cash`,
+`net_worth`, `leverage`, `max_leverage`, `buying_power` and `open_orders`.
+`leverage` is gross exposure as a multiple of net worth, what
+`Portfolio.leverage` returns: 2.02 means positions worth about twice the
+account. `buying_power` is in dollars, the further gross exposure the
+leverage cap allows. `open_orders` lists the agent's limit orders still
+waiting in the book, each with its `symbol`, `side`, `limit_price` and
+`remaining` shares.
+
+This payload is version 1 of the observation contract and is frozen for the
+0.8.x line: no key is added, removed or renamed in a 0.8.x patch release.
+[SUPPORT.md](../../docs/SUPPORT.md#the-agent-payload-and-decision-contract)
+lists every key. Until 0.8.5, `leverage` was called `gross_exposure` and
+there was no `open_orders`.
+
+What comes back is a list of actions, each a symbol, a side (BUY, SELL, HOLD
+or CANCEL) and a share count. An action is a market order unless it carries
+a `limit_price`, which makes it a `tf.Limit`: it trades at that price or
+better, and what does not fill at once waits in the book until it fills, a
+CANCEL for the symbol withdraws it, or a new limit order on the symbol
+replaces it. CANCEL is a `tf.Cancel()`. These are the orders a native agent
+returns from `act(obs)`, so an LLM agent and a Python agent trade the same
+market. [The decision boundary](#the-decision-boundary) below has the
+rules. Until 0.8.5 (decision schema 1) the adapters sent market orders only.
 
 ## Plain Python
 
@@ -118,15 +141,70 @@ scores = tf.evaluate({"mine": agent}, seed=4242, universe=roster, days=5)
 
 Fuller example: [`callable/five_days.py`](callable/five_days.py).
 
-`rule` is handed the serialized payload and never the `Observation`. The
-Observation carries `.engine`, which holds the answer key: fair value, the
-ten-way attribution of every price move, each company's mispricing, and the
-macro path the run has not reached yet. A function given that would step
-around the allowlist where no test could see it. A policy that genuinely
-needs the Observation is a native Tradefloor agent and implements `act`
-directly.
+`rule` is handed the serialized payload and never the `Observation`. Since
+0.8.5 the Observation's `.engine` is a read-only market view: it serves
+prices, the public columns, the book, the bars already run and the published
+macro fields, and it refuses fair value, the factor attribution of every
+price move, each company's mispricing and the macro path the run has not
+reached yet. The view still serves more than the payload, and a function
+given the Observation would read past the payload's allowlist where no test
+of the payload could see it. A policy that genuinely needs the Observation
+is a native Tradefloor agent and implements `act` directly.
 
 An async function works too, driven through `common.run_sync`.
+
+### A function that calls a model
+
+When `rule` calls a language model, two arguments decide what a recorded
+run tests in CI.
+
+```python
+import json
+from tradefloor.integrations.callable import callable_agent
+from tradefloor.integrations.common import AdapterInfo, Transcript, digest
+
+PROMPT = "You manage a portfolio..."
+
+def ask_model(payload: dict) -> str:
+    return call_my_model(system=PROMPT, user=json.dumps(payload))
+
+def to_decision(raw: str, payload: dict) -> dict:
+    decision = parse_my_tool_call(raw)
+    return cap_to_buying_power(decision, payload)
+
+info = AdapterInfo(framework="callable", instructions_digest=digest(PROMPT))
+
+# Record once, live.
+recorder = Transcript()
+live = callable_agent(ask_model, postprocess=to_decision, info=info,
+                      mode="live", recorder=recorder)
+tf.evaluate({"copilot": live}, seed=100, universe=roster, days=10)
+recorder.save("copilot.json")
+
+# Replay in CI, with no key and no model function.
+replay = callable_agent(postprocess=to_decision, info=info, mode="replay",
+                        transcript=Transcript.load("copilot.json"))
+```
+
+`postprocess` is the code that runs after the model answers. The transcript
+holds what `ask_model` returned, the raw response, and a replay hands that
+back without calling `ask_model`. `to_decision(raw, payload)` then runs in
+both modes and returns the decision, so a change to the parsing, a risk
+check or the sizing is exercised by every replay. Code of that kind left
+inside `ask_model` is recorded as its output and never runs on replay.
+Without `postprocess`, whatever `ask_model` returns is the decision, as
+before.
+
+`instructions_digest` is the prompt guard. The callable adapter's replay key
+is the payload alone, and the system prompt is not in it, so a replay under
+an edited prompt matches every recorded key and completes. With
+`AdapterInfo(instructions_digest=digest(PROMPT))` on both the recording and
+the replay, the digest is written into the transcript's meta, and a replay
+built with a different one is refused with a `ValidationError` when the
+adapter is built. With no `AdapterInfo`, or one whose `instructions_digest`
+is empty, the replay is not checked. The framework adapters below record
+their own instructions; the callable adapter cannot see inside your
+function, so you have to name the prompt.
 
 ## OpenAI Agents SDK
 
@@ -322,10 +400,21 @@ and no network reached. An experiment that cost real money to record is
 therefore reproducible by anyone, for nothing.
 
 The key derives from the input and never from a step number. Change the
-roster, the seed, the cadence or the instructions and the key goes missing:
-the run stops and names the step it stopped at. Keyed by position, a replay
+roster, the seed or the cadence and the key goes missing: the run stops with
+`ReplayMiss` and names the step it stopped at. Keyed by position, a replay
 would answer the new question with the answer given to the old one, and
 nothing in the output would say so.
+
+Instructions are a separate case, because most adapters do not send them in
+the input the key is computed over. LangGraph renders its `instructions`
+into that input, so changing them moves the key as above. The OpenAI Agents,
+PydanticAI and FinRobot adapters record a digest of their instructions in
+the transcript's meta, and a replay under different instructions is refused
+when the adapter is built, before the market opens. The callable adapter
+checks only when you give it `AdapterInfo(instructions_digest=...)`, as
+[the plain Python section](#a-function-that-calls-a-model) shows. Without
+that, a callable replay under a changed prompt runs to the end on the old
+answers.
 
 ## The agent's own noise floor
 
@@ -402,27 +491,74 @@ output would say the question had changed.
 A framework returns a decision and never touches engine state.
 
 ```json
-{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": 1200}],
+{"actions": [{"symbol": "TECH_A", "side": "BUY", "quantity": 1200},
+             {"symbol": "UTIL_B", "side": "SELL", "quantity": 400,
+              "order_type": "limit", "limit_price": 51.25},
+             {"symbol": "FIN_C", "side": "CANCEL"}],
  "rationale": "one line, for the record"}
 ```
 
-`parse_decision` checks that against the shared schema, and `orders_from`
-checks what survives against this market: every symbol against the listed
-universe, every side against BUY, SELL and HOLD, and the size against the
-participation cap, which clips and records the clip. A well-formed decision
-this market cannot take raises `MarketRefusalError`.
+`parse_decision` checks that against the shared schema (decision schema 2),
+and `orders_from` checks what survives against this market: every symbol
+against the listed universe, and the size against the participation cap,
+which clips and records the clip, for a limit order as for a market one.
+`order_type` is optional. A `limit_price` alone makes a limit order, and
+`order_type: "limit"` without one is refused.
 
-Unknown keys are refused by name, at the top level and on an action. A
-silently dropped `stop_loss` would leave an agent believing it has protection
-this market cannot give. There are no order types and no limit prices at this
-boundary either: `Portfolio.execute` sweeps the live book with a signed
-quantity, so an `order_type` other than `market`, or any `limit_price`, is
-refused with a message naming the capability that is missing.
+A bad action is refused on its own and the rest of the decision trades. An
+unknown side, a negative quantity, a HOLD or CANCEL with a quantity, a limit
+order with no price, an unlisted symbol, or a symbol named by two actions is
+left out, and the refusal and its reason go into the decision's `refused`
+list, the adapter's `record`, and the scorecard's `errors` under
+`tf.evaluate`. Under decision schema 1 (before 0.8.5) any of them refused
+the whole decision.
+
+Unknown keys are refused by name. A silently dropped `stop_loss` would leave
+an agent believing it has protection this market cannot give, so an action
+carrying one is refused, and an unknown key at the top level refuses the
+whole decision.
 
 A mapping carrying no `actions` key is refused instead of being read as a
 hold. An unwrapped framework envelope would otherwise score as `trades=0`
 with an empty error list, which no scorecard can tell apart from an agent
 that looked at the market and declined.
+
+
+## History
+
+The scorecard rows above were re-measured each time the default preset
+moved. The old rows are kept here so a reader comparing against an older
+run can see what it printed.
+
+Before the 0.8.5 payload freeze, the five-day return the rule reads spanned
+29 steps rather than 30, and on pt-v20 callable and openai_agents read 10
+trades -1.16% +0.04 bps and pydantic_ai 10 trades -2.18% +0.95 bps;
+langgraph's row did not move.
+
+On pt-v20 before its graded arm, callable and openai_agents read 9 trades
+-1.31% +0.05 bps, pydantic_ai 9 trades -3.34% +0.96 bps, and langgraph no
+trades. On pt-v19 with an agent's fills reaching the market once, over ten
+days, callable and openai_agents read 3 trades +1.62% +0.00 bps and
+pydantic_ai 3 trades +6.24% -1.55 bps. Before 0.8.5, fills were counted on
+every tick of a step, and those two rows read +1.60% -1.10 bps and +6.28%
++2.51 bps.
+
+pt-v19 was recomposed several times before 0.8.0 shipped it. At the fifth
+composition callable and openai_agents read 2 trades +1.20% +0.47 bps,
+pydantic_ai 2 trades +4.77% -0.27 bps, and langgraph 1 trade +0.63% +25.71
+bps. At the fourth, callable and openai_agents read 3 trades +1.47%,
+pydantic_ai 3 trades +5.78% +1.55 bps, and langgraph +0.62% +18.99 bps. On
+the final pt-v19 langgraph traded nothing: no name on its roster fell more
+than two per cent over five days (HELX came closest, 1.83 per cent on day
+1), so the rule held every day.
+
+The horizon moved twice. 0.7.0 took the three offline examples from five
+days to ten, because pt-v18's worst five-day fall on their roster was 1.85
+per cent, under the rule's trigger. 0.8.5 took them to twenty, because ten
+days on pt-v20 as it stood before its graded arm traded nothing. On the
+graded arm callable and openai_agents trade twice in ten days. The rule,
+the rosters and the seed have not changed since 0.7.0, so every other
+difference between these rows is the market.
 
 ---
 

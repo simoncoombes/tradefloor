@@ -18,7 +18,9 @@ Three things this makes possible that a seed alone cannot:
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+import contextlib
+import warnings
+from typing import Any, Iterator, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 
@@ -26,9 +28,43 @@ from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 # by name rather than by falling through a chain of ifs into silence.
 _OPS = frozenset({
     "open_market", "close_market", "tick", "run_session", "pin_macro",
-    "set_avg_volume", "list_instrument", "delist", "draw_uniform",
-    "draw_normal", "record",
+    # The day's label, moved between an open and its close (`set_day`).
+    "set_day",
+    "set_avg_volume", "set_fundamentals", "list_instrument", "delist",
+    "draw_uniform", "draw_normal", "record",
+    # Agents' orders against the book, and the collection of what they
+    # produced.
+    "submit", "cancel", "take_fills", "take_impacts",
 })
+
+
+@contextlib.contextmanager
+def _recorded_clock() -> Iterator[None]:
+    """Silence ``run_session``'s repeated-clock warning for one replayed call.
+
+    Since 0.8.5 ``run_session`` warns when a session starts before the day's
+    previous one ended. A replay runs the start the log recorded, and a log
+    written before 0.8.5, when nothing warned, can hold one. Nobody can act
+    on the warning at replay time, and under ``-W error`` it would stop the
+    replay of a run that is correct as recorded.
+
+    Only that warning, and only around the one call. ``catch_warnings``
+    changes the process's filters, so a thread calling ``run_session`` at
+    the same moment would not see the warning either.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="run_session started at",
+                                category=RuntimeWarning)
+        yield
+
+#: The most ticks a replay runs between two closes: sixty 390-minute
+#: sessions. The harnesses here run 390 ticks a day by default and close
+#: every day, so a log they write at their defaults is far inside it. A log is
+#: data that may have come from somebody else (a `RunManifest`, a
+#: `Checkpoint`), and before this bound a 150-byte log naming
+#: ``ticks=10**12`` in one `run_session` entry ran for days. For a log you
+#: trust that runs longer days, pass ``max_ticks_per_day`` to :func:`replay`.
+MAX_TICKS_PER_DAY = 23_400
 
 
 def replay(
@@ -40,6 +76,7 @@ def replay(
     model: str | ModelParams | None = None,
     until: int | None = None,
     ledger: Any = None,
+    max_ticks_per_day: int = MAX_TICKS_PER_DAY,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
 
@@ -67,11 +104,15 @@ def replay(
     ``ledger`` is an optional :class:`tradefloor.DayLedger`, filled at every
     close boundary the log crosses, so a replayed run can be committed to the
     same way the original was.
+
+    ``max_ticks_per_day`` bounds the ticks between two closes, checked over
+    the whole log before anything runs; see :data:`MAX_TICKS_PER_DAY`.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     entries = list(log)[: until if until is not None else len(log)]
-    apply_log(engine, entries, ledger=ledger)
+    apply_log(engine, entries, ledger=ledger,
+              max_ticks_per_day=max_ticks_per_day)
     return engine
 
 
@@ -80,6 +121,7 @@ def apply_log(
     entries: Sequence[dict[str, Any]],
     *,
     ledger: Any = None,
+    max_ticks_per_day: int = MAX_TICKS_PER_DAY,
 ) -> Engine:
     """Execute recorded entries against an engine that already exists.
 
@@ -92,17 +134,23 @@ def apply_log(
     Appends to the engine's own order log, as every operation here does, so
     an engine that started from a snapshot ends holding the entries it was
     given rather than the history it was restored from.
-    """
-    for i, entry in enumerate(entries):
-        op = entry.get("op")
-        if op not in _OPS:
-            raise ValidationError(
-                f"log entry {i}: unknown operation {op!r}. A replay that "
-                "skipped it would produce a market the log does not describe."
-            )
 
+    The whole log is checked before anything runs: every operation must be
+    one the log can carry, every session's ``ticks`` a whole number of at
+    least one, and no day (the entries between two closes) may run more than
+    ``max_ticks_per_day`` ticks (:data:`MAX_TICKS_PER_DAY` unless given). A
+    log that fails leaves the engine as it was.
+    """
+    _check(entries, max_ticks_per_day)
+    for entry in entries:
+        op = entry["op"]
         if op == "open_market":
-            engine.open_market()
+            # The day's label, logged only when the run opened the day under
+            # one that was not the engine's counter (`run_days(first_day=)`).
+            # A label moves no price; the book stamps fills with it.
+            engine.open_market(day=entry.get("day"))
+        elif op == "set_day":
+            engine.set_day(entry["day"])
         elif op == "close_market":
             engine.close_market()
             if ledger is not None:
@@ -131,6 +179,11 @@ def apply_log(
             engine.pin_macro(**entry["fields"])
         elif op == "set_avg_volume":
             engine.set_avg_volume(entry["values"])
+        elif op == "set_fundamentals":
+            # NaN is logged as None, which JSON can carry.
+            engine.set_fundamentals(
+                *([float("nan") if v is None else v for v in entry[k]]
+                  for k in ("eps", "book_value_per_share", "revenue_growth")))
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],
@@ -139,21 +192,65 @@ def apply_log(
                 order_flow=_flow(entry),
             )
         elif op == "run_session":
-            engine.run_session(
-                entry["hour"], entry["minute"], entry["day_of_week"],
-                entry["ticks"],
-                volatility=entry["volatility"],
-                close_at_end=entry["close_at_end"],
-                news=_news(entry),
-                order_flow=_flow(entry),
-            )
+            with _recorded_clock():
+                engine.run_session(
+                    entry["hour"], entry["minute"], entry["day_of_week"],
+                    entry["ticks"],
+                    volatility=entry["volatility"],
+                    close_at_end=entry["close_at_end"],
+                    news=_news(entry),
+                    fills=_flow(entry, "fills"),
+                    flow_per_tick=_session_flow(entry),
+                )
             # The second spelling of a close. A ledger that knew only
             # `close_market` would leave a session-closed run with no leaves
             # and read as one long day.
             if ledger is not None and entry["close_at_end"]:
                 ledger.close(engine)
+        elif op == "submit":
+            engine.submit(entry["agent"], entry["ticker"], entry["quantity"],
+                          limit_price=entry.get("limit_price"),
+                          order_id=entry.get("order_id"))
+        elif op == "cancel":
+            engine.cancel(entry["order_id"], agent=entry.get("agent"))
+        elif op == "take_fills":
+            engine.take_fills(entry.get("agent"))
+        elif op == "take_impacts":
+            engine.take_impacts(entry.get("agent"))
 
     return engine
+
+
+def _check(entries: Sequence[dict[str, Any]],
+           max_ticks_per_day: int = MAX_TICKS_PER_DAY) -> None:
+    """Refuse a log that is malformed or runs too long, before running it."""
+    day_ticks = 0
+    for i, entry in enumerate(entries):
+        op = entry.get("op") if isinstance(entry, dict) else None
+        if op not in _OPS:
+            raise ValidationError(
+                f"log entry {i}: unknown operation {op!r}. A replay that "
+                "skipped it would produce a market the log does not describe."
+            )
+        if op == "tick":
+            day_ticks += 1
+        elif op == "run_session":
+            ticks = entry.get("ticks")
+            if (not isinstance(ticks, int) or isinstance(ticks, bool)
+                    or ticks < 1):
+                raise ValidationError(
+                    f"log entry {i}: a session's ticks must be a whole "
+                    f"number of at least 1, got {repr(ticks)[:40]}")
+            day_ticks += ticks
+        if day_ticks > max_ticks_per_day:
+            raise ValidationError(
+                f"log entry {i}: this day runs {day_ticks:,} ticks, more "
+                f"than the {max_ticks_per_day:,} a replay runs between two "
+                f"closes; the harnesses write 390 a day by default. If you "
+                f"trust the log, pass max_ticks_per_day to tradefloor.replay.")
+        if op == "close_market" or (op == "run_session"
+                                    and entry.get("close_at_end")):
+            day_ticks = 0
 
 
 def _news(entry: dict[str, Any]) -> list[News] | None:
@@ -166,6 +263,20 @@ def _news(entry: dict[str, Any]) -> list[News] | None:
     ]
 
 
-def _flow(entry: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
-    flow = entry.get("order_flow") or {}
+def _flow(entry: dict[str, Any], key: str = "order_flow"
+          ) -> dict[str, tuple[float, float]] | None:
+    flow = entry.get(key) or {}
     return {t: tuple(v) for t, v in flow.items()} if flow else None
+
+
+def _session_flow(entry: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
+    """A session's per-tick flow, under either key a log has carried.
+
+    Logs written before 0.8.5 name it ``order_flow``, the argument that held
+    it on every tick of the session; later logs name it ``flow_per_tick``,
+    the argument that does so now. The meaning is the same, so an archived
+    run replays into the market it recorded.
+    """
+    if "flow_per_tick" in entry:
+        return _flow(entry, "flow_per_tick")
+    return _flow(entry, "order_flow")

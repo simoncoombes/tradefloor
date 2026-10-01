@@ -95,7 +95,8 @@ because a result AT the certified horizon exists only once a run has reached
 that horizon.
 
 The Rust parity suites compare against golden vectors generated from the
-reference implementation. They are the evidence for the port being
+reference implementation, which is not published (see "The reference
+implementation" in `docs/MODEL.md`). They are the evidence for the port being
 bit-identical, so if you change anything in `rust/src/market/` or
 `rust/src/economy/`, run them.
 

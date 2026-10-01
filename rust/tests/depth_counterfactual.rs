@@ -64,6 +64,7 @@ fn company(price: f64, previous_close: f64, avg_volume: f64) -> TickCompany {
             mispricing_s: Some(0.0),
             mispricing_s_prev_close: Some(0.0),
             mispricing_momentum: Some(0.0),
+            fair_value_offset: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -136,6 +137,8 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
             settle_depth_counterfactual: true,
+            resting_orders: &[],
+            fill_impact: &[],
             // The run's opening nominal output. The growth term is
             // off on every preset these tests pin, so it is read
             // nowhere; this tick's own value is what a single-tick
@@ -360,6 +363,8 @@ fn the_arm_reports_nothing_on_the_replay_path() {
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourOrZero,
             settle_depth_counterfactual: true,
+            resting_orders: &[],
+            fill_impact: &[],
             // The run's opening nominal output. The growth term is
             // off on every preset these tests pin, so it is read
             // nowhere; this tick's own value is what a single-tick

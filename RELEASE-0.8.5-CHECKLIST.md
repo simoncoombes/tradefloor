@@ -1,0 +1,204 @@
+# Release 0.8.5 checklist
+
+What is left between `release/0.8.5` and 0.8.5 on PyPI, in order.
+`RELEASING.md` is the runbook, and each step names the section of it that
+applies. The last step is the owner's.
+
+## The branch today
+
+`integration/0.8.5` (2026-09-26) is `release/0.8.5` (6a808c0) with
+`fix/ptv20-final` (1b21118, pt-v20's graded arm), `feature/seed64`
+(d589c04) and `fix/harness-sandbox` (238571b) merged, one merge commit
+each, and RELEASING 5b run on the final vector. It is pushed and not yet
+merged into `release/0.8.5`. `release/0.8.5` before it merged
+`fix/agent-flow-once`, `feature/order-book-depth`, `feature/bonds`,
+`docs/model-spec`, `preset/pt-v20`, `fixtures/pt-v20`, `fix/ptv20-core`
+(the Oracle, `fair_value_shift`, the corporate-yield fixes) and
+`docs/model-spec-v20`, plus five commits cherry-picked from `dev` (c618089,
+d1cb9a6, a46575e, fbdcac1, d445d9c; 1c653e7 is superseded). pt-v20 is the
+default, at the vector the grade box ptv20g6 passed 40 of 40 on.
+
+On `rel085/candidate` after `rel085/last-lib` merged (2026-10-01), with
+no API keys set, the full Python suite (`pytest -n 4`) passes 5087 with
+305 skipped and none failing, every recorded LLM fixture replays, and
+`cargo test --release` passes 586 with 20 ignored and none failing.
+`tools/release/check.py --version 0.8.5` reports 0 problems.
+
+| digest | value |
+|---|---|
+| `simulationSha256` (KAT 28) | `72485a9f...` |
+| `sha256` (known answer) | `ac004fea...` |
+| `metadataSha256` | `8804ef0e...` |
+| `bondsSha256` | `cac3ff44...` |
+| book `sha256` | `b14d1f50...` (BOOK_KAT_VERSION 2 since `rel085/fix-book`, 2026-10-01; it was `81aceb27...`) |
+| traded `sha256` | `8e032d38...` since `rel085/fix-book`, 2026-10-01; it was `5b4944ab...` |
+| presets, 19 rows | combined `87f0b185...`; pt-v20's row `07ab6e0c...` |
+| 64-bit seed line | `cef62229...` (seed 2**63 + 12345, pt-v19) |
+
+These are pt-v20's graded arm, produced on macOS arm64. The eighteen
+per-preset rows before pt-v20 are `release/0.8.5`'s and match the published
+0.8.1 wheel with the two treasury yields left out; seed64 and the sandbox
+moved no digest.
+
+## 1. The last engine changes
+
+- [x] **E3's `fix/ptv20-final` is merged** (1b21118): the graded arm,
+      `garch_beta` back at 0.7905, the known answers re-based in place
+      (KAT 28 has never shipped).
+- [x] **E7's `feature/seed64` is merged** (d589c04), and every digest
+      checked again on the merged build.
+- [x] **`fix/harness-sandbox` is merged** (238571b).
+- [ ] **The independent adversarial audit of pt-v20** re-runs on the final
+      commit, after RELEASING 5b and before the PR, and the bar is no open
+      blockers or majors. Any finding goes back to E3 for a fix and a
+      regrade, and every step from here is re-run on the fixed vector
+      before the PR.
+- [x] **The LLM fixtures are re-recorded** live (2026-10-01): callable,
+      OpenAI Agents, PydanticAI, LangGraph, FinRobot rate-shock and the
+      liquidity-crisis study, plus example 08.
+- [x] **The LangGraph fixture is re-recorded live after `rel085/fix-book`** (done 2026-10-01, 60 calls; its replay tests pass)
+      (`TRADEFLOOR_LIVE_EXAMPLES=1 python examples/integrations/langgraph/rate_shock.py --record`, with an
+      Anthropic key). Its recording has a buy limit for HELX at 86.10 that
+      the old flow filled for 1,425 shares on day 1 while HELX traded at
+      87.33 to 87.37, which is the bug that branch fixed. With the fix the
+      order does not fill, the step-12 observation differs and the replay
+      misses. Until then three tests in `tests/test_langgraph.py` and
+      `test_render.py::test_langgraph_default_renderer_replays_the_shipped_fixture`
+      fail on `rel085/candidate`. The other fixtures replay.
+- [x] **`rel085/last-lib` is merged** (217e322, 2026-10-01): an agent's
+      resting buy and sell no longer trade with each other in the
+      settlement book, the bar note on resting fills, and the report fixes
+      (non-mapping answers, a short run's Sharpe, an unguarded replay). No
+      digest moved; every one in the table was re-run on the merged build.
+- [x] RELEASING 5b on the final vector: pt-v20's record from the grade
+      box's preset panel (ptv20g6), its level block from a paired run on
+      this build (`tools/presets/results/level-rows-pt-v20-2026-09-26.json`,
+      the control pt-v19 reproducing its four constants), its long-run
+      block from `verdict-pt-v20-g6.json`, `envelope_tables.py --write`,
+      and the known answers as re-based on `fix/ptv20-final`.
+- [x] Re-run the envelope gap measurements on the final vector
+      (`tools/calibration/aws/user-data-envgaps.sh`, one box, about $0.15)
+      and fold them into `envelope.py` and `loss.py`. The runs on branches
+      `envgaps/pt-v20` (folded) and `envgaps/pt-v20-final` (6fa7462, not
+      folded, measured at `garch_beta` 0.85) are superseded by that run.
+      Done on `integration/0.8.5-envgaps` (2026-09-26): run `envgaps-085` at
+      ba3f020, about $0.15, artefacts in
+      `tools/calibration/results/envgaps-085-2026-09-26/`, folded in 0d2b7a9.
+      The scenario gap's summary now reads "a quarter to a half of the real
+      size", and a local re-run on notebook 09's Baa path (`driven-path/`)
+      shows that response arrives through the credit leg (239970a).
+- [ ] The CHANGELOG's release note (it quotes the ptv20g3 figures), the
+      README's realism section, notebooks 00 to 06 and 09 and the pt-v19
+      figures left in the docs glossary and core-concepts pages follow the
+      final vector. MODEL.md's values follow it on `integration/0.8.5`.
+      The glossary's and core concepts' pt-v19 figures are re-measured on
+      pt-v20 on `docs/0.8.5-final` (9b57dc6 there).
+
+## 2. The docs branch against the final engine
+
+In `tradefloor-docs` on `release/0.8.5`, with `TRADEFLOOR_PYTHON` naming a
+venv that holds a build of the final engine commit:
+
+- [ ] `python tools/docs/learn/regenerate.py --source <engine checkout> --ref origin/release/0.8.5`
+      (mirrors, library pages, inventories, experiments, build, commits).
+      Done against `--ref origin/integration/0.8.5-envgaps` on the docs
+      branch `docs/0.8.5-final` (off `release/0.8.5`, pushed, not merged);
+      to be run once more against `origin/release/0.8.5` after this branch
+      is merged into it, which should change only `mirrors.json`'s ref.
+- [x] Merge the figures branch (`figures/pt-v20`) once its gate is clean
+      (4f16d54 on `release/0.8.5`).
+- [ ] `python tools/docs/check.py` passes all fifteen steps. Passes on
+      `docs/0.8.5-final` (15 of 15, 2026-09-26), with `TRADEFLOOR_PYTHON`
+      a Python 3.11 venv and `node` on the PATH.
+- [x] `python tools/remeasure/resync.py --lines` from the engine checkout
+      with `TRADEFLOOR_DOCS` set, and commit the register (94 ok, 0 moved,
+      on `docs/0.8.5-final`).
+- [ ] The docs repo's CI installs `tradefloor==0.8.5` from PyPI, so it stays
+      red until the tag.
+
+## 3. The remeasure box (RELEASING step 4)
+
+- [ ] From `tradefloor-design`, with `TRADEFLOOR_DOCS` at the docs checkout
+      of step 2, run the commands in the header of
+      `tools/calibration/aws/user-data-remeasure.sh`: upload the register
+      tarball as `in/remeasure-0.8.5-register.tgz`, launch run
+      `remeasure-0.8.5` on c8g.24xlarge with `BRANCH=release/0.8.5`, then
+      `status`, `collect` into `tools/remeasure/out-0.8.5` and `reap`.
+      About $0.45 at the spot floor, $1.37 at most.
+- [ ] Read "Doc edits needed", fix each MOVED row in the docs repo, rebuild,
+      and repeat until clean, then commit `tools/remeasure/out-0.8.5/` on
+      the engine branch. Run on `integration/0.8.5-envgaps` instead of
+      `release/0.8.5`: `remeasure-085env` (6152466, 9 MOVED, fixed on
+      `docs/0.8.5-final`) and `remeasure-085env2` (e35ce06: 41 reproduced,
+      0 MOVED, 0 structural_fail), about $0.31 each; the clean run is
+      committed as `tools/remeasure/out-0.8.5/`. Re-run on `release/0.8.5`
+      only if something moves a figure before the PR.
+
+## 4. The determinism gate (RELEASING step 7)
+
+- [ ] `gh workflow run determinism.yml --ref release/0.8.5 -f targets=all`
+- [ ] Read the run you started and check its `headSha` is the branch head.
+      This is the second architecture for KAT 28's digests, which were
+      produced on macOS arm64.
+      Dispatched on `integration/0.8.5-envgaps` at 6152466 (run
+      36240292877): all five targets and `all targets agree` green, and
+      the envgaps box reproduced sim 72485a9f on linux-aarch64. Both boxes
+      (remeasure) passed the known answer there too. The required check
+      still has to run on `release/0.8.5` (or its PR) once merged.
+
+## 5. The pull request to main
+
+- [ ] Open the PR `release/0.8.5` into `main`. The required checks are
+      `all targets agree` and `the suite is green`, and the protection is
+      strict, so the branch has to be up to date with `main`.
+- [x] Zenodo's GitHub integration is on for `simoncoombes/tradefloor`
+      (the owner, 2026-09-25), so the 0.8.5 GitHub release gets a DOI.
+- [ ] The owner merges.
+
+## 6. Tag and publish
+
+- [ ] `git fetch && git rev-parse origin/main` against the merge commit.
+- [ ] `CITATION.cff` `date-released:` is the day of the tag.
+- [ ] `git tag -a v0.8.5 -m "..." origin/main` and `git push origin v0.8.5`.
+      `release.yml` builds, verifies, publishes to PyPI and crates.io, and
+      writes the GitHub release from the section above
+      `<!-- release-note-ends -->`. A crates.io version cannot be replaced.
+
+## 7. After the tag
+
+- [ ] Install from outside the tree and ask it what it is:
+
+      python -m venv /tmp/rel && /tmp/rel/bin/pip install tradefloor==0.8.5
+      /tmp/rel/bin/python -c "import tradefloor as tf; print(tf.version(), tf.model_preset()['name'])"
+      /tmp/rel/bin/pip install --no-binary :all: tradefloor==0.8.5
+
+- [ ] Reproduce every known-answer digest inside the installed wheel against
+      `tests/known_answer.json`, `known_answer_book.json`,
+      `known_answer_presets.json` and `known_answer_traded.json` from the
+      tag.
+- [ ] docs.rs: `https://docs.rs/tradefloor/0.8.5`.
+- [ ] The docs site: mirror from `v0.8.5`, regenerate against the released
+      wheel (`params.py --check --python /tmp/rel/bin/python`),
+      `build.py --target live` (it refuses any `[PLACEHOLDER` or
+      `[REMEASURE` marker left), `check.py`, a PR into `main`, merged by the
+      owner, then `curl -sI https://tradefloor.dev/` and `indexnow.py`.
+- [ ] Merge `main` into `dev`.
+- [ ] Delete the working branches and worktrees: `integration/0.8.5`,
+      `archive/integration-0.8.5-677ca51` (the earlier local integration
+      branch, renamed when this one was made),
+      `flip/a`, `flip/b`, `flip/c`, `envgaps/pt-v20`, `remeasure/pt-v20`,
+      and in the docs repo `figures/pt-v20`.
+
+## 8. Zenodo
+
+- [x] The owner switched Zenodo's GitHub integration on for
+      `simoncoombes/tradefloor` on 2026-09-25 (`RELEASING.md`, "DOI
+      (Zenodo)").
+- [ ] After the 0.8.5 GitHub release: open the new Zenodo record, check its
+      title, author and licence against `.zenodo.json`, and read the concept
+      DOI from it.
+- [ ] Put the concept DOI in `CITATION.cff` (`doi:`), in the README's
+      "Citing tradefloor" BibTeX entry in place of `10.5281/zenodo.XXXXXXX`,
+      and on the docs Install page. That is a documentation change, which an
+      LTS patch allows, and the docs change goes through a PR into the docs
+      repo's `main`.

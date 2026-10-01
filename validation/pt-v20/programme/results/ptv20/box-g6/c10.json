@@ -1,0 +1,3114 @@
+{
+ "pt-v19": {
+  "histories": 90,
+  "lag": 0,
+  "rules": {
+   "out_contraction_trough": {
+    "median_excess": 0.024638677413950816,
+    "share_ahead": 0.5444444444444444
+   },
+   "out_peak_contraction": {
+    "median_excess": -0.34785524124122746,
+    "share_ahead": 0.24444444444444444
+   },
+   "in_trough_recovery": {
+    "median_excess": -5.1361751129574476,
+    "share_ahead": 0.0
+   },
+   "out_contraction": {
+    "median_excess": 0.07848321155539369,
+    "share_ahead": 0.5777777777777777
+   },
+   "out_vix_up21": {
+    "median_excess": -5.74463442071255,
+    "share_ahead": 0.0
+   },
+   "out_vix_down21": {
+    "median_excess": -3.7959661103354514,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_vix_p95_up": {
+    "median_excess": -4.9777605652954175,
+    "share_ahead": 0.0
+   },
+   "out63_after_vix_p95_up": {
+    "median_excess": -5.534042411242517,
+    "share_ahead": 0.0
+   },
+   "out126_after_vix_p95_up": {
+    "median_excess": -5.57821633447378,
+    "share_ahead": 0.0
+   },
+   "out21_after_vix_p95_down": {
+    "median_excess": -3.469917313787416,
+    "share_ahead": 0.0
+   },
+   "out63_after_vix_p95_down": {
+    "median_excess": -3.8942714548000814,
+    "share_ahead": 0.0
+   },
+   "out126_after_vix_p95_down": {
+    "median_excess": -4.26166807276763,
+    "share_ahead": 0.0
+   },
+   "out21_after_vix_up": {
+    "median_excess": -2.6356998773637668,
+    "share_ahead": 0.022222222222222223
+   },
+   "out63_after_vix_up": {
+    "median_excess": -3.574017048793034,
+    "share_ahead": 0.0
+   },
+   "out126_after_vix_up": {
+    "median_excess": -3.701946677874284,
+    "share_ahead": 0.0
+   },
+   "out21_after_vix_down": {
+    "median_excess": -1.3343577588565747,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_vix_down": {
+    "median_excess": -2.038295957452685,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_vix_down": {
+    "median_excess": -2.044039076050181,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_vix_p99.9_up": {
+    "median_excess": -0.6982063531093328,
+    "share_ahead": 0.15555555555555556
+   },
+   "out63_after_vix_p99.9_up": {
+    "median_excess": -1.3775745915015492,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_vix_p99.9_up": {
+    "median_excess": -1.7246656206633222,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_vix_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out63_after_vix_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.14444444444444443
+   },
+   "out126_after_vix_p99.9_down": {
+    "median_excess": -0.1720185002226141,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_vix_5d_p95_up": {
+    "median_excess": -4.027932005818931,
+    "share_ahead": 0.0
+   },
+   "out63_after_vix_5d_p95_up": {
+    "median_excess": -5.2925952583130425,
+    "share_ahead": 0.0
+   },
+   "out126_after_vix_5d_p95_up": {
+    "median_excess": -5.362307108298912,
+    "share_ahead": 0.0
+   },
+   "out21_after_vix_5d_p95_down": {
+    "median_excess": -3.2373281994421053,
+    "share_ahead": 0.022222222222222223
+   },
+   "out63_after_vix_5d_p95_down": {
+    "median_excess": -3.913848293573329,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_vix_5d_p95_down": {
+    "median_excess": -4.2479501714076555,
+    "share_ahead": 0.0
+   },
+   "out21_after_vix_5d_up": {
+    "median_excess": -1.9693858154161537,
+    "share_ahead": 0.08888888888888889
+   },
+   "out63_after_vix_5d_up": {
+    "median_excess": -3.0686047391546083,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_vix_5d_up": {
+    "median_excess": -3.3929638985828356,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_vix_5d_down": {
+    "median_excess": -1.2203371399988723,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_vix_5d_down": {
+    "median_excess": -1.7055202875005442,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_vix_5d_down": {
+    "median_excess": -2.0789348095206357,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_vix_5d_p99.9_up": {
+    "median_excess": -0.6452846063912885,
+    "share_ahead": 0.2
+   },
+   "out63_after_vix_5d_p99.9_up": {
+    "median_excess": -1.124663665167398,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_vix_5d_p99.9_up": {
+    "median_excess": -1.4680697888157077,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_vix_5d_p99.9_down": {
+    "median_excess": -0.11304803949846312,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_vix_5d_p99.9_down": {
+    "median_excess": -0.3530605009121765,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_vix_5d_p99.9_down": {
+    "median_excess": -0.5883086318465467,
+    "share_ahead": 0.05555555555555555
+   },
+   "out_federal_funds_rate_up21": {
+    "median_excess": -0.9071388711296622,
+    "share_ahead": 0.2
+   },
+   "out_federal_funds_rate_down21": {
+    "median_excess": -0.010586056824647874,
+    "share_ahead": 0.4888888888888889
+   },
+   "out21_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out63_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_federal_funds_rate_p95_down": {
+    "median_excess": 0.05537760539295667,
+    "share_ahead": 0.5888888888888889
+   },
+   "out63_after_federal_funds_rate_p95_down": {
+    "median_excess": -0.2759391053885978,
+    "share_ahead": 0.2777777777777778
+   },
+   "out126_after_federal_funds_rate_p95_down": {
+    "median_excess": -0.6667516103988669,
+    "share_ahead": 0.17777777777777778
+   },
+   "out21_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_federal_funds_rate_down": {
+    "median_excess": 0.042287188200075536,
+    "share_ahead": 0.6
+   },
+   "out63_after_federal_funds_rate_down": {
+    "median_excess": -0.12390344769981694,
+    "share_ahead": 0.3333333333333333
+   },
+   "out126_after_federal_funds_rate_down": {
+    "median_excess": -0.3414666292705105,
+    "share_ahead": 0.2111111111111111
+   },
+   "out21_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_federal_funds_rate_p99.9_down": {
+    "median_excess": 0.042287188200075536,
+    "share_ahead": 0.6
+   },
+   "out63_after_federal_funds_rate_p99.9_down": {
+    "median_excess": -0.12390344769981694,
+    "share_ahead": 0.3333333333333333
+   },
+   "out126_after_federal_funds_rate_p99.9_down": {
+    "median_excess": -0.3414666292705105,
+    "share_ahead": 0.2111111111111111
+   },
+   "out21_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out63_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": 0.05559636992395941,
+    "share_ahead": 0.5444444444444444
+   },
+   "out63_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": -0.3491301416465299,
+    "share_ahead": 0.23333333333333334
+   },
+   "out126_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": -0.6163422803224228,
+    "share_ahead": 0.15555555555555556
+   },
+   "out21_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_federal_funds_rate_5d_down": {
+    "median_excess": 0.01753172421020946,
+    "share_ahead": 0.5777777777777777
+   },
+   "out63_after_federal_funds_rate_5d_down": {
+    "median_excess": -0.15446051600137595,
+    "share_ahead": 0.24444444444444444
+   },
+   "out126_after_federal_funds_rate_5d_down": {
+    "median_excess": -0.2841922120663486,
+    "share_ahead": 0.24444444444444444
+   },
+   "out21_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": 0.01753172421020946,
+    "share_ahead": 0.5777777777777777
+   },
+   "out63_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": -0.15446051600137595,
+    "share_ahead": 0.24444444444444444
+   },
+   "out126_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": -0.2841922120663486,
+    "share_ahead": 0.24444444444444444
+   },
+   "out_corporate_bond_yield_up21": {
+    "median_excess": -2.597452977177659,
+    "share_ahead": 0.05555555555555555
+   },
+   "out_corporate_bond_yield_down21": {
+    "median_excess": -1.4833383710365045,
+    "share_ahead": 0.17777777777777778
+   },
+   "out21_after_corporate_bond_yield_p95_up": {
+    "median_excess": -0.06913058548911995,
+    "share_ahead": 0.43333333333333335
+   },
+   "out63_after_corporate_bond_yield_p95_up": {
+    "median_excess": -0.28007099747934516,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_corporate_bond_yield_p95_up": {
+    "median_excess": -0.4478184141568227,
+    "share_ahead": 0.23333333333333334
+   },
+   "out21_after_corporate_bond_yield_p95_down": {
+    "median_excess": 0.03461554715384879,
+    "share_ahead": 0.5444444444444444
+   },
+   "out63_after_corporate_bond_yield_p95_down": {
+    "median_excess": -0.30791289259031485,
+    "share_ahead": 0.3
+   },
+   "out126_after_corporate_bond_yield_p95_down": {
+    "median_excess": -0.7808615572064335,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_corporate_bond_yield_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_corporate_bond_yield_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_corporate_bond_yield_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_corporate_bond_yield_down": {
+    "median_excess": -0.10571512678866915,
+    "share_ahead": 0.3888888888888889
+   },
+   "out63_after_corporate_bond_yield_down": {
+    "median_excess": -0.14588522787067293,
+    "share_ahead": 0.34444444444444444
+   },
+   "out126_after_corporate_bond_yield_down": {
+    "median_excess": -0.3679509966410096,
+    "share_ahead": 0.3
+   },
+   "out21_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -0.03746019501959155,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -0.15856558814046984,
+    "share_ahead": 0.37777777777777777
+   },
+   "out126_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -0.19476091259878342,
+    "share_ahead": 0.3333333333333333
+   },
+   "out21_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -0.11850969324378112,
+    "share_ahead": 0.43333333333333335
+   },
+   "out63_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -0.308763984657039,
+    "share_ahead": 0.2111111111111111
+   },
+   "out126_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -0.4273973336454081,
+    "share_ahead": 0.25555555555555554
+   },
+   "out21_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -0.021931959750862023,
+    "share_ahead": 0.45555555555555555
+   },
+   "out63_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -0.33241709808752185,
+    "share_ahead": 0.24444444444444444
+   },
+   "out126_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -0.761275979589554,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_corporate_bond_yield_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_corporate_bond_yield_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_corporate_bond_yield_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_corporate_bond_yield_5d_down": {
+    "median_excess": -0.07217858535378494,
+    "share_ahead": 0.3888888888888889
+   },
+   "out63_after_corporate_bond_yield_5d_down": {
+    "median_excess": -0.1604209586434912,
+    "share_ahead": 0.36666666666666664
+   },
+   "out126_after_corporate_bond_yield_5d_down": {
+    "median_excess": -0.3838664926544707,
+    "share_ahead": 0.32222222222222224
+   },
+   "out21_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.020357850619420303,
+    "share_ahead": 0.4444444444444444
+   },
+   "out63_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.12107773435139152,
+    "share_ahead": 0.3888888888888889
+   },
+   "out126_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.20659388755568392,
+    "share_ahead": 0.32222222222222224
+   },
+   "out_inflation_rate_up21": {
+    "median_excess": -3.2906373875973016,
+    "share_ahead": 0.03333333333333333
+   },
+   "out_inflation_rate_down21": {
+    "median_excess": -3.1716263993747744,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_inflation_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.4444444444444444
+   },
+   "out63_after_inflation_rate_p95_up": {
+    "median_excess": -0.03397626455324706,
+    "share_ahead": 0.32222222222222224
+   },
+   "out126_after_inflation_rate_p95_up": {
+    "median_excess": -0.15419093687035745,
+    "share_ahead": 0.32222222222222224
+   },
+   "out21_after_inflation_rate_p95_down": {
+    "median_excess": 0.019078229073725687,
+    "share_ahead": 0.5
+   },
+   "out63_after_inflation_rate_p95_down": {
+    "median_excess": -0.2621651406967226,
+    "share_ahead": 0.3111111111111111
+   },
+   "out126_after_inflation_rate_p95_down": {
+    "median_excess": -0.662685843008013,
+    "share_ahead": 0.14444444444444443
+   },
+   "out21_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_inflation_rate_down": {
+    "median_excess": -0.031168601013078362,
+    "share_ahead": 0.45555555555555555
+   },
+   "out63_after_inflation_rate_down": {
+    "median_excess": -0.14477404406331218,
+    "share_ahead": 0.4
+   },
+   "out126_after_inflation_rate_down": {
+    "median_excess": -0.3362371189770832,
+    "share_ahead": 0.2222222222222222
+   },
+   "out21_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_inflation_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.4
+   },
+   "out63_after_inflation_rate_p99.9_down": {
+    "median_excess": -0.04599795989962364,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_inflation_rate_p99.9_down": {
+    "median_excess": -0.16556317329423553,
+    "share_ahead": 0.2222222222222222
+   },
+   "out21_after_inflation_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.4222222222222222
+   },
+   "out63_after_inflation_rate_5d_p95_up": {
+    "median_excess": -0.07869849844922996,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_inflation_rate_5d_p95_up": {
+    "median_excess": -0.14339061133591427,
+    "share_ahead": 0.3
+   },
+   "out21_after_inflation_rate_5d_p95_down": {
+    "median_excess": -0.02191425640195842,
+    "share_ahead": 0.4888888888888889
+   },
+   "out63_after_inflation_rate_5d_p95_down": {
+    "median_excess": -0.33901818857751204,
+    "share_ahead": 0.2777777777777778
+   },
+   "out126_after_inflation_rate_5d_p95_down": {
+    "median_excess": -0.7339117869430972,
+    "share_ahead": 0.13333333333333333
+   },
+   "out21_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out63_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out126_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_inflation_rate_5d_down": {
+    "median_excess": -0.028417219181690975,
+    "share_ahead": 0.4
+   },
+   "out63_after_inflation_rate_5d_down": {
+    "median_excess": -0.16205379635477307,
+    "share_ahead": 0.37777777777777777
+   },
+   "out126_after_inflation_rate_5d_down": {
+    "median_excess": -0.42022395639754495,
+    "share_ahead": 0.2
+   },
+   "out21_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out63_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": -0.0666213545020167,
+    "share_ahead": 0.2777777777777778
+   },
+   "out126_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": -0.18929318469828357,
+    "share_ahead": 0.26666666666666666
+   },
+   "out_gdp_growth_up21": {
+    "median_excess": -4.410730802744056,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_gdp_growth_down21": {
+    "median_excess": -2.264943486541248,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_gdp_growth_p95_up": {
+    "median_excess": -0.532381583749928,
+    "share_ahead": 0.23333333333333334
+   },
+   "out63_after_gdp_growth_p95_up": {
+    "median_excess": -0.8394022451286073,
+    "share_ahead": 0.1
+   },
+   "out126_after_gdp_growth_p95_up": {
+    "median_excess": -1.0801176393809588,
+    "share_ahead": 0.1
+   },
+   "out21_after_gdp_growth_p95_down": {
+    "median_excess": 0.23245109927473934,
+    "share_ahead": 0.8
+   },
+   "out63_after_gdp_growth_p95_down": {
+    "median_excess": 0.24658761501068643,
+    "share_ahead": 0.6666666666666666
+   },
+   "out126_after_gdp_growth_p95_down": {
+    "median_excess": 0.04334485809917648,
+    "share_ahead": 0.5666666666666667
+   },
+   "out21_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_gdp_growth_down": {
+    "median_excess": 0.19890848393239097,
+    "share_ahead": 0.7888888888888889
+   },
+   "out63_after_gdp_growth_down": {
+    "median_excess": 0.16102989439983584,
+    "share_ahead": 0.6888888888888889
+   },
+   "out126_after_gdp_growth_down": {
+    "median_excess": 0.13227665492756235,
+    "share_ahead": 0.5888888888888889
+   },
+   "out21_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_gdp_growth_p99.9_down": {
+    "median_excess": 0.11535621792596992,
+    "share_ahead": 0.7333333333333333
+   },
+   "out63_after_gdp_growth_p99.9_down": {
+    "median_excess": 0.09687334153138724,
+    "share_ahead": 0.6444444444444445
+   },
+   "out126_after_gdp_growth_p99.9_down": {
+    "median_excess": 0.05444190018349386,
+    "share_ahead": 0.5555555555555556
+   },
+   "out21_after_gdp_growth_5d_p95_up": {
+    "median_excess": -0.6797711936550592,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_gdp_growth_5d_p95_up": {
+    "median_excess": -1.0317583600433733,
+    "share_ahead": 0.1111111111111111
+   },
+   "out126_after_gdp_growth_5d_p95_up": {
+    "median_excess": -1.2799642541575145,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_gdp_growth_5d_p95_down": {
+    "median_excess": 0.42856419421547254,
+    "share_ahead": 0.7777777777777778
+   },
+   "out63_after_gdp_growth_5d_p95_down": {
+    "median_excess": 0.15575037174803644,
+    "share_ahead": 0.5777777777777777
+   },
+   "out126_after_gdp_growth_5d_p95_down": {
+    "median_excess": -0.45166644827624836,
+    "share_ahead": 0.26666666666666666
+   },
+   "out21_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.14444444444444443
+   },
+   "out63_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out126_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_gdp_growth_5d_down": {
+    "median_excess": 0.22765493551949387,
+    "share_ahead": 0.8333333333333334
+   },
+   "out63_after_gdp_growth_5d_down": {
+    "median_excess": 0.21494237987041692,
+    "share_ahead": 0.7111111111111111
+   },
+   "out126_after_gdp_growth_5d_down": {
+    "median_excess": 0.11760345559912282,
+    "share_ahead": 0.6111111111111112
+   },
+   "out21_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": 0.12579689372095998,
+    "share_ahead": 0.6888888888888889
+   },
+   "out63_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": 0.048209259714444355,
+    "share_ahead": 0.6111111111111112
+   },
+   "out126_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": 0.08261532265683386,
+    "share_ahead": 0.6111111111111112
+   },
+   "out_unemployment_rate_up21": {
+    "median_excess": -0.45492738085629275,
+    "share_ahead": 0.23333333333333334
+   },
+   "out_unemployment_rate_down21": {
+    "median_excess": -1.176422441044528,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_unemployment_rate_p95_up": {
+    "median_excess": 0.07656412076898925,
+    "share_ahead": 0.6
+   },
+   "out63_after_unemployment_rate_p95_up": {
+    "median_excess": 0.06011929192394278,
+    "share_ahead": 0.5222222222222223
+   },
+   "out126_after_unemployment_rate_p95_up": {
+    "median_excess": -0.10690140039560127,
+    "share_ahead": 0.4222222222222222
+   },
+   "out21_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_up": {
+    "median_excess": 0.05007698443110536,
+    "share_ahead": 0.6
+   },
+   "out63_after_unemployment_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.4666666666666667
+   },
+   "out126_after_unemployment_rate_up": {
+    "median_excess": -0.04894893304909835,
+    "share_ahead": 0.45555555555555555
+   },
+   "out21_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_p99.9_up": {
+    "median_excess": 0.04413743256940911,
+    "share_ahead": 0.5777777777777777
+   },
+   "out63_after_unemployment_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.4888888888888889
+   },
+   "out126_after_unemployment_rate_p99.9_up": {
+    "median_excess": -0.029917623395946488,
+    "share_ahead": 0.4666666666666667
+   },
+   "out21_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_5d_p95_up": {
+    "median_excess": 0.07880917907220206,
+    "share_ahead": 0.5555555555555556
+   },
+   "out63_after_unemployment_rate_5d_p95_up": {
+    "median_excess": 0.018750678478585907,
+    "share_ahead": 0.5444444444444444
+   },
+   "out126_after_unemployment_rate_5d_p95_up": {
+    "median_excess": -0.09767461038634496,
+    "share_ahead": 0.4222222222222222
+   },
+   "out21_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_5d_up": {
+    "median_excess": 0.05886353574168478,
+    "share_ahead": 0.5888888888888889
+   },
+   "out63_after_unemployment_rate_5d_up": {
+    "median_excess": -0.004025380618331476,
+    "share_ahead": 0.4444444444444444
+   },
+   "out126_after_unemployment_rate_5d_up": {
+    "median_excess": -0.08279268155299821,
+    "share_ahead": 0.4444444444444444
+   },
+   "out21_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": 0.055371523660355915,
+    "share_ahead": 0.5666666666666667
+   },
+   "out63_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": 0.0025704342068946806,
+    "share_ahead": 0.5
+   },
+   "out126_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": -0.028972400983998524,
+    "share_ahead": 0.4666666666666667
+   },
+   "out21_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out_oil_price_up21": {
+    "median_excess": -4.519171881913648,
+    "share_ahead": 0.0
+   },
+   "out_oil_price_down21": {
+    "median_excess": -4.049992620202352,
+    "share_ahead": 0.0
+   },
+   "out21_after_oil_price_p95_up": {
+    "median_excess": -2.5200592800806274,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_oil_price_p95_up": {
+    "median_excess": -4.492691204565395,
+    "share_ahead": 0.0
+   },
+   "out126_after_oil_price_p95_up": {
+    "median_excess": -5.674911829169277,
+    "share_ahead": 0.0
+   },
+   "out21_after_oil_price_p95_down": {
+    "median_excess": -2.5655979169862704,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_oil_price_p95_down": {
+    "median_excess": -4.539376839926424,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_oil_price_p95_down": {
+    "median_excess": -5.602689994719205,
+    "share_ahead": 0.0
+   },
+   "out21_after_oil_price_up": {
+    "median_excess": -0.48040271318470756,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_oil_price_up": {
+    "median_excess": -1.699073404137828,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_oil_price_up": {
+    "median_excess": -3.123429889462222,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_oil_price_down": {
+    "median_excess": -0.6506900240589046,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_oil_price_down": {
+    "median_excess": -1.501512200625593,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_oil_price_down": {
+    "median_excess": -2.6998502771463637,
+    "share_ahead": 0.1
+   },
+   "out21_after_oil_price_p99.9_up": {
+    "median_excess": -0.09915718944968255,
+    "share_ahead": 0.34444444444444444
+   },
+   "out63_after_oil_price_p99.9_up": {
+    "median_excess": -0.1311572419983371,
+    "share_ahead": 0.3111111111111111
+   },
+   "out126_after_oil_price_p99.9_up": {
+    "median_excess": -0.39177962784458165,
+    "share_ahead": 0.23333333333333334
+   },
+   "out21_after_oil_price_p99.9_down": {
+    "median_excess": -0.055368036816820676,
+    "share_ahead": 0.3888888888888889
+   },
+   "out63_after_oil_price_p99.9_down": {
+    "median_excess": -0.13969952626359539,
+    "share_ahead": 0.3333333333333333
+   },
+   "out126_after_oil_price_p99.9_down": {
+    "median_excess": -0.2521463305350642,
+    "share_ahead": 0.23333333333333334
+   },
+   "out21_after_oil_price_5d_p95_up": {
+    "median_excess": -1.6473740915915607,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_oil_price_5d_p95_up": {
+    "median_excess": -3.092709119922543,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_oil_price_5d_p95_up": {
+    "median_excess": -4.842842829789559,
+    "share_ahead": 0.0
+   },
+   "out21_after_oil_price_5d_p95_down": {
+    "median_excess": -1.8110550655668964,
+    "share_ahead": 0.14444444444444443
+   },
+   "out63_after_oil_price_5d_p95_down": {
+    "median_excess": -3.032678571930971,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_oil_price_5d_p95_down": {
+    "median_excess": -4.689026477330794,
+    "share_ahead": 0.0
+   },
+   "out21_after_oil_price_5d_up": {
+    "median_excess": -0.5067215464265149,
+    "share_ahead": 0.2222222222222222
+   },
+   "out63_after_oil_price_5d_up": {
+    "median_excess": -0.9895423937143637,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_oil_price_5d_up": {
+    "median_excess": -2.1995486126083623,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_oil_price_5d_down": {
+    "median_excess": -0.5613458243927427,
+    "share_ahead": 0.2111111111111111
+   },
+   "out63_after_oil_price_5d_down": {
+    "median_excess": -1.2813569966480796,
+    "share_ahead": 0.14444444444444443
+   },
+   "out126_after_oil_price_5d_down": {
+    "median_excess": -2.2151408322952912,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_oil_price_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.36666666666666664
+   },
+   "out63_after_oil_price_5d_p99.9_up": {
+    "median_excess": -0.09356004721364854,
+    "share_ahead": 0.32222222222222224
+   },
+   "out126_after_oil_price_5d_p99.9_up": {
+    "median_excess": -0.2054638899189662,
+    "share_ahead": 0.2
+   },
+   "out21_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.05261682380911244,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.3498130122240984,
+    "share_ahead": 0.23333333333333334
+   },
+   "out126_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.4799560434002237,
+    "share_ahead": 0.2
+   },
+   "out_treasury_yield_2y_up21": {
+    "median_excess": -4.865134598784608,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_treasury_yield_2y_down21": {
+    "median_excess": -3.91072020451502,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_2y_p95_up": {
+    "median_excess": -2.923008210573955,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_treasury_yield_2y_p95_up": {
+    "median_excess": -4.863748618053103,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_2y_p95_up": {
+    "median_excess": -5.876783298533177,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_2y_p95_down": {
+    "median_excess": -2.131498609938336,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_treasury_yield_2y_p95_down": {
+    "median_excess": -5.06899917410579,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_2y_p95_down": {
+    "median_excess": -5.782530709271289,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_2y_up": {
+    "median_excess": -0.8487319534496052,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_treasury_yield_2y_up": {
+    "median_excess": -1.3512181842961424,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_treasury_yield_2y_up": {
+    "median_excess": -1.7373668654948116,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_2y_down": {
+    "median_excess": -0.01837167396688178,
+    "share_ahead": 0.4888888888888889
+   },
+   "out63_after_treasury_yield_2y_down": {
+    "median_excess": -1.4137527202959221,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_2y_down": {
+    "median_excess": -1.5171648251367391,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": 0.10686731447874412,
+    "share_ahead": 0.6
+   },
+   "out63_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": -0.5265611697681725,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": -0.7623450585251472,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -1.3234283359860446,
+    "share_ahead": 0.1
+   },
+   "out63_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -1.6748414158693385,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -2.2023698590358816,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -0.33637157647039545,
+    "share_ahead": 0.34444444444444444
+   },
+   "out63_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -1.5392401047191964,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -1.852943057077899,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_treasury_yield_2y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_treasury_yield_2y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out126_after_treasury_yield_2y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out21_after_treasury_yield_2y_5d_down": {
+    "median_excess": 0.07934596265861467,
+    "share_ahead": 0.5555555555555556
+   },
+   "out63_after_treasury_yield_2y_5d_down": {
+    "median_excess": -0.7669205515261452,
+    "share_ahead": 0.14444444444444443
+   },
+   "out126_after_treasury_yield_2y_5d_down": {
+    "median_excess": -0.9004678118022955,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": 0.050898937710467274,
+    "share_ahead": 0.5555555555555556
+   },
+   "out63_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": -0.2548909567353368,
+    "share_ahead": 0.2222222222222222
+   },
+   "out126_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": -0.4363572474467051,
+    "share_ahead": 0.2222222222222222
+   },
+   "out_treasury_yield_10y_up21": {
+    "median_excess": -4.936730823679827,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_treasury_yield_10y_down21": {
+    "median_excess": -4.028619086201908,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_10y_p95_up": {
+    "median_excess": -2.923008210573955,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_treasury_yield_10y_p95_up": {
+    "median_excess": -4.863748618053103,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_10y_p95_up": {
+    "median_excess": -5.876783298533177,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_10y_p95_down": {
+    "median_excess": -2.131498609938336,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_treasury_yield_10y_p95_down": {
+    "median_excess": -5.06899917410579,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_10y_p95_down": {
+    "median_excess": -5.782530709271289,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_10y_up": {
+    "median_excess": -0.79859997148259,
+    "share_ahead": 0.2
+   },
+   "out63_after_treasury_yield_10y_up": {
+    "median_excess": -1.3512181842961424,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_treasury_yield_10y_up": {
+    "median_excess": -1.7472195001477315,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_10y_down": {
+    "median_excess": -0.15436549917477987,
+    "share_ahead": 0.4777777777777778
+   },
+   "out63_after_treasury_yield_10y_down": {
+    "median_excess": -1.658724879050077,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_treasury_yield_10y_down": {
+    "median_excess": -1.7422452699157356,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.08888888888888889
+   },
+   "out63_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out126_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": 0.08960571181365418,
+    "share_ahead": 0.5666666666666667
+   },
+   "out63_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": -0.587438275893833,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": -0.7854314553812145,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -1.496668107035969,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -1.9212319787995888,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -2.6937348095044307,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -0.5093953004025311,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -1.9894868695233943,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -2.5181736856528287,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_10y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_treasury_yield_10y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.23333333333333334
+   },
+   "out126_after_treasury_yield_10y_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2111111111111111
+   },
+   "out21_after_treasury_yield_10y_5d_down": {
+    "median_excess": 0.037583219228423684,
+    "share_ahead": 0.5222222222222223
+   },
+   "out63_after_treasury_yield_10y_5d_down": {
+    "median_excess": -0.8420501628990609,
+    "share_ahead": 0.1
+   },
+   "out126_after_treasury_yield_10y_5d_down": {
+    "median_excess": -1.0440587208445335,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": 0.062324644262140697,
+    "share_ahead": 0.5888888888888889
+   },
+   "out63_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": -0.27805612293209875,
+    "share_ahead": 0.2111111111111111
+   },
+   "out126_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": -0.45309112297021753,
+    "share_ahead": 0.17777777777777778
+   },
+   "out_fear_greed_index_up21": {
+    "median_excess": -5.507181558261655,
+    "share_ahead": 0.011111111111111112
+   },
+   "out_fear_greed_index_down21": {
+    "median_excess": -5.33367619829565,
+    "share_ahead": 0.0
+   },
+   "out21_after_fear_greed_index_p95_up": {
+    "median_excess": -3.456022180069273,
+    "share_ahead": 0.044444444444444446
+   },
+   "out63_after_fear_greed_index_p95_up": {
+    "median_excess": -5.218221349670317,
+    "share_ahead": 0.0
+   },
+   "out126_after_fear_greed_index_p95_up": {
+    "median_excess": -5.823181092559581,
+    "share_ahead": 0.0
+   },
+   "out21_after_fear_greed_index_p95_down": {
+    "median_excess": -2.790790099184948,
+    "share_ahead": 0.044444444444444446
+   },
+   "out63_after_fear_greed_index_p95_down": {
+    "median_excess": -5.091472103188559,
+    "share_ahead": 0.0
+   },
+   "out126_after_fear_greed_index_p95_down": {
+    "median_excess": -5.885014753938272,
+    "share_ahead": 0.0
+   },
+   "out21_after_fear_greed_index_up": {
+    "median_excess": -0.9906148521970954,
+    "share_ahead": 0.13333333333333333
+   },
+   "out63_after_fear_greed_index_up": {
+    "median_excess": -2.124467062315438,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_fear_greed_index_up": {
+    "median_excess": -3.0795098685268423,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_fear_greed_index_down": {
+    "median_excess": -0.5449324181773552,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_fear_greed_index_down": {
+    "median_excess": -1.8227814192594198,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_fear_greed_index_down": {
+    "median_excess": -2.6316421342423784,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.14555381537811773,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.31802227627243684,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.47277716587941077,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_fear_greed_index_p99.9_down": {
+    "median_excess": 0.14688120038975527,
+    "share_ahead": 0.6666666666666666
+   },
+   "out63_after_fear_greed_index_p99.9_down": {
+    "median_excess": 0.020355955848981956,
+    "share_ahead": 0.5111111111111111
+   },
+   "out126_after_fear_greed_index_p99.9_down": {
+    "median_excess": -0.08514957104989836,
+    "share_ahead": 0.45555555555555555
+   },
+   "out21_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -2.679964669859883,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -4.1858233836900745,
+    "share_ahead": 0.0
+   },
+   "out126_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -5.540627412273828,
+    "share_ahead": 0.0
+   },
+   "out21_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -1.883362216881428,
+    "share_ahead": 0.08888888888888889
+   },
+   "out63_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -4.433615999731727,
+    "share_ahead": 0.0
+   },
+   "out126_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -5.365011576336313,
+    "share_ahead": 0.0
+   },
+   "out21_after_fear_greed_index_5d_up": {
+    "median_excess": -0.787213351456518,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_fear_greed_index_5d_up": {
+    "median_excess": -1.3328834673816459,
+    "share_ahead": 0.1
+   },
+   "out126_after_fear_greed_index_5d_up": {
+    "median_excess": -1.8845279642165416,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_fear_greed_index_5d_down": {
+    "median_excess": -0.45911464329267204,
+    "share_ahead": 0.36666666666666664
+   },
+   "out63_after_fear_greed_index_5d_down": {
+    "median_excess": -1.1068273526126442,
+    "share_ahead": 0.23333333333333334
+   },
+   "out126_after_fear_greed_index_5d_down": {
+    "median_excess": -1.64818589433544,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": 0.18629841767863514,
+    "share_ahead": 0.7666666666666667
+   },
+   "out63_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": 0.10352438254999444,
+    "share_ahead": 0.6444444444444445
+   },
+   "out126_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": 0.012225848396195775,
+    "share_ahead": 0.5222222222222223
+   }
+  },
+  "worst": "out21_after_gdp_growth_5d_p95_down",
+  "worst_median_excess": 0.42856419421547254,
+  "worst_share_ahead": 0.7777777777777778,
+  "drift_63": {
+   "contraction": -4.274960373949602,
+   "recovery": 3.834817656243714
+  },
+  "events": {
+   "contraction": 215,
+   "recovery": 218
+  },
+  "C10a": false,
+  "C10b": true,
+  "pass": false
+ },
+ "pt-v20": {
+  "histories": 90,
+  "lag": 0,
+  "rules": {
+   "out_contraction_trough": {
+    "median_excess": -1.2930922527244886,
+    "share_ahead": 0.08888888888888889
+   },
+   "out_peak_contraction": {
+    "median_excess": -2.574511290953094,
+    "share_ahead": 0.011111111111111112
+   },
+   "in_trough_recovery": {
+    "median_excess": -5.473080500298964,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_contraction": {
+    "median_excess": -1.0140607001261244,
+    "share_ahead": 0.07777777777777778
+   },
+   "out_vix_up21": {
+    "median_excess": -5.642799923534348,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_vix_down21": {
+    "median_excess": -3.8863154412117322,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_vix_p95_up": {
+    "median_excess": -3.9307859217366214,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_vix_p95_up": {
+    "median_excess": -4.355449873562594,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_vix_p95_up": {
+    "median_excess": -5.198374909433962,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_vix_p95_down": {
+    "median_excess": -1.7191758419912029,
+    "share_ahead": 0.13333333333333333
+   },
+   "out63_after_vix_p95_down": {
+    "median_excess": -2.4762229513702847,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_vix_p95_down": {
+    "median_excess": -3.04393999079982,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_vix_up": {
+    "median_excess": -1.6032863954711822,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_vix_up": {
+    "median_excess": -2.339804043083628,
+    "share_ahead": 0.17777777777777778
+   },
+   "out126_after_vix_up": {
+    "median_excess": -3.0571077455334095,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_vix_down": {
+    "median_excess": -0.8437737881200835,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_vix_down": {
+    "median_excess": -1.2686170833172619,
+    "share_ahead": 0.2111111111111111
+   },
+   "out126_after_vix_down": {
+    "median_excess": -1.3100051685850507,
+    "share_ahead": 0.15555555555555556
+   },
+   "out21_after_vix_p99.9_up": {
+    "median_excess": -0.6380201558396549,
+    "share_ahead": 0.2222222222222222
+   },
+   "out63_after_vix_p99.9_up": {
+    "median_excess": -1.063438561650995,
+    "share_ahead": 0.2222222222222222
+   },
+   "out126_after_vix_p99.9_up": {
+    "median_excess": -1.2611778142756642,
+    "share_ahead": 0.15555555555555556
+   },
+   "out21_after_vix_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.15555555555555556
+   },
+   "out63_after_vix_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1111111111111111
+   },
+   "out126_after_vix_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out21_after_vix_5d_p95_up": {
+    "median_excess": -2.799440999349745,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_vix_5d_p95_up": {
+    "median_excess": -3.44762893392208,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_vix_5d_p95_up": {
+    "median_excess": -4.031339628173263,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_vix_5d_p95_down": {
+    "median_excess": -2.094493695446897,
+    "share_ahead": 0.16666666666666666
+   },
+   "out63_after_vix_5d_p95_down": {
+    "median_excess": -2.6773451811089206,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_vix_5d_p95_down": {
+    "median_excess": -3.4790522812139395,
+    "share_ahead": 0.1
+   },
+   "out21_after_vix_5d_up": {
+    "median_excess": -1.1826321624869942,
+    "share_ahead": 0.16666666666666666
+   },
+   "out63_after_vix_5d_up": {
+    "median_excess": -1.90870121384335,
+    "share_ahead": 0.14444444444444443
+   },
+   "out126_after_vix_5d_up": {
+    "median_excess": -2.279949332627374,
+    "share_ahead": 0.14444444444444443
+   },
+   "out21_after_vix_5d_down": {
+    "median_excess": -0.9559225256995535,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_vix_5d_down": {
+    "median_excess": -1.6055813806247619,
+    "share_ahead": 0.2
+   },
+   "out126_after_vix_5d_down": {
+    "median_excess": -1.5699207114191966,
+    "share_ahead": 0.18888888888888888
+   },
+   "out21_after_vix_5d_p99.9_up": {
+    "median_excess": -0.6181448549185137,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_vix_5d_p99.9_up": {
+    "median_excess": -0.9307813793257682,
+    "share_ahead": 0.2222222222222222
+   },
+   "out126_after_vix_5d_p99.9_up": {
+    "median_excess": -1.1308939307277273,
+    "share_ahead": 0.18888888888888888
+   },
+   "out21_after_vix_5d_p99.9_down": {
+    "median_excess": -0.18194030665812677,
+    "share_ahead": 0.2
+   },
+   "out63_after_vix_5d_p99.9_down": {
+    "median_excess": -0.3483354570414635,
+    "share_ahead": 0.2
+   },
+   "out126_after_vix_5d_p99.9_down": {
+    "median_excess": -0.4848452355478037,
+    "share_ahead": 0.2111111111111111
+   },
+   "out_federal_funds_rate_up21": {
+    "median_excess": -1.1153346280139618,
+    "share_ahead": 0.1111111111111111
+   },
+   "out_federal_funds_rate_down21": {
+    "median_excess": -1.0292082723815321,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.044444444444444446
+   },
+   "out63_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out126_after_federal_funds_rate_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out21_after_federal_funds_rate_p95_down": {
+    "median_excess": -0.13482706860398078,
+    "share_ahead": 0.2777777777777778
+   },
+   "out63_after_federal_funds_rate_p95_down": {
+    "median_excess": -0.8326098991241742,
+    "share_ahead": 0.1111111111111111
+   },
+   "out126_after_federal_funds_rate_p95_down": {
+    "median_excess": -1.1578617885445306,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_federal_funds_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_federal_funds_rate_down": {
+    "median_excess": -0.027206672630207783,
+    "share_ahead": 0.3333333333333333
+   },
+   "out63_after_federal_funds_rate_down": {
+    "median_excess": -0.34066985116294446,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_federal_funds_rate_down": {
+    "median_excess": -0.6521212449233418,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_federal_funds_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_federal_funds_rate_p99.9_down": {
+    "median_excess": -0.016862044416592066,
+    "share_ahead": 0.3333333333333333
+   },
+   "out63_after_federal_funds_rate_p99.9_down": {
+    "median_excess": -0.3147504339083107,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_federal_funds_rate_p99.9_down": {
+    "median_excess": -0.58124217529908,
+    "share_ahead": 0.1
+   },
+   "out21_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out126_after_federal_funds_rate_5d_p95_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out21_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": -0.22711447101964222,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": -0.8653642362122029,
+    "share_ahead": 0.05555555555555555
+   },
+   "out126_after_federal_funds_rate_5d_p95_down": {
+    "median_excess": -1.1713131990380812,
+    "share_ahead": 0.1
+   },
+   "out21_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out63_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_federal_funds_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_federal_funds_rate_5d_down": {
+    "median_excess": -0.0029162152919073986,
+    "share_ahead": 0.36666666666666664
+   },
+   "out63_after_federal_funds_rate_5d_down": {
+    "median_excess": -0.32352838281041885,
+    "share_ahead": 0.1
+   },
+   "out126_after_federal_funds_rate_5d_down": {
+    "median_excess": -0.6043142807061679,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out63_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_federal_funds_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": -0.0029162152919073986,
+    "share_ahead": 0.36666666666666664
+   },
+   "out63_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": -0.32352838281041885,
+    "share_ahead": 0.1
+   },
+   "out126_after_federal_funds_rate_5d_p99.9_down": {
+    "median_excess": -0.6043142807061679,
+    "share_ahead": 0.07777777777777778
+   },
+   "out_corporate_bond_yield_up21": {
+    "median_excess": -6.03918088459743,
+    "share_ahead": 0.011111111111111112
+   },
+   "out_corporate_bond_yield_down21": {
+    "median_excess": -3.1180327535071704,
+    "share_ahead": 0.1
+   },
+   "out21_after_corporate_bond_yield_p95_up": {
+    "median_excess": -3.989195848560118,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_corporate_bond_yield_p95_up": {
+    "median_excess": -4.7601727171154335,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_corporate_bond_yield_p95_up": {
+    "median_excess": -5.674581164062506,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_corporate_bond_yield_p95_down": {
+    "median_excess": -3.251311661525688,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_corporate_bond_yield_p95_down": {
+    "median_excess": -4.9025378170405745,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_corporate_bond_yield_p95_down": {
+    "median_excess": -5.374106969483038,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_corporate_bond_yield_up": {
+    "median_excess": -1.3864088733395965,
+    "share_ahead": 0.1
+   },
+   "out63_after_corporate_bond_yield_up": {
+    "median_excess": -2.628165331862813,
+    "share_ahead": 0.17777777777777778
+   },
+   "out126_after_corporate_bond_yield_up": {
+    "median_excess": -3.228559525138108,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_corporate_bond_yield_down": {
+    "median_excess": -1.182124213953085,
+    "share_ahead": 0.23333333333333334
+   },
+   "out63_after_corporate_bond_yield_down": {
+    "median_excess": -2.8669938786013125,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_corporate_bond_yield_down": {
+    "median_excess": -3.743977127373517,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": 0.07643734446483602,
+    "share_ahead": 0.5666666666666667
+   },
+   "out63_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": 0.11739341931440711,
+    "share_ahead": 0.6111111111111112
+   },
+   "out126_after_corporate_bond_yield_p99.9_up": {
+    "median_excess": -0.35808338967856357,
+    "share_ahead": 0.35555555555555557
+   },
+   "out21_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -0.23120628567620838,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -0.9193215770559533,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_corporate_bond_yield_p99.9_down": {
+    "median_excess": -1.345991833032969,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -2.883067598263583,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -3.4618214976822888,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_corporate_bond_yield_5d_p95_up": {
+    "median_excess": -4.2204046733716805,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -2.1010428464897464,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -4.216564315409494,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_corporate_bond_yield_5d_p95_down": {
+    "median_excess": -5.080149820085236,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_corporate_bond_yield_5d_up": {
+    "median_excess": -0.2254313049737462,
+    "share_ahead": 0.3888888888888889
+   },
+   "out63_after_corporate_bond_yield_5d_up": {
+    "median_excess": -0.7215183699932859,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_corporate_bond_yield_5d_up": {
+    "median_excess": -1.6779402822279303,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_corporate_bond_yield_5d_down": {
+    "median_excess": -0.5312984377648613,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_corporate_bond_yield_5d_down": {
+    "median_excess": -1.7420551758638587,
+    "share_ahead": 0.1
+   },
+   "out126_after_corporate_bond_yield_5d_down": {
+    "median_excess": -2.7477331341050095,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.13333333333333333
+   },
+   "out126_after_corporate_bond_yield_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.14658562407921488,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.5574659357217426,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_corporate_bond_yield_5d_p99.9_down": {
+    "median_excess": -0.9327147916473881,
+    "share_ahead": 0.08888888888888889
+   },
+   "out_inflation_rate_up21": {
+    "median_excess": -2.418918441703447,
+    "share_ahead": 0.14444444444444443
+   },
+   "out_inflation_rate_down21": {
+    "median_excess": -4.258457930429833,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_inflation_rate_p95_up": {
+    "median_excess": -0.021418542711727,
+    "share_ahead": 0.4666666666666667
+   },
+   "out63_after_inflation_rate_p95_up": {
+    "median_excess": -0.2614996632547396,
+    "share_ahead": 0.3333333333333333
+   },
+   "out126_after_inflation_rate_p95_up": {
+    "median_excess": -0.6632109631511593,
+    "share_ahead": 0.26666666666666666
+   },
+   "out21_after_inflation_rate_p95_down": {
+    "median_excess": -0.8269791061097183,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_inflation_rate_p95_down": {
+    "median_excess": -1.8328116735986275,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_inflation_rate_p95_down": {
+    "median_excess": -2.4703903019809603,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.28888888888888886
+   },
+   "out63_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.26666666666666666
+   },
+   "out126_after_inflation_rate_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.23333333333333334
+   },
+   "out21_after_inflation_rate_down": {
+    "median_excess": -0.06005102333913909,
+    "share_ahead": 0.3
+   },
+   "out63_after_inflation_rate_down": {
+    "median_excess": -0.5000802318501041,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_inflation_rate_down": {
+    "median_excess": -1.0283129281127672,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2222222222222222
+   },
+   "out63_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out126_after_inflation_rate_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.17777777777777778
+   },
+   "out21_after_inflation_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out63_after_inflation_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.12222222222222222
+   },
+   "out126_after_inflation_rate_p99.9_down": {
+    "median_excess": -0.3177960807736838,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_inflation_rate_5d_p95_up": {
+    "median_excess": -0.04309399494457341,
+    "share_ahead": 0.4222222222222222
+   },
+   "out63_after_inflation_rate_5d_p95_up": {
+    "median_excess": -0.23542795309658424,
+    "share_ahead": 0.32222222222222224
+   },
+   "out126_after_inflation_rate_5d_p95_up": {
+    "median_excess": -0.6997781381383914,
+    "share_ahead": 0.3
+   },
+   "out21_after_inflation_rate_5d_p95_down": {
+    "median_excess": -0.9787228878094323,
+    "share_ahead": 0.1
+   },
+   "out63_after_inflation_rate_5d_p95_down": {
+    "median_excess": -1.746246489829643,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_inflation_rate_5d_p95_down": {
+    "median_excess": -2.503332314253809,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_inflation_rate_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.25555555555555554
+   },
+   "out21_after_inflation_rate_5d_down": {
+    "median_excess": -0.09236219249720111,
+    "share_ahead": 0.28888888888888886
+   },
+   "out63_after_inflation_rate_5d_down": {
+    "median_excess": -0.47640102748463353,
+    "share_ahead": 0.1
+   },
+   "out126_after_inflation_rate_5d_down": {
+    "median_excess": -1.0217779415683466,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2111111111111111
+   },
+   "out126_after_inflation_rate_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out21_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2222222222222222
+   },
+   "out63_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.1
+   },
+   "out126_after_inflation_rate_5d_p99.9_down": {
+    "median_excess": -0.29619379657767764,
+    "share_ahead": 0.03333333333333333
+   },
+   "out_gdp_growth_up21": {
+    "median_excess": -1.60986416128603,
+    "share_ahead": 0.15555555555555556
+   },
+   "out_gdp_growth_down21": {
+    "median_excess": -0.5944034561627758,
+    "share_ahead": 0.37777777777777777
+   },
+   "out21_after_gdp_growth_p95_up": {
+    "median_excess": -0.21095972215154174,
+    "share_ahead": 0.24444444444444444
+   },
+   "out63_after_gdp_growth_p95_up": {
+    "median_excess": -0.5288547752137693,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_gdp_growth_p95_up": {
+    "median_excess": -0.7880366422030919,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_gdp_growth_p95_down": {
+    "median_excess": -0.06206841894540925,
+    "share_ahead": 0.4444444444444444
+   },
+   "out63_after_gdp_growth_p95_down": {
+    "median_excess": -0.42874122507936263,
+    "share_ahead": 0.2222222222222222
+   },
+   "out126_after_gdp_growth_p95_down": {
+    "median_excess": -1.5427452983921033,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out63_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_gdp_growth_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_gdp_growth_down": {
+    "median_excess": -0.02836830587946364,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_gdp_growth_down": {
+    "median_excess": -0.21356786174413872,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_gdp_growth_down": {
+    "median_excess": -0.5255980816318331,
+    "share_ahead": 0.17777777777777778
+   },
+   "out21_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out63_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_gdp_growth_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_gdp_growth_p99.9_down": {
+    "median_excess": -0.02836830587946364,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_gdp_growth_p99.9_down": {
+    "median_excess": -0.21356786174413872,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_gdp_growth_p99.9_down": {
+    "median_excess": -0.5255980816318331,
+    "share_ahead": 0.17777777777777778
+   },
+   "out21_after_gdp_growth_5d_p95_up": {
+    "median_excess": -0.23606742588515944,
+    "share_ahead": 0.23333333333333334
+   },
+   "out63_after_gdp_growth_5d_p95_up": {
+    "median_excess": -0.5642487390564872,
+    "share_ahead": 0.15555555555555556
+   },
+   "out126_after_gdp_growth_5d_p95_up": {
+    "median_excess": -0.7412417992684863,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_gdp_growth_5d_p95_down": {
+    "median_excess": -0.09094242551669249,
+    "share_ahead": 0.4222222222222222
+   },
+   "out63_after_gdp_growth_5d_p95_down": {
+    "median_excess": -0.5589530930467295,
+    "share_ahead": 0.2
+   },
+   "out126_after_gdp_growth_5d_p95_down": {
+    "median_excess": -1.5142987032535222,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_gdp_growth_5d_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_gdp_growth_5d_down": {
+    "median_excess": -0.07167942563779767,
+    "share_ahead": 0.35555555555555557
+   },
+   "out63_after_gdp_growth_5d_down": {
+    "median_excess": -0.23818977536415797,
+    "share_ahead": 0.3111111111111111
+   },
+   "out126_after_gdp_growth_5d_down": {
+    "median_excess": -0.5286447913900216,
+    "share_ahead": 0.18888888888888888
+   },
+   "out21_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_gdp_growth_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": -0.07167942563779767,
+    "share_ahead": 0.35555555555555557
+   },
+   "out63_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": -0.23818977536415797,
+    "share_ahead": 0.3111111111111111
+   },
+   "out126_after_gdp_growth_5d_p99.9_down": {
+    "median_excess": -0.5286447913900216,
+    "share_ahead": 0.18888888888888888
+   },
+   "out_unemployment_rate_up21": {
+    "median_excess": -2.238737987539003,
+    "share_ahead": 0.06666666666666667
+   },
+   "out_unemployment_rate_down21": {
+    "median_excess": -1.0497768208640388,
+    "share_ahead": 0.16666666666666666
+   },
+   "out21_after_unemployment_rate_p95_up": {
+    "median_excess": -0.5105149902066912,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_unemployment_rate_p95_up": {
+    "median_excess": -1.191161668770732,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_unemployment_rate_p95_up": {
+    "median_excess": -1.8828428592070492,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_unemployment_rate_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_unemployment_rate_up": {
+    "median_excess": -0.0846678134454564,
+    "share_ahead": 0.3111111111111111
+   },
+   "out63_after_unemployment_rate_up": {
+    "median_excess": -0.41000689468668594,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_unemployment_rate_up": {
+    "median_excess": -0.9569035318638165,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_p99.9_up": {
+    "median_excess": -0.058755175045465916,
+    "share_ahead": 0.32222222222222224
+   },
+   "out63_after_unemployment_rate_p99.9_up": {
+    "median_excess": -0.34870498083274415,
+    "share_ahead": 0.15555555555555556
+   },
+   "out126_after_unemployment_rate_p99.9_up": {
+    "median_excess": -0.8580967503379755,
+    "share_ahead": 0.07777777777777778
+   },
+   "out21_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out21_after_unemployment_rate_5d_p95_up": {
+    "median_excess": -0.551710128447477,
+    "share_ahead": 0.14444444444444443
+   },
+   "out63_after_unemployment_rate_5d_p95_up": {
+    "median_excess": -1.2139599937266197,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_unemployment_rate_5d_p95_up": {
+    "median_excess": -1.875509121006289,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_unemployment_rate_5d_p95_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_unemployment_rate_5d_up": {
+    "median_excess": -0.0795636926120743,
+    "share_ahead": 0.34444444444444444
+   },
+   "out63_after_unemployment_rate_5d_up": {
+    "median_excess": -0.4622040233213749,
+    "share_ahead": 0.2
+   },
+   "out126_after_unemployment_rate_5d_up": {
+    "median_excess": -1.0099923369937154,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_5d_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": -0.0767828437011835,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": -0.45446493609331945,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_unemployment_rate_5d_p99.9_up": {
+    "median_excess": -0.9088012979568032,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out63_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.0
+   },
+   "out126_after_unemployment_rate_5d_p99.9_down": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out_oil_price_up21": {
+    "median_excess": -4.8517413828247395,
+    "share_ahead": 0.03333333333333333
+   },
+   "out_oil_price_down21": {
+    "median_excess": -4.799957569507203,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_oil_price_p95_up": {
+    "median_excess": -2.879224701034338,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_oil_price_p95_up": {
+    "median_excess": -4.4782326077578976,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_oil_price_p95_up": {
+    "median_excess": -5.804631021311763,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_oil_price_p95_down": {
+    "median_excess": -2.73988315522707,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_oil_price_p95_down": {
+    "median_excess": -4.527288467303496,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_oil_price_p95_down": {
+    "median_excess": -5.696336388288442,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_oil_price_up": {
+    "median_excess": -0.648614734654363,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_oil_price_up": {
+    "median_excess": -1.8289204054591164,
+    "share_ahead": 0.17777777777777778
+   },
+   "out126_after_oil_price_up": {
+    "median_excess": -2.8239749282795588,
+    "share_ahead": 0.12222222222222222
+   },
+   "out21_after_oil_price_down": {
+    "median_excess": -0.7162105887733239,
+    "share_ahead": 0.26666666666666666
+   },
+   "out63_after_oil_price_down": {
+    "median_excess": -1.1373871055256801,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_oil_price_down": {
+    "median_excess": -2.476974486010209,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_oil_price_p99.9_up": {
+    "median_excess": -0.02926629099395365,
+    "share_ahead": 0.37777777777777777
+   },
+   "out63_after_oil_price_p99.9_up": {
+    "median_excess": -0.15701617307111193,
+    "share_ahead": 0.3333333333333333
+   },
+   "out126_after_oil_price_p99.9_up": {
+    "median_excess": -0.13620689887729368,
+    "share_ahead": 0.34444444444444444
+   },
+   "out21_after_oil_price_p99.9_down": {
+    "median_excess": -0.1507842888536107,
+    "share_ahead": 0.3
+   },
+   "out63_after_oil_price_p99.9_down": {
+    "median_excess": -0.18205975095914997,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_oil_price_p99.9_down": {
+    "median_excess": -0.09799570681152844,
+    "share_ahead": 0.35555555555555557
+   },
+   "out21_after_oil_price_5d_p95_up": {
+    "median_excess": -1.8076524613491503,
+    "share_ahead": 0.2111111111111111
+   },
+   "out63_after_oil_price_5d_p95_up": {
+    "median_excess": -3.4043346630563827,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_oil_price_5d_p95_up": {
+    "median_excess": -4.156629053046792,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_oil_price_5d_p95_down": {
+    "median_excess": -1.8034544603880294,
+    "share_ahead": 0.17777777777777778
+   },
+   "out63_after_oil_price_5d_p95_down": {
+    "median_excess": -3.1567922145088287,
+    "share_ahead": 0.1
+   },
+   "out126_after_oil_price_5d_p95_down": {
+    "median_excess": -4.329227349517134,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_oil_price_5d_up": {
+    "median_excess": -0.42373552187183233,
+    "share_ahead": 0.35555555555555557
+   },
+   "out63_after_oil_price_5d_up": {
+    "median_excess": -0.9165167299106652,
+    "share_ahead": 0.24444444444444444
+   },
+   "out126_after_oil_price_5d_up": {
+    "median_excess": -1.9857813118001864,
+    "share_ahead": 0.15555555555555556
+   },
+   "out21_after_oil_price_5d_down": {
+    "median_excess": -0.41638041662229763,
+    "share_ahead": 0.3111111111111111
+   },
+   "out63_after_oil_price_5d_down": {
+    "median_excess": -1.0434644917242508,
+    "share_ahead": 0.25555555555555554
+   },
+   "out126_after_oil_price_5d_down": {
+    "median_excess": -1.5991420697647822,
+    "share_ahead": 0.16666666666666666
+   },
+   "out21_after_oil_price_5d_p99.9_up": {
+    "median_excess": -0.025323336859943008,
+    "share_ahead": 0.4
+   },
+   "out63_after_oil_price_5d_p99.9_up": {
+    "median_excess": -0.0969331109668791,
+    "share_ahead": 0.37777777777777777
+   },
+   "out126_after_oil_price_5d_p99.9_up": {
+    "median_excess": -0.14397402088668382,
+    "share_ahead": 0.36666666666666664
+   },
+   "out21_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.04482662134298121,
+    "share_ahead": 0.36666666666666664
+   },
+   "out63_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.0837413685394825,
+    "share_ahead": 0.35555555555555557
+   },
+   "out126_after_oil_price_5d_p99.9_down": {
+    "median_excess": -0.22318491825532052,
+    "share_ahead": 0.3333333333333333
+   },
+   "out_treasury_yield_2y_up21": {
+    "median_excess": -4.857763632203106,
+    "share_ahead": 0.06666666666666667
+   },
+   "out_treasury_yield_2y_down21": {
+    "median_excess": -4.709260649458159,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_treasury_yield_2y_p95_up": {
+    "median_excess": -3.740772171308164,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_treasury_yield_2y_p95_up": {
+    "median_excess": -5.049526365259491,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_treasury_yield_2y_p95_up": {
+    "median_excess": -5.733858054597487,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_2y_p95_down": {
+    "median_excess": -3.428837929047323,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_treasury_yield_2y_p95_down": {
+    "median_excess": -5.683679924323505,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_2y_p95_down": {
+    "median_excess": -6.189553908313191,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_2y_up": {
+    "median_excess": -1.2485464457446507,
+    "share_ahead": 0.2
+   },
+   "out63_after_treasury_yield_2y_up": {
+    "median_excess": -1.0406907074940224,
+    "share_ahead": 0.2777777777777778
+   },
+   "out126_after_treasury_yield_2y_up": {
+    "median_excess": -1.2045994362987358,
+    "share_ahead": 0.2777777777777778
+   },
+   "out21_after_treasury_yield_2y_down": {
+    "median_excess": -1.0422162693809116,
+    "share_ahead": 0.16666666666666666
+   },
+   "out63_after_treasury_yield_2y_down": {
+    "median_excess": -3.5272532936652397,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_2y_down": {
+    "median_excess": -3.956566737977264,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.14444444444444443
+   },
+   "out63_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out126_after_treasury_yield_2y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.18888888888888888
+   },
+   "out21_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": -0.24486300241059122,
+    "share_ahead": 0.3333333333333333
+   },
+   "out63_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": -1.1097482249688406,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_treasury_yield_2y_p99.9_down": {
+    "median_excess": -1.8577699257457194,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -1.3458307762507133,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -1.5558982520323745,
+    "share_ahead": 0.2777777777777778
+   },
+   "out126_after_treasury_yield_2y_5d_p95_up": {
+    "median_excess": -2.111489383178208,
+    "share_ahead": 0.2
+   },
+   "out21_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -1.479006532252189,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -4.1786059870574945,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_treasury_yield_2y_5d_p95_down": {
+    "median_excess": -4.654618467849281,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_2y_5d_up": {
+    "median_excess": -0.2997167897520133,
+    "share_ahead": 0.28888888888888886
+   },
+   "out63_after_treasury_yield_2y_5d_up": {
+    "median_excess": -0.4095008640362281,
+    "share_ahead": 0.28888888888888886
+   },
+   "out126_after_treasury_yield_2y_5d_up": {
+    "median_excess": -0.4821230577562929,
+    "share_ahead": 0.34444444444444444
+   },
+   "out21_after_treasury_yield_2y_5d_down": {
+    "median_excess": -0.6331272017426622,
+    "share_ahead": 0.2111111111111111
+   },
+   "out63_after_treasury_yield_2y_5d_down": {
+    "median_excess": -1.670771961043764,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_treasury_yield_2y_5d_down": {
+    "median_excess": -2.824604243107377,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.011111111111111112
+   },
+   "out63_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_2y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": -0.11124645607257595,
+    "share_ahead": 0.4111111111111111
+   },
+   "out63_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": -0.4975262607427766,
+    "share_ahead": 0.1111111111111111
+   },
+   "out126_after_treasury_yield_2y_5d_p99.9_down": {
+    "median_excess": -0.7319229795099473,
+    "share_ahead": 0.13333333333333333
+   },
+   "out_treasury_yield_10y_up21": {
+    "median_excess": -5.504122649478532,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_treasury_yield_10y_down21": {
+    "median_excess": -3.8298354194388553,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_treasury_yield_10y_p95_up": {
+    "median_excess": -3.5918943891050885,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_treasury_yield_10y_p95_up": {
+    "median_excess": -4.8038796786400315,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_10y_p95_up": {
+    "median_excess": -5.8219184407990205,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_treasury_yield_10y_p95_down": {
+    "median_excess": -3.5392721623828645,
+    "share_ahead": 0.03333333333333333
+   },
+   "out63_after_treasury_yield_10y_p95_down": {
+    "median_excess": -5.662207788232816,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_treasury_yield_10y_p95_down": {
+    "median_excess": -6.254664931880847,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_10y_up": {
+    "median_excess": -0.9983368130555661,
+    "share_ahead": 0.2
+   },
+   "out63_after_treasury_yield_10y_up": {
+    "median_excess": -0.8174508001183318,
+    "share_ahead": 0.32222222222222224
+   },
+   "out126_after_treasury_yield_10y_up": {
+    "median_excess": -1.0284444063552833,
+    "share_ahead": 0.24444444444444444
+   },
+   "out21_after_treasury_yield_10y_down": {
+    "median_excess": -1.1902274846029872,
+    "share_ahead": 0.2111111111111111
+   },
+   "out63_after_treasury_yield_10y_down": {
+    "median_excess": -3.4614169719786227,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_treasury_yield_10y_down": {
+    "median_excess": -4.164181898887302,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.23333333333333334
+   },
+   "out126_after_treasury_yield_10y_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.2
+   },
+   "out21_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": -0.2375794108735986,
+    "share_ahead": 0.3
+   },
+   "out63_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": -1.0804143493648883,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_treasury_yield_10y_p99.9_down": {
+    "median_excess": -1.7399442285663258,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -2.044767228997623,
+    "share_ahead": 0.07777777777777778
+   },
+   "out63_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -2.217353426521455,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_treasury_yield_10y_5d_p95_up": {
+    "median_excess": -3.211444093719239,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -1.8784407698295231,
+    "share_ahead": 0.18888888888888888
+   },
+   "out63_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -4.390343818429086,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_treasury_yield_10y_5d_p95_down": {
+    "median_excess": -5.219294296335159,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_treasury_yield_10y_5d_up": {
+    "median_excess": -0.30666840050430255,
+    "share_ahead": 0.2
+   },
+   "out63_after_treasury_yield_10y_5d_up": {
+    "median_excess": -0.3281464681891239,
+    "share_ahead": 0.32222222222222224
+   },
+   "out126_after_treasury_yield_10y_5d_up": {
+    "median_excess": -0.5572851688041227,
+    "share_ahead": 0.3
+   },
+   "out21_after_treasury_yield_10y_5d_down": {
+    "median_excess": -0.6876296207422417,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_treasury_yield_10y_5d_down": {
+    "median_excess": -1.9798549480885996,
+    "share_ahead": 0.044444444444444446
+   },
+   "out126_after_treasury_yield_10y_5d_down": {
+    "median_excess": -2.945964415664787,
+    "share_ahead": 0.044444444444444446
+   },
+   "out21_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out63_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_treasury_yield_10y_5d_p99.9_up": {
+    "median_excess": 0.0,
+    "share_ahead": 0.06666666666666667
+   },
+   "out21_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": -0.12437324680444842,
+    "share_ahead": 0.32222222222222224
+   },
+   "out63_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": -0.6123894522234754,
+    "share_ahead": 0.08888888888888889
+   },
+   "out126_after_treasury_yield_10y_5d_p99.9_down": {
+    "median_excess": -0.8650540340968031,
+    "share_ahead": 0.15555555555555556
+   },
+   "out_fear_greed_index_up21": {
+    "median_excess": -4.924631664002181,
+    "share_ahead": 0.022222222222222223
+   },
+   "out_fear_greed_index_down21": {
+    "median_excess": -6.068024010004093,
+    "share_ahead": 0.011111111111111112
+   },
+   "out21_after_fear_greed_index_p95_up": {
+    "median_excess": -2.9745787574958706,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_fear_greed_index_p95_up": {
+    "median_excess": -5.356074472765178,
+    "share_ahead": 0.06666666666666667
+   },
+   "out126_after_fear_greed_index_p95_up": {
+    "median_excess": -6.320186440824293,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_fear_greed_index_p95_down": {
+    "median_excess": -3.615428937243851,
+    "share_ahead": 0.1111111111111111
+   },
+   "out63_after_fear_greed_index_p95_down": {
+    "median_excess": -5.5451694967334895,
+    "share_ahead": 0.011111111111111112
+   },
+   "out126_after_fear_greed_index_p95_down": {
+    "median_excess": -5.954420296517393,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_fear_greed_index_up": {
+    "median_excess": -0.6437839494628927,
+    "share_ahead": 0.25555555555555554
+   },
+   "out63_after_fear_greed_index_up": {
+    "median_excess": -1.5732764576475842,
+    "share_ahead": 0.18888888888888888
+   },
+   "out126_after_fear_greed_index_up": {
+    "median_excess": -2.6267657743651656,
+    "share_ahead": 0.1111111111111111
+   },
+   "out21_after_fear_greed_index_down": {
+    "median_excess": -1.3341318980935277,
+    "share_ahead": 0.12222222222222222
+   },
+   "out63_after_fear_greed_index_down": {
+    "median_excess": -2.632315919145027,
+    "share_ahead": 0.15555555555555556
+   },
+   "out126_after_fear_greed_index_down": {
+    "median_excess": -4.092232914462359,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.0803748159543024,
+    "share_ahead": 0.4111111111111111
+   },
+   "out63_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.14461420327385324,
+    "share_ahead": 0.35555555555555557
+   },
+   "out126_after_fear_greed_index_p99.9_up": {
+    "median_excess": -0.25263042579422373,
+    "share_ahead": 0.32222222222222224
+   },
+   "out21_after_fear_greed_index_p99.9_down": {
+    "median_excess": -0.2600955008748288,
+    "share_ahead": 0.2777777777777778
+   },
+   "out63_after_fear_greed_index_p99.9_down": {
+    "median_excess": -0.6695377537557814,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_fear_greed_index_p99.9_down": {
+    "median_excess": -1.0650341072907088,
+    "share_ahead": 0.08888888888888889
+   },
+   "out21_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -2.3820264331464633,
+    "share_ahead": 0.13333333333333333
+   },
+   "out63_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -4.314368388579053,
+    "share_ahead": 0.03333333333333333
+   },
+   "out126_after_fear_greed_index_5d_p95_up": {
+    "median_excess": -5.117551159212919,
+    "share_ahead": 0.03333333333333333
+   },
+   "out21_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -2.9305237892288734,
+    "share_ahead": 0.05555555555555555
+   },
+   "out63_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -4.837395064454263,
+    "share_ahead": 0.022222222222222223
+   },
+   "out126_after_fear_greed_index_5d_p95_down": {
+    "median_excess": -5.725442819712285,
+    "share_ahead": 0.022222222222222223
+   },
+   "out21_after_fear_greed_index_5d_up": {
+    "median_excess": -0.222692093765914,
+    "share_ahead": 0.4111111111111111
+   },
+   "out63_after_fear_greed_index_5d_up": {
+    "median_excess": -0.9692120442839958,
+    "share_ahead": 0.25555555555555554
+   },
+   "out126_after_fear_greed_index_5d_up": {
+    "median_excess": -1.6212267448823177,
+    "share_ahead": 0.18888888888888888
+   },
+   "out21_after_fear_greed_index_5d_down": {
+    "median_excess": -1.1482419140928306,
+    "share_ahead": 0.2111111111111111
+   },
+   "out63_after_fear_greed_index_5d_down": {
+    "median_excess": -2.381489363505511,
+    "share_ahead": 0.07777777777777778
+   },
+   "out126_after_fear_greed_index_5d_down": {
+    "median_excess": -3.366635571899857,
+    "share_ahead": 0.05555555555555555
+   },
+   "out21_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": -0.06610013094005457,
+    "share_ahead": 0.4222222222222222
+   },
+   "out63_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": -0.11557849770279692,
+    "share_ahead": 0.43333333333333335
+   },
+   "out126_after_fear_greed_index_5d_p99.9_up": {
+    "median_excess": -0.3262093798037313,
+    "share_ahead": 0.28888888888888886
+   },
+   "out21_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": -0.1811553935704524,
+    "share_ahead": 0.23333333333333334
+   },
+   "out63_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": -0.4199410994808063,
+    "share_ahead": 0.16666666666666666
+   },
+   "out126_after_fear_greed_index_5d_p99.9_down": {
+    "median_excess": -0.6763805606279869,
+    "share_ahead": 0.1
+   }
+  },
+  "worst": "out63_after_corporate_bond_yield_p99.9_up",
+  "worst_median_excess": 0.11739341931440711,
+  "worst_share_ahead": 0.6111111111111112,
+  "drift_63": {
+   "contraction": 5.002499129006873,
+   "recovery": -0.3742763382590431
+  },
+  "events": {
+   "contraction": 196,
+   "recovery": 193
+  },
+  "C10a": true,
+  "C10b": true,
+  "pass": true
+ }
+}

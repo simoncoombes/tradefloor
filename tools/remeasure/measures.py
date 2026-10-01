@@ -2,8 +2,11 @@
 
 Each function here recomputes one family of published figures from the
 installed `tradefloor` package and returns a flat dict of key -> value. The
-mapping from published claims to these keys lives in `inventory.json`;
-`remeasure.py` joins the two and writes the delta report.
+mapping from published claims to these keys is the claim register, which
+lives in the documentation repository at `tools/remeasure/inventory.json`
+(see register.py); `remeasure.py` joins the two and writes the delta report.
+A group can outlive every row that reads it, so a key here is not by itself
+evidence that any page states the figure.
 
 Groups are independent of each other and are safe to run concurrently in
 threads (the engine releases the GIL for session compute), EXCEPT the groups
@@ -31,7 +34,9 @@ from pathlib import Path
 
 import tradefloor as pt
 import pyarrow as pa
-from tradefloor.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
+from tradefloor.baselines import (BuyAndHold, Momentum, Oracle, capture_ratio,
+                                  capture_withheld, reference_agents,
+                                  versus_buy_and_hold)
 from tradefloor.scenario import Scenario, compare, run_scenario
 
 
@@ -154,7 +159,16 @@ def g_consts(ctx: Ctx) -> dict:
     book = pa.table(e.book_table())
     rows_per_snapshot = book.num_rows / len(u) if book.num_rows else float("nan")
 
+    # The crisis threshold is a preset dial, and the glossary states it per
+    # preset: VIX 30.88 from pt-v14, 25.5 before. The source constant above
+    # is only the dial's default, so it says nothing about any preset that
+    # overrides it, which since pt-v14 is every one.
+    def dial(preset: str, name: str) -> float:
+        return pt.ModelParams.from_preset(preset).to_dict()[name]
+
     return {
+        "crisis_vix_threshold_pt_v12": dial("pt-v12", "crisis_vix_threshold"),
+        "crisis_vix_threshold_pt_v14": dial("pt-v14", "crisis_vix_threshold"),
         "market_factor_sigma": market_sigma,
         "reversion_half_life_days": half_life_days,
         # the realism page publishes the GJR form of the per-name persistence
@@ -202,12 +216,21 @@ def g_arith(ctx: Ctx) -> dict:
 # ---------------------------------------------------------------------------
 
 def g_truth_residual(ctx: Ctx) -> dict:
+    """The factor columns sum to the change in mispricing_s.
+
+    Every page that states this sums all of `Engine.FACTORS`, which is
+    eleven names since 0.8.5 added fair_value_shift (ten before it, since
+    the circuit breaker, jump and overnight columns were added),
+    and the glossary states the WORST residual over the run. This summed a
+    hard-coded seven and was graded on the median, so it checked a sum no
+    page describes: on any day a jump or the breaker fired, seven columns
+    fall short of the move by far more than 1e-16, and the median hid it.
+    """
     u = _u(20, 11)
     e = pt.Engine(seed=42, universe=u)
     e.run_days(5, record=True)
     t = pa.table(e.truth()).to_pydict()
-    factors = ["reversion", "momentum", "crowd_lean", "company_news",
-               "order_flow_impact", "short_squeeze_effect", "random_noise"]
+    factors = list(pt.Engine.FACTORS)
     series: dict[int, list[tuple[tuple[int, int], float, float]]] = defaultdict(list)
     for i in range(len(t["instrument_id"])):
         fsum = sum(t[f][i] for f in factors)
@@ -225,6 +248,7 @@ def g_truth_residual(ctx: Ctx) -> dict:
         "p99_residual": residuals[int(n * 0.99)],
         "max_residual": residuals[-1],
         "rows": n,
+        "factors": len(factors),
     }
 
 
@@ -348,14 +372,28 @@ def g_horizon(ctx: Ctx) -> dict:
     The agent is mean_reversion because that is the agent the page's
     sentence is about. This measured momentum, left over from an era when
     the bullet was written about momentum, and reported the horizon captures
-    as MOVED ever since against prose that was correct."""
+    as MOVED ever since against prose that was correct.
+
+    On pt-v20 `capture_ratio` reports nothing, because the Oracle is not a
+    ceiling there (`baselines.ORACLE_NOT_A_CEILING`), so `capture_{days}d`
+    read None on the default from 0.8.5 and this group measured nothing. The
+    capture is kept for a preset where the Oracle is a ceiling, and beside
+    it the comparison the library quotes on pt-v20: mean reversion's P&L
+    less buy-and-hold's over the same horizon (`versus_buy_and_hold`), with
+    `capture_withheld` saying which reading applies. The bullet itself is
+    retired from the register (no page states it since 0.8.1); a page that
+    restates it on pt-v20 quotes `excess_{days}d`.
+    """
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
         out[f"capture_{days}d"] = capture_ratio(scores).get("mean_reversion")
+        out[f"excess_{days}d"] = versus_buy_and_hold(scores).get(
+            "mean_reversion")
         out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
+        out["capture_withheld"] = capture_withheld(scores) is not None
     return out
 
 
@@ -409,13 +447,17 @@ def g_ranking(ctx: Ctx) -> dict:
 
     # the prose behind the table: mean-reversion's one win is barely above
     # 1.0, buy-and-hold's is the largest per-seed capture on the whole grid
+    # A capture exists only where the reference made money, as in
+    # `capture_ratio`: on pt-v20 the ten-day Oracle can lose on a seed.
     def beat_captures(name):
         return [pnl / ref for pnl, ref in zip(records[name].pnls,
-                                              rk.reference_pnls) if pnl > ref]
-    grid_max = max(pnl / ref
-                   for name in ("momentum", "mean_reversion", "buy_and_hold",
-                                "random")
-                   for pnl, ref in zip(records[name].pnls, rk.reference_pnls))
+                                              rk.reference_pnls)
+                if ref > 0 and pnl > ref]
+    grid_max = max((pnl / ref
+                    for name in ("momentum", "mean_reversion", "buy_and_hold",
+                                 "random")
+                    for pnl, ref in zip(records[name].pnls, rk.reference_pnls)
+                    if ref > 0), default=float("nan"))
     mr_beat = max(beat_captures("mean_reversion"), default=float("nan"))
     bh_beat = max(beat_captures("buy_and_hold"), default=float("nan"))
 
@@ -453,11 +495,29 @@ def g_ranking(ctx: Ctx) -> dict:
         "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
         "mr3_gt1_count": len(gt1),
         "mr3_gt1_on_thin4": len(gt1 & thin4),
-        "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
+        # Over the seeds where a capture exists (`AgentRecord.measured`).
+        "mr3_mean_of_ratios": (sum(mr3.measured) / len(mr3.measured)
+                               if mr3.measured else float("nan")),
+        # None on pt-v20, where the ranking withholds every capture
+        # (`Ranking.capture_withheld`); `capture_range` is None there too,
+        # and indexing it took the whole group down on the default.
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
-        "momentum_capture_lo": mom.capture_range[0],
-        "momentum_capture_hi": mom.capture_range[1],
+        "momentum_capture_lo": (mom.capture_range[0]
+                                if mom.capture_range else None),
+        "momentum_capture_hi": (mom.capture_range[1]
+                                if mom.capture_range else None),
+        # The comparison the pages quote where the capture is withheld:
+        # P&L less buy-and-hold's, averaged over the twelve markets, and
+        # momentum's per-market range of it. Read from the same records the
+        # docs' experiments.py writes into experiments.json.
+        "capture_withheld": rk.capture_withheld is not None,
+        "excess_momentum": mom.mean_excess_pnl,
+        "excess_mean_reversion": mr.mean_excess_pnl,
+        "momentum_excess_lo": min(v for v in mom.excess_pnls if v is not None),
+        "momentum_excess_hi": max(v for v in mom.excess_pnls if v is not None),
+        "momentum_seeds_ahead": mom.seeds_ahead,
+        "mr_seeds_ahead": mr.seeds_ahead,
         "momentum_wins": mom.wins,
         "mr_wins": mr.wins,
         "seeds": len(rk.seeds) if hasattr(rk, "seeds") else 12,
@@ -579,9 +639,10 @@ def g_llm_impact(ctx: Ctx) -> dict:
 # ---------------------------------------------------------------------------
 
 def g_rng(ctx: Ctx) -> dict:
-    """docs/rng-streams.md: three substreams, a nine-number snapshot, the
-    market stream's schedule a pure function of the tick schedule, and the
-    refusal of pre-split snapshots."""
+    """The random streams: `draws_by_stream` reports three of them by name,
+    `stream_positions` reports all ten, and a snapshot carrying fewer
+    streams than this build (the schemas page names a 0.7.x snapshot's
+    eight) is refused on restore."""
     u = _u(20, 7)
     a = pt.Engine(seed=42, universe=u)
     a.run_days(2)
@@ -597,21 +658,37 @@ def g_rng(ctx: Ctx) -> dict:
                           == b.draws_by_stream()["market"])
 
     snap = a.state_snapshot()
-    presplit = dict(snap)
-    presplit["rng"] = list(snap["rng"])[:3]
-    fresh = pt.Engine(seed=42, universe=u)
-    try:
-        fresh.restore_state(presplit)
-        refused = False
-    except Exception:
-        refused = True
+
+    def refused_with(streams: int) -> bool:
+        """Restore a snapshot cut to the first `streams` streams, the shape
+        an older build wrote: three rng numbers and two draw counts each.
+
+        Cutting `rng` alone does not stand for an older snapshot, because
+        restore_state accepts a short `rng` on purpose (a missing stream
+        keeps this engine's seed-derived position). What an eight-stream
+        0.7.x snapshot fails on is its sixteen draw counts."""
+        cut = dict(snap)
+        cut["rng"] = list(snap["rng"])[:3 * streams]
+        if "draw_counts" in snap and streams > 1:
+            cut["draw_counts"] = list(snap["draw_counts"])[:2 * streams]
+        try:
+            pt.Engine(seed=42, universe=u).restore_state(cut)
+            return False
+        except Exception:
+            return True
 
     return {
         "stream_count": len(streams),
         "stream_names": ",".join(streams),
         "rng_snapshot_len": len(snap["rng"]),
+        # Every stream, where `draws_by_stream` reports only three of them.
+        "stream_positions_count": len(a.stream_positions()),
         "market_sched_independent": market_independent,
-        "presplit_snapshot_refused": refused,
+        # The 0.1.x pre-split shape: one stream, three numbers.
+        "presplit_snapshot_refused": refused_with(1),
+        # The shape the schemas page names: a 0.7.x snapshot carries eight
+        # streams where this build has ten.
+        "eight_stream_snapshot_refused": refused_with(8),
     }
 
 
@@ -621,12 +698,13 @@ def g_rng(ctx: Ctx) -> dict:
 
 def g_macro_chain(ctx: Ctx) -> dict:
     """core-concepts: the macro chain runs endogenously by default. Over
-    run_days(120) on random(20, seed=11), sim seed 42, VIX takes a new value
-    every day, the policy-driven fields step at the meeting calendar
-    (federal_funds_rate 2 distinct values, corporate_bond_yield 3,
-    inflation_rate 4, gdp_growth 6), and fundamental_value takes 3 distinct
-    values per instrument (repricing at the day-45 and day-96 meetings)
-    except the book-valued loss-maker, which never reprices."""
+    run_days(120) on random(20, seed=11), sim seed 42, the page's field
+    update frequency table counts distinct values per macro field and says
+    fundamental_value moves every day, because fair value grows with nominal
+    output from pt-v18. The pt-v12 reading this group was written for (fair
+    value repricing only at the day-45 and day-96 meetings, a loss-maker
+    that never reprices) is kept in `reprice_days` and the `fv_distinct_*`
+    keys, which no current page states."""
     u = _u(20, 11)
     e = pt.Engine(seed=42, universe=u)
     e.run_days(120, record=True)
@@ -635,6 +713,10 @@ def g_macro_chain(ctx: Ctx) -> dict:
 
     per: dict[int, set] = defaultdict(set)
     reprice_days: set[int] = set()
+    # Per instrument, the days its fair value changed. The page's table says
+    # fundamental_value moves "every day" on pt-v20, which is a claim about
+    # each name rather than about the roster as a whole.
+    changed_on: dict[int, set] = defaultdict(set)
     last: dict[int, float] = {}
     order = sorted(range(len(t["instrument_id"])),
                    key=lambda i: (t["instrument_id"][i], t["day"][i],
@@ -644,8 +726,10 @@ def g_macro_chain(ctx: Ctx) -> dict:
         per[inst].add(fv)
         if inst in last and fv != last[inst]:
             reprice_days.add(t["day"][i])
+            changed_on[inst].add(t["day"][i])
         last[inst] = fv
     counts = sorted(len(s) for s in per.values())
+    run_days = set(range(1, 120))
 
     return {
         "vix_distinct": len(set(macro["vix"])),
@@ -656,6 +740,8 @@ def g_macro_chain(ctx: Ctx) -> dict:
         "fv_distinct_repricer": counts[-1],
         "fv_distinct_lossmaker": counts[0],
         "reprice_days": ",".join(str(d) for d in sorted(reprice_days)),
+        "fv_moves_every_day": (len(changed_on) == len(u) and all(
+            days >= run_days for days in changed_on.values())),
         "default_cby": round(macro["corporate_bond_yield"][0], 6),
     }
 
@@ -854,10 +940,12 @@ _TCA_SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 def g_tca_example(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's worked figures, method stated on the
     page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
-    one six-step day. Entry: 97 shares (1% ADV) at the first step costs
-    +16.71 bps on every seed measured. Round trip (sell three steps later):
-    a seed range, -17.72 to +2.03 bps over sim seeds 2026,1,2,3,4,5,7,11,
-    negative on 7 of 8, median -12.40. Partial fill: a request for 4,856
+    one six-step day. Round trip (sell three steps later) on pt-v20 at
+    0.8.5: +13.65 to +21.62 bps over sim seeds 2026,1,2,3,4,5,7,11, a cost
+    on all 8, median +18.22 (pt-v19: +12.67 to +28.75, median +18.01).
+    Entry on pt-v19: 97 shares (1% ADV) at the first step costs +20.18 bps
+    on every seed measured. Before 0.8.5 the fill was counted on every tick
+    of the step and the range crossed zero. Partial fill: a request for 4,856
     shares (half ADV, sim seed 2026) fills 483 - the whole displayed
     depth - and requests of 9,713 and 48,563 fill the same 483, on every
     seed measured."""
@@ -907,11 +995,17 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. The agent trades 57 names; all 3 untouched names move (-10.72,
-    +1.97 and +2.00 bps) against a 9.71 bps median direct impact, so the
-    largest ripple now EXCEEDS the median direct impact. The channel needs a
-    horizon: nothing leaks at one or two days, nine untouched names leak at
-    three and eighteen at four. Pinning VIX returns untouched_moved() to
+    days. Measured on pt-v20's graded arm at 0.8.5 (2026-09-26): the agent
+    trades 57 names, all three untouched names move by under 3e-5 bps, and
+    the median direct impact is 0.0020 bps (pt-v20 as first composed: 58
+    names, both untouched under 3e-6 bps, 0.0018; pt-v19: 57 names, none of
+    3 untouched moves, 10.10 bps).
+    Before 0.8.5 the agent's fills were counted on every tick of the step,
+    and that flow was large enough to reach the untouched names through
+    the VIX. On pt-v20 the flight to quality carries the session's return
+    into the corporate yield too, so the control pins both, as
+    `Execution.moved` says: hold(vix=15.0) alone leaves two names moved, and
+    hold(vix=15.0, corporate_bond_yield=0.055) returns untouched_moved() to
     empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
@@ -922,7 +1016,8 @@ def g_tca_ripple(ctx: Ctx) -> dict:
 
     jobs = {
         "full": lambda: analyse(10),
-        "pinned": lambda: analyse(10, Scenario().hold(vix=15.0)),
+        "pinned": lambda: analyse(10, Scenario().hold(
+            vix=15.0, corporate_bond_yield=0.055)),
         "d1": lambda: analyse(1),
         "d2": lambda: analyse(2),
         "d3": lambda: analyse(3),
@@ -962,11 +1057,16 @@ def g_tca_ripple(ctx: Ctx) -> dict:
 
 
 def g_drawdiv(ctx: Ctx) -> dict:
-    """scenarios.md: the macro-counterfactual draw divergence is zero in every
-    comparison run -- four scenarios at seed 3 plus three of them repeated
-    across seeds 1 to 8, twenty instruments, forty days. The four scenarios
-    are named in the docstring at python/tradefloor/scenario.py:110-117; the
-    universe is reconstructed as random(20, seed=4) from tests/test_scenario.py."""
+    """The macro-counterfactual draw divergence is zero in every comparison
+    run -- four scenarios at seed 3 plus three of them repeated across seeds
+    1 to 8, twenty-eight comparisons of twenty instruments over forty days.
+    The four scenarios are named in the docstring at
+    python/tradefloor/scenario.py:110-117; the universe is reconstructed as
+    random(20, seed=4) from tests/test_scenario.py.
+
+    The glossary states the result on pt-v14 ("zero across all twenty-eight
+    comparisons on pt-v14"), so it is measured there. This ran the shipped
+    default, which grades a sentence about a different preset."""
     u = _u(20, 4)
     scenarios = {
         "rate_5": Scenario.rate_shock(start=0.025, end=0.05, over=30),
@@ -981,7 +1081,7 @@ def g_drawdiv(ctx: Ctx) -> dict:
     def one(job):
         name, seed = job
         return compare(scenarios[name], seed=seed, universe=u,
-                       days=40)["draw_delta"]
+                       days=40, model="pt-v14")["draw_delta"]
 
     with ThreadPoolExecutor(max_workers=min(8, ctx.workers)) as pool:
         deltas = list(pool.map(one, jobs))
@@ -1024,18 +1124,24 @@ def g_replay(ctx: Ctx) -> dict:
 # ---------------------------------------------------------------------------
 
 def g_universe_stats(ctx: Ctx) -> dict:
-    """conventions.md: short interest median about 3.7% of shares outstanding,
-    roughly one name in eleven above the 20% squeeze threshold. The page does
-    not name a universe; measured over ten generated 100-name universes."""
-    pcts = []
-    for seed in range(1, 11):
-        for inst in _u(100, seed):
-            pcts.append(inst.short_interest / inst.shares_outstanding * 100.0)
-    above = sum(1 for p in pcts if p > 20.0)
+    """The conventions page's short-interest table: the median over the
+    whole three-letter ticker space, the share of names above the 20%
+    squeeze threshold, and the median on random(108, seed=7).
+
+    "The whole ticker space" is 26^3 = 17,576 names, measured at seed 7 when
+    the figures were written. This used to pool ten 100-name universes,
+    which is a different sample from the one the page names and was judged
+    inside a band wide enough to hide the difference."""
+    def pcts(universe):
+        return [inst.short_interest / inst.shares_outstanding * 100.0
+                for inst in universe]
+
+    space = pcts(_u(26 ** 3, 7))
     return {
-        "median_si_pct": _median(pcts),
-        "one_in_n_above_20": len(pcts) / above if above else float("inf"),
-        "names": len(pcts),
+        "median_si_pct": _median(space),
+        "pct_above_20": 100.0 * sum(1 for p in space if p > 20.0) / len(space),
+        "median_si_pct_108": _median(pcts(_u(108, 7))),
+        "names": len(space),
     }
 
 
@@ -1121,18 +1227,17 @@ def g_perf(ctx: Ctx) -> dict:
 
 
 def g_fork(ctx: Ctx) -> dict:
-    """forking-a-simulation.md: branch < 1 ms, Checkpoint.resume seconds.
-    The page does not say what run length the 2.7 s was measured over;
-    replay cost scales with the order log, so the absolute is doubly
-    machine- and method-bound. This measures the 30-day run that reproduces
-    the page's branch/resume ratio - the claim's portable part (three
-    orders of magnitude, judged as a band on log10) - and reports the
-    resume wall clock the way every other wall clock is reported: as
-    machine_bound, never judged at printed precision."""
+    """checkpoints: branch < 1 ms, Checkpoint.resume 2.7 s, "from a
+    sixty-day, forty-instrument market on one development machine". This
+    measured a 30-day, 20-name run from before the page named its market,
+    so it now runs the market the page describes. Both absolutes are wall
+    clocks and are reported as machine_bound, never judged; the portable
+    claim is the ratio, three orders of magnitude, judged as a band on
+    log10."""
     import math
-    u = _u(20, 11)
+    u = _u(40, 7)
     e = pt.Engine(seed=42, universe=u)
-    e.run_days(30)
+    e.run_days(60)
     times = []
     for _ in range(5):
         t0 = time.perf_counter()
@@ -1148,7 +1253,8 @@ def g_fork(ctx: Ctx) -> dict:
         "branch_ms": branch_ms,
         "resume_s": resume_s,
         "ratio_orders": math.log10(resume_s * 1e3 / branch_ms),
-        "run_days": 30,
+        "run_days": 60,
+        "instruments": len(u),
     }
 
 

@@ -28,6 +28,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -44,7 +45,41 @@ SCHEMA = 1
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
     "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0", "pt-v19": "0.8.0",
+    "pt-v20": "0.8.5",
 }
+
+#: Grades published in this repository, by the box that ran them, and the
+#: folder that holds each one in the design repository's layout
+#: (`validation/README.md`). `criteria.py` names its inputs by their paths in
+#: that private repository, so a verdict from a box listed here has each
+#: `programme/...` path rewritten under the folder when it is written onto a
+#: record, and the record then names files a reader can open.
+PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20"}
+
+_DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
+
+
+def public_paths(block: dict) -> dict:
+    """A copy of a `long_run` block whose design-repository paths are public.
+
+    Rewrites only a block whose `measured.box` is in `PUBLISHED_GRADES`; any
+    other block comes back as it was, design paths and all, because those
+    files are not in this repository.
+    """
+    folder = PUBLISHED_GRADES.get((block.get("measured") or {}).get("box"))
+    if folder is None:
+        return block
+
+    def walk(value):
+        if isinstance(value, str):
+            return _DESIGN_PATH.sub(folder + "/programme/", value)
+        if isinstance(value, list):
+            return [walk(v) for v in value]
+        if isinstance(value, dict):
+            return {k: walk(v) for k, v in value.items()}
+        return value
+
+    return walk(block)
 
 
 def moved_values(was: dict[str, float], now: dict[str, float]) -> list[str]:
@@ -357,8 +392,8 @@ def carry_long_run(record: dict, path: pathlib.Path) -> str:
 
     `carry_level_protocol`'s rule on the long-run verdict, which `--panel`
     cannot rebuild either: it comes from thirty 21-year histories, the 2008
-    and 2020 replays and the headline edge, graded by the design
-    repository's `programme/longrun/criteria.py`, and it reaches a record
+    and 2020 replays and the headline edge, graded by `criteria.py` (pt-v20's
+    grade is published under `validation/pt-v20/`), and it reaches a record
     through `--long-run` or not at all. Carried while the preset's
     coefficient VALUES have not moved since the verdict was written (a name
     added inert does not invalidate it); dropped loudly when they have.
@@ -730,12 +765,14 @@ def main() -> int:
     ap.add_argument("--long-run", metavar="VERDICT",
                     help="write ONLY the long_run block onto the record the "
                          "verdict names: the adopted long-run pass bar "
-                         "(design repo programme/longrun/CRITERIA.md) as "
-                         "graded by programme/longrun/criteria.py --verdict "
+                         "(programme/longrun/CRITERIA.md) as graded by "
+                         "programme/longrun/criteria.py --verdict "
                          "on thirty 21-year histories, the 2008 and 2020 "
                          "replays, the headline edge and the one-year "
                          "table. Refused unless the long run measured the "
-                         "preset BY NAME")
+                         "preset BY NAME. A verdict from a box in "
+                         "PUBLISHED_GRADES has its paths rewritten under "
+                         "validation/")
     ap.add_argument("--default-since", action="store_true",
                     help="rewrite only `default_since` on every committed "
                          "record from the DEFAULT_SINCE table; no panel "
@@ -1225,13 +1262,15 @@ def write_level_protocol(rows_path: str) -> int:
 def write_long_run(verdict_path: str) -> int:
     """Set the `long_run` block on the record the verdict names.
 
-    The owner's adopted pass bar for a preset is the design repository's
-    `programme/longrun/CRITERIA.md`: what a user would notice over thirty
-    21-year histories, the 2008 and 2020 replays with the real VIX imposed,
-    the edge a headline read five ticks late is worth, and the one-year
-    table. `programme/longrun/criteria.py --verdict` grades it by code; this
-    writes that verdict, as it is, under `long_run`, where the trading
-    server reads whether the preset passes.
+    The owner's adopted pass bar for a preset is `programme/longrun/CRITERIA.md`
+    (published for pt-v20 under `validation/pt-v20/`): what a user would
+    notice over thirty 21-year histories, the 2008 and 2020 replays with the
+    real VIX imposed, the edge a headline read five ticks late is worth, and
+    the one-year table. `programme/longrun/criteria.py --verdict` grades it
+    by code; this writes that verdict under `long_run`, where the trading
+    server reads whether the preset passes. The verdict is written as it is,
+    except that a box in `PUBLISHED_GRADES` has its design-repository paths
+    pointed at the published copies (`public_paths`).
 
     REFUSES a verdict whose long run did not measure the preset BY NAME: its
     `measured.fingerprint` must be the record's preset, the rule
@@ -1269,7 +1308,7 @@ def write_long_run(verdict_path: str) -> int:
             print(f"REFUSED: {p}", file=sys.stderr)
         return 1
     record = json.loads(path.read_text(encoding="utf-8"))
-    block = dict(doc)
+    block = public_paths(dict(doc))
     block["coefficients"] = dict(sorted(record["coefficients"].items()))
     record["long_run"] = block
     path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",

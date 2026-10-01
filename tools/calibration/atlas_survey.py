@@ -284,6 +284,38 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_share": (0.0, 0.5),
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
+    # pt-v20's tape, closing cross, fair-value share, opening spread and
+    # stop-ladder scale (design repository, programme/ptv20-registration.md).
+    "quote_model_weight": (0.0, 1.0),
+    "closing_auction": (0.0, 1.0),
+    "fair_value_news_share": (0.0, 1.0),
+    "opening_mispricing_sigma": (0.0, 0.3),
+    "opening_market_sigma": (0.0, 0.3),
+    "fair_value_market_share": (0.0, 1.0),
+    "treasury_2y_noise": (0.0, 0.1),
+    "flight_to_quality_day": (0.0, 1.0),
+    "corporate_yield_daily": (0.0, 1.0),
+    "earnings_cycle_depth": (0.0, 0.6),
+    "earnings_cycle_upside": (0.0, 0.3),
+    "earnings_cycle_sigma": (0.0, 0.005),
+    "earnings_anticipation_half_life": (0.0, 504.0),
+    # Moves what the engine reports as the phase, never a price.
+    "cycle_publication_lag": (0.0, 504.0),
+    # Moves what the engine reports as GDP growth, never a price.
+    "gdp_publication_lag": (0.0, 126.0),
+    # Unemployment's partial adjustment, 0 to half a year.
+    "unemployment_adjustment_half_life": (0.0, 126.0),
+    # A switch: the fear/greed index reads the published phase and growth.
+    "fear_greed_published_inputs": (0.0, 1.0),
+    "macro_publication_repricing": (0.0, 1.0),
+    # The agent-facing book (2026-09-24): read only on an agent's path.
+    "book_depth_coefficient": (0.0, 2.0),
+    "book_depth_exponent": (0.0, 1.0),
+    "book_depth_reach": (0.0, 2.0),
+    "book_shared": (0.0, 1.0),
+    "book_refill_half_life": (0.0, 120.0),
+    "book_resting": (0.0, 1.0),
+    "fill_impact_coefficient": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
@@ -330,6 +362,23 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # entries around it there is no strong-to-implausible top to choose:
     # the top is where the correction is exact.
     "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The same share for the lagged wire's multiple of the tilt. Its top is
+    # where the correction is exact, as for the entry above.
+    "market_beta_down_asym_lag_recentre": (0.0, 1.0),
+    # A switch: which part of a market shock the market share takes.
+    "fair_value_market_linear": (0.0, 1.0),
+    # A multiple of the market factor's base sigma; 1 to 3 is where the
+    # market's daily sigma spends most of its time (median 0.78, 99th
+    # percentile 4.9 on pt-v20).
+    "fair_value_market_vol_cap": (0.0, 4.0),
+    # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
+    # about a quarter off fair value, past any measured feedback.
+    "fair_value_vix_discount": (0.0, 0.3),
+    # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
+    "fair_value_vix_half_life": (0.0, 63.0),
+    # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
+    # name's (real ones run to a few per cent).
+    "buyback_yield_cap": (0.0, 0.3),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
@@ -634,6 +683,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The stop and squeeze ladders' scale: 1.0 on every preset through
+    # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
+    # The whole unit range, off to full.
+    "cascade_gain": (0.0, 1.0),
+    # The 10-year's noise and the flight to quality's size: 0.03 and 0.02
+    # through pt-v19, 0.025 and 0.008 on pt-v20.
+    "treasury_10y_noise": (0.0, 0.1),
+    # The earnings cycle's half-life in sessions: 60 through every preset
+    # (unread there), a quarter to two years around it.
+    "earnings_cycle_half_life": (20.0, 504.0),
+    "flight_to_quality_gain": (0.0, 0.05),
     # The macro calendar's year in steps: 365 as shipped, 252 the session
     # calendar (21-step months, 63-step quarters).
     "macro_calendar_days_per_year": (252.0, 365.0),

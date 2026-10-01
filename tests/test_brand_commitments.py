@@ -21,6 +21,7 @@ would overstate it.
 from __future__ import annotations
 
 import base64
+import gzip
 import pathlib
 import re
 import subprocess
@@ -504,6 +505,13 @@ class TreeScan(typing.NamedTuple):
     missing: list[str]
 
 
+#: Tracked files kept gzipped, which the walk reads through gzip so the text
+#: inside is checked like any other. One today: the S&P 500 and VIX tape that
+#: grade box ptv20g6 unpacked, kept as the bytes it ran on so its sha256
+#: still matches `validation/pt-v20/scripts-as-run.txt`.
+GZIPPED_TEXT = ("validation/pt-v20/programme/longrun/data/tape.json.gz",)
+
+
 def scan_tree(paths: list[str] | None = None) -> TreeScan:
     """Apply the control-byte rule to each path, and account for all of them.
 
@@ -519,8 +527,11 @@ def scan_tree(paths: list[str] | None = None) -> TreeScan:
         if not p.is_file():
             missing.append(path)
             continue
+        raw = p.read_bytes()
+        if path in GZIPPED_TEXT:
+            raw = gzip.decompress(raw)
         try:
-            text = p.read_bytes().decode("utf-8")
+            text = raw.decode("utf-8")
         except UnicodeDecodeError:
             undecodable.append(path)
             continue

@@ -644,8 +644,15 @@ def test_the_jacobian_refresh_is_reached(short_days):
     # exactly that at 0.7.0: 28 evaluations either way. Requiring one strict
     # separation across the set says the branch ran somewhere, and requiring
     # no seed to come out FASTER with refresh on says what it costs.
+    #
+    # SEEDS 6 AND 8 JOIN AT 0.8.5, when pt-v20 became the default: all three
+    # of 11, 21 and 13 converge inside the refresh interval there (28, 28
+    # and 27 evaluations either way; pt-v19 read 28/28, 35/56 and 30/48), so
+    # the set stopped separating anywhere. Over seeds 1 to 25 on pt-v20, 6
+    # reads 34 against 57 with refresh and 8 reads 29 against 48, the two
+    # cheapest that separate, and every solve on those five converges.
     separated = []
-    for seed in (11, 21, 13):
+    for seed in (11, 21, 13, 6, 8):
         engine = tf.Engine(seed=seed, universe=UNIVERSE)
         fwd = shadow.Forward(engine, 0, len(UNIVERSE))
         x_true = np.random.default_rng(9).normal(size=fwd.layout.size)

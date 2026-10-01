@@ -39,7 +39,7 @@
 //! # The process
 //!
 //! GARCH(1,1) on the factor's own daily innovation, at daily scale,
-//! reverting to the baseline [`MARKET_FACTOR_SIGMA`]²:
+//! reverting to the baseline [`MARKET_FACTOR_SIGMA`](crate::market::tick::MARKET_FACTOR_SIGMA)²:
 //!
 //! ```text
 //! v' = (1 − α − β)·target + α·ε² + β·v      then clamped to
@@ -107,6 +107,12 @@
 //! transcendentals, no RNG — the same discipline as `garch.rs`, and the
 //! reason GARCH was chosen over an EGARCH/log-variance form, which would
 //! have dragged `exp`/`log` into the daily state chain.
+//!
+//! That is the path every shipped preset takes. Two dials add a
+//! transcendental when a custom vector switches them on: the VIX response
+//! goes through `mathx::pow`, and `market_vol_alpha_excursion` through
+//! `mathx::log`. Both are `mathx`, never the platform's libm, and
+//! `tests/platform_maths.rs` fails on any call that is not.
 
 use crate::mathx;
 
@@ -414,7 +420,10 @@ fn alpha_beta_at(
     if k == 0.0 || target_variance <= 0.0 || current_variance <= 0.0 {
         return (alpha, beta);
     }
-    let delta = k * (current_variance / target_variance).ln();
+    // `mathx::log`, not `f64::ln`: a dial a user sets with `with_override`
+    // must not reach the platform's libm, or their custom market stops being
+    // the same market on every platform. No shipped preset reaches this line.
+    let delta = k * mathx::log(current_variance / target_variance);
     // The largest rotation the fourth moment allows, from
     // `3a^2 + a(3g + 2b') + (1.5g^2 + b'g + b'^2) = 0.999` with the rotation
     // b' = beta - d and a = alpha + d substituted; solved numerically by
@@ -1159,7 +1168,7 @@ mod tests {
         // And the boundedness that replaces it: ordered bounds, and a
         // quiet-run fixed point ABOVE the floor, so the floor is a
         // worst-case guarantee rather than a regime.
-        assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE);
+        const { assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE) };
         let quiet_fixed_point = (1.0 - persistence) / (1.0 - MARKET_VOL_BETA);
         assert!(
             quiet_fixed_point > MARKET_VOL_FLOOR_MULTIPLE,

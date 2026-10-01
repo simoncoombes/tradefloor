@@ -17,6 +17,8 @@ was nothing for anyone to do to anyone.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import tradefloor as tf
@@ -26,6 +28,10 @@ from tradefloor.externality import Externality, externalities
 SEED = 42
 ROSTER_SEED = 99
 NAMES = 8
+
+#: The last preset whose agents price off a snapshot of the book and take no
+#: levels from each other. The default shares the book from pt-v20.
+SNAPSHOT_PRESET = "pt-v19"
 
 
 def roster():
@@ -200,7 +206,7 @@ def test_the_cohort_flow_reaches_the_market_as_one_merged_order_flow():
 
 
 def test_agents_do_not_take_each_others_liquidity_within_a_step():
-    """`Portfolio.execute` reads the ladder and removes nothing.
+    """`Portfolio.execute` reads the ladder and removes nothing, on pt-v19.
 
     So label order decides which agent is asked first, which flow is summed
     first and whose rejection is written first, and no price. Two agents
@@ -211,9 +217,14 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     the levels an earlier one took. The behaviour was always right and the
     sentence was wrong, which is the failure a test states rather than a
     paragraph.
+
+    pt-v20, the default, shares the agent-facing book, and there a later
+    agent does pay the levels an earlier one took;
+    `test_order_book_depth.py::test_a_cohort_takes_levels_from_each_other`
+    holds that.
     """
     cash = 50_000_000.0
-    both = cohort(cash=cash,
+    both = cohort(cash=cash, model=SNAPSHOT_PRESET,
                   agents={"alpha": Buyer(0, at=0, shares=10_000.0),
                           "beta": Buyer(0, at=0, shares=10_000.0)})
     both.run(days=1)
@@ -223,7 +234,7 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     assert alpha["worst_price"] == beta["worst_price"]
 
     # And the ladder both of them swept is the ladder neither of them moved.
-    fresh = tf.Engine(seed=SEED, universe=roster())
+    fresh = tf.Engine(seed=SEED, universe=roster(), model=SNAPSHOT_PRESET)
     fresh.open_market()
     ticker = fresh.tickers[0]
     before = _levels(fresh, ticker)
@@ -231,10 +242,10 @@ def test_agents_do_not_take_each_others_liquidity_within_a_step():
     assert _levels(fresh, ticker) == before
 
     # Sorting order decides no price and no market.
-    first = cohort(cash=cash,
+    first = cohort(cash=cash, model=SNAPSHOT_PRESET,
                    agents={"aa": Buyer(0, at=0, shares=3_000.0),
                            "zz": Buyer(0, at=0, shares=9_000.0)})
-    second = cohort(cash=cash,
+    second = cohort(cash=cash, model=SNAPSHOT_PRESET,
                     agents={"aa": Buyer(0, at=0, shares=9_000.0),
                             "zz": Buyer(0, at=0, shares=3_000.0)})
     first.run(days=1)
@@ -431,19 +442,47 @@ def test_a_cohort_summary_reads_the_agent_it_names():
 # The reconstruction the diagonal rests on
 # ---------------------------------------------------------------------------
 
-def test_closing_and_opening_a_day_moves_no_price():
-    """`_path` reads the price a step's session left as the next step's
-    opening cross-section, and a day boundary sits between those two reads.
+@pytest.mark.parametrize("preset", ("pt-v19", "pt-v20"))
+def test_each_step_is_priced_from_the_cross_section_it_opened_on(preset):
+    """`_path` reads the cross-section each step opened on, as recorded.
 
-    If a close or an open ever moves a price, that reconstruction is wrong
-    at every day boundary and the diagonal quietly stops being a shortfall.
+    It used to read the price a step's session left as the next step's
+    opening cross-section, with a day boundary between those two reads,
+    which is right only if a close and an open move no price. On pt-v20,
+    the default, the close re-marks every traded name to the macro state it
+    publishes (`macro_publication_repricing`), so the next day's first step
+    opens at the re-marked price, and the reconstruction priced a fill on
+    that step against the wrong baseline. This holds the recorded opening
+    to what the agents were shown, and shows the two reads part at a close
+    on pt-v20 and agree on pt-v19, where the close writes no price.
     """
-    world = World(seed=SEED, universe=roster(), agent=Idle())
+    world = World(seed=SEED, universe=roster(), agent=Idle(), model=preset)
     world.run(days=1)
-    assert world.trace[-1]["prices"] == _prices(world.engine)
-    world.engine.open_market()
-    assert world.trace[-1]["prices"] == _prices(world.engine)
-    world.engine.close_market()
+    last_print = world.trace[-1]["prices"]
+    after_close = _prices(world.engine)
+    assert (last_print == after_close) == (preset == "pt-v19")
+    world.run(days=1)
+    first_of_day = world.steps_per_day
+    assert world._step_opens[first_of_day] == after_close
+    within = world._step_opens[first_of_day + 1]
+    assert within == world.trace[first_of_day]["prices"]
+
+
+def test_a_fill_on_a_days_first_step_is_priced_as_tca_prices_it():
+    """The diagonal against `tca.analyse` where the reconstruction broke:
+    one 200-share buy at step 6, the first step of day 1, three days, on
+    the default. Before `_path` read the recorded openings the diagonal was
+    -24.48 against tca's 8.77, because the baseline row for step 6 was the
+    last print of day 0 and not the price the close re-marked it to."""
+    def agent():
+        return Buyer(0, at=6, shares=200.0)
+
+    reference = tf.tca.analyse(agent(), seed=SEED, universe=roster(), days=3)
+    world = World(seed=SEED, universe=roster(), agents={"alpha": agent()})
+    result = externalities(world, days=3)
+    assert reference.shortfall() != 0.0, "the fixture agent never traded"
+    assert result.diagonal["alpha"] == reference.shortfall()
+    assert result.diagonal_bps["alpha"] == reference.shortfall_bps()
 
 
 def _prices(engine):
@@ -568,7 +607,8 @@ class OnceOnly:
         return {t: self.shares for t in obs.tickers[self.lo:self.hi]}
 
 
-def test_an_idle_agents_column_moves_through_marking():
+@pytest.mark.parametrize("preset", (SNAPSHOT_PRESET, "pt-v20"))
+def test_an_idle_agents_column_moves_through_marking(preset):
     """What the idle caveat attributes the movement to.
 
     An agent that filled nothing over the window has the same cash and
@@ -577,13 +617,21 @@ def test_an_idle_agents_column_moves_through_marking():
     says exactly that, and this is the check that it is saying the right
     thing rather than a plausible thing.
 
-    The two figures agree to about 1.5e-11 on 25.0 rather than to the
-    bit, because `pnl_since` reaches the total by differencing two net
+    The two figures agree to a rounding of the net worth rather than to
+    the bit, because `pnl_since` reaches the total by differencing two net
     worths and this sums the per-position differences, which is a
-    different summation order over the same values.
+    different summation order over the same values. Measured on pt-v19:
+    -25.0 against a sum 5.7e-12 away (it read "about 1.5e-11 on 25.0"
+    before 0.8.5). On pt-v20: -0.0173 against a sum 2.9e-9 away, under one
+    ulp (3.7e-9) of the 20,006,008 net worth the total is differenced from.
+    pt-v20's final prices in this fixture are off the cent grid and move by
+    about 1e-5 between the arms, so the rounding shows at a size pt-v19's
+    cent moves never reach, and the relative tolerance alone would hold a
+    0.0173 to 1.7e-11, below one ulp of the net worth.
     """
     universe = list(tf.Universe.random(20, seed=11))
     world = World(seed=SEED, universe=universe, cash=20_000_000.0,
+                  model=preset,
                   agents={"idle": OnceOnly(0, 10, at=0),
                           "active": OnceOnly(10, 20, at=9)})
     world.run(days=1)
@@ -602,9 +650,11 @@ def test_an_idle_agents_column_moves_through_marking():
     in_arm = dict(zip(tickers, _prices(arm.engine)))
     marking = sum(position.quantity * (in_arm[t] - in_full[t])
                   for t, position in held.items())
+    assert marking != 0.0, "the idle fixture's holdings did not move"
 
-    assert result.matrix["active"]["idle"] == pytest.approx(marking,
-                                                            rel=1e-9)
+    worth = full.portfolios["idle"].net_worth(full.engine)
+    assert result.matrix["active"]["idle"] == pytest.approx(
+        marking, rel=1e-9, abs=2 * math.ulp(worth))
 
 
 class Half:
@@ -619,10 +669,11 @@ class Half:
         return {t: self.shares for t in obs.tickers[self.lo:self.hi]}
 
 
-def _disjoint(pins=None, days: int = 4):
+def _disjoint(pins=None, days: int = 4, model=None):
     universe = list(tf.Universe.random(20, seed=11))
     world = World(seed=SEED, universe=universe, cash=20_000_000.0, pins=pins,
-                  agents={"low": Half(0, 10), "high": Half(10, 20)})
+                  agents={"low": Half(0, 10), "high": Half(10, 20)},
+                  model=model)
     return externalities(world, days=days)
 
 
@@ -657,13 +708,94 @@ def test_a_pinned_fear_gauge_removes_the_whole_cross_effect():
     Pinning VIX in both worlds collapses every entry between agents on
     disjoint names to exactly zero, which is what makes the attribution
     in the caveat a measurement rather than a story. The existence test
-    above would pass on any leak; this one says which leak it is.
+    above would pass on any leak; this one says which leak it is. On
+    pt-v20 the corporate yield moves at every close with the market (the
+    flight to quality moves the 10-year, which it follows), so the control
+    pins it too, and a pinned corporate yield holds through the close.
     """
-    result = _disjoint(pins={"vix": 15.0})
-    assert result.matrix["low"]["high"] == 0.0
-    assert result.matrix["high"]["low"] == 0.0
-    assert not any("holds and trades no name" in line
-                   for line in result.caveats())
+    for preset, pins in (("pt-v19", {"vix": 15.0}),
+                         ("pt-v20", {"vix": 15.0,
+                                     "corporate_bond_yield": 0.055})):
+        model = tf.ModelParams.from_preset(preset)
+        for days in (4, 10):
+            result = _disjoint(pins=pins, days=days, model=model)
+            assert result.matrix["low"]["high"] == 0.0, (preset, days)
+            assert result.matrix["high"]["low"] == 0.0, (preset, days)
+            assert not any("holds and trades no name" in line
+                           for line in result.caveats())
+
+
+def test_a_vix_pin_alone_leaves_pt_v20s_credit_channel_open():
+    """Why the control names the corporate yield on pt-v20.
+
+    With `flight_to_quality_day` on, the session's index return moves the
+    10-year, the corporate yield follows the 10-year every session, and
+    every name is discounted at it. A pinned VIX does not hold that, so the
+    entry is non-zero and the caveat hands over the second pin.
+    """
+    result = _disjoint(pins={"vix": 15.0}, days=4,
+                       model=tf.ModelParams.from_preset("pt-v20"))
+    assert result.matrix["high"]["low"] != 0.0
+    assert any("corporate_bond_yield" in line for line in result.caveats())
+
+
+def test_a_pinned_corporate_yield_holds_through_the_close():
+    """A pinned macro value is the value, overnight included, on every preset.
+
+    pt-v20's `corporate_yield_daily` moved the corporate yield at the close
+    by the 10-year's change, so a pinned level drifted after every session
+    (0.054865 after day 1 of a 0.055 pin) and came back only with the next
+    morning's pin. pt-v19 held it. Both hold it now.
+    """
+    universe = list(tf.Universe.random(8, seed=99))
+    for preset in ("pt-v19", "pt-v20"):
+        e = tf.Engine(seed=42, universe=universe, model=preset)
+        for _ in range(5):
+            e.pin_macro(corporate_bond_yield=0.055)
+            e.open_market()
+            e.run_session(9, 30, 3, 30)
+            e.close_market()
+            assert e.macro_fields["corporate_bond_yield"] == 0.055, preset
+
+
+def test_a_pinned_vix_moves_the_corporate_yield_by_nothing():
+    """`corporate_yield_daily` charges the close's VIX change to the spread.
+
+    Under a pinned VIX that change is the VIX law's reversion from the
+    written level, and the next morning's pin writes the level back without
+    passing through the spread, so charging it ratcheted the corporate yield
+    down every session: 2.809 to 2.421 per cent over five sessions of
+    hold(vix=45) on pt-v20's first 0.8.5 build, with the 10-year flat. A
+    pinned session now takes no VIX term, so the yield moves only by the
+    10-year: within one basis point of the run with the dial off, whose
+    corporate yield never moves between meetings, plus the 10-year's own
+    change.
+    """
+    universe = list(tf.Universe.random(8, seed=99))
+    # Up to 16 sessions, the last before the first meeting. Since pt-v20's
+    # graded arm (2026-09-26) the run's first meeting at seed 42 falls on
+    # session 17 (it fell after session 20 before), and a meeting re-anchors
+    # the yield to the formula at the pinned VIX, +39 bp here: the meeting's
+    # rule, not the ratchet this test is about. Was (1, 5, 10, 20).
+    for days in (1, 5, 10, 16):
+        e = tf.run_scenario(tf.Scenario().hold(vix=45.0), seed=42,
+                            universe=universe, days=days, ticks_per_day=30,
+                            model="pt-v20")
+        off = tf.run_scenario(tf.Scenario().hold(vix=45.0), seed=42,
+                              universe=universe, days=days, ticks_per_day=30,
+                              model=tf.ModelParams.from_preset(
+                                  "pt-v20", corporate_yield_daily=0.0))
+        m0 = tf.Engine(seed=42, universe=universe, model="pt-v20").macro_fields
+        drift = (e.macro_fields["corporate_bond_yield"]
+                 - m0["corporate_bond_yield"])
+        ten = (e.macro_fields["treasury_yield_10y"]
+               - m0["treasury_yield_10y"])
+        assert abs(drift - ten) < 5e-4, (days, drift, ten)
+        off0 = tf.Engine(seed=42, universe=universe,
+                         model=tf.ModelParams.from_preset(
+                             "pt-v20", corporate_yield_daily=0.0)).macro_fields
+        assert (off.macro_fields["corporate_bond_yield"]
+                == off0["corporate_bond_yield"])
 
 
 class BuyFirstOnce:
@@ -722,17 +854,41 @@ def test_the_cross_name_caveat_reads_exposure_and_not_fills():
     assert pinned.matrix["mover"]["holder"] != 0.0
 
 
-def test_one_day_leaks_nothing_across_disjoint_names():
-    """The reaction has to cross two closes, so one day cannot carry it.
+def test_one_day_leaks_nothing_across_disjoint_names_but_the_close():
+    """The fear gauge's reaction has to cross two closes, so one day cannot
+    carry it; on pt-v20 the close's re-mark carries the macro step at once.
 
-    `tca.py` says a one-day analysis is structurally immune because its
-    final prices predate the first repriced variance target. The same
-    holds here, and it is why the zero matrix at one day is not evidence
-    that the channel is absent.
+    `tca.py` says a one-day analysis is immune to the variance channel
+    because its final prices predate the first repriced variance target.
+    That still holds, and is why the zero matrix at one day is not evidence
+    that the channel is absent: pt-v20 with `macro_publication_repricing`
+    at 0 reads exactly zero here, as pt-v19 does.
+
+    What one day does carry on pt-v20, the default, is the close's re-mark.
+    The agents' flow moves the session's index return, the close's macro
+    step reads it (the VIX, the 10-year's flight to quality and the
+    corporate yield that follows it), and the re-mark prices every name at
+    that step before the day's P&L is marked, so each agent's holdings move
+    with the other's flow at the first close: 0.0120 and 0.0586 here,
+    against -1,523.87 and -400.00 over four days. Isolation at one day
+    therefore means the same macro path: pinning the VIX and the corporate
+    yield in both worlds, the control `test_a_pinned_fear_gauge_removes_
+    the_whole_cross_effect` runs at four and ten days, takes both entries to
+    exactly zero at one.
     """
-    result = _disjoint(days=1)
-    assert result.matrix["low"]["high"] == 0.0
-    assert result.matrix["high"]["low"] == 0.0
+    quiet = _disjoint(days=1, model=tf.ModelParams.from_preset(
+        "pt-v20", macro_publication_repricing=0.0))
+    assert quiet.matrix["low"]["high"] == 0.0
+    assert quiet.matrix["high"]["low"] == 0.0
+
+    remarked = _disjoint(days=1)
+    assert remarked.matrix["low"]["high"] != 0.0
+    assert remarked.matrix["high"]["low"] != 0.0
+
+    same_path = _disjoint(days=1, pins={"vix": 15.0,
+                                        "corporate_bond_yield": 0.055})
+    assert same_path.matrix["low"]["high"] == 0.0
+    assert same_path.matrix["high"]["low"] == 0.0
 
 
 def test_the_matrix_is_the_pnl_the_removal_changed():
@@ -776,9 +932,15 @@ def test_removing_an_agent_that_traded_moves_the_other_agents_pnl():
     what persists, so the two cannot move together: measured non-zero on
     both entries at 3,000 and 5,000 shares over one, two and three days, on
     the fifth composition and on the fourth.
+
+    5,000 shares since 0.8.5. With each buy's flow reaching the market once
+    instead of on all 65 ticks of the step, 3,000 shares of this $84 name
+    (average volume 976,206) moves `s` by well under a cent and no print
+    differs: both entries read exactly 0.0 over one, two and three days.
+    At 5,000 they read +200, -100 and +300 over one, two and three days.
     """
-    world = cohort(agents={"alpha": Buyer(0, at=0, shares=3_000.0),
-                           "beta": Buyer(0, at=0, shares=3_000.0)})
+    world = cohort(agents={"alpha": Buyer(0, at=0, shares=5_000.0),
+                           "beta": Buyer(0, at=0, shares=5_000.0)})
     result = externalities(world, days=2)
     assert result.matrix["alpha"]["beta"] != 0.0
     assert result.matrix["beta"]["alpha"] != 0.0

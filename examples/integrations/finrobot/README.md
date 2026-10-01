@@ -50,8 +50,13 @@ python examples/integrations/finrobot/rate_shock.py
 
 That replays a genuine recorded FinRobot run. It needs no API key, no network
 and no FinRobot install. The market is deterministic, so re-executing it
-against the recorded agent responses reproduces the experiment exactly, in
-about a second.
+against the recorded agent responses reproduces the experiment exactly. The
+replay takes about a second of CPU.
+
+The recording is in the repository's `tests/fixtures/finrobot/` and is not
+installed with the package, so the replay needs a clone. A copy of
+`rate_shock.py` outside one stops before the market runs and says where the
+recording lives; pass `--fixture` to replay a recording of your own.
 
 ```bash
 pip install "tradefloor[finrobot]"
@@ -93,7 +98,7 @@ sides, refuses anything it cannot execute, and hands share deltas to the same
 execution path every other agent uses.
 
 **FinRobot is never shown the answer key.** The observation is an allowlist,
-written out field by field. Fair value, the ten-way factor attribution of
+written out field by field. Fair value, the factor attribution of
 every price move, each company's mispricing and the macro path the run has
 not reached yet all stay on the Tradefloor side of the line.
 `tests/test_finrobot.py` proves it twice: once by running the mapping against

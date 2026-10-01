@@ -1,0 +1,44 @@
++ python tools/calibration/memory_vs_drift.py --preset pt-v20 --seeds 20 --workers 20 --out /home/ec2-user/out/memory-vs-drift.json
+pt-v20: 20 seeds x 2520 days x 40 names, detrend window 252, 20 workers
+  ... 1/20
+  ... 2/20
+  ... 3/20
+  ... 4/20
+  ... 5/20
+  ... 6/20
+  ... 7/20
+  ... 8/20
+  ... 9/20
+  ... 10/20
+  ... 11/20
+  ... 12/20
+  ... 13/20
+  ... 14/20
+  ... 15/20
+  ... 16/20
+  ... 17/20
+  ... 18/20
+  ... 19/20
+  ... 20/20
+
+   lag   |r| acf raw    de-trended     kept
+     1        0.0990        0.0606      61%
+     5        0.0770        0.0366      47%
+    20        0.0539        0.0122      23%
+    60        0.0312       -0.0125     -40%
+   120        0.0110       -0.0184    -167%
+
+log-log slope, lags 1-20:  raw -0.192   de-trended -0.364   (real markets -0.436)
+
+annualised volatility by year -- the drift, measured directly
+  y1 19.5%  y2 18.9%  y3 19.9%  y4 18.9%  y5 19.5%  y6 19.6%  y7 19.1%  y8 19.3%  y9 18.4%  y10 17.9%
+  year 1 19.48%  ->  year 10 17.91%   -8.1%
+
+VERDICT
+  DRIFT: lag-20 structure is mostly a level trend. The model has a volatility drift, which is a NEW defect rather than an excuse for the decay-shape gap.
+
+wrote /home/ec2-user/out/memory-vs-drift.json
+
+real	1m3.353s
+user	19m19.067s
+sys	0m47.502s

@@ -272,7 +272,11 @@ def split_half(rosters: int, names: int, sessions: int, workers: int,
     the warm-up takes no draw, so an arm with it on and an arm with it off
     share every stream position, including the level's, and the difference
     between them is one change on one random world."""
-    jobs = [(1000 + i, names, sessions, overrides) for i in range(rosters)]
+    # LEVEL_ON, as `_engine` passes it: on the recomposed pt-v19 the level
+    # never enters its stationary-opening arm, so without it both arms are
+    # the same engine and the control below can never see the defect.
+    jobs = [(1000 + i, names, sessions, {**LEVEL_ON, **overrides})
+            for i in range(rosters)]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         rows = list(pool.map(_window_log_variance, jobs))
     h1 = [r[0] for r in rows]

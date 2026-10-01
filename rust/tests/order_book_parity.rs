@@ -219,6 +219,7 @@ fn matches_the_reference_across_a_replayed_program() {
                         limit_price: limit_price.as_deref().map(f),
                         post_remainder: post_remainder.unwrap_or(false),
                         order_id: order_id.clone(),
+                        skip_own: false,
                     },
                 );
             }

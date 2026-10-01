@@ -60,7 +60,8 @@ pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 /// out, for the reason `rng::stream::COUNT` gives.
 pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
 pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
-pub const COMPONENT_COUNT: usize = OVERNIGHT_SLOT + 1;
+pub const FAIR_VALUE_SLOT: usize = OVERNIGHT_SLOT + 1;
+pub const COMPONENT_COUNT: usize = FAIR_VALUE_SLOT + 1;
 
 /// A name's loading on its sector factor, from its beta (§108).
 ///
@@ -400,6 +401,29 @@ pub const S_COMPONENT_KEYS: [&str; 8] = [
     "circuit_breaker",
 ];
 
+/// The fair-value shift's name: minus the part of a move's shocks that went
+/// to the name's fair value for good instead of its mispricing, under
+/// `fair_value_news_share` and `fair_value_market_share` (pt-v20). The other
+/// factors report the whole shock, which is what moved the PRICE; this one
+/// takes the permanent part back out of `s`, so every factor together sums
+/// to the change in `mispricing_s`, and every factor but this one to the
+/// change in `s` plus the fair-value level, the price's own move at a fixed
+/// valuation. Exactly zero on every preset through pt-v19. The last factor,
+/// so every earlier one keeps its position.
+pub const FAIR_VALUE_COMPONENT_KEY: &str = "fair_value_shift";
+
+/// The tick's own rows: the eight `S_COMPONENT_KEYS`, then the tick's
+/// fair-value shift at [`TICK_FAIR_VALUE`].
+pub const TICK_COMPONENT_COUNT: usize = S_COMPONENT_KEYS.len() + 1;
+
+/// The fair-value shift's index in a tick row.
+pub const TICK_FAIR_VALUE: usize = S_COMPONENT_KEYS.len();
+
+/// The attribution slot a tick row's index `k` accumulates into.
+pub const fn attribution_slot_for_tick(k: usize) -> usize {
+    if k == TICK_FAIR_VALUE { FAIR_VALUE_SLOT } else { k }
+}
+
 /// Total impact coefficient for order flow, before the informed fraction.
 pub const ORDER_FLOW_COEFFICIENT: f64 = 50.0;
 
@@ -584,6 +608,12 @@ pub struct FactorCompany {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LiveFactors {
     pub company_news: f64,
+    /// The part of `company_news` from MARKET-WIDE events (no company, no
+    /// sector), as against the company's own news, a peer's or its
+    /// sector's. A copy of the last branch's sum, written beside it, so
+    /// nothing on the price path is re-associated; read only when
+    /// [`crate::params::ModelParams::fair_value_news_share`] is non-zero.
+    pub company_news_market: f64,
     pub order_flow_impact: f64,
     pub short_squeeze_effect: f64,
     pub random_noise: f64,
@@ -601,6 +631,12 @@ pub struct LiveFactors {
     /// [`crate::params::ModelParams::garch_innovation_commensurate`] is
     /// non-zero.
     pub noise_market: f64,
+    /// The name's plain loading on the tick's market draw, `beta * F`: the
+    /// part of `noise_market` before the down-tick tilt, the lagged wire,
+    /// the crisis injection, the crash amplifier and the recentring. Zero
+    /// mean by construction. Read only under
+    /// [`crate::params::ModelParams::fair_value_market_linear`].
+    pub noise_market_linear: f64,
     pub noise_sector: f64,
     pub noise_idio: f64,
     /// The scale the idiosyncratic draw above was taken at, with the name's
@@ -726,6 +762,7 @@ pub fn calculate_live_factors(
     // through the peer arm, which is off in every shipped preset — so
     // before pt-v4 an event with a companyId moved exactly one name.
     let mut company_news = 0.0;
+    let mut company_news_market = 0.0;
     for event in news {
         let impact = truthy(event.price_impact);
         if event.company_id.as_deref() == Some(company.id.as_str()) {
@@ -779,6 +816,7 @@ pub fn calculate_live_factors(
             company_news += impact * params.news_sector_weight;
         } else if event.company_id.is_none() && event.sector.is_none() {
             company_news += impact * params.news_market_weight;
+            company_news_market += impact * params.news_market_weight;
         }
     }
 
@@ -1060,6 +1098,19 @@ pub fn calculate_live_factors(
             * shared.market_sigma_tick
             / SQRT_TWO_PI
     };
+    // The lagged wire multiplied the tilt by `1 + lag` on this session, so
+    // its mean is `1 + lag` times what the line above gives back
+    // (`market_beta_down_asym_lag_recentre`). The same condition the wire
+    // itself reads, and a branch, so 0.0 is the arithmetic that stood.
+    let tilt_recentre = if params.market_beta_down_asym_lag_recentre == 0.0
+        || params.market_beta_down_asym_lag == 0.0
+        || !shared.prev_day_down
+    {
+        tilt_recentre
+    } else {
+        tilt_recentre
+            * (1.0 + params.market_beta_down_asym_lag_recentre * params.market_beta_down_asym_lag)
+    };
     let random_noise =
         market_component * crash_amplifier + tilt_recentre + sector_component + idiosyncratic_noise;
     // The same three terms kept apart, written AFTER the sum so the sum
@@ -1155,12 +1206,24 @@ pub fn calculate_live_factors(
         short_squeeze_effect += buy_cascade;
     }
 
+    // `cascade_gain` scales the whole forced-flow term -- the squeeze and
+    // both stop ladders -- which reacts to the name's own previous day and
+    // is therefore a daily momentum in the model price. A branch at 1.0, so
+    // every preset through pt-v19 is bit-identical.
+    let short_squeeze_effect = if params.cascade_gain == 1.0 {
+        short_squeeze_effect
+    } else {
+        short_squeeze_effect * params.cascade_gain
+    };
+
     LiveFactors {
         company_news,
+        company_news_market,
         order_flow_impact,
         short_squeeze_effect,
         random_noise,
         noise_market,
+        noise_market_linear: beta * shared.market_factor,
         noise_sector,
         noise_idio,
         noise_idio_unit,
@@ -1659,8 +1722,9 @@ mod tests {
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
             // pt-v18 switched the recentring on; pt-v19 is built on pt-v18
-            // and inherits it. Every preset before pt-v18 must read 0.0.
-            if *name == "pt-v18" || *name == "pt-v19" {
+            // and pt-v20 on pt-v19, and both inherit it. Every preset before
+            // pt-v18 must read 0.0.
+            if *name == "pt-v18" || *name == "pt-v19" || *name == "pt-v20" {
                 assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
                 continue;
             }

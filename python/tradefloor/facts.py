@@ -17,15 +17,17 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days the default preset, pt-v19, holds all fourteen shape
+**At 252 days the default preset, pt-v20, holds all fourteen shape
 statistics in band on the ruled bands `envelope.score` grades with, and at
 504 days all thirteen the ruled 504-day table can read**
 (`corr_persistence_acf1` is unreadable there). On the 2015-2025 decade bands
-of `REAL_MARKETS` one row is out at both horizons: `sector_excess_corr`,
-0.0904 at 252 days and 0.0906 at 504 against a floor of 0.11. The committed
-record `python/tradefloor/presets/pt-v19.json` is what says so and
-`tests/test_preset_records.py` holds `envelope.CERTIFIED` and
-`MEASURED_504` to it. This headline named pt-v16's record and read "all
+of `REAL_MARKETS` every shape row is in at both horizons, and the closest to
+its edge is `sector_excess_corr`, 0.1112 at 504 days against a floor of
+0.11. The committed record `python/tradefloor/presets/pt-v20.json` is what
+says so and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
+`MEASURED_504` to it. This headline named pt-v19 until 0.8.5, whose
+`sector_excess_corr` was out on the decade bands at both horizons, 0.0904
+at 252 days and 0.0906 at 504. It named pt-v16's record and read "all
 fourteen" at both horizons until 2026-09-23, which was pt-v16 on the decade
 bands. It read "thirteen at 504, the one that
 misses is `volume_change_acf1`" until 2026-09-05: that described pt-v10 and
@@ -72,12 +74,15 @@ engine is additive in log returns and keeps that convention instead, and
 the two differ by half the cross-sectional variance. See
 `_index_drift_pct`.
 
-A TWENTIETH GRADED ROW landed on 2026-09-22, `crisis_sector_dispersion`:
+A NINETEENTH GRADED ROW landed on 2026-09-22, `crisis_sector_dispersion`:
 in a crisis, how much more the hardest-hit sector moves than the typical
 one. It is in `DISPERSION` and in neither `SHAPE` nor `REAL_MARKETS`,
 because its ruler is the whole tape and the decade panel carries no
 reading for it -- so the fourteen above are untouched and the RULED basis
-now grades twenty rows at two horizons, forty cells. `crisis_dispersion`
+now grades nineteen rows (fourteen `SHAPE`, one `LEVEL`, three `CRISIS`
+and this one) at two horizons, thirty-eight cells. Until 0.8.5 this
+paragraph said twentieth, twenty and forty, which no list here adds up to.
+`crisis_dispersion`
 is the estimator, run by the same code on the tape
 (`REAL_CRISIS_DISPERSION_WINDOWS`) and on the model
 (`crisis_statistics`), and a window holding fewer than thirty crisis
@@ -118,9 +123,10 @@ reproduces them to about a percent (annualised volatility 41.1 against the
 41.5 below, return autocorrelation +0.244 against +0.249, volume-change
 autocorrelation -0.448 against -0.446), and pt-v1 is still selectable and
 still reads that way. Several of the failures they describe are closed at
-the shipped pt-v19: return autocorrelation reads -0.013, annualised
-volatility 22.8%, lag-one clustering 0.049 and volume-change
-autocorrelation -0.279, all in band. Read `envelope.CERTIFIED` or
+the shipped pt-v20: return autocorrelation reads +0.013, annualised
+volatility 20.1%, lag-one clustering 0.034 and volume-change
+autocorrelation -0.258, all in band (pt-v19: -0.013, 22.8%, 0.049 and
+-0.279). Read `envelope.CERTIFIED` or
 `tradefloor.preset_record()` for the shipped preset's figures.
 
 ## What lands
@@ -225,7 +231,8 @@ factor's variance was funded rather than added, and still above the
 band for a reason about how a universe is generated rather than about
 the price process: a generated roster is deliberately dispersed and
 skews small, which the mega-cap reference biases against, and the real
-crisis year read 45. Prefer ratios -- capture against the oracle,
+crisis year read 45. Prefer relative figures -- P&L over buy-and-hold's,
+capture against the Oracle where it is a ceiling (pt-v19 and before),
 shortfall in basis points -- over raw percentages.
 
 **Volume shocks do not persist, by construction.** Volume CHANGES
@@ -381,6 +388,7 @@ import statistics
 import textwrap
 from typing import Any, Iterable, Mapping, Sequence
 
+from ._arith import ordered_sum
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
 
@@ -2161,9 +2169,13 @@ SEED_SD = {
     "abs_return_acf5": 0.0567399,
     "abs_return_acf20": 0.0467066,
     "cross_sectional_corr": 0.108444,
-    "volume_abs_return_corr": 0.0415843,
+    # The two volume rows were re-measured on 2026-09-30, on the same
+    # protocol and seeds, when 0.8.5 fixed the day bar's volume (see
+    # `SEED_SD_PROVENANCE["volume_rows"]`). They read 0.0415843 and
+    # 0.0107678 on the day bars before the fix.
+    "volume_abs_return_corr": 0.0143240,
     "leverage_effect": 0.0769232,
-    "volume_change_acf1": 0.0107678,
+    "volume_change_acf1": 0.0119299,
     # These four joined the table on 2026-08-25 on the same protocol as the
     # rest of it. A first draft measured three of them on pt-v3 with the
     # population estimator and was caught by the test that re-derives this
@@ -2263,9 +2275,12 @@ SEED_SD_504 = {
     "abs_return_acf5": 0.04497743519,
     "abs_return_acf20": 0.03579083816,
     "cross_sectional_corr": 0.06981599524,
-    "volume_abs_return_corr": 0.01899405944,
+    # Re-measured 2026-09-30 with the day bar's volume fixed in 0.8.5; they
+    # read 0.01899405944 and 0.008456262085 before. See
+    # `SEED_SD_PROVENANCE["volume_rows"]`.
+    "volume_abs_return_corr": 0.008705719391,
     "leverage_effect": 0.05607850586,
-    "volume_change_acf1": 0.008456262085,
+    "volume_change_acf1": 0.00708637409,
     "corr_asymmetry": 0.1349171341,
     "corr_asymmetry_lagged": 0.09982258299,
     "sector_excess_corr": 0.004748081416,
@@ -2388,6 +2403,29 @@ SEED_SD_PROVENANCE = {
                                  "SEED_SD_504 was, on 2026-09-06, by the "
                                  "protocol above with the horizon changed "
                                  "and nothing else.",
+    # The day bar's volume was the sum of the day's running totals until
+    # 0.8.5, about two hundred times the day's volume and weighted toward
+    # the open, and both volume rows read it. The bar now holds the day's
+    # volume. The other twelve rows read no volume and reproduced to the
+    # committed tables' precision on all thirty seeds at both horizons.
+    "volume_rows": {
+        "date": "2026-09-30",
+        "rows": ("volume_abs_return_corr", "volume_change_acf1"),
+        "reason": "Engine.bars() bar volume fixed in 0.8.5: a bar's volume "
+                  "is the running total at its last tick minus the total "
+                  "before its first",
+        "protocol": "unchanged: pt-v1, the committed panel roster, seeds "
+                    "101-130, 252 and 504 days, sample sd",
+        "before_252": {"volume_abs_return_corr": 0.0415843,
+                       "volume_change_acf1": 0.0107678},
+        "before_504": {"volume_abs_return_corr": 0.01899405944,
+                       "volume_change_acf1": 0.008456262085},
+        "median_252": {"volume_abs_return_corr": (0.5727, 0.7611),
+                       "volume_change_acf1": (-0.4484, -0.4390)},
+        "median_504": {"volume_abs_return_corr": (0.6035, 0.7595),
+                       "volume_change_acf1": (-0.4371, -0.4293)},
+        "median_note": "thirty-seed medians at pt-v1, before and after",
+    },
 }
 
 #: The provenance of the `SEED_SD` entries measured on `LEVEL_PROTOCOL`
@@ -2517,7 +2555,7 @@ def level_ar1(series: Sequence[float]) -> float:
             f"a lag-one autocorrelation needs at least three observations, "
             f"got {len(values)}")
     mean = statistics.fmean(values)
-    if sum((v - mean) ** 2 for v in values) == 0.0:
+    if ordered_sum((v - mean) ** 2 for v in values) == 0.0:
         raise ValidationError(
             "a constant series has no lag-one autocorrelation, and 0.0 -- "
             "which `_autocorrelation` returns for one -- would enter a "
@@ -3272,8 +3310,8 @@ def aggregate_panels(panels: Sequence[Mapping[str, Any]],
             sessions = [p.get(session_key) for p in panels]
             if (all(h is not None for h in hits)
                     and all(n is not None for n in sessions)
-                    and sum(sessions)):
-                out[key] = 100.0 * sum(hits) / sum(sessions)
+                    and ordered_sum(sessions)):
+                out[key] = 100.0 * ordered_sum(hits) / ordered_sum(sessions)
             continue
         present = [p[key] for p in panels if p.get(key) is not None]
         if present:
@@ -3374,10 +3412,10 @@ def _autocorrelation(series: Sequence[float], lag: int) -> float:
     if len(series) <= lag + 1:
         return 0.0
     mean = statistics.mean(series)
-    variance = sum((x - mean) ** 2 for x in series)
+    variance = ordered_sum((x - mean) ** 2 for x in series)
     if variance == 0:
         return 0.0
-    return sum(
+    return ordered_sum(
         (series[i] - mean) * (series[i - lag] - mean)
         for i in range(lag, len(series))
     ) / variance
@@ -3400,7 +3438,7 @@ def _unit_centred(series: Sequence[float]) -> list[float] | None:
     """
     mean = statistics.mean(series)
     centred = [x - mean for x in series]
-    norm = math.sqrt(sum(x * x for x in centred))
+    norm = math.sqrt(ordered_sum(x * x for x in centred))
     if norm == 0:
         return None
     return [x / norm for x in centred]
@@ -3418,7 +3456,7 @@ def _correlation(a: Sequence[float], b: Sequence[float]) -> float | None:
     unit_a, unit_b = _unit_centred(a[:n]), _unit_centred(b[:n])
     if unit_a is None or unit_b is None:
         return None
-    return sum(x * y for x, y in zip(unit_a, unit_b))
+    return ordered_sum(x * y for x, y in zip(unit_a, unit_b))
 
 
 def _zumbach_terms(
@@ -3774,7 +3812,7 @@ def _index_drift_pct(
     if not by_day:
         return None
     daily = [math.log(statistics.mean(values)) for values in by_day.values()]
-    return sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
+    return ordered_sum(daily) / len(daily) * TRADING_DAYS_PER_YEAR * 100.0
 
 
 #: Window, in sessions, for the correlation-persistence diagnostic. The
@@ -3843,7 +3881,7 @@ def _dependence(
             for b in keys[position + 1:]:
                 if unit[b] is None:
                     continue
-                rho = sum(x * y for x, y in zip(unit[a], unit[b]))
+                rho = ordered_sum(x * y for x, y in zip(unit[a], unit[b]))
                 pairwise.append(rho)
                 if sectors is not None and a in sectors and b in sectors:
                     (same_sector if sectors[a] == sectors[b] else cross_sector).append(rho)
@@ -3870,7 +3908,8 @@ def _dependence(
                     for b in live[position + 1:]:
                         if sub[b] is None:
                             continue
-                        rhos.append(sum(x * y for x, y in zip(sub[a], sub[b])))
+                        rhos.append(ordered_sum(
+                            x * y for x, y in zip(sub[a], sub[b])))
                 return statistics.fmean(rhos) if rhos else None
 
             if m_sd > 0:
@@ -4024,11 +4063,15 @@ def measure(
 ) -> dict[str, Any]:
     """Run a market and report its statistical properties.
 
-    Ten statistics against `REAL_MARKETS`: two marginal, describing one
-    return series on its own, and eight dependence, describing how things
-    move together -- across time, across stocks, with volume, and
-    asymmetrically with their own sign. The split is the finding, so
-    `report` prints it in two sections.
+    Eighteen statistics against `REAL_MARKETS`: the fourteen of `SHAPE`
+    (two marginal, describing one return series on its own, and twelve
+    dependence, describing how things move together -- across time, across
+    stocks, with volume, and asymmetrically with their own sign), the
+    `LEVEL` row and the three `CRISIS` rows. With `crisis_sector_dispersion`,
+    which `crisis_statistics` reads, they are the nineteen rows the one-year
+    realism table grades. This docstring said ten until 0.8.5, the count
+    before the panel grew; the marginal-dependence split is still the
+    finding, so `report` prints it in two sections.
 
     ``model`` selects the coefficient set the market runs, either a preset
     name or a :class:`tradefloor.ModelParams`, defaulting to the shipped preset. This
@@ -4331,7 +4374,7 @@ def _excess_kurtosis(values: Sequence[float]) -> float | None:
     if sd == 0:
         return None
     standard = [(x - mean) / sd for x in values]
-    return sum(x ** 4 for x in standard) / len(standard) - 3.0
+    return ordered_sum(x ** 4 for x in standard) / len(standard) - 3.0
 
 
 def crisis_dispersion(
@@ -4558,8 +4601,9 @@ def panel_statistics(
         "instruments": count,
         "observations": len(pooled),
         "annualised_vol_pct": sd * math.sqrt(252) * 100.0,
-        "excess_kurtosis": sum(x ** 4 for x in standard) / len(standard) - 3.0,
-        "skew": sum(x ** 3 for x in standard) / len(standard),
+        "excess_kurtosis": (ordered_sum(x ** 4 for x in standard)
+                            / len(standard) - 3.0),
+        "skew": ordered_sum(x ** 3 for x in standard) / len(standard),
         # Medians across instruments, not a pooled series. Splicing sixty
         # histories end to end would measure the joins.
         "return_acf1": statistics.median(return_acf1),
@@ -6458,8 +6502,8 @@ def binomial_two_sided(n: int, k: int) -> float:
     if n < 1 or not 0 <= k <= n:
         raise ValidationError(f"need 0 <= k <= n and n >= 1, got k={k}, n={n}")
     total = 2 ** n
-    upper = sum(math.comb(n, j) for j in range(k, n + 1)) / total
-    lower = sum(math.comb(n, j) for j in range(0, k + 1)) / total
+    upper = ordered_sum(math.comb(n, j) for j in range(k, n + 1)) / total
+    lower = ordered_sum(math.comb(n, j) for j in range(0, k + 1)) / total
     return min(1.0, 2.0 * min(upper, lower))
 
 

@@ -50,6 +50,19 @@ CASE = dict(size=12, universe_seed=7, seed=3, days=5, ticks=65,
 EXPECTED = "1c5acabf07692228c840518b51240abe0e379fdd5272b9a4575206e8f93159ea"
 
 
+#: The same probe on 64-bit seeds (0.8.5): the widest universe seed and a
+#: simulation seed with its top bit set, on a frozen preset. The browser
+#: takes these as BigInts, since a JavaScript Number holds integers exactly
+#: only to 2**53 - 1; `tools/wasm/check.mjs` passes `2n ** 64n - 1n` and
+#: `2n ** 63n + 12345n` and compares against this value.
+#:
+#: Measured on macos-arm64 native and on wasm32-unknown-unknown through
+#: node, wasm-bindgen 0.2.129, identical, on 2026-09-25.
+HIGH_CASE = dict(size=12, universe_seed=2**64 - 1, seed=2**63 + 12345,
+                 days=5, ticks=65, preset="pt-v19")
+HIGH_EXPECTED = "415ebce7634bff21c3c903f57f6a7b4c728b48d2379b2cb5eeea5f7bc9a16675"
+
+
 def test_the_fixed_simulation_digest_is_stable():
     assert _core.fixed_simulation_digest(**CASE) == EXPECTED
 
@@ -108,3 +121,10 @@ def test_the_probe_simulates_the_market_it_names():
     # same footing as EXPECTED above. They read [483.82, 245.57, 470.59]
     # before, measured on macos-arm64 and reproduced by the wasm build.
     assert [round(p, 2) for p in prices[:3]] == [483.44, 245.73, 470.15]
+
+
+def test_the_probe_on_64_bit_seeds_is_stable():
+    assert _core.fixed_simulation_digest(**HIGH_CASE) == HIGH_EXPECTED
+    # Its low halves alone are a different market: the high bits count.
+    low = dict(HIGH_CASE, universe_seed=2**32 - 1, seed=12345)
+    assert _core.fixed_simulation_digest(**low) != HIGH_EXPECTED

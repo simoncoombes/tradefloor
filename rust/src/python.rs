@@ -12,6 +12,123 @@
 
 use pyo3::prelude::*;
 
+/// The seed range every surface states, in the words its errors use.
+pub const SEED_RANGE: &str = "an integer from 0 to 2**64 - 1 (18446744073709551615)";
+
+/// Read a seed from Python, or refuse it with the range in the message.
+///
+/// Every seed the library takes, simulation, universe or surgery, is a
+/// `u64` from 0.8.5. Before that it was a `u32`, and a larger integer
+/// reached the caller as pyo3's bare `OverflowError: out of range integral
+/// type conversion attempted`, which named neither the argument nor the
+/// range. This is the one place that turns a Python value into a seed, so
+/// every surface refuses the same things in the same words: a negative
+/// integer, one of `2**64` or more, a bool (an `int` to Python, and a bug
+/// in a seed position), and anything that is not an integer at all, a
+/// float included, since `3.7` truncated silently would be a different
+/// market from the one the caller wrote down.
+///
+/// Anything with `__index__` is an integer here, so a numpy integer is
+/// accepted as the `int` it holds.
+pub(crate) fn seed_from(value: &Bound<'_, PyAny>, name: &str) -> PyResult<u64> {
+    let refuse = |what: String| {
+        ValidationError::new_err(format!("{name} must be {SEED_RANGE}, got {what}"))
+    };
+    let shown = || -> String {
+        value.repr().map(|r| r.to_string()).unwrap_or_else(|_| "?".to_string())
+    };
+    let type_name = || -> String {
+        value.get_type().name().map(|n| n.to_string()).unwrap_or_else(|_| "?".to_string())
+    };
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(refuse(format!("{}, a bool", shown())));
+    }
+    match value.extract::<u64>() {
+        Ok(seed) => Ok(seed),
+        Err(e) if e.is_instance_of::<pyo3::exceptions::PyOverflowError>(value.py()) => {
+            Err(refuse(shown()))
+        }
+        Err(_) => Err(refuse(format!("{}, a {}", shown(), type_name()))),
+    }
+}
+
+/// " Did you mean \"x\"? <note>" when `given` differs from one of `valid`
+/// only in case, and nothing otherwise.
+///
+/// Preset and sector names are lower case, and `"PT-V20"` or
+/// `"Technology"` used to be refused with the full list of valid names and
+/// nothing to say that case was the only problem.
+pub(crate) fn case_hint(given: &str, valid: &[&str], note: &str) -> String {
+    match valid
+        .iter()
+        .find(|v| **v != given && v.eq_ignore_ascii_case(given))
+    {
+        Some(v) => format!(" Did you mean {v:?}? {note}"),
+        None => String::new(),
+    }
+}
+
+/// The refusal for a model preset name this build does not ship.
+pub(crate) fn unknown_preset(name: &str) -> String {
+    let names = crate::params::ModelParams::preset_names();
+    format!(
+        "unknown model preset {name:?}.{} Shipped presets: {}",
+        case_hint(name, names, "Preset names are lower case."),
+        names.join(", ")
+    )
+}
+
+/// The first sentence of the refusal for a sector name that is not in the
+/// sector table, with the case hint when that is all that is wrong.
+pub(crate) fn unknown_sector(sector: &str) -> String {
+    format!(
+        "unknown sector {sector:?}.{} Valid sectors: {}",
+        case_hint(sector, &crate::sectors::keys(), "Sector names are lower case."),
+        crate::sectors::keys().join(", ")
+    )
+}
+
+/// A seed argument, read through [`seed_from`] under the name `seed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Seed(pub u64);
+
+impl<'py> FromPyObject<'py> for Seed {
+    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        seed_from(value, "seed").map(Seed)
+    }
+}
+
+/// A keyword argument that tells "left out" from "passed None".
+///
+/// pyo3 reads an `Option` argument's `None` default and a caller's `None`
+/// as the same thing. `Engine` takes `*args` so it can refuse positional
+/// arguments in its own words, which means `seed` and `universe` need a
+/// default to be reachable at all, and this default says nothing was
+/// passed: a missing seed stays a `TypeError`, as it was when the argument
+/// was required, and `seed=None` stays the `ValidationError` that names
+/// the range.
+pub(crate) enum Given<'py> {
+    Missing,
+    Value(Bound<'py, PyAny>),
+}
+
+impl<'py> FromPyObject<'py> for Given<'py> {
+    fn extract_bound(value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        Ok(Given::Value(value.clone()))
+    }
+}
+
+/// Check a seed and return it as an `int`, or raise `ValidationError`.
+///
+/// The Python modules that take a seed before any engine sees it (a
+/// checkpoint, a manifest, a sealed battery, the gym) call this, so their
+/// refusals are the engine's word for word.
+#[pyfunction]
+#[pyo3(signature = (value, name = "seed"))]
+fn check_seed(value: &Bound<'_, PyAny>, name: &str) -> PyResult<u64> {
+    seed_from(value, name)
+}
+
 /// Deterministic seeded random number generator (PCG32 + Box-Muller).
 ///
 /// Two instances constructed with the same `(seed, sequence)` produce the
@@ -39,10 +156,13 @@ impl PyGameRng {
     /// required rather than defaulted: two generators differing only by
     /// sequence are independent, and silently sharing a default would make
     /// "two independent streams" quietly false.
+    ///
+    /// `seed` is any integer from 0 to `2**64 - 1`. Every seed below
+    /// `2**32` gives the stream it gave when the seed was 32-bit.
     #[new]
-    fn new(seed: u32, sequence: u32) -> Self {
+    fn new(seed: Seed, sequence: u32) -> Self {
         Self {
-            inner: crate::GameRng::new(seed, sequence),
+            inner: crate::GameRng::new(seed.0, sequence),
         }
     }
 
@@ -64,6 +184,24 @@ impl PyGameRng {
     /// A boolean that is true with probability `p`.
     fn next_bool(&mut self, p: f64) -> bool {
         self.inner.next_bool(p)
+    }
+
+    /// An independent generator at this one's exact position.
+    ///
+    /// Both continue with the same draws, Box-Muller spare included, and
+    /// neither moves the other. This is what `copy.deepcopy` of an agent
+    /// holding a generator needs, and what `World.fork` does to an agent
+    /// with no `fork()` of its own: until 0.8.5 the copy raised, because a
+    /// native object with no `__deepcopy__` cannot be pickled, so a world
+    /// holding the random baseline could not be forked at all.
+    fn __copy__(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
+        self.__copy__()
     }
 
     fn __repr__(&self) -> String {
@@ -92,11 +230,12 @@ pyo3::create_exception!(
 /// state is in the digest.
 #[pyfunction]
 #[pyo3(signature = (*, size, universe_seed, seed, days, ticks, preset))]
-fn fixed_simulation_digest(size: usize, universe_seed: u32, seed: u32,
+fn fixed_simulation_digest(size: usize, universe_seed: &Bound<'_, PyAny>, seed: Seed,
                            days: usize, ticks: usize, preset: &str)
                            -> PyResult<String> {
+    let universe_seed = seed_from(universe_seed, "universe_seed")?;
     crate::engine::fixed_simulation_digest(
-        size, universe_seed, seed, days, ticks, preset)
+        size, universe_seed, seed.0, days, ticks, preset)
         .ok_or_else(|| ValidationError::new_err(
             format!("unknown preset {preset:?}")))
 }
@@ -131,6 +270,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(fixed_simulation_digest, m)?)?;
     m.add_function(wrap_pyfunction!(check_rate, m)?)?;
+    m.add_function(wrap_pyfunction!(check_seed, m)?)?;
     m.add_function(wrap_pyfunction!(fair_value, m)?)?;
     m.add_function(wrap_pyfunction!(sectors, m)?)?;
     m.add_function(wrap_pyfunction!(step_mispricing_daily, m)?)?;
@@ -159,6 +299,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::python_arrow::fills_stream, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::market_status, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::random_instruments, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::rate_instruments, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::rate_specs, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::sector_volatility, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::sector_daily_sigma, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::stationary_sigma, m)?)?;
@@ -284,10 +426,7 @@ fn fair_value(
     // so transposing two would typecheck, run, and quietly value the company
     // wrong.
     let s = crate::sectors::by_key(sector).ok_or_else(|| {
-        Rejected::new_err(format!(
-            "unknown sector {sector:?}. Valid sectors: {}",
-            crate::sectors::keys().join(", ")
-        ))
+        Rejected::new_err(crate::python::unknown_sector(sector))
     })?;
 
     // Finite floats everywhere, per the validation policy. The core
@@ -561,10 +700,7 @@ fn model_preset(py: Python<'_>, name: Option<&str>) -> PyResult<PyObject> {
     // `Engine::default_model()` so the two cannot drift apart again.
     let name = name.unwrap_or(crate::params::DEFAULT_PRESET_NAME);
     let preset = crate::params::ModelParams::preset(name).ok_or_else(|| {
-        ValidationError::new_err(format!(
-            "unknown model preset {name:?}. Shipped presets: {}",
-            crate::params::ModelParams::preset_names().join(", ")
-        ))
+        ValidationError::new_err(crate::python::unknown_preset(name))
     })?;
     let d = pyo3::types::PyDict::new_bound(py);
     d.set_item("name", name)?;

@@ -124,6 +124,7 @@ from ._core import (
     MispricingState,
     ModelParams,
     ValidationError,
+    check_seed,
     fair_value,
     model_preset,
     sectors,
@@ -228,9 +229,9 @@ _SNAPSHOT_KEYS = (
     # epicentre) and the pin a scenario set (-2 for no pin). All four are
     # the state a run with `crisis_epicentre_extra` off zero carries, and
     # all four read their defaults on every preset before pt-v19. pt-v19
-    # ships the dial at 1.93, so on the default they move whenever the VIX
-    # crosses `crisis_vix_threshold`. This read "on every shipped preset"
-    # until 2026-09-24.
+    # and pt-v20 ship the dial at 1.93, so on the default they move
+    # whenever the VIX crosses `crisis_vix_threshold`. This read "on every
+    # shipped preset" until 2026-09-24.
     "crisis_in_episode", "crisis_sessions_under",
     "crisis_epicentre", "crisis_epicentre_pin",
     "nominal_output_base", "volume_state",
@@ -255,6 +256,24 @@ _SNAPSHOT_KEYS = (
     # called them equal would be overclaiming.
     "pending_jump", "pending_overnight",
 )
+
+#: Snapshot keys the state hash accepts and does not cover. One:
+#: ``session_tick``, the ticks the day has run, which is the tick the book
+#: stamps a fill with. It moves no price, and every snapshot of an open or a
+#: closed day carries a count, so covering it would have moved every leaf
+#: written before it was carried. A restore puts it back, which is what it
+#: is carried for: a fill after a restore is stamped as the original's was.
+_UNHASHED_KEYS = ("session_tick",)
+
+
+def _default_day(day_count: int, market_open: bool) -> int:
+    """The day an engine's label and valuation clock hold when nothing moved
+    them off its counter: ``day_count`` while a session is open, the day just
+    closed after a close, 0 before the first open. The engine's
+    ``default_day``, which decides when a snapshot carries the two."""
+    count = int(day_count)
+    return count if market_open or count == 0 else count - 1
+
 
 #: The generator sequence :func:`verify` draws its sample of days from.
 #: The library's own PCG32 rather than `random`, because a verification is
@@ -399,7 +418,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     the market factor's variance, the volume states, the universe stress, the
     forced-flow budget, the growth term's nominal base, the day's endogenous
     news, the economy in declared order, the central bank and the day
-    counter.
+    counter. After the book come four fields a snapshot carries only when
+    they have moved: the day's label and the valuation's clock where they
+    are not the day the counter gives, the fair-value inputs once
+    ``set_fundamentals`` has changed them, and the variance cascade on a
+    model that runs it.
+
+    The one key it accepts and does not cover is ``session_tick``, the
+    ticks the day has run (:data:`_UNHASHED_KEYS` says why).
 
     ``market_digest`` covers nine columns and the draw count, which is what a
     published result is checked against. This covers the macro chain and the
@@ -455,7 +481,30 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
     # `vix_anchor_memory` off zero; every other snapshot omits it.
-    expected = set(_SNAPSHOT_KEYS) | ({"vix_anchor_slow"} & carried)
+    # So are the rate instruments, only on an engine that holds them, and
+    # the agent-facing book, only once an agent has used it.
+    # From pt-v20 the fair-value levels and the unapplied opening draws are
+    # carried, together, on a model that can move a level.
+    expected = set(_SNAPSHOT_KEYS) | (
+        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z",
+         # Carried only while set: a forced close pending tonight, today's
+         # macro pins the corporate yield reads, and a jump's fair-value
+         # shift waiting for its tape row.
+         "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
+         # Carried only where they are not the day the counter gives, once
+         # `set_fundamentals` has moved them, and on a model that runs the
+         # variance cascade. Hashed after the book, each behind its name.
+         "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # Carried by every snapshot since 0.8.5 and hashed by none: the
+         # ticks the day has run, the tick the book stamps a fill with. See
+         # `_UNHASHED_KEYS`.
+         *_UNHASHED_KEYS}
+        & carried)
+    if ("fair_value_offset" in carried) != ("opening_z" in carried):
+        raise ValidationError(
+            "this snapshot carries one of fair_value_offset and opening_z "
+            "without the other. The engine writes both or neither, so it was "
+            "edited or assembled from two snapshots.")
     if carried != expected:
         missing = sorted(expected - carried)
         extra = sorted(carried - expected)
@@ -502,8 +551,26 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _text(buf, snapshot["model_fingerprint"])
 
     from ._core import Engine  # the attribution width, one slot per factor
-    for name, width in (("attribution", len(Engine.FACTORS)), ("tick_components", 8),
-                        ("tick_fundamental", 1), ("tick_anchor", 1),
+    # The fair-value shift is the last slot of an attribution row and of a
+    # tick row. It is hashed after both, and only for an engine carrying
+    # fair-value offsets (whose snapshot has the "fair_value_offset" key), as
+    # `Engine::state_hash_with_pending` does, so every other engine hashes as
+    # it did before the slot existed.
+    width_a, width_t = len(Engine.FACTORS), 9
+    rows_a = _column(snapshot["attribution"], n * width_a, "attribution")
+    rows_t = _column(snapshot["tick_components"], n * width_t, "tick_components")
+    for i in range(n):
+        for value in rows_a[i * width_a:(i + 1) * width_a - 1]:
+            _f64(buf, value)
+    for i in range(n):
+        for value in rows_t[i * width_t:(i + 1) * width_t - 1]:
+            _f64(buf, value)
+    fv_a = [rows_a[(i + 1) * width_a - 1] for i in range(n)]
+    fv_t = [rows_t[(i + 1) * width_t - 1] for i in range(n)]
+    if ("fair_value_offset" in snapshot or any(fv_a) or any(fv_t)):
+        for value in fv_a + fv_t:
+            _f64(buf, value)
+    for name, width in (("tick_fundamental", 1), ("tick_anchor", 1),
                         # The day's noise split, its idiosyncratic scale and
                         # the pending jump move, hashed here because they sit
                         # beside the accumulators above in the snapshot and
@@ -550,6 +617,29 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot.get("vix_log_level", 0.0))
     if "vix_anchor_slow" in snapshot:
         _f64(buf, snapshot["vix_anchor_slow"])
+    # The aggregate earnings cycle, only on a model with the cycle on, and
+    # then the fair-value levels and the unapplied opening draws, only on a
+    # model that can move a level: `Engine::state_hash`'s order and rule.
+    if "earnings_cycle" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["earnings_cycle"])
+    # The volatility feedback's smoothed exposure, only on a model with both
+    # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
+    if "vix_feedback" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["vix_feedback"])
+    if "fair_value_offset" in snapshot:
+        for name in ("fair_value_offset", "opening_z"):
+            if len(snapshot[name]) % 8:
+                raise ValidationError(
+                    f"snapshot field {name!r} carries {len(snapshot[name])} "
+                    "bytes, which is not a whole number of f64s.")
+        raw = snapshot["fair_value_offset"]
+        for value in _column(raw, len(raw) // 8, "fair_value_offset"):
+            _f64(buf, value)
+        raw = snapshot["opening_z"]
+        values = _column(raw, len(raw) // 8, "opening_z")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the
@@ -560,6 +650,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, float(snapshot.get("crisis_sessions_under", 0)))
     _f64(buf, float(snapshot.get("crisis_epicentre", -1)))
     _f64(buf, float(snapshot.get("crisis_epicentre_pin", -2)))
+    # A forced close pending tonight, and today's macro pins, each only
+    # while set, as the engine hashes them.
+    if snapshot.get("vix_sets_variance_pending"):
+        _flag(buf, True)
+    if snapshot.get("macro_pins_today"):
+        _f64(buf, 7.0)
+        _f64(buf, float(snapshot["macro_pins_today"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -571,6 +668,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                 f"snapshot field {name!r} carries {len(raw)} bytes, which is "
                 "not a whole number of f64s.")
         values = _column(raw, len(raw) // 8, name)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The jump's fair-value shift waiting for its tape row: a key only while
+    # non-empty, and hashed only then.
+    if snapshot.get("pending_fair_value"):
+        raw = snapshot["pending_fair_value"]
+        values = _column(raw, len(raw) // 8, "pending_fair_value")
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
@@ -588,11 +693,22 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _maybe_f64(buf, event["price_impact"])
 
     economy = snapshot["economy"]
-    if set(economy) != set(_ECONOMY_KEYS):
+    # `earnings_cycle` only on a model with the cycle on; hashed above, beside
+    # the other states a dial turns on. `cycle_history` only on a model with
+    # `cycle_publication_lag` set; hashed after the phase, below.
+    # `gdp_publication` only on a model with `gdp_publication_lag` set;
+    # hashed after the history. `unemployment_impulse` only on a model with
+    # `unemployment_adjustment_half_life` set; hashed before it.
+    # `vix_feedback` only with the volatility feedback smoothed; hashed
+    # after `earnings_cycle`.
+    economy_expected = set(_ECONOMY_KEYS) | (
+        {"earnings_cycle", "cycle_history", "gdp_publication",
+         "unemployment_impulse", "vix_feedback"} & set(economy))
+    if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
-            f"missing {sorted(set(_ECONOMY_KEYS) - set(economy))}, unexpected "
-            f"{sorted(set(economy) - set(_ECONOMY_KEYS))}."
+            f"missing {sorted(economy_expected - set(economy))}, unexpected "
+            f"{sorted(set(economy) - economy_expected)}."
         )
     for name in _ECONOMY_FIELDS:
         value = economy[name]
@@ -611,6 +727,42 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     for value in trend:
         _f64(buf, value)
     _text(buf, economy["cycle_phase"])
+    # The published-phase history, oldest first, LENGTH-PREFIXED, only while
+    # `cycle_publication_lag` keeps one: `Engine::state_hash`'s order and rule.
+    if "cycle_history" in economy:
+        history = list(economy["cycle_history"])
+        _u32(buf, len(history))
+        for phase in history:
+            _text(buf, phase)
+    # Unemployment's impulse, only while `unemployment_adjustment_half_life`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "unemployment_impulse" in economy:
+        _f64(buf, economy["unemployment_impulse"])
+    # The published GDP growth figure's state, only while
+    # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
+    # the pending releases LENGTH-PREFIXED, each its day then its figure.
+    if "gdp_publication" in economy:
+        gdp = economy["gdp_publication"]
+        keys = {"published", "quarter", "count", "sum",
+                "pending_days", "pending_values"}
+        if set(gdp) != keys:
+            raise ValidationError(
+                "this snapshot's gdp_publication is not the one the state "
+                f"hash covers: missing {sorted(keys - set(gdp))}, "
+                f"unexpected {sorted(set(gdp) - keys)}.")
+        days, values = list(gdp["pending_days"]), list(gdp["pending_values"])
+        if len(days) != len(values):
+            raise ValidationError(
+                f"this snapshot's gdp_publication has {len(days)} pending "
+                f"release days and {len(values)} pending figures.")
+        _f64(buf, gdp["published"])
+        _i64(buf, gdp["quarter"])
+        _u32(buf, gdp["count"])
+        _f64(buf, gdp["sum"])
+        _u32(buf, len(days))
+        for day, value in zip(days, values):
+            _i64(buf, day)
+            _f64(buf, value)
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):
@@ -658,7 +810,160 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, kind)
         _u64(buf, index)
         _f64(buf, value)
+    # The rate instruments, before the book and only when carried, so every
+    # snapshot of an engine without them hashes as it did before they existed. Each
+    # instrument's state in `_RATE_STATE_FIELDS` order, then the curve state
+    # the book shares.
+    rates = snapshot.get("rates")
+    if rates is not None:
+        _text(buf, "rates")
+        items = list(rates["instruments"])
+        _u32(buf, len(items))
+        for item in items:
+            if set(item) != {"ticker", *_RATE_STATE_FIELDS}:
+                raise ValidationError(
+                    "a rate instrument in this snapshot does not carry the "
+                    f"fields the state hash covers: {sorted(item)}.")
+            _text(buf, item["ticker"])
+            for name in _RATE_STATE_FIELDS:
+                _f64(buf, item[name])
+        _f64(buf, rates["ig_spread"])
+        _f64(buf, rates["last_corporate"])
+        _flag(buf, bool(rates["closed_since_open"]))
+    # The agent-facing book, after the rate instruments, and only when the
+    # snapshot carries it, which is only once an agent has used it.
+    if "book" in snapshot:
+        _book(buf, snapshot["book"])
+    # The day's label and the valuation's clock, each behind its name and
+    # only where it is not the day the counter gives. The engine never
+    # writes one equal to that day, so a snapshot that does was edited, and
+    # hashing it would describe a state no engine holds.
+    usual = _default_day(snapshot["day_count"], snapshot["market_open"])
+    for name in ("current_day", "elapsed_days"):
+        if name in snapshot:
+            day = int(snapshot[name])
+            if day == usual:
+                raise ValidationError(
+                    f"this snapshot carries {name}={day}, which is the day its "
+                    f"day_count and market_open give. The engine writes the "
+                    f"key only when the two differ, so the snapshot was "
+                    f"edited.")
+            _text(buf, name)
+            _i64(buf, day)
+    # The fair-value inputs, once `set_fundamentals` has moved them: every
+    # equity's earnings, book value and revenue growth, NaN where absent.
+    if "fundamentals" in snapshot:
+        block = snapshot["fundamentals"]
+        keys = ("eps", "book_value_per_share", "revenue_growth")
+        if not isinstance(block, dict) or set(block) != set(keys):
+            raise ValidationError(
+                "this snapshot's fundamentals are not the three columns the "
+                f"state hash covers: {sorted(block) if isinstance(block, dict) else block!r}.")
+        columns = [_column(block[k], n, f"fundamentals.{k}") for k in keys]
+        _text(buf, "fundamentals")
+        _u32(buf, n)
+        for i in range(n):
+            for column in columns:
+                _f64(buf, column[i])
+    # The variance cascade's components, on a model that runs it,
+    # LENGTH-PREFIXED as the engine writes them.
+    if "garch_cascade" in snapshot:
+        raw = snapshot["garch_cascade"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'garch_cascade' carries {len(raw)} bytes, "
+                "which is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "garch_cascade")
+        _text(buf, "garch_cascade")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     return hashlib.sha256(bytes(buf)).hexdigest()
+
+
+#: A rate instrument's state in a snapshot, in the order the state hash walks
+#: it. The same list as `RATE_STATE_FIELDS` in `rust/src/python_engine.rs`.
+_RATE_STATE_FIELDS = (
+    "level", "marked_yield", "price", "previous_close", "open", "high", "low",
+    "volume", "avg_volume", "units_outstanding", "maker_inventory",
+    "day_carry", "day_duration", "day_convexity",
+)
+
+
+#: The fields of the snapshot's ``book`` entry, which ``Engine.state_hash``
+#: covers in this order.
+_BOOK_KEYS = ("sequence", "fill_sequence", "taken", "orders", "flow",
+              "fills", "impacts")
+
+#: Values per company in the book's ``taken`` buffer: the maker's bid and
+#: ask consumed, the latent depth's bid and ask consumed, and the maker's
+#: inventory change waiting for its next quote.
+_TAKEN_WIDTH = 5
+
+
+def _book(buf: bytearray, book: dict[str, Any]) -> None:
+    """The agent-facing book's entry, as the engine hashes it."""
+    if set(book) != set(_BOOK_KEYS):
+        raise ValidationError(
+            "this snapshot's book is not the one the state hash covers: "
+            f"missing {sorted(set(_BOOK_KEYS) - set(book))}, unexpected "
+            f"{sorted(set(book) - set(_BOOK_KEYS))}.")
+    _text(buf, "book")
+    _u64(buf, book["sequence"])
+    _u64(buf, book["fill_sequence"])
+    raw = book["taken"]
+    if len(raw) % (8 * _TAKEN_WIDTH):
+        raise ValidationError(
+            f"the book's taken buffer carries {len(raw)} bytes, which is not "
+            f"a whole number of {_TAKEN_WIDTH}-value rows.")
+    rows = len(raw) // (8 * _TAKEN_WIDTH)
+    _u32(buf, rows)
+    for value in _column(raw, rows * _TAKEN_WIDTH, "book.taken"):
+        _f64(buf, value)
+    orders = list(book["orders"])
+    _u32(buf, len(orders))
+    for o in orders:
+        _text(buf, o["order_id"])
+        _text(buf, o["agent"])
+        _text(buf, o["ticker"])
+        _text(buf, o["side"])
+        _f64(buf, o["limit_price"])
+        _f64(buf, o["quantity"])
+        _f64(buf, o["remaining"])
+        _u64(buf, o["sequence"])
+        _text(buf, o["mode"])
+    flow = list(book["flow"])
+    _u32(buf, len(flow))
+    for agent, ticker, bought, sold in flow:
+        _text(buf, agent)
+        _text(buf, ticker)
+        _f64(buf, bought)
+        _f64(buf, sold)
+    fills = list(book["fills"])
+    _u32(buf, len(fills))
+    for f in fills:
+        _text(buf, f["agent"])
+        _text(buf, f["order_id"])
+        _text(buf, f["ticker"])
+        _text(buf, f["side"])
+        _f64(buf, f["quantity"])
+        _f64(buf, f["price"])
+        _text(buf, f["liquidity"])
+        _text(buf, f["counterparty"])
+        _f64(buf, f["reference"])
+        _i64(buf, f["day"])
+        # Not `tick`, which is a label counted from the engine's own open
+        # and restarts at a restore; see `Engine::state_hash`.
+        _u64(buf, f["sequence"])
+    impacts = list(book["impacts"])
+    _u32(buf, len(impacts))
+    for r in impacts:
+        _text(buf, r["agent"])
+        _text(buf, r["ticker"])
+        _f64(buf, r["bought"])
+        _f64(buf, r["sold"])
+        _f64(buf, r["permanent"])
+        _i64(buf, r["day"])
 
 
 
@@ -775,6 +1080,12 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "jump_move", "volume_idio",
                    "sector_variance", "jump_excitation", "sector_day_factor",
                    "pending_jump", "pending_overnight")
+
+#: Byte buffers only some snapshots carry: the fair-value levels and the
+#: unapplied opening draws on a model that can move a level (pt-v20 on), and
+#: the agent-facing book's consumed depth once an agent has used it. Encoded
+#: where present and left out where not.
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,
@@ -1049,6 +1360,13 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
                       for name, buf in snapshot["columns"].items()}
     for name in _LEDGER_BUFFERS:
         out[name] = base64.b64encode(snapshot[name]).decode("ascii")
+    for name in _LEDGER_OPTIONAL_BUFFERS:
+        if name in snapshot:
+            out[name] = base64.b64encode(snapshot[name]).decode("ascii")
+    if "book" in snapshot:
+        book = dict(snapshot["book"])
+        book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
+        out["book"] = book
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
@@ -1062,6 +1380,13 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
                       for name, text in payload["columns"].items()}
     for name in _LEDGER_BUFFERS:
         out[name] = base64.b64decode(payload[name])
+    for name in _LEDGER_OPTIONAL_BUFFERS:
+        if name in payload:
+            out[name] = base64.b64decode(payload[name])
+    if "book" in payload:
+        book = dict(payload["book"])
+        book["taken"] = base64.b64decode(book["taken"])
+        out["book"] = book
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out
@@ -1090,7 +1415,8 @@ class RunManifest:
            strategy: StrategySpec | str | None = None,
            universe_source: Any = None, label: str = "",
            derived_from: Any = None,
-           ledger: "DayLedger | None" = None) -> "RunManifest":
+           ledger: "DayLedger | None" = None,
+           agent_access: dict[str, Any] | None = None) -> "RunManifest":
         """Capture a finished run.
 
         ``universe`` and ``seed`` are passed rather than read off the engine
@@ -1127,6 +1453,17 @@ class RunManifest:
         alone; the leaves and the states stay in the ledger, because a year
         of snapshots at forty names is several megabytes and a manifest is
         meant to be read. :func:`verify` is what the block is for.
+
+        ``agent_access`` records how the run's agents were given the market,
+        when that was not the default read-only view: ``trusted_agents``
+        (handed the live engine), ``hidden_state`` (the labels that declared
+        the capability), ``tampered`` (label to the steps on which agent
+        code changed the market) and ``margin_interest`` (False when the
+        world let its portfolios borrow for free). :meth:`World.manifest`
+        fills it. Absent,
+        the key is not written, so every other document is the one it was.
+        It sits outside ``fingerprints``: it describes the agents, and the
+        market's replay does not depend on it.
         """
         from . import Universe
 
@@ -1201,16 +1538,23 @@ class RunManifest:
             "model": engine.model_fingerprint,
             "order_log": _sha(_canonical(log)),
         }
+        seed = check_seed(seed)
         fingerprints["inputs"] = _sha(_canonical(
-            {"seed": int(seed), **fingerprints}))
+            {"seed": seed, **fingerprints}))
 
         doc = {
             "schema": MANIFEST_SCHEMA,
             "label": label,
             "written_by": {
                 "pretium_version": version(),
+                # The Python version as well, since 0.8.5. The engine does
+                # not depend on it, so a replay of this log does not either;
+                # an agent re-run to regenerate the log does, because the
+                # agent is Python. Manifests written before it was recorded
+                # load and replay the same way.
                 "platform": {"os": _platform.system(),
-                             "machine": _platform.machine()},
+                             "machine": _platform.machine(),
+                             "python": _platform.python_version()},
                 # The FULL preset surface of the model the engine actually
                 # ran, not the build's default, with "name" as its
                 # fingerprint. Embedding the values is what lets a custom
@@ -1219,7 +1563,7 @@ class RunManifest:
                 "model": dict(engine.model_params),
                 "era": {"probe": ERA_PROBE, "digest": era_fingerprint()},
             },
-            "seed": int(seed),
+            "seed": seed,
             "universe": universe_payload,
             "universe_source": universe_source,
             "macro": macro_payload,
@@ -1301,6 +1645,13 @@ class RunManifest:
                 "label": derived_from.label,
                 "entries": entries,
             }
+        if agent_access:
+            try:
+                doc["agent_access"] = json.loads(_canonical(agent_access))
+            except TypeError:
+                raise ValidationError(
+                    "agent_access must be JSON-serialisable: it travels "
+                    "inside the manifest.") from None
         return cls(doc)
 
     def to_json(self) -> str:
@@ -1487,6 +1838,21 @@ class RunManifest:
             f"{recorded['digest'][:12]}... (draws consumed "
             f"{engine.draws_consumed} against {recorded['draws_consumed']}). "
         )
+        python_there = wrote.get("python")
+        python_here = _platform.python_version()
+        if python_there is not None and python_there != python_here:
+            # Named so that it is ruled out rather than chased. Python 3.12
+            # changed float sum(), which is a real cause of two runs of the
+            # same AGENT disagreeing, and a reader who sees two versions here
+            # will suspect it.
+            head += (
+                f"It was written under Python {python_there} and replayed "
+                f"under {python_here}. That does not explain this: a replay "
+                "hands the recorded orders to the engine, which is compiled "
+                "Rust, and no Python arithmetic runs between them. A "
+                "different Python explains a different order log when an "
+                "agent is re-run, which is a different failure. "
+            )
         bisect = (" Bisect with tradefloor.replay(log, ..., until=n): replay "
                   "both to step n and compare, and the first n that differs "
                   "is the operation to look at.")
@@ -1726,6 +2092,14 @@ class RunManifest:
             )
 
     @property
+    def agent_access(self) -> dict[str, Any] | None:
+        """How the run's agents were given the market, or ``None`` for the
+        default read-only view with no privileged agent and no tampering.
+        See :meth:`of`."""
+        recorded = self._doc.get("agent_access")
+        return json.loads(_canonical(recorded)) if recorded else None
+
+    @property
     def day_ledger(self) -> dict[str, Any] | None:
         """The run's per-day commitment, or ``None`` when it has none.
 
@@ -1851,6 +2225,7 @@ class RunManifest:
         checking it here would compare against."""
         doc = self._doc
         wrote = doc["written_by"]
+        python = wrote["platform"].get("python")
         lines = [
             f"run manifest{f' {self.label!r}' if self.label else ''}: "
             f"seed {doc['seed']}, "
@@ -1858,7 +2233,8 @@ class RunManifest:
             f"{doc['result']['days']} days, "
             f"{len(doc['order_log'])} log entries",
             f"  written by tradefloor {wrote['pretium_version']} on "
-            f"{wrote['platform']['os']}-{wrote['platform']['machine']}, "
+            f"{wrote['platform']['os']}-{wrote['platform']['machine']}"
+            f"{f' under Python {python}' if python else ''}, "
             f"model {wrote['model'].get('name')!r}, "
             f"era {wrote['era']['digest'][:12]}...",
             f"  universe: carried "
@@ -1964,8 +2340,13 @@ def _sample_days(count: int, k: int, seed: int) -> list[int]:
     library's generator would do the arithmetic, and its ``sample`` is not a
     published sequence: a verification whose sampled days moved between
     Python versions could not be repeated by the reader it was reported to.
+
+    ``seed`` is any integer from 0 to ``2**64 - 1``. Until 0.8.5 it was masked
+    to its low 32 bits here, so ``2**32 + 5`` drew seed 5's days and ``-1``
+    drew ``2**32 - 1``'s. Every seed below ``2**32`` draws the days it drew;
+    one above now draws its own, and a negative one is refused.
     """
-    rng = GameRng(int(seed) & 0xFFFFFFFF, _VERIFY_STREAM)
+    rng = GameRng(check_seed(seed), _VERIFY_STREAM)
     pool = list(range(count))
     for i in range(k):
         j = i + int(rng.next_int(0, count - 1 - i))

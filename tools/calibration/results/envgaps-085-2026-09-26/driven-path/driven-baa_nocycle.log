@@ -1,0 +1,16 @@
+real {'vix': -0.005, 'credit': 0.39514, 'valuation': 1.27185} corr {'vix': -0.622, 'credit': 0.009, 'valuation': 0.803} sd 0.02358
+pt-v20 beta vix       median -0.00009  range -0.00056 .. +0.00072  real -0.00500  ratio 0.018
+pt-v20 beta credit    median -4.51626  range -7.55728 .. -1.84048  real +0.39514  ratio -11.429
+pt-v20 beta valuation median +0.00357  range -0.08398 .. +0.22986  real +1.27185  ratio 0.003
+pt-v20 corr vix       median -0.009  real -0.622
+pt-v20 corr credit    median -0.092  real +0.009
+pt-v20 corr valuation median +0.002  real +0.803
+pt-v20 sd ratio median 1.139 range 1.062 .. 1.301
+pt-v20 |r| vs VIX median +0.330
+pt-v20 seed 2020 event study: sign agreement 3/6
+    2020-02-19 S&P peak, selloff begins     sim -6.1% real -9.6% yes
+    2020-03-03 Fed emergency cut 50bp       sim +13.9% real -1.4% NO
+    2020-03-16 VIX record close 82.69       sim +2.4% real -7.4% NO
+    2020-03-23 trough, unlimited QE         sim +1.0% real +13.6% yes
+    2020-11-09 vaccine efficacy             sim -3.1% real +3.4% NO
+    2021-11-26 Omicron                      sim +0.9% real +3.2% yes

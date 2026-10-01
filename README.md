@@ -17,10 +17,28 @@ Real market data can't tell you what would have happened if you had traded
 differently, or what caused a move. tradefloor can, because it computed every
 price.
 
+Use it to test how a strategy or an agent handles risk, execution and events.
+It can't tell you whether a price signal has an edge. Good results here do not
+predict real returns: the prices come from a known model, and the model holds
+rules that read only prices to no edge (criteria C4a and C4b in
+[docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)).
+12-1 momentum has a rank IC of -0.003 here against 0.027 in real markets.
+
 ## Documentation
 
 Documentation is at https://tradefloor.dev. It covers install, core
 concepts, the realism envelope, presets, the API and the notebooks.
+
+Three documents in this repository are for anyone publishing with it:
+
+- [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
+  the model as equations, with every coefficient's value on the default
+  preset and where it came from
+- [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md):
+  the named sets of realism statistics, so a count on one page can be
+  matched to a count on another
+- [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
+  which release lines get fixes, and for how long
 
 ## Install
 
@@ -35,20 +53,29 @@ pip install tradefloor
 There are wheels for Linux, macOS and Windows on CPython 3.11+, and no
 dependencies. The same engine is a Rust crate (`cargo add tradefloor`).
 
-The API may change before 1.0. Results will not, because model changes ship
-as a new preset, so a run you cited last month replays the same way this
-month.
+The API may change before 1.0. Model changes ship as new presets, so a market
+with no agent orders in it replays exactly on its named preset in later
+releases. [Seed determinism](#seed-determinism) says what holds for a run
+with agent orders in it.
 
 ## The demo
 
+The examples are in this repository and not in the package, so clone it
+first:
+
 ```
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 python examples/rate-shock/counterfactual.py
 ```
 
 Run an agent in a controlled market, checkpoint the world and fork it, then
 raise rates by 200bps in one branch and compare what the same agent does next.
+The wheel carries the library and not the examples, so the clone is what puts
+the script on disk.
 
-The run takes about two seconds and needs no keys and no network. It prints
+The run takes under five seconds of CPU and needs no keys and no network.
+It prints
 the nine checks that show the two branches started identical, the step at
 which the agent's behavior changed, and the two branches side by side. The
 walkthrough is
@@ -67,28 +94,133 @@ scores = tf.evaluate({"mine": spec}, seed=7, universe=universe, days=10)
 scores["mine"].return_pct            # what it made
 scores["mine"].impact_bps            # what its own footprint cost
 scores["mine"].strategy_fingerprint  # sha256, cite this
+scores["mine"].errors                # each step that raised or was refused
+scores["mine"].sharpe                # annualised, from the daily closes
+scores["mine"].time_in_market        # share of steps holding a position
 ```
 
 That result comes from one random market, so it says as much about the seed
 as about the strategy. `tf.rank` runs many seeds and compares strategies with
 a paired sign test.
 
+Every `evaluate` and `rank` run starts at day 0, so a rule that needs 20
+days of prices would sit out the first 20 days while buy-and-hold is
+invested, which counts against it in the comparison. `history_days=20` runs
+the market for 20 days before day 0 with nobody trading, and
+`obs.history.bars(ticker, last=20)` returns those days' bars at the first
+decision. Each scored day joins the history after its close, and
+`obs.history.macro()` gives the published macro figures for the same days.
+The scored days continue the warmed market, so on the same seed they are
+different days from a run without the warm-up, and the scorecard records
+`history_days`. The reference agents and `StrategySpec` strategies keep
+their own price history and do not read `obs.history`.
+
+Add `tf.baselines.reference_agents()` to the entrants to read a score against
+buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
+agent's P&L less buy-and-hold's. The reference set includes an Oracle that
+reads the model's fair value. On pt-v19 and earlier `tf.capture_ratio(scores)`
+gives each P&L as a fraction of the Oracle's. On pt-v20, the default, it
+returns `{}` and warns why: market moves there mostly stick, so even perfect
+knowledge of fair value leaves little edge, and buy-and-hold is the
+comparison to quote.
+
+## The agent's view
+
+A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
+read-only market view: prices, the public columns, each book, the bars of
+days already recorded (a World run with `record=True`; `tf.evaluate` records
+none), the published macro fields, the curve and which names have news today.
+`obs.history` holds a daily bar per name and the published macro for every
+day the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`,
+and needs no extra package. A bar's close is the day's last print. On
+pt-v20 the market's close then re-marks every name, so the next day starts
+from a different price: 15 bp away at the median on a 20-name roster. A
+broker's daily bar closes at the official close.
+`obs.portfolio` reads the agent's own positions and cannot trade. Forking the
+engine, writing to it and reading the hidden state all raise
+`tf.SandboxError`. The hidden state includes the true business-cycle phase;
+the macro fields carry the phase as published. The gym environment's `env.engine` and
+`env.portfolio` are the same views.
+
+In the mapping `act` returns, a plain number is a market order for that many
+shares, negative to sell. A native Python agent can also return
+`tf.Limit(quantity, price)`, which waits in the book for what does not fill,
+and `tf.Cancel()`. The framework adapters can send all three: an LLM's action
+with a `limit_price` becomes a `tf.Limit`, and `side: "CANCEL"` becomes a
+`tf.Cancel()`. There are no stop, stop-limit or bracket orders, so a stop has to be checked at each
+step: at six steps a day an emulated stop filled a median 26.5 bp past its
+level, 9 bp at 5-minute steps, and 540 bp at the 90th percentile in the
+packaged recession. A trade costs the spread and its impact on the book.
+There are no commissions and no borrow fee on a short. Uninvested cash earns
+nothing by default. A negative cash balance pays the policy rate before each
+close in `tf.evaluate`, `tf.rank` and `World`, which is below a broker's
+margin rate, so leverage up to the default `max_leverage=2.0` costs at least
+that. `margin_interest=False` makes borrowing free, as it was before 0.8.5,
+and `cash_interest=True` pays the policy rate on idle cash.
+
+Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
+Python process, on the same seed, so the first agent can leave the price path
+in a class variable for a later one, and nothing detects it. The read-only
+view guards against accidents, and an agent written to cheat can get round
+it. One way round it is unflagged: `tf.evaluate`'s own frames hold the
+`seed` and the `universe`, an agent can read them through `sys._getframe`,
+build a second `tf.Engine` from them and run it ahead. The copy count does
+not see a newly built engine, so the card says `tampered=False`. To compare
+agents you did not write, or two that might share state, run each in its own
+process.
+
+In a `World` with several agents, orders placed at the same step execute in
+label order, alphabetical, for the whole run. Two identical buyers of 10% of
+a day's volume paid 19.5 to 30.7 bp apart on seeds 1 to 10, the later label
+paying more. Rotate the labels across runs when you compare different agents
+in one market.
+
+The Oracle reads hidden state by declaring `privileged = True`, which gives
+it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for
+research that needs the live engine, and every scorecard says so. Either way
+the harness compares the engine's state hash around each call, and an agent
+that changed the market is scored `tampered` and left out of `tf.rank`. So
+is a sandboxed agent that forked or snapshotted the engine, however it
+reached it.
+[`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
+lists what the view serves and what the check cannot catch. The view and the
+check guard against accident. Agent code runs in the harness's own process, so
+it can reach the engine by walking the interpreter, and a read made that way
+leaves no trace. Run code you do not trust in a separate process, through the
+MCP server.
+
 ## Contents
 
 | | |
 |---|---|
-| `engine.truth()` | why each price moved: ten factors that sum to the move, to 1e-16 |
+| `engine.truth()` | why each price moved: eleven factors that sum to the mispricing's move, to 1e-16 |
 | `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
 | counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| MCP server | twelve read-only tools for a coding agent, scenarios included |
+| MCP server | thirteen read-only tools for a coding agent, scenarios included |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
 Historical data shows that a stock fell. `truth()` also says why, for example
 that 60% of the fall was order flow, and no historical dataset carries that
 label.
+
+The eleven factors sum to the change in mispricing, the log gap between the
+price and the model's fair value. On pt-v20 a shock that sticks is booked
+whole to `random_noise` and then taken back out by `fair_value_shift`, so the
+two move against each other (a per-tick correlation of about -0.75 on one
+seed) and should be read together. `engine.explain(ticker, day)` breaks down
+the move in the printed price instead. An agent scored on explaining moves
+gets an `explanation_accuracy`: the share of days on which it named the
+factor that moved prices most, open to close, summed over every name.
+`fair_value_shift` moves no price and is never that answer. On pt-v20 a
+constant answer scores near the top, because `random_noise` wins almost
+every day: answering it every day scores 0.95 to 1.0. So the scorecard
+carries `explanation_baseline`, what a constant answer scores on the same
+days, and `explanation_edge`, the accuracy minus the baseline, and its repr
+prints the three together. Only the edge means anything. Quote it, or all
+three, and never the accuracy alone.
 
 To drive it from an agent:
 
@@ -118,12 +250,14 @@ reads. The file keeps the shock apart from the knock-on effects you assume
 follow it:
 
 ```
-tradefloor scenario show scenarios/oil_price_spike.yml
+tradefloor scenario show oil_price_spike
 
 Exogenous shocks
+----------------------------------------------------------
   day 50+            commodity.oil            x1.4
 
 Assumed transmission
+----------------------------------------------------------
   day 55..74 ramp    macro.inflation          +1.50pp
   day 55+            macro.corporate_yield    +0.50pp
 ```
@@ -132,70 +266,139 @@ tradefloor does not predict what a war, an election, an oil shock or a
 recession will do to markets. You state the assumptions and it measures how an
 agent behaves under them.
 
-Six scenarios ship with the package, so `Scenario.load` works after a plain
+Seven scenarios ship with the package, so `Scenario.load` works after a plain
 `pip install`. Each one records how big its effect was measured to be. Their
 [source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
 `tradefloor scenario list` names them, and `tradefloor scenario targets`
 lists every target and what each one reaches.
 
+### Bonds
+
+`Universe.random(40, seed=1, bonds=True)` adds three simulated rate indices
+after the equities: `UST2Y` and `UST10Y`, constant-maturity 2-year and
+10-year treasury indices, and `IGCORP`, an investment-grade corporate bond
+index. They are not real securities. Each is priced off the engine's own
+curve, returning `yield / 252 - D * dy + 0.5 * C * dy**2` a day, with
+duration and convexity of 1.9 and 4.6, 8.5 and 84, and 7.0 and 100. They
+trade through the same books, fills, portfolio and tape as the equities, and
+they leave every equity price unchanged. `Scenario.load("curve_shock")` moves
+the whole curve 200 basis points in one day, which takes about 15% off
+`UST10Y`; `tradefloor.baselines.Balanced` is a 60/40 portfolio with a drift
+band. `evaluate(..., cash_interest=True)` pays uninvested cash the policy
+rate, and is off by default. A negative cash balance is charged the policy
+rate in `evaluate`, `rank` and `World` unless you pass
+`margin_interest=False`.
+
 ## Realism
 
-tradefloor checks its market against real ones. `tf.facts.measure()` measures
-19 statistics of a simulated market, such as volatility, fat tails, how much
-stocks move together and how far the VIX jumps after a fall. It compares each
-one with the range real markets show. On the default preset, `pt-v19`, every
-statistic is inside its real range at one year, and every one that can be read
-at two years is inside too. The check runs 30 random seeds and is repeated on
-a second, held-out set of companies. The statistic furthest from real is how
-much stocks in one sector move together beyond the market, 0.090 against a
-real 0.164, which is still inside the range.
+tradefloor checks its market against real ones with three named sets of
+statistics. [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
+lists every member of each, and the counts below refer to them.
 
-Four of the 19 measure levels. An equal-weight portfolio of the stocks gains
-7.6 percent a year, inside a real range of 1.1 to 10.3. On a day the index
-falls 1 percent or more, the VIX rises a median 1.9 points against a real 2.7,
-and on a 3 percent fall it rises 5.4 against 5.7. The index falls 3 percent or
-more on 1.14 percent of days, against 1.21 percent in real markets.
+**The one-year table** has 19 statistics of a simulated market, such as
+volatility, fat tails, how much stocks move together and how far the VIX
+jumps after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
+`tf.facts.crisis_statistics()` the nineteenth, which needs a run with a
+crisis in it. `tf.envelope.score()` compares each with the range real
+markets show over a year. On the default preset, `pt-v20`, all 19 are inside
+their ranges. The check runs 30 random seeds. Fifteen of the statistics are read on one fixed
+set of companies, and that fixed-roster panel is repeated on held-out seeds
+and on a held-out set of companies.
 
-pt-v19 also passes a long-run check. It runs the market for 21 years, 30 times
-over, and replays 2008 and 2020 with the real VIX. Fifteen things a user would
-notice are compared with real markets: how deep crashes go, how long fear
-lasts, how often the VIX is above 30 or below 15, how many bear markets and
-corrections a decade brings, the long-run return, and whether a headline read
-late still pays. pt-v19 passes all fifteen. pt-v18, the previous default,
-passes eight. In the 2008 replay the market falls 41 percent against the real
-57, the VIX is above 30 on 8.1 percent of days against a real 8.2, and the
-index returns 6.3 percent a year over 21 years. The result ships with the
-package as `tf.preset_record()["long_run"]`.
+The 19 of 19 is a verdict on figures pooled over the 30 seeds, the median
+for each shape statistic. One seed's year often misses one or more of the 14
+shape statistics: on seeds 101 to 116 all 14 were in range on 5 of the 16,
+and one seed had 8 of 14. If you run one market per condition, read
+`tf.envelope.intervals()`, which gives each statistic's spread across seeds
+beside its range.
 
-Three things are still off. The worst month of the 2020 replay is about 30
-percent milder than the real one. Over two years the VIX forgets a shock a
-little too fast. With the VIX held at 65 the market is 5.2 times as volatile as
-with it held at 5, against 6.2 times in real markets.
+A shape statistic's range is the median of 35 real one-year windows, plus or
+minus 2.1 times their trimmed standard deviation. That makes it wide, and
+passing it is weak evidence. Volatility clustering shows the gap.
+`abs_return_acf1` reads 0.028 and `abs_return_acf5` 0.019, below the lowest
+of the ten 2015 to 2025 windows in `tf.facts.REAL_MARKETS_WINDOWS` (0.039 and
+0.034), and both pass because their ranges reach lower than those windows do.
+Raising them changes the simulation, so it waits for the next preset.
+
+Four of the 19 describe the index as a whole. An equal-weight index of the
+stocks gains 7.7 percent a year over one year, inside a real range of 1.1 to
+10.3 (pt-v19 gains 7.6). On a day the index falls 1 percent or more, the VIX
+rises a median 1.7 points, inside a real range of 0.39 to 3.03. On a 3
+percent fall it rises 4.3, inside 2.6 to 9.58. The index falls 3 percent or
+more on 0.89 percent of days, against 1.21 percent in real markets.
+
+**The two-year panel** is the fixed-roster panel run for 504 days. Fourteen
+of its 15 statistics have a two-year range, and pt-v20 has all 14 inside.
+
+**The long-run criteria** are 40 rows over 21 years for pt-v20. The check
+runs the market for 21 years, 90 times over, and replays 2008 and 2020 with
+the real VIX. The first 15 rows compare what a user would notice with real
+markets: how deep crashes go, how long fear lasts, how often the VIX is above
+30 or below 15, how many bear markets and corrections a decade brings, the
+long-run return, and whether a headline read late still pays. C4a and C4b ask
+whether a rule that reads only prices can find an edge real markets do not
+have. The other 23 cover the rate indices against real treasury and
+corporate bonds, the earnings cycle, value and momentum signals, timing rules
+on the published macro data, the cost of size in the book, the real 2020-21
+and 2022 macro paths, and the packaged recession. pt-v20 meets all 40.
+pt-v19, the previous default, fails 16 of the 40. Its own record has only
+the first 17 rows and reads 15 of 17, failing C4a and C4b. On pt-v20 the 2008
+replay falls 45 percent against the real 57, the VIX is above 30 on 5.9
+percent of days against a real 8.2, and the index returns 6.4 percent a year
+over 21 years against a real 6.25. The verdicts ship with the package as
+`tf.preset_record()["long_run"]`. The scripts that graded pt-v20, their
+inputs and the grading run's output are in `validation/pt-v20/`, and
+[validation/README.md](https://github.com/simoncoombes/tradefloor/blob/main/validation/README.md) says how to check the grade
+in a second or run it again.
+
+Some rows pass near their edges. A timing rule on the published macro data
+uses 92 percent of its tolerance. The price trough leads the earnings trough
+in the driven 2020 market by 10 sessions against a real 68. The two-year
+yield moves 3.87 basis points a day against a real 5.23. A recession wins
+back 49 percent of its fall in a year against 62 percent in 2009. The index
+has 2.0 bear markets a decade against a real 1.1.
+
+Two things are still off. The worst month of the 2020 replay is about 19
+percent milder than the real one. With the VIX held at 65 the market is 5.1
+times as volatile as with it held at 5, against 6.2 times in real markets
+(pt-v19 5.2).
 
 Each crisis starts in one sector, picked at random. A scenario can pick it for
 you with `Scenario().hold(epicentre="financial_services")`.
 
-Five of the statistics were also used to tune the model, so they were not held
-out for testing.
+pt-v20 keeps pt-v19's coefficients where it does not add a mechanism, and
+those were chosen with a scoring rule over 19 statistics that overlaps the
+one-year table, so that table helped choose them and cannot also serve as a
+held-out test. pt-v20's own dials were chosen against the long-run
+criteria. The held-out checks are the fresh seeds and the fresh set of
+companies.
 
-Five limits are measured and written down:
+These limits are measured and written down. The last column says what would
+close each one. Anything marked "the next preset" changes the simulation, and
+a shipped preset never changes, so those wait for a new one.
 
-| limit | what it means |
-|---|---|
-| horizon | one year is certified against the bands. Longer runs are graded only by the long-run check |
-| volatility memory | it decays too fast |
-| scenario size | the response has the right sign, but one run cannot size it |
-| macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
-| roster | certification used a sector-balanced roster, which no real index is |
+| limit | what it means | closed by |
+|---|---|---|
+| horizon | one year is certified. Two years is graded on the two-year panel, and longer runs only by the long-run criteria | bands derived at longer horizons |
+| volatility memory | weaker than real at every lag: about a quarter of real at lag 1 and a sixth at lag 20 | the next preset |
+| scenario size | a driven scenario moves prices at a quarter to a half of the real size, in the right direction. On the real 2020-21 path the response to the VIX, the credit yield and valuations is 0.27, 0.47 and 0.26 of real AAPL's. Use a scenario to detect a response, and do not read its size as a forecast | the next preset |
+| macro crises | an inflation crisis or a policy crisis needs a scenario to drive it | a scenario |
+| roster | certification used a sector-balanced roster. Four concentrated sector mixes were measured on pt-v19 only, on the shape rows and for up to two years | the same measurement on pt-v20 |
+| opening state | every run on a roster opens at nearly the same VIX (17.66 on the certified roster, whatever the seed), so one-year figures describe years that start calm. For another starting state, run `engine.run_days(n)` and fork from there | the next preset |
+| overnight gaps | each session opens at the last print. The first tick moves with a standard deviation of 0.67% against 2.0% for the whole day, so a position held overnight behind a stop looks safer than it would live | the next preset |
+| intraday | nothing below the 65-minute step is calibrated. One-minute returns have a lag-1 autocorrelation of -0.37 from bid-ask bounce | the next preset |
+| slicing a large order | one sweep of the book follows the square-root law, but an order spread over a day costs far less. Buying 10% of a day's volume in 36 slices costs 0.04 of a daily standard deviation, against 0.15 to 0.3 from published studies of such orders, so a schedule optimiser will overstate the value of trading slowly | the next preset |
+| agent interaction | an agent's temporary impact barely reaches the tape, its permanent impact is linear and fades on the mispricing's half-life, and volume, depth and the background flow ignore it. No liquidity spiral or predatory trading can arise | the next preset |
 
-`tf.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://tradefloor.dev/realism-envelope.html) says
-what each one forbids.
+`tf.envelope.check(horizon_days=...)` refuses a question that falls outside
+a limit, and [the realism envelope](https://tradefloor.dev/realism-envelope.html)
+says what each one forbids.
 
-Good results here do not predict real returns. The prices come from a known
-model, so a strategy that happens to match it will score well here and may
-fail on real data. The market has one venue, no latency, and no other trader
-that adapts to you.
+The model has no factor structure beyond each company's beta and sector.
+There are no style factors, and you cannot supply a covariance matrix.
+Forced selling is switched off on pt-v20, so a crowded trade unwinding, or
+any other correlated deleveraging, cannot be represented. The market has one
+venue, no latency, and no other trader that adapts to you.
 
 ## Seed determinism
 
@@ -204,9 +407,19 @@ for five platforms, runs one fixed simulation on each, and stops if any result
 differs. tradefloor ships its own `exp`, `log`, `pow`, `sin` and `cos`, so
 the system's math library cannot change a result.
 
-`pt-v19` became the default in 0.8.0, replacing `pt-v18`. If you name your
-preset, a run replays exactly, and every preset from `pt-v1` on can still be
-selected.
+`pt-v20` became the default in 0.8.5, replacing `pt-v19`. Every preset from
+`pt-v1` on can still be selected, and a market with no agent orders in it
+replays exactly on its named preset in every later release. Each release
+checks that with a digest per shipped preset.
+
+A run with agent orders in it replays exactly on the same release. Across
+releases the promise is narrower. 0.8.5 changed how an agent's fills reach
+the market, on every preset, so a traded run recorded before 0.8.5 matches up
+to its first trade and differs after it. One traded `evaluate` run has a
+digest from 0.8.5, checked on all five platforms: the reference agents on
+`pt-v20`, with their orders, fills and scorecards.
+[docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
+lists what each digest covers.
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -221,13 +434,13 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
 | [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
 | [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The ten factors that sum to every move |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The eleven factors that sum to the mispricing's move |
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
-| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in ten to twenty seconds and needs `tradefloor[arrow]` |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel the repair uses, with the same path on `pt-v19` at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel the repair uses, with the same path on the default, `pt-v20`, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -268,7 +481,29 @@ model gives a different answer each time. So an adapter records each call
 and its answer, and can replay the recording later without the framework or
 a key. The four examples are in
 [`examples/integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations),
-which says what each framework contributes and what tradefloor keeps.
+which says what each framework contributes and what tradefloor keeps. They
+run from a clone of this repository, because they read recorded runs from its
+`tests/fixtures/`.
+
+To test your own model-calling function this way, two arguments of
+`callable_agent` matter. `postprocess=to_decision` runs
+`to_decision(raw, payload)` on what the function returned, in a live run and
+in a replay, so the parsing, risk checks and sizing written there are tested
+by every replay. The transcript holds the raw response, and code left inside
+the function after the model call runs live only. The callable adapter's
+replay key is the payload, which does not include your system prompt, so
+pass `info=AdapterInfo(framework="callable", instructions_digest=digest(PROMPT))`
+when you record and when you replay. A replay under a different prompt is
+then refused when the adapter is built. Without it the replay runs on the
+old answers. The "Plain Python" section of
+[`examples/integrations/README.md`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/README.md)
+has the whole pattern.
+
+Some things multi-agent research needs are not supported yet. Every agent in a
+`World` starts with the same cash. There is no
+multi-agent Gymnasium environment, and the Gymnasium reward is the step's
+change in net worth in dollars. `Ranking.separation` is a sign test with no
+effect size, and `externalities` does not aggregate across seeds.
 
 ## FinRobot integration
 
@@ -279,13 +514,26 @@ same agent responds. It is the rate-shock demo above with the agent swapped and
 nothing else changed.
 
 ```bash
-pip install "tradefloor[finrobot]"
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 python examples/integrations/finrobot/rate_shock.py            # replays a real recorded run
-python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot
 ```
 
 By default it replays a recorded FinRobot run, which needs no API key, no
-network and no FinRobot install.
+network and no FinRobot install. A plain `pip install tradefloor` runs it on
+any supported Python.
+
+Calling FinRobot itself needs the `finrobot` extra, which installs only on
+Python 3.11. FinRobot declares Python 3.10 and 3.11, and tradefloor needs
+3.11 or later. On 3.12 or 3.13, pip stops with "Could not find a version
+that satisfies the requirement finrobot>=0.1.5". uv installs it anyway,
+outside FinRobot's declared range, and `uv pip check` then reports the
+conflict.
+
+```bash
+pip install "tradefloor[finrobot]"                             # Python 3.11 only
+python examples/integrations/finrobot/rate_shock.py --live     # calls FinRobot
+```
 
 - [`examples/integrations/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.py)
 - [`examples/integrations/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.ipynb)
@@ -300,8 +548,52 @@ To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/
 is that any change to the simulated trajectory is a breaking change, however
 small.
 
-To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
-`RunManifest`.
+## Citing tradefloor
+
+Cite the version you ran and name the preset. The same version can run
+several presets, and results depend on the preset.
+
+```bibtex
+@software{tradefloor,
+  author  = {Coombes, Simon},
+  title   = {tradefloor: a deterministic market simulator with a limit order book},
+  version = {0.8.5},
+  year    = {2026},
+  url     = {https://github.com/simoncoombes/tradefloor},
+  doi     = {10.5281/zenodo.XXXXXXX},
+  note    = {Model preset pt-v20}
+}
+```
+
+The DOI is a placeholder. Zenodo will mint one DOI per release once the
+archive is switched on; until then, cite the version and the URL and leave
+the `doi` line out. [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff)
+carries the same details, and GitHub's "Cite this repository" button reads
+it.
+
+In the text, say which model you used, for example: "tradefloor 0.8.5,
+preset pt-v20, specified in its docs/MODEL.md". To let a reader rerun a
+result, publish its `RunManifest`: it records the version, preset, seed,
+universe, macro state and scenario, and `reproduce()` stops on a mismatch.
+It checks the market and carries no score: its `result` block holds the
+market's `digest`, the number of `days` and `draws_consumed`, and
+`tf.evaluate` and `tf.rank` write no manifest. A published score has to be
+rerun to be checked.
+[docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
+says which release to pin for a long study.
+
+To show a score was not tuned to its seeds, publish `tf.commit(seeds, salt)`
+before the run and the seeds and salt after it. Draw the seeds with
+`secrets.randbits(64)`. `tf.reveal(commitment, seeds, salt)` checks the pair,
+and `tf.sealed_battery(seeds, salt)` builds the fingerprint battery on those
+seeds. `tf.fingerprint.fingerprint(agent)` hashes what an agent ordered
+across that battery's fixed markets, so two versions of an agent, with a
+changed prompt or in another framework, can be checked for whether they
+ordered the same things. It says nothing about which of the two is better.
+The default battery is version 2: seven markets, one per shipped scenario,
+each run 120 days so a day-50 shock has seventy days after it.
+`tf.battery(1)`, the six 60-day markets of earlier releases, still builds,
+and a fingerprint compares only against one taken on the same version.
 
 ## License
 

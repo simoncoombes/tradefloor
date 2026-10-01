@@ -183,6 +183,9 @@ jobs:
           cd "${{ github.workspace }}"
           # test_known_answer.py deliberately does not depend on the golden
           # corpus, so it runs here where that corpus does not exist.
+          # It checks the traded run's digests per agent and per part
+          # (orders, fills, scorecard), so a target that disagrees there
+          # is named down to the agent.
           python -m pytest tests/test_known_answer.py -v
 
       - name: The reproducibility guarantees
@@ -283,13 +286,18 @@ jobs:
             exit 1
           fi
 
-          # Each file now holds THREE digests -- simulation, metadata and the
-          # combined -- so the comparison is per FILE, not per line. Hashing
-          # each file and counting unique hashes asks the right question
-          # ("does every target report the same three?"); concatenating and
-          # `sort -u` would count three distinct digests as three
-          # disagreements and fail on a green run, which is how a gate stops
-          # meaning anything.
+          # Each file now holds SEVEN digests -- the combined, simulation,
+          # metadata, the session with the simulated rate indices, every
+          # shipped preset's own digest combined (tests/known_answer_presets.py,
+          # from 0.8.5), a seed above 2**32 (tests/known_answer_seed64.py,
+          # from 0.8.5), and a traded run through evaluate with the reference
+          # agents' orders, fills and scorecards (tests/known_answer_traded.py,
+          # from 0.8.5) -- so the comparison is per FILE, not per line.
+          # Hashing each file and counting unique hashes asks the right
+          # question ("does every target report the same seven?");
+          # concatenating and `sort -u` would count seven distinct digests
+          # as seven disagreements and fail
+          # on a green run, which is how a gate stops meaning anything.
           unique=$(for f in digests/*.txt; do shasum -a 256 < "$f" | cut -d' ' -f1; done | sort -u | wc -l)
           if [ "$unique" -ne 1 ]; then
             echo
@@ -297,9 +305,10 @@ jobs:
             echo
             echo "This is the failure the libm-only design exists to prevent."
             echo "Do not ship these wheels. Likely causes, in order:"
-            echo "  - a std transcendental reached the source (the grep test"
-            echo "    in mathx_parity should have caught it -- check whether"
-            echo "    it was weakened or its walk stopped being recursive)"
+            echo "  - a std transcendental reached the source (the source test"
+            echo "    in rust/tests/platform_maths.rs should have caught it --"
+            echo "    check whether it was weakened or its walk stopped"
+            echo "    being recursive)"
             echo "  - a build flag enabling float reassociation or FMA"
             echo "    contraction, or target-cpu=native"
             echo "  - a dependency that is not itself deterministic"

@@ -54,30 +54,46 @@ false.
 call that cannot return inside a conversation is not a tool. Atlas stays a
 library API, driven by `tools/calibration/atlas_survey.py`.
 
-**Arbitrary model parameters.** `ModelParams` has 87 settable coefficients
-and a preset fingerprint that makes a result citable. Letting a model
-improvise coefficients produces markets nobody calibrated, reported with
-the authority of a named preset. No tool here takes a preset argument
+**Arbitrary model parameters.** `ModelParams` has over 200 settable
+coefficients and a preset fingerprint that makes a result citable. Letting
+a model improvise coefficients produces markets nobody calibrated, reported
+with the authority of a named preset. No tool here takes a preset argument
 either: every run is the shipped default, named in provenance, and
-selecting another of the twelve is a library call.
+selecting another preset is a library call.
 
 **Anything that writes.** Every tool is read-only and pure: same arguments,
 same bytes, on every platform.
+
+**The live engine, to a strategy.** A strategy here is data, and it runs
+through `evaluate` and `rank` with `trusted_agents=False`, stated at each
+call: it is handed the read-only market view every sandboxed agent gets
+(see `tradefloor.sandbox`), so it cannot read the true business-cycle
+phase, the economy block, the mispricing or the fundamentals, fork the
+market or write it. The `oracle` signal is the one declared exception, and
+its row says `uses_hidden_state`. There is no opt-in: a tool call cannot
+carry the code that would need one. `explain_price_move` and `explain`
+answer the experimenter about a run of their own, after it has run; no
+strategy is running inside them, so they hand no agent anything.
 """
 
 from __future__ import annotations
 
+import functools
+import inspect
 import json
 import struct
 import threading
 import time
 import traceback
+import typing
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import tradefloor as tf
 from tradefloor import baselines, envelope
-from tradefloor.facts import REAL_MARKETS, band_distance
+from tradefloor._arith import ordered_sum
+from tradefloor._core import check_seed
+from tradefloor.facts import REAL_MARKETS
 
 try:
     from mcp.server import MCPServer
@@ -86,6 +102,12 @@ except ImportError as exc:  # pragma: no cover - exercised by the install path
         "The MCP server needs the `mcp` package, which tradefloor does not "
         "depend on by default:\n\n    pip install 'tradefloor[mcp]'\n"
     ) from exc
+
+# pydantic arrives with `mcp`, so it is imported after the check above. It
+# carries the parameter descriptions into each tool's input schema, and it
+# checks a background job's arguments the way the SDK checks a direct call's.
+from pydantic import Field, TypeAdapter  # noqa: E402
+from pydantic import ValidationError as _SchemaError  # noqa: E402
 
 
 # -- limits ----------------------------------------------------------------
@@ -124,17 +146,62 @@ MAX_UNIVERSE = 120
 MAX_STRATEGIES = 8
 MAX_SEEDS = 12
 
-#: The three shipped scenario presets, reachable by name.
+#: Steps per simulated day on `evaluate_strategies` and `rank_strategies`.
 #:
-#: An earlier draft of this module exposed ONLY these, on the stated grounds
-#: that free-form building was "a fluent API over 40-odd engine fields" and
-#: would let a model pin macro state nobody calibrated. Both halves were
-#: wrong. A scenario pins a SHORT, VALIDATED list of macro fields -- eleven
-#: since the intervention framework exposed four the economy already
-#: carried -- not forty; unknown
-#: names are refused with the valid list; and `Scenario` already round-trips
-#: through `to_json`/`from_json`, so it is data in exactly the way a
-#: `StrategySpec` is data.
+#: Every step here is 65 ticks, a minute each (`evaluate`'s default), so six
+#: steps are the whole 390-minute session and each step past the sixth runs
+#: 65 minutes after the close. 22 steps is 1,430 minutes, the most that fits
+#: in a 24-hour day. A run costs time in proportion to days times steps, and
+#: until this cap only days were bounded: `steps_per_day=10**9` on a one-day
+#: call ran until the server was killed, and two such jobs held both job
+#: workers, so every later job was refused.
+MAX_STEPS_PER_DAY = 22
+
+#: The steps per day the day caps were measured at, and the tools' default.
+DEFAULT_STEPS_PER_DAY = 6
+
+
+def _steps_refusal(days: int, steps_per_day: int,
+                   day_cap: int) -> dict[str, Any] | None:
+    """A `_fail` for a steps_per_day the server will not run, else None.
+
+    Days times steps may not exceed `day_cap` days at the default six steps,
+    so a longer day buys fewer of them and a run costs at most what the day
+    cap already allowed.
+    """
+    if not 1 <= steps_per_day <= MAX_STEPS_PER_DAY:
+        return _fail(
+            f"steps_per_day must be 1..{MAX_STEPS_PER_DAY}, got "
+            f"{steps_per_day}. A step is 65 minutes, so "
+            f"{DEFAULT_STEPS_PER_DAY} steps are the whole trading session and "
+            f"{MAX_STEPS_PER_DAY} fill a 24-hour day.")
+    budget = day_cap * DEFAULT_STEPS_PER_DAY
+    if days * steps_per_day > budget:
+        return _fail(
+            f"days x steps_per_day must be at most {budget} "
+            f"({day_cap} days at {DEFAULT_STEPS_PER_DAY} steps), got {days} x "
+            f"{steps_per_day} = {days * steps_per_day}. Ask for fewer days or "
+            f"fewer steps"
+            + ("." if day_cap > MAX_DAYS else
+               f", or use `start_job`, which allows "
+               f"{MAX_DAYS_ASYNC * DEFAULT_STEPS_PER_DAY}."))
+    return None
+
+
+#: The seeds `rank_strategies` runs when none are given, and the count the
+#: job estimate assumes for it.
+DEFAULT_SEEDS = (1, 2, 3, 4, 5, 6)
+
+#: The scenario CONSTRUCTORS reachable by name, each timed by `peak_day`.
+#:
+#: An earlier draft of this module exposed ONLY preset shapes, on the stated
+#: grounds that free-form building was "a fluent API over 40-odd engine
+#: fields" and would let a model pin macro state nobody calibrated. Both
+#: halves were wrong. A scenario pins a SHORT, VALIDATED list of macro fields
+#: (`_macro_fields` reads it from the engine, so no count is written here);
+#: unknown names are refused with the valid list; and `Scenario` already
+#: round-trips through `to_json`/`from_json`, so it is data in exactly the
+#: way a `StrategySpec` is data.
 #:
 #: The reasoning was also inconsistent with this server's whole design. The
 #: caveat engine exists so that questions can be ALLOWED AND LABELLED rather
@@ -142,17 +209,38 @@ MAX_SEEDS = 12
 #: gap for precisely the risk being invoked. Forbidding here while labelling
 #: everywhere else was a rule with no principle behind it.
 #:
-#: `build_scenario` now authors one, and `run_stress_scenario` takes either
-#: a preset name or an authored document.
-SCENARIOS = ("rate_shock", "vix_shock", "vol_shock")
+#: Keyed by the name this server takes, valued by the `Scenario` class
+#: method it calls and the keyword `peak_day` fills. `rate_ramp` calls
+#: `Scenario.rate_shock`, because `rate_shock` is also a shipped document
+#: (`scenarios/rate_shock.yml`) and one name can reach only one of the two.
+#: Until 0.8.5 the document won, so the constructor was listed and could not
+#: be called, and `peak_day` was passed to `vix_shock` under its own name,
+#: which `vix_shock` does not take.
+CONSTRUCTORS: dict[str, tuple[str, str]] = {
+    "vix_shock": ("vix_shock", "at"),
+    "rate_ramp": ("rate_shock", "over"),
+}
+
+#: Names still accepted and no longer listed. `vol_shock` is the library's
+#: deprecated alias of `vix_shock`, and it runs `vix_shock` here.
+_CONSTRUCTOR_ALIASES = {"vol_shock": "vix_shock"}
+
+SCENARIOS = tuple(CONSTRUCTORS)
+
+#: The macro inputs whose extreme states the endogenous economy does not
+#: reach on its own, so a scenario driving one of them earns the envelope's
+#: `macro-range` gap (`envelope.check(macro_regime=True)`). Pinned fields by
+#: `Scenario` name, intervention targets by registry name.
+_REGIME_FIELDS = frozenset({"inflation_rate", "gdp_growth", "cycle"})
+_REGIME_TARGETS = frozenset({"macro.inflation", "macro.growth", "macro.cycle"})
 
 
 def _packaged() -> tuple[str, ...]:
     """The scenario files that ship inside the wheel, by name.
 
     Read from the package rather than listed, so the pack and this server
-    cannot disagree about what exists. Distinct from `SCENARIOS` above, which
-    are CONSTRUCTORS -- shapes built from arguments. These are documents: a
+    cannot disagree about what exists. Distinct from `CONSTRUCTORS` above,
+    which are shapes built from arguments. These are documents: a
     named collection of explicit interventions somebody wrote down, with a
     fingerprint, which is what makes one citable.
     """
@@ -180,21 +268,104 @@ def _fail(msg: str) -> dict[str, Any]:
     return {"ok": False, "error": msg}
 
 
+#: How much of an unexpected exception's text a result carries.
+_CRASH_TEXT = 600
+
+
+def _guarded(fn: Any) -> Any:
+    """Turn an exception that escapes a tool into a `_fail` result.
+
+    The SDK sends a crash to the client as `Error executing tool <name>` and
+    nothing else, which leaves a model nothing to correct. Every input this
+    module expects is refused by name before it gets here. This catches the
+    ones nobody expected, a list where a mapping belongs or a string where a
+    number does, and returns Python's own message so the next call can fix
+    the argument. Only the exception's type and message are sent, never a
+    traceback.
+
+    `functools.wraps` keeps the signature, so the SDK builds the same input
+    schema from the wrapper as from the function.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            text = f"{type(exc).__name__}: {exc}"
+            if len(text) > _CRASH_TEXT:
+                text = text[:_CRASH_TEXT] + "..."
+            return _fail(
+                f"{fn.__name__} could not run on these arguments ({text}). "
+                f"The argument checks did not catch this input, so the "
+                f"message is Python's own. Check each argument against the "
+                f"tool's input schema.")
+    return wrapper
+
+
+def _seed_refusal(**named: Any) -> dict[str, Any] | None:
+    """A `_fail` for the first argument that is not a seed, else None.
+
+    Checked before any engine is built, so a seed outside 0 to 2**64 - 1
+    comes back as a result naming the range rather than as an exception
+    from inside a run. A list is checked entry by entry.
+    """
+    for name, value in named.items():
+        for item in (value if isinstance(value, (list, tuple)) else [value]):
+            try:
+                check_seed(item, name)
+            except tf.ValidationError as exc:
+                return _fail(str(exc))
+    return None
+
+
+def _whole(name: str, value: Any) -> int:
+    """``value`` as an int, or ValueError naming the argument.
+
+    A direct tool call is type-checked against its signature before it gets
+    here. A job's arguments and a universe document are not: they arrive as
+    raw JSON, so ``"abc"``, ``2.5`` or a list would otherwise raise from
+    inside the tool, or run with a float where a count belongs.
+    """
+    try:
+        whole = int(value)
+        exact = whole == value or (isinstance(value, str)
+                                   and value.strip() == str(whole))
+    except (TypeError, ValueError, OverflowError):
+        exact = False
+    if not exact:
+        raise ValueError(f"{name} must be a whole number, got "
+                         f"{repr(value)[:80]}")
+    return whole
+
+
 def _provenance(**extra: Any) -> dict[str, Any]:
     """What is needed to re-run this exact result somewhere else.
 
     Present on every successful result, because a number from a simulator
     without its seed and fingerprints is not a measurement -- it is an
     anecdote, and a model summarising it cannot tell the difference.
+
+    `model_fingerprint` is the default preset's `ModelParams.fingerprint`,
+    the value a scorecard and `Engine.model_fingerprint` record. Until 0.8.5
+    it was read from `tf.model_preset()`, which carries no fingerprint, so
+    every result here sent an empty string. `pretium_version` is the old
+    name of `tradefloor_version`, kept for the 0.8 line so a reader of an
+    earlier result does not break, and due to go in 0.9.
     """
     preset = tf.model_preset()
     return {
+        "tradefloor_version": tf.__version__,
         "pretium_version": tf.__version__,
         "model_preset": preset["name"],
-        "model_fingerprint": preset.get("fingerprint", ""),
+        "model_fingerprint": _preset_fingerprint(preset["name"]),
         "spec_version": tf.SPEC_VERSION,
         **extra,
     }
+
+
+@functools.lru_cache(maxsize=None)
+def _preset_fingerprint(name: str) -> str:
+    return tf.ModelParams.from_preset(name).fingerprint
 
 
 # -- the caveat engine -----------------------------------------------------
@@ -233,38 +404,74 @@ def _nodes(tree: dict[str, Any]) -> int:
     number of nodes rather than as an empty list that could equally mean
     nothing was replayed.
     """
-    return 1 + sum(_nodes(child) for child in tree["children"])
+    return 1 + ordered_sum(_nodes(child) for child in tree["children"])
 
 
-def _statistic_line(name: str) -> str:
+def _statistic_line(name: str, cert: dict[str, Any] | None = None) -> str:
     """One measured statistic against its real-market band, as a sentence.
 
-    Read from `envelope.CERTIFIED` and `facts.REAL_MARKETS` on every call.
-    The numbers move when the preset moves; a sentence typed here would not.
+    Read from `envelope.certified()` on every call: the measured value, the
+    band and the verdict are the envelope's own, on the envelope's own band
+    basis. The numbers move when the preset moves; a sentence typed here
+    would not.
+
+    Until 0.8.5 the band came from `facts.REAL_MARKETS`, the 2015-2025
+    decade table, while `describe_simulator` served the verdicts of the
+    default basis beside it. The two named different bands for the same
+    row, and `crisis_sector_dispersion`, which the decade table does not
+    carry, had no line at all.
     """
-    lo, hi = REAL_MARKETS[name]
-    measured = _certified_value(name)
-    if measured is None:
-        return (f"{name} is graded against a real-market band of {lo:g} to "
-                f"{hi:g} and its certified value has not been measured yet")
-    verdict = "in band" if band_distance(measured, lo, hi) == 0 else "OUT OF BAND"
+    cert = cert if cert is not None else envelope.certified()
+    row = cert["statistics"].get(name)
+    horizon = cert["certified_horizon_days"]
+    if row is None or row.get("measured") is None:
+        return (f"{name} is graded and its certified value has not been "
+                f"measured yet")
+    measured, band, in_band = row["measured"], row.get("band"), row["in_band"]
+    if band is None or in_band is None:
+        return (f"{name} measures {measured:.4g} at the certified "
+                f"{horizon}-day horizon, and the {cert['band_basis']} band "
+                f"basis has no band to grade it on")
+    verdict = "in band" if in_band else "OUT OF BAND"
     return (f"{name} measures {measured:.4g} against a real-market band of "
-            f"{lo:g} to {hi:g} ({verdict}) at the certified "
-            f"{envelope.CERTIFIED_HORIZON_DAYS}-day horizon")
+            f"{band[0]:g} to {band[1]:g} ({verdict}, {cert['band_basis']} "
+            f"basis) at the certified {horizon}-day horizon")
 
 
-def _certified_value(name: str) -> float | None:
-    """The default preset's certified reading of a row, whichever group holds it."""
-    for table in (envelope.CERTIFIED, envelope.CERTIFIED_LEVEL, envelope.CERTIFIED_CRISIS):
-        if name in table:
-            return table[name]
-    return None
+#: Sentences in `envelope.check`'s reasons that tell a LIBRARY caller what
+#: to do, with the text a caller of this server can act on instead. The
+#: roster refusal says to pass the mix's name as `sector_concentrated`, and
+#: no run tool here takes that argument; `check_envelope` does. Replaced by
+#: exact match, so a reworded library sentence passes through unchanged
+#: rather than being half-rewritten, and `test_mcp.py` catches the drift.
+_MCP_ADVICE: tuple[tuple[str, str], ...] = (
+    ("If your roster is one of them, pass its name as `sector_concentrated`. "
+     "Otherwise measure your own roster, since no other mix was measured",
+     "To ask about one of those mixes, call `check_envelope` with its name "
+     "as `sector_concentrated`. No tool here measures a roster of your own. "
+     "That needs the library and tools/calibration/roster_shapes.py in the "
+     "repository"),
+)
+
+
+def _for_this_server(reason: str) -> str:
+    for library, here in _MCP_ADVICE:
+        reason = reason.replace(library, here)
+    return reason
+
+
+def _drives_regime(sc: Any) -> bool:
+    """Whether a scenario pins or shocks inflation, growth or the cycle."""
+    return (bool(_REGIME_FIELDS & set(sc.fields))
+            or any(item.target in _REGIME_TARGETS
+                   for item in sc.interventions))
 
 
 def _caveats(*, days: int, n_seeds: int, signals: set[str],
              max_leverage: float | None, universe_size: int,
              scenario_magnitude: bool = False,
-             sector_concentrated: bool = False) -> list[str]:
+             sector_concentrated: bool = False,
+             macro_regime: bool = False) -> list[str]:
     """The caveats this particular call earns.
 
     Computed, not selected from a list of stock warnings. Each branch below
@@ -282,10 +489,11 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
     # from what the envelope page says.
     v = envelope.check(horizon_days=days,
                        scenario_magnitude=scenario_magnitude,
-                       sector_concentrated=sector_concentrated)
+                       sector_concentrated=sector_concentrated,
+                       macro_regime=macro_regime)
     if not v.inside:
         out.append("Outside the certified realism envelope: "
-                   + "; ".join(v.reasons))
+                   + "; ".join(_for_this_server(r) for r in v.reasons))
 
     # The envelope calls any horizon at or under the certified one "inside",
     # and it is right to -- its gaps are about running LONGER. But that
@@ -328,10 +536,16 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
         )
 
     if "oracle" in signals:
+        # Every tool here runs the default preset, so whether the Oracle is
+        # a ceiling is the default's answer.
         out.append(
             "The `oracle` signal is PRIVILEGED: it reads the simulator's own "
-            "fair value, which no real trader can observe. It is a ceiling "
-            "for measuring capture, never a strategy."
+            "fair value, which no real trader can observe. "
+            + ("It is a ceiling for measuring capture, never a strategy."
+               if baselines.oracle_is_ceiling() else
+               "It is a reference agent, never a strategy, and on this preset "
+               "not a ceiling either: market moves mostly stick, so knowing "
+               "fair value leaves little edge.")
         )
 
     if max_leverage is None:
@@ -355,8 +569,10 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
         )
     else:
         out.append(
-            "The roster is sector-BALANCED, which no real index is -- a "
-            "named gap in the envelope. Pass `sectors` to concentrate it."
+            "The roster is sector-BALANCED, which no real index is, and that "
+            "is a named gap in the envelope. Pass `universe_sectors`, or a "
+            "`universe` from `build_universe` with `sectors`, to "
+            "concentrate it."
         )
     out.append(
         "The market is single-venue with zero latency and no strategic "
@@ -419,6 +635,42 @@ _INSTRUMENT_FIELDS = ("ticker", "sector", "initial_price",
                       "short_interest")
 
 
+def _refuse_unvalued(i: int, inst: Any) -> None:
+    """Refuse an authored row the model can value only at its floor.
+
+    The valuation reads a positive `eps` times a sector P/E, or, for a
+    loss-making company, `book_value_per_share` times a price-to-book
+    multiple. A row with neither (both are optional on `Instrument`) is
+    valued at the fair-value floor of one cent, and the mispricing pulls its
+    price toward that floor every day, as far as the circuit breaker lets
+    it. Measured on a two-name roster (AAA technology at 50, BBB energy at
+    30, nothing else set, seed 7): buy-and-hold lost 26% on day one and the
+    prices kept falling, while the same rows with an `eps` held near their
+    opening prices. The result read as an ordinary day, so the row is
+    refused here with the fix, and the library is left as it is.
+
+    The floor is read from `tf.fair_value` with nothing to value on, rather
+    than typed, and the row is valued the same way.
+    """
+    floor = tf.fair_value(sector=inst.sector).fair_value
+    value = tf.fair_value(eps=inst.eps, sector=inst.sector,
+                          revenue_growth=inst.revenue_growth,
+                          book_value_per_share=inst.book_value_per_share
+                          ).fair_value
+    if value > floor:
+        return
+    given = ", ".join(f"{k}={getattr(inst, k)!r}"
+                      for k in ("eps", "book_value_per_share")
+                      if getattr(inst, k) is not None) or "no eps or book value"
+    raise ValueError(
+        f"instrument {i} ({inst.ticker}): with {given} the model has nothing "
+        f"to value it on, so its fair value is the {floor:g} floor and its "
+        f"price falls toward that floor every day, as far as the circuit "
+        f"breaker allows. Give a positive `eps` (earnings per share, which "
+        f"the valuation multiplies by a sector P/E), or, for a loss-making "
+        f"company, a positive `book_value_per_share`.")
+
+
 def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
     """A universe document to (roster, concentrated, canonical document).
 
@@ -436,11 +688,20 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
 
     rows = doc.get("instruments")
     if rows:
+        # Checked by shape here because the rows reach `tf.Instrument`, whose
+        # binding raises TypeError on a wrong type, and a refusal is a
+        # result: an exception reaches the model as a bare transport error.
+        if not isinstance(rows, list):
+            raise ValueError(f"instruments must be a list of objects, got "
+                             f"{type(rows).__name__}")
         if not 2 <= len(rows) <= MAX_UNIVERSE:
             raise ValueError(
                 f"instruments must number 2..{MAX_UNIVERSE}, got {len(rows)}")
         built = []
         for i, row in enumerate(rows):
+            if not isinstance(row, dict):
+                raise ValueError(f"instrument {i} must be an object, got "
+                                 f"{type(row).__name__}")
             unknown = sorted(set(row) - set(_INSTRUMENT_FIELDS))
             if unknown:
                 raise ValueError(
@@ -453,12 +714,14 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
             kw = {k: v for k, v in row.items()
                   if k not in ("ticker", "sector")}
             try:
-                built.append(tf.Instrument(row["ticker"], row["sector"], **kw))
-            except tf.ValidationError as exc:
+                inst = tf.Instrument(row["ticker"], row["sector"], **kw)
+            except (tf.ValidationError, TypeError) as exc:
                 # The library's messages name the trap -- short_interest is a
                 # SHARE COUNT, not a fraction -- so pass them through whole.
                 raise ValueError(f"instrument {i} ({row['ticker']}): "
                                  f"{exc}") from exc
+            _refuse_unvalued(i, inst)
+            built.append(inst)
         universe = tf.Universe(built)
         counts = {}
         for inst in universe:
@@ -469,9 +732,20 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
         concentrated = len(counts) < max(2, len(tf.sectors()) // 2)
         return universe, concentrated, {"instruments": rows}
 
-    size = int(doc.get("size", 40))
-    seed = int(doc.get("seed", 111))
+    unknown = sorted(set(doc) - {"size", "seed", "sectors", "instruments"})
+    if unknown:
+        raise ValueError(
+            f"a universe document takes size, seed and sectors, or "
+            f"instruments; {unknown} is not one of them")
+    size = _whole("universe size", doc.get("size", 40))
+    seed = check_seed(doc.get("seed", 111), "universe seed")
     sectors = doc.get("sectors")
+    if sectors is not None and (
+            not isinstance(sectors, list)
+            or not all(isinstance(s, str) for s in sectors)):
+        raise ValueError(
+            f"sectors must be a list of sector ids, for example "
+            f"[\"technology\", \"energy\"], got {repr(sectors)[:80]}")
     universe, concentrated = _build_universe(size, seed, sectors)
     return universe, concentrated, {"size": size, "seed": seed,
                                     "sectors": sectors}
@@ -511,21 +785,46 @@ def _normalise(doc: Any) -> tuple[str, bool]:
     return json.dumps(doc), False
 
 
+def _baseline_names() -> tuple[str, ...]:
+    """The entrant names the run tools add beside a caller's strategies."""
+    return tuple(baselines.reference_agents(seed=0))
+
+
 def _specs_from(
     strategies: dict[str, Any],
+    reserved: tuple[str, ...] = (),
 ) -> tuple[dict[str, Any], list[str]]:
     """Turn the wire form into specs, naming the offender on failure.
 
     A model authoring a spec gets the grammar wrong in specific ways, and
     `ValidationError` already says which. Wrapping it with the strategy's
     name is the difference between a fixable error and a retry loop.
+
+    `reserved` names the baselines the calling tool adds to the same
+    market. A strategy under one of those names is refused. The baselines
+    were added with `setdefault`, so until 0.8.5 a strategy called
+    `buy_and_hold` replaced the real buy-and-hold with no message, every
+    `versus_buy_and_hold` figure was then measured against the caller's own
+    strategy, and a strategy called `oracle` vanished from a ranking whose
+    table leaves the oracle row out.
     """
     if not strategies:
         raise ValueError("no strategies given")
+    if not isinstance(strategies, dict):
+        raise ValueError(
+            f"strategies must be an object of name to spec, got "
+            f"{type(strategies).__name__}")
     if len(strategies) > MAX_STRATEGIES:
         raise ValueError(
             f"at most {MAX_STRATEGIES} strategies per call, got "
             f"{len(strategies)}")
+    taken = sorted(set(strategies) & set(reserved))
+    if taken:
+        raise ValueError(
+            f"strategy name(s) {taken} belong to baselines this call runs on "
+            f"the same market ({', '.join(reserved)}), and a strategy under "
+            f"that name would replace the baseline in every comparison. "
+            f"Rename it, for example 'my_{taken[0]}'.")
     built: dict[str, Any] = {}
     assumed: list[str] = []
     for name, doc in strategies.items():
@@ -575,7 +874,224 @@ def _scorecard_row(s: Any) -> dict[str, Any]:
         "rejected": s.rejected,
         "errors": list(s.errors),
         "strategy_fingerprint": s.strategy_fingerprint,
+        # Only when set, so every ordinary row is the row it was. A strategy
+        # here is data and runs sandboxed, so `trusted` never appears; the
+        # oracle, and a blend holding one, read hidden state by declaration.
+        **({"uses_hidden_state": True} if s.uses_hidden_state else {}),
+        **({"tampered": True} if s.tampered else {}),
     }
+
+
+# -- scenario timing -------------------------------------------------------
+
+
+#: How far ahead a macro path is read for the days it changes. Four
+#: certified horizons, which covers every shipped document's timing (the
+#: latest, `recession`, starts its last event on day 680) and a path is a
+#: few closures, so reading it is cheap.
+_PATH_SCAN_DAYS = 4 * envelope.CERTIFIED_HORIZON_DAYS
+
+
+def _path_episodes(sc: Any, days: int) -> list[tuple[int, int, str]]:
+    """When a scenario's macro PATH moves: (first day, last day, what).
+
+    One episode per field per run of consecutive days on which its pinned
+    value changes, so a ten-day ramp is one episode and a step is an
+    episode of one day. Day 0 is left out, since a pin holds its field from
+    the first day and what a reader needs is when the path MOVES. Read from
+    `Scenario.at` rather than from the pins, so a constructor that builds
+    its path in one closure (`vix_shock` spikes on its own `at`) is read the
+    same way as a ramp.
+    """
+    if not sc.fields:
+        return []
+    moves: dict[str, list[int]] = {field: [] for field in sc.fields}
+    before = sc.at(0)
+    for day in range(1, max(days, _PATH_SCAN_DAYS)):
+        now = sc.at(day)
+        for field in sc.fields:
+            if now[field] != before[field]:
+                moves[field].append(day)
+        before = now
+    out: list[tuple[int, int, str]] = []
+    for field, changed in moves.items():
+        run: list[int] = []
+        for day in changed + [None]:
+            if run and (day is None or day != run[-1] + 1):
+                out.append((run[0], run[-1],
+                            f"{field} moves on days {run[0]} to {run[-1]}"
+                            if len(run) > 1 else
+                            f"{field} changes on day {run[0]}"))
+                run = []
+            if day is not None:
+                run.append(day)
+    return sorted(out)
+
+
+def _events(sc: Any, days: int) -> list[tuple[int, int | None, str]]:
+    """What can make shocked and control differ: (start, last day, what).
+
+    The control keeps a scenario's pins whenever it carries interventions
+    (see `run_stress_scenario`), so for such a scenario only the
+    interventions count, each to its `last_day` (None for a permanent
+    one). For a pure macro path the control runs no scenario at all, and
+    the path's episodes are the events.
+    """
+    if sc.interventions:
+        return sorted(((item.at, item.last_day,
+                        " ".join(item.describe().split()))
+                       for item in sc.interventions), key=lambda e: e[0])
+    return [(a, b, what) for a, b, what in _path_episodes(sc, days)]
+
+
+def _run_length_advice(day: int) -> str:
+    """What run length reaches `day`, and which tool can run it."""
+    need = day + 1
+    if need <= MAX_DAYS:
+        return f"Run at least {need} days."
+    if need <= MAX_DAYS_ASYNC:
+        return (f"Run at least {need} days, which is past the {MAX_DAYS}-day "
+                f"cap on a direct call, so use `start_job` (up to "
+                f"{MAX_DAYS_ASYNC} days).")
+    return (f"That needs {need} days, past the {MAX_DAYS_ASYNC}-day cap on a "
+            f"job, so no call here reaches it. `tf.run_scenario` in the "
+            f"library has no cap.")
+
+
+def _listed(events: list[tuple[int, int | None, str]], cap: int = 6) -> str:
+    shown = "; ".join(what for _, _, what in events[:cap])
+    more = f"; and {len(events) - cap} more" if len(events) > cap else ""
+    return shown + more
+
+
+def _timing(sc: Any, name: str, days: int) -> tuple[str | None, list[str]]:
+    """(a refusal or None, caveats) for running `sc` over `days` days.
+
+    Refused when nothing in the scenario happens inside the run: a day-50
+    shock in a 20-day run left shocked and control identical, and until
+    0.8.5 every shipped document, run at the default 20 days, came back
+    `ok` with a difference of 0.0 for every entrant and nothing saying the
+    shock never fired. When some events start after the run, or are still
+    in force when it ends, the result carries a caveat naming them.
+    """
+    events = _events(sc, days)
+    if not events:
+        return None, []
+    inside = [e for e in events if e[0] < days]
+    after = [e for e in events if e[0] >= days]
+    if not inside:
+        first, _, what = after[0]
+        return (
+            f"{name}: its first event is on day {first} ({what}), and a "
+            f"{days}-day run covers days 0 to {days - 1}, so nothing in the "
+            f"scenario would happen and every difference would read 0.0. "
+            f"{_run_length_advice(first)}"), []
+    caveats = []
+    if after:
+        caveats.append(
+            f"{len(after)} of the scenario's {len(events)} events "
+            f"{'starts' if len(after) == 1 else 'start'} after this "
+            f"{days}-day run ends and never "
+            f"{'happens' if len(after) == 1 else 'happen'} here: "
+            f"{_listed(after)}. {_run_length_advice(after[-1][0])}")
+    cut = [e for e in inside if e[1] is not None and e[1] >= days]
+    if cut:
+        caveats.append(
+            f"The run ends on day {days - 1} while "
+            + ("1 event is" if len(cut) == 1 else f"{len(cut)} events are")
+            + f" still under way, so the result covers only the start: "
+            f"{_listed(cut)}. {_run_length_advice(max(e[1] for e in cut))}")
+    return None, caveats
+
+
+# -- tool parameters -------------------------------------------------------
+#
+# Each parameter carries a description into the tool's input schema. Until
+# 0.8.5 none did, and a model had to guess the grammars (a strategy spec, a
+# universe document, a scenario), the caps and the sector spelling. Built
+# at import from the module's own constants and the library's lists, so a
+# cap or a signal kind named here is the one enforced.
+
+_SPEC_EXAMPLE = ('{"signal": {"kind": "momentum", "lookback_days": 1.0}, '
+                 '"portfolio": {"top_k": 5, "gross": 1.0}}')
+
+StrategiesArg = Annotated[dict[str, Any], Field(description=(
+    f"Strategies to run, keyed by a name you choose. Each value is a "
+    f"strategy spec, for example {_SPEC_EXAMPLE}. Signal kinds: "
+    f"{', '.join(tf.spec.SIGNAL_KINDS)}. At most {MAX_STRATEGIES}. The "
+    f"baseline names ({', '.join(_baseline_names())}) are taken. Check a "
+    f"spec with validate_strategy before running it."))]
+SpecArg = Annotated[dict[str, Any], Field(description=(
+    f"One strategy spec, for example {_SPEC_EXAMPLE}. `spec_version` may be "
+    f"left out and is then set to the current version."))]
+SeedArg = Annotated[int, Field(description=(
+    "Simulation seed, an integer from 0 to 2**64 - 1. The same seed and "
+    "arguments give the same result."))]
+SeedsArg = Annotated[list[int] | None, Field(description=(
+    f"Simulation seeds, 2 to {MAX_SEEDS} of them. Every entrant trades the "
+    f"same market on each seed. Omit for {list(DEFAULT_SEEDS)}."))]
+UniverseSizeArg = Annotated[int, Field(description=(
+    f"Names in a generated roster, 2 to {MAX_UNIVERSE}. Ignored when "
+    f"`universe` is given."))]
+UniverseSeedArg = Annotated[int, Field(description=(
+    "Seed that generates the roster, separate from the simulation seed. "
+    "Ignored when `universe` is given."))]
+SectorsArg = Annotated[list[str] | None, Field(description=(
+    f"Lowercase sector ids to concentrate a generated roster on, for "
+    f"example [\"technology\", \"energy\"]. The ids: "
+    f"{', '.join(tf.sectors())}. A concentrated roster is a named envelope "
+    f"gap, and the result says so."))]
+UniverseArg = Annotated[dict[str, Any] | None, Field(description=(
+    "A roster document, usually the `universe` field of a build_universe "
+    "result. Either {\"size\": n, \"seed\": s, \"sectors\": [...]} or "
+    "{\"instruments\": [...]}. When given it replaces universe_size, "
+    "universe_seed and universe_sectors."))]
+DaysArg = Annotated[int, Field(description=(
+    f"Trading days to run: 1 to {MAX_DAYS} in a direct call, up to "
+    f"{MAX_DAYS_ASYNC} (the certified horizon) through start_job."))]
+StepsPerDayArg = Annotated[int, Field(description=(
+    f"Decision points per trading day, 1 to {MAX_STEPS_PER_DAY}. Each entrant "
+    f"is asked for orders at each one. A step is 65 minutes, so "
+    f"{DEFAULT_STEPS_PER_DAY} cover the trading session, and days times steps "
+    f"may be at most {MAX_DAYS * DEFAULT_STEPS_PER_DAY} in a direct call."))]
+CashArg = Annotated[float, Field(description=(
+    "Starting cash for each entrant, in currency."))]
+LeverageArg = Annotated[float | None, Field(description=(
+    "Cap on gross exposure as a multiple of net worth. null removes the "
+    "cap, and the result then warns that trading size alone can win."))]
+BaselinesArg = Annotated[bool, Field(description=(
+    f"Add the baseline agents ({', '.join(_baseline_names())}) to the same "
+    f"market. On by default, because a return means little without "
+    f"buy-and-hold's beside it."))]
+ScenarioArg = Annotated[str | dict[str, Any], Field(description=(
+    "A shipped document by name (list_scenarios lists them with the day "
+    "each one's first event falls on, and the run must be longer than "
+    f"that), a constructor by name ({', '.join(CONSTRUCTORS)}, timed with "
+    "peak_day), or a scenario document from build_scenario."))]
+
+
+def _constructor_default(name: str) -> Any:
+    """The library's default for the keyword `peak_day` fills, or None."""
+    method, keyword = CONSTRUCTORS[name]
+    raw = vars(tf.Scenario).get(method)
+    try:
+        return inspect.signature(getattr(raw, "_func", raw)
+                                 ).parameters[keyword].default
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+PeakDayArg = Annotated[int | None, Field(description=(
+    f"Constructors only. vix_shock: the day the VIX jumps to its peak "
+    f"(default {_constructor_default('vix_shock')}). rate_ramp: the day the "
+    f"policy rate and corporate yield reach their end level (default "
+    f"{_constructor_default('rate_ramp')}). A vix_shock peak must fall "
+    f"inside the run."))]
+TickerArg = Annotated[str | None, Field(description=(
+    "One ticker from the roster. Omit to take the largest moves "
+    "(explain_price_move) or the first name (explain)."))]
+DayArg = Annotated[int, Field(description=(
+    f"The trading day to explain, 1 to {MAX_DAYS}."))]
 
 
 # -- the server ------------------------------------------------------------
@@ -606,10 +1122,33 @@ server = MCPServer(
 )
 
 
+def _measured_cost() -> str:
+    """The cost line `describe_simulator` serves.
+
+    Computed from the estimate `start_job` reports, so the two cannot
+    disagree. The figures it replaced (0.5s at 5 days, 20s at 60, 95s at
+    252) carried no date and came from 0.1.0's preset.
+    """
+    one = {"strategies": {"m": {}}}
+    figures = ", ".join(
+        f"{_estimate_seconds('evaluate_strategies', {**one, 'days': d}):.0f}s"
+        f" at {d} days" for d in (5, MAX_DAYS, MAX_DAYS_ASYNC))
+    return (
+        f"One strategy and the baselines on 40 names: about {figures}. CPU "
+        f"time measured on pt-v20 on 2026-09-26; a loaded machine takes "
+        f"longer. Most of a short run is start-up: each entrant trades its "
+        f"own copy of the market, one more copy runs untraded, and each copy "
+        f"costs about the same to start whatever the roster. max_days is set "
+        f"below the certified {MAX_DAYS_ASYNC}-day horizon for this reason, "
+        f"so every direct result here is a SHORT WINDOW on a market whose "
+        f"realism is an annual measurement.")
+
+
 @server.tool(
     description="What this simulator is, what it is certified to reproduce, "
                 "and what it cannot do. Call this first."
 )
+@_guarded
 def describe_simulator() -> dict[str, Any]:
     """Orientation, computed from the shipped envelope rather than prose."""
     cert = envelope.certified()
@@ -651,7 +1190,12 @@ def describe_simulator() -> dict[str, Any]:
             # than counted either way.
             "groups": cert["groups"],
             "statistics_unmeasured": unmeasured,
-            "detail": [_statistic_line(n) for n in REAL_MARKETS],
+            # One line per served statistic, from the same rows as the
+            # verdicts above. This walked `REAL_MARKETS` until 0.8.5, which
+            # quoted the decade bands beside the default basis's verdicts
+            # and left out `crisis_sector_dispersion`, a row that table
+            # does not carry.
+            "detail": [_statistic_line(n, cert) for n in cert["statistics"]],
         },
         "known_gaps": [
             {"id": g["id"], "forbids": g["forbids"]} for g in cert["gaps"]
@@ -661,7 +1205,10 @@ def describe_simulator() -> dict[str, Any]:
             "Zero latency; orders arrive instantly.",
             "No strategic counterparties -- you trade against a market maker "
             "and aggregate flow, not agents that adapt to you.",
-            "The roster is sector-balanced, which no real index is.",
+            "Generated rosters are sector-balanced, which no real index is. "
+            "build_universe can concentrate one on chosen sectors or take "
+            "authored instruments, and a result on either says the roster "
+            "is outside the certification.",
             "Good results do not predict real returns. The price process "
             "comes from a known model.",
         ],
@@ -685,8 +1232,11 @@ def describe_simulator() -> dict[str, Any]:
             "catalogue": "list_scenarios returns the shipped documents, the "
                          "constructors, and every intervention target with "
                          "what it was measured to be worth.",
-            "shipped": "named documents with fingerprints -- pass the name "
-                       "to run_stress_scenario.",
+            "shipped": "named documents with fingerprints. Pass the name to "
+                       "run_stress_scenario with days past the document's "
+                       "first_event_day, which list_scenarios gives.",
+            "constructors": f"{', '.join(CONSTRUCTORS)}, timed with "
+                            f"peak_day.",
             "custom": "build_scenario composes one, from hold/ramp/step "
                       "instructions (a macro path) or from shocks and "
                       "transmission (explicit interventions); "
@@ -712,11 +1262,7 @@ def describe_simulator() -> dict[str, Any]:
             "max_strategies": MAX_STRATEGIES, "max_seeds": MAX_SEEDS,
             "note": "Limits of this MCP server, so a call answers inside a "
                     "conversation. The library imposes none of them.",
-            "measured_cost": "40 names with the baselines: ~0.5s at 5 days, "
-                             "~20s at 60, ~95s at 252. max_days is set below "
-                             "the certified 252-day horizon for this reason, "
-                             "so every result here is a SHORT WINDOW on a "
-                             "market whose realism is an annual measurement.",
+            "measured_cost": _measured_cost(),
         },
         "not_exposed_here": {
             "atlas": "Response-surface surveys run for hours. Library only.",
@@ -736,26 +1282,53 @@ def describe_simulator() -> dict[str, Any]:
     description="Ask whether a question falls inside the realism envelope "
                 "BEFORE running it. Names the measurement behind any refusal."
 )
+@_guarded
 def check_envelope(
-    horizon_days: int,
-    statistics: list[str] | None = None,
-    sector_concentrated: bool = False,
-    scenario_magnitude: bool = False,
+    horizon_days: Annotated[int, Field(description=(
+        f"The run length you are asking about, in trading days. The "
+        f"certified horizon is {envelope.CERTIFIED_HORIZON_DAYS}."))],
+    statistics: Annotated[list[str] | None, Field(description=(
+        f"Panel statistics your conclusion leans on. Known: "
+        f"{', '.join(sorted(REAL_MARKETS))}. An unknown name is refused."))
+    ] = None,
+    sector_concentrated: Annotated[bool | str, Field(description=(
+        f"true if the roster is sector-concentrated, or the name of a "
+        f"measured mix: {', '.join(sorted(envelope.ROSTER_SHAPES))}. A mix "
+        f"is certified only on the preset it was measured on."))] = False,
+    scenario_magnitude: Annotated[bool, Field(description=(
+        "true if the conclusion depends on the SIZE of a scenario's effect "
+        "rather than its direction."))] = False,
+    macro_regime: Annotated[bool, Field(description=(
+        "true if the conclusion depends on the economy reaching a particular "
+        "state, such as high inflation, stagflation or a policy crisis. "
+        "run_stress_scenario sets this itself when a scenario drives "
+        "inflation, growth or the cycle."))] = False,
 ) -> dict[str, Any]:
-    """The honesty gate. Cheap, and worth calling before an expensive run."""
+    """The honesty gate. Cheap, and worth calling before an expensive run.
+
+    `sector_concentrated` takes a mix name as well as a flag, and
+    `macro_regime` is exposed, since 0.8.5. Both are `envelope.check`
+    arguments this tool left out, which put a named mix and the macro-range
+    gap out of reach of a client.
+    """
     try:
         v = envelope.check(
             horizon_days=horizon_days,
             statistics=statistics or (),
             sector_concentrated=sector_concentrated,
             scenario_magnitude=scenario_magnitude,
+            macro_regime=macro_regime,
         )
     except tf.ValidationError as exc:
+        # The statistic list only where a statistic was the problem. A
+        # horizon error used to carry it too, and an unknown statistic got
+        # the list twice, since the library's message already includes it.
+        unknown = [s for s in (statistics or ()) if s not in REAL_MARKETS]
         return _fail(
-            f"{exc}. Known statistics: {sorted(REAL_MARKETS)}. An unknown "
-            f"name is refused rather than ignored, because silently dropping "
-            f"one would grant a certification nobody measured."
-        )
+            str(exc) + (
+                ". An unknown name is refused rather than ignored, because "
+                "silently dropping one would grant a certification nobody "
+                "measured." if unknown and horizon_days >= 1 else ""))
     return {
         "ok": True,
         "inside": v.inside,
@@ -771,7 +1344,8 @@ def check_envelope(
                 "Use this to iterate on a spec cheaply; grammar errors come "
                 "back naming what was wrong."
 )
-def validate_strategy(spec: dict[str, Any]) -> dict[str, Any]:
+@_guarded
+def validate_strategy(spec: SpecArg) -> dict[str, Any]:
     """The authoring loop.
 
     Separate from `evaluate_strategies` because a model gets the grammar
@@ -804,22 +1378,27 @@ def validate_strategy(spec: dict[str, Any]) -> dict[str, Any]:
 
 
 @server.tool(
-    description="Run strategies against one identical market and score them. "
-                "Fast, and the right first look -- but it is ONE seed; use "
-                "rank_strategies before believing an ordering."
+    description=(
+        "Run strategies against one identical market, beside the baseline "
+        "agents, and score them. The right first look, but it is ONE seed, "
+        "so use rank_strategies before believing an ordering. A strategy is "
+        f"data, for example {_SPEC_EXAMPLE}. days 1 to {MAX_DAYS} here, up "
+        f"to {MAX_DAYS_ASYNC} through start_job; roster 2 to {MAX_UNIVERSE} "
+        f"names.")
 )
+@_guarded
 def evaluate_strategies(
-    strategies: dict[str, Any],
-    seed: int = 7,
-    universe_size: int = 40,
-    universe_seed: int = 111,
-    universe_sectors: list[str] | None = None,
-    universe: dict[str, Any] | None = None,
-    days: int = 5,
-    steps_per_day: int = 6,
-    cash: float = 1_000_000.0,
-    max_leverage: float | None = 2.0,
-    include_baselines: bool = True,
+    strategies: StrategiesArg,
+    seed: SeedArg = 7,
+    universe_size: UniverseSizeArg = 40,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    days: DaysArg = 5,
+    steps_per_day: StepsPerDayArg = 6,
+    cash: CashArg = 1_000_000.0,
+    max_leverage: LeverageArg = 2.0,
+    include_baselines: BaselinesArg = True,
 ) -> dict[str, Any]:
     """The headline tool.
 
@@ -827,6 +1406,8 @@ def evaluate_strategies(
     nothing without knowing what buy-and-hold did on the same market, and a
     model handed a bare number will report the bare number.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -834,8 +1415,11 @@ def evaluate_strategies(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
+    if (refused := _steps_refusal(days, steps_per_day, cap)) is not None:
+        return refused
     try:
-        specs, assumed = _specs_from(strategies)
+        specs, assumed = _specs_from(
+            strategies, _baseline_names() if include_baselines else ())
         roster, concentrated, uni_doc = _resolve_universe(
             universe or {"size": universe_size, "seed": universe_seed,
                          "sectors": universe_sectors})
@@ -851,6 +1435,9 @@ def evaluate_strategies(
         scores = tf.evaluate(
             entrants, seed=seed, universe=roster, days=days,
             steps_per_day=steps_per_day, cash=cash, max_leverage=max_leverage,
+            # Stated rather than defaulted: a strategy here is never handed
+            # the live engine. See the module docstring.
+            trusted_agents=False,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -863,7 +1450,21 @@ def evaluate_strategies(
         "scores": rows,
         "ranking_note": "Sorted by return on this ONE market draw.",
     }
-    if include_baselines and "oracle" in scores:
+    withheld = baselines.capture_withheld(scores)
+    if include_baselines and withheld is not None:
+        # The preset's Oracle is no ceiling, so no ratio is sent, not even
+        # an empty one: the headline is buy-and-hold, and the reason is
+        # sent in place of the ratio.
+        result["versus_buy_and_hold"] = {
+            k: round(v, 2)
+            for k, v in baselines.versus_buy_and_hold(scores).items()
+        }
+        result["versus_buy_and_hold_note"] = (
+            "Each entrant's P&L less buy-and-hold's on the same market, in "
+            "currency: above zero, it earned more than owning the market."
+        )
+        result["capture_ratio_withheld"] = withheld
+    elif include_baselines and "oracle" in scores:
         result["capture_ratio"] = {
             k: round(v, 4) for k, v in tf.capture_ratio(scores).items()
         }
@@ -889,20 +1490,24 @@ def evaluate_strategies(
 
 
 @server.tool(
-    description="Score strategies across MANY seeds and rank them with a "
-                "paired sign test. Slower than evaluate_strategies and the "
-                "only version whose ordering is worth believing."
+    description=(
+        "Score strategies across MANY seeds, beside the baseline agents, and "
+        "rank them with a paired sign test. Slower than evaluate_strategies "
+        f"and the only version whose ordering is worth believing. 2 to "
+        f"{MAX_SEEDS} seeds (default six), days 1 to {MAX_DAYS} here, up to "
+        f"{MAX_DAYS_ASYNC} through start_job.")
 )
+@_guarded
 def rank_strategies(
-    strategies: dict[str, Any],
-    seeds: list[int] | None = None,
-    universe_size: int = 40,
-    universe_seed: int = 111,
-    universe_sectors: list[str] | None = None,
-    universe: dict[str, Any] | None = None,
-    days: int = 5,
-    steps_per_day: int = 6,
-    max_leverage: float | None = 2.0,
+    strategies: StrategiesArg,
+    seeds: SeedsArg = None,
+    universe_size: UniverseSizeArg = 40,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    days: DaysArg = 5,
+    steps_per_day: StepsPerDayArg = 6,
+    max_leverage: LeverageArg = 2.0,
 ) -> dict[str, Any]:
     """The honest version.
 
@@ -910,10 +1515,16 @@ def rank_strategies(
     and a reused instance carries one market's history into the next with no
     visible symptom. Specs are immune -- they are rebuilt per seed -- which
     is why this server only ever passes specs.
+
+    Omitted seeds are `DEFAULT_SEEDS`. An EMPTY list is refused like any
+    other count outside 2 to `MAX_SEEDS`; until 0.8.5 `seeds or [...]` ran
+    the six defaults for it without a word.
     """
-    seeds = seeds or [1, 2, 3, 4, 5, 6]
+    seeds = list(DEFAULT_SEEDS) if seeds is None else list(seeds)
     if not 2 <= len(seeds) <= MAX_SEEDS:
         return _fail(f"seeds must be 2..{MAX_SEEDS} values, got {len(seeds)}")
+    if (refused := _seed_refusal(seed=seeds)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -921,8 +1532,10 @@ def rank_strategies(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
+    if (refused := _steps_refusal(days, steps_per_day, cap)) is not None:
+        return refused
     try:
-        specs, assumed = _specs_from(strategies)
+        specs, assumed = _specs_from(strategies, _baseline_names())
         roster, concentrated, uni_doc = _resolve_universe(
             universe or {"size": universe_size, "seed": universe_seed,
                          "sectors": universe_sectors})
@@ -939,12 +1552,17 @@ def rank_strategies(
         ranking = tf.rank(
             make_agents, seeds=seeds, universe=roster, days=days,
             steps_per_day=steps_per_day, max_leverage=max_leverage,
+            trusted_agents=False,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
 
     # `table()` is the RANKED order; `records` is a dict, and iterating it
     # would present insertion order as if it were a ranking.
+    if ranking.capture_withheld is not None:
+        return _ranking_against_buy_and_hold(ranking, specs, days, seeds,
+                                             steps_per_day, max_leverage,
+                                             roster, concentrated, uni_doc)
     records = [
         {
             "name": r.name,
@@ -1006,6 +1624,105 @@ def rank_strategies(
             universe_fingerprint=ranking.universe_fingerprint,
         ),
     }
+
+
+def _ranking_against_buy_and_hold(ranking: Any, specs: dict[str, Any],
+                                  days: int, seeds: list[int],
+                                  steps_per_day: int,
+                                  max_leverage: float | None, roster: Any,
+                                  concentrated: bool,
+                                  uni_doc: Any) -> dict[str, Any]:
+    """`rank_strategies`' result on a preset where the Oracle is no ceiling.
+
+    The same shape as the capture version, with every capture field left
+    out rather than sent as None, the buy-and-hold comparison in their
+    place, and the reason in `capture_withheld`.
+    """
+    records = [
+        {
+            "name": r.name,
+            "mean_excess_over_buy_and_hold": (
+                round(r.mean_excess_pnl, 2)
+                if r.mean_excess_pnl is not None else None),
+            "seeds_ahead_of_buy_and_hold": r.seeds_ahead,
+            "median_pnl": round(r.median_pnl, 2),
+            "seeds_first": r.wins,
+        }
+        for r in ranking.table()
+    ]
+    order = [r["name"] for r in records]
+    tests = []
+    for name in specs:
+        for other in order:
+            if other == name:
+                continue
+            try:
+                tests.append(ranking.separation(name, other))
+            except Exception:  # a pair the test cannot form is not an error
+                continue
+    return {
+        "ok": True,
+        "records": records,
+        "seeds": list(ranking.seeds),
+        "paired_sign_tests": tests,
+        "capture_withheld": ranking.capture_withheld,
+        "report": ranking.report(),
+        "reading_note": (
+            "QUOTE `mean_excess_over_buy_and_hold`: the entrant's P&L less "
+            "buy-and-hold's on the same market, averaged over the seeds, "
+            "with `seeds_ahead_of_buy_and_hold` beside it. No capture ratio "
+            "is reported on this preset; `capture_withheld` says why. "
+            "`seeds_first` counts seeds where this entrant ranked FIRST "
+            "among ALL entrants, baselines included -- so it is not a "
+            "head-to-head record, and two entrants that behave identically "
+            "will split it arbitrarily on a tie. For 'is A better than B', "
+            "read `paired_sign_tests`: both traded the SAME market on each "
+            "seed, so the pairing removes the market from the question. "
+            "`decisive` is true only when one won on every paired seed."
+        ),
+        "caveats": _caveats(
+            days=days, n_seeds=len(seeds), signals=_signals_in(specs),
+            max_leverage=max_leverage, universe_size=len(roster),
+            sector_concentrated=concentrated,
+        ),
+        "provenance": _provenance(
+            seeds=list(seeds), days=days, steps_per_day=steps_per_day,
+            universe=uni_doc,
+            universe_fingerprint=ranking.universe_fingerprint,
+        ),
+    }
+
+
+#: The macro fields whose values are names, which the library checks. Every
+#: other field takes a number.
+_NAMED_FIELDS = frozenset({"cycle", "epicentre"})
+
+
+def _step_value(i: int, kind: str, field: Any, key: str, value: Any) -> Any:
+    """A path step's value, refused by name when a number was needed.
+
+    `Scenario` range-checks a rate and names a bad cycle phase, but it
+    takes a string for `vix` and fails on it later, inside arithmetic or
+    the engine, as a `TypeError` that reached a client as a bare "Error
+    executing tool build_scenario" until 0.8.5.
+    """
+    if field in _NAMED_FIELDS:
+        return value
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        what = f"{field!r}" if key == field else f"{key} for {field!r}"
+        raise ValueError(f"step {i} ({kind}): {what} must be a number, got "
+                         f"{value!r}")
+    return value
+
+
+def _step_days(i: int, kind: str, key: str, value: Any) -> int:
+    """A path step's day count, as a whole number or refused by name."""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"step {i} ({kind}): {key} must be a whole number "
+                         f"of days, got {value!r}")
+    return value
 
 
 def _scenario_from(doc: Any, days: int) -> Any:
@@ -1082,6 +1799,9 @@ def _scenario_from(doc: Any, days: int) -> Any:
             '"value":V,"at":N,"duration":D,"shape":"impulse|hold|ramp|'
             'permanent"}. Targets and what each one actually reaches: call '
             '`list_scenarios`.')
+    if not isinstance(steps, list):
+        raise ValueError(f"steps must be a list of step objects, got "
+                         f"{type(steps).__name__}")
     sc = tf.Scenario(str(doc.get("label", "")))
     for i, st in enumerate(steps):
         if not isinstance(st, dict) or "kind" not in st:
@@ -1089,13 +1809,30 @@ def _scenario_from(doc: Any, days: int) -> Any:
         kind = st["kind"]
         try:
             if kind == "hold":
-                sc = sc.hold(**st.get("fields", {}))
+                fields = st.get("fields", {})
+                if not isinstance(fields, dict):
+                    raise ValueError(
+                        f"step {i} (hold): fields must be an object of "
+                        f"field to value, for example {{\"vix\": 30.0}}, got "
+                        f"{fields!r}")
+                for field, value in fields.items():
+                    _step_value(i, kind, field, field, value)
+                sc = sc.hold(**fields)
             elif kind == "ramp":
-                sc = sc.ramp(st["field"], start=st["start"], end=st["end"],
-                             over=st["over"], begin=st.get("begin", 0))
+                field = st["field"]
+                sc = sc.ramp(
+                    field,
+                    start=_step_value(i, kind, field, "start", st["start"]),
+                    end=_step_value(i, kind, field, "end", st["end"]),
+                    over=_step_days(i, kind, "over", st["over"]),
+                    begin=_step_days(i, kind, "begin", st.get("begin", 0)))
             elif kind == "step":
-                sc = sc.step(st["field"], before=st["before"],
-                             after=st["after"], at=st["at"])
+                field = st["field"]
+                sc = sc.step(
+                    field,
+                    before=_step_value(i, kind, field, "before", st["before"]),
+                    after=_step_value(i, kind, field, "after", st["after"]),
+                    at=_step_days(i, kind, "at", st["at"]))
             else:
                 raise ValueError(
                     f"unknown step kind {kind!r}; use hold, ramp or step")
@@ -1103,6 +1840,14 @@ def _scenario_from(doc: Any, days: int) -> Any:
             raise ValueError(f"step {i} ({kind}): missing {exc}") from exc
         except tf.ValidationError as exc:
             raise ValueError(f"step {i} ({kind}): {exc}") from exc
+        except TypeError as exc:
+            # A string where a number belongs, or an argument the step does
+            # not take. Until 0.8.5 this escaped the tool and reached the
+            # client as a bare "Error executing tool build_scenario".
+            raise ValueError(
+                f"step {i} ({kind}): {exc}. Values are numbers (the cycle "
+                f"is a phase name), and `over`, `at` and `begin` are whole "
+                f"days.") from exc
     return sc
 
 
@@ -1112,15 +1857,16 @@ def _scenario_from(doc: Any, days: int) -> Any:
                 "four of the targets are honest mechanisms with effects too "
                 "small to see over a hundred days."
 )
+@_guarded
 def list_scenarios() -> dict[str, Any]:
     """The catalogue: shipped documents, constructors, and the registry.
 
-    A model authoring a scenario is choosing between twelve targets whose
+    A model authoring a scenario is choosing between fifteen targets whose
     effect sizes differ by three orders of magnitude, and nothing on the wire
-    told it which. `macro.qe_pe_boost` moves the median instrument 19.78%;
-    `macro.fear_greed` moves it exactly 0.00%, measured, because nothing in
-    the market reads it. Both are legitimate to write and only one of them is
-    an experiment.
+    told it which. `macro.corporate_yield` held 200bp higher moves the median
+    instrument -4.02%; `macro.fear_greed` moves it exactly 0.00%, measured,
+    because nothing in the market reads it. Both are legitimate to write and
+    only one of them is an experiment.
 
     So every target here carries the note the library carries: what reads it,
     how long it takes to arrive, and what it was MEASURED to be worth. The
@@ -1130,17 +1876,33 @@ def list_scenarios() -> dict[str, Any]:
     shipped = []
     for name in _packaged():
         sc = tf.Scenario.load(name)
+        starts = sorted(item.at for item in sc.interventions)
+        beyond = [day for day in starts if day >= MAX_DAYS_ASYNC]
         shipped.append({
             "name": name,
             "description": sc.description,
             "fingerprint": sc.fingerprint,
+            # The day each document's first and last intervention starts.
+            # A run must be longer than `first_event_day`, or nothing in the
+            # document happens and `run_stress_scenario` refuses it.
+            "first_event_day": starts[0] if starts else None,
+            "last_event_day": starts[-1] if starts else None,
+            "reach": (
+                f"Run at least {starts[0] + 1} days to reach the first "
+                f"event" + (
+                    f" (past the {MAX_DAYS}-day direct cap, so through "
+                    f"start_job)" if starts[0] + 1 > MAX_DAYS else "")
+                + (f". {len(beyond)} of its {len(starts)} events start on "
+                   f"day {beyond[0]} or later, past the {MAX_DAYS_ASYNC}-day "
+                   f"job cap, and no run here reaches them." if beyond
+                   else ".")) if starts else "",
             "shocks": [item.as_dict() for item in sc.shocks],
             "transmission": [item.as_dict() for item in sc.transmission],
         })
     return {
         "ok": True,
         "shipped": shipped,
-        "constructors": list(SCENARIOS),
+        "constructors": list(CONSTRUCTORS),
         "targets": {
             name: {"units": target.units, "note": target.note}
             for name, target in sorted(tf.TARGETS.items())
@@ -1148,11 +1910,16 @@ def list_scenarios() -> dict[str, Any]:
         "not_supported": dict(sorted(tf.UNSUPPORTED_TARGETS.items())),
         "operations": list(tf.interventions.OPERATIONS),
         "shapes": list(tf.interventions.SHAPES),
-        "note": ("Pass a shipped name straight to `run_stress_scenario`. To "
-                 "author one, call `build_scenario` with `shocks` (what the "
-                 "scenario asserts happened) and `transmission` (what it "
-                 "ASSUMES happened next -- this simulator derives neither). "
-                 "`at` counts days from the start of the run."),
+        "note": ("Pass a shipped name straight to `run_stress_scenario`, "
+                 "with `days` past its `first_event_day`. To author one, "
+                 "call `build_scenario` with `shocks` (what the scenario "
+                 "asserts happened) and `transmission` (what it ASSUMES "
+                 "happened next; this simulator derives neither). `at` "
+                 "counts days from the start of the run, from day 0, so an "
+                 "event at day 50 needs a run of at least 51 days. A "
+                 "constructor is timed with `peak_day`: the day vix_shock's "
+                 "spike arrives, or the day rate_ramp's rates reach their "
+                 "end level."),
         "caveats": [
             "Scenario MAGNITUDE is outside the certified envelope: the "
             "DIRECTION of a shock's effect is certified, the SIZE is not.",
@@ -1168,18 +1935,47 @@ def list_scenarios() -> dict[str, Any]:
     description="Author a custom scenario -- a macro PATH from hold/ramp/step "
                 "instructions, or explicit INTERVENTIONS as shocks and "
                 "assumed transmission -- and see what it resolves to before "
-                "running it."
+                "running it. Days count from 0, so an event at day 50 needs "
+                "a run of at least 51 days."
 )
-def build_scenario(steps: list[dict[str, Any]] | None = None,
-                   shocks: list[dict[str, Any]] | None = None,
-                   transmission: list[dict[str, Any]] | None = None,
-                   label: str = "", days: int = 20) -> dict[str, Any]:
+@_guarded
+def build_scenario(
+    steps: Annotated[list[dict[str, Any]] | None, Field(description=(
+        "A macro PATH, pinned for the whole run. Each step is "
+        "{\"kind\": \"hold\", \"fields\": {\"vix\": 30.0}}, "
+        "{\"kind\": \"ramp\", \"field\": F, \"start\": X, \"end\": Y, "
+        "\"over\": N, \"begin\": D} or "
+        "{\"kind\": \"step\", \"field\": F, \"before\": X, \"after\": Y, "
+        "\"at\": D}. Fields: " + ", ".join(_macro_fields()) + "."))] = None,
+    shocks: Annotated[list[dict[str, Any]] | None, Field(description=(
+        "INTERVENTIONS the scenario asserts happened, each {\"target\": T, "
+        "\"operation\": \"set|add|multiply\", \"value\": V, \"at\": D, "
+        "\"duration\": N, \"shape\": \"impulse|hold|ramp|permanent\"}. "
+        "list_scenarios gives every target and what it was measured to "
+        "move."))] = None,
+    transmission: Annotated[list[dict[str, Any]] | None, Field(description=(
+        "Interventions the scenario ASSUMES followed, in the same form as "
+        "shocks. The simulator treats them alike; the split records which "
+        "effects are assumptions."))] = None,
+    label: Annotated[str, Field(description=(
+        "A name for the scenario, carried into results."))] = "",
+    days: Annotated[int, Field(description=(
+        f"The run length you intend, 1 to {MAX_DAYS} (up to "
+        f"{MAX_DAYS_ASYNC} through start_job). A path's table covers these "
+        f"days, and a scenario whose events all fall after them is "
+        f"refused."))] = 20,
+) -> dict[str, Any]:
     """Compose a scenario as data, and check it before spending anything.
 
     Separate from `run_stress_scenario` for the same reason
     `validate_strategy` is separate from `evaluate_strategies`: a model gets
     a grammar wrong several times before it gets it right, and each of those
     attempts should cost a parse rather than a simulation.
+
+    `days` is checked against the scenario's timing, the way
+    `run_stress_scenario` checks it, so a shock on day 100 in a 20-day run
+    is refused here rather than accepted and then run to a difference of
+    0.0.
     """
     cap = _day_cap()
     if not 1 <= days <= cap:
@@ -1204,8 +2000,11 @@ def build_scenario(steps: list[dict[str, Any]] | None = None,
     try:
         sc = _scenario_from(doc, days)
         table = sc.table(days) if sc.fields else []
-    except (ValueError, tf.ValidationError) as exc:
+    except (ValueError, TypeError, tf.ValidationError) as exc:
         return _fail(str(exc))
+    refusal, timing = _timing(sc, label or "this scenario", days)
+    if refusal is not None:
+        return _fail(refusal)
     return {
         "ok": True,
         "scenario": json.loads(sc.to_json(days if sc.fields else None)),
@@ -1226,26 +2025,36 @@ def build_scenario(steps: list[dict[str, Any]] | None = None,
             "An authored scenario can pin macro states no calibration ever "
             "saw -- which is a legitimate question, and an uncertified "
             "answer.",
+            *timing,
         ],
         "provenance": _provenance(days=days),
     }
 
 
 @server.tool(
-    description="Run strategies through a macro stress scenario -- a preset "
-                "name (rate_shock, vix_shock, vol_shock) or a document from "
-                "build_scenario -- always against the same market unshocked."
+    description=(
+        "Run strategies through a macro stress scenario, always beside the "
+        "same market unshocked. `scenario` is a shipped document by name "
+        "(list_scenarios gives each one's first_event_day, and the run must "
+        "be longer than that), a constructor by name ("
+        + ", ".join(CONSTRUCTORS) + ", timed with peak_day), or a document "
+        "from build_scenario. A scenario whose events all fall after the "
+        f"run is refused. days 1 to {MAX_DAYS} here, up to {MAX_DAYS_ASYNC} "
+        "through start_job.")
 )
+@_guarded
 def run_stress_scenario(
-    scenario: Any,
-    strategies: dict[str, Any] | None = None,
-    seed: int = 7,
-    universe_size: int = 40,
-    universe_seed: int = 111,
-    universe_sectors: list[str] | None = None,
-    universe: dict[str, Any] | None = None,
-    days: int = 20,
-    peak_day: int | None = None,
+    scenario: ScenarioArg,
+    strategies: Annotated[dict[str, Any] | None, Field(description=(
+        "Optional strategies to run beside the baselines, in the "
+        "evaluate_strategies form. The baseline names are taken."))] = None,
+    seed: SeedArg = 7,
+    universe_size: UniverseSizeArg = 40,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    days: DaysArg = 20,
+    peak_day: PeakDayArg = None,
 ) -> dict[str, Any]:
     """Stress testing, always paired against the unshocked control.
 
@@ -1253,7 +2062,14 @@ def run_stress_scenario(
     shock could be the shock or could be the market. Running the identical
     seed with and without the scenario is the counterfactual the simulator
     exists to provide, so this tool always returns both.
+
+    The run length is checked against the scenario's timing before
+    anything runs (`_timing`). Every shipped document starts on day 30 or
+    later, and until 0.8.5 each one, run at the default 20 days, came back
+    with a difference of 0.0 for every entrant and nothing saying why.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -1261,46 +2077,65 @@ def run_stress_scenario(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
-    if (isinstance(scenario, str) and scenario not in SCENARIOS
-            and scenario not in _packaged()):
+    # A document that arrived as JSON text (a direct call, or a job's
+    # arguments) is a document, not a name.
+    if isinstance(scenario, str) and scenario.lstrip().startswith("{"):
+        try:
+            scenario = json.loads(scenario)
+        except ValueError as exc:
+            return _fail(f"scenario looks like a JSON document and does not "
+                         f"parse: {exc}")
+    name = (_CONSTRUCTOR_ALIASES.get(scenario, scenario)
+            if isinstance(scenario, str) else None)
+    if (name is not None and name not in CONSTRUCTORS
+            and name not in _packaged()):
         return _fail(
-            f"unknown scenario {scenario!r}. Constructors: {list(SCENARIOS)}. "
-            f"Shipped scenarios: {list(_packaged())}. For anything else, "
-            f"author one with `build_scenario` and pass the document here.")
+            f"unknown scenario {scenario!r}. Constructors: "
+            f"{list(CONSTRUCTORS)}. Shipped scenarios: {list(_packaged())}. "
+            f"For anything else, author one with `build_scenario` and pass "
+            f"the document here.")
+    if peak_day is not None and name not in CONSTRUCTORS:
+        what = (f"{scenario!r} is a shipped document" if name is not None
+                else "an authored document carries its own timing")
+        return _fail(
+            f"peak_day times a constructor ({', '.join(CONSTRUCTORS)}), and "
+            f"{what}, so peak_day means nothing to it. "
+            + ("For a rate ramp you can time, use the constructor "
+               "'rate_ramp'. " if name == "rate_shock" else "")
+            + "Read a document's timing with `list_scenarios`, or author "
+              "your own with `build_scenario`.")
+    if peak_day is not None and peak_day < 1:
+        return _fail(f"peak_day must be a day of the run, 1 or later, got "
+                     f"{peak_day}")
     try:
-        specs, assumed = (_specs_from(strategies) if strategies else ({}, []))
+        specs, assumed = (_specs_from(strategies, _baseline_names())
+                          if strategies else ({}, []))
         roster, concentrated, uni_doc = _resolve_universe(
             universe or {"size": universe_size, "seed": universe_seed,
                          "sectors": universe_sectors})
     except ValueError as exc:
         return _fail(str(exc))
 
-    authored = not isinstance(scenario, str)
+    authored = name is None
     try:
         if authored:
             built = _scenario_from(scenario, days)
-            label = scenario.get("label") or "authored"
+            label = (scenario.get("label") or scenario.get("name")
+                     or built.name or "authored")
+        elif name in CONSTRUCTORS:
+            method, keyword = CONSTRUCTORS[name]
+            kwargs = {} if peak_day is None else {keyword: peak_day}
+            built = getattr(tf.Scenario, method)(**kwargs)
+            label = name
         else:
-            kwargs: dict[str, Any] = {}
-            if peak_day is not None:
-                kwargs["peak_day" if scenario != "rate_shock"
-                       else "over"] = peak_day
-            if scenario in _packaged():
-                if peak_day is not None:
-                    return _fail(
-                        f"{scenario!r} is a shipped scenario, not a "
-                        f"constructor, so peak_day means nothing to it: its "
-                        f"timing is written into the document. Read it with "
-                        f"`list_scenarios`, or author your own with "
-                        f"`build_scenario`.")
-                built = tf.Scenario.load(scenario)
-            else:
-                built = getattr(tf.Scenario, scenario)(**kwargs)
-            label = scenario
+            built = tf.Scenario.load(name)
+            label = name
     except (ValueError, tf.ValidationError) as exc:
         return _fail(f"building scenario: {exc}")
-    except Exception as exc:
-        return _fail(f"building scenario: {exc}")
+
+    refusal, timing = _timing(built, label, days)
+    if refusal is not None:
+        return _fail(refusal)
 
     # The same entrants twice: once shocked, once not. Baselines are rebuilt
     # per call rather than shared between the two runs, because a reference
@@ -1309,13 +2144,14 @@ def run_stress_scenario(
     # this tool exists to report, with no visible symptom.
     def entrants() -> dict[str, Any]:
         out: dict[str, Any] = dict(specs)
-        for name, agent in baselines.reference_agents(seed=seed).items():
-            out.setdefault(name, agent)
+        for key, agent in baselines.reference_agents(seed=seed).items():
+            out.setdefault(key, agent)
         return out
 
     try:
         shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
-                              days=days, scenario=built)
+                              days=days, scenario=built,
+                              trusted_agents=False)
         # The control is the same world WITHOUT the thing being tested. For a
         # macro PATH that is no scenario at all. For a scenario carrying
         # INTERVENTIONS it is the same pins with the interventions removed --
@@ -1324,13 +2160,14 @@ def run_stress_scenario(
         against = (built.without_interventions() if built.interventions
                    else None)
         control = tf.evaluate(entrants(), seed=seed, universe=roster,
-                              days=days, scenario=against or None)
+                              days=days, scenario=against or None,
+                              trusted_agents=False)
     except tf.ValidationError as exc:
         return _fail(str(exc))
 
     rows = []
-    for name, s in shocked.items():
-        base = control.get(name)
+    for entrant, s in shocked.items():
+        base = control.get(entrant)
         # Differenced on the ROUNDED figures, so a reader who subtracts the
         # two numbers shown gets the number shown. Rounding the exact
         # difference instead would leave the result disagreeing with its own
@@ -1339,7 +2176,7 @@ def run_stress_scenario(
         hi = round(s.return_pct, 4)
         lo = round(base.return_pct, 4) if base else None
         rows.append({
-            "name": name,
+            "name": entrant,
             "return_pct_shocked": hi,
             "return_pct_control": lo,
             "difference": round(hi - lo, 4) if lo is not None else None,
@@ -1350,12 +2187,14 @@ def run_stress_scenario(
         days=days, n_seeds=1, signals=_signals_in(specs),
         max_leverage=2.0, universe_size=len(roster),
         scenario_magnitude=True, sector_concentrated=concentrated,
+        macro_regime=_drives_regime(built),
     )
     caveats.insert(1, (
         "Scenario MAGNITUDE is outside the envelope: the direction of a "
         "shock's effect is certified, the size of it is not. Read these "
         "differences as sign and ordering, not as a calibrated loss."
     ))
+    caveats[2:2] = timing
     return {
         "ok": True,
         "scenario": label,
@@ -1376,28 +2215,43 @@ def run_stress_scenario(
 
 
 @server.tool(
-    description="Why did a price move? Returns the seven factor "
-                "contributions that SUM to the move -- ground truth the "
-                "simulator can give because it computed the reasons."
+    description="Why did a price move? Returns the "
+                f"{len(tf.Engine.FACTORS)} factor contributions that sum to "
+                "the day's change in the mispricing, the log gap between the "
+                "model price and fair value. They are the simulator's own "
+                "bookkeeping, and they are not the whole price move. On the "
+                "default preset most of the day's news and noise moves fair "
+                "value, `fair_value_shift` takes that part out of the "
+                "mispricing, and the fair-value move itself is not split up. "
+                "`explain` breaks down the price move."
 )
+@_guarded
 def explain_price_move(
-    ticker: str | None = None,
-    seed: int = 3,
-    universe_size: int = 40,
-    universe_seed: int = 111,
-    universe_sectors: list[str] | None = None,
-    universe: dict[str, Any] | None = None,
-    day: int = 1,
-    top_n: int = 10,
+    ticker: TickerArg = None,
+    seed: SeedArg = 3,
+    universe_size: UniverseSizeArg = 40,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    day: DayArg = 1,
+    top_n: Annotated[int, Field(description=(
+        "How many instruments to return, largest moves first, when no "
+        "ticker is given. 1 or more."))] = 10,
 ) -> dict[str, Any]:
-    """The labelled-dataset output, and the thing no historical data has.
+    """How much each driver moved each name's mispricing on one day.
 
-    You can observe that a stock fell. You cannot observe that 60% of the
-    fall was order-flow pressure and the rest was noise -- unless something
-    computed it, and something did.
+    A price history shows that a stock fell. It cannot show how much of the
+    fall was order-flow pressure and how much was noise, and this can,
+    because the simulator computed each part. It covers the mispricing
+    only. On pt-v20 most of a price's move is fair value moving, and these
+    factors do not split that move up.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
+    if top_n < 1:
+        return _fail(f"top_n must be 1 or more, got {top_n}")
     try:
         roster, concentrated, uni_doc = _resolve_universe(
             universe or {"size": universe_size, "seed": universe_seed,
@@ -1417,7 +2271,7 @@ def explain_price_move(
     rows = []
     for i, tk in enumerate(tickers):
         parts = {f: cols[f][i] for f in tf.Engine.FACTORS}
-        total = sum(parts.values())
+        total = ordered_sum(parts.values())
         # Rounded for readability, but the residual is measured on the
         # ROUNDED values that are actually returned. Reporting the model's
         # ~1e-16 residual next to figures rounded to 1e-10 would be a
@@ -1429,7 +2283,7 @@ def explain_price_move(
             "ticker": tk,
             "total_log_move": shown_total,
             "factors": shown,
-            "residual": abs(sum(shown.values()) - shown_total),
+            "residual": abs(ordered_sum(shown.values()) - shown_total),
             "largest_factor": max(parts, key=lambda f: abs(parts[f])),
         })
 
@@ -1440,7 +2294,7 @@ def explain_price_move(
                          f"{tickers[:8]}")
     else:
         rows.sort(key=lambda r: abs(r["total_log_move"]), reverse=True)
-        rows = rows[:max(1, min(top_n, len(rows)))]
+        rows = rows[:min(top_n, len(rows))]
 
     return {
         "ok": True,
@@ -1448,12 +2302,17 @@ def explain_price_move(
         "rows": rows,
         "factors": list(tf.Engine.FACTORS),
         "reading_note": (
-            f"The {len(tf.Engine.FACTORS)} factors in `factors` SUM to "
-            "`total_log_move`. Each row carries "
-            "its own `residual` -- the measured disagreement in the figures "
-            "as returned, so the claim is checkable rather than asserted. "
-            "Contributions accumulate per day and reset at market open, so "
-            "this is the named day only."
+            f"The {len(tf.Engine.FACTORS)} factors in `factors` sum to "
+            "`total_log_move`, which is the day's change in the mispricing "
+            "`s` (the log gap between the model price and fair value), not "
+            "the log change in the price. On pt-v20, the default, most of "
+            "the day's news and noise moves fair value instead, so "
+            "`random_noise` and `fair_value_shift` are both large and mostly "
+            "cancel, and `total_log_move` is a small part of the price's "
+            "move. Each row carries its own `residual`, the measured "
+            "disagreement in the figures as returned, so the sum can be "
+            "checked. Contributions accumulate per day and reset at market "
+            "open, so this is the named day only."
         ),
         "caveats": [
             "This is the simulator's own bookkeeping, not an inference. It "
@@ -1462,6 +2321,10 @@ def explain_price_move(
             "No agent traded in this run, so `order_flow_impact` reflects "
             "background flow only. Use `evaluate_strategies` to see a "
             "strategy's own footprint.",
+            "`fair_value_shift` is the part of the day's news and noise that "
+            "changed the stock's fair value for good, entered as a negative "
+            "because it left the mispricing. The other factors report the "
+            "whole shock; on presets through pt-v19 this one is zero.",
         ],
         "provenance": _provenance(
             seed=seed, day=day,
@@ -1477,15 +2340,18 @@ def explain_price_move(
                 "it, with every node replayable and every number measured "
                 "by running the day again."
 )
+@_guarded
 def explain(
-    ticker: str | None = None,
-    seed: int = 3,
-    universe_size: int = 12,
-    universe_seed: int = 111,
-    universe_sectors: list[str] | None = None,
-    universe: dict[str, Any] | None = None,
-    day: int = 1,
-    depth: int = 3,
+    ticker: TickerArg = None,
+    seed: SeedArg = 3,
+    universe_size: UniverseSizeArg = 12,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    day: DayArg = 1,
+    depth: Annotated[int, Field(description=(
+        "How many levels of the tree the `render` text shows, 0 to 4. The "
+        "`tree` field is always whole."))] = 3,
 ) -> dict[str, Any]:
     """One name's day, from its move down to the draws that seeded it.
 
@@ -1497,6 +2363,8 @@ def explain(
     days, and returns what it measured. It exposes no replay, because a
     replay runs engines and a tool call answers inside a conversation.
     """
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
     try:
@@ -1521,6 +2389,14 @@ def explain(
         result = engine.explain(name, day)
     except tf.ValidationError as exc:
         return _fail(str(exc))
+    except ImportError as exc:
+        # pyarrow, which reads the truth table. The `mcp` extra installs
+        # it since 0.8.5; before that, `pip install "tradefloor[mcp]"`
+        # left it out, and the exception reached the client as a bare
+        # "Error executing tool explain" with the install line lost. A
+        # server whose mcp was installed some other way can still lack it.
+        return _fail(f"{exc}. The extra that installs the MCP server "
+                     "installs it too: pip install \"tradefloor[mcp]\"")
 
     misses = result.check()
     tree = json.loads(result.to_json())["root"]
@@ -1568,10 +2444,25 @@ def explain(
                 "with optional sector concentration, or from explicit "
                 "instruments. Returns a universe document the run tools take."
 )
-def build_universe(size: int = 40, seed: int = 111,
-                   sectors: list[str] | None = None,
-                   instruments: list[dict[str, Any]] | None = None,
-                   limit: int = 20) -> dict[str, Any]:
+@_guarded
+def build_universe(
+    size: Annotated[int, Field(description=(
+        f"Names in a generated roster, 2 to {MAX_UNIVERSE}."))] = 40,
+    seed: Annotated[int, Field(description=(
+        "Seed that generates the roster, 0 to 2**64 - 1."))] = 111,
+    sectors: SectorsArg = None,
+    instruments: Annotated[list[dict[str, Any]] | None, Field(description=(
+        f"Explicit rows, 2 to {MAX_UNIVERSE}, in roster order. Each needs "
+        f"ticker, sector (a lowercase id), initial_price and "
+        f"shares_outstanding. Give eps (earnings per share, valued at a "
+        f"sector P/E) or, for a loss-making company, book_value_per_share: "
+        f"a row with neither is refused, because the model would value it "
+        f"at one cent. Optional: revenue_growth, avg_volume, beta, "
+        f"short_interest (a share count, not a fraction). When given, "
+        f"size, seed and sectors are ignored."))] = None,
+    limit: Annotated[int, Field(description=(
+        "How many instruments the preview lists."))] = 20,
+) -> dict[str, Any]:
     """Construct and inspect in one call.
 
     Rosters were previously only reachable as `(size, seed)` arguments on
@@ -1648,7 +2539,9 @@ MAX_KEPT_JOBS = 32
 
 #: The tools worth running in the background. The cheap ones are absent on
 #: purpose -- a job for a 40ms call is two round trips to save nothing.
-JOBBABLE = ("evaluate_strategies", "rank_strategies", "run_stress_scenario")
+JobTool = Literal["evaluate_strategies", "rank_strategies",
+                  "run_stress_scenario"]
+JOBBABLE: tuple[str, ...] = typing.get_args(JobTool)
 
 _jobs: dict[str, dict[str, Any]] = {}
 _jobs_lock = threading.Lock()
@@ -1656,26 +2549,130 @@ _pool = ThreadPoolExecutor(max_workers=MAX_RUNNING_JOBS,
                            thread_name_prefix="tradefloor-mcp-job")
 _job_counter = 0
 
+#: What a run costs, in CPU seconds, measured with `tf.evaluate` on pt-v20
+#: on the 0.8.5 release candidate on an Apple-silicon Mac (rosters of 8, 40
+#: and 120 names, 1 and 11 days, the five reference agents, sim seed 7).
+#: `tf.evaluate` builds one engine and forks it for the untraded market and
+#: each entrant, and a pt-v20 engine now takes about 0.02s to build, so the
+#: cost is almost all days times entrants: 0.05s for 8 names over 1 day,
+#: 1.58s for 40 names over 11 days, 4.44s for 120 names over 11 days.
+#: Measured on 2026-09-26, before the engine build went from 0.9s to 0.02s
+#: and before evaluate forked one engine, the same model had 0.9s per
+#: entrant of start-up, 0.02s per entrant-day and 0.0012s per name-day.
+_COST_ENGINE = 0.02
+_COST_ENTRANT_DAY = 0.002
+_COST_NAME_DAY = 0.00065
+
+
+def _roster_size(args: dict[str, Any]) -> int:
+    """How many names a tool call's roster holds, for the estimate.
+
+    Tolerant by design: the estimate must not be the thing that fails. A
+    universe can arrive as a document, as JSON text, or with explicit
+    instruments; anything unreadable counts as the default 40.
+    """
+    doc = args.get("universe")
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(doc)
+        except ValueError:
+            doc = None
+    if isinstance(doc, dict):
+        rows = doc.get("instruments")
+        if isinstance(rows, list) and rows:
+            return len(rows)
+        if isinstance(doc.get("size"), (int, float)):
+            return int(doc["size"])
+    size = args.get("universe_size", 40)
+    return int(size) if isinstance(size, (int, float)) else 40
+
 
 def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
-    """A rough wall-clock estimate, from measured cost.
+    """A rough run time, from measured cost (see `_COST_ENGINE`).
 
-    Anchored on three measurements at 40 names with the six reference
-    entrants: 0.5s at 5 days, 20s at 60, 95s at 252 -- about 0.38 s/day.
-    Scaled by roster size and, for a ranking, by the number of seeds. It is
-    an estimate and the field says so; a model deciding whether to wait or
-    poll needs an order of magnitude, not a promise.
+    Scaled by entrants, roster size, days and steps per day, by the seed
+    count for a ranking (six when none are given, as `rank_strategies`
+    runs), and by two for a stress test, which runs its control as well. It is an
+    estimate and the field says so; a model deciding whether to wait or
+    poll needs an order of magnitude, not a promise. The figures are CPU
+    time, so a loaded machine takes longer.
     """
-    days = float(args.get("days", 5))
-    size = float((args.get("universe") or {}).get("size")
-                 or args.get("universe_size", 40) or 40)
-    per_day = 0.38 * (size / 40.0)
-    seeds = len(args.get("seeds") or []) or 1
+    days = args.get("days", 20 if tool == "run_stress_scenario" else 5)
+    days = float(days) if isinstance(days, (int, float)) else 5.0
+    strategies = args.get("strategies")
+    entrants = len(strategies) if isinstance(strategies, dict) else 0
+    if tool != "evaluate_strategies" or args.get("include_baselines", True):
+        entrants += len(_baseline_names())
+    entrants = max(1, entrants)
+    # A step past the sixth runs more ticks a day, so the per-day term
+    # scales with steps against the six the costs were measured at.
+    steps = args.get("steps_per_day", DEFAULT_STEPS_PER_DAY)
+    steps = (float(steps) if isinstance(steps, (int, float)) and steps > 0
+             else float(DEFAULT_STEPS_PER_DAY))
+    run = (_COST_ENGINE
+           + days * entrants * (steps / DEFAULT_STEPS_PER_DAY)
+           * (_COST_ENTRANT_DAY + _COST_NAME_DAY * _roster_size(args)))
     if tool == "rank_strategies":
-        return per_day * days * max(1, seeds)
+        seeds = args.get("seeds")
+        count = len(seeds) if isinstance(seeds, list) else len(DEFAULT_SEEDS)
+        return run * max(1, count)
     if tool == "run_stress_scenario":
-        return per_day * days * 2.0        # shocked plus its control
-    return per_day * days
+        return run * 2.0                   # shocked plus its control
+    return run
+
+
+def _schema_message(exc: _SchemaError) -> str:
+    return "; ".join(
+        (".".join(str(p) for p in err["loc"]) + ": " if err["loc"] else "")
+        + err["msg"] for err in exc.errors()[:3])
+
+
+def _job_arguments(tool: str, arguments: Any
+                   ) -> tuple[dict[str, Any] | None, str | None]:
+    """A job's arguments checked as the SDK checks a direct call's.
+
+    Returns (the checked arguments, None) or (None, the reason). Checked
+    BEFORE the job is registered: until 0.8.5 an unknown argument was
+    accepted and the job then failed on it, a string for `days` raised out
+    of `start_job` with no message, and a string `universe` made the
+    estimate raise after the job had been submitted, so a job ran whose id
+    the caller never saw.
+
+    Each value goes through the tool's own annotation with pydantic, as a
+    direct call's does. A string where a structure belongs is read as JSON
+    first, as the SDK does for a direct call.
+    """
+    if not isinstance(arguments, dict):
+        return None, (f"arguments must be an object of argument name to "
+                      f"value, got {type(arguments).__name__}")
+    fn = inspect.unwrap(globals()[tool])
+    params = inspect.signature(fn).parameters
+    unknown = sorted(set(arguments) - set(params))
+    if unknown:
+        return None, (f"{tool} takes no argument named {unknown}. Its "
+                      f"arguments are {list(params)}.")
+    missing = [name for name, p in params.items()
+               if p.default is inspect.Parameter.empty
+               and name not in arguments]
+    if missing:
+        return None, f"{tool} needs {missing}"
+    hints = typing.get_type_hints(fn, include_extras=True)
+    checked: dict[str, Any] = {}
+    for key, value in arguments.items():
+        adapter = TypeAdapter(hints[key])
+        try:
+            checked[key] = adapter.validate_python(value)
+            continue
+        except _SchemaError as exc:
+            error = exc
+        if isinstance(value, str):
+            try:
+                checked[key] = adapter.validate_json(value)
+                continue
+            except _SchemaError:
+                pass
+        return None, f"{tool}: {key}: {_schema_message(error)}"
+    return checked, None
 
 
 def _run_job(job_id: str, tool: str, args: dict[str, Any]) -> None:
@@ -1697,19 +2694,44 @@ def _run_job(job_id: str, tool: str, args: dict[str, Any]) -> None:
     description="Start a long simulation in the background and get a job id "
                 "back immediately. This is the ONLY way to run to the "
                 "certified 252-day horizon; a direct call is capped at 60 "
-                "days so it can answer inside a conversation."
+                "days so it can answer inside a conversation. The arguments "
+                "are checked before the job starts."
 )
-def start_job(tool: str, arguments: dict[str, Any] | None = None
-              ) -> dict[str, Any]:
-    """Submit work that is too slow to answer inline."""
+@_guarded
+def start_job(
+    tool: Annotated[JobTool, Field(description=(
+        "The tool to run in the background."))],
+    arguments: Annotated[dict[str, Any] | None, Field(description=(
+        f"That tool's arguments, as a direct call takes them. days may go "
+        f"to {MAX_DAYS_ASYNC}. An unknown argument or a wrong type is "
+        f"refused before the job starts."))] = None,
+) -> dict[str, Any]:
+    """Submit work that is too slow to answer inline.
+
+    Everything that can refuse runs before the job is registered: the tool
+    name, the arguments, the day cap and the estimate. A job that has been
+    submitted always comes back with its id.
+    """
     global _job_counter
     if tool not in JOBBABLE:
         return _fail(f"{tool!r} cannot be run as a job. Jobbable: "
                      f"{list(JOBBABLE)}. Everything else answers inline.")
-    args = dict(arguments or {})
-    days = args.get("days")
-    if days is not None and not 1 <= int(days) <= MAX_DAYS_ASYNC:
+    args, reason = _job_arguments(tool, {} if arguments is None
+                                  else arguments)
+    if reason is not None:
+        return _fail(reason)
+    params = inspect.signature(inspect.unwrap(globals()[tool])).parameters
+    days = args.get("days", params["days"].default)
+    if not 1 <= days <= MAX_DAYS_ASYNC:
         return _fail(f"days must be 1..{MAX_DAYS_ASYNC} for a job, got {days}")
+    # Days times steps, bounded as a direct call bounds it, before a worker
+    # is spent on the job.
+    if "steps_per_day" in params:
+        steps = args.get("steps_per_day", params["steps_per_day"].default)
+        if (refused := _steps_refusal(days, steps, MAX_DAYS_ASYNC)) is not None:
+            return refused
+    est = _estimate_seconds(tool, args)
+    provenance = _provenance()
 
     with _jobs_lock:
         running = sum(1 for j in _jobs.values() if j["status"] == "running")
@@ -1730,16 +2752,16 @@ def start_job(tool: str, arguments: dict[str, Any] | None = None
             _jobs.pop(stale["id"], None)
 
     _pool.submit(_run_job, job_id, tool, args)
-    est = _estimate_seconds(tool, args)
     return {
         "ok": True,
         "job_id": job_id,
         "status": "running",
         "estimated_seconds": round(est, 1),
-        "note": (f"Poll `check_job` with this id. Estimated ~{est:.0f}s -- an "
-                 f"estimate from measured cost, not a promise. Jobs live in "
-                 f"the server process and do not survive a restart."),
-        "provenance": _provenance(),
+        "note": (f"Poll `check_job` with this id. Estimated ~{est:.1f}s of "
+                 f"CPU time, from measured cost. It is an estimate, and a "
+                 f"loaded machine takes longer. Jobs live in the server "
+                 f"process and do not survive a restart."),
+        "provenance": provenance,
     }
 
 
@@ -1747,7 +2769,12 @@ def start_job(tool: str, arguments: dict[str, Any] | None = None
     description="Check a background job. Returns its status, and the full "
                 "result once it has finished. Omit job_id to list all jobs."
 )
-def check_job(job_id: str | None = None) -> dict[str, Any]:
+@_guarded
+def check_job(
+    job_id: Annotated[str | None, Field(description=(
+        "An id from start_job, such as \"job-1\". Omit to list every job "
+        "this server process holds."))] = None,
+) -> dict[str, Any]:
     """Poll a job, or list what this server is holding."""
     with _jobs_lock:
         if job_id is None:
@@ -1778,9 +2805,9 @@ def check_job(job_id: str | None = None) -> dict[str, Any]:
         if job["status"] == "running":
             est = _estimate_seconds(job["tool"], job["arguments"])
             out["estimated_seconds"] = round(est, 1)
-            out["note"] = ("Still running. The estimate is from measured "
-                           "cost and a long overrun means the machine is "
-                           "loaded, not that the job has hung.")
+            out["note"] = ("Still running. The estimate is CPU time from "
+                           "measured cost, and a long overrun means the "
+                           "machine is loaded, not that the job has hung.")
         else:
             out["result"] = job["result"]
         out["provenance"] = _provenance()

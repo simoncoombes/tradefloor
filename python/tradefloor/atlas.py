@@ -99,7 +99,8 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
-from ._core import ValidationError
+from ._arith import ordered_sum
+from ._core import ValidationError, check_seed
 
 #: The default box around a shipped value when a caller names a parameter
 #: without a range: a quarter to four times it, matching the calibration
@@ -129,7 +130,7 @@ def latin_hypercube(n: int, dims: int, seed: int) -> list[list[float]]:
     """
     from ._core import GameRng
 
-    rng = GameRng(int(seed), 7717)
+    rng = GameRng(check_seed(seed), 7717)
     columns: list[list[float]] = []
     for _ in range(dims):
         strata = [(i + rng.next_float()) / n for i in range(n)]
@@ -675,7 +676,7 @@ class Survey:
             ((n, c) for n, c in contributions.items()
              if n not in within_noise),
             key=lambda kv: -abs(kv[1]["delta"])))
-        predicted = sum(c["delta"] for c in contributions.values())
+        predicted = ordered_sum(c["delta"] for c in contributions.values())
         measured_delta = residual = None
         if measured is not None:
             measured_delta = measured[1] - measured[0]
@@ -1091,9 +1092,9 @@ def _ranks(values: Sequence[float]) -> list[float]:
 
 def _pearson(xs: Sequence[float], ys: Sequence[float]) -> float:
     mx, my = statistics.fmean(xs), statistics.fmean(ys)
-    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    dx = math.sqrt(sum((x - mx) ** 2 for x in xs))
-    dy = math.sqrt(sum((y - my) ** 2 for y in ys))
+    num = ordered_sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    dx = math.sqrt(ordered_sum((x - mx) ** 2 for x in xs))
+    dy = math.sqrt(ordered_sum((y - my) ** 2 for y in ys))
     return 0.0 if dx == 0 or dy == 0 else num / (dx * dy)
 
 

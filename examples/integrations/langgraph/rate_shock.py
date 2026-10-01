@@ -135,7 +135,9 @@ SHOCKED_DISCOUNT_RATE = DISCOUNT_RATE + SHOCK_BPS / 10_000
 #:
 #: They differ in the one property that decides rate sensitivity in this
 #: model: revenue growth is the duration term in
-#: ``1 - (discount - neutral) * 1.5 * (1 + growth * 2)``.
+#: ``1 - (discount - neutral) * sensitivity * (1 + growth * 2)``, where
+#: ``sensitivity`` is the preset's ``rate_pe_sensitivity``, 3 on pt-v20 and
+#: 1.5 through pt-v19.
 #:
 #: ticker, sector, what it is, price, shares, eps, book value, revenue
 #: growth, average daily volume, beta, short interest.
@@ -337,7 +339,7 @@ def analyse(state: TradeState) -> dict[str, Any]:
     lines = [
         f"policy rate {macro['federal_funds_rate']:.2%}, "
         f"corporate bond yield {macro['corporate_bond_yield']:.2%}",
-        f"equity {book['net_worth']:,.0f}, gross {book['gross_exposure']:.2f}x "
+        f"equity {book['net_worth']:,.0f}, gross {book['leverage']:.2f}x "
         f"of {book['max_leverage']}x, buying power "
         f"{(book['buying_power'] or 0):,.0f}",
     ]
@@ -586,17 +588,17 @@ def weights(world: World) -> dict[str, float]:
 
 
 def sides(world: World) -> dict[str, int]:
-    """BUY, SELL and HOLD instructions issued AFTER the fork.
+    """BUY, SELL, HOLD and CANCEL instructions issued AFTER the fork.
 
     The behavioural question in its most direct form: did the agent do
     different things, not did it say different words.
     """
-    counts = {"BUY": 0, "SELL": 0, "HOLD": 0}
+    counts = {"BUY": 0, "SELL": 0, "HOLD": 0, "CANCEL": 0}
     for entry in world.agent.record:
         if world.fork_step is not None and entry["step"] < world.fork_step:
             continue
         for action in entry["decision"]["actions"]:
-            counts[action["side"]] += 1
+            counts[action["side"]] = counts.get(action["side"], 0) + 1
     return counts
 
 
@@ -645,10 +647,13 @@ def divergence_story(control: World, shock: World) -> str:
         if not actions:
             lines.append("    no change")
         for action in actions:
-            lines.append(f"    HOLD {action['symbol']}"
-                         if action["side"] == "HOLD" else
-                         f"    {action['side']} {action['quantity']:,.0f} "
-                         f"{action['symbol']}")
+            if action["side"] in ("HOLD", "CANCEL"):
+                lines.append(f"    {action['side']} {action['symbol']}")
+                continue
+            limit = action.get("limit_price")
+            lines.append(f"    {action['side']} {action['quantity']:,.0f} "
+                         f"{action['symbol']}"
+                         + (f" at {limit:,.2f} or better" if limit else ""))
         rationale = entry["decision"]["rationale"]
         if rationale:
             lines += [""] + _wrap(rationale, "    ")

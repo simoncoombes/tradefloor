@@ -52,6 +52,7 @@ from ._core import (
     Instrument,
     ValidationError,
     apply_mispricing,
+    check_seed,
     fair_value,
     model_preset,
     sector_daily_sigma,
@@ -221,6 +222,19 @@ def to_instruments(
     shocks accumulate, on the order of one 60-day half-life. Run a burn-in
     before handing control to an agent if that matters.
 
+    # On pt-v20 the engine draws the opening
+
+    That cost, the `initial_s` option below and the macro warning at the
+    end describe presets that take the day-zero premium of price over fair
+    value as the mispricing, which is every preset through pt-v19. pt-v20,
+    the default since 0.8.5, draws the opening mispricing itself
+    (`opening_market_sigma` 0.1 on the index, `opening_mispricing_sigma`
+    0.016 per name) and books the rest of each name's premium as its
+    fair-value level, which scales the fundamentals it values. On pt-v20 a
+    loaded universe opens with the preset's own dispersion whatever
+    `initial_s` says, and a macro mismatch opens as a fair-value level and
+    not as mispricing. `tests/test_edgar.py` measures both.
+
     # initial_s="stationary" starts the universe where a long run would be
 
     ``"zero"`` (the default) prices everything at fair value, which is honest
@@ -233,7 +247,8 @@ def to_instruments(
     That is not a fudge: it is the distribution the model itself implies, and
     the width is computed from the AR(2) parameters rather than chosen. The
     draw uses its own RNG stream, so seeding a universe's dispersion cannot
-    perturb the market it is built for.
+    perturb the market it is built for. ``s_seed`` is any integer from 0 to
+    ``2**64 - 1``.
 
     The macro arguments are the conditions the fair value is computed under.
     They must match the macro the engine then runs, or every company starts
@@ -244,7 +259,7 @@ def to_instruments(
         raise ValidationError(
             f"initial_s must be \"zero\" or \"stationary\", got {initial_s!r}"
         )
-    rng = GameRng(int(s_seed), MISPRICING_STREAM)
+    rng = GameRng(check_seed(s_seed, "s_seed"), MISPRICING_STREAM)
     # THE MODEL, for the same reason the macro is taken: a price computed
     # under one valuation and run under another starts mispriced by the
     # difference. `neutral_discount_rate` is the rate at which the multiple

@@ -1,0 +1,4 @@
+1 presets, 180 measurements, 48 workers
+  100/180  3.0/s  eta 0.5m
+pt-v20   252:15/15 504:14/14 hoU:15/15 hoS:15/15 vol: 20.5%  lever:5.11x  mech:10/10  centre: 9/14  vixar1(ungraded):0.9302/0.9406  disp(read):1 of 30/2 of 30
+wrote /home/ec2-user/out/preset-panel.json in 62s

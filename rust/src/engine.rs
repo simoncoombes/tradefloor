@@ -80,6 +80,11 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 /// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
 
+/// `Engine::macro_pins_today`: the VIX was pinned today.
+pub const PIN_VIX: u8 = 1;
+/// `Engine::macro_pins_today`: the corporate yield was pinned today.
+pub const PIN_CORPORATE: u8 = 2;
+
 /// The exact position of all three engine streams — the checkpoint half
 /// that cannot be reconstructed from the columns.
 ///
@@ -179,6 +184,7 @@ pub struct TickRequest<'a> {
 }
 
 /// What one tick produced.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TickOutcome {
     pub market_status: MarketStatus,
@@ -189,6 +195,33 @@ pub struct TickOutcome {
     pub volumes: Vec<f64>,
     /// Draws consumed by this tick. Zero when the market was closed.
     pub draws_consumed: usize,
+}
+
+/// What an agent's order did when it met the book.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderReport {
+    pub order_id: String,
+    pub agent: String,
+    pub ticker: String,
+    pub side: crate::order_book::Side,
+    pub requested: f64,
+    /// Shares taken from the book on arrival.
+    pub filled: f64,
+    /// Volume-weighted across the taker fills, or `None` if none.
+    pub average_price: Option<f64>,
+    /// The last level the order reached, or `None` if it took nothing.
+    pub worst_price: Option<f64>,
+    /// The mid of the book the order met.
+    pub reference: f64,
+    /// Shares left waiting, in the queue or for the traded range.
+    pub resting: f64,
+    /// Shares of a market order the book could not fill. Zero for a limit
+    /// order, whose remainder waits.
+    pub unfilled: f64,
+    /// How the remainder waits, when it does.
+    pub mode: Option<crate::agent_book::RestMode>,
+    /// The taker fills, one per level, in the order the order took them.
+    pub fills: Vec<crate::agent_book::AgentFill>,
 }
 
 /// What the embedder supplies at the close of a simulated day.
@@ -259,10 +292,21 @@ pub struct Engine {
     overnight_rng: GameRng,
     market_vol_level_rng: GameRng,
     crisis_epicentre_rng: GameRng,
+    /// The opening mispricing draws, one standard normal per name of the
+    /// roster the engine was built with and one more for the market's
+    /// common level, from the one-shot [`stream::OPENING`]. Empty unless
+    /// `opening_mispricing_sigma` or `opening_market_sigma` is non-zero,
+    /// and emptied once the opening has been applied.
+    opening_z: Vec<f64>,
     /// The move each name's `s` took at the last open under the overnight
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
     overnight_moves: Vec<f64>,
+    /// What each name's `s` gave up to its fair value at the last close's
+    /// jump, in roster order (`fair_value_shift`), 0.0 where nothing moved.
+    /// Per-day state like `overnight_moves`: the tape books it onto the row
+    /// where the jump is observed, beside the jump.
+    jump_fair_value_moves: Vec<f64>,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -333,7 +377,7 @@ pub struct Engine {
     /// apart: `fundamental` is the valuation, `anchor` is
     /// `fundamental * exp(s)` -- the price the model wanted before the book
     /// touched it -- and the printed price is what the book actually settled.
-    tick_components: Vec<[f64; 8]>,
+    tick_components: Vec<[f64; crate::market::factors::TICK_COMPONENT_COUNT]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
     /// This tick's print decomposition, per company slot: the shock that
@@ -349,6 +393,25 @@ pub struct Engine {
     /// How far the print breaker moved this tick's print, per slot. The
     /// book's own share is `tick_absorbed - tick_clamp`.
     tick_clamp: Vec<f64>,
+    /// How far each price was moved between its last print and this tick,
+    /// per slot, in log units: `log(the price the tick started from / the
+    /// last print)`. Zero on every tick nothing wrote the price between
+    /// prints. `repriced + shock + absorbed` is the print's log move from
+    /// the previous print, where `shock + absorbed` alone is its move from
+    /// the price the tick started from.
+    tick_repriced: Vec<f64>,
+    /// The log move written to each name's price since its last print and
+    /// not yet booked onto a tape row, per slot: the close's re-mark and a
+    /// `pin_macro`'s (`macro_publication_repricing`) and the opening print
+    /// (`overnight_variance_ratio`). The next tick moves it into
+    /// `tick_repriced` and zeroes it. NaN where it is not known, which is
+    /// after a `restore_state` on a model that can write a price between
+    /// prints: the snapshot does not carry it.
+    ///
+    /// RECORDING state, like the `tick_*` columns: it moves no price and no
+    /// draw, it is outside the snapshot and the state hash, and a fork
+    /// (`Clone`) carries it.
+    repriced_pending: Vec<f64>,
     /// The depth counterfactual, per company slot. Empty unless
     /// [`Engine::set_settle_depth_counterfactual`] turned it on, which is
     /// how the reporting surface knows whether it has an arm to report.
@@ -432,6 +495,17 @@ pub struct Engine {
     /// epicentre pin is: a fork taken between the pin and the close that
     /// dropped it would close a forced session as a free one.
     vix_sets_variance_pending: bool,
+    /// What a caller pinned today, for tonight's corporate yield
+    /// (`economy::daily`, the corporate yield between meetings). Bit
+    /// [`PIN_VIX`]: the close charges the corporate yield no VIX term, since
+    /// the close's VIX move is the law's reversion from the written level,
+    /// which the next pin discards. Bit [`PIN_CORPORATE`]: the pinned
+    /// corporate yield holds through the close. Set only while
+    /// `corporate_yield_daily` is on, cleared by the close, and carried by
+    /// the snapshot and the state hash only while non-zero, as
+    /// `vix_sets_variance_pending` is, so no engine that never pins, and no
+    /// preset through pt-v19, hashes or snapshots differently.
+    macro_pins_today: u8,
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
@@ -458,7 +532,29 @@ pub struct Engine {
     /// The day the engine is on, for the draw log and the day marks. Set by
     /// the caller that knows it (`set_current_day`), at each open, so the
     /// draws a close takes carry the day they close; zero on a fresh engine.
+    /// A LABEL: the fills the book stamps and the draw log carry it, and
+    /// nothing that prices reads it. The valuation reads `elapsed_days`.
     current_day: i64,
+    /// Trading days elapsed when the current day opened: the clock the
+    /// valuation reads, which is the buyback factor's elapsed time
+    /// (`buyback_payout_share`). `set_current_day` sets it with the label,
+    /// so a caller of the core sees one number as before; the Python
+    /// binding sets the two apart, the label from `first_day` or `set_day`
+    /// and this from its own day counter, so a label cannot reprice the
+    /// market. They are equal on every run that numbers its days from the
+    /// counter, which is every run that passes neither.
+    elapsed_days: i64,
+    /// The ticks run on the current day, carried across a restore. A
+    /// restore drops the day marks, which is where the count normally
+    /// lives (`ticks_today`), so a fill after it was stamped tick 0.
+    /// `None` until a restore sets it, and ignored once a day mark exists.
+    carried_ticks: Option<u32>,
+    /// Each company's fair-value inputs as it was built or listed: earnings,
+    /// book value and revenue growth per share. What `set_fundamentals`
+    /// changes is measured against this, so a snapshot carries the three
+    /// only once they have moved and every engine that was never told
+    /// anything snapshots and hashes as it did before they were carried.
+    base_fundamentals: Vec<[Option<f64>; 3]>,
     /// One mark per opened day: the day, the seven streams' draw positions
     /// at the open, the active company indices and the sector count, and
     /// the ticks the day ran. Together they map a `(day, company)` pair to
@@ -481,6 +577,17 @@ pub struct Engine {
     /// built with [`Engine::with_params`]; immutable for the engine's life,
     /// which is what lets its fingerprint be quoted for the whole run.
     params: ModelParams,
+    /// `params.fingerprint()`, taken the first time anything asks and kept.
+    ///
+    /// The fingerprint hashes the whole preset surface and then every
+    /// shipped preset to find a match, about a millisecond, and
+    /// [`Engine::state_hash`] folds it in. The sandbox's tamper guard hashes
+    /// the state twice around every call into agent code, so re-deriving it
+    /// each time was about 90 per cent of the guard's cost and a tenth of an
+    /// `evaluate`. `params` is fixed for the engine's life, so the first
+    /// answer is the only answer; a clone carries it with the params it
+    /// describes.
+    model_fingerprint: std::sync::OnceLock<String>,
     /// The VIX at which every variance coupling reads ONE — the factor's
     /// forward map, the sector draw's sigma, the per-name GARCH clamp
     /// reference and the jump arrival rate.
@@ -523,6 +630,66 @@ pub struct Engine {
     /// Diagnostic only, like `last_index_variance`, and kept OUT of
     /// `state_snapshot` and the state hash for the same reason.
     last_market_targets: Option<(f64, Option<f64>)>,
+    /// The rate instruments, if the embedder listed any
+    /// ([`Engine::set_rate_instruments`]). Empty on every engine built
+    /// without them, and an empty book is never touched: no hook runs, no
+    /// column or buffer grows and nothing extra is hashed, so such an engine
+    /// is the engine it was before rate instruments existed. They take no
+    /// draws and write nothing back to the economy, so adding them leaves
+    /// every equity price bit-identical. See `crate::rates`.
+    rates: crate::rates::RateBook,
+
+    /// The agent-facing book's state: consumed depth, agents' waiting
+    /// orders, their taker flow not yet applied, and fills and impact rows
+    /// not yet collected. See `crate::agent_book`.
+    ///
+    /// Pristine on every engine no agent has sent an order through, and a
+    /// pristine state takes no part in a tick, the state hash or the
+    /// snapshot, so every such run is the one it was before this existed.
+    book: crate::agent_book::BookState,
+
+    /// The phases the economy held at the last `cycle_publication_lag + 1`
+    /// closes, oldest first; the front is the phase published
+    /// ([`Engine::published_cycle_phase`]). Seeded at construction with the
+    /// opening phase, so until the lag's worth of sessions has closed the
+    /// opening phase is what an observer reads. Empty, never touched,
+    /// unsnapshotted and unhashed while the dial is 0.0, which every preset
+    /// through pt-v19 carries, so such an engine is the engine it was
+    /// before this existed.
+    cycle_history: std::collections::VecDeque<crate::economy::CyclePhase>,
+
+    /// The GDP growth figure as published under `gdp_publication_lag`, and
+    /// what it is computed from: the quarter being averaged and the
+    /// quarters averaged and awaiting release. Seeded at construction with
+    /// the opening growth. Default, never touched, unsnapshotted and
+    /// unhashed while the dial is 0.0, which every preset through pt-v19
+    /// carries.
+    gdp_publication: GdpPublication,
+}
+
+/// The state behind the published GDP growth figure
+/// (`gdp_publication_lag`), in the economy's percent.
+///
+/// Quarters are the macro calendar's own ([`crate::economy::MacroCalendar::days_per_quarter`]):
+/// day `d` belongs to quarter `d.div_euclid(q)`, the quarter whose first
+/// close takes the quarterly GDP step in `economy::daily`, and day 0, the
+/// opening, belongs to quarter 0. A quarter's figure is the mean of the true
+/// growth after each of its closes (the opening's value on day 0), and it is
+/// released on the close `lag` sessions after the quarter's last day.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct GdpPublication {
+    /// The figure an observer reads: the last quarter released, or the
+    /// opening growth before the first release.
+    pub published: f64,
+    /// The quarter being averaged.
+    pub quarter: i64,
+    /// Closes averaged so far in that quarter.
+    pub count: u32,
+    /// Their growth, summed.
+    pub sum: f64,
+    /// Quarters averaged and not yet released, oldest first: the close on
+    /// which each is released, and its figure.
+    pub pending: std::collections::VecDeque<(i64, f64)>,
 }
 
 impl Engine {
@@ -547,7 +714,7 @@ impl Engine {
     /// changes. A 30-name universe and a 100-name universe from one seed have
     /// nothing to do with each other.
     pub fn new(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -761,6 +928,124 @@ impl Engine {
         &self.jump_excitation
     }
 
+    /// Each name's log fair-value level `v`, in roster order, 0.0 where
+    /// nothing has moved it. See `ModelParams::fair_value_news_share`. For
+    /// checkpoints and forks; every preset through pt-v19 holds zeros.
+    pub fn fair_value_offsets(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.fair_value_offset.unwrap_or(0.0)).collect()
+    }
+
+    /// Put the fair-value levels back. A width mismatch is refused, as the
+    /// jump excitation's is: the levels are positional against the roster.
+    pub fn set_fair_value_offsets(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} fair-value levels and the roster holds {} \
+                 companies. The levels are positional against the roster, so this \
+                 restore is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        for (c, &v) in self.companies.iter_mut().zip(values) {
+            c.stock.fair_value_offset = if v == 0.0 { None } else { Some(v) };
+        }
+        Ok(())
+    }
+
+    /// The opening draws not yet applied: one standard normal per name of
+    /// the roster the engine was built with and one for the market's common
+    /// level, until the first open that is not closed takes them, and empty
+    /// after it. For checkpoints and forks. `state_hash` has covered them
+    /// since pt-v20 composed, and a snapshot that dropped them rebuilt a
+    /// pre-open engine that opened at other draws and hashed apart.
+    pub fn opening_z(&self) -> &[f64] {
+        &self.opening_z
+    }
+
+    /// Put the unapplied opening draws back. Empty is a legal state (the
+    /// opening has happened), and any other length must be the roster's
+    /// plus one, the length the engine drew.
+    pub fn set_opening_z(&mut self, values: &[f64]) -> Result<(), String> {
+        if !values.is_empty() && values.len() != self.companies.len() + 1 {
+            return Err(format!(
+                "this snapshot carries {} opening draws and the roster holds {} \
+                 companies, which draws {}. The draws are positional against the \
+                 roster, so this restore is refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len(),
+                self.companies.len() + 1
+            ));
+        }
+        self.opening_z = values.to_vec();
+        Ok(())
+    }
+
+    /// Whether this engine's model carries the volatility feedback's
+    /// smoothed exposure, which is when the snapshot and the state hash
+    /// carry it. Off on every preset through pt-v19; on for pt-v20.
+    pub fn carries_vix_feedback(&self) -> bool {
+        self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0
+    }
+
+    /// Whether this engine's model can move a fair-value level, which is
+    /// when the snapshot and the state hash carry them. Off on every preset
+    /// through pt-v19, so their snapshots and hashes are the ones they were.
+    pub fn carries_fair_value_offsets(&self) -> bool {
+        self.params.fair_value_news_share != 0.0
+            || self.params.fair_value_market_share != 0.0
+            || self.params.opening_mispricing_sigma != 0.0
+            || self.params.opening_market_sigma != 0.0
+    }
+
+    /// Whether this engine's model runs the variance cascade
+    /// (`garch_cascade_components` at 1 or more), which is when the snapshot
+    /// and the state hash carry its components. Off on every shipped
+    /// preset, so their snapshots and hashes are the ones they were.
+    pub fn carries_garch_cascade(&self) -> bool {
+        self.params.garch_cascade_components >= 1.0
+    }
+
+    /// Every company's cascade components, `CASCADE_MAX` per name in roster
+    /// order. For checkpoints and forks: the close updates them from the
+    /// day's return, so a restore that dropped them ran every name's
+    /// variance off another level (1.4 per cent in log price after twenty
+    /// days at three components).
+    pub fn garch_cascade(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .flat_map(|c| c.stock.garch_cascade.iter().copied())
+            .collect()
+    }
+
+    /// Put the cascade components back, `CASCADE_MAX` per name. A width
+    /// mismatch is refused, as the fair-value levels' is: the components
+    /// are positional against the roster.
+    pub fn set_garch_cascade(&mut self, values: &[f64]) -> Result<(), String> {
+        let width = crate::market::garch::CASCADE_MAX;
+        if values.len() != self.companies.len() * width {
+            return Err(format!(
+                "this snapshot carries {} variance cascade components and the \
+                 roster holds {} companies of {width} each. The components are \
+                 positional against the roster, so this restore is refused \
+                 rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        if let Some(v) = values.iter().find(|v| !v.is_finite()) {
+            return Err(format!(
+                "this snapshot's variance cascade holds {v}. A component is a \
+                 variance, and a non-finite one would carry into every price \
+                 its name prints."
+            ));
+        }
+        for (c, chunk) in self.companies.iter_mut().zip(values.chunks_exact(width)) {
+            c.stock.garch_cascade.copy_from_slice(chunk);
+        }
+        Ok(())
+    }
+
     /// Put the per-name jump excitation back. See
     /// [`Engine::jump_excitation`]. A width mismatch is refused, on the
     /// reasoning in [`Engine::set_volume_idio`], and this write sits AFTER
@@ -800,7 +1085,19 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.8.0 this is [`PT_V19`]: pt-v18 with four dials moved and
+    /// Since 0.8.5 this is [`PT_V20`]: pt-v19 with a tape that follows the
+    /// model price, a closing cross, the stock- and sector-specific part of
+    /// every shock in fair value, the agent-facing book on, the curve dials
+    /// and the aggregate earnings cycle. It holds all fifteen rows of the
+    /// fixed-roster panel at 252 days, fourteen of fourteen at 504, fifteen
+    /// on both held-out axes, and all 28 long-run criteria registered for
+    /// it (design repo, programme/ptv20-registration.md). It reads further
+    /// from real on two rows: the crisis lever is 3.60x against a real
+    /// 6.16x (pt-v19 5.22x), and on the level protocol the index returns
+    /// +1.14 per cent a year, inside the ruled band of 1.1 to 10.3 at its
+    /// floor (pt-v19 +7.65).
+    ///
+    /// In 0.8.0 and 0.8.1 it was [`PT_V19`]: pt-v18 with four dials moved and
     /// nothing else. It holds all fourteen shape rows at 252 and 504 days
     /// and on both held-out axes, as pt-v18 did, and every one of the
     /// fourteen at the real centre where pt-v18 held twelve. On the level
@@ -827,8 +1124,9 @@ impl Engine {
     /// anything recorded under one replays exactly by naming it.
     ///
     /// [`PT_V19`]: crate::params::PT_V19
+    /// [`PT_V20`]: crate::params::PT_V20
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V19
+        crate::params::PT_V20
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -836,7 +1134,7 @@ impl Engine {
     /// preset-constructed engine reproduces the const build's trajectories
     /// bit for bit, draw for draw — the phase-1 acceptance gate.
     pub fn with_params(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -871,7 +1169,7 @@ impl Engine {
     /// is what a caller naming an opening asked for, and it is what every
     /// preset before pt-v18 did.
     pub fn with_params_from_opening(
-        seed: u32,
+        seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,
         central_bank: CentralBankState,
@@ -880,6 +1178,12 @@ impl Engine {
         settle_opening: bool,
     ) -> Self {
         let companies_len = companies.len();
+        // Read before the companies move into the struct, and never
+        // rewritten: what `set_fundamentals` is measured against.
+        let base_fundamentals = companies
+            .iter()
+            .map(|c| [c.eps, c.book_value_per_share, c.revenue_growth])
+            .collect();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
@@ -895,14 +1199,25 @@ impl Engine {
             overnight_rng: GameRng::substream(seed, stream::OVERNIGHT),
             market_vol_level_rng: GameRng::substream(seed, stream::MARKET_VOL_LEVEL),
             crisis_epicentre_rng: GameRng::substream(seed, stream::CRISIS_EPICENTRE),
+            // One normal per name, then one for the market's common level,
+            // whenever either opening dial is on.
+            opening_z: if params.opening_mispricing_sigma != 0.0
+                || params.opening_market_sigma != 0.0
+            {
+                let mut g = GameRng::substream(seed, stream::OPENING);
+                (0..companies_len + 1).map(|_| g.next_normal()).collect()
+            } else {
+                Vec::new()
+            },
             overnight_moves: vec![0.0; companies_len],
+            jump_fair_value_moves: vec![0.0; companies_len],
             companies,
             economy,
             central_bank,
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
             noise_parts: vec![[0.0; 3]; companies_len],
             noise_own_scale2: vec![0.0; companies_len],
-            tick_components: vec![[0.0; 8]; companies_len],
+            tick_components: vec![[0.0; crate::market::factors::TICK_COMPONENT_COUNT]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
             // rather than as "not yet computed".
@@ -913,6 +1228,9 @@ impl Engine {
             tick_shock: vec![0.0; companies_len],
             tick_absorbed: vec![0.0; companies_len],
             tick_clamp: vec![0.0; companies_len],
+            tick_repriced: vec![0.0; companies_len],
+            // Nothing has been written to a price before the first print.
+            repriced_pending: vec![0.0; companies_len],
             // Empty until the counterfactual is switched on, so emptiness is
             // the one signal that says whether an arm ran.
             tick_unbounded_print: Vec::new(),
@@ -930,6 +1248,7 @@ impl Engine {
             crisis_epicentre: -1,
             crisis_epicentre_pin: None,
             vix_sets_variance_pending: false,
+            macro_pins_today: 0,
             session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -940,8 +1259,12 @@ impl Engine {
             sector_keys,
             draws: StreamDraws::default(),
             current_day: 0,
+            elapsed_days: 0,
+            carried_ticks: None,
+            base_fundamentals,
             day_marks: Vec::new(),
             params,
+            model_fingerprint: std::sync::OnceLock::new(),
             // Replaced immediately below. Zero rather than the dial's own
             // value so that a path which somehow skipped the derivation
             // would divide by zero rather than run on a plausible number.
@@ -949,6 +1272,10 @@ impl Engine {
             // No day has closed, so no VIX update has read a variance.
             last_index_variance: None,
             last_market_targets: None,
+            rates: crate::rates::RateBook::default(),
+            book: crate::agent_book::BookState::default(),
+            cycle_history: std::collections::VecDeque::new(),
+            gdp_publication: GdpPublication::default(),
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         // The opening meeting interval, 45 calendar days, onto the macro
@@ -961,10 +1288,332 @@ impl Engine {
                 cb.next_meeting_date = cb.last_meeting_date + cal.scale_days(45) * 24 * 60;
             }
         }
+        // Unemployment's impulse opens at the drive of the economy it opens
+        // in, so the adjustment starts stationary; the burn-in then runs it.
+        engine.seed_unemployment_impulse();
         if settle_opening {
             engine.burn_in_economy();
         }
+        // The earnings cycle opens at the level of the phase the economy
+        // opens in, so a market that opens in a contraction does not spend
+        // its first months drifting toward it: a stationary opening, as the
+        // mispricing's is. The opening's premium split books the difference
+        // into the names' fair-value levels, so no opening price moves.
+        if engine.params.earnings_cycle_depth != 0.0 {
+            engine.economy.earnings_cycle = engine.earnings_cycle_target();
+        }
+        engine.refresh_earnings_anticipation();
+        // After the burn-in and the stationary opening, so the phase the
+        // run opens in is the one published until the lag has elapsed.
+        engine.seed_cycle_history();
+        // Likewise the growth the run opens at, as day 0 of quarter 0.
+        engine.seed_gdp_publication(0);
         engine
+    }
+
+    /// The share of the gap to its drive unemployment's impulse closes at a
+    /// monthly release, from `unemployment_adjustment_half_life`; 0.0 off.
+    fn unemployment_adjustment(&self) -> f64 {
+        let h = self.params.unemployment_adjustment_half_life;
+        if h == 0.0 {
+            return 0.0;
+        }
+        1.0 - crate::mathx::pow(0.5, self.macro_calendar().month_f64() / h)
+    }
+
+    /// Set unemployment's impulse to what its cyclical drivers ask for in
+    /// the economy as it stands: at construction, or on a restore from a
+    /// snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_unemployment_impulse(&mut self) {
+        if self.params.unemployment_adjustment_half_life == 0.0 {
+            return;
+        }
+        let e = &self.economy;
+        let phase = crate::economy::phase_characteristics_for(
+            e.cycle_phase, self.params.cycle_us_calibration != 0.0);
+        self.economy.unemployment_impulse = crate::economy::daily::unemployment_drive(
+            phase.unemployment_trend, e.cycle_phase, e.gdp_growth);
+    }
+
+    /// `gdp_publication_lag` in sessions; 0 is off.
+    pub fn gdp_publication_lag(&self) -> i64 {
+        self.params.gdp_publication_lag as i64
+    }
+
+    /// GDP growth as published, in percent: the mean of the true daily
+    /// growth over the last macro-calendar quarter released, released
+    /// `gdp_publication_lag` sessions after that quarter's last close, and
+    /// the opening growth until the first release. With the dial at 0.0 the
+    /// growth the economy runs at, `economy().gdp_growth`.
+    ///
+    /// Every route that REPORTS growth reads this; everything that MOVES on
+    /// it (output, earnings, unemployment, the cycle's hazards, the central
+    /// bank) reads the true figure.
+    pub fn published_gdp_growth(&self) -> f64 {
+        if self.params.gdp_publication_lag == 0.0 {
+            return self.economy.gdp_growth;
+        }
+        self.gdp_publication.published
+    }
+
+    /// The published figure and the quarters behind it. Default with the
+    /// dial at 0.0.
+    pub fn gdp_publication(&self) -> &GdpPublication {
+        &self.gdp_publication
+    }
+
+    /// Put the published figure's state back (a restore). Refuses any
+    /// state while the dial is 0.0, a quarter with no close averaged,
+    /// non-finite figures, and releases out of order.
+    pub fn set_gdp_publication(&mut self, state: GdpPublication) -> Result<(), String> {
+        if self.params.gdp_publication_lag == 0.0 {
+            return Err(
+                "this snapshot carries a published GDP growth state, and this \
+                 engine's gdp_publication_lag is 0, so it keeps none".to_string());
+        }
+        if state.count == 0 {
+            return Err(
+                "this snapshot's published GDP growth state averages no close \
+                 in its quarter; gdp_publication_lag's state always holds one".to_string());
+        }
+        let finite = state.published.is_finite() && state.sum.is_finite()
+            && state.pending.iter().all(|&(_, v)| v.is_finite());
+        if !finite {
+            return Err(
+                "this snapshot's published GDP growth state (gdp_publication_lag) \
+                 carries a non-finite figure".to_string());
+        }
+        if state.pending.iter().zip(state.pending.iter().skip(1)).any(|(a, b)| a.0 >= b.0) {
+            return Err(
+                "this snapshot's pending GDP releases (gdp_publication_lag) are \
+                 not in release order".to_string());
+        }
+        self.gdp_publication = state;
+        Ok(())
+    }
+
+    /// Start the published figure at the growth the economy holds now,
+    /// taken as the value of `day`, the last day closed: the opening (day
+    /// 0), or a restore from a snapshot that carried no state. The quarter
+    /// `day` falls in is averaged from this value on; nothing is pending.
+    /// Nothing with the dial at 0.0.
+    pub fn seed_gdp_publication(&mut self, day: i64) {
+        if self.params.gdp_publication_lag == 0.0 {
+            self.gdp_publication = GdpPublication::default();
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let g = self.economy.gdp_growth;
+        self.gdp_publication = GdpPublication {
+            published: g,
+            quarter: day.div_euclid(q),
+            count: 1,
+            sum: g,
+            pending: std::collections::VecDeque::new(),
+        };
+    }
+
+    /// The close of `day` into the published figure: a new quarter closes
+    /// the one before (its mean queued for release `lag` sessions after its
+    /// last day), the day's growth joins its quarter, and every release due
+    /// by this close is published, the latest last. Nothing with the dial
+    /// at 0.0.
+    fn record_gdp_growth(&mut self, day: i64) {
+        let lag = self.gdp_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        let q = self.macro_calendar().days_per_quarter();
+        let quarter = day.div_euclid(q);
+        let growth = self.economy.gdp_growth;
+        let p = &mut self.gdp_publication;
+        if quarter != p.quarter {
+            if p.count > 0 {
+                let last_day = (p.quarter + 1) * q - 1;
+                p.pending.push_back((last_day + lag, p.sum / f64::from(p.count)));
+            }
+            p.quarter = quarter;
+            p.count = 0;
+            p.sum = 0.0;
+        }
+        p.sum += growth;
+        p.count += 1;
+        while let Some(&(release, value)) = p.pending.front() {
+            if release > day {
+                break;
+            }
+            p.published = value;
+            p.pending.pop_front();
+        }
+    }
+
+    /// `cycle_publication_lag` in sessions; 0 is off.
+    pub fn cycle_publication_lag(&self) -> usize {
+        self.params.cycle_publication_lag as usize
+    }
+
+    /// The business-cycle phase as published: the phase the economy held at
+    /// the close `cycle_publication_lag` sessions ago, or the opening phase
+    /// while fewer than that many sessions have closed. With the dial at 0.0
+    /// the phase the economy is in, `economy().cycle_phase`.
+    ///
+    /// Every route that REPORTS the phase reads this; everything that PRICES
+    /// or MOVES on it (the earnings cycle and its anticipation, the cycle's
+    /// hazards, the stress intensity, the central bank) reads the true phase.
+    pub fn published_cycle_phase(&self) -> crate::economy::CyclePhase {
+        if self.params.cycle_publication_lag == 0.0 {
+            return self.economy.cycle_phase;
+        }
+        self.cycle_history.front().copied().unwrap_or(self.economy.cycle_phase)
+    }
+
+    /// The phase history the published phase is read from, oldest first:
+    /// `cycle_publication_lag + 1` phases, the last the current one as of
+    /// the last close. Empty with the dial at 0.0.
+    pub fn cycle_history(&self) -> &std::collections::VecDeque<crate::economy::CyclePhase> {
+        &self.cycle_history
+    }
+
+    /// Put a phase history back (a restore). Refuses one whose length is not
+    /// `cycle_publication_lag + 1`, or any history while the dial is 0.0.
+    pub fn set_cycle_history(
+        &mut self,
+        history: Vec<crate::economy::CyclePhase>,
+    ) -> Result<(), String> {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            if history.is_empty() {
+                return Ok(());
+            }
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and this engine's cycle_publication_lag is 0, so it keeps none",
+                history.len()));
+        }
+        if history.len() != lag + 1 {
+            return Err(format!(
+                "this snapshot carries a published-phase history of {} phases, \
+                 and cycle_publication_lag {} keeps {}",
+                history.len(), lag, lag + 1));
+        }
+        self.cycle_history = history.into();
+        Ok(())
+    }
+
+    /// Fill the history with the current phase: the opening, or a restore
+    /// from a snapshot that carried none. Nothing with the dial at 0.0.
+    pub fn seed_cycle_history(&mut self) {
+        let lag = self.cycle_publication_lag();
+        self.cycle_history.clear();
+        if lag > 0 {
+            self.cycle_history.extend(std::iter::repeat_n(self.economy.cycle_phase, lag + 1));
+        }
+    }
+
+    /// Record the phase the close has left the economy in, and drop the
+    /// oldest. Nothing with the dial at 0.0.
+    fn record_cycle_phase(&mut self) {
+        let lag = self.cycle_publication_lag();
+        if lag == 0 {
+            return;
+        }
+        self.cycle_history.push_back(self.economy.cycle_phase);
+        while self.cycle_history.len() > lag + 1 {
+            self.cycle_history.pop_front();
+        }
+    }
+
+    /// The anticipated earnings level's phase terms, `g_p` in
+    /// [`crate::economy::cycle::phase_cycle`] order, and its weight `c` on
+    /// the current level. `None` with the anticipation or the cycle off.
+    ///
+    /// # The derivation
+    ///
+    /// The valuation reads `A = E[ integral rho e^(-rho s) e(t+s) ds ]`, the
+    /// earnings cycle's level averaged over the future with a discount of
+    /// `rho = ln 2 / earnings_anticipation_half_life` a session. The level
+    /// follows the engine's own law, `de = kappa (T_p - e)` with `kappa =
+    /// ln 2 / earnings_cycle_half_life` toward the phase's target `T_p`
+    /// (`-depth` in a contraction or a trough, `+depth * upside` otherwise),
+    /// and the phase leaves at the rate `lambda_p = 1 / E[T_p]`, its mean
+    /// sojourn on the engine's own hazard table (`mean_sojourn_days_for`),
+    /// to the next phase of the cycle. Trying `A = c e + g_p` in the
+    /// generator equation `rho A = rho e + kappa (T_p - e) dA/de +
+    /// lambda_p (A_next - A)` gives `c = rho / (rho + kappa)` and
+    /// `(rho + lambda_p) g_p = kappa c T_p + lambda_p g_next`, five linear
+    /// equations around the cycle, solved here in closed form.
+    ///
+    /// So a turn of phase moves `A` at once, by `g_next - g_p`, and a
+    /// trough, from which a recovery is nearer than from a contraction,
+    /// already reads above a contraction while the level is still falling:
+    /// the price's trough leads the earnings'. The sojourns are treated as
+    /// exponential, where the table's are Weibull; that is the one
+    /// approximation.
+    pub fn earnings_anticipation_terms(&self) -> Option<([f64; 5], f64)> {
+        let p = &self.params;
+        if p.earnings_anticipation_half_life <= 0.0 || p.earnings_cycle_depth == 0.0 {
+            return None;
+        }
+        let rho = std::f64::consts::LN_2 / p.earnings_anticipation_half_life;
+        let kappa = std::f64::consts::LN_2 / p.earnings_cycle_half_life;
+        let c = rho / (rho + kappa);
+        let (mean, _) = crate::economy::cycle::stationary_phase_shares_for(&self.cycle_spec());
+        let phases = crate::economy::cycle::phase_cycle();
+        let target = |ph: crate::economy::CyclePhase| match ph {
+            crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                -p.earnings_cycle_depth
+            }
+            _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+        };
+        let mut a = [0.0; 5];
+        let mut b = [0.0; 5];
+        for k in 0..5 {
+            let lambda = if mean[k] > 0.0 { 1.0 / mean[k] } else { 0.0 };
+            a[k] = kappa * c * target(phases[k]) / (rho + lambda);
+            b[k] = lambda / (rho + lambda);
+        }
+        // g_k = a_k + b_k g_(k+1): unroll once around the cycle for g_0,
+        // then walk backwards.
+        let mut acc_a = 0.0;
+        let mut acc_b = 1.0;
+        for k in 0..5 {
+            acc_a += acc_b * a[k];
+            acc_b *= b[k];
+        }
+        let mut g = [0.0; 5];
+        g[0] = acc_a / (1.0 - acc_b);
+        for k in (1..5).rev() {
+            let next = if k == 4 { g[0] } else { g[k + 1] };
+            g[k] = a[k] + b[k] * next;
+        }
+        Some((g, c))
+    }
+
+    /// Keep `economy.earnings_anticipation` current: `A - e`, or 0.0 with
+    /// the anticipation off. Called wherever the phase or the level moves.
+    pub fn refresh_earnings_anticipation(&mut self) {
+        self.economy.earnings_anticipation = match self.earnings_anticipation_terms() {
+            None => 0.0,
+            Some((g, c)) => {
+                let k = crate::economy::cycle::phase_cycle()
+                    .iter()
+                    .position(|ph| *ph == self.economy.cycle_phase)
+                    .unwrap_or(0);
+                g[k] + c * self.economy.earnings_cycle - self.economy.earnings_cycle
+            }
+        };
+    }
+
+    /// The level the earnings cycle is pulled toward in the current phase:
+    /// `-depth` in a contraction or a trough, `+depth * upside` otherwise.
+    fn earnings_cycle_target(&self) -> f64 {
+        let p = &self.params;
+        match self.economy.cycle_phase {
+            crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                -p.earnings_cycle_depth
+            }
+            _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+        }
     }
 
     /// The VIX at which every variance coupling reads one.
@@ -1505,6 +2154,13 @@ impl Engine {
         &self.params
     }
 
+    /// `self.params().fingerprint()`, worked out once per engine. A shipped
+    /// preset's name, or `custom-XXXXXXXX`. See the field for why it is
+    /// kept.
+    pub fn model_fingerprint(&self) -> &str {
+        self.model_fingerprint.get_or_init(|| self.params.fingerprint())
+    }
+
     /// The macro calendar `macro_calendar_days_per_year` selects.
     pub fn macro_calendar(&self) -> crate::economy::MacroCalendar {
         crate::economy::MacroCalendar::from_days_per_year(self.params.macro_calendar_days_per_year)
@@ -1663,6 +2319,7 @@ impl Engine {
     /// two together by behaviour: a market uniform patched just under it
     /// fires and one just over it does not.
     #[rustfmt::skip]
+    #[allow(clippy::let_and_return, reason = "the body is generated by tools/mechanism/emit.py, which binds every mechanism output by name")]
     pub fn market_jump_intensity(&self) -> f64 {
         // mechanism:jumps.intensity_market begin -- generated by tools/mechanism/emit.py from
         // tools/mechanism/mechanisms/jumps.py; do not edit by hand.
@@ -1678,33 +2335,63 @@ impl Engine {
     /// its own: `run_session` and `tick` take no day, and only the caller
     /// that numbers its days does.
     ///
-    /// It was a label until pt-v18. The sentence here used to read that
-    /// nothing in the tick, the close or the macro chain consults it, so
-    /// moving it could not move a trajectory. `buyback_payout_share` made
-    /// that false: the buyback factor is an earnings yield over elapsed
-    /// time and this is the elapsed time, so under a preset that sets that
-    /// share, moving this number reprices every name.
+    /// Sets both of the engine's day numbers: the label the draw log, the
+    /// day marks and the book's fill stamps carry, and the elapsed trading
+    /// days the valuation reads (`elapsed_days`). A caller of the core that
+    /// counts its days from zero, which is what this has always asked of
+    /// one, sees one number and the behaviour it always had.
+    ///
+    /// It was a label until pt-v18. `buyback_payout_share` made the number
+    /// the valuation's clock as well: the buyback factor is an earnings
+    /// yield over elapsed time. With one field serving both, a label moved
+    /// the market. `run_days(first_day=1000)` on pt-v20 priced every name as
+    /// though a thousand days had passed, 0.17 in log price within thirty
+    /// days, and the log recorded no input that said so. So the two are two
+    /// fields now, and [`Engine::set_day_label`] moves the label alone.
     ///
     /// `open_market` is the only caller that must run before a draw is
     /// taken, because the day mark and the day's news draws are taken
-    /// there, and `PyEngine::restore_state` pushes the restored day here
-    /// for the mid-day case that no open follows.
-    ///
-    /// The valuation and the draw log want different things from this
-    /// field, elapsed trading days and a label, and they coincide only
-    /// because one counter serves both. Giving the valuation its own
-    /// counter is the better answer and it costs a snapshot field and a
-    /// state-hash entry, beside a `day` key the snapshot already carries,
-    /// so it belongs to a preset boundary rather than to a fix inside one.
+    /// there, and `PyEngine::restore_state` sets both numbers for the
+    /// mid-day case that no open follows.
     pub fn set_current_day(&mut self, day: i64) {
+        self.set_day_label(day);
+        self.elapsed_days = day;
+    }
+
+    /// Move the label alone: the day the draw log, the day marks and the
+    /// book's fill stamps carry. Nothing that prices reads it.
+    pub fn set_day_label(&mut self, day: i64) {
         self.current_day = day;
         for id in 0..stream::COUNT as u32 {
             self.stream_rng_mut(id).set_day(day);
         }
     }
 
+    /// Set the valuation's clock alone: trading days elapsed at the open of
+    /// the current day. See `elapsed_days` on the struct.
+    pub fn set_elapsed_days(&mut self, days: i64) {
+        self.elapsed_days = days;
+    }
+
     pub fn current_day(&self) -> i64 {
         self.current_day
+    }
+
+    /// Trading days elapsed at the open of the current day, the number the
+    /// valuation reads.
+    pub fn elapsed_days(&self) -> i64 {
+        self.elapsed_days
+    }
+
+    /// The ticks run on the current day: the tick a fill is stamped with.
+    pub fn session_ticks(&self) -> u32 {
+        self.ticks_today()
+    }
+
+    /// Put back the ticks a restored day had run, for the fills stamped
+    /// before the next open. See `carried_ticks` on the struct.
+    pub fn set_session_ticks(&mut self, ticks: u32) {
+        self.carried_ticks = Some(ticks);
     }
 
     /// `(uniforms, normals)` taken so far on each stream, by stream id.
@@ -1817,6 +2504,17 @@ impl Engine {
         outcome.draws_consumed = consumed;
         if let Some(mark) = self.day_marks.last_mut() {
             mark.ticks += 1;
+        } else if let Some(ticks) = self.carried_ticks.as_mut() {
+            // A restored day with no mark of its own: counted here, so the
+            // fills of its later ticks carry the tick the original's did.
+            *ticks += 1;
+        }
+        // The rate indices' minute, after the equities' and reading nothing
+        // they wrote: the economy does not move inside a tick, and the flow
+        // an instrument reads is keyed by its own ticker, which no equity
+        // carries. No draw.
+        if !self.rates.is_empty() {
+            self.rates.tick(request.time, &self.economy, request.order_volumes);
         }
         outcome
     }
@@ -1931,6 +2629,80 @@ impl Engine {
             let t = crate::market::tick::sector_sigma_at(&self.params, &self.economy, self.vix_anchor);
             self.sector_target_day = t * t;
         }
+        if !self.opening_z.is_empty() && status != crate::market::MarketStatus::Closed {
+            self.apply_opening();
+        }
+        // The agent-facing book's part of the tick, before the market moves:
+        // the maker re-quotes on the inventory agents left it and the
+        // consumed depth refills; agents' taker flow reaches the market,
+        // once, on the first tick that is not closed; resting orders join
+        // the settlement book. None of it runs on an engine no agent has
+        // used, which is what keeps every such tick the tick it was.
+        let book_on = !self.book.is_pristine();
+        let open_now = status == MarketStatus::Open;
+        if book_on && open_now {
+            self.requote_book();
+        }
+        let mut merged_flow: Option<Vec<(String, OrderVolume)>> = None;
+        let mut fill_impact: Vec<f64> = Vec::new();
+        let mut applied: Vec<(String, String, f64, f64)> = Vec::new();
+        if book_on && status != MarketStatus::Closed && !self.book.flow.is_empty() {
+            applied = std::mem::take(&mut self.book.flow);
+            if self.params.fill_impact_coefficient != 0.0 {
+                fill_impact = vec![0.0; self.companies.len()];
+                for (_, t, b, s) in &applied {
+                    if let Some(i) = self.companies.iter().position(|c| &c.ticker == t) {
+                        fill_impact[i] += self.fill_impact_of(i, b - s);
+                    }
+                }
+            } else {
+                let mut agg: Vec<(String, OrderVolume)> = Vec::new();
+                for (_, t, b, s) in &applied {
+                    match agg.iter_mut().find(|(x, _)| x == t) {
+                        Some((_, v)) => {
+                            v.buy += *b;
+                            v.sell += *s;
+                        }
+                        None => agg.push((t.clone(), OrderVolume { buy: *b, sell: *s })),
+                    }
+                }
+                merged_flow = Some(merge_order_volumes(request.order_volumes, &agg));
+            }
+        }
+        let resting: Vec<Vec<crate::microstructure::RestingOrder>> = if book_on
+            && open_now
+            && self.book.orders.iter().any(|o| o.mode == crate::agent_book::RestMode::Queue)
+        {
+            let mut per: Vec<Vec<crate::microstructure::RestingOrder>> =
+                vec![Vec::new(); self.companies.len()];
+            for o in &self.book.orders {
+                if o.mode != crate::agent_book::RestMode::Queue {
+                    continue;
+                }
+                if let Some(i) = self.companies.iter().position(|c| c.ticker == o.ticker) {
+                    per[i].push(crate::microstructure::RestingOrder {
+                        id: o.id.clone(),
+                        side: o.side,
+                        price: o.limit,
+                        quantity: o.remaining,
+                        owner_id: o.agent.clone(),
+                    });
+                }
+            }
+            per
+        } else {
+            Vec::new()
+        };
+        let prints_before: Vec<f64> = if book_on {
+            self.companies.iter().map(|c| c.stock.price).collect()
+        } else {
+            Vec::new()
+        };
+        let order_volumes: &[(String, OrderVolume)] = match &merged_flow {
+            Some(flow) => flow.as_slice(),
+            None => request.order_volumes,
+        };
+
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -1959,18 +2731,20 @@ impl Engine {
                 volatility_multiplier: request.volatility_multiplier,
                 news: request.news,
                 news_impact_queue: request.news_impact_queue,
-                order_volumes: request.order_volumes,
+                order_volumes,
                 sector_keys: &self.sector_keys,
                 sector_sigmas: &sector_sigmas,
                 market_sigma_daily,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
+                resting_orders: &resting,
+                fill_impact: &fill_impact,
                 nominal_output_base: self.nominal_output_base,
                 // Resolved at this session's `open_market` and fixed for
                 // the day; `None` on every preset before pt-v19.
                 crisis_epicentre: epicentre,
-                elapsed_days: self.current_day,
+                elapsed_days: self.elapsed_days,
                 params: &self.params,
             },
             rng,
@@ -2008,7 +2782,7 @@ impl Engine {
         // is true, and keeps the columns summing to a Δs of zero. Carrying the
         // previous tick's values forward would invent activity.
         for slot in self.tick_components.iter_mut() {
-            *slot = [0.0; 8];
+            *slot = [0.0; crate::market::factors::TICK_COMPONENT_COUNT];
         }
         // The print decomposition is zeroed on the same argument and for the
         // same reason: a company that did not tick moved by nothing, so its
@@ -2022,6 +2796,18 @@ impl Engine {
         }
         for slot in self.tick_clamp.iter_mut() {
             *slot = 0.0;
+        }
+        // Every slot's row prints, active or not, so every slot books what
+        // was written to its price since the last print, and the pending
+        // value is spent. A name that did not tick prints the price it
+        // carries, so its row's move is exactly this.
+        self.tick_repriced.clear();
+        self.tick_repriced.resize(self.companies.len(), 0.0);
+        for (slot, pending) in self.repriced_pending.iter_mut().enumerate() {
+            if let Some(v) = self.tick_repriced.get_mut(slot) {
+                *v = *pending;
+            }
+            *pending = 0.0;
         }
         // The counterfactual columns are prices, so their zero is the price
         // the company is carrying: unbounded depth does not move a name that
@@ -2043,7 +2829,7 @@ impl Engine {
                 outcome.s_components.get(n),
             ) {
                 for (k, value) in computed.iter().enumerate() {
-                    acc[k] += value;
+                    acc[crate::market::factors::attribution_slot_for_tick(k)] += value;
                 }
             }
             if let (Some(row), Some(computed)) = (
@@ -2109,12 +2895,573 @@ impl Engine {
             }
         }
 
+        if book_on {
+            self.settle_book(&outcome, &applied, &prints_before, open_now);
+        }
+
         TickOutcome {
             market_status: status,
             active_indices: outcome.active_indices,
             fair_values: outcome.fair_values,
             volumes: outcome.volumes,
             draws_consumed: 0,
+        }
+    }
+
+    /// The maker re-quotes: the inventory agents left it lands, its ladder
+    /// is whole again, and consumed latent depth refills by one tick.
+    fn requote_book(&mut self) {
+        use crate::agent_book::*;
+        let refill = refill_factor(&self.params);
+        for (i, row) in self.book.taken.iter_mut().enumerate() {
+            if row[TAKEN_MAKER_INVENTORY] != 0.0 {
+                if let Some(c) = self.companies.get_mut(i) {
+                    c.stock.maker_inventory =
+                        Some(c.stock.maker_inventory.unwrap_or(0.0) + row[TAKEN_MAKER_INVENTORY]);
+                }
+                row[TAKEN_MAKER_INVENTORY] = 0.0;
+            }
+            row[TAKEN_MAKER_BID] = 0.0;
+            row[TAKEN_MAKER_ASK] = 0.0;
+            for k in [TAKEN_DEPTH_BID, TAKEN_DEPTH_ASK] {
+                // Below a millionth of a share it is gone, rather than a
+                // geometric tail that never reaches zero.
+                row[k] = if row[k] * refill < 1e-6 { 0.0 } else { row[k] * refill };
+            }
+        }
+    }
+
+    /// The linear law's change to one name's `s` for a net signed size:
+    /// `gamma * sigma * net / V`.
+    fn fill_impact_of(&self, index: usize, net: f64) -> f64 {
+        let c = &self.companies[index];
+        let sigma = crate::agent_book::daily_sigma(c, self.market_vol.sigma_daily());
+        self.params.fill_impact_coefficient * sigma * net / crate::agent_book::daily_volume(c)
+    }
+
+    /// After the market moved: attribute the flow that was applied, record
+    /// the fills of resting orders in the settlement, and fill any waiting
+    /// limit the tick's print reached.
+    fn settle_book(
+        &mut self,
+        outcome: &crate::market::TickOutcome,
+        applied: &[(String, String, f64, f64)],
+        prints_before: &[f64],
+        open_now: bool,
+    ) {
+        use crate::agent_book::*;
+        let (day, tick) = (self.current_day, self.ticks_today());
+
+        // Permanent impact, per agent and name.
+        let linear = self.params.fill_impact_coefficient != 0.0;
+        for (agent, t, b, s) in applied {
+            let Some(i) = self.companies.iter().position(|c| &c.ticker == t) else {
+                continue;
+            };
+            let Some(n) = outcome.active_indices.iter().position(|&x| x == i) else {
+                continue;
+            };
+            let permanent = if linear {
+                self.fill_impact_of(i, b - s)
+            } else {
+                let mut net = 0.0;
+                for (_, t2, b2, s2) in applied {
+                    if t2 == t {
+                        net += b2 - s2;
+                    }
+                }
+                if net == 0.0 {
+                    0.0
+                } else {
+                    outcome.s_components[n][4] * (b - s) / net
+                }
+            };
+            self.book.impacts.push(AgentImpact {
+                agent: agent.clone(),
+                ticker: t.clone(),
+                bought: *b,
+                sold: *s,
+                permanent,
+                day,
+                tick,
+            });
+        }
+
+        // Resting orders the settlement filled. A resting order the maker's
+        // re-quote left crossed took liquidity, so its share of the fills
+        // is taker flow like any other agent's, and reaches the market on
+        // the next tick. Left out, a standing bid at the ask would take the
+        // maker's fresh size every tick and never pay the impact of it.
+        for (i, f) in &outcome.agent_fills {
+            let ticker = self.companies[*i].ticker.clone();
+            if f.taker {
+                self.book.add_flow(&f.agent, &ticker, f.side, f.quantity);
+            }
+            self.reduce_order(&f.order_id, f.quantity);
+            self.push_fill(AgentFill {
+                agent: f.agent.clone(),
+                order_id: f.order_id.clone(),
+                ticker,
+                side: f.side,
+                quantity: f.quantity,
+                price: f.price,
+                liquidity: if f.taker { Liquidity::Taker } else { Liquidity::Maker },
+                counterparty: f.counterparty.clone(),
+                reference: prints_before.get(*i).copied().unwrap_or(f64::NAN),
+                day,
+                tick,
+                sequence: 0,
+            });
+        }
+
+        // Limits waiting for the traded range.
+        if open_now {
+            let waiting: Vec<AgentOrder> = self
+                .book
+                .orders
+                .iter()
+                .filter(|o| o.mode == RestMode::Range)
+                .cloned()
+                .collect();
+            for o in waiting {
+                let Some(i) = self.companies.iter().position(|c| c.ticker == o.ticker) else {
+                    continue;
+                };
+                if !outcome.active_indices.contains(&i) {
+                    continue;
+                }
+                let print = self.companies[i].stock.price;
+                if !range_reached(o.side, o.limit, print) {
+                    continue;
+                }
+                self.reduce_order(&o.id, o.remaining);
+                self.push_fill(AgentFill {
+                    agent: o.agent.clone(),
+                    order_id: o.id.clone(),
+                    ticker: o.ticker.clone(),
+                    side: o.side,
+                    quantity: o.remaining,
+                    price: o.limit,
+                    liquidity: Liquidity::Range,
+                    counterparty: RANGE_OWNER.to_string(),
+                    reference: prints_before.get(i).copied().unwrap_or(f64::NAN),
+                    day,
+                    tick,
+                    sequence: 0,
+                });
+            }
+        }
+    }
+
+    // ── Agents' orders: the agent-facing book ──────────────────────────────
+    //
+    // `crate::agent_book` carries the model. What is here is the engine's
+    // half: an order meeting the book, what it leaves behind, and what the
+    // tick does with it.
+
+    /// The agent-facing book's state, for a snapshot.
+    pub fn book_state(&self) -> &crate::agent_book::BookState {
+        &self.book
+    }
+
+    /// Install a book state, for a restore. `taken` must follow the roster
+    /// or be empty.
+    pub fn set_book_state(&mut self, state: crate::agent_book::BookState) -> Result<(), String> {
+        if !state.taken.is_empty() && state.taken.len() != self.companies.len() {
+            return Err(format!(
+                "the book's consumed-depth table has {} rows and the roster {} names",
+                state.taken.len(),
+                self.companies.len()
+            ));
+        }
+        self.book = state;
+        Ok(())
+    }
+
+    /// Whether an agent's order must execute in the engine rather than be
+    /// priced off a snapshot of the book: when agents consume the book they
+    /// share, or when their limit orders rest in it.
+    pub fn book_live(&self) -> bool {
+        self.params.book_shared != 0.0 || self.params.book_resting != 0.0
+    }
+
+    /// Whether the book a caller reads is the agent-facing one rather than
+    /// the maker's ladder alone.
+    fn agent_view(&self) -> bool {
+        self.book_live() || self.params.book_depth_coefficient != 0.0 || !self.book.is_pristine()
+    }
+
+    /// The ticks already run on the current day: the day mark's count, or
+    /// the count a restore carried when no day has opened since it.
+    fn ticks_today(&self) -> u32 {
+        match self.day_marks.last() {
+            Some(m) => m.ticks,
+            None => self.carried_ticks.unwrap_or(0),
+        }
+    }
+
+    /// The agent-facing book for one name, leaving out one agent's orders.
+    fn agent_book_at(&self, index: usize, exclude: Option<&str>) -> Option<crate::order_book::OrderBook> {
+        let company = self.companies.get(index)?;
+        let taken = self
+            .book
+            .taken
+            .get(index)
+            .copied()
+            .unwrap_or([0.0; crate::agent_book::TAKEN_WIDTH]);
+        Some(crate::agent_book::agent_book(&crate::agent_book::AgentBookInputs {
+            company,
+            vix: self.economy.vix,
+            params: &self.params,
+            market_sigma_daily: self.market_vol.sigma_daily(),
+            taken,
+            orders: &self.book.orders,
+            exclude_agent: exclude,
+        }))
+    }
+
+    fn push_fill(&mut self, mut fill: crate::agent_book::AgentFill) -> crate::agent_book::AgentFill {
+        fill.sequence = self.book.fill_sequence;
+        self.book.fill_sequence += 1;
+        self.book.fills.push(fill.clone());
+        fill
+    }
+
+    /// Reduce a waiting order by a fill, removing it once it is done.
+    fn reduce_order(&mut self, order_id: &str, quantity: f64) {
+        if let Some(o) = self.book.orders.iter_mut().find(|o| o.id == order_id) {
+            o.remaining -= quantity;
+        }
+        self.book.orders.retain(|o| o.remaining > 1e-9);
+    }
+
+    /// An order meets the book an agent trades against, for one name.
+    ///
+    /// Everything it takes is recorded: the consumed depth and the maker's
+    /// inventory when the book is shared, the other agents' resting orders
+    /// it hit, a taker fill per level and, when `count_flow`, the taker flow
+    /// the next tick applies. Returns the taker fills and the mid the order
+    /// met.
+    #[allow(clippy::too_many_arguments)]
+    fn meet_book(
+        &mut self,
+        index: usize,
+        agent: &str,
+        order_id: &str,
+        side: crate::order_book::Side,
+        quantity: f64,
+        limit: Option<f64>,
+        count_flow: bool,
+    ) -> (Vec<crate::agent_book::AgentFill>, f64) {
+        use crate::agent_book::{self as ab, AgentFill, Liquidity};
+        use crate::order_book::{Side, SubmitOptions};
+        let Some(mut book) = self.agent_book_at(index, Some(agent)) else {
+            return (Vec::new(), f64::NAN);
+        };
+        let ticker = self.companies[index].ticker.clone();
+        let reference = book.mid_price().unwrap_or(self.companies[index].stock.price);
+        let r = book.submit(
+            side,
+            quantity,
+            agent,
+            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None, skip_own: true },
+        );
+        let shared = self.params.book_shared != 0.0;
+        if shared {
+            self.book.fit(self.companies.len());
+        }
+        let (day, tick) = (self.current_day, self.ticks_today());
+        let mut taker = Vec::with_capacity(r.fills.len());
+        for f in &r.fills {
+            let owner = f.maker_id.as_str();
+            if shared {
+                if let Some(slot) = ab::taken_slot(side, owner) {
+                    self.book.taken[index][slot] += f.quantity;
+                }
+                if owner == crate::market_maker::MARKET_MAKER_ID {
+                    // The maker is opposite the taker; it quotes on this
+                    // from its next re-quote.
+                    self.book.taken[index][ab::TAKEN_MAKER_INVENTORY] += match side {
+                        Side::Buy => -f.quantity,
+                        Side::Sell => f.quantity,
+                    };
+                }
+            }
+            if !ab::is_house(owner) {
+                self.reduce_order(&f.maker_order_id, f.quantity);
+                self.push_fill(AgentFill {
+                    agent: owner.to_string(),
+                    order_id: f.maker_order_id.clone(),
+                    ticker: ticker.clone(),
+                    side: match side { Side::Buy => Side::Sell, Side::Sell => Side::Buy },
+                    quantity: f.quantity,
+                    price: f.price,
+                    liquidity: Liquidity::Maker,
+                    counterparty: agent.to_string(),
+                    reference,
+                    day,
+                    tick,
+                    sequence: 0,
+                });
+            }
+            let fill = self.push_fill(AgentFill {
+                agent: agent.to_string(),
+                order_id: order_id.to_string(),
+                ticker: ticker.clone(),
+                side,
+                quantity: f.quantity,
+                price: f.price,
+                liquidity: Liquidity::Taker,
+                counterparty: owner.to_string(),
+                reference,
+                day,
+                tick,
+                sequence: 0,
+            });
+            if count_flow {
+                self.book.add_flow(agent, &ticker, side, f.quantity);
+            }
+            taker.push(fill);
+        }
+        (taker, reference)
+    }
+
+    /// Match every resting order on one name that the book now crosses,
+    /// against the book at the book's prices, in arrival order.
+    ///
+    /// A resting order is never posted crossed, and a tick's settlement
+    /// matches any its re-quote crosses. What is left is the night: the
+    /// open moves every price without a tick, and an order the gap went
+    /// through would otherwise sit crossed for the first agent to pick off
+    /// at a price the market left behind. Matched here it fills at the
+    /// opening ladder's prices, as an opening auction would fill it, and
+    /// what it takes is taker flow like any other.
+    fn cross_resting(&mut self, index: usize) {
+        use crate::agent_book::RestMode;
+        use crate::order_book::Side;
+        let Some(ticker) = self.companies.get(index).map(|c| c.ticker.clone()) else {
+            return;
+        };
+        let ids: Vec<String> = self
+            .book
+            .orders
+            .iter()
+            .filter(|o| o.mode == RestMode::Queue && o.ticker == ticker)
+            .map(|o| o.id.clone())
+            .collect();
+        for id in ids {
+            let Some(o) = self.book.orders.iter().find(|o| o.id == id).cloned() else {
+                continue;
+            };
+            let Some(book) = self.agent_book_at(index, Some(&o.agent)) else {
+                continue;
+            };
+            let crossed = match o.side {
+                Side::Buy => book.best_ask().is_some_and(|a| o.limit >= a),
+                Side::Sell => book.best_bid().is_some_and(|b| o.limit <= b),
+            };
+            if !crossed {
+                continue;
+            }
+            let (fills, _) = self.meet_book(index, &o.agent, &o.id, o.side, o.remaining, Some(o.limit), true);
+            let filled: f64 = fills.iter().map(|f| f.quantity).sum();
+            self.reduce_order(&o.id, filled);
+        }
+    }
+
+    /// The book at the open: the maker's pending inventory lands, the
+    /// consumed depth is whole again, and crossed resting orders match.
+    fn open_book(&mut self) {
+        use crate::agent_book::{RestMode, TAKEN_MAKER_INVENTORY};
+        for (i, row) in self.book.taken.iter_mut().enumerate() {
+            if row[TAKEN_MAKER_INVENTORY] != 0.0 {
+                if let Some(c) = self.companies.get_mut(i) {
+                    c.stock.maker_inventory =
+                        Some(c.stock.maker_inventory.unwrap_or(0.0) + row[TAKEN_MAKER_INVENTORY]);
+                }
+            }
+            *row = [0.0; crate::agent_book::TAKEN_WIDTH];
+        }
+        let names: Vec<usize> = (0..self.companies.len())
+            .filter(|&i| {
+                let t = &self.companies[i].ticker;
+                self.book.orders.iter().any(|o| o.mode == RestMode::Queue && &o.ticker == t)
+            })
+            .collect();
+        for i in names {
+            self.cross_resting(i);
+        }
+    }
+
+    /// Send one agent's order to the book.
+    ///
+    /// A market order (`limit` None) takes what the book holds up to
+    /// `quantity` and the rest is unfilled. A limit order takes what the
+    /// book holds at its limit or better, and its remainder waits: resting
+    /// in the queue with `book_resting` on, outside the book for the traded
+    /// range with it off. Every share taken is taker flow, applied to the
+    /// market once, on the next open tick.
+    ///
+    /// Orders are processed in the order they arrive. A caller submitting
+    /// for several agents in one step decides that order, and
+    /// `PyEngine::submit_many` documents the one it uses.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_order(
+        &mut self,
+        agent: &str,
+        ticker: &str,
+        side: crate::order_book::Side,
+        quantity: f64,
+        limit: Option<f64>,
+        order_id: Option<String>,
+    ) -> Result<OrderReport, String> {
+        use crate::agent_book::{self as ab, AgentOrder, RestMode};
+        if agent.is_empty() || ab::is_house(agent) {
+            return Err(format!(
+                "{agent:?} cannot place orders: agent labels are non-empty and \
+                 not one of the book's own owners (mm, depth, flow, range)"
+            ));
+        }
+        if !(quantity > 0.0) || !quantity.is_finite() {
+            return Err(format!("quantity must be finite and greater than zero, got {quantity}"));
+        }
+        if let Some(p) = limit {
+            if !(p > 0.0) || !p.is_finite() {
+                return Err(format!("limit_price must be finite and greater than zero, got {p}"));
+            }
+        }
+        // The rate indices quote their own ladder (`crate::rates`) and take
+        // their flow from `run_session`'s `fills`; the agent-facing book
+        // holds equities only.
+        if self.rates.instruments.iter().any(|i| i.spec.ticker == ticker) {
+            return Err(format!(
+                "{ticker} is a simulated rate index, and the agent-facing book holds \
+                 equities only: price it with Portfolio.execute, which reads its own \
+                 book, and pass its flow in run_session's fills"
+            ));
+        }
+        let index = self
+            .companies
+            .iter()
+            .position(|c| c.ticker == ticker)
+            .ok_or_else(|| format!("no instrument with ticker {ticker:?}"))?;
+        let company = &self.companies[index];
+        if company.is_bankrupt || !company.is_public {
+            return Err(format!("{ticker} does not trade: it is bankrupt or no longer public"));
+        }
+        let id = match order_id {
+            Some(id) => {
+                if id.is_empty() {
+                    return Err("order_id cannot be empty".to_string());
+                }
+                id
+            }
+            None => format!("{agent}-{}", self.book.sequence),
+        };
+        if self.book.orders.iter().any(|o| o.id == id) {
+            return Err(format!("order id {id:?} is already waiting in the book"));
+        }
+        let sequence = self.book.sequence;
+        self.book.sequence += 1;
+
+        if self.book.orders.iter().any(|o| o.mode == RestMode::Queue && o.ticker == ticker) {
+            self.cross_resting(index);
+        }
+        let (fills, reference) = self.meet_book(index, agent, &id, side, quantity, limit, true);
+        let mut filled = 0.0;
+        let mut notional = 0.0;
+        let mut worst: Option<f64> = None;
+        for f in &fills {
+            filled += f.quantity;
+            notional += f.price * f.quantity;
+            worst = Some(f.price);
+        }
+        let remainder = quantity - filled;
+        let (resting, mode) = match limit {
+            Some(p) if remainder > 1e-9 => {
+                let mode = if self.params.book_resting != 0.0 { RestMode::Queue } else { RestMode::Range };
+                self.book.orders.push(AgentOrder {
+                    id: id.clone(),
+                    agent: agent.to_string(),
+                    ticker: ticker.to_string(),
+                    side,
+                    limit: p,
+                    quantity,
+                    remaining: remainder,
+                    sequence,
+                    mode,
+                });
+                (remainder, Some(mode))
+            }
+            _ => (0.0, None),
+        };
+        Ok(OrderReport {
+            order_id: id,
+            agent: agent.to_string(),
+            ticker: ticker.to_string(),
+            side,
+            requested: quantity,
+            filled,
+            average_price: if filled > 0.0 { Some(notional / filled) } else { None },
+            worst_price: worst,
+            reference,
+            resting,
+            unfilled: if mode.is_some() { 0.0 } else { remainder },
+            mode,
+            fills,
+        })
+    }
+
+    /// Cancel a waiting order. `agent`, when given, must own it. Returns
+    /// whether an order was removed.
+    pub fn cancel_order(&mut self, order_id: &str, agent: Option<&str>) -> bool {
+        let before = self.book.orders.len();
+        self.book
+            .orders
+            .retain(|o| !(o.id == order_id && agent.is_none_or(|a| a == o.agent)));
+        self.book.orders.len() != before
+    }
+
+    /// Waiting orders, in arrival order, for one agent or all.
+    pub fn open_orders(&self, agent: Option<&str>) -> Vec<crate::agent_book::AgentOrder> {
+        self.book
+            .orders
+            .iter()
+            .filter(|o| agent.is_none_or(|a| a == o.agent))
+            .cloned()
+            .collect()
+    }
+
+    /// Collect fills, for one agent or all, in the order they happened.
+    pub fn take_fills(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentFill> {
+        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.fills)
+            .into_iter()
+            .partition(|f| agent.is_none_or(|a| a == f.agent));
+        self.book.fills = kept;
+        taken
+    }
+
+    /// Collect permanent-impact rows, for one agent or all.
+    pub fn take_impacts(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentImpact> {
+        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.impacts)
+            .into_iter()
+            .partition(|f| agent.is_none_or(|a| a == f.agent));
+        self.book.impacts = kept;
+        taken
+    }
+
+    /// Queue fills that arrived from outside the engine (`run_session`'s
+    /// `fills`) as anonymous taker flow, so the linear law prices them too.
+    /// Only under `fill_impact_coefficient`; the imbalance law merges them
+    /// into the first tick's flow as it always has.
+    pub fn queue_external_fills(&mut self, fills: &[(String, OrderVolume)]) {
+        for (ticker, v) in fills {
+            if v.buy > 0.0 {
+                self.book.add_flow("", ticker, crate::order_book::Side::Buy, v.buy);
+            }
+            if v.sell > 0.0 {
+                self.book.add_flow("", ticker, crate::order_book::Side::Sell, v.sell);
+            }
         }
     }
 
@@ -2147,7 +3494,7 @@ impl Engine {
     /// This tick's `s` decomposition per company slot, in
     /// [`crate::market::factors::S_COMPONENT_KEYS`] order. Zero for a company
     /// that did not tick.
-    pub fn tick_components(&self) -> &[[f64; 8]] {
+    pub fn tick_components(&self) -> &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]] {
         &self.tick_components
     }
 
@@ -2182,6 +3529,28 @@ impl Engine {
     /// own share.
     pub fn tick_clamp(&self) -> &[f64] {
         &self.tick_clamp
+    }
+
+    /// This tick's repricing per company slot: `log(the price the tick
+    /// started from / the last print)`, what the close's re-mark, a pin's
+    /// re-mark or the opening print wrote to the price between the two.
+    /// Zero where nothing did; NaN where it is not known (after a restore;
+    /// see `repriced_pending`).
+    pub fn tick_repriced(&self) -> &[f64] {
+        &self.tick_repriced
+    }
+
+    /// Forget what was written to each price since its last print, as not
+    /// known: NaN on a model that can write a price between prints
+    /// (`macro_publication_repricing` or `overnight_variance_ratio` set),
+    /// zero on one that cannot. For a restore, whose snapshot does not
+    /// carry it, so the engine restored into does not keep its own.
+    pub fn forget_repriced(&mut self) {
+        let unknown = self.params.macro_publication_repricing != 0.0
+            || self.params.overnight_variance_ratio != 0.0;
+        let value = if unknown { f64::NAN } else { 0.0 };
+        self.repriced_pending.clear();
+        self.repriced_pending.resize(self.companies.len(), value);
     }
 
     /// What each company would have printed this tick against unbounded
@@ -2248,19 +3617,32 @@ impl Engine {
         anchor: &[f64],
     ) -> Result<(), String> {
         let n = self.companies.len();
-        // Nine-wide attribution rows predate the overnight slot; they
-        // restore with that slot at zero, which is what such a day held.
-        let attribution: Vec<f64> = if n > 0 && attribution.len() == n * (crate::market::factors::COMPONENT_COUNT - 1) {
-            attribution
-                .chunks_exact(crate::market::factors::COMPONENT_COUNT - 1)
+        // Nine-wide attribution rows predate the overnight slot and ten-wide
+        // ones the fair-value shift; each restores with the slots it lacks at
+        // zero, which is what such a day held. Likewise eight-wide tick rows.
+        let width = crate::market::factors::COMPONENT_COUNT;
+        let attribution: Vec<f64> = match (n, attribution.len()) {
+            (n, len) if n > 0 && (len == n * (width - 1) || len == n * (width - 2)) => {
+                let old = len / n;
+                attribution
+                    .chunks_exact(old)
+                    .flat_map(|c| c.iter().copied().chain(std::iter::repeat_n(0.0, width - old)))
+                    .collect()
+            }
+            _ => attribution.to_vec(),
+        };
+        let tick_width = crate::market::factors::TICK_COMPONENT_COUNT;
+        let components: Vec<f64> = if n > 0 && components.len() == n * (tick_width - 1) {
+            components
+                .chunks_exact(tick_width - 1)
                 .flat_map(|c| c.iter().copied().chain(std::iter::once(0.0)))
                 .collect()
         } else {
-            attribution.to_vec()
+            components.to_vec()
         };
         for (name, len, want) in [
             ("attribution", attribution.len(), n * crate::market::factors::COMPONENT_COUNT),
-            ("tick_components", components.len(), n * 8),
+            ("tick_components", components.len(), n * tick_width),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
         ] {
@@ -2277,8 +3659,12 @@ impl Engine {
             })
             .collect();
         self.tick_components = components
-            .chunks_exact(8)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
+            .chunks_exact(tick_width)
+            .map(|c| {
+                let mut row = [0.0; crate::market::factors::TICK_COMPONENT_COUNT];
+                row.copy_from_slice(c);
+                row
+            })
             .collect();
         self.tick_fundamental = fundamental.to_vec();
         self.tick_anchor = anchor.to_vec();
@@ -2597,6 +3983,26 @@ impl Engine {
         self.vix_sets_variance_pending = on;
     }
 
+    /// Today's pins that tonight's corporate yield reads, as bits
+    /// ([`PIN_VIX`], [`PIN_CORPORATE`]). See `macro_pins_today`.
+    pub fn macro_pins_today(&self) -> u8 {
+        self.macro_pins_today
+    }
+
+    /// Add today's pins (an OR; the close clears them). Kept only while
+    /// `corporate_yield_daily` is on, the one reader.
+    pub fn mark_macro_pins_today(&mut self, bits: u8) {
+        if self.params.corporate_yield_daily != 0.0 {
+            self.macro_pins_today |= bits & (PIN_VIX | PIN_CORPORATE);
+        }
+    }
+
+    /// Restore the marks from a snapshot, as they were.
+    pub fn set_macro_pins_today(&mut self, bits: u8) {
+        self.macro_pins_today = 0;
+        self.mark_macro_pins_today(bits);
+    }
+
     /// The VIX-ratio denominator a FORCED close uses.
     ///
     /// Off `market_vol_vix_excursion` the denominator is the anchor, a
@@ -2650,6 +4056,12 @@ impl Engine {
         0.5 * (lo + hi)
     }
 
+    /// Open a trading day. Call once per day, before its first session.
+    ///
+    /// Steps the overnight processes (the crisis episode, the overnight gap
+    /// in each name's `s`, the day's endogenous news), resets the day's
+    /// attribution and anchors the daily open. [`Engine::run_session`] with
+    /// `reopen: true` calls this itself.
     pub fn open_market(&mut self) {
         // THE CRISIS EPISODE, stepped before anything else the session does.
         // At `crisis_epicentre_extra` 0.0 -- every preset before pt-v19's fourth
@@ -2666,7 +4078,7 @@ impl Engine {
         self.noise_own_scale2.clear();
         self.noise_own_scale2.resize(self.companies.len(), 0.0);
         self.tick_components.clear();
-        self.tick_components.resize(self.companies.len(), [0.0; 8]);
+        self.tick_components.resize(self.companies.len(), [0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.clear();
         self.tick_fundamental.resize(self.companies.len(), f64::NAN);
         self.tick_anchor.clear();
@@ -2677,6 +4089,11 @@ impl Engine {
         self.tick_absorbed.resize(self.companies.len(), 0.0);
         self.tick_clamp.clear();
         self.tick_clamp.resize(self.companies.len(), 0.0);
+        self.tick_repriced.clear();
+        self.tick_repriced.resize(self.companies.len(), 0.0);
+        // Not the pending repricing: it carries the close's re-mark across
+        // the open to the first print. Only its width follows the roster.
+        self.repriced_pending.resize(self.companies.len(), 0.0);
         // Resized only while the arm is on, so a roster that changed between
         // days does not leave a short column behind -- and emptiness keeps
         // meaning "no arm ran" rather than "no companies".
@@ -2703,6 +4120,9 @@ impl Engine {
             .filter(|(_, c)| !c.is_bankrupt && c.is_public)
             .map(|(i, _)| i as u32)
             .collect();
+        // The day's own mark counts its ticks from here, so a count a
+        // restore carried for the day before is spent.
+        self.carried_ticks = None;
         self.day_marks.push(DayMark {
             day: self.current_day,
             positions: self.stream_positions(),
@@ -2746,6 +4166,22 @@ impl Engine {
         self.apply_overnight();
 
         reset_daily_prices(&mut self.companies);
+
+        // The rate indices' open: a day's carry if a close came before, then
+        // the curve as it now stands, after the close's macro step and any
+        // pin written since. No draw. Skipped on an engine without them.
+        if !self.rates.is_empty() {
+            self.rates.open(&self.economy);
+        }
+
+        // The book opens whole: the maker quotes afresh on its inventory,
+        // the night has refilled any consumed depth, and a resting order
+        // the night moved the price through is matched against the opening
+        // ladder at the ladder's prices, as an opening auction would fill
+        // it, rather than left crossed for the first agent to pick off.
+        if !self.book.is_pristine() {
+            self.open_book();
+        }
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -2830,6 +4266,7 @@ impl Engine {
         let market_sigma_daily = self.market_vol.sigma_daily();
         let sector_sigma =
             crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let night_vix = crate::market::tick::vix_feedback_exposure(&self.params, &self.economy);
         let econ_view = crate::fair_value::EconomyValuationInputs {
             corporate_bond_yield: Some(self.economy.corporate_bond_yield),
             federal_funds_rate: self.economy.federal_funds_rate,
@@ -2881,15 +4318,28 @@ impl Engine {
             } else {
                 crate::market::tick::scale_valuation(company.valuation(), nominal)
             };
-            let fv = crate::fair_value::compute_fair_value_with(
+            let valuation = match company.stock.fair_value_offset {
+                Some(v) if v != 0.0 => {
+                    crate::market::tick::scale_valuation(valuation, crate::mathx::exp(v))
+                }
+                _ => valuation,
+            };
+            let fv = crate::fair_value::compute_fair_value_at(
                 &valuation, &econ_view, p.fair_value_book_floor,
                 p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
+                p.rate_pe_sensitivity,
             )
             .fair_value;
+            let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
             let price = crate::mathx::min(
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
             );
+            // For the tape, as at the re-mark: the first print's `repriced`
+            // books the opening print's move from the last close.
+            if let Some(v) = self.repriced_pending.get_mut(index) {
+                *v += crate::mathx::log(price / company.stock.price);
+            }
             company.stock.price = price;
             company.stock.market_cap = price * company.stock.shares_outstanding;
         }
@@ -2899,6 +4349,12 @@ impl Engine {
     /// process, in roster order; 0.0 where nothing moved.
     pub fn overnight_moves(&self) -> &[f64] {
         &self.overnight_moves
+    }
+
+    /// What each name's `s` gave up to its fair value at the last close's
+    /// jump, in roster order; 0.0 where nothing moved.
+    pub fn jump_fair_value_moves(&self) -> &[f64] {
+        &self.jump_fair_value_moves
     }
 
     /// Close-of-day bookkeeping. Zero draws.
@@ -3183,6 +4639,71 @@ impl Engine {
         self.carry_jump_moves();
         self.update_volume_state();
         self.update_volume_idio();
+        // The rate indices only note that a night has begun, so the next
+        // open accrues its carry. They reprice to the economy's new yields at
+        // that open, not here: the close's macro step runs after this.
+        if !self.rates.is_empty() {
+            self.rates.close();
+        }
+    }
+
+    /// The stationary opening (`opening_mispricing_sigma`), applied once,
+    /// before the first tick that prices anything.
+    ///
+    /// Each name's day-zero premium of price over its published fair value
+    /// is split in two. The mispricing `s` is a common level plus this
+    /// name's draw at `opening_mispricing_sigma`, the draws re-centred to
+    /// cap-weighted zero. The common level is a draw at
+    /// `opening_market_sigma` when that is non-zero, the market opening at
+    /// a point of its own stationary mispricing; at 0.0 it is the roster's
+    /// cap-weighted premium, so the index opens with the mispricing the
+    /// generated roster gives it (and reverts from it over the first months,
+    /// which is a start-up drift of up to 30 per cent on a 20-name roster). The rest of the premium is the name's opening
+    /// fair-value level `v`. The price does not move: `P = FV exp(v) exp(s)`
+    /// holds with the same `P`. What changes is how much of the premium the
+    /// model later pulls back: only the stationary part.
+    ///
+    /// A name listed after the engine was built has no draw and takes the
+    /// lazy opening in `market::tick`, which adopts its whole premium as `s`.
+    fn apply_opening(&mut self) {
+        let z = std::mem::take(&mut self.opening_z);
+        let sigma = self.params.opening_mispricing_sigma;
+        // The per-name draws are the first `n`, the market's the last.
+        let n_draws = z.len().saturating_sub(1);
+        let mut gap = vec![f64::NAN; self.companies.len()];
+        let (mut wsum, mut wgap, mut wz) = (0.0, 0.0, 0.0);
+        for (i, c) in self.companies.iter().enumerate() {
+            if i >= n_draws || c.stock.mispricing_s.is_some() || c.is_bankrupt || !c.is_public {
+                continue;
+            }
+            let fv = crate::market::tick::published_fair_value(
+                &self.params, &self.economy, self.nominal_output_base, self.elapsed_days, c);
+            let g = crate::mathx::log(crate::mathx::max(0.01, c.stock.price) / fv);
+            gap[i] = g;
+            let w = c.stock.price * c.stock.shares_outstanding;
+            wsum += w;
+            wgap += w * g;
+            wz += w * z[i];
+        }
+        if !(wsum > 0.0) {
+            return;
+        }
+        let centre = if self.params.opening_market_sigma != 0.0 {
+            self.params.opening_market_sigma * z[n_draws]
+        } else {
+            wgap / wsum
+        };
+        let zbar = wz / wsum;
+        for (i, c) in self.companies.iter_mut().enumerate() {
+            if gap[i].is_nan() {
+                continue;
+            }
+            let s0 = crate::market::tick::clamp_s(&self.params, centre + sigma * (z[i] - zbar));
+            c.stock.mispricing_s = Some(s0);
+            c.stock.mispricing_s_prev_close = Some(s0);
+            c.stock.mispricing_momentum = Some(0.0);
+            c.stock.fair_value_offset = Some(gap[i] - s0);
+        }
     }
 
     /// Endogenous jumps, applied once per name at the day close.
@@ -3225,7 +4746,21 @@ impl Engine {
     /// to the committed text byte for byte, so a routine format run would
     /// leave that comparison failing until somebody regenerated the body.
     #[rustfmt::skip]
+    #[allow(clippy::if_same_then_else, reason = "the generated idiosyncratic rate spells out each branch of the spec, two of which give the same value")]
     fn apply_jumps(&mut self) {
+        self.jump_fair_value_moves.clear();
+        self.jump_fair_value_moves.resize(self.companies.len(), 0.0);
+        // The permanent share's reading of the jump (`fair_value_news_share`):
+        // each name's `s` before the generated body, so the company's own
+        // jump can be told from the market's after it. Empty, and nothing
+        // below runs, at 0.0.
+        let s_before: Vec<f64> = if self.params.fair_value_news_share != 0.0
+            || self.params.fair_value_market_share != 0.0
+        {
+            self.companies.iter().map(|c| c.stock.mispricing_s.unwrap_or(f64::NAN)).collect()
+        } else {
+            Vec::new()
+        };
         // mechanism:jumps begin -- generated by tools/mechanism/emit.py from
         // tools/mechanism/mechanisms/jumps.py (spec 0ff870280c51); do not edit by hand.
         // Draws: 1 uniform, 1 normal, 1 uniform per company, 1 normal per company on the jumps stream, unconditionally.
@@ -3306,6 +4841,55 @@ impl Engine {
         if self.params.jump_market_variance_share != 0.0 && market != 0.0 {
             self.market_vol
                 .accumulate(self.params.jump_market_variance_share * market);
+        }
+        // THE COMPANY'S OWN JUMP, SHARED WITH FAIR VALUE. The body above put
+        // `market + idio - compensator` into `s`; what is left after taking
+        // the common part out is the company's own jump (exactly zero on a
+        // name that did not jump, up to the rounding of `(s + x) - s`, which
+        // the 1e-9 floor absorbs: a company jump is `jump_sigma_idio` times a
+        // normal). `psi` of it moves to the fair-value level, as the tick
+        // does with the name's own noise and news. The attribution slot
+        // keeps the whole jump: it reports what moved the price.
+        if !s_before.is_empty() {
+            let psi = self.params.fair_value_news_share;
+            let psim = crate::market::tick::market_permanent_share(
+                &self.params, self.market_vol.sigma_daily());
+            let common = market - compensator;
+            for (index, company) in self.companies.iter_mut().enumerate() {
+                let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
+                    continue;
+                };
+                if before.is_nan() {
+                    continue;
+                }
+                let own = (after - before) - common;
+                // The company's own jump on the stock-level share, the
+                // market's on the market-wide share (a name the clamp held
+                // back from the market jump keeps the share of what it took).
+                let own = if own.abs() <= 1e-9 { 0.0 } else { own };
+                let taken_common = (after - before) - own;
+                let dv = psi * own + psim * taken_common;
+                if dv == 0.0 {
+                    continue;
+                }
+                let s_new = after - dv;
+                company.stock.mispricing_s = Some(s_new);
+                // What left `s` for `v`, booked where the tape can find it:
+                // the attribution's `fair_value_shift` and, for the tape's
+                // row where the jump is observed, `jump_fair_value_moves`.
+                if let Some(acc) = self.attribution.get_mut(index) {
+                    acc[crate::market::factors::FAIR_VALUE_SLOT] += s_new - after;
+                }
+                if let Some(slot) = self.jump_fair_value_moves.get_mut(index) {
+                    *slot = s_new - after;
+                }
+                if let Some(prev) = company.stock.mispricing_s_prev_close {
+                    let carried = (1.0 - self.params.jump_momentum_share) * dv;
+                    company.stock.mispricing_s_prev_close = Some(prev - carried);
+                }
+                let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                company.stock.fair_value_offset = Some(v + dv - 0.5 * dv * dv);
+            }
         }
     }
 
@@ -3432,6 +5016,11 @@ impl Engine {
         rng: &mut impl Rng,
     ) -> DayAdvanceOutcome {
         let phase_before = self.economy.cycle_phase;
+        // Today's pins and the corporate yield a pin wrote, for the end of
+        // the step: a pinned corporate yield holds through tonight's close,
+        // a meeting's re-anchoring included (`macro_pins_today`).
+        let pins_today = self.macro_pins_today;
+        let corporate_pinned_at = self.economy.corporate_bond_yield;
 
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
@@ -3440,6 +5029,7 @@ impl Engine {
         // `apply_jumps` has already run, so the jumps are in `price`.
         let market_day_return_pct = if self.params.vix_return_source == 0.0
             && self.params.vix_level_identity == 0.0
+            && self.params.flight_to_quality_day == 0.0
         {
             0.0
         } else {
@@ -3603,6 +5193,24 @@ impl Engine {
                 oil_seasonality_target: self.params.oil_seasonality_target,
                 trough_growth_floor: self.params.trough_growth_floor,
                 phase_target_range_draw: self.params.phase_target_range_draw,
+                unemployment_adjustment: self.unemployment_adjustment(),
+                // The phase and growth as an observer reads them tonight,
+                // before the step: the same moment the economy's own are
+                // read at with the switch off.
+                fear_greed_published: if self.params.fear_greed_published_inputs != 0.0 {
+                    Some((self.published_cycle_phase(), self.published_gdp_growth()))
+                } else {
+                    None
+                },
+                yields: crate::economy::daily::YieldDials {
+                    treasury_10y_noise: self.params.treasury_10y_noise,
+                    treasury_2y_noise: self.params.treasury_2y_noise,
+                    flight_to_quality_gain: self.params.flight_to_quality_gain,
+                    flight_to_quality_day: self.params.flight_to_quality_day,
+                    corporate_yield_daily: self.params.corporate_yield_daily,
+                    vix_pinned: self.macro_pins_today & PIN_VIX != 0,
+                    corporate_pinned: self.macro_pins_today & PIN_CORPORATE != 0,
+                },
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
@@ -3613,6 +5221,41 @@ impl Engine {
         rng.site(Site::EconomyCycle, 0);
         let spec = self.cycle_spec();
         self.economy = check_cycle_transition_for(&self.economy, rng, &spec);
+
+        // THE AGGREGATE EARNINGS CYCLE, one step a session after the phase
+        // has moved: every company's earnings, beyond what nominal output
+        // gives them, pulled toward a level set by the cycle phase at a
+        // half-life of `earnings_cycle_half_life` sessions. Contraction and
+        // trough pull toward `-depth`, every other phase toward
+        // `+depth * earnings_cycle_upside`, the share that centres the
+        // level over a cycle. `earnings_cycle_sigma` adds a normal on the
+        // economy stream when it is non-zero, and only then. Nothing runs at
+        // zero depth, so every preset through pt-v19 takes no draw here and
+        // leaves the level at 0.0. See `ModelParams::earnings_cycle_depth`.
+        if self.params.earnings_cycle_depth != 0.0 {
+            let target = self.earnings_cycle_target();
+            let p = &self.params;
+            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / p.earnings_cycle_half_life);
+            let mut level = self.economy.earnings_cycle
+                + pull * (target - self.economy.earnings_cycle);
+            if p.earnings_cycle_sigma != 0.0 {
+                rng.site(Site::EconomyCycle, 1);
+                level += p.earnings_cycle_sigma * rng.next_normal();
+            }
+            self.economy.earnings_cycle = level;
+        }
+
+        // THE VOLATILITY FEEDBACK'S SMOOTHED EXPOSURE, one step a session
+        // after the VIX has moved: the log excess of the VIX over the knee,
+        // pulled at a half-life of `fair_value_vix_half_life` sessions.
+        // Nothing runs unless both the gain and the half-life are set, so
+        // every preset through pt-v19 leaves the field at 0.0. It takes no
+        // draw at any setting.
+        if self.params.fair_value_vix_discount != 0.0 && self.params.fair_value_vix_half_life != 0.0 {
+            let target = crate::market::tick::vix_excess(&self.params, self.economy.vix);
+            let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / self.params.fair_value_vix_half_life);
+            self.economy.vix_feedback += pull * (target - self.economy.vix_feedback);
+        }
 
         let policy = crate::economy::PolicyOptions {
             calendar: self.macro_calendar(),
@@ -3629,6 +5272,22 @@ impl Engine {
         let announcement_variant = meeting.announcement_variant;
         self.central_bank = meeting.central_bank;
         self.economy = meeting.economy;
+        // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE, the meeting's
+        // re-anchoring to the formula included, on a preset that moves it
+        // daily (the mark is kept only there). The close has read today's
+        // pins; tomorrow's are their own.
+        if pins_today & PIN_CORPORATE != 0 {
+            self.economy.corporate_bond_yield = corporate_pinned_at;
+        }
+        self.macro_pins_today = 0;
+        self.refresh_earnings_anticipation();
+        // The close's phase into the published history. The burn-in runs
+        // this too, and the construction's seeding overwrites what it left.
+        self.record_cycle_phase();
+        // The close's growth into the published figure's quarter, and any
+        // release now due. The burn-in runs this too, and the
+        // construction's seeding overwrites what it left.
+        self.record_gdp_growth(request.game_day);
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
@@ -3669,7 +5328,10 @@ impl Engine {
         request: &SessionRequest,
         buffer: &mut SessionBuffer,
     ) -> SessionOutcome {
-        buffer.resize(request.ticks, self.companies.len());
+        // The row width is every instrument, rate indices after equities, so
+        // the tape carries them in the same rows as the names they trade
+        // beside. Without rate instruments this is `companies.len()`.
+        buffer.resize(request.ticks, self.instrument_count());
         buffer.resize_counterfactual(self.settle_depth_counterfactual);
 
         if request.reopen {
@@ -3689,7 +5351,40 @@ impl Engine {
         let (mut hour, mut minute) = (request.start.hour, request.start.minute);
         let mut halted_at = None;
 
+        // The first tick's flow: the standing rate plus the fills, once.
+        // Built only when there are fills, so a session without them reads
+        // `order_volumes` on every tick exactly as it always did.
+        //
+        // Under `fill_impact_coefficient` the fills are agent fills priced by
+        // the linear law instead, so they join the book's pending flow and
+        // the first open tick applies them with every other agent's.
+        //
+        // The rate indices are not in the agent-facing book and the linear
+        // law does not price them, so their fills stay on the first tick's
+        // flow, where their own books read them, under either law.
+        let first_tick_flow = if request.fills.is_empty() {
+            None
+        } else if self.params.fill_impact_coefficient != 0.0 {
+            let (equity, rates): (Vec<_>, Vec<_>) = request
+                .fills
+                .iter()
+                .cloned()
+                .partition(|(t, _)| !self.rates.instruments.iter().any(|i| i.spec.ticker == t.as_str()));
+            self.queue_external_fills(&equity);
+            if rates.is_empty() {
+                None
+            } else {
+                Some(merge_order_volumes(request.order_volumes, &rates))
+            }
+        } else {
+            Some(merge_order_volumes(request.order_volumes, request.fills))
+        };
+
         for t in 0..request.ticks {
+            let order_volumes = match (&first_tick_flow, t) {
+                (Some(flow), 0) => flow.as_slice(),
+                _ => request.order_volumes,
+            };
             let outcome = self.tick(&TickRequest {
                 time: GameTime {
                     hour,
@@ -3699,7 +5394,7 @@ impl Engine {
                 volatility_multiplier: request.volatility_multiplier,
                 news: request.news,
                 news_impact_queue: request.news_impact_queue,
-                order_volumes: request.order_volumes,
+                order_volumes,
             });
             draws += outcome.draws_consumed;
             buffer.write_tick(
@@ -3712,10 +5407,14 @@ impl Engine {
                     shock: &self.tick_shock,
                     absorbed: &self.tick_absorbed,
                     clamp: &self.tick_clamp,
+                    repriced: &self.tick_repriced,
                     unbounded_print: &self.tick_unbounded_print,
                     liquidity_share: &self.tick_liquidity_share,
                 },
             );
+            if !self.rates.is_empty() {
+                buffer.write_rates(t, self.companies.len(), &self.rates);
+            }
 
             if let Some(stop) = &request.stop {
                 if stop.triggered(t, &self.companies) {
@@ -3887,6 +5586,17 @@ impl Engine {
         self.nominal_output_base = base;
     }
 
+    /// Close the trading day and step the economy to the next one.
+    ///
+    /// This settles the day the ticks just traded: it feeds each name's
+    /// accumulated noise to GARCH as the day's innovation, rolls the daily
+    /// open and close, then runs [`Engine::advance_macro_day`] for
+    /// `game_day` (the macro chain, the central bank and the rates).
+    ///
+    /// It does not trade and draws no prices. Called on its own, with no
+    /// session since the last close, it leaves every price where it was. A
+    /// day that moves the market is [`Engine::open_market`], then
+    /// [`Engine::run_session`] (or [`Engine::tick`] in a loop), then this.
     pub fn close_day(&mut self, game_day: i64) {
         let noise = self.daily_innovation_column();
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
@@ -3952,13 +5662,21 @@ impl Engine {
                     // A branch, as at the valuation, so the arithmetic
                     // before pt-v18 is the arithmetic it always was.
                     let earnings = if nominal == 1.0 { eps } else { eps * nominal };
+                    // The earnings the valuation holds carry the name's own
+                    // fair-value level (`fair_value_news_share`), so the
+                    // market P/E reads the earnings the price does. A branch:
+                    // `None` on every preset through pt-v19.
+                    let earnings = match c.stock.fair_value_offset {
+                        Some(v) if v != 0.0 => earnings * crate::mathx::exp(v),
+                        _ => earnings,
+                    };
                     // `market_pe_buybacks`: the earnings the valuation holds
                     // also carry the buyback term (`market::tick`), so a
                     // multiple read without it rises by the buyback yield
                     // every year. A branch, so 0.0 is the line that stood.
                     let earnings = if self.params.market_pe_buybacks != 0.0 {
                         earnings * crate::market::tick::buyback_scale(
-                            &self.params, Some(earnings), c.stock.price, self.current_day)
+                            &self.params, Some(earnings), c.stock.price, self.elapsed_days)
                     } else {
                         earnings
                     };
@@ -3985,13 +5703,131 @@ impl Engine {
         } else {
             0.0
         };
-        self.advance_day(&DayAdvanceRequest {
+        // The fair values the market stands on BEFORE the step, taken only
+        // with `macro_publication_repricing` on: the step's decision is
+        // readable the moment it ends, so the price takes it then.
+        let marks = self.published_macro_marks();
+        let outcome = self.advance_day(&DayAdvanceRequest {
             volatility: 1.0,
             active_shocks: &[],
             market_return_pct,
             game_day,
             timestamp: game_day * 24 * 60,
-        })
+        });
+        self.reprice_to_published_macro(marks);
+        outcome
+    }
+
+    /// Every name's fair value as the tick would read it on the state now
+    /// standing, at its current price and day, for
+    /// [`Engine::reprice_to_published_macro`]. `None`, computing nothing,
+    /// with `macro_publication_repricing` off. NaN for a name the re-mark
+    /// leaves alone: bankrupt, private, or not yet traded (no `s`), whose
+    /// first tick adopts its premium lazily and so moves nothing anyway.
+    pub fn published_macro_marks(&self) -> Option<Vec<f64>> {
+        if self.params.macro_publication_repricing == 0.0 {
+            return None;
+        }
+        Some(
+            self.companies
+                .iter()
+                .map(|c| {
+                    if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none()
+                        || !(c.stock.price > 0.0)
+                    {
+                        f64::NAN
+                    } else {
+                        crate::market::tick::tick_fair_value(
+                            &self.params, &self.economy, self.nominal_output_base,
+                            self.elapsed_days, c, c.stock.price)
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    /// THE PRICE TAKES A MACRO DECISION WHEN IT IS PUBLISHED
+    /// (`macro_publication_repricing`).
+    ///
+    /// The close's macro step -- the economy, the cycle, the central bank's
+    /// meeting, the corporate yield it re-anchors -- is readable from the
+    /// moment it ends (`macro_fields`, `macro_state`, a World's trace), but
+    /// fair value only reached the price at the next session's first tick.
+    /// Everything in between, the evening and the opening step of any
+    /// harness, traded at the price from before the decision. Here each
+    /// name that has traded is re-marked as the step ends to the price its
+    /// premium over fair value implies on the published state: `price =
+    /// (last / fv_before) * fv_after(price)`, both fair values computed as
+    /// the tick computes them (`market::tick::tick_fair_value`) on the same
+    /// day, `fv_after` at the new price because the buyback term reads it.
+    /// The name's mispricing `s` is left as it was. The next tick therefore
+    /// starts on the model price the published state implies, and the move
+    /// sits between the day's last print and
+    /// the next open, which is where a decision announced after the close
+    /// lands on a real tape. `pin_macro` re-marks the same way, so a
+    /// scenario's written state is priced the moment it is readable too.
+    ///
+    /// No draw, no new state: the price is the state it writes, with the
+    /// market cap and the day's high and low beside it (the latter are
+    /// reset at the next open when the re-mark comes after a close).
+    /// `marks` is [`Engine::published_macro_marks`] taken before the change;
+    /// `None` does nothing.
+    pub fn reprice_to_published_macro(&mut self, marks: Option<Vec<f64>>) {
+        let Some(before) = marks else {
+            return;
+        };
+        let p = &self.params;
+        let economy = &self.economy;
+        let base = self.nominal_output_base;
+        let day = self.elapsed_days;
+        let pending = &mut self.repriced_pending;
+        for (slot, (c, &fv0)) in self.companies.iter_mut().zip(before.iter()).enumerate() {
+            if !(fv0 > 0.0) || c.is_bankrupt || !c.is_public {
+                continue;
+            }
+            let last = c.stock.price;
+            let fv1 = crate::market::tick::tick_fair_value(p, economy, base, day, c, last);
+            if !(fv1 > 0.0) || fv1 == fv0 {
+                continue;
+            }
+            // The price the name's mispricing implies on the published
+            // state: `price = (last / fv0) * fv(price)`. Fair value reads
+            // the price itself through the buyback term (the yield is
+            // earnings over price), so the first step, `last * fv1 / fv0`,
+            // is exact only with `buyback_payout_share` at 0.0; with it on,
+            // a re-mark that stopped there leaves the next tick to raise
+            // fair value by the buyback yield the lower price implies, and
+            // measured on pt-v20 with its leading dials that handed back 14
+            // bp of a 79 bp hike in the first 65 minutes. The fixed point
+            // is a contraction (the term's elasticity is the buyback yield
+            // times the years elapsed, well under one), so a few steps
+            // settle it; the loop stops when a step moves nothing, or at
+            // sixteen, and takes no draw.
+            let ratio = last / fv0;
+            let clamp = |x: f64| crate::mathx::min(crate::mathx::max(x, 0.01), p.price_hard_cap);
+            let mut price = clamp(ratio * fv1);
+            if p.buyback_payout_share != 0.0 {
+                for _ in 0..16 {
+                    let fv = crate::market::tick::tick_fair_value(p, economy, base, day, c, price);
+                    let next = clamp(ratio * fv);
+                    if next == price {
+                        break;
+                    }
+                    price = next;
+                }
+            }
+            let stock = &mut c.stock;
+            stock.price = price;
+            stock.high = crate::mathx::max(stock.high, price);
+            stock.low = crate::mathx::min(stock.low, price);
+            stock.market_cap = price * stock.shares_outstanding;
+            // For the tape: the next print's `repriced` books this move, so
+            // the print decomposition still sums to the move from the last
+            // print. Recording only; the price above is the whole effect.
+            if let Some(v) = pending.get_mut(slot) {
+                *v += crate::mathx::log(price / last);
+            }
+        }
     }
 
     // ── State access ──────────────────────────────────────────────────────
@@ -4040,6 +5876,76 @@ impl Engine {
         self.companies.is_empty()
     }
 
+    /// Install rate instruments, marked at the curve the economy holds now.
+    ///
+    /// Call once, after construction and before the first open: an engine
+    /// built with a settled opening has already run its burn-in by then, so
+    /// the instruments are marked at the curve the run starts from. They
+    /// never draw and never write the economy, so installing them changes no
+    /// equity price. See `crate::rates`.
+    pub fn set_rate_instruments(&mut self, instruments: Vec<crate::rates::RateInstrument>) {
+        self.rates = crate::rates::RateBook::new(instruments, &self.economy);
+    }
+
+    pub fn rates(&self) -> &crate::rates::RateBook {
+        &self.rates
+    }
+
+    /// A caller has written the corporate yield: re-mark the corporate
+    /// index's spread to it, even if the value did not change. Nothing on an
+    /// engine without rate instruments. See `crate::rates`.
+    pub fn remark_credit_spread(&mut self) {
+        if !self.rates.is_empty() {
+            self.rates.remark_credit_spread(&self.economy);
+        }
+    }
+
+    /// For a restore, which writes the book back whole.
+    pub fn rates_mut(&mut self) -> &mut crate::rates::RateBook {
+        &mut self.rates
+    }
+
+    /// Equities plus rate instruments: the width of every per-instrument
+    /// surface. Equal to [`Engine::len`] on an engine without rate
+    /// instruments.
+    pub fn instrument_count(&self) -> usize {
+        self.companies.len() + self.rates.len()
+    }
+
+    /// One field for the rate instruments, positional against
+    /// `rates().instruments`, in the units [`Engine::column`] uses.
+    ///
+    /// NaN where the field does not exist for an index (`garch_variance`,
+    /// `beta`, `last_daily_return`). The mispricing fields are zero: an
+    /// index level is its own fair value, and the mispricing process never
+    /// runs on it.
+    pub fn rate_column(&self, field: PriceField) -> Vec<f64> {
+        self.rates
+            .instruments
+            .iter()
+            .map(|i| match field {
+                PriceField::Price => i.price,
+                PriceField::PreviousClose => i.previous_close,
+                PriceField::Open => i.open,
+                PriceField::High => i.high,
+                PriceField::Low => i.low,
+                PriceField::Volume => i.volume,
+                PriceField::MarketCap => i.market_cap(),
+                PriceField::MispricingS => 0.0,
+                PriceField::MakerInventory => i.maker_inventory,
+                PriceField::GarchVariance => f64::NAN,
+                PriceField::PreviousTickPrice => f64::NAN,
+                PriceField::MispricingSPrevClose => 0.0,
+                PriceField::MispricingMomentum => 0.0,
+                PriceField::LastDailyReturn => f64::NAN,
+                PriceField::AvgVolume => i.avg_volume,
+                PriceField::Beta => f64::NAN,
+                PriceField::ShortInterest => 0.0,
+                PriceField::FloatShares => i.units_outstanding,
+            })
+            .collect()
+    }
+
     // ── Roster mutation ───────────────────────────────────────────────────
     //
     // A listed universe is not static: companies IPO in, go bankrupt, and are
@@ -4085,15 +5991,22 @@ impl Engine {
     /// under a preset with a non-zero `volume_idio_sigma` every company past
     /// the new one read a state that was not its own.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
+        self.base_fundamentals
+            .push([company.eps, company.book_value_per_share, company.revenue_growth]);
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
         self.noise_own_scale2.push(0.0);
-        self.tick_components.push([0.0; 8]);
+        self.tick_components.push([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.volume_idio.push(0.0);
         self.jump_move.push(0.0);
+        // The book's per-slot row, only once the book has been used: an
+        // engine that never saw an agent's order keeps its empty table.
+        if !self.book.taken.is_empty() {
+            self.book.taken.push([0.0; crate::agent_book::TAKEN_WIDTH]);
+        }
         // The per-name jump excitation follows the roster for the reason
         // `volume_idio` above does, and it was left out for the same
         // reason: it landed after this function was written. A name that
@@ -4106,6 +6019,9 @@ impl Engine {
         self.tick_shock.push(0.0);
         self.tick_absorbed.push(0.0);
         self.tick_clamp.push(0.0);
+        self.tick_repriced.push(0.0);
+        // A name that joins has had nothing written to its price.
+        self.repriced_pending.push(0.0);
         // Only where the arm is running. Empty means no arm, and pushing
         // into an empty pair would turn that into a one-row column.
         if !self.tick_unbounded_print.is_empty() {
@@ -4162,6 +6078,15 @@ impl Engine {
         if index < self.jump_move.len() {
             self.jump_move.remove(index);
         }
+        // A name that leaves takes its book with it: its waiting orders are
+        // cancelled and its unapplied flow is dropped, since there is no
+        // market left for either to reach.
+        if index < self.book.taken.len() {
+            self.book.taken.remove(index);
+        }
+        let leaving = self.companies[index].ticker.clone();
+        self.book.orders.retain(|o| o.ticker != leaving);
+        self.book.flow.retain(|(_, t, _, _)| *t != leaving);
         // `Vec::remove` for the reason the line above uses it: the tail
         // shifts down and keeps its relative order, so every remaining
         // name keeps its own excitation.
@@ -4180,11 +6105,20 @@ impl Engine {
         if index < self.tick_clamp.len() {
             self.tick_clamp.remove(index);
         }
+        if index < self.tick_repriced.len() {
+            self.tick_repriced.remove(index);
+        }
+        if index < self.repriced_pending.len() {
+            self.repriced_pending.remove(index);
+        }
         if index < self.tick_unbounded_print.len() {
             self.tick_unbounded_print.remove(index);
         }
         if index < self.tick_liquidity_share.len() {
             self.tick_liquidity_share.remove(index);
+        }
+        if index < self.base_fundamentals.len() {
+            self.base_fundamentals.remove(index);
         }
         Some(self.companies.remove(index))
     }
@@ -4214,7 +6148,22 @@ impl Engine {
     /// keeps the tick pure and replay deterministic for free.
     ///
     /// Returns `None` for an out-of-range index.
+    ///
+    /// With any of the agent-facing book's dials on, or once an agent has
+    /// used the book, this is that book instead
+    /// (`crate::agent_book::agent_book`): the ladder less what agents have
+    /// taken, the latent depth behind it, and every agent's resting orders.
+    /// Otherwise it is the maker's ladder, built exactly as it always was.
     pub fn book_for(&self, index: usize) -> Option<crate::order_book::OrderBook> {
+        // Rate instruments sit after the equities, so their index is the
+        // equity count plus their place in the rate book.
+        if index >= self.companies.len() {
+            let inst = self.rates.instruments.get(index - self.companies.len())?;
+            return Some(inst.book(self.economy.vix));
+        }
+        if self.agent_view() {
+            return self.agent_book_at(index, None);
+        }
         let company = self.companies.get(index)?;
         Some(crate::microstructure::build_live_book(
             &company.micro_view(company.stock.price),
@@ -4397,6 +6346,34 @@ impl Engine {
         )
     }
 
+    /// Whether any company's fair-value inputs differ from the ones it was
+    /// built or listed with, to the bit. What decides whether a snapshot
+    /// carries them and whether the state hash covers them, so an engine
+    /// `set_fundamentals` never moved snapshots and hashes as it did before
+    /// they were carried.
+    pub fn fundamentals_changed(&self) -> bool {
+        fn bits(v: Option<f64>) -> Option<u64> {
+            v.map(f64::to_bits)
+        }
+        self.companies.len() != self.base_fundamentals.len()
+            || self.companies.iter().zip(&self.base_fundamentals).any(|(c, b)| {
+                bits(c.eps) != bits(b[0])
+                    || bits(c.book_value_per_share) != bits(b[1])
+                    || bits(c.revenue_growth) != bits(b[2])
+            })
+    }
+
+    /// Put every company's fair-value inputs back to the ones it was built
+    /// or listed with. What a restore does when the snapshot carries none:
+    /// such a snapshot was taken on an engine whose inputs had not moved.
+    pub fn reset_fundamentals(&mut self) {
+        for (c, b) in self.companies.iter_mut().zip(&self.base_fundamentals) {
+            c.eps = b[0];
+            c.book_value_per_share = b[1];
+            c.revenue_growth = b[2];
+        }
+    }
+
     pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
         if values.len() != self.companies.len() {
             return Err(format!(
@@ -4447,6 +6424,8 @@ impl Engine {
         Ok(())
     }
 
+    /// One field for every company, in roster order. A field a company does
+    /// not have yet (a return before its first close, say) is NaN.
     pub fn column(&self, field: PriceField) -> Vec<f64> {
         self.companies
             .iter()
@@ -4479,7 +6458,8 @@ impl Engine {
             .collect()
     }
 
-    /// Convenience for the most-read column.
+    /// Every company's current price, in roster order. Rate indices are not
+    /// in it. A copy, so it does not follow later ticks.
     pub fn prices(&self) -> Vec<f64> {
         self.column(PriceField::Price)
     }
@@ -4556,7 +6536,7 @@ impl Engine {
     /// Empty slices for a caller that has none, which is every core-only
     /// caller and every test below.
     pub fn state_hash(&self, day_count: u32, market_open: bool) -> [u8; 32] {
-        self.state_hash_with_pending(day_count, market_open, &[], &[])
+        self.state_hash_with_pending(day_count, market_open, &[], &[], &[])
     }
 
     /// [`Engine::state_hash`], carrying the wrapper's pending tape state.
@@ -4566,6 +6546,7 @@ impl Engine {
         market_open: bool,
         pending_jump: &[f64],
         pending_overnight: &[f64],
+        pending_fair_value: &[f64],
     ) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
@@ -4606,17 +6587,33 @@ impl Engine {
         for id in self.ids() {
             hash_str(&mut buf, &id);
         }
-        hash_str(&mut buf, &self.params.fingerprint());
+        hash_str(&mut buf, self.model_fingerprint());
 
-        // The day accumulators, in snapshot order.
+        // The day accumulators, in snapshot order. The fair-value shift's
+        // slot, the last in both, follows the rest and only on an engine that
+        // carries fair-value offsets, the one place it can be non-zero, so
+        // every engine without them hashes as it did before the slot.
+        // Also wherever a slot is non-zero, so an edited slot on an engine
+        // without offsets is still covered.
+        let fv_hashed = self.carries_fair_value_offsets()
+            || self.attribution.iter().any(|r| r[crate::market::factors::FAIR_VALUE_SLOT] != 0.0)
+            || self.tick_components.iter().any(|r| r[crate::market::factors::TICK_FAIR_VALUE] != 0.0);
         for row in &self.attribution {
-            for value in row {
+            for value in &row[..crate::market::factors::FAIR_VALUE_SLOT] {
                 hash_f64(&mut buf, *value);
             }
         }
         for row in &self.tick_components {
-            for value in row {
+            for value in &row[..crate::market::factors::TICK_FAIR_VALUE] {
                 hash_f64(&mut buf, *value);
+            }
+        }
+        if fv_hashed {
+            for row in &self.attribution {
+                hash_f64(&mut buf, row[crate::market::factors::FAIR_VALUE_SLOT]);
+            }
+            for row in &self.tick_components {
+                hash_f64(&mut buf, row[crate::market::factors::TICK_FAIR_VALUE]);
             }
         }
         for value in &self.tick_fundamental {
@@ -4693,6 +6690,25 @@ impl Engine {
         if self.params.vix_anchor_memory != 0.0 {
             hash_f64(&mut buf, self.vix_anchor_slow);
         }
+        // The aggregate earnings cycle, on the same rule.
+        if self.params.earnings_cycle_depth != 0.0 {
+            hash_f64(&mut buf, self.economy.earnings_cycle);
+        }
+        // The volatility feedback's smoothed exposure, on the same rule.
+        if self.carries_vix_feedback() {
+            hash_f64(&mut buf, self.economy.vix_feedback);
+        }
+        // The fair-value levels and the unspent opening draws, on the same
+        // rule: only when a dial can move them.
+        if self.carries_fair_value_offsets() {
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.fair_value_offset.unwrap_or(0.0));
+            }
+            hash_u32(&mut buf, self.opening_z.len() as u32);
+            for value in &self.opening_z {
+                hash_f64(&mut buf, *value);
+            }
+        }
         // The crisis episode. Hashed for the reason every field here is:
         // two engines alike in every column, one of them three sessions
         // into a financial-services episode and the other not in an episode
@@ -4710,6 +6726,12 @@ impl Engine {
         if self.vix_sets_variance_pending {
             hash_bool(&mut buf, true);
         }
+        // Today's pins, likewise only while any is set, behind a tag so the
+        // marks cannot hash as the forced close's.
+        if self.macro_pins_today != 0 {
+            hash_f64(&mut buf, 7.0);
+            hash_f64(&mut buf, self.macro_pins_today as f64);
+        }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty
@@ -4717,6 +6739,15 @@ impl Engine {
         for pending in [pending_jump, pending_overnight] {
             hash_u32(&mut buf, pending.len() as u32);
             for value in pending {
+                hash_f64(&mut buf, *value);
+            }
+        }
+        // The jump's fair-value shift waiting for its tape row, beside the
+        // jump. Only while non-empty, which only a preset with fair-value
+        // offsets can make it, so every other engine hashes as it did.
+        if !pending_fair_value.is_empty() {
+            hash_u32(&mut buf, pending_fair_value.len() as u32);
+            for value in pending_fair_value {
                 hash_f64(&mut buf, *value);
             }
         }
@@ -4772,6 +6803,34 @@ impl Engine {
             hash_f64(&mut buf, value);
         }
         hash_str(&mut buf, e.cycle_phase.as_str());
+        // The published-phase history, only while `cycle_publication_lag`
+        // keeps one, so every other engine's hash is the one it was.
+        if self.params.cycle_publication_lag != 0.0 {
+            hash_u32(&mut buf, self.cycle_history.len() as u32);
+            for phase in &self.cycle_history {
+                hash_str(&mut buf, phase.as_str());
+            }
+        }
+        // Unemployment's impulse, only while
+        // `unemployment_adjustment_half_life` is set.
+        if self.params.unemployment_adjustment_half_life != 0.0 {
+            hash_f64(&mut buf, e.unemployment_impulse);
+        }
+        // The published GDP growth figure's state, only while
+        // `gdp_publication_lag` is set, so every other engine's hash is the
+        // one it was.
+        if self.params.gdp_publication_lag != 0.0 {
+            let p = &self.gdp_publication;
+            hash_f64(&mut buf, p.published);
+            hash_i64(&mut buf, p.quarter);
+            hash_u32(&mut buf, p.count);
+            hash_f64(&mut buf, p.sum);
+            hash_u32(&mut buf, p.pending.len() as u32);
+            for &(release, value) in &p.pending {
+                hash_i64(&mut buf, release);
+                hash_f64(&mut buf, value);
+            }
+        }
 
         // The central bank.
         let bank = &self.central_bank;
@@ -4816,6 +6875,86 @@ impl Engine {
             hash_u32(&mut buf, u32::from(kind));
             hash_u64(&mut buf, index);
             hash_f64(&mut buf, value);
+        }
+
+        // The rate instruments, after every equity field and before the
+        // agent-facing book, and only when there are any, so every engine
+        // without them hashes exactly as it did before they existed.
+        // In the order the snapshot's `rates` block carries them, which is
+        // the order `manifest.state_hash` reads. The per-tick print
+        // decomposition is output, not state, and is left out as the
+        // equities' is.
+        if !self.rates.is_empty() {
+            hash_str(&mut buf, "rates");
+            hash_u32(&mut buf, self.rates.len() as u32);
+            for inst in &self.rates.instruments {
+                hash_str(&mut buf, inst.spec.ticker);
+                for value in [
+                    inst.level, inst.marked_yield, inst.price, inst.previous_close,
+                    inst.open, inst.high, inst.low, inst.volume, inst.avg_volume,
+                    inst.units_outstanding, inst.maker_inventory, inst.day_carry,
+                    inst.day_duration, inst.day_convexity,
+                ] {
+                    hash_f64(&mut buf, value);
+                }
+            }
+            hash_f64(&mut buf, self.rates.ig_spread);
+            hash_f64(&mut buf, self.rates.last_corporate);
+            hash_bool(&mut buf, self.rates.closed_since_open);
+        }
+
+        // The agent-facing book, after the rate instruments, and only when
+        // it has been used, so every state that never saw an agent's order
+        // hashes as it did before the book existed. Everything in it decides what the next
+        // tick or the next agent meets, the undelivered fills included:
+        // two engines alike in every column but owing an agent different
+        // fills are not the same state. `manifest.state_hash` writes the
+        // same bytes from the snapshot's `book` entry.
+        if !self.book.is_pristine() {
+            hash_book(&mut buf, &self.book);
+        }
+
+        // Four fields added after the book, each behind its own name and
+        // each only where it can differ from what an engine that never
+        // moved it holds, so every state hashed before them hashes the same.
+        //
+        // The day's label and the valuation's clock, each only when it is not
+        // the day `day_count` and the session flag give (`default_day`). A
+        // run that numbers its days from the counter never writes either.
+        // The label is here although nothing prices off it, because the
+        // book stamps fills with it and two engines owing different stamps
+        // would hash apart one fill later.
+        let usual = default_day(day_count, market_open);
+        if self.current_day != usual {
+            hash_str(&mut buf, "current_day");
+            hash_i64(&mut buf, self.current_day);
+        }
+        if self.elapsed_days != usual {
+            hash_str(&mut buf, "elapsed_days");
+            hash_i64(&mut buf, self.elapsed_days);
+        }
+        // The fair-value inputs, once `set_fundamentals` has moved them off
+        // the ones each company was built or listed with. Every price
+        // values off them, so two engines alike in every column and valuing
+        // different earnings are not the same state; before this they
+        // hashed equal and a restore brought back the construction figures.
+        if self.fundamentals_changed() {
+            hash_str(&mut buf, "fundamentals");
+            hash_u32(&mut buf, n as u32);
+            for c in &self.companies {
+                hash_f64(&mut buf, c.eps.unwrap_or(f64::NAN));
+                hash_f64(&mut buf, c.book_value_per_share.unwrap_or(f64::NAN));
+                hash_f64(&mut buf, c.revenue_growth.unwrap_or(f64::NAN));
+            }
+        }
+        // The variance cascade's components, only on a model that runs it.
+        if self.carries_garch_cascade() {
+            let values = self.garch_cascade();
+            hash_str(&mut buf, "garch_cascade");
+            hash_u32(&mut buf, values.len() as u32);
+            for value in values {
+                hash_f64(&mut buf, value);
+            }
         }
 
         let mut hasher = Sha256::new();
@@ -4889,6 +7028,25 @@ pub const STATE_HASH_COLUMNS: [PriceField; 18] = [
     PriceField::ShortInterest,
     PriceField::FloatShares,
 ];
+
+/// The day an engine's two day numbers hold when nothing has moved them
+/// off the binding's counter: `day_count` while a session is open, the day
+/// just closed once it has closed (`day_count - 1`), and 0 before the first
+/// open. [`Engine::state_hash`] covers the label and the valuation's clock
+/// only where they differ from this, and a restore that finds neither in
+/// its snapshot sets both to it.
+///
+/// `run_session(close_at_end=True)` closes the day and leaves the session
+/// flag set, so after it the two read one day behind this and the snapshot
+/// carries them.
+pub fn default_day(day_count: u32, market_open: bool) -> i64 {
+    let count = i64::from(day_count);
+    if market_open || count == 0 {
+        count
+    } else {
+        count - 1
+    }
+}
 
 /// Where a column sits in [`Engine::state_hash`].
 ///
@@ -4974,6 +7132,70 @@ fn hash_opt_f64(buf: &mut Vec<u8>, value: Option<f64>) {
     }
 }
 
+/// The agent-facing book, in the order the snapshot's `book` entry holds it.
+fn hash_book(buf: &mut Vec<u8>, book: &crate::agent_book::BookState) {
+    use crate::order_book::Side;
+    let side = |s: Side| match s {
+        Side::Buy => "buy",
+        Side::Sell => "sell",
+    };
+    hash_str(buf, "book");
+    hash_u64(buf, book.sequence);
+    hash_u64(buf, book.fill_sequence);
+    hash_u32(buf, book.taken.len() as u32);
+    for row in &book.taken {
+        for v in row {
+            hash_f64(buf, *v);
+        }
+    }
+    hash_u32(buf, book.orders.len() as u32);
+    for o in &book.orders {
+        hash_str(buf, &o.id);
+        hash_str(buf, &o.agent);
+        hash_str(buf, &o.ticker);
+        hash_str(buf, side(o.side));
+        hash_f64(buf, o.limit);
+        hash_f64(buf, o.quantity);
+        hash_f64(buf, o.remaining);
+        hash_u64(buf, o.sequence);
+        hash_str(buf, o.mode.as_str());
+    }
+    hash_u32(buf, book.flow.len() as u32);
+    for (agent, ticker, bought, sold) in &book.flow {
+        hash_str(buf, agent);
+        hash_str(buf, ticker);
+        hash_f64(buf, *bought);
+        hash_f64(buf, *sold);
+    }
+    hash_u32(buf, book.fills.len() as u32);
+    for f in &book.fills {
+        hash_str(buf, &f.agent);
+        hash_str(buf, &f.order_id);
+        hash_str(buf, &f.ticker);
+        hash_str(buf, side(f.side));
+        hash_f64(buf, f.quantity);
+        hash_f64(buf, f.price);
+        hash_str(buf, f.liquidity.as_str());
+        hash_str(buf, &f.counterparty);
+        hash_f64(buf, f.reference);
+        hash_i64(buf, f.day);
+        // Not `tick`: it is a label counted from this engine's own open,
+        // and a restore clears the day marks it is counted from, so a
+        // restored engine would hash apart from the one it copied on a
+        // label alone. The fill's sequence orders it.
+        hash_u64(buf, f.sequence);
+    }
+    hash_u32(buf, book.impacts.len() as u32);
+    for r in &book.impacts {
+        hash_str(buf, &r.agent);
+        hash_str(buf, &r.ticker);
+        hash_f64(buf, r.bought);
+        hash_f64(buf, r.sold);
+        hash_f64(buf, r.permanent);
+        hash_i64(buf, r.day);
+    }
+}
+
 fn hash_opt_str(buf: &mut Vec<u8>, value: Option<&str>) {
     match value {
         Some(v) => {
@@ -5027,13 +7249,83 @@ impl Rng for Counting<'_> {
 }
 
 /// What a session needs beyond the engine's own state.
+///
+/// [`SessionRequest::new`] gives a quiet session (no news, no orders,
+/// volatility multiplier 1.0) that leaves opening and closing the day to the
+/// caller. Set the other fields on the value it returns.
+///
+/// Outside this crate a `SessionRequest` can only come from `new`, because
+/// the struct is `#[non_exhaustive]`: a later patch release can add a field
+/// without breaking your code. 0.8.5 added `fills`, and every struct literal
+/// written for 0.8.1 stopped compiling. So this does not compile:
+///
+/// ```compile_fail,E0639
+/// use tradefloor::engine::SessionRequest;
+/// use tradefloor::market::GameTime;
+///
+/// let request = SessionRequest {
+///     start: GameTime { hour: 9, minute: 30, day_of_week: 3 },
+///     ticks: 390,
+///     volatility_multiplier: 1.0,
+///     news: &[],
+///     news_impact_queue: &[],
+///     order_volumes: &[],
+///     fills: &[],
+///     close_at_end: false,
+///     reopen: false,
+///     daily_innovations: &[],
+///     sector_base_variances: &[],
+///     stop: None,
+/// };
+/// ```
+#[non_exhaustive]
 pub struct SessionRequest<'a> {
+    /// The clock at the first tick. Each tick is one minute after the last.
     pub start: GameTime,
+    /// How many one-minute ticks to run. 390 is a full session, 09:30 to
+    /// 16:00, and is the Python package's default.
     pub ticks: usize,
+    /// Scales the per-tick noise. 1.0 is the model as calibrated.
     pub volatility_multiplier: f64,
+    /// News events that reach the factor model this session.
     pub news: &'a [NewsEvent],
+    /// News already in flight from earlier sessions, still being absorbed.
     pub news_impact_queue: &'a [NewsImpactEntry],
+    /// Order volume held on EVERY tick of the session: a standing rate, in
+    /// shares per minute, for a program that trades all session long.
     pub order_volumes: &'a [(String, OrderVolume)],
+    /// Order volume that reaches the market ONCE, on the session's first
+    /// tick: the trades an agent filled at the step boundary just before it.
+    ///
+    /// # Why this is not `order_volumes`
+    ///
+    /// Until 0.8.5 every harness handed an agent's fills to the session as
+    /// `order_volumes`, so one order was counted on every tick of the step:
+    /// 65 times at six steps a day, 390 at one. It also landed only after the
+    /// agent had filled at the pre-trade book, so the agent never paid its
+    /// own permanent impact and collected it instead. A spec mean reversion
+    /// rule beat buy-and-hold on 20 of 20 suite markets by a median 42
+    /// points in 60 days on that alone (design repo,
+    /// `programme/meanrev-edge-ptv19-2026-09-24.md`).
+    ///
+    /// # When it lands, and who pays for it
+    ///
+    /// The fill is priced against the book standing at the step boundary,
+    /// which charges the spread and the depth the order walks. The order's
+    /// permanent impact then moves `s` once, on the first tick after the
+    /// fill, and the next trader meets the moved price. That is the
+    /// discrete Almgren-Chriss convention: a trade executes at the
+    /// pre-trade price less its temporary impact, and its permanent impact
+    /// reaches the trades after it. The convention is free of a round-trip
+    /// profit only while the book charges at least the permanent impact an
+    /// order causes, and `tests/test_agent_flow.py` holds that on every
+    /// shipped preset: a fill's premium over the print it traded at is
+    /// never below the move its own flow leaves behind.
+    ///
+    /// Summed with `order_volumes` per ticker on the first tick when both
+    /// name one. Empty is bit-identical to the session this field did not
+    /// exist in: the first tick reads `order_volumes` untouched.
+    pub fills: &'a [(String, OrderVolume)],
     /// Run the close bookkeeping when the session finishes normally.
     pub close_at_end: bool,
     /// Open the market before the first tick.
@@ -5060,10 +7352,75 @@ pub struct SessionRequest<'a> {
     /// Set false for the second and later sessions of one day. A day of one
     /// session is unaffected either way, which is why no parity vector moves.
     pub reopen: bool,
+    /// Read only when `close_at_end` is set: each name's daily innovation for
+    /// GARCH. A `None` slot takes the noise the engine accumulated this
+    /// session, which is what [`Engine::close_day`] always uses.
     pub daily_innovations: &'a [Option<f64>],
+    /// Read only when `close_at_end` is set: each sector's base variance.
     pub sector_base_variances: &'a [f64],
     /// Stop early when a condition is met, for event-driven advancement.
     pub stop: Option<StopCondition>,
+}
+
+impl<'a> SessionRequest<'a> {
+    /// A quiet session of `ticks` minutes starting at `start`.
+    ///
+    /// No news, no order flow, volatility multiplier 1.0, no stop
+    /// condition. It neither opens the market (`reopen` is false) nor
+    /// closes it (`close_at_end` is false), so it fits the day loop
+    /// [`Engine::open_market`], [`Engine::run_session`], [`Engine::close_day`]
+    /// that the WebAssembly binding runs. Set any field on the result to add
+    /// news or flow.
+    ///
+    /// ```
+    /// use tradefloor::engine::SessionRequest;
+    /// use tradefloor::market::GameTime;
+    ///
+    /// let open = GameTime { hour: 9, minute: 30, day_of_week: 3 };
+    /// let request = SessionRequest::new(open, 390);
+    /// assert_eq!(request.ticks, 390);
+    /// assert!(!request.reopen && !request.close_at_end);
+    /// ```
+    pub fn new(start: GameTime, ticks: usize) -> Self {
+        SessionRequest {
+            start,
+            ticks,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            fills: &[],
+            close_at_end: false,
+            reopen: false,
+            daily_innovations: &[],
+            sector_base_variances: &[],
+            stop: None,
+        }
+    }
+}
+
+/// One flow per ticker: `standing` with `once` added to it.
+///
+/// The tick finds a ticker's flow with the FIRST matching entry, so two
+/// entries for one name would drop the second rather than add it. Standing
+/// entries keep their order and take any fills for the same name; fills for
+/// names the standing flow does not carry follow, in their own order. Both
+/// inputs arrive sorted from the bindings, and neither order reaches a price.
+pub fn merge_order_volumes(
+    standing: &[(String, OrderVolume)],
+    once: &[(String, OrderVolume)],
+) -> Vec<(String, OrderVolume)> {
+    let mut out: Vec<(String, OrderVolume)> = standing.to_vec();
+    for (ticker, v) in once {
+        match out.iter_mut().find(|(t, _)| t == ticker) {
+            Some((_, have)) => {
+                have.buy += v.buy;
+                have.sell += v.sell;
+            }
+            None => out.push((ticker.clone(), *v)),
+        }
+    }
+    out
 }
 
 /// Why a session might end before its last tick.
@@ -5100,6 +7457,7 @@ impl StopCondition {
     }
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SessionOutcome {
     pub draws_consumed: usize,
@@ -5115,6 +7473,7 @@ pub struct SessionOutcome {
 /// hot direction: emission is per tick.
 ///
 /// `f64` only. See [`Engine::run_session`] for why there is no `f32` variant.
+#[non_exhaustive]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct SessionBuffer {
     pub companies: usize,
@@ -5126,11 +7485,12 @@ pub struct SessionBuffer {
     pub mispricing_s: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    /// The seven component columns, each `ticks * companies`, in
-    /// `S_COMPONENT_KEYS` order. Seven flat buffers rather than one of
-    /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
-    /// contiguous run of its own values.
-    pub components: [Vec<f64>; 8],
+    /// The component columns, each `ticks * companies`: the eight
+    /// `S_COMPONENT_KEYS` in order, then the tick's fair-value shift
+    /// (`TICK_COMPONENT_COUNT` in all). Flat buffers rather than one of
+    /// `[f64; TICK_COMPONENT_COUNT]`, because each becomes an Arrow column
+    /// and a column wants a contiguous run of its own values.
+    pub components: [Vec<f64>; crate::market::factors::TICK_COMPONENT_COUNT],
     /// The print decomposition, each `ticks * companies`: the shock that
     /// arrived and the depth that absorbed it, in log units.
     pub shock: Vec<f64>,
@@ -5138,6 +7498,10 @@ pub struct SessionBuffer {
     /// How far the print breaker moved each print. `absorbed - clamp` is the
     /// book's own share of the distance from the model price to the tape.
     pub clamp: Vec<f64>,
+    /// What was written to each price between its last print and the
+    /// tick, in log units. `repriced + shock + absorbed` is the print's log
+    /// move from the previous print.
+    pub repriced: Vec<f64>,
     /// The depth counterfactual, each `ticks * companies` when it ran and
     /// EMPTY when it did not. Emptiness is the signal, which is why these
     /// two are not resized alongside the columns above.
@@ -5146,23 +7510,29 @@ pub struct SessionBuffer {
 }
 
 /// One tick's ground truth, as the engine holds it, handed to
-/// [`SessionBuffer::write_tick`].
+/// `SessionBuffer::write_tick`.
 ///
 /// A struct rather than nine positional slices. The call site passes nine
 /// same-typed buffers and a transposition there would compile, run, and
 /// mislabel every row of every column it touched.
+#[non_exhaustive]
 pub struct TickTruth<'a> {
-    pub components: &'a [[f64; 8]],
+    pub components: &'a [[f64; crate::market::factors::TICK_COMPONENT_COUNT]],
     pub fundamental: &'a [f64],
     pub anchor: &'a [f64],
     pub shock: &'a [f64],
     pub absorbed: &'a [f64],
     pub clamp: &'a [f64],
+    /// What was written to each price between its last print and this
+    /// tick (`Engine::tick_repriced`).
+    pub repriced: &'a [f64],
     pub unbounded_print: &'a [f64],
     pub liquidity_share: &'a [f64],
 }
 
 impl SessionBuffer {
+    /// An empty buffer. [`Engine::run_session`] sizes it to the session on
+    /// each call, so one buffer serves every day of a run.
     pub fn new() -> Self {
         Self::default()
     }
@@ -5178,6 +7548,7 @@ impl SessionBuffer {
             self.shock.resize(needed, 0.0);
             self.absorbed.resize(needed, 0.0);
             self.clamp.resize(needed, 0.0);
+            self.repriced.resize(needed, 0.0);
             for column in self.components.iter_mut() {
                 column.resize(needed, 0.0);
             }
@@ -5217,6 +7588,7 @@ impl SessionBuffer {
             self.shock[base + i] = truth.shock.get(i).copied().unwrap_or(0.0);
             self.absorbed[base + i] = truth.absorbed.get(i).copied().unwrap_or(0.0);
             self.clamp[base + i] = truth.clamp.get(i).copied().unwrap_or(0.0);
+            self.repriced[base + i] = truth.repriced.get(i).copied().unwrap_or(0.0);
             // Guarded on the buffer rather than on the source: a session that
             // sized these columns and then met an engine with the arm off
             // would otherwise write NaN into a column it had promised.
@@ -5229,9 +7601,40 @@ impl SessionBuffer {
                 self.liquidity_share[base + i] =
                     truth.liquidity_share.get(i).copied().unwrap_or(0.0);
             }
-            let row = truth.components.get(i).copied().unwrap_or([0.0; 8]);
+            let row = truth.components.get(i).copied().unwrap_or([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
+            }
+        }
+    }
+
+    /// Write the rate instruments' rows for one tick, after the equities'.
+    ///
+    /// The truth columns carry what exists for an index: the model price is
+    /// the index level (as both `fundamental` and `anchor`), `s` is zero, the
+    /// equity components are zero, and the print decomposition is the book's.
+    /// The depth counterfactual never runs on an index, so its print there is
+    /// the print and its share zero.
+    fn write_rates(&mut self, tick: usize, first: usize, rates: &crate::rates::RateBook) {
+        let base = tick * self.companies + first;
+        for (j, inst) in rates.instruments.iter().enumerate() {
+            let at = base + j;
+            self.prices[at] = inst.price;
+            self.volumes[at] = inst.volume;
+            self.mispricing_s[at] = 0.0;
+            self.fundamental[at] = inst.level;
+            self.anchor[at] = inst.level;
+            self.shock[at] = inst.tick_shock;
+            self.absorbed[at] = inst.tick_absorbed;
+            self.clamp[at] = 0.0;
+            // No re-mark or opening print writes a rate index's price.
+            self.repriced[at] = 0.0;
+            if !self.unbounded_print.is_empty() {
+                self.unbounded_print[at] = inst.price;
+                self.liquidity_share[at] = 0.0;
+            }
+            for column in self.components.iter_mut() {
+                column[at] = 0.0;
             }
         }
     }
@@ -5241,6 +7644,109 @@ impl SessionBuffer {
         let base = tick * self.companies;
         &self.prices[base..base + self.companies]
     }
+}
+
+/// A fixed simulation, hashed — the cross-binding determinism probe.
+///
+/// Every binding calls THIS rather than hashing state on its own side. A
+/// check implemented twice is a fork of the check: the first attempt at
+/// this compared a wasm digest against one rebuilt in Python, and the two
+/// disagreed because the Python surface reports rates as fractions while
+/// the core carries percent. That is a units bug in the harness reported as
+/// a determinism failure, which is precisely the confusion a shared
+/// implementation removes.
+///
+/// Hashing rules follow `tests/known_answer.py`: raw big-endian IEEE-754
+/// bytes, no decimal formatting anywhere, because a float formatter would
+/// make the digest depend on something other than the simulation.
+///
+/// Prices are tick-rounded to cents, so a price-only digest can agree while
+/// two builds have drifted below that. The macro state is carried at full
+/// precision and sits downstream of the whole day chain, so it is the part
+/// of this probe that can see a low-bit difference.
+///
+/// Returns `None` for an unknown preset.
+pub fn fixed_simulation_digest(
+    size: usize,
+    universe_seed: u64,
+    seed: u64,
+    days: usize,
+    ticks: usize,
+    preset: &str,
+) -> Option<String> {
+    use sha2::{Digest, Sha256};
+
+    let params = crate::params::ModelParams::preset(preset)?;
+    let generated = crate::universe::random_universe(size, universe_seed);
+    let companies: Vec<TickCompany> = generated
+        .iter()
+        .enumerate()
+        .map(|(i, g)| g.to_init().to_tick_company(i))
+        .collect();
+    let mut engine = Engine::with_params(
+        seed,
+        companies,
+        crate::economy::create_initial_economy_state(
+            &crate::economy::InitialEconomyOptions::default()),
+        crate::economy::create_initial_central_bank_state(0),
+        crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        params,
+    );
+    let mut buffer = SessionBuffer::new();
+    for day in 1..=days {
+        engine.open_market();
+        engine.run_session(
+            &SessionRequest {
+                start: crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 },
+                ticks,
+                volatility_multiplier: 1.0,
+                news: &[],
+                news_impact_queue: &[],
+                order_volumes: &[],
+                fills: &[],
+                close_at_end: false,
+                reopen: false,
+                daily_innovations: &[],
+                sector_base_variances: &[],
+                stop: None,
+            },
+            &mut buffer,
+        );
+        engine.close_day(day as i64);
+    }
+
+    // NaN IS THE ONE PLACE WEBASSEMBLY IS LOOSE.
+    //
+    // The wasm specification pins IEEE-754 exactly for add, subtract,
+    // multiply, divide and square root, which is why a browser build can
+    // agree with a native one at all. It deliberately does NOT pin NaN
+    // payload bits. So hashing a NaN would compare a bit pattern the spec
+    // permits two engines to choose differently -- a digest that could
+    // disagree for a reason that is not the model, which is precisely the
+    // failure this probe exists to detect.
+    //
+    // Measured: zero NaN and zero infinities across 16,800 price samples
+    // (seven seeds x sixty days x forty names) plus the macro state. So this
+    // does not fire today. It is a guard rather than a hope, because "we
+    // have never seen one" is not the same claim as "there cannot be one",
+    // and the failure it prevents is a determinism report that is wrong in
+    // the reassuring direction.
+    let mut hasher = Sha256::new();
+    for price in engine.prices() {
+        if !price.is_finite() {
+            return None;
+        }
+        hasher.update(price.to_be_bytes());
+    }
+    let e = engine.economy();
+    for v in [e.vix, e.federal_funds_rate, e.inflation_rate,
+              e.corporate_bond_yield, e.fear_greed_index] {
+        if !v.is_finite() {
+            return None;
+        }
+        hasher.update(v.to_be_bytes());
+    }
+    Some(format!("{:x}", hasher.finalize()))
 }
 
 #[cfg(test)]
@@ -5284,6 +7790,7 @@ mod tests {
                 mispricing_s: None,
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
+                fair_value_offset: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,
                 garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],
@@ -5295,7 +7802,7 @@ mod tests {
         }
     }
 
-    fn engine(seed: u32) -> Engine {
+    fn engine(seed: u64) -> Engine {
         Engine::new(
             seed,
             vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
@@ -5303,6 +7810,146 @@ mod tests {
             create_initial_central_bank_state(0),
             sectors(),
         )
+    }
+
+    /// [`engine`] under pt-v19: the snapshot-priced flow path, where an
+    /// agent's fills reach the first tick's `order_volumes`. pt-v20, the
+    /// default from 0.8.5, turns `fill_impact_coefficient` on and routes them
+    /// through the agent-facing book's pending flow instead.
+    fn engine_v19(seed: u64) -> Engine {
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            crate::params::PT_V19,
+        )
+    }
+
+    /// `cycle_publication_lag`: off, the published phase is the true one and
+    /// no history is kept or hashed; on, the published phase is the phase
+    /// of `lag` closes before, the opening phase until then, and a pin is
+    /// the true phase at once and published `lag` closes after the close
+    /// that carried it.
+    #[test]
+    fn the_published_phase_lags_the_true_one_only_under_the_dial() {
+        use crate::economy::CyclePhase;
+        // "Off" is pt-v19: the default, pt-v20, sets the lag since its
+        // graded arm (2026-09-26). Was `engine(7)`, the default.
+        let off = engine_v19(7);
+        assert!(off.cycle_history().is_empty());
+        assert_eq!(off.published_cycle_phase(), off.economy().cycle_phase);
+
+        let lag = 4usize;
+        let params = crate::params::ModelParams {
+            cycle_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let opening = e.economy().cycle_phase;
+        assert_eq!(e.cycle_history().len(), lag + 1);
+        let turned = if opening == CyclePhase::Trough { CyclePhase::Peak } else { CyclePhase::Trough };
+        e.economy_mut().cycle_phase = turned;
+        assert_eq!(e.published_cycle_phase(), opening);
+        let mut truth = vec![opening];
+        for day in 1..=12i64 {
+            e.advance_macro_day(day);
+            truth.push(e.economy().cycle_phase);
+            let d = day as usize;
+            assert_eq!(e.published_cycle_phase(), truth[d.saturating_sub(lag)], "day {d}");
+        }
+        assert_ne!(truth[1], opening);
+        // Hashed while set: the same engine with one phase of history
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut history: Vec<CyclePhase> = other.cycle_history().iter().copied().collect();
+        history[0] = if history[0] == CyclePhase::Expansion {
+            CyclePhase::Recovery
+        } else {
+            CyclePhase::Expansion
+        };
+        other.set_cycle_history(history).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        assert!(other.set_cycle_history(vec![opening; lag]).is_err());
+        assert!(engine_v19(7).clone().set_cycle_history(vec![opening]).is_err());
+    }
+
+    /// `gdp_publication_lag`: off, the published growth is the true one and
+    /// no state is kept or hashed; on, it is the mean of each macro-calendar
+    /// quarter's true growth (day 0, the opening, included), released `lag`
+    /// closes after the quarter's last day, and the opening growth until then.
+    #[test]
+    fn the_published_growth_is_the_quarter_mean_released_late_only_under_the_dial() {
+        // "Off" is pt-v19: the default, pt-v20, sets the lag since its
+        // graded arm (2026-09-26). Was `engine(7)`, the default.
+        let off = engine_v19(7);
+        assert_eq!(off.gdp_publication(), &GdpPublication::default());
+        assert_eq!(off.published_gdp_growth(), off.economy().gdp_growth);
+
+        let lag = 5i64;
+        let params = crate::params::ModelParams {
+            gdp_publication_lag: lag as f64,
+            ..Engine::default_model()
+        };
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params,
+        );
+        let q = e.macro_calendar().days_per_quarter();
+        let opening = e.economy().gdp_growth;
+        assert_eq!(e.published_gdp_growth(), opening);
+        let mut truth = vec![opening];
+        let mut published = vec![opening];
+        for day in 1..=(2 * q + lag) {
+            e.advance_macro_day(day);
+            truth.push(e.economy().gdp_growth);
+            published.push(e.published_gdp_growth());
+        }
+        let mean = |k: i64| -> f64 {
+            let mut sum = 0.0;
+            for d in (k * q)..((k + 1) * q) {
+                sum += truth[d as usize];
+            }
+            sum / q as f64
+        };
+        for d in 0..published.len() as i64 {
+            let want = if d >= 2 * q - 1 + lag {
+                mean(1)
+            } else if d >= q - 1 + lag {
+                mean(0)
+            } else {
+                opening
+            };
+            assert_eq!(published[d as usize], want, "day {d}");
+        }
+        // Hashed while set: the same engine with one pending figure
+        // changed hashes apart.
+        let before = e.state_hash(12, false);
+        let mut other = e.clone();
+        let mut state = other.gdp_publication().clone();
+        state.sum += 1.0;
+        other.set_gdp_publication(state).unwrap();
+        assert_ne!(other.state_hash(12, false), before);
+        let mut empty = e.gdp_publication().clone();
+        empty.count = 0;
+        assert!(e.clone().set_gdp_publication(empty).is_err());
+        assert!(engine_v19(7).clone().set_gdp_publication(GdpPublication {
+            count: 1,
+            ..GdpPublication::default()
+        }).is_err());
     }
 
     fn request(hour: i64, minute: i64) -> TickRequest<'static> {
@@ -5359,7 +8006,7 @@ mod tests {
             }
             e.prices()
         };
-        let seeds: Vec<Vec<f64>> = (1u32..=4).map(run).collect();
+        let seeds: Vec<Vec<f64>> = (1u64..=4).map(run).collect();
         for (i, a) in seeds.iter().enumerate() {
             for b in seeds.iter().skip(i + 1) {
                 assert!(
@@ -5490,8 +8137,13 @@ mod tests {
         // after the day boundary; a pinned run and its baseline never saw
         // the same noise again. Now the market stream's position is
         // identical whatever the macro chain consumed.
+        // On pt-v19. On the default since pt-v20 took its graded arm
+        // (2026-09-26) the two phase ages happen to draw the same number of
+        // economy normals at this seed, so the precondition below found
+        // nothing to test; the stream split it tests is the same on every
+        // preset. Was `engine(4242)`, the default.
         let run = |fresh_phase: bool| {
-            let mut e = engine(4242);
+            let mut e = engine_v19(4242);
             // A phase that changed TODAY draws the phase-change shock
             // uniform; one 0.9 months in draws neither that (window passed)
             // nor the transition roll (min_months not reached). The counts
@@ -5779,6 +8431,7 @@ mod tests {
             news: &[],
             news_impact_queue: &[],
             order_volumes: &[],
+            fills: &[],
             close_at_end: true,
             // These tests run one session per day, where opening inside the
             // session and opening the day are the same act. True preserves
@@ -5788,6 +8441,149 @@ mod tests {
             sector_base_variances: variances,
             stop: None,
         }
+    }
+
+    // ── Fills: an agent's trades reach the market once ────────────────────
+
+    /// A session of `ticks` from `start_minute` past 09:30, inside a day
+    /// already opened, carrying `standing` on every tick and `fills` once.
+    fn stepped<'a>(
+        ticks: usize,
+        start_minute: i64,
+        standing: &'a [(String, OrderVolume)],
+        fills: &'a [(String, OrderVolume)],
+        innovations: &'a [Option<f64>],
+        variances: &'a [f64],
+    ) -> SessionRequest<'a> {
+        let at = 30 + start_minute;
+        SessionRequest {
+            start: GameTime {
+                hour: 9 + at / 60,
+                minute: at % 60,
+                day_of_week: 3,
+            },
+            order_volumes: standing,
+            fills,
+            close_at_end: false,
+            reopen: false,
+            ..session(ticks, innovations, variances)
+        }
+    }
+
+    /// `fills` IS one tick of `order_volumes` followed by the rest of the
+    /// session without it: the same prices to the bit and the same draws.
+    /// That is the whole contract, stated as the market the tick loop
+    /// already defines, so it cannot drift into a second meaning.
+    #[test]
+    fn fills_are_one_tick_of_flow_at_the_start_of_the_session() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let fills = vec![("A".to_string(), OrderVolume { buy: 40_000.0, sell: 0.0 })];
+
+        let mut once = engine_v19(11);
+        once.open_market();
+        let mut buf = SessionBuffer::new();
+        once.run_session(&stepped(65, 0, &[], &fills, &innovations, &variances), &mut buf);
+
+        let mut spelled = engine_v19(11);
+        spelled.open_market();
+        spelled.tick(&TickRequest {
+            order_volumes: &fills,
+            ..request(9, 30)
+        });
+        let mut buf2 = SessionBuffer::new();
+        spelled.run_session(&stepped(64, 1, &[], &[], &innovations, &variances), &mut buf2);
+
+        assert_eq!(once.draws_consumed(), spelled.draws_consumed());
+        for (i, (x, y)) in once.prices().iter().zip(spelled.prices()).enumerate() {
+            assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+        }
+        let flow = crate::market::factors::S_COMPONENT_KEYS
+            .iter()
+            .position(|f| *f == "order_flow_impact")
+            .unwrap();
+        let a = once.attribution_column(flow);
+        assert!(a[0] > 0.0, "the buy reached A: {a:?}");
+        assert_eq!(a[1], 0.0);
+        assert_eq!(a[2], 0.0);
+    }
+
+    /// The same flow held on every tick is counted on every tick. This is
+    /// what every harness did with an agent's fills until 0.8.5, and the
+    /// ratio is the 65 the investigation measured, not an approximation of
+    /// it: a name's flow impact depends on its average volume, which does
+    /// not move inside a day.
+    #[test]
+    fn a_standing_flow_is_counted_on_every_tick_and_fills_once() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let flow = vec![("A".to_string(), OrderVolume { buy: 40_000.0, sell: 0.0 })];
+        let column = crate::market::factors::S_COMPONENT_KEYS
+            .iter()
+            .position(|f| *f == "order_flow_impact")
+            .unwrap();
+
+        let run = |standing: &[(String, OrderVolume)], fills: &[(String, OrderVolume)]| {
+            let mut e = engine_v19(11);
+            e.open_market();
+            let mut buf = SessionBuffer::new();
+            e.run_session(&stepped(65, 0, standing, fills, &innovations, &variances), &mut buf);
+            e.attribution_column(column)[0]
+        };
+        let once = run(&[], &flow);
+        let held = run(&flow, &[]);
+        assert!(once > 0.0);
+        let ratio = held / once;
+        assert!((ratio - 65.0).abs() < 1e-9, "held / once = {ratio}");
+    }
+
+    /// With no fills the session is the one that existed before the field:
+    /// the first tick reads `order_volumes` untouched. Bit-identical rather
+    /// than equal, since the untraded known-answer digest rests on it.
+    #[test]
+    fn empty_fills_change_nothing() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let standing = vec![("B".to_string(), OrderVolume { buy: 0.0, sell: 9_000.0 })];
+        let run = |fills: &[(String, OrderVolume)]| {
+            let mut e = engine(5);
+            e.open_market();
+            let mut buf = SessionBuffer::new();
+            e.run_session(&stepped(90, 0, &standing, fills, &innovations, &variances), &mut buf);
+            (e.prices(), e.draws_consumed())
+        };
+        let (a, da) = run(&[]);
+        // A zero fill for a name is a no-op too: zero volume is the literal
+        // 0.0 imbalance under either impact law.
+        let (b, db) = run(&[("C".to_string(), OrderVolume { buy: 0.0, sell: 0.0 })]);
+        assert_eq!(da, db);
+        for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+            assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+        }
+    }
+
+    /// One entry per ticker on the first tick, standing and fills summed.
+    /// The tick reads the FIRST entry for a name, so a second entry would
+    /// be dropped rather than added.
+    #[test]
+    fn standing_flow_and_fills_merge_per_ticker() {
+        let standing = vec![
+            ("A".to_string(), OrderVolume { buy: 1.0, sell: 2.0 }),
+            ("C".to_string(), OrderVolume { buy: 7.0, sell: 0.0 }),
+        ];
+        let fills = vec![
+            ("A".to_string(), OrderVolume { buy: 3.0, sell: 4.0 }),
+            ("B".to_string(), OrderVolume { buy: 5.0, sell: 0.0 }),
+        ];
+        let merged = merge_order_volumes(&standing, &fills);
+        assert_eq!(
+            merged,
+            vec![
+                ("A".to_string(), OrderVolume { buy: 4.0, sell: 6.0 }),
+                ("C".to_string(), OrderVolume { buy: 7.0, sell: 0.0 }),
+                ("B".to_string(), OrderVolume { buy: 5.0, sell: 0.0 }),
+            ]
+        );
     }
 
     // ── The depth counterfactual ──────────────────────────────────────────
@@ -6156,8 +8952,18 @@ mod tests {
         // Two identical engines, one told that every company doubled its
         // earnings. If the prices came out the same, syncing fundamentals
         // would be pointless work.
+        //
+        // The revision lands after the open. Before it, pt-v20's stationary
+        // opening (the default from 0.8.5) adopts any premium into the
+        // mispricing so the opening price holds, and a revision there moved
+        // no price inside a 60-tick session; after the open it moves the
+        // price on every preset.
         let mut stale = engine(11);
         let mut fresh = engine(11);
+        for e in [&mut stale, &mut fresh] {
+            e.open_market();
+            e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        }
 
         let n = fresh.len();
         let (eps, book, growth) = fresh.fundamentals();
@@ -6167,8 +8973,7 @@ mod tests {
             .expect("one value per company");
 
         for e in [&mut stale, &mut fresh] {
-            e.open_market();
-            e.run_session(&session(60, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+            e.run_session(&stepped(60, 30, &[], &[], &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
         }
 
         let a = stale.prices();
@@ -6351,6 +9156,47 @@ mod tests {
     }
 
     #[test]
+    fn a_pt_v20_engine_walks_the_cycle_shares_once() {
+        // `refresh_earnings_anticipation` asks for the cycle's stationary
+        // shares on every close, burn-in included, and pt-v20 is the first
+        // preset that turns anticipation on. Each answer is a survival walk
+        // of about a thousand `pow` calls a phase. Before the memo, building
+        // this engine took 756 walks, 96 per cent of its construction time.
+        let start = crate::economy::cycle::share_walks();
+        let mut e = engine(7);
+        assert_ne!(e.params().earnings_anticipation_half_life, 0.0);
+        for day in 1..=3i64 {
+            e.open_market();
+            for m in 0..10 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            e.close_day(day);
+        }
+        let walks = crate::economy::cycle::share_walks() - start;
+        assert!(walks <= 1, "{walks} survival walks for one fixed cycle spec");
+    }
+
+    #[test]
+    fn the_state_hash_works_out_the_model_fingerprint_once() {
+        // The sandbox's tamper guard hashes the state before and after every
+        // call into agent code. The hash folds in the model's fingerprint,
+        // which was twenty digests of the preset surface each time and about
+        // 90 per cent of the hash's cost.
+        let e = engine(7);
+        let first = e.state_hash(0, false);
+        let taken = crate::params::digests_taken();
+        for _ in 0..5 {
+            assert_eq!(e.state_hash(0, false), first);
+        }
+        let copy = e.clone();
+        assert_eq!(copy.state_hash(0, false), first);
+        assert_eq!(crate::params::digests_taken(), taken, "the fingerprint was worked out again");
+        assert_eq!(e.model_fingerprint(), e.params().fingerprint());
+        assert_eq!(e.model_fingerprint(), "pt-v20");
+        assert_eq!(engine_v19(7).model_fingerprint(), "pt-v19");
+    }
+
+    #[test]
     fn a_clone_hashes_the_same_and_a_tick_moves_the_hash() {
         let mut e = engine(77);
         e.open_market();
@@ -6447,107 +9293,117 @@ mod tests {
             }
         }
     }
-}
 
-
-/// A fixed simulation, hashed — the cross-binding determinism probe.
-///
-/// Every binding calls THIS rather than hashing state on its own side. A
-/// check implemented twice is a fork of the check: the first attempt at
-/// this compared a wasm digest against one rebuilt in Python, and the two
-/// disagreed because the Python surface reports rates as fractions while
-/// the core carries percent. That is a units bug in the harness reported as
-/// a determinism failure, which is precisely the confusion a shared
-/// implementation removes.
-///
-/// Hashing rules follow `tests/known_answer.py`: raw big-endian IEEE-754
-/// bytes, no decimal formatting anywhere, because a float formatter would
-/// make the digest depend on something other than the simulation.
-///
-/// Prices are tick-rounded to cents, so a price-only digest can agree while
-/// two builds have drifted below that. The macro state is carried at full
-/// precision and sits downstream of the whole day chain, so it is the part
-/// of this probe that can see a low-bit difference.
-///
-/// Returns `None` for an unknown preset.
-pub fn fixed_simulation_digest(
-    size: usize,
-    universe_seed: u32,
-    seed: u32,
-    days: usize,
-    ticks: usize,
-    preset: &str,
-) -> Option<String> {
-    use sha2::{Digest, Sha256};
-
-    let params = crate::params::ModelParams::preset(preset)?;
-    let generated = crate::universe::random_universe(size, universe_seed);
-    let companies: Vec<TickCompany> = generated
-        .iter()
-        .enumerate()
-        .map(|(i, g)| g.to_init().to_tick_company(i))
-        .collect();
-    let mut engine = Engine::with_params(
-        seed,
-        companies,
-        crate::economy::create_initial_economy_state(
-            &crate::economy::InitialEconomyOptions::default()),
-        crate::economy::create_initial_central_bank_state(0),
-        crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
-        params,
-    );
-    let mut buffer = SessionBuffer::new();
-    for day in 1..=days {
-        engine.open_market();
-        engine.run_session(
-            &SessionRequest {
-                start: crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 },
-                ticks,
-                volatility_multiplier: 1.0,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
-                close_at_end: false,
-                reopen: false,
-                daily_innovations: &[],
-                sector_base_variances: &[],
-                stop: None,
-            },
-            &mut buffer,
-        );
-        engine.close_day(day as i64);
+    /// pt-v20 with every branch of the valuation live: the buyback term,
+    /// the earnings cycle and its anticipation, and the re-mark itself.
+    fn engine_repricing(seed: u64, on: bool) -> Engine {
+        let mut p = ModelParams::preset("pt-v20").expect("pt-v20 ships");
+        p.buyback_payout_share = 0.75;
+        p.earnings_anticipation_half_life = 126.0;
+        p.rate_pe_sensitivity = 3.0;
+        p.macro_publication_repricing = if on { 1.0 } else { 0.0 };
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            p,
+        )
     }
 
-    // NaN IS THE ONE PLACE WEBASSEMBLY IS LOOSE.
-    //
-    // The wasm specification pins IEEE-754 exactly for add, subtract,
-    // multiply, divide and square root, which is why a browser build can
-    // agree with a native one at all. It deliberately does NOT pin NaN
-    // payload bits. So hashing a NaN would compare a bit pattern the spec
-    // permits two engines to choose differently -- a digest that could
-    // disagree for a reason that is not the model, which is precisely the
-    // failure this probe exists to detect.
-    //
-    // Measured: zero NaN and zero infinities across 16,800 price samples
-    // (seven seeds x sixty days x forty names) plus the macro state. So this
-    // does not fire today. It is a guard rather than a hope, because "we
-    // have never seen one" is not the same claim as "there cannot be one",
-    // and the failure it prevents is a determinism report that is wrong in
-    // the reassuring direction.
-    let mut hasher = Sha256::new();
-    for price in engine.prices() {
-        if !price.is_finite() {
-            return None;
+    #[test]
+    fn tick_fair_value_is_the_ticks_own_fundamental_to_the_bit() {
+        // The re-mark reads fair value through `tick_fair_value`, a copy of
+        // the tick's phase 2. If the two ever part, the re-mark prices a
+        // state the tick does not, and the first tick moves again.
+        //
+        // The tick's `fundamental` is the fair value AFTER its own
+        // permanent share of the minute's shocks (`fair_value_news_share`),
+        // which the re-mark has no reason to read, so both shares are off
+        // here and the column is the valuation the tick started from. The
+        // opening's levels, the nominal path, the earnings cycle and the
+        // buyback term (the day set, so it is live) all stay on.
+        let mut e = engine_repricing(21, false);
+        e.params.fair_value_news_share = 0.0;
+        e.params.fair_value_market_share = 0.0;
+        for day in 1..=3i64 {
+            e.set_current_day(day);
+            e.open_market();
+            for m in 0..30 {
+                let start = e.clone();
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                for (i, c) in start.companies().iter().enumerate() {
+                    // A name's first tick runs the opening, which writes its
+                    // fair-value level inside the tick; the re-mark never
+                    // reads a name that has not traded.
+                    if c.stock.mispricing_s.is_none() {
+                        continue;
+                    }
+                    let fv = crate::market::tick::tick_fair_value(
+                        start.params(), start.economy(), start.nominal_output_base(),
+                        start.current_day(), c, c.stock.price);
+                    assert_eq!(fv.to_bits(), e.tick_fundamental()[i].to_bits(),
+                               "day {day} minute {m} name {i}");
+                }
+            }
+            e.close_day(day);
         }
-        hasher.update(price.to_be_bytes());
     }
-    let e = engine.economy();
-    for v in [e.vix, e.federal_funds_rate, e.inflation_rate,
-              e.corporate_bond_yield, e.fear_greed_index] {
-        if !v.is_finite() {
-            return None;
+
+    #[test]
+    fn the_close_prices_what_its_macro_step_publishes() {
+        let mut on = engine_repricing(33, true);
+        let mut off = engine_repricing(33, false);
+        for day in 1..=6i64 {
+            for e in [&mut on, &mut off] {
+                // The day set, so the buyback term reads the price.
+                e.set_current_day(day);
+                e.open_market();
+                for m in 0..40 {
+                    e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+                }
+                e.close_market(&DayCloseRequest {
+                    daily_innovations: &[None, None, None],
+                    sector_base_variances: &[0.0004, 0.0004, 0.0004],
+                    avg_volume: crate::market::AvgVolumePolicy::Hold,
+                });
+            }
+            // Pinned apart so every day's step moves fair value.
+            let bump = if day % 2 == 0 { 0.5 } else { -0.4 };
+            on.economy_mut().corporate_bond_yield += bump;
+            off.economy_mut().corporate_bond_yield += bump;
+            let last: Vec<f64> = on.prices();
+            let marks = on.published_macro_marks().expect("on");
+            assert!(off.published_macro_marks().is_none(), "off computes nothing");
+            let s_before: Vec<Option<f64>> =
+                on.companies().iter().map(|c| c.stock.mispricing_s).collect();
+            on.advance_macro_day(day);
+            off.advance_macro_day(day);
+            for (i, c) in on.companies().iter().enumerate() {
+                // The re-marked price is the one the name's mispricing
+                // implies on the published state, fair value read at that
+                // very price (the buyback term reads it).
+                let fv1 = crate::market::tick::tick_fair_value(
+                    on.params(), on.economy(), on.nominal_output_base(),
+                    on.current_day(), c, c.stock.price);
+                let want = last[i] / marks[i] * fv1;
+                assert!((c.stock.price / want - 1.0).abs() < 1e-13,
+                        "day {day} name {i}: {} against {want}", c.stock.price);
+                assert_eq!(c.stock.mispricing_s, s_before[i], "the re-mark leaves s alone");
+                assert!((c.stock.price / last[i] - 1.0).abs() > 1e-6, "the step moved fair value");
+            }
+            // Off, the close's price is the last print, as it always was.
+            let off_prices = off.prices();
+            let off_last: Vec<f64> = off.companies().iter().map(|c| c.stock.price).collect();
+            assert_eq!(off_prices, off_last);
+            // Put the pair back on one market for the next day, so each day
+            // tests the step alone.
+            let synced: Vec<f64> = on.prices();
+            for (c, p) in off.companies_mut().iter_mut().zip(synced.iter()) {
+                c.stock.price = *p;
+                c.stock.market_cap = *p * c.stock.shares_outstanding;
+            }
         }
-        hasher.update(v.to_be_bytes());
     }
-    Some(format!("{:x}", hasher.finalize()))
 }

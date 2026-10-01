@@ -1,0 +1,50 @@
++ python tools/calibration/long_horizon.py --preset pt-v20 --seeds 30 --workers 48 --mem-gb 110 --out /home/ec2-user/out/long-horizon.json
+pt-v20: 5 horizons x 30 seeds = 150 panels
+
+  2520d: ~8.0 GB per panel, 13 workers
+  2520d: 30/30 done
+
+  1260d: ~4.0 GB per panel, 27 workers
+  1260d: 30/30 done
+
+  756d: ~2.4 GB per panel, 45 workers
+  756d: 30/30 done
+
+  504d: ~1.6 GB per panel, 48 workers
+  504d: 30/30 done
+
+  252d: ~0.8 GB per panel, 48 workers
+  252d: 30/30 done
+
+statistic                        252       504       756      1260      2520   drift 504->2520
+abs_return_acf1               0.0282    0.0384    0.0436    0.0606    0.0841            +118.9%
+abs_return_acf20              0.0044    0.0092    0.0162    0.0300    0.0502            +446.8%
+abs_return_acf5               0.0188    0.0246    0.0312    0.0504    0.0674            +173.7%
+annualised_vol_pct           20.5456   21.1128   21.7506   22.6705   22.6886              +7.5%
+corr_asymmetry                0.0791    0.0489    0.0265    0.0155   -0.0127            -125.9%
+corr_asymmetry_lagged         0.0860    0.0842    0.0810    0.0545    0.0454             -46.1%
+corr_persistence_acf1         0.2303    0.2778    0.3806    0.4250    0.4901             +76.4%
+cross_sectional_corr          0.3053    0.3116    0.3458    0.3366    0.3435             +10.3%
+excess_kurtosis              18.1072   19.2141   20.5837   19.2526   19.7907              +3.0%
+fear_gauge_dn1                1.8298    1.7601    1.7372    1.7304    1.8006              +2.3%
+fear_gauge_dn3                4.4745    4.3579    4.3303    4.5131    4.5330              +4.0%
+index_drift_pct               8.5667    7.0324    6.5496    6.9692    6.7710              -3.7%
+index_tail_dn3_pct            0.8499    0.8615    0.9360    0.9981    1.0732             +24.6%
+leverage_effect              -0.0341   -0.0365   -0.0341   -0.0387   -0.0411             -12.8%
+return_acf1                   0.0130    0.0250    0.0259    0.0273    0.0326             +30.2%
+sector_excess_corr            0.1165    0.1102    0.1061    0.1105    0.1091              -1.1%
+volume_abs_return_corr        0.5084    0.5614    0.5721    0.5671    0.5805              +3.4%
+volume_change_acf1           -0.2540   -0.2415   -0.2360   -0.2306   -0.2242              +7.2%
+
+Against BANDS_504 (not horizon-matched -- indicative only):
+    252d: 12/14 shape rows in band, out: abs_return_acf1, abs_return_acf5; level and crisis rows beside the count: index_drift_pct in, fear_gauge_dn1 in, fear_gauge_dn3 in, index_tail_dn3_pct in
+    504d: 13/14 shape rows in band, out: abs_return_acf1; level and crisis rows beside the count: index_drift_pct in, fear_gauge_dn1 in, fear_gauge_dn3 in, index_tail_dn3_pct in
+    756d: 13/14 shape rows in band, out: sector_excess_corr; level and crisis rows beside the count: index_drift_pct in, fear_gauge_dn1 in, fear_gauge_dn3 in, index_tail_dn3_pct in
+   1260d: 14/14 shape rows in band; level and crisis rows beside the count: index_drift_pct in, fear_gauge_dn1 in, fear_gauge_dn3 in, index_tail_dn3_pct in
+   2520d: 12/14 shape rows in band, out: corr_persistence_acf1, sector_excess_corr; level and crisis rows beside the count: index_drift_pct in, fear_gauge_dn1 in, fear_gauge_dn3 in, index_tail_dn3_pct in
+
+wrote /home/ec2-user/out/long-horizon.json
+
+real	5m7.723s
+user	71m56.671s
+sys	4m50.337s

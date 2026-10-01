@@ -13,7 +13,7 @@
 //! Everything of substance lives in `crate::params`; this file is the
 //! boundary.
 
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, clippy::useless_conversion)]
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -328,10 +328,7 @@ impl PyModelParams {
 /// BUILD, only in what they refuse.
 fn build(name: &str, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<ModelParams> {
     let mut params = ModelParams::preset(name).ok_or_else(|| {
-        ValidationError::new_err(format!(
-            "unknown model preset {name:?}. Shipped presets: {}",
-            ModelParams::preset_names().join(", ")
-        ))
+        ValidationError::new_err(crate::python::unknown_preset(name))
     })?;
     if let Some(kwargs) = overrides {
         // Sorted for a deterministic application order. The overrides

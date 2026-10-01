@@ -1,0 +1,581 @@
++ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20
++ BRANCH=release/0.8.5
++ SCRIPTS_URL=s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz
++ dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
+Amazon Linux 2023 repository                     84 MB/s |  79 MB     00:00    
+Amazon Linux 2023 Kernel Livepatch repository   688 kB/s |  80 kB     00:00    
+Package tar-2:1.34-1.amzn2023.0.4.aarch64 is already installed.
+Package gzip-1.12-1.amzn2023.0.1.aarch64 is already installed.
+Package awscli-2-2.33.15-1.amzn2023.0.1.noarch is already installed.
+Dependencies resolved.
+================================================================================
+ Package                   Arch    Version                    Repository   Size
+================================================================================
+Installing:
+ gcc                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  31 M
+ git                       aarch64 2.50.1-1.amzn2023.0.1      amazonlinux  53 k
+ python3.11                aarch64 3.11.16-1.amzn2023.0.1     amazonlinux  28 k
+ python3.11-devel          aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 235 k
+Installing dependencies:
+ annobin-docs              noarch  12.69-1.amzn2023.0.1       amazonlinux  93 k
+ annobin-plugin-gcc        aarch64 12.69-1.amzn2023.0.1       amazonlinux 973 k
+ cpp                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  10 M
+ gc                        aarch64 8.0.4-5.amzn2023.0.2       amazonlinux 102 k
+ gcc-plugin-annobin        aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  37 k
+ git-core                  aarch64 2.50.1-1.amzn2023.0.1      amazonlinux 5.1 M
+ git-core-doc              noarch  2.50.1-1.amzn2023.0.1      amazonlinux 2.8 M
+ glibc-devel               aarch64 2.34-231.amzn2023.0.5      amazonlinux 445 k
+ guile22                   aarch64 2.2.7-2.amzn2023.0.3       amazonlinux 6.4 M
+ kernel6.18-headers        aarch64 1:6.18.48-109.150.amzn2023 amazonlinux 1.5 M
+ libmpc                    aarch64 1.2.1-2.amzn2023.0.2       amazonlinux  63 k
+ libtool-ltdl              aarch64 2.4.7-1.amzn2023.0.3       amazonlinux  38 k
+ libxcrypt-devel           aarch64 4.4.33-7.amzn2023          amazonlinux  32 k
+ make                      aarch64 1:4.3-5.amzn2023.0.2       amazonlinux 530 k
+ mpdecimal                 aarch64 2.5.1-3.amzn2023.0.3       amazonlinux 103 k
+ perl-Error                noarch  1:0.17030-2.amzn2023.0.1   amazonlinux  42 k
+ perl-File-Find            noarch  1.37-477.amzn2023.0.9      amazonlinux  26 k
+ perl-Git                  noarch  2.50.1-1.amzn2023.0.1      amazonlinux  41 k
+ perl-TermReadKey          aarch64 2.38-9.amzn2023.0.3        amazonlinux  36 k
+ perl-lib                  aarch64 0.65-477.amzn2023.0.9      amazonlinux  15 k
+ python3.11-libs           aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 9.7 M
+ python3.11-pip-wheel      noarch  22.3.1-2.amzn2023.0.14     amazonlinux 1.4 M
+ python3.11-setuptools-wheel
+                           noarch  65.5.1-2.amzn2023.0.7      amazonlinux 717 k
+
+Transaction Summary
+================================================================================
+Install  27 Packages
+
+Total download size: 72 M
+Installed size: 269 M
+Downloading Packages:
+(1/27): annobin-plugin-gcc-12.69-1.amzn2023.0.1  35 MB/s | 973 kB     00:00    
+(2/27): annobin-docs-12.69-1.amzn2023.0.1.noarc 3.1 MB/s |  93 kB     00:00    
+(3/27): gc-8.0.4-5.amzn2023.0.2.aarch64.rpm     4.8 MB/s | 102 kB     00:00    
+(4/27): gcc-plugin-annobin-11.5.0-5.amzn2023.0. 1.5 MB/s |  37 kB     00:00    
+(5/27): git-2.50.1-1.amzn2023.0.1.aarch64.rpm   2.0 MB/s |  53 kB     00:00    
+(6/27): cpp-11.5.0-5.amzn2023.0.5.aarch64.rpm    80 MB/s |  10 MB     00:00    
+(7/27): git-core-2.50.1-1.amzn2023.0.1.aarch64.  79 MB/s | 5.1 MB     00:00    
+(8/27): git-core-doc-2.50.1-1.amzn2023.0.1.noar  64 MB/s | 2.8 MB     00:00    
+(9/27): glibc-devel-2.34-231.amzn2023.0.5.aarch  19 MB/s | 445 kB     00:00    
+(10/27): kernel6.18-headers-6.18.48-109.150.amz  64 MB/s | 1.5 MB     00:00    
+(11/27): libmpc-1.2.1-2.amzn2023.0.2.aarch64.rp 2.2 MB/s |  63 kB     00:00    
+(12/27): guile22-2.2.7-2.amzn2023.0.3.aarch64.r  80 MB/s | 6.4 MB     00:00    
+(13/27): libtool-ltdl-2.4.7-1.amzn2023.0.3.aarc 1.5 MB/s |  38 kB     00:00    
+(14/27): libxcrypt-devel-4.4.33-7.amzn2023.aarc 1.2 MB/s |  32 kB     00:00    
+(15/27): make-4.3-5.amzn2023.0.2.aarch64.rpm     19 MB/s | 530 kB     00:00    
+(16/27): mpdecimal-2.5.1-3.amzn2023.0.3.aarch64 3.3 MB/s | 103 kB     00:00    
+(17/27): perl-Error-0.17030-2.amzn2023.0.1.noar 1.7 MB/s |  42 kB     00:00    
+(18/27): perl-File-Find-1.37-477.amzn2023.0.9.n 1.2 MB/s |  26 kB     00:00    
+(19/27): perl-Git-2.50.1-1.amzn2023.0.1.noarch. 1.7 MB/s |  41 kB     00:00    
+(20/27): perl-TermReadKey-2.38-9.amzn2023.0.3.a 1.6 MB/s |  36 kB     00:00    
+(21/27): gcc-11.5.0-5.amzn2023.0.5.aarch64.rpm   80 MB/s |  31 MB     00:00    
+(22/27): perl-lib-0.65-477.amzn2023.0.9.aarch64 189 kB/s |  15 kB     00:00    
+(23/27): python3.11-3.11.16-1.amzn2023.0.1.aarc 419 kB/s |  28 kB     00:00    
+(24/27): python3.11-devel-3.11.16-1.amzn2023.0. 6.6 MB/s | 235 kB     00:00    
+(25/27): python3.11-pip-wheel-22.3.1-2.amzn2023  41 MB/s | 1.4 MB     00:00    
+(26/27): python3.11-setuptools-wheel-65.5.1-2.a  26 MB/s | 717 kB     00:00    
+(27/27): python3.11-libs-3.11.16-1.amzn2023.0.1  80 MB/s | 9.7 MB     00:00    
+--------------------------------------------------------------------------------
+Total                                           124 MB/s |  72 MB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : libmpc-1.2.1-2.amzn2023.0.2.aarch64                   1/27 
+  Installing       : git-core-2.50.1-1.amzn2023.0.1.aarch64                2/27 
+  Installing       : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             3/27 
+  Installing       : cpp-11.5.0-5.amzn2023.0.5.aarch64                     4/27 
+  Installing       : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.    5/27 
+  Installing       : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch    6/27 
+  Installing       : perl-lib-0.65-477.amzn2023.0.9.aarch64                7/27 
+  Installing       : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64          8/27 
+  Installing       : perl-File-Find-1.37-477.amzn2023.0.9.noarch           9/27 
+  Installing       : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           10/27 
+  Installing       : perl-Git-2.50.1-1.amzn2023.0.1.noarch                11/27 
+  Installing       : git-2.50.1-1.amzn2023.0.1.aarch64                    12/27 
+  Installing       : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               13/27 
+  Installing       : python3.11-3.11.16-1.amzn2023.0.1.aarch64            14/27 
+  Installing       : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       15/27 
+  Installing       : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            16/27 
+  Installing       : kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarc   17/27 
+  Installing       : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            18/27 
+  Installing       : glibc-devel-2.34-231.amzn2023.0.5.aarch64            19/27 
+  Installing       : gc-8.0.4-5.amzn2023.0.2.aarch64                      20/27 
+  Installing       : guile22-2.2.7-2.amzn2023.0.3.aarch64                 21/27 
+  Installing       : make-1:4.3-5.amzn2023.0.2.aarch64                    22/27 
+  Installing       : gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Running scriptlet: gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Installing       : annobin-docs-12.69-1.amzn2023.0.1.noarch             24/27 
+  Installing       : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Running scriptlet: annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Installing       : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64     26/27 
+  Installing       : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Running scriptlet: python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Verifying        : annobin-docs-12.69-1.amzn2023.0.1.noarch              1/27 
+  Verifying        : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64       2/27 
+  Verifying        : cpp-11.5.0-5.amzn2023.0.5.aarch64                     3/27 
+  Verifying        : gc-8.0.4-5.amzn2023.0.2.aarch64                       4/27 
+  Verifying        : gcc-11.5.0-5.amzn2023.0.5.aarch64                     5/27 
+  Verifying        : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64      6/27 
+  Verifying        : git-2.50.1-1.amzn2023.0.1.aarch64                     7/27 
+  Verifying        : git-core-2.50.1-1.amzn2023.0.1.aarch64                8/27 
+  Verifying        : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             9/27 
+  Verifying        : glibc-devel-2.34-231.amzn2023.0.5.aarch64            10/27 
+  Verifying        : guile22-2.2.7-2.amzn2023.0.3.aarch64                 11/27 
+  Verifying        : kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarc   12/27 
+  Verifying        : libmpc-1.2.1-2.amzn2023.0.2.aarch64                  13/27 
+  Verifying        : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            14/27 
+  Verifying        : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            15/27 
+  Verifying        : make-1:4.3-5.amzn2023.0.2.aarch64                    16/27 
+  Verifying        : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               17/27 
+  Verifying        : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           18/27 
+  Verifying        : perl-File-Find-1.37-477.amzn2023.0.9.noarch          19/27 
+  Verifying        : perl-Git-2.50.1-1.amzn2023.0.1.noarch                20/27 
+  Verifying        : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64         21/27 
+  Verifying        : perl-lib-0.65-477.amzn2023.0.9.aarch64               22/27 
+  Verifying        : python3.11-3.11.16-1.amzn2023.0.1.aarch64            23/27 
+  Verifying        : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      24/27 
+  Verifying        : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       25/27 
+  Verifying        : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch   26/27 
+  Verifying        : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.   27/27 
+
+Installed:
+  annobin-docs-12.69-1.amzn2023.0.1.noarch                                      
+  annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64                               
+  cpp-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gc-8.0.4-5.amzn2023.0.2.aarch64                                               
+  gcc-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64                              
+  git-2.50.1-1.amzn2023.0.1.aarch64                                             
+  git-core-2.50.1-1.amzn2023.0.1.aarch64                                        
+  git-core-doc-2.50.1-1.amzn2023.0.1.noarch                                     
+  glibc-devel-2.34-231.amzn2023.0.5.aarch64                                     
+  guile22-2.2.7-2.amzn2023.0.3.aarch64                                          
+  kernel6.18-headers-1:6.18.48-109.150.amzn2023.aarch64                         
+  libmpc-1.2.1-2.amzn2023.0.2.aarch64                                           
+  libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64                                     
+  libxcrypt-devel-4.4.33-7.amzn2023.aarch64                                     
+  make-1:4.3-5.amzn2023.0.2.aarch64                                             
+  mpdecimal-2.5.1-3.amzn2023.0.3.aarch64                                        
+  perl-Error-1:0.17030-2.amzn2023.0.1.noarch                                    
+  perl-File-Find-1.37-477.amzn2023.0.9.noarch                                   
+  perl-Git-2.50.1-1.amzn2023.0.1.noarch                                         
+  perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64                                  
+  perl-lib-0.65-477.amzn2023.0.9.aarch64                                        
+  python3.11-3.11.16-1.amzn2023.0.1.aarch64                                     
+  python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64                               
+  python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64                                
+  python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch                            
+  python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.noarch                      
+
+Complete!
+++ date -u
++ echo 'preflight Fri Sep 25 00:31:11 UTC 2026'
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (978 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
++ cat
++ chmod +x /home/ec2-user/stream.sh
++ mkdir -p /home/ec2-user/out
++ setsid nohup /home/ec2-user/stream.sh s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20
++ aws s3 cp s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz /home/ec2-user/scripts.tgz
+Completed 4.7 KiB/4.7 KiB (141.9 KiB/s) with 1 file(s) remainingdownload: s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz to home/ec2-user/scripts.tgz
++ tar xzf /home/ec2-user/scripts.tgz -C /home/ec2-user
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
++ '[' '!' -f /home/ec2-user/scripts/jobs.sh ']'
++ sha256sum /home/ec2-user/scripts.tgz
++ aws s3 cp /home/ec2-user/scripts.tgz s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
+Completed 4.7 KiB/4.7 KiB (104.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
++ chown -R ec2-user:ec2-user /home/ec2-user/scripts /home/ec2-user/scripts.tgz /home/ec2-user/out
++ cat
++ sed -i 's|BRANCH_PLACEHOLDER|release/0.8.5|' /home/ec2-user/run.sh
++ sed -i 's|PIN_PLACEHOLDER|20269e3a502bdd89c1b05601aed9bf7f5a6e74d0|' /home/ec2-user/run.sh
++ chown ec2-user:ec2-user /home/ec2-user/run.sh
++ chmod +x /home/ec2-user/run.sh
++ set +e
++ sudo -u ec2-user bash /home/ec2-user/run.sh
++ cd /home/ec2-user
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ curl -sSf https://sh.rustup.rs
++ sh -s -- -y --profile minimal
+info: downloading installer
+info: profile set to minimal
+info: default host tuple is aarch64-unknown-linux-gnu
+info: syncing channel updates for stable-aarch64-unknown-linux-gnu
+info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+info: downloading 3 components
+info: default toolchain set to stable-aarch64-unknown-linux-gnu
+
+  stable-aarch64-unknown-linux-gnu installed - rustc 1.98.1 (48a229cea 2026-09-01)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, you need to source the
+corresponding env file under $HOME/.cargo.
+
+Consider running the right command for your shell (note the leading DOT):
+. "$HOME/.cargo/env"           # For sh/ash/dash/pdksh/bash
+source "$HOME/.cargo/env.tcsh" # For tcsh
+cargo:rerun-if-env-changed=CC_aarch64-unknown-linux-gnu
+CC_aarch64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_aarch64_unknown_linux_gnu
+CC_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64_unknown_linux_gnu
+CFLAGS_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64-unknown-linux-gnu
+CFLAGS_aarch64-unknown-linux-gnu = None
++ curl -LsSf https://astral.sh/uv/install.sh
++ sh
+downloading uv 0.12.18 aarch64-unknown-linux-gnu
+installing to /home/ec2-user/.local/bin
+  uv
+  uvx
+everything's installed!
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ git clone --branch release/0.8.5 https://github.com/simoncoombes/tradefloor.git src
+Cloning into 'src'...
++ cd src
++ git checkout --detach 20269e3a502bdd89c1b05601aed9bf7f5a6e74d0
+HEAD is now at 20269e3 Merge flip/a: flow and book tests name the preset they describe
++ git rev-parse HEAD
++ uv venv --python 3.11 .venv
+Using CPython 3.11.16 interpreter at: /usr/bin/python3.11
+Creating virtual environment at: .venv
+Activate with: source .venv/bin/activate
++ export VIRTUAL_ENV=/home/ec2-user/src/.venv
++ VIRTUAL_ENV=/home/ec2-user/src/.venv
++ export PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ uv pip install numpy pyarrow maturin pytest
+Resolved 8 packages in 111ms
+Downloading pygments (1.2MiB)
+Downloading numpy (15.2MiB)
+Downloading pyarrow (44.7MiB)
+Downloading maturin (9.6MiB)
+ Downloaded pygments
+ Downloaded maturin
+ Downloaded numpy
+ Downloaded pyarrow
+Prepared 8 packages in 479ms
+Installed 8 packages in 856ms
+ + iniconfig==2.3.0
+ + maturin==1.15.0
+ + numpy==2.4.6
+ + packaging==26.3
+ + pluggy==1.6.0
+ + pyarrow==25.0.1
+ + pygments==2.21.0
+ + pytest==9.1.1
++ maturin build --release --out dist --features python
+    Updating crates.io index
+     Locking 121 packages to latest compatible versions
+      Adding arrow v53.4.1 (available: v60.0.0)
+      Adding chrono v0.4.39 (available: v0.4.45)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding pyo3 v0.22.6 (available: v0.29.2)
+      Adding sha2 v0.10.9 (available: v0.11.0)
+ Downloading crates ...
+  Downloaded android-tzdata v0.1.1
+  Downloaded android_system_properties v0.1.6
+  Downloaded core-foundation-sys v0.8.7
+  Downloaded crypto-common v0.1.7
+  Downloaded iana-time-zone-haiku v0.1.2
+  Downloaded windows-result v0.4.1
+  Downloaded memoffset v0.9.1
+  Downloaded num v0.4.3
+  Downloaded sha2 v0.10.9
+  Downloaded find-msvc-tools v0.1.13
+  Downloaded lexical-parse-integer v1.0.6
+  Downloaded arrow-select v53.4.1
+  Downloaded lexical-write-integer v1.0.6
+  Downloaded cc v1.4.7
+  Downloaded num-traits v0.2.19
+  Downloaded zmij v1.0.23
+  Downloaded windows-interface v0.59.3
+  Downloaded libm v0.2.16
+  Downloaded chrono v0.4.39
+  Downloaded windows-implement v0.60.2
+  Downloaded windows-targets v0.52.6
+  Downloaded target-lexicon v0.12.16
+  Downloaded windows-core v0.62.2
+  Downloaded pyo3 v0.22.6
+  Downloaded wit-bindgen v0.57.1
+  Downloaded libc v0.2.189
+  Downloaded wasm-bindgen-macro-support v0.2.128
+  Downloaded zerocopy-derive v0.8.58
+  Downloaded wasm-bindgen-shared v0.2.128
+  Downloaded windows_aarch64_gnullvm v0.52.6
+  Downloaded zerocopy v0.8.58
+  Downloaded windows-link v0.2.1
+  Downloaded windows_x86_64_gnullvm v0.52.6
+  Downloaded windows_i686_gnullvm v0.52.6
+  Downloaded windows_x86_64_msvc v0.52.6
+  Downloaded windows_aarch64_msvc v0.52.6
+  Downloaded windows_i686_msvc v0.52.6
+  Downloaded windows_x86_64_gnu v0.52.6
+  Downloaded windows_i686_gnu v0.52.6
+  Downloaded futures-util v0.3.34
+  Downloaded quote v1.0.47
+  Downloaded lexical-core v1.0.6
+  Downloaded futures-task v0.3.34
+  Downloaded arrow-string v53.4.1
+  Downloaded wasi v0.11.1+wasi-snapshot-preview1
+  Downloaded pyo3-macros v0.22.6
+  Downloaded ryu v1.0.23
+  Downloaded log v0.4.34
+  Downloaded serde_derive v1.0.229
+  Downloaded heck v0.5.0
+  Downloaded portable-atomic v1.15.0
+  Downloaded syn v2.0.119
+  Downloaded serde_json v1.0.151
+  Downloaded ahash v0.8.12
+  Downloaded typenum v1.20.1
+  Downloaded arrow-schema v53.4.1
+  Downloaded r-efi v5.3.0
+  Downloaded arrow-data v53.4.1
+  Downloaded autocfg v1.5.1
+  Downloaded hashbrown v0.15.5
+  Downloaded version_check v0.9.5
+  Downloaded tiny-keccak v2.0.2
+  Downloaded lexical-write-float v1.0.6
+  Downloaded num-bigint v0.4.8
+  Downloaded pyo3-ffi v0.22.6
+  Downloaded arrow-array v53.4.1
+  Downloaded arrow-row v53.4.1
+  Downloaded cpufeatures v0.2.17
+  Downloaded digest v0.10.7
+  Downloaded regex v1.13.1
+  Downloaded shlex v2.0.1
+  Downloaded unindent v0.2.4
+  Downloaded aho-corasick v1.1.5
+  Downloaded serde_core v1.0.229
+  Downloaded block-buffer v0.10.4
+  Downloaded wasm-bindgen v0.2.128
+  Downloaded bytes v1.12.1
+  Downloaded cfg-if v1.0.5
+  Downloaded getrandom v0.3.4
+  Downloaded arrow-arith v53.4.1
+  Downloaded arrow-ord v53.4.1
+  Downloaded lexical-parse-float v1.0.6
+  Downloaded wasip2 v1.0.4+wasi-0.2.12
+  Downloaded getrandom v0.2.17
+  Downloaded half v2.7.1
+  Downloaded unicode-ident v1.0.26
+  Downloaded windows-strings v0.5.1
+  Downloaded bumpalo v3.20.3
+  Downloaded arrow v53.4.1
+  Downloaded memchr v2.8.3
+  Downloaded pyo3-build-config v0.22.6
+  Downloaded serde v1.0.229
+  Downloaded bitflags v2.13.2
+  Downloaded arrow-buffer v53.4.1
+  Downloaded const-random v0.1.18
+  Downloaded slab v0.4.12
+  Downloaded iana-time-zone v0.1.65
+  Downloaded crunchy v0.2.4
+  Downloaded futures-core v0.3.34
+  Downloaded base64 v0.22.1
+  Downloaded indoc v2.0.7
+  Downloaded syn v3.0.6
+  Downloaded regex-syntax v0.8.11
+  Downloaded const-random-macro v0.1.16
+  Downloaded once_cell v1.21.4
+  Downloaded proc-macro2 v1.0.107
+  Downloaded atoi v2.0.0
+  Downloaded num-complex v0.4.6
+  Downloaded rustversion v1.0.23
+  Downloaded pyo3-macros-backend v0.22.6
+  Downloaded itoa v1.0.18
+  Downloaded num-rational v0.4.2
+  Downloaded num-iter v0.1.46
+  Downloaded lexical-util v1.0.7
+  Downloaded regex-automata v0.4.18
+  Downloaded pin-project-lite v0.2.17
+  Downloaded num-integer v0.1.47
+  Downloaded js-sys v0.3.105
+  Downloaded arrow-cast v53.4.1
+  Downloaded generic-array v0.14.7
+  Downloaded wasm-bindgen-macro v0.2.128
+🍹 Building a mixed python/rust project
+🐍 Found CPython 3.11 at /home/ec2-user/src/.venv/bin/python
+🔗 Found pyo3 bindings with abi3-py3.11 support
+   Compiling autocfg v1.5.1
+   Compiling libm v0.2.16
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling version_check v0.9.5
+   Compiling libc v0.2.189
+   Compiling cfg-if v1.0.5
+   Compiling target-lexicon v0.12.16
+   Compiling zerocopy v0.8.58
+   Compiling once_cell v1.21.4
+   Compiling getrandom v0.3.4
+   Compiling bitflags v2.13.2
+   Compiling bytes v1.12.1
+   Compiling iana-time-zone v0.1.65
+   Compiling hashbrown v0.15.5
+   Compiling lexical-util v1.0.7
+   Compiling typenum v1.20.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling heck v0.5.0
+   Compiling base64 v0.22.1
+   Compiling ryu v1.0.23
+   Compiling indoc v2.0.7
+   Compiling unindent v0.2.4
+   Compiling arrow-schema v53.4.1
+   Compiling ahash v0.8.12
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling memoffset v0.9.1
+   Compiling lexical-write-integer v1.0.6
+   Compiling lexical-parse-integer v1.0.6
+   Compiling lexical-parse-float v1.0.6
+   Compiling pyo3-build-config v0.22.6
+   Compiling lexical-write-float v1.0.6
+   Compiling aho-corasick v1.1.5
+   Compiling syn v2.0.119
+   Compiling lexical-core v1.0.6
+   Compiling cpufeatures v0.2.17
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling pyo3-ffi v0.22.6
+   Compiling pyo3-macros-backend v0.22.6
+   Compiling pyo3 v0.22.6
+   Compiling sha2 v0.10.9
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling chrono v0.4.39
+   Compiling atoi v2.0.0
+   Compiling num-bigint v0.4.8
+   Compiling num-iter v0.1.46
+   Compiling regex-automata v0.4.18
+   Compiling num-rational v0.4.2
+   Compiling num v0.4.3
+   Compiling zerocopy-derive v0.8.58
+   Compiling regex v1.13.1
+   Compiling pyo3-macros v0.22.6
+   Compiling half v2.7.1
+   Compiling arrow-buffer v53.4.1
+   Compiling arrow-data v53.4.1
+   Compiling arrow-array v53.4.1
+   Compiling arrow-select v53.4.1
+   Compiling arrow-arith v53.4.1
+   Compiling arrow-row v53.4.1
+   Compiling arrow-string v53.4.1
+   Compiling arrow-cast v53.4.1
+   Compiling arrow-ord v53.4.1
+   Compiling arrow v53.4.1
+   Compiling tradefloor v0.8.5 (/home/ec2-user/src/rust)
+warning: unused import: `TickStock`
+  --> src/python_engine.rs:36:85
+   |
+36 | use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+   |                                                                                     ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `PT_V3_BITS` is never used
+    --> src/params.rs:4762:7
+     |
+4762 | const PT_V3_BITS: &[(&str, u64)] = &[
+     |       ^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `PT_V2_BITS` is never used
+    --> src/params.rs:4773:7
+     |
+4773 | const PT_V2_BITS: &[(&str, u64)] = &[
+     |       ^^^^^^^^^^
+
+warning: function `random_noise_index` is never used
+    --> src/python_engine.rs:5421:8
+     |
+5421 | pub fn random_noise_index() -> usize {
+     |        ^^^^^^^^^^^^^^^^^^
+
+warning: `tradefloor` (lib) generated 4 warnings (run `cargo fix --lib -p tradefloor` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 45.40s
+📦 Including files matching "python/tradefloor/py.typed"
+📦 Including files matching "python/tradefloor/_core.pyi"
+📦 Including files matching "python/tradefloor/scenarios/*.yml"
+📦 Including files matching "python/tradefloor/presets/*.json"
+📦 Built wheel for abi3 Python ≥ 3.11 to dist/tradefloor-0.8.5-cp311-abi3-manylinux_2_34_aarch64.whl
++ uv pip install --no-index --find-links dist --force-reinstall tradefloor
+Resolved 1 package in 0.93ms
+Prepared 1 package in 14ms
+Installed 1 package in 111ms
+ + tradefloor==0.8.5
++ python -c 'import numpy, pyarrow, tradefloor; print('\''PREFLIGHT OK'\'', tradefloor.version(), tradefloor.model_preset()['\''name'\''])'
+PREFLIGHT OK 0.8.5 pt-v20
++ python tests/known_answer.py
++ tee /home/ec2-user/out/known-answer.txt
+pretium known-answer test v28
+  package  0.8.5
+  bytes    16920
+  sha256   92c9cb7cf3376674f1449479307264301bce64d5de5de76e928b7f0101576017
+  sim      b0ef10ef6ebbc9c4919f50772b468a589016b28110ac446434812cbd137062e0
+  meta     8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165
+  bonds    3d5bdd8c3325720c404e429f38437a86c8e715ff2c344ab36d47479828a632a2
+  presets  33d4efcfc3cff707082f74a16b69bb3e6a19fcd5be8c1f495e9f1d29e90478de
++ python -m pytest tests/test_known_answer.py -q
++ tail -5
++ tee /home/ec2-user/out/gate.txt
+........                                                                 [100%]
+8 passed in 4.83s
++ export REPO=/home/ec2-user/src SCR=/home/ec2-user/scripts OUT=/home/ec2-user/out
++ REPO=/home/ec2-user/src
++ SCR=/home/ec2-user/scripts
++ OUT=/home/ec2-user/out
++ bash /home/ec2-user/scripts/jobs.sh
++ tee /home/ec2-user/out/jobs.log
++ cd /home/ec2-user/src
++ free -g
+               total        used        free      shared  buff/cache   available
+Mem:             185           0         182           0           2         182
+Swap:              0           0           0
++ echo '[{"label":"pt-v20","base":"pt-v20","overrides":{}},{"label":"pt-v19","base":"pt-v19","overrides":{}}]'
++ echo 'decay exit 0'
++ echo 'driven exit 0'
++ echo 'macro exit 0'
++ echo 'memory exit 0'
++ echo 'long exit 0'
++ free -g
+               total        used        free      shared  buff/cache   available
+Mem:             185           4         178           0           2         179
+Swap:              0           0           0
++ STATUS=0
++ set -e
++ '[' -f /home/ec2-user/out/long-horizon.json ']'
++ '[' -f /home/ec2-user/out/decay.json ']'
++ '[' -f /home/ec2-user/out/driven.json ']'
++ '[' -f /home/ec2-user/out/macro.json ']'
++ '[' -f /home/ec2-user/out/memory-vs-drift.json ']'
++ echo 'OK exit=0'
++ aws s3 cp /var/log/pretium-run.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/run.log

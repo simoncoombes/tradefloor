@@ -550,3 +550,280 @@ def test_a_forked_arms_log_holds_the_shared_history_exactly_once():
     assert len(control.order_log) > before
     assert control.order_log[:before] == world.order_log
     assert len(shock.order_log) == before, "the arms are not independent"
+
+
+# ---------------------------------------------------------------------------
+# Forking a world that holds the shipped reference agents
+# ---------------------------------------------------------------------------
+
+
+def _every_reference_agent() -> dict:
+    """The five reference agents, and the spec-built random and oracle at
+    daily cadence, whose wrapper deep-copies the agent inside it."""
+    agents = dict(tf.baselines.reference_agents(seed=3))
+    agents["random_daily"] = tf.StrategySpec.random(seed=5, cadence="daily").build()
+    agents["oracle_daily"] = tf.StrategySpec.oracle(cadence="daily").build()
+    return agents
+
+
+def test_a_world_holding_every_reference_agent_forks_and_replays_identically():
+    """Found by the hosted app: `World.fork` falls back to `copy.deepcopy`
+    for an agent with no `fork()`, and until 0.8.5 two of the five
+    reference agents could not be copied. The random baseline holds a
+    `GameRng` and the Oracle holds the engine it last read; both raised,
+    so a world holding either could not be forked at all.
+
+    Now both have `fork()`, and a `GameRng` copies at its position. Two
+    arms forked after two days and run three more are the same market to
+    the bit, and each is the market a world that never forked reaches
+    in five: every trace row, every agent's net worth and every price."""
+    universe = tf.Universe.random(12, seed=7)
+    world = World(seed=SEED, universe=universe, agents=_every_reference_agent())
+    world.run(days=2)
+    a, b = world.fork("a", "b")
+    a.run(days=3)
+    b.run(days=3)
+    assert a.digest() == b.digest()
+    assert a.trace == b.trace
+
+    straight = World(seed=SEED, universe=universe,
+                     agents=_every_reference_agent())
+    straight.run(days=5)
+    assert a.trace == straight.trace
+    assert a.engine.prices() == straight.engine.prices()
+    # Non-vacuity: every agent traded, the random ones included, so the
+    # copied generators were drawn from on both sides of the fork.
+    for label, portfolio in a.portfolios.items():
+        assert portfolio.fills, f"{label} never traded"
+
+
+def test_a_forked_random_baseline_draws_what_the_original_would_draw():
+    """The generator is copied at its position, and the two copies are
+    independent: drawing from one does not move the other."""
+    agent = tf.baselines.RandomTrader(seed=11)
+    for _ in range(7):
+        agent.rng.next_float()
+    agent.rng.next_normal()          # leaves a Box-Muller spare behind
+    twin = agent.fork()
+    ahead = [agent.rng.next_normal() for _ in range(3)]
+    assert [twin.rng.next_normal() for _ in range(3)] == ahead
+    assert copy.deepcopy(agent).rng.next_float() == agent.rng.next_float()
+
+
+def test_a_forked_oracle_forgets_the_engine_it_was_reading():
+    """The Oracle keeps the read-only hidden-state view of the world it last
+    read, never the live engine, and a fork starts with none."""
+    from tradefloor.sandbox import HiddenState
+
+    def reads(agent, engine):
+        held = agent._engine
+        return (isinstance(held, HiddenState)
+                and tf.sandbox._WRAPPED[held] is engine)
+
+    world = World(seed=SEED, universe=tf.Universe.random(8, seed=7),
+                  agent=tf.baselines.Oracle())
+    world.run(days=1)
+    assert reads(world.agent, world.engine)
+    (arm,) = world.fork("arm")
+    assert arm.agent._engine is None
+    arm.run(days=1)
+    assert reads(arm.agent, arm.engine)
+
+
+# ---------------------------------------------------------------------------
+# P&L since the fork starts from the mark the arm starts from
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("preset", ("pt-v19", "pt-v20"))
+def test_pnl_since_the_fork_starts_from_the_mark_after_the_last_close(preset):
+    """An arm's `pnl_since` counts only what happened in the arm.
+
+    The last trace row before a fork marks the portfolio before that day's
+    close. On pt-v20 `macro_publication_repricing` re-marks every name at
+    the close, so a P&L measured from the row carried the shared re-mark
+    into each arm: measured here on pt-v20, a buy-and-hold arm read
+    +267.51 before it had run a step, and its first day's P&L -359.48
+    where the worth moved -627.00 from the fork. On pt-v19 the close
+    writes no price, and the row and the fork differ only by the day's
+    interest on the few dollars the buyer borrowed, booked before the
+    close (decision 11).
+    """
+    world = World(seed=7, universe=list(tf.Universe.random(20, seed=11)),
+                  agent=tf.baselines.BuyAndHold(), model=preset)
+    world.run(days=1)
+    interest_before = world.portfolio.interest
+    world.run(days=1)
+    at_fork = world.net_worth()
+    remark = at_fork - world.trace[-1]["net_worth"]
+    if preset == "pt-v20":
+        assert abs(remark) > 1.0, "no re-mark to keep out of the arm"
+    else:
+        charged = world.portfolio.interest - interest_before
+        assert charged < 0
+        assert remark == pytest.approx(charged, abs=1e-6)
+    (arm,) = world.fork("arm")
+    fresh = arm.summary()
+    assert fresh["value_at_start"] == at_fork
+    assert fresh["pnl_since"] == 0.0
+    arm.run(days=1)
+    after = arm.summary()
+    assert after["value_at_start"] == at_fork
+    assert after["pnl_since"] == after["final_net_worth"] - at_fork
+    # Asked from a step other than the fork's, the window still starts
+    # from the trace row before it, as it always has.
+    assert (arm.summary(since=1)["value_at_start"]
+            == world.trace[0]["net_worth"])
+
+
+def test_a_cohort_arms_pnl_since_starts_from_each_agents_mark_at_the_fork():
+    world = World(seed=7, universe=list(tf.Universe.random(20, seed=11)),
+                  agents={"hold": tf.baselines.BuyAndHold(),
+                          "trend": tf.baselines.Momentum()},
+                  model="pt-v20")
+    world.run(days=2)
+    at_fork = {label: world.net_worth(agent=label)
+               for label in ("hold", "trend")}
+    (arm,) = world.fork("arm")
+    arm.run(days=1)
+    for label, worth in at_fork.items():
+        summary = arm.summary(agent=label)
+        assert summary["value_at_start"] == worth
+        assert summary["pnl_since"] == summary["final_net_worth"] - worth
+
+
+# --------------------------------------------------------------------------
+# Orders World cannot take, handled the way evaluate handles them
+# --------------------------------------------------------------------------
+
+FOUR = tf.Universe.random(4, seed=7)
+
+
+class OnStepZero:
+    def __init__(self, value):
+        self.value = value
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        return self.value(obs) if callable(self.value) else self.value
+
+
+def test_a_summary_after_a_resting_limit_order_does_not_raise():
+    """A limit order that filled nothing when sent is in the trace with
+    price None, and summary() subtracted the mid from it (0.8.5 review:
+    Priya Raman)."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: {obs.tickers[0]: tf.Limit(100, obs.book(obs.tickers[0])
+                                              .best_bid)}))
+    world.run(days=2)
+    first = world.trace[0]["fills"][0]
+    assert first["limit"] is True and first["price"] is None
+    summary = world.summary()
+    assert summary["trades"] == 1
+    assert summary["execution_cost"] == 0.0
+
+
+def test_forks_of_a_world_that_sent_a_limit_order_agree():
+    """A trace that holds a `tf.Limit` compares equal to its fork's copy.
+
+    `Limit` compared by identity, and a fork copies the trace, so `agree`
+    reported the shared history of every World that had sent a limit order
+    as DIFFERENT. The PydanticAI notebook printed that at the release check
+    of 2026-10-01, beside a line reading `True` from `bool(agreement)`.
+    """
+    assert tf.Limit(100, 101.25) == tf.Limit(100, 101.25)
+    assert tf.Limit(100, 101.25) != tf.Limit(-100, 101.25)
+    assert hash(tf.Limit(100, 101.25)) == hash(tf.Limit(100, 101.25))
+    assert tf.Cancel() == tf.Cancel() and tf.Cancel() != tf.Limit(1, 1.0)
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: {obs.tickers[0]: tf.Limit(100, obs.book(obs.tickers[0])
+                                              .best_bid)}))
+    world.run(days=2)
+    assert any(isinstance(order, tf.Limit)
+               for row in world.trace for order in row["orders"].values())
+    control, shock = world.fork("control", "shock")
+    agreement = agree(control, shock)
+    assert agreement.identical, agreement.differences
+
+
+@pytest.mark.parametrize("policy", ["raise", "skip"])
+def test_an_unknown_ticker_is_refused_and_the_run_goes_on(policy):
+    """World raised on an unknown ticker, even under on_refusal="skip",
+    where evaluate recorded a rejection (0.8.5 review: Tomas Herrera)."""
+    world = World(seed=1, universe=FOUR, on_refusal=policy,
+                  agent=OnStepZero(lambda obs: {"ZZZZ": 10,
+                                                obs.tickers[0]: 10}))
+    world.run(days=1)
+    summary = world.summary()
+    assert summary["refused"] == 1 and summary["trades"] == 1
+    assert "ZZZZ" in world.rejected[0]
+
+
+@pytest.mark.parametrize("value, said", [("100", "got '100' (str)"),
+                                         (True, "got True (bool)")])
+def test_a_quantity_that_is_not_a_number_is_refused(value, said):
+    world = World(seed=1, universe=FOUR,
+                  agent=OnStepZero(lambda obs: {obs.tickers[0]: value}))
+    world.run(days=1)
+    assert world.summary()["trades"] == 0
+    assert world.trace[0]["refused"] and said in world.trace[0]["refused"][0]
+
+
+def test_a_return_that_is_not_a_mapping_raises_a_validation_error():
+    """A list of pairs raised AttributeError from inside the run (0.8.5
+    review: Tomas Herrera)."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(
+        lambda obs: [(obs.tickers[0], 10)]))
+    with pytest.raises(tf.ValidationError,
+                       match=r"step 0: act\(\) must return a mapping"):
+        world.run(days=1)
+
+
+def test_an_empty_list_ends_a_world_run_on_the_default():
+    """[] passed as a step with no trade before 0.8.5. It is a return that
+    is not a mapping, so the default on_refusal="raise" ends the run."""
+    world = World(seed=1, universe=FOUR, agent=OnStepZero(lambda obs: []))
+    with pytest.raises(tf.ValidationError, match="It returned a list"):
+        world.run(days=1)
+
+
+def test_a_decimal_or_a_0d_array_is_a_number_of_shares():
+    """Anything float() reads as a finite number trades, as it did before
+    0.8.5 (review of fix085/agent-orders)."""
+    import decimal
+    np = pytest.importorskip("numpy")
+    for value in (decimal.Decimal("10"), np.array(10.0)):
+        world = World(seed=1, universe=FOUR,
+                      agent=OnStepZero(lambda obs: {obs.tickers[0]: value}))
+        world.run(days=1)
+        assert world.summary()["trades"] == 1, value
+
+
+def test_under_skip_a_return_that_is_not_a_mapping_is_unusable():
+    world = World(seed=1, universe=FOUR, on_refusal="skip",
+                  agent=OnStepZero(lambda obs: [(obs.tickers[0], 10)]))
+    world.run(days=1)
+    summary = world.summary()
+    assert summary["unusable_responses"] == 1 and summary["trades"] == 0
+    assert "It returned a list" in world.trace[0]["unusable"]
+
+
+def test_resample_does_not_say_a_prompt_change_is_nothing():
+    """With identical inputs the footer said the gap was "agent noise and
+    nothing else", which is wrong for a fork whose arms run different
+    prompts (0.8.5 review: Priya Raman)."""
+    from tradefloor.counterfactual import Resample
+
+    stats = {"samples": 8, "refusals": 0, "distinct": 1, "modal_share": 1.0,
+             "mean_net": 0.0, "stdev_net": 0.1, "mean_gross": 0.0,
+             "stdev_gross": 0.0}
+    probe = Resample(
+        at=48, n=8, control="v1", treatment="v2",
+        noise={"v1": dict(stats), "v2": dict(stats, mean_net=0.92)},
+        separation={"gap_net": 0.92, "floor_net": 0.1, "net": 9.2,
+                    "gap_gross": 0.0, "floor_gross": 0.0, "gross": None},
+        identical_inputs=True, differing_lines=[], intervened_fields=[])
+    text = probe.render()
+    assert "nothing else" not in text
+    assert "market did not differ" in text
+    assert "different prompt" in text

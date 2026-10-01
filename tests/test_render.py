@@ -48,6 +48,14 @@ from tradefloor.render import (LANGUAGE, ORDER, UNITS, JSONRenderer,
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (pydantic_ai at step 12, day 2; finrobot at step 228, day
+#: 38).
+#: Its replay tests are skipped with the other fixtures that wait on a
+#: live re-record (decisions 4 and 11).
+
+
 def _load(name: str, path: pathlib.Path):
     """An example script, loaded for its seed, roster and fork constants.
 
@@ -114,7 +122,10 @@ def test_renderers_are_pure_stdlib_no_engine_no_observation():
     """`render.py` imports the standard library, `._core.ValidationError`,
     and -- inside `TextRenderer.render`, lazily, to avoid a load-time
     cycle with `counterfactual.py` -- `.counterfactual.MACRO_FIELDS`, a
-    plain tuple of field names. Nothing else, and nothing engine-shaped:
+    plain tuple of field names -- and `._arith.ordered_sum`, float
+    addition in a fixed order so a figure is the same on Python 3.11 and
+    3.12 (it imports only `functools`, `operator` and `typing`). Nothing
+    else, and nothing engine-shaped:
     a renderer that could reach `Engine` or `Observation` would put the
     ground-truth boundary `serialize_observation` guards behind a
     formatting choice.
@@ -141,12 +152,13 @@ def test_renderers_are_pure_stdlib_no_engine_no_observation():
             # top-level package that happened to share one of these
             # names would be a different thing entirely.
             name = node.module
-            if name in ("_core", "counterfactual"):
+            if name in ("_core", "counterfactual", "_arith"):
                 assert node.level >= 1, (
                     f"{name!r} imported absolutely, not package-relative")
             imported.add(name)
 
-    allowed = {"json", "typing", "__future__", "_core", "counterfactual"}
+    allowed = {"json", "typing", "__future__", "_core", "counterfactual",
+               "_arith"}
     assert imported <= allowed, (
         f"render.py imports {imported - allowed}, outside the allowed "
         f"{allowed}")
@@ -181,6 +193,28 @@ def test_default_textrenderer_matches_finrobot_render_with_a_held_position():
     obs = _observation(world)
     payload = fr.observe(obs, history=[], fundamentals={})
     assert TextRenderer().render(payload) == fr.render(payload)
+
+
+def test_the_text_shows_leverage_and_the_waiting_limit_orders():
+    """Observation payload 1 (0.8.5): `leverage` replaces `gross_exposure`,
+    and the agent's waiting limit orders are listed, because an agent that
+    sends them needs to see which are still working. A payload without
+    `open_orders` (built before the key existed) reads "none"."""
+    world = small_world(n=4, days=2)
+    ticker = world.engine.tickers[0]
+    bid = world.engine.book(ticker).best_bid
+    world.portfolio.submit_limit(world.engine, ticker, 200, bid * 0.9)
+    payload = fr.observe(_observation(world), history=[], fundamentals={})
+    text = TextRenderer().render(payload)
+    assert "leverage" in text and "gross exposure" not in text
+    waiting = payload["portfolio"]["open_orders"]
+    assert len(waiting) == 1 and waiting[0]["remaining"] == 200
+    assert "Waiting limit orders:" in text
+    assert f"  {ticker:<8} BUY  200 shares at" in text
+    french = TextRenderer(language="fr").render(payload)
+    assert "Ordres a cours limite en attente :" in french
+    payload["portfolio"].pop("open_orders")
+    assert "Waiting limit orders:\n  none" in TextRenderer().render(payload)
 
 
 def test_default_textrenderer_plus_objective_matches_finrobot_render():
@@ -492,6 +526,7 @@ def test_jsonrenderer_refuses_a_fundamentals_value_it_cannot_encode():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_finrobot_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_finrobot_rate_shock",
                     REPO / "examples" / "integrations" / "finrobot"
@@ -513,13 +548,17 @@ def test_finrobot_default_renderer_replays_the_shipped_fixture():
                  ticks_per_step=example.TICKS_PER_STEP)
     world.run(days=example.WARMUP_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.WARMUP_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.WARMUP_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests, (
         "the default renderer no longer reproduces the shipped fixture's "
         "prompts byte for byte")
 
 
+@pytest.mark.needs_live_model
 def test_langgraph_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_langgraph_rate_shock",
                     REPO / "examples" / "integrations" / "langgraph"
@@ -538,11 +577,15 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
                  agent=agent, cash=example.CASH, pins=example.BASE_PINS)
     world.run(days=example.WARMUP_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.WARMUP_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.WARMUP_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
+@pytest.mark.needs_live_model
 def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_pydantic_ai_rate_shock",
                     REPO / "examples" / "integrations" / "pydantic_ai"
@@ -559,8 +602,11 @@ def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
                  agent=agent, cash=example.CASH, pins=example.PINS)
     world.run(days=example.SHARED_DAYS)
 
-    recorded_digests = [e["digest"] for e in transcript.entries[
-        :example.SHARED_DAYS]]
+    # The shared phase, in step order: a saved transcript is not kept in
+    # the order the decisions were made, so read it by arm and step.
+    recorded_digests = [e["digest"] for e in sorted(
+        (e for e in transcript.entries if e.get("arm") == "shared"),
+        key=lambda e: e["step"])][:example.SHARED_DAYS]
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
@@ -624,6 +670,7 @@ def test_openai_agents_provenance_carries_the_renderer_key():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_two_identical_renderers_give_identical_decisions_on_the_fixture():
     """`invariance` proper needs a `renderer` attribute and a live fork;
     this is the narrower claim it rests on -- two SEPARATELY CONSTRUCTED
@@ -712,6 +759,7 @@ def test_invariance_fork_agreement_holds_on_a_real_finrobot_adapter():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.needs_live_model
 def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     """The design note's claim: "against a recorded agent only renderers
     with recordings replay; the others are reported as unrecorded."
@@ -767,6 +815,7 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     assert other.key() in report.render()
 
 
+@pytest.mark.needs_live_model
 def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
     """Round 2, finding 1: asking for `days` more than the transcript
     covers used to catch the exception at the WHOLE `run()` call, so the

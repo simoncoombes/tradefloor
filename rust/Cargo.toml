@@ -1,13 +1,14 @@
 [package]
 name = "tradefloor"
-version = "0.8.1"
+version = "0.8.5"
 edition = "2021"
+rust-version = "1.83"
 description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
-# user picks whichever term suits their own policy. Supersedes an earlier
-# Apache-2.0-only decision -- see DECISIONS.md in tradefloor-design for the
-# reasoning. LICENSE-APACHE and LICENSE-MIT carry the full texts; there is no
-# longer a generic LICENSE file, matching the same crates' convention.
+# user picks whichever term suits their own policy. This replaced an earlier
+# plan to license under Apache-2.0 alone. LICENSE-APACHE and LICENSE-MIT
+# carry the full texts; there is no generic LICENSE file, matching the same
+# crates' convention.
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/simoncoombes/tradefloor"
 homepage = "https://tradefloor.dev"
@@ -20,6 +21,9 @@ readme = "README.md"
 exclude = [
     "goldens/**",
     "_keep/**",
+    # Checks or rewrites goldens/, which is not in the package, so it cannot
+    # run from the published crate.
+    "sync-goldens.py",
     # Development probes, not user examples: divergence hunts, libm
     # comparisons, single-function traces. Four of them read the excluded
     # corpus, so `cargo run --example divergence` on the published crate
@@ -32,12 +36,12 @@ exclude = [
     # worse than shipping no test: a consumer running `cargo test` would
     # conclude the crate is broken.
     #
-    # What remains is a suite that runs on its own: circuit_breaker,
-    # roster_mutation and stream_alignment, plus the unit tests in 21 source
-    # modules. The parity corpus is the port contract and lives in the
-    # repository, where `cargo test --offline` runs it as a manual step in
-    # RELEASING.md. No workflow invokes cargo, so this is a checklist item
-    # rather than a gate, and calling it a gate would overstate it.
+    # What remains runs on its own: six integration tests
+    # (circuit_breaker, depth_counterfactual, maker_ladder_allocations,
+    # platform_maths, roster_mutation and stream_alignment) and the unit tests
+    # in the source modules. The parity corpus lives in the repository, where
+    # suite.yml's rust job runs it with `cargo test --release`. release.yml
+    # runs `cargo test --offline` on the packaged crate before it publishes.
     "tests/divergence_statistics.rs",
     "tests/economy_parity.rs",
     "tests/fair_value_parity.rs",
@@ -55,6 +59,12 @@ exclude = [
     "tests/tick_regression.rs",
     "tests/reference_parity_smoke.rs",
 ]
+
+# docs.rs builds the default features, which leave out the `wasm` module.
+# It is public API, so build it into the docs. `python` stays out: its
+# modules are private and it links against a Python interpreter.
+[package.metadata.docs.rs]
+features = ["wasm"]
 
 [lib]
 name = "tradefloor"
@@ -94,8 +104,8 @@ wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 # abi3-py311: one wheel per platform covers CPython 3.11 and every later
-# version. The floor is 3.11 rather than WP7's "CPython 3.9+" sketch, which
-# is stale -- 3.9 is past EOL and SPEC 0 has dropped 3.10.
+# version. The floor is 3.11 rather than 3.9 because 3.9 is past end of life
+# and SPEC 0 has dropped 3.10.
 python = ["dep:pyo3", "pyo3/extension-module", "dep:arrow"]
 
 # The browser surface. Deliberately does NOT pull arrow: a columnar C Data
@@ -128,4 +138,12 @@ sha2 = "0.10"
 [profile.release]
 lto = true
 codegen-units = 1
+opt-level = 3
+
+# `cargo test` builds with this profile. At the default opt-level 0 the unit
+# tests took about 17 minutes on a shared machine and several single tests ran
+# over a minute each, long enough for a user to think the suite had hung.
+# Optimising cannot change a result: Rust never reassociates or contracts
+# floating point at any opt-level, so the tests see the same bits.
+[profile.test]
 opt-level = 3

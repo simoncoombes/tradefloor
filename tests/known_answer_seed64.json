@@ -1,0 +1,12 @@
+{
+ "bytes": 13248,
+ "kind": "pretium.known-answer.seed64",
+ "note": "Recorded 2026-09-25 on feature/seed64, when seeds became 64-bit for 0.8.5. The seed is 2**63 + 12345, above 2**32, so the row covers the wide derivation in rust/src/rng.rs: the raw generator, Universe.random, the engine's substreams on pt-v19 (a frozen preset, so the row does not move with the default) and a surgery under the widest surgery seed. Every seed below 2**32 keeps its market, which is why no digest in known_answer.json, known_answer_book.json or known_answer_presets.json moved. Produced on macOS arm64; the five-target determinism workflow is the check on the other four.",
+ "preset": "pt-v19",
+ "seed": 9223372036854788153,
+ "seed64KatVersion": 1,
+ "sessions": 5,
+ "sha256": "cef62229d22349e5fbd41dac6ccaba91555b68a86dd79bde1c0259bd8e3e6a8b",
+ "surgerySeed": 18446744073709551615,
+ "ticks": 78
+}

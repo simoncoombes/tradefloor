@@ -20,6 +20,7 @@ what the three consumers who asked for the split actually get:
 - cutover: an embedder's own draws never move the market.
 """
 
+import math
 import struct
 
 import pytest
@@ -73,20 +74,14 @@ def test_two_macro_scenarios_consume_identical_market_noise():
     assert shocked.draws_by_stream()["market"] == flat.draws_by_stream()["market"]
 
 
-def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
-    """Pinning the values the chain would have produced is a no-op.
-
-    The sharpest form of the alignment: world A evolves its macro chain,
-    world B never runs a chain at all -- it pins each day to the values A
-    happened to produce. Before the split, B's unconsumed macro draws
-    shifted every market draw and the two worlds diverged everywhere. Now
-    they are the same market to the bit, which makes a pinned
-    HISTORICAL series comparable against an endogenous baseline: the
-    difference is the macro values, never the plumbing.
-    """
+def _pinned_twin(model):
+    """World A evolves its macro chain; world B pins, after each of its
+    closes, the values A's close produced. Returns both engines and B's
+    economy block after each pin beside A's."""
     days = 3
-    a = tradefloor.Engine(seed=99, universe=UNIVERSE)
+    a = tradefloor.Engine(seed=99, universe=UNIVERSE, model=model)
     pins = []
+    economies = []
     for _ in range(days):
         a.open_market()
         a.run_session(9, 30, 3, 60)
@@ -97,8 +92,10 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
                          inflation_rate=m.inflation_rate,
                          qe_pe_boost=m.qe_pe_boost,
                          fear_greed_index=m.fear_greed_index))
+        economies.append(a.state_snapshot()["economy"])
 
-    b = tradefloor.Engine(seed=99, universe=UNIVERSE)
+    b = tradefloor.Engine(seed=99, universe=UNIVERSE, model=model)
+    pinned = []
     for day in range(days):
         b.open_market()
         b.run_session(9, 30, 3, 60)
@@ -106,9 +103,72 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
         # values, the way a replayed historical series would.
         b.close_market()
         b.pin_macro(**pins[day])
+        pinned.append(b.state_snapshot()["economy"])
+    return a, b, economies, pinned
 
+
+#: pt-v20 with the close's re-mark off: the price reads the macro state at
+#: the next tick, as on every preset before it.
+PT_V20_NO_REMARK = tradefloor.ModelParams.from_preset(
+    "pt-v20", macro_publication_repricing=0.0)
+
+
+@pytest.mark.parametrize("model", ["pt-v19", PT_V20_NO_REMARK],
+                         ids=["pt-v19", "pt-v20-no-remark"])
+def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree(model):
+    """Pinning the values the chain would have produced is a no-op.
+
+    The sharpest form of the alignment: world A evolves its macro chain,
+    world B pins each day to the values A happened to produce. Before the
+    split, B's unconsumed macro draws shifted every market draw and the
+    two worlds diverged everywhere. Now they are the same market to the
+    bit, which makes a pinned HISTORICAL series comparable against an
+    endogenous baseline: the difference is the macro values, never the
+    plumbing.
+
+    Exact wherever the price reads the macro state only at the next tick:
+    every preset through pt-v19, and pt-v20 with
+    `macro_publication_repricing` at 0. The re-mark's case is the test
+    below.
+    """
+    a, b, economies, pinned = _pinned_twin(model)
+    assert pinned == economies
     assert prices(a) == prices(b)
     assert market_stream_state(a) == market_stream_state(b)
+
+
+def test_under_the_close_re_mark_a_pinned_twin_agrees_to_rounding():
+    """The same twin on pt-v20, the default, where the close re-marks every
+    traded name to the macro state it publishes
+    (`macro_publication_repricing`), and a pin re-marks it again.
+
+    Why the prices are not bit-identical, measured on this run: B's pin of
+    the VIX and the corporate yield is also an instruction on pt-v20, to
+    hold them through B's NEXT close (`macro_pins_today`; see
+    test_externality's pinned-corporate-yield test). So B's close on days 1
+    and 2 leaves the corporate yield where the pin put it (5.2935 on day 1)
+    while A's moves it (5.3260), and the close re-marks B's prices to that
+    state. The pin then writes A's values and re-marks them again. B's price
+    is `last * (fv_B / fv_0) * (fv_A / fv_B)` where A's is `last * (fv_A /
+    fv_0)`: equal in exact arithmetic, and one or two units in the last
+    place apart in floating point (measured 1.1e-16 and 2.2e-16 relative).
+    Before the re-mark the held state was overwritten before any tick read
+    it, so it never reached a price.
+
+    What is still exact: B's economy after every pin is A's to the bit, and
+    so is the market stream. The prices agree to the rounding of composing
+    two re-marks, which is what the mechanism allows, and no more: a
+    tolerance of eight units in the last place.
+    """
+    a, b, economies, pinned = _pinned_twin(None)
+    assert pinned == economies
+    assert market_stream_state(a) == market_stream_state(b)
+    pa, pb = prices(a), prices(b)
+    assert pa != pb, (
+        "the twin is bit-identical under the re-mark, so the composition "
+        "this test explains no longer happens; tighten it to equality")
+    for x, y in zip(pa, pb):
+        assert abs(x - y) <= 8 * math.ulp(max(x, y)), (x, y)
 
 
 # --------------------------------------------------------------------------

@@ -46,7 +46,7 @@ TICKS = 30
 SHIPPED_PRESETS = (
     "pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8",
     "pt-v9", "pt-v10", "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-    "pt-v16", "pt-v18", "pt-v19",
+    "pt-v16", "pt-v18", "pt-v19", "pt-v20",
 )
 
 
@@ -137,11 +137,27 @@ UNDERIVABLE = {
     "qe_pe_stock_gain": "multiplies the log of economy.qe_assets_ratio, and "
                         "Engine.state_snapshot does not carry that field, so "
                         "this side cannot read the value the engine used",
+    # pt-v20's fair-value level (2026-09-24). Both scale a name's published
+    # fundamentals by exp(v), its own level, and v moves tick by tick with
+    # the name's own shocks; the truth table reports the valued figure but
+    # not the level it was valued at, so this side cannot rebuild it from
+    # the published fundamentals. Both are 0.0 on every preset but pt-v20.
+    "fair_value_news_share": "scales the fundamentals by the name's own "
+                             "fair-value level, which moves every tick and "
+                             "which the truth table does not carry",
+    "opening_mispricing_sigma": "books part of each name's opening premium "
+                                "as its fair-value level, which the "
+                                "truth table does not carry",
+    "fair_value_market_share": "scales the fundamentals by the name's own "
+                               "fair-value level, as the stock-level share "
+                               "does, from the market's shocks",
+    "opening_market_sigma": "books the rest of the index's opening premium "
+                            "as the names' fair-value levels",
 }
 
 
 def _buyback_scale(share: float, grown_eps: float, price: float,
-                   day: int) -> float:
+                   day: int, cap: float = 0.0) -> float:
     """The payout term, in the engine's own spelling.
 
     `market::tick::buyback_scale`, which reads the ALREADY-grown earnings, so
@@ -156,7 +172,11 @@ def _buyback_scale(share: float, grown_eps: float, price: float,
         return 1.0
     if not (price > 0.0) or not math.isfinite(price) or day <= 0:
         return 1.0
-    return math.exp(share * grown_eps / price * day / 252.0)
+    yield_ = share * grown_eps / price
+    # `buyback_yield_cap`: a ceiling on the yield, a branch at 0.0.
+    if cap != 0.0:
+        yield_ = min(yield_, cap)
+    return math.exp(yield_ * day / 252.0)
 
 
 def _derived(instrument, economy, scale: float, model, *,
@@ -190,6 +210,10 @@ def _derived(instrument, economy, scale: float, model, *,
     # and `Engine.state_snapshot` does not carry that field, so nothing on
     # this side can read the value the engine used.
     assert p["qe_pe_stock_gain"] == 0.0, UNDERIVABLE["qe_pe_stock_gain"]
+    assert p["fair_value_news_share"] == 0.0, UNDERIVABLE["fair_value_news_share"]
+    assert p["opening_mispricing_sigma"] == 0.0, UNDERIVABLE["opening_mispricing_sigma"]
+    assert p["fair_value_market_share"] == 0.0, UNDERIVABLE["fair_value_market_share"]
+    assert p["opening_market_sigma"] == 0.0, UNDERIVABLE["opening_market_sigma"]
     if price is None:
         assert p["buyback_payout_share"] == 0.0, (
             "this arm derives the nominal term alone, so the payout share "
@@ -205,7 +229,8 @@ def _derived(instrument, economy, scale: float, model, *,
     qe_adjustment = 1.0 + p["qe_pe_gain"] * economy["qe_pe_boost"]
 
     buyback = 1.0 if price is None else _buyback_scale(
-        p["buyback_payout_share"], instrument.eps * scale, price, day)
+        p["buyback_payout_share"], instrument.eps * scale, price, day,
+        p["buyback_yield_cap"])
     total = scale * buyback
 
     eps = instrument.eps * total
@@ -236,7 +261,7 @@ def test_every_preset_before_pt_v18_carries_the_dial_at_zero():
             "earnings_nominal_growth"]
         # pt-v18 switched it on; pt-v19 is built on pt-v18 and inherits
         # it. Every preset before pt-v18 must read 0.0.
-        expected = 1.0 if name in ("pt-v18", "pt-v19") else 0.0
+        expected = 1.0 if name in ("pt-v18", "pt-v19", "pt-v20") else 0.0
         assert value == expected, (
             f"{name} carries earnings_nominal_growth {value}")
     # pt-v17 stays reserved and unresolvable. pt-v19 was asserted here the

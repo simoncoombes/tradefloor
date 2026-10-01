@@ -38,6 +38,9 @@ PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
 rendered page that prints the version. Bump it there, rebuild, and
 push that repo as part of the same release pass.
 
+The BibTeX entry in the README's "Citing tradefloor" section carries the
+version too, with the preset beside it, so bump the version in both places.
+
 `CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
 the day the version was tagged. A version without the date it shipped is half
 a citation.
@@ -163,7 +166,11 @@ partial run now labels itself `PARTIAL RUN: n of N`, and `meta.groups_run` in
 **Run it on AWS, not here.** A 504-day 40-name measurement holds about 1.6 GB
 per worker, so eight workers is roughly 13 GB, and it has taken this machine
 out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
-96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
+96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents. It
+is launched with `fleet.py` from `tradefloor-design`, and its header gives the
+three commands. The docs repository is private, so the box gets the register
+from S3, as a tarball holding the register and the data files its bound rows
+read.
 Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
 the ceiling is how much of the engine releases the GIL, not the core
 count.
@@ -184,68 +191,101 @@ The last stored run is the record of what was current at that release. The
 106 reproduced against 165 MOVED and 5 `structural_fail`: the shape of a
 release where the preset moved and the prose did not follow yet.
 
-### 4b. Re-point the inventory before believing a MOVED row
+### 4b. Re-point the register before believing a MOVED row
 
-Run this whenever the documentation has been rewritten since the last
-release, which at an era boundary is always.
+The register is `tools/remeasure/inventory.json` in `tradefloor-docs`, beside
+the pages it describes. This repository keeps no copy, and the tools stop and
+say so when neither `TRADEFLOOR_DOCS` nor `--inventory` names one.
 
 ```
-python tools/remeasure/resync.py --report      # says what it would do
-python tools/remeasure/resync.py --apply
+export TRADEFLOOR_DOCS=/path/to/tradefloor-docs
+python tools/remeasure/resync.py --lines       # every row's line, no run needed
+python tools/remeasure/resync.py --report      # MOVED rows from the last run
+python tools/remeasure/resync.py --apply       # write what it can re-point
 ```
 
-`inventory.json` records, per published figure, the value the page states and
-the line it states it on. A docs rewrite moves both and nothing re-reads them,
-so the gate ends up comparing today's engine against yesterday's prose. At
-0.3.0 that produced **106 MOVED rows and three structural_fail rows, and not
-one of them was a documentation defect.** Fifty described content the rewrite
-had deleted, several were reading the wrong column of a table the page gets
-right, and the rest recorded a value the page no longer prints.
+Run `--lines` whenever the site has been rebuilt, and `--report` before
+believing a MOVED row. `--apply` writes the register in the docs checkout,
+so the change is committed there, on the docs branch.
 
-`resync` re-points a row when the measured value appears exactly once on its
-page and the surrounding lines mention what the row measures, and retires a
-row only when neither the value nor its subject is there. Anything else it
+Each row cites a built page, `docs/<slug>.html`, by line, because that is
+what a reader sees and the only place a figure the build writes from a data
+file appears. A person edits the page's source, which `build.py` names for the
+slug (`handoff/<Name>.dc.html` or `content/<slug>.md`). Beside its page and
+line, each row carries four fields that the tools read and that a person
+editing a page should keep in step with it.
+
+- `anchor`, the words around the figure as a reader sees them. `--lines`
+  checks that the cited line still shows them, re-points a row whose anchor
+  moved to one other line, and exits non-zero when an anchor is gone, because
+  a rewritten sentence needs reading before anyone knows what it now claims.
+- `also`, the other places the site repeats the figure, each with its own
+  anchor. The report names them beside the row, so an edit reaches all of
+  them.
+- `preset`, the preset the figure describes, or `any`.
+- `bound`, for a figure the build writes from `experiments.json` or
+  `preset-records.json`. `remeasure.py` reads the published value from that
+  file, so a regenerated file does not leave the row stale, and it stops
+  before measuring if the file is missing. A bound row that reads MOVED means
+  the file is stale against this build (rerun its generator in the docs repo)
+  or the recipe here differs from the one that wrote it.
+
+A docs rewrite moves figures and lines, and nothing re-reads them, so the gate
+ends up comparing today's engine against yesterday's prose. At 0.3.0 that
+produced **106 MOVED rows and three structural_fail rows, and not one of them
+was a documentation defect.** Fifty described content the rewrite had deleted,
+several were reading the wrong column of a table the page gets right, and the
+rest recorded a value the page no longer prints.
+
+`resync` re-points a MOVED row when the measured value appears exactly once on
+its page and the surrounding lines mention what the row measures, and retires
+a row only when neither the value nor its subject is there. Anything else it
 leaves for a human, and that residue needs reading rather than clearing.
 
-**Three of the 0.3.0 rows were the measurement tool, not the inventory.**
-`measures.py` called `separation("momentum", "mean_reversion")` where the page
-prints `separation("mean_reversion", "momentum")`, which reverses every win
-count, and compared momentum to random where the page compares mean-reversion
-to random -- a different test. The horizon bullet measured momentum's capture
-where the page says "the same mean-reversion agent". When a row disagrees,
-check what the tool measures against what the page claims before editing
-either.
+**When a row disagrees, check what the tool measures against what the page
+claims before editing either.** Three of the 0.3.0 rows were the measurement
+tool: `measures.py` called `separation("momentum", "mean_reversion")` where the
+page prints `separation("mean_reversion", "momentum")`, which reverses every
+win count, compared momentum to random where the page compares mean-reversion
+to random, and measured momentum's capture where the page says "the same
+mean-reversion agent". The 0.8.1 re-point found six more, listed below.
 
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
-**Since 0.5.0 this step could not do its job, and said so in neither
-direction.** The documentation left this repository for `tradefloor-docs` at
-0.5.0 and was rebuilt from Markdown into `.dc.html` under new page names.
-`inventory.json` still cites `docs/*.md`, so 257 of its 260 rows name a file
-nothing holds. `resync.py` defaulted to `--figures out-0.3.0/figures.json`, a
-run with zero MOVED rows, so it walked nothing, opened nothing and printed
-`0 / 0 / 0`; pointed at a real run it raised on the first missing page
-instead. Both are fixed: the default is the current run, `--docs-root` (or
-`TRADEFLOOR_DOCS`) resolves pages outside this repository, an unreadable page
-is reported rather than raised, and a report in which every row was
-unreadable exits non-zero, which are the three behaviours
-`tests/test_resync.py` now holds against a regression.
+**From 0.5.0 to 0.8.1 this step could not do its job.** The documentation left
+this repository at 0.5.0 and was rebuilt into `.dc.html` under new page names,
+and the register stayed here citing `docs/*.md`, so every row named a page no
+root held. The 0.8.0 run read 260 figures, 85 reproduced and 113 MOVED, all of
+them on pages nobody could open.
 
-The data is still stale. At 0.6.1 the gate ran clean mechanically, 260
-figures, zero `structural_fail`, and reported 83 MOVED of which all 83 name a
-page no root holds. Judged by resync's own standard of a unique distinctive
-match, five of those re-point automatically, ten are pages still printing a
-pt-v12 number, and fifty-four state neither value anywhere. Re-pointing the
-inventory at the new page set is therefore a piece of work with judgement in
-it and not a `--apply` away. The register itself now follows the pages it
-describes: `remeasure.py` and `resync.py` resolve it from `--inventory`,
-then `TRADEFLOOR_DOCS/tools/remeasure/inventory.json`, then the copy still
-committed here, and each prints which of the three it read. A
-`TRADEFLOOR_DOCS` holding no register stops the run and says so, since a
-quiet fall back to the copy here would report the old register's figures
-under the new one's name, which is the failure this section describes. The 0.6.1 run is stored under
-`tools/remeasure/out-0.6.1/` as the record of where this stands.
+At 0.8.1 every row was read against the built site. 65 describe a figure a page
+still prints and were re-pointed, 13 of them bound. 195 describe figures no
+page states any more and moved to the register's `retired` list, each with its
+reason, so a figure that returns can be restored from it. Six recipes measured
+something other than what the page says, and were fixed:
+
+- The factor residual summed seven of the ten factors and graded the median,
+  where every page sums all ten and the glossary states the worst case.
+- Short interest pooled ten 100-name universes, where the page measures the
+  whole 17,576-name ticker space.
+- The crisis threshold read a source constant, which is only the dial's
+  default, where the glossary states the value for pt-v12 and for pt-v14.
+- The draw-divergence count ran the default preset, where the glossary names
+  pt-v14.
+- The snapshot refusal cut a snapshot to one stream, where the schemas page
+  is about a 0.7.x snapshot with eight. restore_state refuses that snapshot
+  for its sixteen draw counts and would accept its rng alone.
+- The branch and resume timings ran a market the page does not describe, and
+  branch's wall clock was judged on the gate's own hardware.
+
+The crisis lever on the presets page is bound to the shipped record and not
+re-measured, because the `vix` group's short pinned recipe reads 3.17 where the
+record's thirty-seed measurement reads 5.22. `tests/test_preset_records.py`
+holds the record. The gate after the re-point, run on AWS at `c618089` against the
+committed register: 65 figures in 364 seconds, 43 reproduced, 14
+`structural_ok`, 5 `covered_by_tests`, 3 `machine_bound`, zero MOVED, zero
+`structural_fail`. The run is stored under `tools/remeasure/out-0.8.1/`.
 
 ### 5. Documentation site
 
@@ -365,6 +405,23 @@ new digest on two architectures before committing it; the baseline note
 records that it was, and at 0.6.0 a Windows build and a Graviton box agreed
 before the five-target gate ever ran.
 
+The new preset also adds its row to `tests/known_answer_presets.json`, from
+`python tests/known_answer_presets.py`, and `test_known_answer.py` fails
+until it does. Add the row and nothing else: every other row belongs to a
+frozen preset, and one that moved is a defect in the change, never a
+baseline to regenerate. The combined `sha256` in that file moves with the
+new row.
+
+`tests/known_answer_traded.json` runs the reference agents through
+`evaluate` on pt-v20 by name, so a new preset leaves it where it was. It
+moves when pt-v20 changes before it ships, when a reference agent changes,
+or when `evaluate` scores differently, and `test_known_answer.py` names the
+agent and the part (orders, fills or scorecard). Re-base it with `python
+tests/known_answer_traded.py --write` and add a sentence to its note saying
+what moved. Its `presetRow` must equal pt-v20's row in
+`known_answer_presets.json`, so re-basing that row fails this test until
+the traded run is re-based too.
+
 **4. Test expectations pinned to the old default.** NEW, and the largest
 unplanned piece of 0.6.0, where six broke in three shapes:
 
@@ -409,9 +466,11 @@ chart because the charts are generated; nothing catches a moved sentence, so
 this one is on the person doing the release. Where a figure is written down,
 write the preset beside it.
 
-`figures.py` in the docs repo cannot help here: it wants
-`tools/remeasure/inventory.json`, which lives in this repository and was never
-vendored, so the prose-figure check does not run there at all.
+The twelve-market grid and the rebalance table are exceptions: the pages bind
+them to `experiments.json`, which `tools/docs/learn/experiments.py` regenerates
+on the shipped default, and the register reads them from there.
+`tools/docs/learn/figures.py` in the docs repo lists every prose figure the
+register does not cover; at 0.8.1 that is 134 of 156.
 
 **What a default move does NOT change.** A figure measured under a preset
 that is still selectable stays true; it just stops describing the default. Say
@@ -587,13 +646,32 @@ environments must be constrained to a single environment name on the registry
 side**, or any workflow in the repository with `id-token: write` can publish.
 
 The crate job packages and runs the packaged crate's own tests before
-uploading. That check matters more than it sounds: sixteen of nineteen
+uploading. That check matters more than it sounds: sixteen of 22
 integration tests read the 140 MB parity corpus that `exclude` deliberately
-keeps out, and they panic when it is absent. What remains is `circuit_breaker`,
-`roster_mutation` and `stream_alignment` plus the unit tests. They are excluded
+keeps out, and they panic when it is absent. What remains is six integration
+tests (`circuit_breaker`, `depth_counterfactual`, `maker_ladder_allocations`,
+`platform_maths`, `roster_mutation` and `stream_alignment`), the unit tests and the doctests,
+among them the README example. The others are excluded
 **by name**, so a new test is not silently dropped: add one that reads
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.
+
+**Check the Rust API against the last published crate.** The crate takes
+the Python package's version, so a patch release reaches every user who wrote
+`tradefloor = "0.8"` on their next `cargo update`. 0.8.5 broke code written
+for 0.8.1 (seeds went from `u32` to `u64`, structs gained fields) and nothing
+caught it until a review of the published crate. Before every publish, run
+cargo-semver-checks against the newest version on crates.io:
+
+```
+cargo install cargo-semver-checks --locked   # once
+cd rust && cargo semver-checks check-release
+```
+
+If it reports a break, either take it out or list every item in the
+CHANGELOG, as 0.8.5's "The Rust crate since 0.8.1" does, and in the crate
+README. A new public struct that will grow should be `#[non_exhaustive]`
+with a constructor, as `ModelParams` and `SessionRequest` are.
 
 Unlike PyPI, the crate upload is not idempotent. PyPI's `skip-existing` lets a
 re-run finish a partial upload; crates.io refuses a version that already
@@ -640,6 +718,36 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
+
+## DOI (Zenodo)
+
+`.zenodo.json` is the metadata Zenodo's GitHub integration reads when a
+GitHub release is published. Zenodo then mints a DOI for that release, and
+one concept DOI that always resolves to the newest. It reads `.zenodo.json`
+before `CITATION.cff`, so keep the two saying the same thing. It takes the
+version from the release tag, so `.zenodo.json` has no
+`version` field.
+
+Switching it on is the owner's job, once, in the owner's own accounts:
+
+1. Sign in at https://zenodo.org with "Log in with GitHub" and allow the
+   Zenodo app to see the repositories.
+2. Open the GitHub page of the Zenodo account settings
+   (https://zenodo.org/account/settings/github/), press "Sync now", and
+   switch `simoncoombes/tradefloor` on.
+3. Merge the branch that adds `.zenodo.json` before the next release.
+   Zenodo archives only releases published after the switch, and only a
+   published GitHub release (not a bare tag or a draft) triggers it. The
+   release workflow already publishes one per tag.
+4. After that release, open the new record on Zenodo and check the title,
+   author and licence. Copy the concept DOI.
+5. Put the concept DOI in `CITATION.cff` (`doi:`), in the README's "Citing
+   tradefloor" section in place of the placeholder, and on the docs site's
+   Install page.
+
+A release published before the switch gets no DOI, so the first DOI is
+the next release's. If 0.8.1 needs one, its source archive can be uploaded
+to Zenodo by hand.
 
 ## Past failures and their checks
 

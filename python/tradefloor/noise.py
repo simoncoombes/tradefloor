@@ -48,7 +48,8 @@ import math
 import struct
 from typing import Any, Callable, NamedTuple, Sequence
 
-from ._core import Engine
+from ._arith import ordered_sum
+from ._core import Engine, check_seed
 
 STREAMS = ("market", "economy", "external", "jumps", "volume", "news",
            "volume_idio", "overnight", "market_vol_level", "crisis_epicentre")
@@ -250,7 +251,8 @@ def surgery_patches(seed: int, stream: str, surgery_seed: int,
             raise ValueError(
                 f"a surgery of {stream} cannot patch {a.stream}; one "
                 f"stream per surgery, so the record says what moved")
-    values = Engine.surgery_draws(int(seed), stream, int(surgery_seed),
+    values = Engine.surgery_draws(check_seed(seed), stream,
+                                  check_seed(surgery_seed, "surgery_seed"),
                                   [a.kind for a in checked])
     return [Patch(a, v) for a, v in zip(checked, values)]
 
@@ -549,9 +551,15 @@ def attribute(world: Any, window: Any, target: Any,
             + "; day aggregate covers the market stream.")
     # An event lands at its day's close and is first seen at the next open,
     # so a horizon that stops on the window's last day gives every event row
-    # nothing to move and every one of them measures exactly zero. The
-    # default therefore reaches one day past the window whenever an event
-    # stream is attributed. A caller who passes a horizon gets it as given,
+    # nothing to move and every one of them measures exactly zero. Under
+    # `macro_publication_repricing` (pt-v20) the close re-marks every price
+    # to the macro state it publishes, so the close's economy draws reach
+    # that close's prices at once, and a jump's permanent share reaches
+    # them in the second order (through the buyback yield the re-mark's
+    # fair values read; tests/test_noise_attribution.py measures it at
+    # under a millionth of what the next day reads). The default therefore
+    # reaches one day past the window whenever an event stream is
+    # attributed. A caller who passes a horizon gets it as given,
     # and the caveats say what a column of zeros means under it.
     if horizon is None:
         horizon = last + 1 if event_streams else last
@@ -665,7 +673,7 @@ def attribute(world: Any, window: Any, target: Any,
         joint, = world.fork("joint")
         patch_draws(joint.engine, joint_patches)
         joint_effect = _run_arm(target, joint, horizon, record) - base
-        interaction = joint_effect - sum(r["effect"] for r in joint_rows)
+        interaction = joint_effect - ordered_sum(r["effect"] for r in joint_rows)
 
     caveats: list[str] = []
     if day_streams:
@@ -711,7 +719,7 @@ def attribute(world: Any, window: Any, target: Any,
             "covers the market stream.")
     counted_joint: list[str] = []
     if joint_patches:
-        summed = sum(r["effect"] for r in joint_rows)
+        summed = ordered_sum(r["effect"] for r in joint_rows)
         counted_joint.append(
             f"the {len(joint_rows)} rows with a non-zero effect do not "
             "decompose the target. Installed together they move it by "
@@ -737,7 +745,7 @@ def _total_draws(positions: dict) -> int:
     matched the control took the same total, and one that did not took a
     different one.
     """
-    return sum(int(u) + int(n) for u, n in positions.values())
+    return ordered_sum(int(u) + int(n) for u, n in positions.values())
 
 
 #: What the suite can and cannot state about the comparison above.
@@ -887,7 +895,7 @@ def _evaluate(target: Target, arm: Any) -> float:
         values = struct.unpack(f"<{len(arm.engine.tickers)}d",
                                arm.engine.column(target.name))
         if target.ticker is None:
-            return float(sum(values) / len(values))
+            return float(ordered_sum(values) / len(values))
         try:
             return float(values[arm.engine.tickers.index(target.ticker)])
         except ValueError:

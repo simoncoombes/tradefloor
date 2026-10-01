@@ -119,6 +119,7 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_s: maybe(&s["mispricingS"]),
             mispricing_s_prev_close: maybe(&s["mispricingSPrevClose"]),
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
+            fair_value_offset: None,
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -142,7 +143,7 @@ pub struct DayResult {
 
 pub fn run(doc: &Json) -> Vec<DayResult> {
     let spec = &doc["spec"];
-    let tick_seed = spec["tickSeed"].as_u64().unwrap() as u32;
+    let tick_seed = u64::from(spec["tickSeed"].as_u64().unwrap() as u32);
     let ticks_per_day = spec["ticksPerDay"].as_i64().unwrap();
     let volatility = bits(spec["volatility"].as_str().unwrap());
     let sector_keys: Vec<String> =

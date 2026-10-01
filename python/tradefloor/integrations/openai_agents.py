@@ -57,9 +57,13 @@ change to who the agent is.
 ``output_type`` is ``common.decision_model()``, the shared Pydantic
 rendering of ``common.decision_schema()``, bound in strict mode. The
 provider then constrains generation to the contract: the side enum, the
-non-negative quantity, ``additionalProperties: false`` -- which is what
-stops a model inventing ``order_type`` or ``limit_price``, fields this
-market has no execution path for.
+non-negative quantity, the optional ``order_type`` and ``limit_price`` of a
+limit order, and ``additionalProperties: false``, which stops a model
+inventing a ``stop_loss`` or another field this market has no execution
+path for. The rules a schema cannot state (a limit order needs a price,
+HOLD carries no quantity) are applied by ``parse_decision`` one action at a
+time, so a bad action is refused and the rest of the decision trades
+rather than the SDK failing the whole output.
 
 What binding it does NOT buy, measured rather than assumed: on
 ``openai-agents`` 0.22.0 there is no client-side retry when validation
@@ -141,6 +145,13 @@ same reader tries next. So this calls the ASYNC entry point, ``Runner.run``,
 and bridges with :func:`~tradefloor.integrations.common.run_sync`, which is
 the one supported crossing and behaves the same whether or not a loop is
 already running.
+
+The bridge runs every decision on ONE long-lived loop, and this adapter is
+why. The SDK caches a default ``AsyncOpenAI`` client whose connection pool
+is bound to the loop that first used it. Until 0.8.5 the bridge gave each
+call a fresh loop and closed it, so from the second decision on the cached
+client raised "Event loop is closed": a live five-day run recorded 3 of 5
+decisions, on every attempt.
 
 ## Tracing is off unless asked for
 
