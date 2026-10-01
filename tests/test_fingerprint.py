@@ -59,6 +59,16 @@ from tradefloor.counterfactual import Resample, World
 from tradefloor.fingerprint import _decisions_for_trace, _digest
 from tradefloor.integrations.common import DecisionError
 
+
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (step 228, day 38). Strict, so the re-recorded fixture turns
+#: this into a failure that says to delete the mark.
+_MARGIN_RERECORD = pytest.mark.xfail(
+    strict=True,
+    reason="tests/fixtures/finrobot/rate-shock.json was recorded with free "
+           "borrowing; re-record it under decision 11's margin charge")
+
 REPO = Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "integrations" / "finrobot" / "rate_shock.py"
@@ -112,9 +122,9 @@ class Scripted:
 
 
 #: A battery shaped like `tf.battery()` but two cells and four days
-#: instead of six and sixty, so a test that only needs SOME battery to
+#: instead of seven and 120, so a test that only needs SOME battery to
 #: run `fingerprint()` against does not pay for the shipped one's full
-#: sixty-day coverage. `version=-1` names it as what it is: a fixture,
+#: coverage. `version=-1` names it as what it is: a fixture,
 #: never a real battery version, so it can never be mistaken for one or
 #: legitimately compared against a `tf.battery()` fingerprint by
 #: `compare`'s own version check. `test_a_changed_prompt_on_a_scripted_
@@ -151,13 +161,13 @@ def _load_finrobot_example():
 # ---------------------------------------------------------------------------
 
 def test_battery_names_one_cell_per_shipped_scenario():
-    b = tf.battery()
-    assert b.version == tf.BATTERY_VERSION == 1
+    """Version 1, which pins the six scenarios that shipped when it was set."""
+    b = tf.battery(1)
+    assert b.version == 1
     assert len(b.cells) == 6
-    # The six scenarios that shipped when version 1 was set. A version pins
-    # its names rather than the live directory (`fingerprint.py`), so
-    # `curve_shock`, packaged later, is not a cell of it; every cell must
-    # still name a scenario the package ships.
+    # A version pins its names rather than the live directory
+    # (`fingerprint.py`), so `curve_shock`, packaged later, is not a cell of
+    # it; every cell must still name a scenario the package ships.
     version_one = ["geopolitical_conflict", "liquidity_crisis",
                    "oil_price_spike", "policy_regime_shift", "rate_shock",
                    "recession"]
@@ -168,10 +178,74 @@ def test_battery_names_one_cell_per_shipped_scenario():
     # the six; see the next test.
     assert all(cell.steps == 6 for cell in b.cells)
     assert all(cell.days >= 55 for cell in b.cells)
+    assert not any(cell.bonds for cell in b.cells)
     # Seeds and roster seeds are pairwise distinct, so no two cells are
     # the same world twice under a different scenario label.
     assert len({cell.seed for cell in b.cells}) == 6
     assert len({cell.roster_seed for cell in b.cells}) == 6
+
+
+def test_version_two_is_the_default_and_covers_every_shipped_scenario():
+    """Decision 9 (2026-09-26): battery v2, longer post-shock windows and
+    `curve_shock` included, as a new version rather than an edit to 1."""
+    b = tf.battery()
+    assert b.version == tf.BATTERY_VERSION == 2
+    assert b == tf.battery(2)
+    assert sorted(cell.scenario for cell in b.cells) == sorted(
+        tf.Scenario.available())
+    assert len(b.cells) == 7
+    assert {cell.days for cell in b.cells} == {120}
+    assert {cell.steps for cell in b.cells} == {6}
+    # The curve shock is a stress for a bond book, so its roster carries the
+    # three rate indices; every other cell is equities only.
+    assert [cell.scenario for cell in b.cells if cell.bonds] == ["curve_shock"]
+    # New seeds: no cell is a version 1 world run longer.
+    seeds = {cell.seed for cell in b.cells}
+    rosters = {cell.roster_seed for cell in b.cells}
+    assert len(seeds) == len(rosters) == 7
+    assert not seeds & {cell.seed for cell in tf.battery(1).cells}
+    assert not rosters & {cell.roster_seed for cell in tf.battery(1).cells}
+
+
+def test_version_two_sees_seventy_days_after_each_day_50_shock():
+    """The figures the module docstring quotes for version 2, read off the
+    scenarios: which shocks end inside a 120-day cell and which do not."""
+    cells = {cell.scenario: cell for cell in tf.battery(2).cells}
+    first = {name: min(i.at for i in tf.Scenario.load(name).interventions)
+             for name in cells}
+    assert first.pop("policy_regime_shift") == 30
+    assert first == dict.fromkeys(first, 50)
+    assert {cell.days - 50 for cell in cells.values()} == {70}
+
+    doc = " ".join(tf.fingerprint.__doc__.split())
+    ends = {}
+    for name in cells:
+        for i in tf.Scenario.load(name).interventions:
+            if i.duration:
+                ends.setdefault(name, []).append(i.at + i.duration - 1)
+    # Inside the cell.
+    for name, last in (("liquidity_crisis", 74), ("liquidity_crisis", 91),
+                       ("geopolitical_conflict", 79),
+                       ("oil_price_spike", 74), ("recession", 109)):
+        assert last in ends[name], (name, last)
+        assert last < cells[name].days
+        assert f"day {last})" in doc or f"to day {last}" in doc
+    # Past the end, and said to be.
+    for name, last in (("liquidity_crisis", 175), ("recession", 364)):
+        assert last in ends[name], (name, last)
+        assert last > cells[name].days
+        assert f"to day {last}" in doc
+
+
+def test_the_default_digests_are_pinned_per_version():
+    """A scripted agent whose orders do not read the market (it buys the
+    first ticker, 1,000 shares, every step) hashes to a fixed digest on each
+    version. Version 1's is the digest it had before version 2 existed,
+    which is what immutable means here."""
+    assert tf.fingerprint.fingerprint(Scripted(), tf.battery(1)).digest == (
+        "9e7c86b9893008a29ef4cc3a229e12e72e1fb63888d78a7774ebdb3164d4b817")
+    assert tf.fingerprint.fingerprint(Scripted()).digest == (
+        "637dcde5483857c4521f5ab5dbce87f115ec74948add8d30888d817253eae8d6")
 
 
 def test_the_battery_docstring_says_what_version_one_pins():
@@ -219,6 +293,7 @@ def test_version_one_leaves_about_ten_days_after_each_shock():
 
 
 def test_battery_version_is_immutable():
+    assert tf.battery(2) == tf.battery(2) != tf.battery(1)
     a, b = tf.battery(1), tf.battery(1)
     assert a == b
     assert a.cells == b.cells
@@ -230,8 +305,8 @@ def test_battery_version_is_immutable():
 
 
 def test_an_unknown_battery_version_is_refused_by_name():
-    with pytest.raises(tf.ValidationError, match="no battery version 2"):
-        tf.battery(2)
+    with pytest.raises(tf.ValidationError, match="no battery version 3"):
+        tf.battery(3)
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +399,7 @@ def test_a_refusal_does_not_reset_decision_deduplication():
 # ---------------------------------------------------------------------------
 
 @needs_fixture
+@_MARGIN_RERECORD
 def test_the_recorded_finrobot_fixture_matches_its_own_transcript():
     """Two ways of getting a decision list out of the same recording,
     neither a value typed into this file.
@@ -735,11 +811,11 @@ def test_sealed_battery_assigns_revealed_seeds_in_cell_order():
 
 
 def test_sealed_battery_refuses_the_wrong_number_of_seeds():
-    with pytest.raises(tf.ValidationError, match="needs 6 seeds"):
+    with pytest.raises(tf.ValidationError, match="needs 7 seeds"):
         tf.sealed_battery([1, 2, 3], b"salt")
 
 
 def test_sealed_battery_refuses_a_string_salt():
-    seeds = list(range(101, 107))
+    seeds = list(range(101, 108))
     with pytest.raises(tf.ValidationError, match="salt must be bytes"):
         tf.sealed_battery(seeds, "not bytes")

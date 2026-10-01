@@ -644,17 +644,23 @@ def test_pnl_since_the_fork_starts_from_the_mark_after_the_last_close(preset):
     into each arm: measured here on pt-v20, a buy-and-hold arm read
     +267.51 before it had run a step, and its first day's P&L -359.48
     where the worth moved -627.00 from the fork. On pt-v19 the close
-    writes no price, the row and the fork agree, and nothing moves.
+    writes no price, and the row and the fork differ only by the day's
+    interest on the few dollars the buyer borrowed, booked before the
+    close (decision 11).
     """
     world = World(seed=7, universe=list(tf.Universe.random(20, seed=11)),
                   agent=tf.baselines.BuyAndHold(), model=preset)
-    world.run(days=2)
+    world.run(days=1)
+    interest_before = world.portfolio.interest
+    world.run(days=1)
     at_fork = world.net_worth()
     remark = at_fork - world.trace[-1]["net_worth"]
     if preset == "pt-v20":
         assert abs(remark) > 1.0, "no re-mark to keep out of the arm"
     else:
-        assert remark == 0.0
+        charged = world.portfolio.interest - interest_before
+        assert charged < 0
+        assert remark == pytest.approx(charged, abs=1e-6)
     (arm,) = world.fork("arm")
     fresh = arm.summary()
     assert fresh["value_at_start"] == at_fork

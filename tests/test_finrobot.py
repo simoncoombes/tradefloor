@@ -32,6 +32,16 @@ import tradefloor as tf
 from tradefloor.counterfactual import World, agree, compare
 from tradefloor.integrations import finrobot as fr
 
+
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (step 228, day 38). Strict, so the re-recorded fixture turns
+#: this into a failure that says to delete the mark.
+_MARGIN_RERECORD = pytest.mark.xfail(
+    strict=True,
+    reason="tests/fixtures/finrobot/rate-shock.json was recorded with free "
+           "borrowing; re-record it under decision 11's margin charge")
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "integrations" / "finrobot" / "rate_shock.py"
@@ -2430,6 +2440,7 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
 
 
 @needs_fixture
+@_MARGIN_RERECORD
 def test_the_recorded_run_replays_end_to_end(tmp_path):
     """The whole experiment, from the shipped fixture, with no key.
 

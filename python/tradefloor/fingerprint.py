@@ -57,34 +57,53 @@ question it was not asked, so a floor over one is not offered here.
 ## The battery
 
 :data:`BATTERY_VERSION` names the cell set :func:`battery` returns by
-default. A version is immutable: `battery(1)` builds the same six cells,
-byte for byte, on every call and on every future release, because a
-fingerprint is only comparable to another taken against the SAME worlds.
-Extending the battery -- another cell, a different roster size, a longer
-run -- is a new version, never an edit to `1`.
+default, which is version 2 from 0.8.5. A version is immutable:
+`battery(1)` and `battery(2)` build the same cells, byte for byte, on
+every call and on every future release, because a fingerprint is only
+comparable to another taken against the SAME worlds. Extending the
+battery -- another cell, a different roster size, a longer run -- is a new
+version, never an edit to an old one. A fingerprint records its version,
+and :meth:`Fingerprint.compare` refuses two versions, so a version 1
+fingerprint taken before 0.8.5 is compared against `battery(1)` and not
+against the default.
 
 Each cell is one :class:`~tradefloor.counterfactual.World`, seeded and
 rostered by :func:`tradefloor.Universe.random`, running one shipped
 :class:`~tradefloor.Scenario` from day zero at the library's own six
-steps a day. Version 1 has one cell for each of the six scenarios that
-shipped when it was fixed: ``geopolitical_conflict``, ``liquidity_crisis``,
-``oil_price_spike``, ``policy_regime_shift``, ``rate_shock`` and
-``recession``. It pins those names, not the live directory.
-`Scenario.available()` lists seven today, and ``curve_shock``, packaged
-later, is not in version 1 and cannot be added to it.
+steps a day.
 
-Every version 1 cell runs 60 days, which is short for these scenarios.
-Five of the six fire their main shock at day 50, so their cells see ten
-days after it. ``policy_regime_shift`` moves credit at day 30, tariffs at
-day 40 and inflation at day 50. Several shocks are still running when a
-cell stops: ``liquidity_crisis`` holds its depth and volatility shock to
-day 74, ``geopolitical_conflict`` its volatility to day 79, and
-``recession`` its contraction to day 364. So a version 1 fingerprint
-hashes how an agent reacts in the first ten days of a shock, and says
-nothing about how it trades through the rest. A longer battery would be
-version 2, which does not exist yet. The ``at:`` and ``duration:`` fields
-under ``python/tradefloor/scenarios/`` give each day, and
+Version 2 has seven cells, one for each scenario the package ships:
+``curve_shock``, ``geopolitical_conflict``, ``liquidity_crisis``,
+``oil_price_spike``, ``policy_regime_shift``, ``rate_shock`` and
+``recession``. Every cell runs 120 days, the length the scenario files
+were measured over. Six of the seven fire their main shock at day 50, so
+their cells see seventy days after it, and ``policy_regime_shift`` moves
+credit at day 30, tariffs at day 40 and inflation at day 50. That covers
+the whole of ``liquidity_crisis``'s depth and volatility shock (to day
+74) and its earnings fall (to day 91), ``geopolitical_conflict``'s
+volatility (to day 79), ``oil_price_spike``'s supply ramp (to day 74) and
+``recession``'s tripled volatility (to day 109). Two shocks are still
+running when a cell stops: ``liquidity_crisis``'s earnings recovery runs
+to day 175, and ``recession``'s contraction to day 364. The
+``curve_shock`` cell's roster carries the three rate indices
+(``Universe.random(6, seed=..., bonds=True)``), because that scenario is
+a stress for a bond book; every other cell is six equities.
+
+Version 1 has six cells of 60 days, one for each scenario that shipped
+when it was fixed. ``curve_shock``, packaged later, is not in version 1
+and cannot be added to it. Five of its six fire their
+main shock at day 50, so a version 1 fingerprint hashes how an agent
+reacts in the first ten days of a shock and says nothing about how it
+trades through the rest. ``liquidity_crisis`` holds its depth and
+volatility shock to day 74, ``geopolitical_conflict`` its volatility to
+day 79, and ``recession`` its contraction to day 364, all past the end
+of a version 1 cell. The ``at:`` and ``duration:`` fields under
+``python/tradefloor/scenarios/`` give each day, and
 `tests/test_fingerprint.py` checks the ones quoted here.
+
+A version 2 run is twice as long as a version 1 run: 840 days of six
+steps against 360, so an LLM agent asked once a day makes 840 calls
+instead of 360.
 
 A :class:`Cell` is one un-forked :meth:`~tradefloor.counterfactual.World.run`
 and cannot express a checkpoint-fork-intervene experiment -- two arms
@@ -169,15 +188,15 @@ if TYPE_CHECKING:
     from .integrations.common import Action, Decision
 
 #: The cell set :func:`battery` returns by default. Bump this, and add a
-#: new entry to the version table below, to ship a different battery; `1`
-#: itself never changes shape. See the module docstring.
-BATTERY_VERSION = 1
+#: new entry to the version table below, to ship a different battery; an
+#: existing version never changes shape. See the module docstring.
+BATTERY_VERSION = 2
 
-#: Instruments per cell. Fixed across every cell and every version so that
+#: Equities per cell. Fixed across every cell and every version so that
 #: only the seed varies what a roster IS, not how big it is. Small enough
-#: to keep the whole six-cell, sixty-day battery cheap against a scripted
-#: agent, large enough that a decision naming one symbol is not a coin
-#: flip.
+#: to keep a whole battery cheap against a scripted agent, large enough
+#: that a decision naming one symbol is not a coin flip. A cell with
+#: ``bonds=True`` adds the three rate indices after them.
 _ROSTER_SIZE = 6
 
 
@@ -191,7 +210,10 @@ class Cell(NamedTuple):
     companies" separately citable. ``scenario`` is a name
     :meth:`~tradefloor.Scenario.load` accepts. ``days`` is how long the
     cell runs; ``steps`` is
-    :attr:`~tradefloor.counterfactual.World.steps_per_day`.
+    :attr:`~tradefloor.counterfactual.World.steps_per_day`. ``bonds``
+    adds the three rate indices to the roster
+    (``Universe.random(..., bonds=True)``); it is False on every version 1
+    cell and True only on version 2's ``curve_shock`` cell.
     """
 
     seed: int
@@ -199,6 +221,7 @@ class Cell(NamedTuple):
     scenario: str
     days: int
     steps: int
+    bonds: bool = False
 
 
 class Battery:
@@ -246,6 +269,19 @@ _CELLS: dict[int, tuple[Cell, ...]] = {
         Cell(90_003, 91_003, "policy_regime_shift", 60, 6),
         Cell(90_004, 91_004, "rate_shock", 60, 6),
         Cell(90_005, 91_005, "recession", 60, 6),
+    ),
+    #: Version 2 (0.8.5): every shipped scenario, 120 days each, so the
+    #: day-50 shocks have seventy days after them. New seeds, so no cell
+    #: replays a version 1 cell's first sixty days. `curve_shock` trades
+    #: with the rate indices on the roster.
+    2: (
+        Cell(90_100, 91_100, "curve_shock", 120, 6, bonds=True),
+        Cell(90_101, 91_101, "geopolitical_conflict", 120, 6),
+        Cell(90_102, 91_102, "liquidity_crisis", 120, 6),
+        Cell(90_103, 91_103, "oil_price_spike", 120, 6),
+        Cell(90_104, 91_104, "policy_regime_shift", 120, 6),
+        Cell(90_105, 91_105, "rate_shock", 120, 6),
+        Cell(90_106, 91_106, "recession", 120, 6),
     ),
 }
 
@@ -422,7 +458,8 @@ def fingerprint(agent: Any,
     for index, cell in enumerate(battery.cells):
         cell_agent = (agent.fork() if callable(getattr(agent, "fork", None))
                      else copy.deepcopy(agent))
-        roster = Universe.random(_ROSTER_SIZE, seed=cell.roster_seed)
+        roster = Universe.random(_ROSTER_SIZE, seed=cell.roster_seed,
+                                 bonds=cell.bonds)
         world = World(seed=cell.seed, universe=list(roster), agent=cell_agent,
                      steps_per_day=cell.steps, on_refusal="skip",
                      label=f"fingerprint battery {battery.version} cell "

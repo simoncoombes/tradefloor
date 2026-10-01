@@ -100,6 +100,22 @@ FACTOR_NAMES: tuple[
      "order_flow_impact", "short_squeeze_effect", "random_noise",
      "circuit_breaker", "jump", "overnight", "fair_value_shift")
 
+# The answers ``explain`` is scored against: the ten factors that move a
+# price. ``fair_value_shift`` is left out because it moves no price. It books
+# the part of a shock that left the mispricing for fair value, and the shock's
+# own column (``random_noise``, ``company_news`` or ``jump``) already holds the
+# whole move. Until 0.8.5's decision 8 the scorer ranked all eleven, so a
+# permanent shock counted twice, once in its own column and once, with the
+# sign flipped, in ``fair_value_shift``. On pt-v20 that made
+# ``fair_value_shift`` the scored answer on about a third of days although it
+# moved nothing.
+DRIVER_NAMES: tuple[
+    Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
+    Literal["company_news"], Literal["order_flow_impact"],
+    Literal["short_squeeze_effect"], Literal["random_noise"],
+    Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
+] = FACTOR_NAMES[:10]
+
 
 def _f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
@@ -282,10 +298,16 @@ class Agent(Protocol):
     of one share. :func:`evaluate` warns when every order in a step is such a
     fraction.
 
-    ``explain`` is optional. When present it returns the factor the agent
-    believes drove the largest recent move, one of ``Engine.FACTORS``. That is
-    what lets the harness ask whether the agent was right for the right
-    reasons, rather than only whether it made money.
+    ``explain`` is optional. When present, ``explain(day)`` returns the
+    factor the agent believes moved prices most that day, one of
+    :data:`DRIVER_NAMES`. The harness calls it after the day's close and
+    scores it against the engine's attribution for the whole day, open to
+    close: for each factor it adds up the size of its push on every name's
+    price, up or down alike, and the factor with the largest total is the
+    right answer. ``fair_value_shift`` is never the answer, because it moves
+    no price (see :data:`DRIVER_NAMES`). That is what lets the harness ask
+    whether the agent was right for the right reasons, rather than only
+    whether it made money.
     """
 
     def act(self, obs: Observation
@@ -323,9 +345,11 @@ class Scorecard:
     limit refused. ``explanation_baseline`` is what always giving the same
     answer to ``explain`` would have scored on the same days: the share of
     scored days won by the factor that won most often. Read
-    ``explanation_accuracy`` against it, because on most markets one or
-    two factors win most days, and a constant answer scores well above
-    one in eleven.
+    ``explanation_accuracy`` against it. On pt-v20 ``random_noise`` moves
+    prices most on almost every day (294 of 300 days over three rosters
+    and five seeds, with ``jump`` on five), so a constant answer scores
+    close to 1.0 there, and an accuracy means something only where it
+    beats the baseline.
     """
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
@@ -334,7 +358,7 @@ class Scorecard:
                  "strategy_fingerprint", "model_fingerprint", "trusted",
                  "uses_hidden_state", "tampered", "equity_curve",
                  "max_drawdown_pct", "ruined", "leverage_refusals",
-                 "explanation_baseline", "partial_fills")
+                 "explanation_baseline", "partial_fills", "margin_interest")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -348,6 +372,7 @@ class Scorecard:
         ruined: bool = False, leverage_refusals: int = 0,
         explanation_baseline: float | None = None,
         partial_fills: list[str] | None = None,
+        margin_interest: bool = True,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -409,6 +434,11 @@ class Scorecard:
         #: 5,529,929, and the rest did not fill." Kept apart from
         #: ``errors``: the order traded, only less of it than was asked.
         self.partial_fills = list(partial_fills or [])
+        #: Borrowing paid the policy rate. False only for a run that passed
+        #: ``margin_interest=False``, whose repr then says "free-borrowing":
+        #: a levered score from such a run is not comparable to one that
+        #: paid for its leverage.
+        self.margin_interest = bool(margin_interest)
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -419,7 +449,9 @@ class Scorecard:
                                          ("RUINED", self.ruined),
                                          ("trusted", self.trusted),
                                          ("hidden-state",
-                                          self.uses_hidden_state)) if on)
+                                          self.uses_hidden_state),
+                                         ("free-borrowing",
+                                          not self.margin_interest)) if on)
         # Counts, so an agent that failed on every step does not print like
         # one that chose to hold cash. The lines are in `errors` and
         # `partial_fills`.
@@ -471,14 +503,16 @@ def session_clock(start: tuple[int, int, int], step_within_day: int,
 
 
 def _dominant_factor(engine: Engine) -> str | None:
-    """The factor with the largest absolute contribution across the roster.
+    """The factor that moved prices most today, of :data:`DRIVER_NAMES`.
 
     Summed over instruments in absolute value, because a factor that pushed two
     names in opposite directions still explains both moves. Netting them would
-    report a busy factor as an idle one.
+    report a busy factor as an idle one. Read after the close, so a jump at
+    the close counts for the day it moved. ``fair_value_shift`` is not ranked:
+    it moves no price, and ranking it counted every permanent shock twice.
     """
     best, best_size = None, 0.0
-    for name in FACTOR_NAMES:
+    for name in DRIVER_NAMES:
         size = ordered_sum(abs(x) for x in _f64(engine.attribution(name)))
         if size > best_size:
             best, best_size = name, size
@@ -501,6 +535,7 @@ def evaluate(
     model: str | ModelParams | None = None,
     cash_interest: bool = False,
     trusted_agents: bool = False,
+    margin_interest: bool = True,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -534,11 +569,16 @@ def evaluate(
 
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
-    default: cash earns nothing, as it always has here. Borrowing is charged
-    the policy rate either way. An agent whose cash goes negative, holding
-    more than it is worth under ``max_leverage``, pays a day's interest on
-    the balance before each close; until 0.8.5 that was free unless
-    ``cash_interest`` was on.
+    default: cash earns nothing, as it always has here.
+
+    ``margin_interest`` charges borrowing the policy rate, and is on by
+    default. An agent whose cash goes negative, holding more than it is
+    worth under ``max_leverage``, pays a day's interest on the balance
+    before each close, at the policy rate the market publishes that day.
+    This changes scores and never prices: the market is the same run with or
+    without it. ``margin_interest=False`` lets a levered agent borrow for
+    free, as every run did before 0.8.5, and its scorecard says
+    ``free-borrowing``.
 
     Agents are sandboxed. ``obs.engine`` is a read-only
     :class:`~tradefloor.sandbox.MarketView` and ``obs.portfolio`` a read-only
@@ -607,7 +647,8 @@ def evaluate(
     # The portfolio's own checks on cash and max_leverage (finite, above
     # zero), run before the untraded market rather than after it: that run
     # costs as much as one agent's, and a bad argument should not wait for it.
-    Portfolio(cash=cash, max_leverage=max_leverage, cash_interest=cash_interest)
+    Portfolio(cash=cash, max_leverage=max_leverage, cash_interest=cash_interest,
+              margin_interest=margin_interest)
     results: dict[str, Scorecard] = {}
 
     # The baseline market: the same seed with nobody trading. Every agent's
@@ -642,7 +683,7 @@ def evaluate(
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
             baseline, scenario, fingerprint, strategy_fingerprint, model,
             cash_interest, bool(trusted_agents),
-            engine=template.fork(1)[0],
+            engine=template.fork(1)[0], margin_interest=margin_interest,
         )
         _warn_if_every_step_failed(results[name], days * steps_per_day)
     return results
@@ -801,12 +842,14 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   day_of_week, baseline, scenario=None,
                   fingerprint="", strategy_fingerprint="",
                   model=None, cash_interest=False,
-                  trusted=False, *, engine=None) -> Scorecard:
+                  trusted=False, *, engine=None,
+                  margin_interest=True) -> Scorecard:
     if engine is None:
         engine = Engine(seed=seed, universe=universe, macro_state=macro,
                         model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
-                          cash_interest=cash_interest)
+                          cash_interest=cash_interest,
+                          margin_interest=margin_interest)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
     # What the agent is handed. Built once: every view reads the live
@@ -944,6 +987,18 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                 peak_leverage = max(peak_leverage, leverage)
             step += 1
 
+        # A day's interest on cash at the rate the day traded under, before
+        # the close's macro step can move it: earned on a positive balance
+        # with `cash_interest` on, charged on a negative one with
+        # `margin_interest` on, the default.
+        portfolio.accrue(engine)
+        engine.close_market()
+        # Marked after the close, which on pt-v20 re-marks every name, so
+        # the last value is the final net worth below.
+        equity_curve.append(portfolio.net_worth(engine))
+        # Asked after the close, so the scored day is the whole day: a jump
+        # at the close moves prices today, and until 0.8.5 the scorer read
+        # the attribution before it, so `jump` could never be the answer.
         explain = getattr(agent, "explain", None)
         if callable(explain):
             actual = _dominant_factor(engine)
@@ -963,15 +1018,6 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                               f"changed or copied the market ({guard.what})")
             if claimed is not None and actual is not None:
                 explanations.append((claimed, actual))
-
-        # A day's interest on cash at the rate the day traded under, before
-        # the close's macro step can move it: earned on a positive balance
-        # with `cash_interest` on, charged on a negative one always.
-        portfolio.accrue(engine)
-        engine.close_market()
-        # Marked after the close, which on pt-v20 re-marks every name, so
-        # the last value is the final net worth below.
-        equity_curve.append(portfolio.net_worth(engine))
 
     final = portfolio.net_worth(engine)
     actual_prices = _f64(engine.prices())
@@ -1029,6 +1075,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         leverage_refusals=leverage_refusals,
         explanation_baseline=explanation_baseline,
         partial_fills=_partial_fill_lines(portfolio.fills),
+        margin_interest=portfolio.margin_interest,
     )
 
 

@@ -876,6 +876,44 @@ twice in one universe (the second could never be traded), and a negative VIX
 in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
 every known-answer digest is unchanged.
 
+### Scoring changes from the owner decisions of 26 September
+
+Owner decisions 8, 9 and 11 of 2026-09-26. None of them changes a price or a
+known-answer digest.
+
+- `explanation_accuracy` is scored on the question an agent is asked: which
+  factor moved prices most that day. The scorer ranked all eleven
+  attribution columns, and `fair_value_shift` moves no price. It books the
+  part of a shock that left the mispricing for fair value, while the
+  shock's own column holds the whole move, so every permanent shock counted
+  twice and `fair_value_shift` was the answer on 102 of 300 days over three
+  rosters and five seeds. The scorer now ranks the ten factors in
+  `harness.DRIVER_NAMES`. It also read the attribution before the close, so
+  a jump at the close never counted and `jump` could not be the answer; it
+  now reads it after the close, and `explain(day)` is called there. On
+  pt-v20 `random_noise` is the answer on 294 of those 300 days and `jump`
+  on 5, so a constant answer scores 0.95 to 1.0, and `explanation_baseline`
+  says what it scored on the same days. Example 08 offers Claude the ten
+  names and describes the rule.
+- Fingerprint battery version 2 is the default (`tf.BATTERY_VERSION == 2`).
+  It has seven cells, one per shipped scenario including `curve_shock`,
+  each 120 days long, so a day-50 shock has seventy days after it instead
+  of ten. The `curve_shock` cell's roster carries the three rate indices,
+  and `Cell` has a `bonds` field for it. `tf.battery(1)` builds version 1
+  unchanged, and its digests are the ones it gave before. A version 2 run
+  is 840 days against 360, so an LLM agent asked once a day costs 840
+  calls. `tf.sealed_battery` takes seven seeds for version 2.
+- A `World` charges borrowing the policy rate before each close, as
+  `evaluate` and `rank` already did, so a levered agent's score there is
+  the one `evaluate` gives it. `evaluate`, `rank`, `World` and `Portfolio`
+  take `margin_interest=False` to borrow for free. A scorecard from such a
+  run has `margin_interest=False` and its repr says `free-borrowing`; a
+  World's summary and manifest record it. The charge changes the cash a
+  levered LLM agent is shown in a World, so two recorded runs no longer
+  replay: `tests/fixtures/finrobot/rate-shock.json` (from step 228, day 38)
+  and `tests/fixtures/pydantic_ai/rate-shock.json` (from step 12, day 2).
+  Their tests are marked as expected failures until they are re-recorded.
+
 ### The MCP server after review
 
 A review of the MCP server over stdio found results that read as answers and

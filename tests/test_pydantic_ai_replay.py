@@ -44,6 +44,17 @@ from tradefloor.integrations.pydantic_ai import (MANDATE, MANDATE_VERSION,
                                                  PydanticAIAdapter)
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+
+
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (step 12, day 2). Strict, so the re-recorded fixture turns
+#: this into a failure that says to delete the mark.
+_MARGIN_RERECORD = pytest.mark.xfail(
+    strict=True,
+    reason="tests/fixtures/pydantic_ai/rate-shock.json was recorded with "
+           "free borrowing; re-record it under decision 11's margin charge")
+
 FIXTURE = REPO / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai" / "rate_shock.py"
 
@@ -75,6 +86,7 @@ def _load_example():
 
 
 @needs_fixture
+@_MARGIN_RERECORD
 def test_the_recorded_run_replays_end_to_end():
     """The whole recorded experiment: shared history, fork, one intervention,
     both arms.

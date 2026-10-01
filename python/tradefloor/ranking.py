@@ -859,6 +859,7 @@ def rank(
     model: str | ModelParams | None = None,
     trusted_agents: bool = False,
     benchmark: str = "buy_and_hold",
+    margin_interest: bool = True,
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
@@ -896,6 +897,12 @@ def rank(
     had the live engine. An agent whose code changed the market on any seed
     is left out of the table and named in :attr:`Ranking.tampered`.
 
+    ``margin_interest`` is passed to every :func:`tradefloor.evaluate`. On by
+    default, so an agent that borrows pays the policy rate on what it
+    borrowed, and a levered strategy is ranked net of its financing.
+    ``margin_interest=False`` lets it borrow for free, as rank did before
+    0.8.5, and every scorecard under the ranking says so.
+
     ```python
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(12),
                       universe=u, days=10)
@@ -925,7 +932,7 @@ def rank(
         universe=roster, macro=macro, days=days, steps_per_day=steps_per_day,
         ticks_per_step=ticks_per_step, cash=cash, max_leverage=max_leverage,
         start=start, scenario=scenario, model=model,
-        trusted_agents=trusted_agents,
+        trusted_agents=trusted_agents, margin_interest=margin_interest,
     )
 
     # The first seed's agents are built here, before any worker starts, and

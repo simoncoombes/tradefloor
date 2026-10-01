@@ -48,6 +48,18 @@ from tradefloor.render import (LANGUAGE, ORDER, UNITS, JSONRenderer,
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (pydantic_ai at step 12, day 2; finrobot at step 228, day
+#: 38). Strict, so the re-recorded fixture turns this into a failure that
+#: says to delete the mark.
+_MARGIN_RERECORD = pytest.mark.xfail(
+    strict=True,
+    reason="tests/fixtures/pydantic_ai/rate-shock.json and "
+           "tests/fixtures/finrobot/rate-shock.json were recorded with free "
+           "borrowing; re-record them under decision 11's margin charge")
+
+
 def _load(name: str, path: pathlib.Path):
     """An example script, loaded for its seed, roster and fork constants.
 
@@ -547,6 +559,7 @@ def test_langgraph_default_renderer_replays_the_shipped_fixture():
     assert [e["digest"] for e in agent.record] == recorded_digests
 
 
+@_MARGIN_RERECORD
 def test_pydantic_ai_default_renderer_replays_the_shipped_fixture():
     example = _load("test_render_pydantic_ai_rate_shock",
                     REPO / "examples" / "integrations" / "pydantic_ai"
@@ -716,6 +729,7 @@ def test_invariance_fork_agreement_holds_on_a_real_finrobot_adapter():
 # ---------------------------------------------------------------------------
 
 
+@_MARGIN_RERECORD
 def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     """The design note's claim: "against a recorded agent only renderers
     with recordings replay; the others are reported as unrecorded."
@@ -771,6 +785,7 @@ def test_invariance_reports_a_non_matching_renderer_as_unrecorded():
     assert other.key() in report.render()
 
 
+@_MARGIN_RERECORD
 def test_invariance_asked_for_more_days_than_the_fixture_covers_stops_early():
     """Round 2, finding 1: asking for `days` more than the transcript
     covers used to catch the exception at the WHOLE `run()` call, so the
