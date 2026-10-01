@@ -1015,6 +1015,105 @@ twice in one universe (the second could never be traded), and a negative VIX
 in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
 every known-answer digest is unchanged.
 
+### Changes from the third review
+
+None of these moves a known-answer digest or the market.
+
+- An action an LLM adapter refuses is a rejected action. Since decision
+  schema 2 an adapter refuses a bad action on its own, such as a ticker the
+  roster does not have, and trades the rest of the decision. `evaluate`
+  wrote the refusal to `Scorecard.errors` and did not count it in
+  `rejected`, so `rank` reported it as a step where `act()` raised, with no
+  first error. It is counted in `rejected` now, `AgentRecord.refused` holds
+  the count per seed, and the report names the agent on a REFUSED line with
+  the first refusal. An exception in `act()` is still reported as RAISED. A
+  scorecard from an adapter run with refusals has a higher `rejected` than
+  before.
+- The rank report names the benchmark it read. Its rows say
+  `vs buy_and_hold`, or `vs flat` under `benchmark="flat"`, where every row
+  said "vs buy-and-hold" whatever was chosen.
+- A seed on which an agent failed at every step and traded nothing has no
+  score in the rank report. It is left out of the agent's excess P&L and
+  its count of seeds ahead, the row says on how many seeds it failed, and
+  the agent cannot win that seed. An agent that raised on every step of
+  three seeds printed "ahead 2/3" in a falling market.
+- On pt-v20 the rank report says that the Oracle ran and has no row, with
+  its P&L over the benchmark's and the number of seeds it was ahead.
+- `Scorecard` has `sharpe`, `volatility_pct`, `time_in_market` and
+  `avg_gross_exposure`. They are read-only properties, shown in the repr
+  and left out of `as_dict()`. Sharpe and volatility are annualised from
+  the daily returns of `equity_curve`, with no risk-free rate subtracted.
+  The other two read the new `exposure_curve`, gross exposure over net
+  worth after each step. `tests/known_answer_traded.py` lists
+  `exposure_curve` as read off fields it hashes, and does not hash it.
+- `from tradefloor.integrations import Transcript` works. It loads
+  `integrations.common` when the name is asked for, so importing the
+  subpackage still imports no adapter.
+- `tf.tca.analyse` takes `history_days`, as `evaluate` and `rank` do. Both
+  worlds start day 0 from the warmed market, and `Execution.history_days`
+  records the warm-up.
+- `envelope.check` refuses a question on short-lag clustering. The
+  decay-shape gap's statistics were `abs_return_acf20` alone, so
+  `check(horizon_days=252, statistics=["abs_return_acf1",
+  "abs_return_acf5"])` read inside the envelope while the gap's own text
+  said lag 1 reads a quarter of real. They are lags 1, 5 and 20 now, and
+  each row's band warning still prints beside the refusal.
+- A horizon past 252 days gets a reason that opens with one plain
+  sentence, "A 450-day run is longer than the 252 days this model is
+  certified for, so the certification does not cover it.", before the
+  504-day and ten-year figures.
+- The five gaps in `envelope.GAPS` state the current finding and nothing
+  else. Their dated correction notes and run ids are below. The
+  measurements they cited are the engine repository's fleet runs
+  envgaps-085 (ba3f020, 2026-09-26, artefacts in
+  `tools/calibration/results/envgaps-085-2026-09-26/`) and envgaps-pt-v20
+  (2026-09-24), and the design repository's runs docs080, docs080b and
+  ptv19panel.
+
+What the gap texts carried before:
+
+- horizon. From 2026-09-14 to 2026-09-20 it read "one row out at 504 days:
+  sector_excess_corr, 0.10421 against a floor of 0.11", a decade-band
+  verdict on an earlier vector. Before 2026-09-14 it read "the shipped
+  pt-v19 holds ALL FOURTEEN at 504 days", measured on pt-v18 plus four dials
+  with sector_loading 0.8. The first pt-v20 composition missed
+  volume_abs_return_corr on the ruled bands from 1260 days and held 13 of
+  14 on the decade bands. Until 2026-09-24 it quoted pt-v12's ten-year
+  volatility, flat at 31.5 to 31.6 per cent, and pt-v12's 10 of 14 on the
+  decade bands at 2520 days.
+- decay-shape. Until 2026-09-24 it read "log-log slope -0.859 +/- 0.199, a
+  ratio of 1.97", resolved to lag 12 and negative by lag 45, which was the
+  2026-09-14 vector's curve. Before 2026-09-14 it read "about 2.2x steeper,
+  and the curve turns NEGATIVE by lag 30", pt-v14's curve. The first pt-v20
+  composition read 0.0342 at lag 1 and a slope of -0.615 +/- 0.129, and
+  kept 61%, 47% and 23% of lags 1, 5 and 20 after de-trending. pt-v12's
+  de-trended run of 2026-08-26 kept 86%, 77% and 29%, with a GJR shock
+  half-life of 3.9 days, and read a raw slope of -0.597 at 2520 days and
+  -0.867 de-trended.
+- scenario-magnitude. Until 2026-09-24 it said a scenario's expected size
+  was calibrated and the dispersion around it was not, which was pt-v10's
+  and pt-v12's reading. Until 2026-09-23 the lever read 2.07x, the
+  2026-09-14 vector's, with pt-v18 at 6.53x, pt-v16 6.23x and pt-v10 5.05x
+  read with no burn-in. Before 2026-09-14 it read 5.28x, measured on a
+  pt-v18 variant that never shipped (ptv19panel). The first pt-v20
+  composition's driven gains were 0.16, 0.22 and 0.14. The event study
+  agreed on five of six until 2026-08-27, two until 2026-09-24 and three
+  until 2026-09-26. Before 2026-09-14 the text said sector structure was
+  closed at 0.2081 and 0.1817; 0.1817 was pt-v13's 504-day reading and the
+  shipped preset missed both horizons. Until 2026-08-26 it said industries
+  held together in a crisis about a third as tightly as real ones, +0.035 on
+  pt-v10 and +0.064 on pt-v7. pt-v3's driven correlations were -0.423,
+  -0.496, +0.573 and +0.512, and pt-v10's residual sd was 1.76x real.
+- macro-range. Until 2026-09-23 it read "peaks at 4.0% on every seed, with
+  sd 1.2 around a mean of 2.0%", pt-v12's figures. The first pt-v20
+  composition peaked at a median 3.1%, passed 4% on 5 seeds of 30 and
+  reached the crisis cadence's condition on 29 days.
+- roster-concentration. Until 2026-09-24 `check` refused every concentrated
+  question, and the gap's statistics were cross_sectional_corr,
+  annualised_vol_pct and corr_persistence_acf1. On pt-v12 (2026-08-26)
+  every mix held 14 of 14 at 252 days, and at 504 days S&P-like held 13 of
+  14, technology-heavy 11 of 14 and all-technology 10 of 13.
+
 ### Bar volume
 
 `Engine.bars()` reported volume wrongly at every grain coarser than a tick.

@@ -95,6 +95,8 @@ scores["mine"].return_pct            # what it made
 scores["mine"].impact_bps            # what its own footprint cost
 scores["mine"].strategy_fingerprint  # sha256, cite this
 scores["mine"].errors                # each step that raised or was refused
+scores["mine"].sharpe                # annualised, from the daily closes
+scores["mine"].time_in_market        # share of steps holding a position
 ```
 
 That result comes from one random market, so it says as much about the seed

@@ -119,7 +119,7 @@ from typing import Any, Sequence
 from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
-from .harness import History, Observation, session_clock
+from .harness import History, Observation, _warm_up, session_clock
 from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
@@ -135,11 +135,12 @@ class Execution:
 
     __slots__ = ("tickers", "fills", "baseline_path", "actual_path",
                  "baseline_final", "actual_final", "seed", "portfolio",
-                 "steps", "universe_fingerprint", "model_fingerprint")
+                 "steps", "universe_fingerprint", "model_fingerprint",
+                 "history_days")
 
     def __init__(self, *, tickers, fills, baseline_path, actual_path, seed,
                  portfolio, steps, universe_fingerprint="",
-                 model_fingerprint=""):
+                 model_fingerprint="", history_days=0):
         self.tickers = list(tickers)
         self.fills = list(fills)
         # One cross-section per decision step, in both worlds. The path rather
@@ -163,6 +164,9 @@ class Execution:
         # coefficient set can never present as one paid in the benchmark
         # market.
         self.model_fingerprint = model_fingerprint
+        #: How many untraded days both worlds ran before day 0. The traded
+        #: days of a run with a warm-up are later days of the seed's market.
+        self.history_days = history_days
 
     # -- shortfall --------------------------------------------------------
 
@@ -348,6 +352,9 @@ class Execution:
             "universe_fingerprint": self.universe_fingerprint,
             "model_fingerprint": self.model_fingerprint,
             "steps": self.steps,
+            # Only with a warm-up, so a run without one is the dict it was.
+            **({"history_days": self.history_days}
+               if self.history_days else {}),
             "fills": len(self.fills),
             "traded": traded,
             "notional": ordered_sum(abs(f["notional"]) for f in self.fills),
@@ -380,6 +387,7 @@ def analyse(
     scenario: Any = None,
     model: str | ModelParams | None = None,
     trusted_agents: bool = False,
+    history_days: int = 0,
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
@@ -417,6 +425,13 @@ def analyse(
     including a quantity that is not a number, is skipped, as a refused
     trade always has been here.
 
+    ``history_days=N`` runs the market for N days before day 0 with nobody
+    trading, as :func:`tradefloor.evaluate` does, so an agent that needs a
+    lookback has ``obs.history`` filled at its first decision. Both worlds
+    start day 0 from that warmed market, and the :class:`Execution` records
+    ``history_days``. No scenario applies during the warm-up. Left at 0,
+    the run is the one it always was.
+
     Both worlds are copies (:meth:`Engine.fork`) of one engine built once,
     which on pt-v20 saves one 755-day macro burn-in per call.
 
@@ -430,14 +445,25 @@ def analyse(
     steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
     ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
     hour, minute, day_of_week = _checks.start_clock(start)
+    history_days = _checks.history_days(history_days)
     tickers = None
     adv = [instrument.avg_volume for instrument in universe]
 
     # One construction, two copies of it. A copy of a fresh engine is the
     # same market to the bit, and on pt-v20 construction is the 755-day
-    # macro burn-in.
-    engine, quiet = Engine(seed=seed, universe=universe, macro_state=macro,
-                           model=model).fork(2)
+    # macro burn-in. The warm-up runs once, before the copies, so both
+    # worlds start day 0 from the same market.
+    template = Engine(seed=seed, universe=universe, macro_state=macro,
+                      model=model)
+    history = History(history_days)
+    _warm_up(template, history_days, steps_per_day=steps_per_day,
+             ticks_per_step=ticks_per_step,
+             start=(hour, minute, day_of_week), history=history)
+    engine, quiet = template.fork(2)
+    # Dropped so the only engine in this frame is the guarded one: an agent
+    # that walks the stack for an engine would otherwise find the template
+    # and copy it unseen.
+    del template
 
     # -- world A: the trader exists ---------------------------------------
     tickers = engine.tickers
@@ -447,7 +473,6 @@ def analyse(
                        else PortfolioView(portfolio, engine))
     hidden = HiddenState(engine) if declares_hidden_state(agent) else None
     guard = TamperGuard(engine, (portfolio,), trusted=trusted_agents)
-    history = History()
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
@@ -543,4 +568,5 @@ def analyse(
         steps=step,
         universe_fingerprint=fingerprint_of(universe),
         model_fingerprint=engine.model_fingerprint,
+        history_days=history_days,
     )

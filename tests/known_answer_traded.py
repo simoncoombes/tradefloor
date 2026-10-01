@@ -92,6 +92,12 @@ SCORECARD_FIELDS = (
 #: The scorecard fields hashed as a count of their lines.
 SCORECARD_COUNTED = ("errors", "partial_fills")
 
+#: The scorecard fields not hashed, each read off what is. `exposure_curve`
+#: is gross position value over net worth after each step, computed from
+#: the fills and the engine's prices, and only `Scorecard`'s read-only
+#: properties read it.
+SCORECARD_DERIVED = ("exposure_curve",)
+
 #: Every key a fill row can carry, in the order hashed. A market order's
 #: row has the first ten; a limit order's adds the rest, and an absent key
 #: is hashed as absent.
