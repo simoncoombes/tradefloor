@@ -3,7 +3,7 @@
 Usage: python tools/calibration/basket_run.py --presets pt-v12,pt-v14,pt-v15,pt-v16
          --seeds 30 --roster <covid-roster json> --out <json> [--workers 8]
 
-REPORTED instrument (MULTINAME-DRIVEN.md): no bands, trajectory only.
+REPORTED instrument: no bands, trajectory only.
 """
 import argparse, json, statistics, sys
 from concurrent.futures import ProcessPoolExecutor

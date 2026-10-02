@@ -67,7 +67,7 @@ from tradefloor.facts import (  # noqa: E402
     shared_rule, trimmed_sd,
 )
 
-#: The fetch window, pinned. `wsd3-realsd.md` asked for a pinned end after a
+#: The fetch window, pinned. A review asked for a pinned end after a
 #: rate whose denominator moved with the fetch date was read as a finding:
 #: 107 hits over a session count that grew every time the cache was
 #: refreshed. Yahoo answers a request end with the last session strictly

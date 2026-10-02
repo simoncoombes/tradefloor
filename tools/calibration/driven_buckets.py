@@ -12,8 +12,8 @@ to 40. **That comparison is not clean and this script exists because it is
 not.** A held VIX 37.5 is a sustained regime the model settles into; real
 days at VIX 37.5 are mostly transient spikes that mean-revert within weeks.
 Sustained-versus-transient would produce a mid-range bump on its own, with
-no model defect at all, and `real_vix_lever.py` flags exactly that asymmetry
-in its own docstring.
+no model defect at all, and the real-market lever measurement (the project's
+unpublished design notes) flags exactly that asymmetry.
 
 So bucket BOTH SIDES the same way, on the same days. Drive the model with
 the real 2020-21 path -- `gate_pick.driven_window` already does this, and it
@@ -47,7 +47,7 @@ import tradefloor as pt
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import gate_pick  # noqa: E402
 
-#: `real_vix_lever.py`'s buckets, so the two measurements are directly
+#: The real-market lever measurement's buckets, so the two are directly
 #: comparable. Open at both ends; the 2020-21 window reaches 82.
 EDGES = [0, 12, 16, 20, 25, 30, 45, 999]
 

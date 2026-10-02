@@ -236,8 +236,8 @@ pub const CRISIS_EPICENTRE_MARKET_SHARE: f64 = 0.3916;
 ///
 /// The limit worth knowing: at `w = 0` the pair below collapses to
 /// `g_down = 1` and `g_up^2 = (e^2 - m) / (1 - m)`, which is exactly the
-/// ADDITIVE form this mechanism shipped with on 2026-09-22 (measured at
-/// `results/ptv19epi2`, design repository, where it was refused for adding
+/// ADDITIVE form this mechanism shipped with on 2026-09-22 (measured that day
+/// and refused for adding
 /// variance to the roster rather than moving it). The additive arm is the
 /// `w = 0` edge of the same solve and not a second mechanism.
 pub const CRISIS_EPICENTRE_SECTOR_SHARE: f64 = 0.1019;
@@ -741,7 +741,7 @@ pub fn cap_size_multiplier(market_cap: f64) -> f64 {
 /// path the live model never takes.
 ///
 /// `params` carries the coefficients that used to be read as consts here
-/// (the runtime seam, CALIBRATION.md §5.3). Passing
+/// (the runtime seam). Passing
 /// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
 /// values, same operations, same order.
 pub fn calculate_live_factors(
@@ -962,7 +962,7 @@ pub fn calculate_live_factors(
     let idiosyncratic_noise =
         rng.next_normal() * idiosyncratic_sigma * cap_mult * volatility_multiplier;
 
-    // The variance-neutral down-tick REALLOCATION (`corr-asymmetry.md` §10).
+    // The variance-neutral down-tick REALLOCATION.
     // The tilt two blocks above is the same-day correlation wire and it
     // multiplies: it buys share by adding variance, and the added variance
     // is what makes its argmin on the nineteen the value it already ships.

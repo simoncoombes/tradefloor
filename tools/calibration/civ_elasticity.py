@@ -19,11 +19,16 @@ estimator pooling across windows would tighten the real interval; if one of
 those puts real outside the model's, the gap is real and a coupling dial is
 worth building. Until then it would be fitting to a point estimate whose own
 interval spans a factor of six.
+
+    python tools/calibration/civ_elasticity.py candidates.json [out.json]
+
+`candidates.json` is a list of `{"label", "base", "overrides"}` objects, the
+shape `gate_pick.model(base, overrides)` takes. The per-seed decomposition is
+written to `out.json`, `decomp-r86.json` in the current directory by default.
 """
 import json, math, sys, os
 from concurrent.futures import ProcessPoolExecutor
-SP = "/private/tmp/claude-503/-Users-simoncoombes-nw-Dev/76cab463-16f4-4a89-baac-68bc86680c4c/scratchpad"
-sys.path.append(f"{SP}/rnd/tools/calibration")
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def stats_from_run(m, seed, vix=45.0):
     import pyarrow as pa, pyarrow.compute as pc
@@ -62,12 +67,15 @@ def one(job):
     return label, seed, stats_from_run(gate_pick.model(base, ov), seed)
 
 if __name__ == "__main__":
-    cands = json.load(open(f"{SP}/{sys.argv[1]}"))
+    if len(sys.argv) not in (2, 3):
+        sys.exit("usage: civ_elasticity.py <candidates JSON> [out JSON]")
+    cands = json.load(open(sys.argv[1]))
+    out_path = sys.argv[2] if len(sys.argv) == 3 else "decomp-r86.json"
     seeds = list(range(101, 125))
     jobs = [(c["label"], c["base"], c["overrides"], s) for c in cands for s in seeds]
     out = {}
     with ProcessPoolExecutor(8) as ex:
         for label, seed, row in ex.map(one, jobs):
             out.setdefault(label, {})[seed] = row
-    json.dump(out, open(f"{SP}/civ/decomp-r86.json", "w"), indent=1)
+    json.dump(out, open(out_path, "w"), indent=1)
     print(f"wrote {len(out)} candidates x {len(seeds)} seeds")

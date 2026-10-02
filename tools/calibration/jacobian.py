@@ -1,7 +1,7 @@
 """The secant Jacobian of the realism panel over the settable surface.
 
-CALIBRATION.md §4.3, built: at a chosen base vector, central differences
-of all eight panel statistics with respect to every runtime-settable
+The calibration design's Jacobian, built: at a chosen base vector, central
+differences of all eight panel statistics with respect to every runtime-settable
 parameter, under common random numbers, with the CRN guard asserted on
 every evaluation. The h-sweep (`secant_hsweep.py`) established that the
 secants are deterministic difference quotients with a stable plateau for
@@ -220,7 +220,7 @@ def main() -> None:
                         f"seed={lib.PANEL_UNIVERSE_SEED})",
             "workers": args.workers,
             "deviation_units": "log for scale parameters, raw for bounded "
-                               "(CALIBRATION.md section 6.3)",
+                               "(the calibration loss's convention)",
             "statistics": list(ALL_STATS),
         },
         "wall_seconds": wall,

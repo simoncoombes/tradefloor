@@ -6,9 +6,8 @@ more than names in different ones. It closed at 0.2.0: the default reads
 close, and the envelope carries it under the scenario-magnitude gap, which
 is what these parameters exist to move. The dial that fixes it in calm
 markets,
-`sector_factor_sigma`, was measured at thirty seeds and found to pay twice
-(CALIBRATION-FOLLOWUPS.md §59, §60): the crisis volatility lever falls by a
-tenth because the sector draw is the one variance term that does not scale
+`sector_factor_sigma`, was measured at thirty seeds and found to pay twice.
+The crisis volatility lever falls by a tenth because the sector draw is the one variance term that does not scale
 with VIX, and at a held VIX 45 sector structure reads zero whatever the dial
 is set to, because the crisis blend consumes the sector draw to inject the
 market factor. Both are properties of the mechanism, not the coefficient.

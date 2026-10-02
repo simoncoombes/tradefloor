@@ -4,13 +4,12 @@ build-backend = "maturin"
 
 [project]
 name = "tradefloor"
-version = "0.8.5"
+version = "0.8.6"
 description = "A reproducible evaluation environment for financial AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
 # Dual-licensed, the Rust-ecosystem norm. See LICENSE-APACHE and LICENSE-MIT
-# at the repository root, and DECISIONS.md in tradefloor-design for the
-# reasoning that superseded an earlier Apache-2.0-only decision.
+# at the repository root. This replaced an earlier Apache-2.0-only decision.
 license = "MIT OR Apache-2.0"
 # Declared explicitly, and it has to be. Left to itself maturin finds the
 # crate's own copies under rust/, records them in PKG-INFO by basename

@@ -2641,7 +2641,7 @@ impl PyEngine {
     /// unit-tested, and reachable from nowhere in Python: every macro field
     /// sat at its initial value for the whole run and fair value never
     /// revalued, so the fundamentals anchoring was inert by default. The
-    /// recorded design decision (PYTHON-API-DESIGN.md section 6.3) is that the
+    /// recorded design decision is that the
     /// full chain runs endogenously by default; this is that default, wired.
     ///
     /// The close is the day boundary the reference implementation uses too:

@@ -7,8 +7,8 @@ after the agent had filled at the pre-trade book, so the agent collected its
 own permanent impact instead of paying it. The spec mean-reversion rule beat
 buy-and-hold on 20 of 20 markets of the published suite by a median of 42
 points in 60 days on that alone, and a round trip of 1% of daily volume beat
-a one-share control by 12 to 52 bp in 10 of 20 names (design repo,
-``programme/meanrev-edge-ptv19-2026-09-24.md``).
+a one-share control by 12 to 52 bp in 10 of 20 names, measured on pt-v19
+on 2026-09-24.
 
 The fix is an argument, ``fills``, that reaches the market once, on the
 session's first tick, and a refusal of the old one. What this file holds:

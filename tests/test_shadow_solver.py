@@ -1040,8 +1040,7 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # time: seed 15 at -4.00 now reads a plain trial of 30.91 against a
     # no-jump 34.19, so it finds the jump alone and the premise inverted for
     # the fifth time in seven. The same seventy cells re-swept on the same
-    # recipe (design repo, programme/results/ptv19recomp/shadow-sweep.json):
-    # TWO are decisive, against one at the last two sweeps.
+    # recipe: TWO are decisive, against one at the last two sweeps.
     #
     # The day chosen is the wider by its narrower side, and it is the widest
     # any sweep has produced: seed 17, planted normal -1.50. The reused
@@ -1057,9 +1056,8 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # law ships). Re-dealt an eighth time: seed 17 at -1.50 now reads a
     # plain trial of 5.69 against a no-jump 21.69, so it finds the jump
     # alone and the premise inverted for the sixth time in eight. The same
-    # seventy cells re-swept on the same recipe (design repo,
-    # programme/results/ptv19gjr/shadow-sweep.json): TWO are decisive, as at
-    # the seventh sweep.
+    # seventy cells re-swept on the same recipe: TWO are decisive, as at the
+    # seventh sweep.
     #
     # The day chosen is the wider by its narrower side: seed 15, planted
     # normal -3.50. The reused Jacobian leaves the trial at 66.72 against a
@@ -1074,8 +1072,7 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # seed 15 at -3.50 now reads a plain trial of 12.00 against a no-jump
     # 32.89, so it finds the jump alone and the premise inverted for the
     # seventh time in nine. The same seventy cells re-swept on the same
-    # recipe (design repo, programme/results/ptv19fix/shadow-sweep.json):
-    # ONE is decisive, seed 18 at -3.10. The reused Jacobian leaves the
+    # recipe: ONE is decisive, seed 18 at -3.10. The reused Jacobian leaves the
     # trial at 147.21 against a no-jump 40.72, 106 nats worse, so it is
     # rejected, and a Jacobian of its own reaches 34.99, 5.7 nats better,
     # so it is accepted. It recovers a normal of -2.129, clear of the 0.6

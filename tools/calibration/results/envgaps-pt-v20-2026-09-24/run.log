@@ -1,6 +1,6 @@
-+ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20
++ BUCKET=s3://<bucket>/pretium-calib/out/envgaps-pt-v20
 + BRANCH=release/0.8.5
-+ SCRIPTS_URL=s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz
++ SCRIPTS_URL=s3://<bucket>/pretium-calib/in/envgaps-pt-v20-scripts.tgz
 + dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 Amazon Linux 2023 repository                     84 MB/s |  79 MB     00:00    
 Amazon Linux 2023 Kernel Livepatch repository   688 kB/s |  80 kB     00:00    
@@ -174,14 +174,14 @@ Installed:
 Complete!
 ++ date -u
 + echo 'preflight Fri Sep 25 00:31:11 UTC 2026'
-+ aws s3 cp /tmp/PREFLIGHT-S3 s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
-Completed 39 Bytes/39 Bytes (978 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://<bucket>/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (978 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://<bucket>/pretium-calib/out/envgaps-pt-v20/PREFLIGHT-S3
 + cat
 + chmod +x /home/ec2-user/stream.sh
 + mkdir -p /home/ec2-user/out
-+ setsid nohup /home/ec2-user/stream.sh s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20
-+ aws s3 cp s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz /home/ec2-user/scripts.tgz
-Completed 4.7 KiB/4.7 KiB (141.9 KiB/s) with 1 file(s) remainingdownload: s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/envgaps-pt-v20-scripts.tgz to home/ec2-user/scripts.tgz
++ setsid nohup /home/ec2-user/stream.sh s3://<bucket>/pretium-calib/out/envgaps-pt-v20
++ aws s3 cp s3://<bucket>/pretium-calib/in/envgaps-pt-v20-scripts.tgz /home/ec2-user/scripts.tgz
+Completed 4.7 KiB/4.7 KiB (141.9 KiB/s) with 1 file(s) remainingdownload: s3://<bucket>/pretium-calib/in/envgaps-pt-v20-scripts.tgz to home/ec2-user/scripts.tgz
 + tar xzf /home/ec2-user/scripts.tgz -C /home/ec2-user
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
@@ -189,8 +189,8 @@ tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.proven
 tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
 + '[' '!' -f /home/ec2-user/scripts/jobs.sh ']'
 + sha256sum /home/ec2-user/scripts.tgz
-+ aws s3 cp /home/ec2-user/scripts.tgz s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
-Completed 4.7 KiB/4.7 KiB (104.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
++ aws s3 cp /home/ec2-user/scripts.tgz s3://<bucket>/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
+Completed 4.7 KiB/4.7 KiB (104.0 KiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://<bucket>/pretium-calib/out/envgaps-pt-v20/scripts-as-run.tgz
 + chown -R ec2-user:ec2-user /home/ec2-user/scripts /home/ec2-user/scripts.tgz /home/ec2-user/out
 + cat
 + sed -i 's|BRANCH_PLACEHOLDER|release/0.8.5|' /home/ec2-user/run.sh
@@ -578,4 +578,4 @@ Swap:              0           0           0
 + '[' -f /home/ec2-user/out/macro.json ']'
 + '[' -f /home/ec2-user/out/memory-vs-drift.json ']'
 + echo 'OK exit=0'
-+ aws s3 cp /var/log/pretium-run.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/envgaps-pt-v20/run.log
++ aws s3 cp /var/log/pretium-run.log s3://<bucket>/pretium-calib/out/envgaps-pt-v20/run.log

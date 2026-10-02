@@ -1,5 +1,5 @@
 """The thirty-seed gate for a survey pick: everything a preset has to pass,
-in one run, on the pt-v7 protocol (CALIBRATION-FOLLOWUPS.md §62, §63).
+in one run, on the pt-v7 protocol.
 
   python tools/calibration/gate_pick.py --base pt-v7 \
       --overrides market_vol_alpha=0.25,market_vol_beta=0.739 [--seeds 30]
@@ -215,7 +215,7 @@ def driven_window(m, seed: int, qe_series=None, qe_assets=None, freeze=()) -> di
             "vix_beta": beta(r_sim, d_vix), "real_vix_beta": beta(r_real, d_vix)}
 
 
-# ── The multi-name driven axis (MULTINAME-DRIVEN.md, item 6) ──────────────
+# ── The multi-name driven axis ──────────────────────────────────────────
 #
 # The certified driven gate rides one name. This instrument runs the SAME
 # 2020-2021 scenario path into a universe built from the reference-panel

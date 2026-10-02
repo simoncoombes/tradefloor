@@ -152,8 +152,8 @@ pub fn close_day(company: &mut TickCompany, inputs: &CloseInputs) {
     close_day_with(&crate::params::PT_V1, company, inputs);
 }
 
-/// [`close_day`] under explicit model parameters (the runtime seam,
-/// CALIBRATION.md §5.3): the GARCH update reads the params' coefficients.
+/// [`close_day`] under explicit model parameters (the runtime seam):
+/// the GARCH update reads the params' coefficients.
 /// What the engine calls; at [`crate::params::PT_V1`] it is the shipped
 /// close bit for bit.
 pub fn close_day_with(

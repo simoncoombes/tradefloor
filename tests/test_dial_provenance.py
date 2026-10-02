@@ -242,7 +242,7 @@ def test_the_two_dials_whose_entries_were_evidence_about_other_values():
     """
     sl = pv.DIAL_PROVENANCE["sector_loading"]
     assert sl["kind"] == "measured"
-    assert "0.6168" in sl["source"] and "transmit1" in sl["script"]
+    assert "0.6168" in sl["source"] and "F3's rule" in sl["script"]
     assert "0.8" in sl["superseded"], (
         "the 0.8 record is the history and it is kept, not deleted")
     assert not pv.validate_entry("sector_loading", sl)
@@ -265,7 +265,8 @@ def test_a_derivation_the_record_holds_is_carried_by_the_table():
     """The inverse defect: a derivation the record has and the guard cannot see.
 
     `garch_beta` 0.7905 and `market_vol_slow_persistence` 0.9913 are both
-    derived in `vix-dynamics.md` -- sections 15.4 and 17.4 -- and both sat
+    derived in the VIX-dynamics derivation of the project's unpublished
+    design notes, and both sat
     in `UNPROVENANCED` as admitted gaps that were not gaps. An entry that
     is missing while its derivation exists is the same blindness as an
     entry that survives while its derivation falls, read from the other
@@ -281,7 +282,7 @@ def test_a_derivation_the_record_holds_is_carried_by_the_table():
         entry = pv.DIAL_PROVENANCE[dial]
         assert entry["kind"] == "derived", dial
         assert entry["presets"]["pt-v19"] == value, dial
-        assert "vix-dynamics.md" in entry["source"], dial
+        assert "VIX-dynamics derivation" in entry["source"], dial
         assert dial not in pv.UNPROVENANCED, dial
         assert not pv.validate_entry(dial, entry), dial
 

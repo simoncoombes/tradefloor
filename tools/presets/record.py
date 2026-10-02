@@ -49,22 +49,22 @@ DEFAULT_SINCE = {
 }
 
 #: Grades published in this repository, by the box that ran them, and the
-#: folder that holds each one in the design repository's layout
-#: (`validation/README.md`). `criteria.py` names its inputs by their paths in
-#: that private repository, so a verdict from a box listed here has each
-#: `programme/...` path rewritten under the folder when it is written onto a
-#: record, and the record then names files a reader can open.
+#: folder that holds each one (`validation/README.md`). `criteria.py` names
+#: its inputs by paths that start `programme/`, the layout the grade ran in,
+#: so a verdict from a box listed here has each of those paths rewritten under
+#: the folder when it is written onto a record, and the record then names
+#: files a reader can open.
 PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20"}
 
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
 
 
 def public_paths(block: dict) -> dict:
-    """A copy of a `long_run` block whose design-repository paths are public.
+    """A copy of a `long_run` block whose grade paths point into `validation/`.
 
     Rewrites only a block whose `measured.box` is in `PUBLISHED_GRADES`; any
-    other block comes back as it was, design paths and all, because those
-    files are not in this repository.
+    other block comes back as it was, because its files are not published
+    and a rewritten path would name a file that does not exist.
     """
     folder = PUBLISHED_GRADES.get((block.get("measured") or {}).get("box"))
     if folder is None:
@@ -461,12 +461,10 @@ def structure_bar(fresh: dict, committed: dict | None) -> dict:
 
 
 #: WHAT THE TWO BARS ABOVE MAY DO AT A WRITE, since the owner's ruling of
-#: 2026-09-23 (design repo `programme/longrun/CRITERIA.md`, ledger
-#: `ruling-the-pass-bar-is-what-a-user-would-notice-programme-longrun-
-#: criteria`): the pass bar for a preset is the fifteen long-run criteria
-#: and every ruled band, and "the certification's VIX persistence rows, the
-#: mechanism certificate ... are reported and investigated but do not gate
-#: ... These stay on the record and a regression in them is investigated;
+#: 2026-09-23 (`validation/pt-v20/programme/longrun/CRITERIA.md`): the pass
+#: bar for a preset is the fifteen long-run criteria and every ruled band,
+#: and "the certification's VIX persistence rows, the mechanism certificate
+#: ... are reported and investigated but do not gate ... These stay on the record and a regression in them is investigated;
 #: they do not by themselves stop a preset."
 #:
 #: Until that ruling the write paths REFUSED a certificate that showed less
@@ -765,8 +763,8 @@ def main() -> int:
     ap.add_argument("--long-run", metavar="VERDICT",
                     help="write ONLY the long_run block onto the record the "
                          "verdict names: the adopted long-run pass bar "
-                         "(programme/longrun/CRITERIA.md) as graded by "
-                         "programme/longrun/criteria.py --verdict "
+                         "(validation/pt-v20/programme/longrun/CRITERIA.md) "
+                         "as graded by criteria.py --verdict "
                          "on thirty 21-year histories, the 2008 and 2020 "
                          "replays, the headline edge and the one-year "
                          "table. Refused unless the long run measured the "
@@ -1262,14 +1260,14 @@ def write_level_protocol(rows_path: str) -> int:
 def write_long_run(verdict_path: str) -> int:
     """Set the `long_run` block on the record the verdict names.
 
-    The owner's adopted pass bar for a preset is `programme/longrun/CRITERIA.md`
-    (published for pt-v20 under `validation/pt-v20/`): what a user would
+    The owner's adopted pass bar for a preset is
+    `validation/pt-v20/programme/longrun/CRITERIA.md`: what a user would
     notice over thirty 21-year histories, the 2008 and 2020 replays with the
     real VIX imposed, the edge a headline read five ticks late is worth, and
-    the one-year table. `programme/longrun/criteria.py --verdict` grades it
-    by code; this writes that verdict under `long_run`, where the trading
+    the one-year table. `criteria.py --verdict`, published beside it, grades
+    it by code; this writes that verdict under `long_run`, where the trading
     server reads whether the preset passes. The verdict is written as it is,
-    except that a box in `PUBLISHED_GRADES` has its design-repository paths
+    except that a box in `PUBLISHED_GRADES` has its `programme/` paths
     pointed at the published copies (`public_paths`).
 
     REFUSES a verdict whose long run did not measure the preset BY NAME: its

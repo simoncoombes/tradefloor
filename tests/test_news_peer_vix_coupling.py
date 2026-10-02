@@ -1,12 +1,11 @@
 """Contagion should know what regime it is in.
 
 The peer weights are constants, so news transferred as hard in a quiet July
-as in March 2020. Measuring that is what made endogenous news unusable
-(CALIBRATION-FOLLOWUPS.md §104): calm-market sector excess is already in
-band at +0.166 against a 0.11-to-0.22 ceiling, and constant transfer pushed
-it to +0.256 at BOTH horizons, in exchange for the crisis figure that was
-actually wanted. A mechanism that cannot tell a crisis from a Tuesday cannot
-be aimed at one.
+as in March 2020. Measuring that is what made endogenous news unusable.
+Calm-market sector excess is already in band at +0.166 against a 0.11-to-0.22
+ceiling, and constant transfer pushed it to +0.256 at BOTH horizons, in
+exchange for the crisis figure that was actually wanted. A mechanism that
+cannot tell a crisis from a Tuesday cannot be aimed at one.
 
 The property that makes this dial safe is the one pinned hardest below: the
 crisis spike is zero under the VIX threshold, so a calm market is untouched

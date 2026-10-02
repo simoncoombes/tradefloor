@@ -5,8 +5,8 @@ VIX levels over a 252-day run, the lag-one autocorrelation about that run's
 own mean, the median across seeds, then the Marriott-Pope / Kendall first
 correction at the run length. For months it was compared against **0.976**,
 which is the WHOLE-SPAN autocorrelation of ^VIX -- one series of 8,960 bars,
-correctly documented as whole-span in the design repository and compared
-against 252-day rows anyway. Two different quantities, and the model's is
+correctly documented as whole-span in the project's unpublished design notes
+and compared against 252-day rows anyway. Two different quantities, and the model's is
 the smaller one, so every identity arm on the record reads as SHORT of the
 real VIX when on a like-for-like ruler it is more persistent than real.
 

@@ -9,7 +9,7 @@ answer cannot be fitted to it:
 
 `docs/realism-envelope.md` Gap 5 says structural, citing a 504-day loss that
 doubles, 0.9887 to 2.0164, when the fast variance component is capped at a
-14-day half-life. `CALIBRATION-FOLLOWUPS.md` §14 reports the same mechanism
+14-day half-life. An earlier calibration run found the same mechanism
 succeeding at 8 of 10 with `L_real` 0.0128 -- on the 252-day panel. Those are
 two rulers on one experiment, not a disagreement, and neither is a search.
 

@@ -616,7 +616,7 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     six windows, a float when it is not, and in every judged table.
 
     It joined REAL_MARKETS on 2026-08-25 with a thirty-seed baseline and a
-    reference band at both horizons (CALIBRATION-FOLLOWUPS.md §64). Twelve
+    reference band at both horizons. Twelve
     non-overlapping 21-day windows in a year is a noisy series and the real
     windows scatter from -0.05 to +0.40, so the 252-day band is wide enough
     to admit every preset; the 504-day band is the ruler. Its seed sd is the
@@ -654,8 +654,8 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
     barely notices: nine of the fourteen are exactly invariant because they
     centre their arguments, and the five built on an absolute return move by
     a fraction of their own seed noise. So a market losing a fifth of its
-    value a year can read fourteen of fourteen, which is what
-    `tradefloor-design/programme/index-drift-investigation.md` found.
+    value a year can read fourteen of fourteen, which is what the project's
+    investigation of index drift found.
 
     This row is the one that moves, and it moves by exactly the drift added.
     """

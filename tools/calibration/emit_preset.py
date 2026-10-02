@@ -41,8 +41,8 @@ def main() -> None:
     if args.vector:
         # An evaluate_axes.py certificate: named vectors, each carrying the
         # full override set and its moves against pt-v1. The shipped vector
-        # is not always the search's own optimum — see CALIBRATION-PTV2.md
-        # on the band-edge margin — so the emitter reads whichever vector
+        # is not always the search's own optimum (the band-edge margin
+        # can move it), so the emitter reads whichever vector
         # the report names rather than assuming.
         row = cert["vectors"][args.vector]
         moves = sorted(

@@ -167,8 +167,7 @@ BASELINE = "pt-v1"
 #: proposed to ship: composed 2026-09-10, recomposed 2026-09-20 on the
 #: factorial (the market variance family and the idio jumps back to pt-v18),
 #: and composed a fifth time on 2026-09-23 with twenty-three dials, the
-#: design programme's candidate LMN-Q25A375 (programme/results/ptv19-fifth/
-#: RESULT.md in the design repository). Fifteen of those dials left
+#: design programme's candidate LMN-Q25A375. Fifteen of those dials left
 #: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
 #: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
 REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20")
@@ -202,8 +201,9 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: somebody chose it.
 #:
 #: PARTIAL, ON PURPOSE, and the module note says how to derive the whole
-#: set. These four are the dials `programme/PT-V19-CHARTER.md` section 3.1
-#: names in its ledger that the difference-from-baseline rule cannot reach.
+#: set. These four are the dials pt-v19's charter, in the project's
+#: unpublished design notes, names in its ledger that the
+#: difference-from-baseline rule cannot reach.
 #: `vix_level_identity` was the fifth until pt-v19 moved it to 1.0 on
 #: 2026-09-10; it is in scope under the difference rule now and has its
 #: entry in `DIAL_PROVENANCE`, which is the transition this list exists
@@ -395,14 +395,14 @@ OUT_OF_SCOPE = {
         "b4fix4), from its third composition until its fifth returned it to "
         "pt-v1's 0.0 for the ANCHOR form of the VIX law, LAWC-D, where the "
         "anchor enters the VIX's own target through `vix_anchor_weight` "
-        "(programme/results/vix-slow-regime/ and results/vix-law-levels/, "
-        "design repository). The two forms are alternatives, so the "
+        "(measured in the project's unpublished design notes). The two "
+        "forms are alternatives, so the "
         "switch's value is the choice of form and the choice is recorded "
         "under the anchor dials' entries",
     # THE FIVE THE 2026-09-20 RECOMPOSITION RETURNED TO 0.0 (six, until
     # `market_vol_gamma` returned to pt-v19 on 2026-09-21). Each shipped a
-    # non-zero value on pt-v19 for six days, with a derivation the design
-    # repository still holds; the factorial (programme/results/bestof)
+    # non-zero value on pt-v19 for six days, with a derivation the project's
+    # unpublished design notes still hold; the 2^6 factorial of 2026-09-20
     # measured the market variance family and the idio jump family away from
     # the tape and every shipped preset now leaves them where pt-v1 did.
     "market_vol_level_sigma":
@@ -426,9 +426,8 @@ OUT_OF_SCOPE = {
         "DERIVED 1.0 and shipped 0.0: the index GJR the shipped "
         "coefficients come from was fitted on the tape's TOTAL index "
         "returns, jumps in, so the whole of a market jump's log return "
-        "belongs in the day's shock "
-        "(programme/results/ptv19refine/jump-derivation.txt, design "
-        "repository). Shipped at 0.0 because a derivation is not a "
+        "belongs in the day's shock (derived in the project's unpublished "
+        "design notes). Shipped at 0.0 because a derivation is not a "
         "measurement of the panel",
     "vix_anchor_reversion":
         "inert at 0.0: economy/daily.rs branches on `!= 0.0` after the VIX "
@@ -437,9 +436,8 @@ OUT_OF_SCOPE = {
         "kappa at which the linearised VIX-variance loop's slow pole equals "
         "the tape's own slow pole of log VIX, 0.9965, at "
         "`market_vol_vix_exponent` 1.83 and the shipped "
-        "`vix_mean_reversion` 0.27 "
-        "(programme/loop-level-law-design-2026-09-22.md section 2(b) and "
-        "results/ptv19loop/looppoles.py, design repository). Shipped at 0.0 "
+        "`vix_mean_reversion` 0.27, from the loop's linearised poles "
+        "(the project's unpublished design notes, 2026-09-22). Shipped at 0.0 "
         "because the arm it was derived for was MEASURED and refused: on "
         "the level law the held-VIX index lever reads 4.61x against the "
         "design's own falsifier of 7x, below the shipped form's 4.90x. The "
@@ -453,15 +451,15 @@ OUT_OF_SCOPE = {
         "law on (`vix_anchor_weight_level` 1.0); on every preset without the "
         "level law it is unread. 1.0 runs the law below the knee too, "
         "lowering the weight toward zero there, which was screened and "
-        "refused (programme/results/vix-law-levels/ sections 4 and 5, "
-        "design repository). A probe, not adopted",
+        "refused in a screen recorded in the project's unpublished design "
+        "notes. A probe, not adopted",
     "vix_anchor_weight_level_knee_fixed":
         "inert at 0.0: economy/daily.rs branches on `!= 0.0` and the knee "
         "reads `L * anchor` as it always has, which is the knee pt-v19's "
         "level law reads since its fifth composition; on every preset "
         "without the level law it is unread. 1.0 takes the slow regime level "
         "out of the knee, which the held map places at an absolute VIX "
-        "(vix-slow-regime section 7, design repository): it moves the "
+        "(the project's unpublished design notes): it moves the "
         "turbulent rows toward the tape and changes no gate, and it was not "
         "in the adopted vector. A probe, not adopted",
     "crisis_epicentre_end_sessions":
@@ -559,14 +557,12 @@ OUT_OF_SCOPE = {
         "`MarketVarianceState::warm_to_level` is never entered. It takes NO "
         "draw at any value -- the warm-up is a deterministic function of "
         "the level draw the close already makes -- so the branch cannot "
-        "reach the schedule either. Registered unrun: "
-        "`programme/results/warmup-registration.md` (design repository) is "
-        "the box that would give it a value, and until that box reports "
-        "the 0.0 is the absence of a measurement rather than the result of "
-        "one. What it would fix is MEASURED and is not in doubt: "
-        "`level-sigma-horizon.md` section 2 measures the two halves of a "
-        "504-session recording disagreeing at sigma 0.085 and agreeing at "
-        "sigma 0",
+        "reach the schedule either. Registered unrun: a box registered in "
+        "the project's unpublished design notes would give it a value, and "
+        "until that box reports the 0.0 is the absence of a measurement "
+        "rather than the result of one. What it would fix is MEASURED and "
+        "is not in doubt: the two halves of a 504-session recording "
+        "disagree at sigma 0.085 and agree at sigma 0",
     "market_vol_alpha_excursion":
         "inert at 0.0: market/factor_vol.rs `alpha_beta_at` branches on "
         "`k == 0.0` and returns the dialled pair unchanged. Measured and "
@@ -578,11 +574,10 @@ OUT_OF_SCOPE = {
         "draw and neither scale is applied, so no preset that predates the "
         "dial multiplies by a pair of ones. It takes NO draw at any value "
         "-- it reshapes a shock the tick has already taken -- so the branch "
-        "cannot reach the schedule either. Registered unrun: "
-        "`programme/results/asymneut-registration.md` (design repository) "
-        "is the box that would give it a value, and until that box reports "
-        "the 0.0 is the absence of a measurement rather than the result of "
-        "one",
+        "cannot reach the schedule either. Registered unrun: a box "
+        "registered in the project's unpublished design notes would give "
+        "it a value, and until that box reports the 0.0 is the absence of "
+        "a measurement rather than the result of one",
     "market_vol_vix_smooth":
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",
@@ -642,8 +637,8 @@ OUT_OF_SCOPE = {
     "vix_jump_scale":
         "unread while `vix_jump_intensity` is 0.0, and 0.0 itself scales "
         "any jump to nothing (economy/daily.rs:1132)",
-    # The seven VIX-dynamics dials of programme/results/vix-dynamics.md,
-    # each derived from the tape and each shipped at the value where its
+    # The seven VIX-dynamics dials, each derived from the tape in the
+    # project's unpublished design notes and each shipped at the value where its
     # branch is not taken. They leave this bucket together with the preset
     # that turns them on.
     "vix_innovation_sigma":
@@ -651,7 +646,7 @@ OUT_OF_SCOPE = {
         "volatility` scale by the same expression when it and "
         "`vix_innovation_return_sigma` are both 0.0; the draw is the same "
         "draw either way",
-    # The two per-component states of vix-dynamics.md section 19 and the
+    # The two per-component states of the VIX-dynamics derivation and the
     # idiosyncratic-rate switch; each a branch at 0.0.
     "vix_target_offset":
         "inert at 0.0: a constant added to the VIX target, and the level "
@@ -672,8 +667,8 @@ OUT_OF_SCOPE = {
 #:
 #: PARTIAL, AND THE REST IS DECLARED. Twenty-six entries: twenty read off
 #: the code or off the doc comment that already carried the derivation,
-#: four (pt-v19's four dials) read off the design repository's measured
-#: record, and two (`vix_target_shock_cap` and
+#: four (pt-v19's four dials) read off the measured record in the
+#: project's unpublished design notes, and two (`vix_target_shock_cap` and
 #: `crash_amplifier_conditional_sigma`, both charter bar B4) read off the
 #: identity the code now derives them through --
 #: rather than invented, so the schema is exercised by real data. The
@@ -703,14 +698,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "Under the law pt-v19 SHIPS the fear term falls with "
                     "the level, `F(C) = 8.83 * 6.39 ** 1.4483 * C ** "
                     "-0.4483`, which at C = 181.3295 is 12.5920, and the "
-                    "smallest admissible C collapses to 56 to 67 "
-                    "(ceiling-and-omega.md 4 and 5). 181.3295 is therefore "
+                    "smallest admissible C collapses to 56 to 67. "
+                    "181.3295 is therefore "
                     "b4fix7's solve CARRIED FORWARD and re-verified, not a "
                     "value the shipping law's condition picks out; see "
                     "`why_the_solve_was_not_retaken` below",
         "terms": {
             "vix_return_gain 8.83": "the tape's fear slope at the tape's "
-                                    "memory (`vix-dynamics.md` 11). It "
+                                    "memory. It "
                                     "enters as the target's fear term. The "
                                     "17.0 the identity's historical clause "
                                     "quotes is the value b4fix7 solved at "
@@ -744,8 +739,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                           "settled level 9 per cent low, which is how the "
                           "value this replaces (173.1087) came to sit "
                           "under its own condition",
-            "vix_target_shock_cap 158.8524": "ORDERING WITHDRAWN 2026-09-14 "
-                                             "(ceiling-and-omega.md 3). This "
+            "vix_target_shock_cap 158.8524": "ORDERING WITHDRAWN 2026-09-14. "
+                                             "This "
                                              "term used to read 'must stay "
                                              "above the ceiling or the cap "
                                              "binds first'. On pt-v19 the "
@@ -790,8 +785,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "why_the_solve_was_not_retaken": "The smallest C meeting the "
             "condition on the shipping law is 55.975 / 56.329 / 58.430 at a "
             "variance-level multiplier of 1.0 and 63.361 / 64.098 / 66.691 "
-            "at 2.0 (closed-form map, blend off, three rosters, "
-            "ceiling-and-omega.md 5). Adopting it WOULD restore the "
+            "at 2.0 (closed-form map, blend off, three rosters). "
+            "Adopting it WOULD restore the "
             "cap/ceiling ordering, and it is refused: the measured maximum "
             "VIX on this vector is 60.59 over twelve rosters at 504 days and "
             "b4fix9's gain-0 census read a highest VIX of 73.9 and a highest "
@@ -811,11 +806,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "roster constants, from a build without the slow variance level "
             "or the sector loading. A pin ladder on the shipped vector is "
             "what would sharpen the 56 to 67, and is a multi-seed run",
-        "source": "programme/results/b4fix6-registration.md section 2 "
-                  "and programme/results/ceiling-derivation-independent"
-                  ".md, design repository, for the solve; "
-                  "programme/results/ceiling-and-omega.md sections 4, 5 "
-                  "and 6 for the re-derivation on the shipping law; "
+        "source": "the project's unpublished design notes, for the solve "
+                  "on the settled pin ladder and for its re-derivation on "
+                  "the shipping law; "
                   "rust/src/params.rs, ModelParams::pt_v19. The relations "
                   "the value rests on are asserted by "
                   "`economy::daily::a_graded_session_moves_the_state_"
@@ -830,8 +823,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "module asserted a ONE-LAW, LEVEL-BLIND response "
                   "and the preset ships a two-law level-dependent "
                   "one, so the tests were stale and were rewritten "
-                  "against the derived law "
-                  "(programme/results/fear-response-shape.md). The "
+                  "against the derived law. The "
                   "ceiling relation itself did not change: what "
                   "moved is the threshold read-back that pins a "
                   "state to the clamp, from -73.67 under the "
@@ -901,9 +893,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "yearly median": "what a calm year and a crisis year "
                                    "differ in; the within-year movement is "
                                    "the fast pole's and the GJR triple's"},
-        "source": "programme/results/ptv19gjr/regime-level-derivation.txt "
-                  "and RESULT.md (design repository); the two-pole fit's "
-                  "0.9965 (vix-level-derivation.txt) is the whole-span "
+        "source": "the yearly medians of log ^VIX, 1990 to 2024, derived "
+                  "in the project's unpublished design notes; the two-pole "
+                  "fit's 0.9965 is the whole-span "
                   "ACF's slow pole with the crisis decay inside it and was "
                   "measured on vixlevel1 to add within-year variance the "
                   "tape's calm years do not have",
@@ -925,9 +917,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "A 0.8445": "the share of an AR(1)'s stationary variance a "
                         "year's mean keeps at 0.9979",
         },
-        "source": "programme/results/vix-slow-regime/RESULT.md section 4 "
-                  "(design repository), derived on LAWC-D; taken by pt-v19's "
-                  "fifth composition (results/ptv19-fifth/RESULT.md)",
+        "source": "the project's unpublished design notes, derived on "
+                  "LAWC-D; taken by pt-v19's fifth composition",
         "date": "2026-09-23",
         "note": "Not exact: the split `V* = V0 + T^2 A sigma^2` is linear on "
                 "a convex loop. Derived on LAWC-D before the calm fix (anchor "
@@ -941,9 +932,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                       "the sd of the yearly medians of log ^VIX over 35 "
                       "years (variance 0.0711). That spread was the VIX's "
                       "own, measured on the loop's OUTPUT; "
-                      "`vix_level_loop_gain` divided the loop back out. "
-                      "Source programme/results/ptv19gjr/"
-                      "regime-level-derivation.txt (design repository)",
+                      "`vix_level_loop_gain` divided the loop back out",
     },
     "garch_vix_exponent": {
         "kind": "undetermined",
@@ -1006,14 +995,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "family, which carried this dial at 1.0 "
                                    "with the excitation on, moved no graded "
                                    "row beyond noise in 32 of 32 pairs at "
-                                   "either horizon (design-repo "
-                                   "programme/results/bestof), so the panel "
+                                   "either horizon, so the panel "
                                    "cannot choose between 0.0 and 1.0 and "
                                    "the recomposition took pt-v18's 0.0",
     },
 
     "market_vol_gamma": {
-        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged. The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "composed": "shipped on pt-v19 from 2026-09-14, left on 2026-09-20 with the market variance family, returned on 2026-09-21 with `market_vol_alpha` and `market_vol_beta` (ptv19gjr): the three are one fit",
         "kind": "measured",
         "date": "2026-09-07",
@@ -1022,12 +1010,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "span, fitted beside a symmetric GARCH(1,1) on the "
                      "same series and window by the same estimator, and "
                      "compared by likelihood ratio",
-        "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B, extended "
+        "script": "the GARCH(1,1) quasi-maximum-likelihood estimator of "
+                  "the project's unpublished design notes, extended "
                   "to the GJR form (the score recursion gains the term "
-                  "`1[r < 0] r^2`); the fit and its sandwich are in "
-                  "programme/results/ceiling-derivation-independent.md "
-                  "of the design repository, section 7",
+                  "`1[r < 0] r^2`), with a Bollerslev-Wooldridge sandwich "
+                  "for the bars",
         # The GJR fit's OWN sandwich bar. This entry shipped for a day
         # with its point estimate pasted into the bar field, and then
         # with no bar at all while the symmetric fit's bars sat on the
@@ -1041,7 +1028,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # `sandwich_bread` note on this entry.
         "standard_error": 0.0236,
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
-        # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
+        # (defect-16).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
                         "gamma 1[r<0]) r^2 + beta s2`, four parameters, "
                         "omega 0.020241. APPLIED VARIANCE-TARGETED: "
@@ -1087,7 +1074,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "NLL 3703.97\n"
                     "  GJR(1,1)   omega 0.0202 alpha 0.0066 gamma 0.1556 "
                     "beta 0.8946 NLL 3551.49\n"
-                    "garch-derive-design.md 2.4: 'the real index's "
+                    "The GARCH derivation in the project's unpublished "
+                    "design notes: 'the real index's "
                     "variance responds to DOWN moves almost exclusively; "
                     "the symmetric 0.1059 is the pseudo-true symmetric "
                     "approximation of that.' This ships the fit rather "
@@ -1096,17 +1084,18 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "not the symmetric fit's -- the three are ONE "
                     "measurement and moving any of them alone would ship "
                     "a vector no fit produced",
-        "source": "programme/garch-derive-design.md 2.4, design "
-                  "repository. The dial is applied at "
+        "source": "the GJR fit above, on the tape's index log returns. "
+                  "The dial is applied at "
                   "rust/src/market/factor_vol.rs `component_step`, which "
                   "loads `alpha + gamma` on a down day and `alpha` on an "
                   "up one and gives back `gamma/2` through omega, so it "
                   "redistributes variance between the two states rather "
                   "than adding any; it passes 0.0 for the SLOW "
-                  "component, which is where 2.4's fit does not reach",
+                  "component, which is where the fit does not reach",
         "note": "WHY IT WAS ADOPTED, having been recorded and declined. "
-                "2.4 left it to Simon because `market_vol_gamma` was "
-                "outside 2.2's dial list. What made it necessary is the "
+                "The GARCH derivation left it to Simon because "
+                "`market_vol_gamma` was outside its dial list. What made "
+                "it necessary is the "
                 "envelope's SHAPE panel -- the fourteen rows measured on "
                 "the HELD roster, which is the protocol that certifies "
                 "`excess_kurtosis`. With the symmetric fit that row read "
@@ -1135,9 +1124,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "the analogue of the excursion form's `e = 2 s / (2 - s)` below. "
             "FITTED: 4.0 is read off route 1's exponent ladder, where the "
             "held-VIX index lever lands near the tape's (10.34x against "
-            "10.50x at 4.0; programme/results/route1-anchor/RESULT.md section "
-            "2), and route1-blend/RESULT.md section 8.4 lists it under what "
-            "is fitted (design repository). Above the anchor only since the "
+            "10.50x at 4.0), and route 1's blend result lists it under what "
+            "is fitted (the project's unpublished design notes). Above the "
+            "anchor only since the "
             "fifth composition: below it the target reads "
             "`market_vol_vix_exponent_below`. It is load-bearing -- the level "
             "law's knee, eta and cap were read off the engine's held map at "
@@ -1153,8 +1142,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "annualised volatility above VIX 45 over below VIX 12 on the "
             "reference roster; 13x the lever protocol's held VIX 65 over "
             "held VIX 5; the read-back rising 3.0x at the square and 4.6x at "
-            "4.9). Source programme/fixes-2026-09-21.md section 0.1 and "
-            "results/ptv19fix/RESULT.md (design repository). 2.0, the literal "
+            "4.9), derived in the project's unpublished design notes on "
+            "2026-09-21. 2.0, the literal "
             "square, from pt-v1 to the 2026-09-21 composition"),
         "date": "2026-09-23",
     },
@@ -1172,9 +1161,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "form": "engine.rs `vix_level_sigma_applied`: the innovation "
                     "and the stationary opening divided by the gain",
         },
-        "source": "programme/results/vix-slow-regime/RESULT.md section 4 "
-                  "(design repository), derived on LAWC-D; taken by pt-v19's "
-                  "fifth composition (results/ptv19-fifth/RESULT.md)",
+        "source": "the project's unpublished design notes, derived on "
+                  "LAWC-D; taken by pt-v19's fifth composition",
         "date": "2026-09-23",
         "note": "Checked on the box: LAWC-D's transmission reads 1.78 [1.69, "
                 "1.88] against the 1.79 it was set to. Interpolated, not "
@@ -1185,9 +1173,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                       "ln(ratio) / ln 13` the read-back's held-VIX "
                       "elasticity on the excursion form: the read-back rose "
                       "4.60x for 13x of held VIX at `market_vol_vix_exponent` "
-                      "4.9, so h = 0.595 (1.7486 at the square). Source "
-                      "programme/fixes-2026-09-21.md design C and "
-                      "results/ptv19fix/RESULT.md (design repository). The "
+                      "4.9, so h = 0.595 (1.7486 at the square), derived "
+                      "in the project's unpublished design notes on "
+                      "2026-09-21. The "
                       "form it read no longer ships",
     },
     "crisis_epicentre_extra": {
@@ -1217,16 +1205,16 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "weights": "`Sector::crisis_weight` in rust/src/sectors.rs; the "
                              "four engine sectors with no name on the tape carry "
                              "0.0 as undetermined"},
-        "source": "programme/epicentre-design-2026-09-22.md, "
-                  "results/ptv19refine/epicentre-derivation.json and "
-                  "results/ptv19epi3/RESULT.md (design repository); shipped "
+        "source": "the epicentre derivation of 2026-09-22 in the "
+                  "project's unpublished design notes, on ^VIX and the "
+                  "roster's names via tools/shadow/data.py; shipped "
                   "0.0 from the build on 2026-09-22 until the fourth "
                   "composition the same day",
         "date": "2026-09-22",
     },
     "market_vol_alpha": {
-        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
-        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial, which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when a later run measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged. The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
         "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
@@ -1234,8 +1222,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "span, with a Bollerslev-Wooldridge sandwich "
                      "covariance; the symmetric GARCH(1,1) fit on the "
                      "same series is recorded beside it",
-        "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B, in its "
+        "script": "the GARCH(1,1) quasi-maximum-likelihood estimator of "
+                  "the project's unpublished design notes, in its "
                   "GJR form; numpy-only Gaussian QMLE, no scipy",
         # THE BAR IS THE GJR FIT'S, FOR THE GJR VALUE. This entry shipped
         # for a day carrying the symmetric fit's bar (0.0093, which
@@ -1250,7 +1238,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # WIDER ONE here, 1.33x, so the correction tightens it.
         "standard_error": 0.0082,
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
-        # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
+        # (defect-16).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
                         "gamma 1[r<0]) r^2 + beta s2`, four parameters, "
                         "omega 0.020241. APPLIED VARIANCE-TARGETED: "
@@ -1294,9 +1282,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "same series reads alpha 0.1059 (0.0093), beta "
                     "0.8787 (0.0092), corr -0.88, and is the "
                     "pseudo-true symmetric approximation of this one",
-        "source": "programme/garch-derive-design.md 0 and 2, design "
-                  "repository; the estimator, its window and its two "
-                  "residual treatments are 2.1 to 2.3",
+        "source": "the GARCH derivation in the project's unpublished "
+                  "design notes, which also sets out the estimator, its "
+                  "window and its two residual treatments",
         "note": "A MEASUREMENT REPLACING A SEARCH OPTIMUM, which is "
                 "charter bar B3: pt-v14's 0.28035004 carries no error "
                 "bar at all. It is only transportable because "
@@ -1310,8 +1298,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "compensating for a mechanism",
     },
     "market_vol_beta": {
-        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
-        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged (arch-crosscheck.md). The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial, which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when a later run measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
+        "sandwich_bread": "CORRECTED 2026-09-14, defect-15: these bars were computed with the EXPECTED information in the sandwich's bread where Bollerslev-Wooldridge uses the OBSERVED HESSIAN. `arch` reproduces every point estimate to the sixth decimal and none of these bars; substituting the Hessian into our own sandwich reproduces `arch` to under 2e-6 with every other line unchanged. The information-matrix equality that would make the two forms equivalent FAILS here and fails in the beta corner -- fifteen of sixteen elements of H - A within 0.4 se of zero, `(beta, beta)` at -4.44 -- so the expected form loses its justification and the Hessian form keeps its own. The year-block bootstrap agrees in direction. No shipped VALUE moves and the likelihood ratio 305 is untouched, so the GJR term's adoption is unaffected. ",
         "kind": "measured",
         "date": "2026-09-07",
         "estimator": "GJR-GARCH(1,1) by Gaussian quasi-maximum "
@@ -1319,8 +1307,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "span, with a Bollerslev-Wooldridge sandwich "
                      "covariance; the symmetric GARCH(1,1) fit on the "
                      "same series is recorded beside it",
-        "script": "the estimator module reproduced whole in "
-                  "programme/garch-derive-design.md Appendix B, in its "
+        "script": "the GARCH(1,1) quasi-maximum-likelihood estimator of "
+                  "the project's unpublished design notes, in its "
                   "GJR form; numpy-only Gaussian QMLE, no scipy",
         # As `market_vol_alpha`: the GJR fit's own bar for the GJR value.
         "estimate": 0.8946,
@@ -1329,7 +1317,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # fails, which is why it is the largest of the four.
         "standard_error": 0.0181,
         # THE FITTED MODEL IS NOT THE APPLIED MODEL, recorded 2026-09-14
-        # (defect-16, programme/results/ceiling-and-omega.md 7 to 9).
+        # (defect-16).
         "applied_form": "FITTED with a FREE omega: `s2 = omega + (alpha + "
                         "gamma 1[r<0]) r^2 + beta s2`, four parameters, "
                         "omega 0.020241. APPLIED VARIANCE-TARGETED: "
@@ -1371,9 +1359,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "at the symmetric values against the old fast "
                     "component's 1.104, so the factor gains a finite "
                     "fourth moment it did not have",
-        "source": "programme/garch-derive-design.md 0 and 2, design "
-                  "repository",
-        "note": "3.4's option B would have corrected this value for "
+        "source": "the GARCH derivation in the project's unpublished "
+                  "design notes",
+        "note": "The derivation's option B would have corrected this value for "
                 "the loop, to 0.844, and that note REJECTED the "
                 "correction because it depends on `c` (an unprovenanced "
                 "dial) and on `s_f` (a roster property), and a value "
@@ -1515,8 +1503,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                               "presets for bit-identity "
                                               "and not re-derived",
         },
-        "source": "programme/crisis-blend-derivation.md and "
-                  "programme/results/b4fix9-result.md, design repository; "
+        "source": "the crisis-blend derivation and the b4fix9 result in "
+                  "the project's unpublished design notes; "
                   "rust/src/params.rs, ModelParams::pt_v19",
         "what_the_value_costs": "corr_persistence_acf1 on the held roster "
                                 "at 504 days reads 0.1493 against a floor "
@@ -1565,8 +1553,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "vix_return_gain 8.83": "the spike's slope, unchanged by this "
                                     "derivation and not derived by it. The "
                                     "17.0 the pt-v16 and pt-v18 rows carry "
-                                    "was read at the wrong memory "
-                                    "(`vix-dynamics.md` 11)",
+                                    "was read at the wrong memory",
             "vix_return_clamp 15.0": "the bound on the driving return, "
                                      "itself outside the 6.39 per cent the "
                                      "tape supplies a conditional median "
@@ -1602,7 +1589,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                    "shock adders, which the spike's supremum does not "
                    "cover -- true at 255.0 as well, and a property of the "
                    "`min` being taken over the sum",
-        "ordering": "WITHDRAWN 2026-09-14, ceiling-and-omega.md 3. This "
+        "ordering": "WITHDRAWN 2026-09-14. This "
                     "entry and `vix_ceiling` both used to assert that the "
                     "cap 'must stay above the ceiling or the cap binds "
                     "first'. On pt-v19 it does not -- 158.8524 against a "
@@ -1620,8 +1607,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "level-blind law's numbers recorded as an invariant",
         "source": "rust/src/params.rs, ModelParams::vix_target_shock_cap, "
                   "section 'It was a shape parameter, and pt-v19 retires "
-                  "it'; programme/results/ceiling-and-omega.md sections 2 "
-                  "and 3, design repository. The guard is "
+                  "it'; the project's unpublished design notes. The guard is "
                   "rust/src/economy/daily.rs, module `fear_response_shape`, "
                   "GREEN since 2026-09-14. It was RED on the shipped "
                   "preset because `the_default_cap_is_the_clamps_own_"
@@ -1639,8 +1625,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "inert: the session that would truncate is 15.0000025 "
                   "per cent against a clamp of 15. The rewritten module "
                   "asserts that identity, the cap's binding session at "
-                  "seven levels, and the level dependence itself "
-                  "(programme/results/fear-response-shape.md)",
+                  "seven levels, and the level dependence itself",
         "note": "WHY THE OLD VALUE WAS NOT A BOUNDARY CONDITION, which is "
                 "the part a derivation alone does not say. At 45.0 against "
                 "a gain of 17.0 the cap bound at 2.647 per cent of session "
@@ -1648,7 +1633,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "produced identical fear -- a SHAPE parameter inside the "
                 "graded range, and an undeclared one until "
                 "`fear_response_shape` made every preset name it. The "
-                "loop-gain run (`loopgain-report.md` section 8.2) found what "
+                "loop-gain run found what "
                 "it was doing there: 'vix_target_shock_cap as a brake is "
                 "compensating for a read-back that omits the crisis blend', "
                 "the index realising 4.0-4.9x the variance V_t priced above "
@@ -1707,9 +1692,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "against 6.25 plus or minus 2). At the model's median "
                   "earnings yield of 0.0555 it is a buyback yield of about "
                   "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
-                  "value record; the model pays no dividends (design "
-                  "repository, programme/ptv20-registration.md, tenth and "
-                  "eleventh registrations and 'The graded arm')",
+                  "value record; the model pays no dividends "
+                  "(validation/pt-v20/programme/ptv20-registration.md, "
+                  "tenth and eleventh registrations and 'The graded arm')",
     },
     "sector_factor_sigma": {
         # A DERIVATION EXISTS AND IT IS NOT FOR THIS VALUE. ws-b derived
@@ -1730,8 +1715,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "of -0.0016 is recorded for "
                                    "0.01070690368 and says nothing about "
                                    "0.008583053614",
-        "source": "programme/RESUME.md, ws-b's derived pair; the arm is not "
-                  "the shipped value",
+        "source": "the project's unpublished design notes, the derived "
+                  "pair; the arm is not the shipped value",
         "derivation_exists_for_another_value": 0.01070690368,
     },
     "garch_gamma": {
@@ -1757,12 +1742,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "so no admissible derived value exists "
                                    "and the shipped figure cannot be "
                                    "reached by derivation",
-        "source": "programme/RESUME.md, ws-b's leverage-effect solve",
+        "source": "the leverage-effect solve in the project's unpublished "
+                  "design notes",
         "no_admissible_derived_value": True,
     },
     "garch_beta": {
         # THE INVERSE DEFECT: a derivation the record HAS and the guard
-        # could not see. 15.4 derives this value and the module did not
+        # could not see. The VIX-dynamics derivation in the project's
+        # unpublished design notes derives this value and the module did not
         # carry it, so the dial sat in `UNPROVENANCED` as an admitted gap
         # that was not a gap. The audit that found it also found the
         # reverse case beside it -- see `vix_mean_reversion` -- which is the
@@ -1783,7 +1770,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                    "autocorrelation decay rate, sd 0.024, half-life 11.5 "
                    "sessions [6.6, 20.6]; per window 0.9005, 0.9554, "
                    "0.9590, 0.9384 (the 2019-21 crisis window), 0.9669, "
-                   "0.9293 (vix-dynamics.md 15.2)",
+                   "0.9293",
             "alpha": "`garch_alpha` 0.059507211981547736, which pt-v19 does "
                      "not move",
             "gamma": "`garch_gamma` 0.18318536187800277, which pt-v19 does "
@@ -1792,10 +1779,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "and solves only for the memory; it is not a claim "
                      "about gamma",
         },
-        "source": "programme/results/vix-dynamics.md section 15.4, on the "
-                  "tape curve measured in section 15.2",
+        "source": "the VIX-dynamics derivation in the project's "
+                  "unpublished design notes, on the tape's per-name decay "
+                  "curve",
         "date": "2026-09-12",
-        "script": "decay-curve-504.json (design repo): the reference "
+        "script": "measurements/decay-curve-504.json: the reference "
                   "roster's per-name |r| autocorrelation, median across 40 "
                   "names, per 504 window, fitted over lags 2 to 60",
         "why_one_exponential": "MEASURED, and it is what makes a single "
@@ -1823,7 +1811,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "which is the distinction this field exists to keep. "
                     "`vixdyn6` ran the three candidates on the composed "
                     "blend-off vector against four predictions registered "
-                    "in 15.4 before the run. Prediction 1 FALSIFIED: held "
+                    "in the derivation before the run. Prediction 1 FALSIFIED: held "
                     "`abs_return_acf20` at 252 read 0.0076 against a "
                     "registered [0.012, 0.035] and a falsification line at "
                     "0.010, and `abs_return_acf1` missed below [0.06, 0.11] "
@@ -1838,7 +1826,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "What was refuted is the claim that putting the tape's "
                     "per-name memory into the engine would move the monthly "
                     "rows. The VALUE is that memory and the step to it is "
-                    "arithmetic, and section 17.6 later traces the "
+                    "arithmetic, and the derivation later traces the "
                     "surviving miss to the index's COMPOSITION -- a roster "
                     "of 40 with 5.3 effective names, carrying a non-factor "
                     "variance share a 500-name index does not have -- which "
@@ -1880,7 +1868,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "not derive 17.0, and the shipped dial "
                                    "ratio of 1.000 has never been compared "
                                    "with it",
-        "source": "programme/RESUME.md, ws-a's tape refutation at 98c5ac4",
+        "source": "a tape refutation recorded in the project's unpublished "
+                  "design notes",
         "docstring_claim_refuted": "the real up response is about half the "
                                    "down one; the tape says 0.848",
     },
@@ -1891,10 +1880,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "withdrew this dial as undetermined "
                                    "rather than deriving it; 0.05 is a "
                                    "round number with no series behind it",
-        "source": "programme/RESUME.md, ws-b's withdrawal",
+        "source": "the withdrawal recorded in the project's unpublished "
+                  "design notes",
     },
     "market_vol_slow_persistence": {
-        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial (design-repo programme/results/bestof/RESULT-504.md), which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when ptv19gjr (design-repo programme/results/ptv19gjr/RESULT.md) measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
+        "composed": "shipped on pt-v19 from 2026-09-14, returned to pt-v18's on 2026-09-20 by the 2^6 factorial, which measured the market variance family as one block, and returned to pt-v19 on 2026-09-21 when a later run measured the block's three parts apart: the cost the factorial saw was the factor level's, and this value with the slow pole and the regime level on the VIX law is the first vector to pass the whole gate",
         # The factor's slow pole: the second derivation the record had and
         # this table could not see. Found by the same audit as `garch_beta`
         # above and added on the same day.
@@ -1907,7 +1897,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "0.55 at 0.918 (half-life 8 sessions) plus slow 0.45 at "
                     "0.9924 (half-life 91), and the window bootstrap puts "
                     "the slow rho at 0.9913 [0.975, 1.000]. The VIX-side "
-                    "measurement of section 10 -- slow 0.64 at 0.990 "
+                    "measurement -- slow 0.64 at 0.990 "
                     "[0.975, 0.994] -- is the same component seen through "
                     "the VIX and sits inside that bar, which is the check "
                     "that the two estimators are reading one thing",
@@ -1929,18 +1919,19 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                     "The impulse response is the estimator "
                                     "here BECAUSE the likelihood is not one",
             "market_vol_slow_weight": "0.35, UNMOVED, and this entry claims "
-                                      "nothing about it. 17.4 derives 0.47 "
+                                      "nothing about it. The same derivation "
+                                      "gives 0.47 "
                                       "[0.19, 0.79] for the weight beside "
                                       "this pole and pt-v19 does not take "
                                       "it, so the weight stays in "
                                       "`UNPROVENANCED` where it belongs",
         },
-        "source": "programme/results/vix-dynamics.md section 17.4, on the "
-                  "tape measurement of section 17.3",
+        "source": "the VIX-dynamics derivation in the project's "
+                  "unpublished design notes, on the tape's variance "
+                  "impulse response",
         "date": "2026-09-12",
-        "script": "`t22`, the estimator of vix-dynamics.md section 10.1 "
-                  "applied to forward realised variance (vix-dynamics.md "
-                  "section 17.3)",
+        "script": "`t22`, the impulse-response estimator described under "
+                  "`terms` above, applied to forward realised variance",
         "moment_condition": "CHECKED AND NOT BINDING, which is the opposite "
                             "of `garch_beta`'s case and worth recording as "
                             "such. The mixture's second-moment spectral "
@@ -1969,7 +1960,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "FELL as the slow weight rose -- falsified in DIRECTION "
                     "-- because the slow component's target is damped by "
                     "`market_vol_slow_vix_damp` and carries less of the "
-                    "excursion loop. 17.6 then derives why the dial cannot "
+                    "excursion loop. It then derives why the dial cannot "
                     "reach the row: the mixture's closed-form impulse "
                     "response at the SHIPPED slow dials already reads 0.43 "
                     "at k = 40 and 0.28 at k = 60, LONGER than the tape's "
@@ -1980,7 +1971,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "cent is short-memory, so the index reads 0.55 x 0.43 "
                     "plus a small term. The value is the tape's pole; what "
                     "is refuted is that moving it buys the monthly rows",
-        "note": "17.7's own read, recorded so the next person does not have "
+        "note": "The derivation's own read, recorded so the next person does not have "
                 "to find it: on the widened-plus-new tables the vector "
                 "carrying this pole scores 40.8 at 252 and 46.5 at 504 "
                 "against pt-v18's 39.5 and 43.0, the release bar of ahead "
@@ -2003,7 +1994,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "2025-07-30, 8,959 aligned sessions with a return; "
                   "per-calendar-year estimator over 35 years",
         "date": "2026-09-05",
-        "script": "programme/scripts/vix-rv-relation.py (design repo)",
+        "script": "a per-calendar-year ratio of the VIX's implied variance "
+                  "to the realised variance that follows, in the "
+                  "project's unpublished design notes",
         "residual": "the per-year IQR, 1.128 to 1.398 on the ratio, so "
                     "+/- 0.13 on pi. The rolling-252-session estimator "
                     "reads median 1.257, P10 1.049, P90 1.473",
@@ -2042,19 +2035,19 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # pt-v19 now ships 1.4483, an engine-shaped fit of the same law on
         # the same tape: the free down-side fit reads `|r|^p V^-g` with
         # p 1.1996 and g 0.49 +/- 0.12, and the standardised form the engine
-        # runs takes `g = p - 1`, which puts the pair at 1.4483 / 0.4483
-        # (vix-dynamics.md sections 2.3 and 5). The shipped value IS the
+        # runs takes `g = p - 1`, which puts the pair at 1.4483 / 0.4483.
+        # The shipped value IS the
         # measured one, for the first time on this dial.
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md sections 2.3 to 2.5 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "bucket-median regression of dVIX on |r| and the VIX "
                      "level, down sessions, whole span, refitted in the "
                      "engine's own standardised form so the exponent the "
                      "dial carries is the exponent that was fitted",
-        "script": "programme/scripts/vix-updown-fit.py and the vixprobe "
-                  "series (design repo); the fit and its residual are "
-                  "programme/results/vix-dynamics.md sections 2.3 to 2.5",
+        "script": "an up-and-down bucket-median fit of the VIX response "
+                  "on the tape, recorded with its residual in the same "
+                  "derivation",
         "estimate": 1.4483,
         "standard_error": 0.12,
         "residual": {
@@ -2075,24 +2068,24 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "arm in wsa16 or wsa17 was, with the "
                                    "shape residual read beside the "
                                    "per-bucket columns "
-                                   "(PT-V19-CHARTER.md 2.4). wsa17 could "
+                                   "(pt-v19's charter). wsa17 could "
                                    "not resolve it: its verdict rests on "
                                    "one bucket holding 336 of 7,560 model "
                                    "sessions against 22 of 8,959 real "
                                    "ones, and dropping that bucket leaves "
                                    "six thousandths of a log unit between "
                                    "the two",
-        "source": "programme/joint-solve-scope.md, the exponent fit; "
-                  "programme/scripts/vix-updown-fit.py (design repo)",
+        "source": "the exponent fit of the joint-solve scope, in the "
+                  "project's unpublished design notes",
         "derivation_exists_for_another_value": 1.1996,
         "inert_at_shipped_value": True,
-        "ruling": "R4 -- ruled out of pt-v19 until 2.4 is measured "
-                  "properly, and the ruling stands",
+        "ruling": "R4 -- ruled out of pt-v19 until the exponent is "
+                  "measured properly, and the ruling stands",
     },
     # ======================================================================
     # THE 0.8.0 VECTOR. Eleven dials that shipped inert at 0.0 and are live
-    # in pt-v19 from 2026-09-13. Every figure is read off
-    # programme/results/vix-dynamics.md in the design repository, which is
+    # in pt-v19 from 2026-09-13. Every figure is read off the VIX-dynamics
+    # derivation in the project's unpublished design notes, which is
     # also where each falsifier and each box are recorded. They were
     # measured BEFORE they were scored: no value below was chosen because it
     # cleared a band, which is the B3 defect this module refuses.
@@ -2106,19 +2099,19 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "it at `p - 1` is the one-parameter-fewer model, and "
                     "the free fit's g of 0.49 +/- 0.12 contains 0.4483",
         "terms": {"vix_return_exponent": "1.4483, the entry above"},
-        "source": "programme/results/vix-dynamics.md section 2.3, and the "
-                  "derived vector of section 5",
+        "source": "the VIX-dynamics derivation, its down-side fit and "
+                  "its derived vector",
         "date": "2026-09-13",
     },
     "vix_return_exponent_up": {
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md section 2.3 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "bucket-median regression on UP sessions, whole span, "
                      "the same estimator as the down side and fitted "
                      "separately because the tape's two sides are two laws",
-        "script": "programme/scripts/vix-updown-fit.py (design repo); "
-                  "vix-dynamics.md section 2.3",
+        "script": "the up-and-down bucket-median fit of the VIX response "
+                  "on the tape, the same one as `vix_return_exponent`",
         "estimate": 0.5433,
         "standard_error": 0.04,
         "residual": {
@@ -2138,20 +2131,20 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "The free fit reads -0.85 +/- 0.12, which is 1.2 "
                     "standard errors from -1, so the ratio form is the "
                     "one-parameter-fewer model the tape does not refuse",
-        "terms": {"free fit": "-0.85 +/- 0.12, vix-dynamics.md section 2.3"},
-        "source": "programme/results/vix-dynamics.md sections 2.3 and 5",
+        "terms": {"free fit": "-0.85 +/- 0.12, the up-side bucket-median fit"},
+        "source": "the VIX-dynamics derivation, its up-side fit and its "
+                  "derived vector",
         "date": "2026-09-13",
     },
     "vix_innovation_return_sigma": {
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md sections 3 and 12 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "Gaussian maximum likelihood on the within-window "
                      "residual of the fitted response law: the "
                      "return-coupled component of the VIX innovation",
-        "script": "programme/scripts/vixstats.py, the form-controlled "
-                  "residual estimator (design repo); vix-dynamics.md "
-                  "sections 3 and 12",
+        "script": "the form-controlled residual estimator of the same "
+                  "derivation",
         "estimate": 0.0175,
         "standard_error": 0.0015,
         "residual": {
@@ -2166,25 +2159,25 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "presets": {"pt-v19": 0.0175, "pt-v20": 0.0175},
         "identity": "the residual a level-aware law leaves, which a "
                     "level-blind law books as innovation and which the "
-                    "`vix_dlog_innovation_sd` row of new-rows.md reads",
+                    "`vix_dlog_innovation_sd` row reads",
     },
     "vix_jump_level_scale": {
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md section 3.2 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "cumulant inversion on the standardised residual of "
                      "the fitted response law: the jump size reproducing "
                      "the residual's third and fourth cumulants at the "
                      "derived arrival rate",
-        "script": "programme/scripts/vixstats.py and t3_resid.py (design "
-                  "repo); vix-dynamics.md section 3.2",
+        "script": "the form-controlled residual estimator of the same "
+                  "derivation, and its cumulant inversion",
         "estimate": 1.700,
         "standard_error": 0.35,
         "residual": {
             "kind": "the VIX daily excess kurtosis it is fitted to",
             "tape": 2.66,
             "note": "the model reaches 0.72 on the shipped vector, short "
-                    "for the reason section 5.5 gives: the index's own "
+                    "for the reason the derivation gives: the index's own "
                     "tail is thinner than the tape's and a convex response "
                     "caps the VIX fourth moment below it. The dial is not "
                     "what is short",
@@ -2203,25 +2196,25 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "integrates back to 2.24/yr on the tape's own return "
                     "distribution",
         "terms": {"2.24/yr": "the arrival rate the cumulant inversion "
-                             "behind `vix_jump_level_scale` implies, "
-                             "vix-dynamics.md section 3.2",
+                             "behind `vix_jump_level_scale` implies",
                   "max(0, -r)": "the carrier, because the tape's VIX jumps "
                                 "arrive on down sessions"},
-        "source": "programme/results/vix-dynamics.md sections 3.2 and 5",
+        "source": "the VIX-dynamics derivation, its cumulant inversion "
+                  "and its derived vector",
         "date": "2026-09-13",
     },
     "sector_vol_alpha": {
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md sections 19.1 and 19.7 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "GARCH(1,1) by Gaussian quasi-maximum likelihood on "
                      "the sector factor daily return STANDARDISED by the "
                      "model's own VIX-coupled target, which is the ratio "
                      "form: the state multiplies the target rather than "
                      "adding a variance to it",
-        "script": "programme/scripts/t25_sector_jump_forms.py and "
-                  "t26_sector_net_of_vix.py (design repo); vix-dynamics.md "
-                  "sections 19.1 and 19.7",
+        "script": "a GARCH(1,1) fit of the sector factor returns, "
+                  "standardised by the model's VIX-coupled target, in the "
+                  "same derivation",
         "estimate": 0.067,
         "standard_error": 0.043,
         "residual": {
@@ -2237,12 +2230,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "sector_vol_beta": {
         "kind": "measured",
-        "source": "programme/results/vix-dynamics.md section 19.7 (design repo)",
+        "source": "the VIX-dynamics derivation in the project's unpublished design notes",
         "date": "2026-09-13",
         "estimator": "the same GARCH(1,1) fit as `sector_vol_alpha`, the "
                      "persistence coefficient of the same pair",
-        "script": "programme/scripts/t25_sector_jump_forms.py (design "
-                  "repo); vix-dynamics.md section 19.7",
+        "script": "the GARCH(1,1) fit of the sector factor returns behind "
+                  "`sector_vol_alpha`",
         "estimate": 0.837,
         "standard_error": 0.111,
         "residual": {
@@ -2266,7 +2259,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # value for it is one draw.
         #
         # Under this schema that is not a measurement, and the refusal is
-        # the point. Charter 3.2 reaches the same place from the other
+        # the point. pt-v19's charter reaches the same place from the other
         # side: 755.0 is pt-v18's and is inherited, and ruling R2 fixes
         # that both halves of the opening ship together without fixing the
         # length.
@@ -2282,8 +2275,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "that is what pt-v19 ships and it moves "
                                    "the quantity being waited for",
         "source": "rust/src/params.rs, ModelParams::macro_burn_in_days, "
-                  "section 'The length is measured'; "
-                  "programme/PT-V19-CHARTER.md 3.2",
+                  "section 'The length is measured'; pt-v19's charter "
+                  "in the project's unpublished design notes",
         "source_claims_a_measurement_without_an_error_bar": True,
     },
     "market_beta_down_asym": {
@@ -2323,9 +2316,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "at both certified horizons. One dial moved on pt-v18 and "
                   "nothing else",
         "date": "2026-09-07",
-        "script": "programme/scripts/armboth.py via ptv19dials-jobs.sh "
-                  "(design repo), arm B; registered at 053f3bf before the "
-                  "run and recorded at 3175a4c",
+        "script": "a one-dial arm against pt-v18, registered before the "
+                  "run and recorded in the project's unpublished design "
+                  "notes",
         "residual": "the argmin of a SEVEN-POINT GRID -- 0, 0.25, 0.375, "
                     "0.5, 0.625, 0.75, 1.0 -- so the value is located to the "
                     "grid and not below it. Its neighbours read S_252 47.74 "
@@ -2350,12 +2343,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "fitted": "pt-v19's 0.46 is FITTED, not measured: f2sweep's value, "
                   "kept because the held-out lagged asymmetry row clears "
                   "under the live keying (`market_beta_down_asym_lag_live` "
-                  "1.0; k 25 / 24 of 30 against 23 / 19 at 0.375), "
-                  "programme/results/route1-blend/RESULT.md sections 8.2 and "
-                  "8.4 (design repository). The ledger's rulings refuse "
+                  "1.0; k 25 / 24 of 30 against 23 / 19 at 0.375), as "
+                  "recorded in the project's unpublished design notes. The "
+                  "ledger's rulings refuse "
                   "exactly this kind of value, and the tape identity has no "
                   "power at this keying: the tape's lagged asymmetry is flat "
-                  "across lags two and three (results/corrlag2/), so it "
+                  "across lags two and three, so it "
                   "derives no window either. What would determine it is a "
                   "tape identity for the lag under the live keying",
     },
@@ -2374,13 +2367,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # supposed to derive 0.27 has been withdrawn or falsified:
         #
         #   R13, the 2026-09-07 ruling of 0.10 off the arm D frontier, is
-        #   WITHDRAWN in place (`stalemark-r13-withdrawn-in-place`), and the
+        #   WITHDRAWN in place, and the
         #   frontier it ruled on -- 0.10, 0.12, 0.15 -- never contained the
         #   shipped value at all.
         #
-        #   `vix-dynamics.md` 10.3 derived [0.27, 0.37] from three tape
-        #   constraints and two are falsified on standing entries
-        #   (`stalemark-vix-dynamics-derivation-of-0.27`). Constraint 1, the
+        #   The VIX-dynamics derivation derived [0.27, 0.37] from three tape
+        #   constraints and two are falsified on standing entries of the
+        #   verdict ledger. Constraint 1, the
         #   fast decay, by V4: the slow weight reads 0.5472 at 0.27 and
         #   0.4739 at 0.10, both inside the tape's [0.47, 0.82] and 0.073
         #   apart against a half-width of 0.175, so the tape cannot separate
@@ -2392,8 +2385,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         #   computed at a constant that MOVES WITH THE RATE BEING EXCLUDED.
         #   Constraint 3, the up side's sign, is untouched.
         #
-        #   `persistence-derivation.md`'s sentence "the rate stays at 0.10"
-        #   is withdrawn (`stalemark-persistence-derivation-basis`); what
+        #   The persistence derivation's sentence "the rate stays at 0.10"
+        #   is withdrawn; what
         #   survives it is a FORM finding -- no value of the rate carries
         #   the clustering row.
         #
@@ -2415,7 +2408,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "undetermined",
         "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27, "pt-v20": 0.27},
         "what_would_determine_it": "a JOINT re-solve of the three "
-                                   "constraints of `vix-dynamics.md` 10.3 "
+                                   "constraints of the VIX-dynamics derivation "
                                    "with the read-back constant c_d "
                                    "MEASURED at each rate instead of "
                                    "assumed invariant, so that "
@@ -2427,16 +2420,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "re-solve. Until it is done neither this "
                                    "dial nor its partner `vix_return_gain` "
                                    "has a derivation, and neither can be "
-                                   "determined alone: section 11.1's own "
+                                   "determined alone: the derivation's own "
                                    "finding is that the pair (0.10, 17) and "
                                    "the pair (0.27, 8.83) are two points on "
                                    "ONE curve",
-        "source": "programme/results/verdict-ledger.json (design repo), "
-                  "entries `ruling-vix-mean-reversion-stays-at-0.27`, "
-                  "`stalemark-vix-dynamics-derivation-of-0.27` and "
-                  "`stalemark-r13-withdrawn-in-place`, all standing at "
-                  "2026-09-15; programme/results/vix-dynamics.md sections "
-                  "10.3 and 11.1",
+        "source": "the verdict ledger and the VIX-dynamics derivation in "
+                  "the project's unpublished design notes: the ruling that "
+                  "the rate stays at 0.27, and the withdrawals of R13 and "
+                  "of the derivation of 0.27, all standing at 2026-09-15",
         "ruling": "RULED 2026-09-15 on box sigmamr1 (12 arms, 120 varying "
                   "rosters plus the 30 held, both horizons): the dial STAYS "
                   "at 0.27 and the suspension is withdrawn outright rather "
@@ -2448,31 +2439,26 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "with its bootstrap median se of 0.0120, meaned across "
                   "rosters. THE CAVEAT TRAVELS WITH THE VALUE and is why "
                   "this entry is `undetermined` rather than `measured`",
-        "ruling_evidence_in_this_tree": "programme/results/sigmamr1/ (design "
-                                        "repo) retains "
-                                        "`per-seed-panels.json.gz` for 120 "
-                                        "seeds across the twelve arms, plus "
-                                        "`RETAINED.json`, "
-                                        "`dials-present.txt`, "
-                                        "`kat-verdict.txt`, "
-                                        "`known-answer.txt` and the per-arm "
-                                        "held and varying directories, so "
-                                        "the figures above are recomputable "
-                                        "here. The box's registration and "
-                                        "result NOTES are in neither "
-                                        "repository, so the prose around "
-                                        "them is not, and nothing in this "
-                                        "entry is cited to them",
+        "ruling_evidence_in_this_tree": "the project's unpublished design "
+                                        "notes retain the box's per-seed "
+                                        "panels for 120 seeds across the "
+                                        "twelve arms, its known answer and "
+                                        "the per-arm held and varying "
+                                        "directories, so the figures above "
+                                        "are recomputable there. The box's "
+                                        "registration and result NOTES "
+                                        "were never committed anywhere, so "
+                                        "the prose around them is not, and "
+                                        "nothing in this entry is cited to "
+                                        "them",
         "superseded": "this entry was `measured` until 2026-09-15 and its "
                       "source, date, script and residual were the arm D "
                       "frontier of 2026-09-07: three non-dominated points "
                       "on the pair (S_252, S_504) -- 0.10 at 28.69 / 29.78, "
                       "0.12 at 25.65 / 32.84, 0.15 at 23.87 / 42.79 -- "
                       "spread 4.8 points at 252 and 13.0 at 504, a partial "
-                      "order rather than an error bar, measured by "
-                      "programme/scripts/armboth.py via ptv19armd-jobs.sh "
-                      "(design repo) arm D, registered at 92463f9 before "
-                      "the run and recorded at 3175a4c, median across "
+                      "order rather than an error bar, measured by a "
+                      "one-dial arm registered before the run, median across "
                       "thirty seeds per row with "
                       "`market_beta_down_asym_lag` pinned at 0.375, the "
                       "model error each row's own across-seed spread at "
@@ -2499,10 +2485,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                    "withdrawn: they are what forced sigmamr1",
     },
     "vix_return_gain": {
-        # THE PARTNER OF 0.27, AND IT SHARES ITS FATE. `vix-dynamics.md`
-        # 11.1 prints DERIVED over this value and the sentence that made it
-        # one is withdrawn: `stalemark-fear-response-shape-solved` marks
-        # `fear-response-shape.md` section 1.1's claim that 8.83 is the pair
+        # THE PARTNER OF 0.27, AND IT SHARES ITS FATE. The VIX-dynamics
+        # derivation prints DERIVED over this value and the sentence that
+        # made it one is withdrawn: a standing ledger entry marks the
+        # fear-response-shape note's claim that 8.83 is the pair
         # SOLVED at the tape's memory and withdraws the word "solved". V9
         # measured the read-back constant c_d at 6.83 at mr 0.27 against
         # about 7.95 at 0.10. The law is `gain = g_tape/mr - c_d`, so its
@@ -2513,7 +2499,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # DOES; it is untouched by the mark, it is why the value ships, and
         # it is in `measured_at_the_pair` below. It is a reading of the
         # RESPONSE, jointly, at one point. It confirms the pair and it does
-        # not locate this dial -- 11.1's own finding is that
+        # not locate this dial -- the derivation's own finding is that
         # `vix_return_gain` "was never independent of `vix_mean_reversion`,
         # and the pair (0.10, 17) was one point on the curve
         # `gain x mr = same-day response - read-back share` at the wrong
@@ -2535,11 +2521,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "further score comparison: the arms "
                                    "already prefer this value and that is "
                                    "not the missing thing",
-        "source": "programme/results/vix-dynamics.md section 11.1 "
-                  "(vixdyn3); programme/results/verdict-ledger.json entry "
-                  "`stalemark-fear-response-shape-solved` (standing "
-                  "2026-09-15), which marks "
-                  "programme/results/fear-response-shape.md section 1.1",
+        "source": "the VIX-dynamics derivation in the project's "
+                  "unpublished design notes, and the verdict-ledger entry "
+                  "there (standing 2026-09-15) that withdraws the word "
+                  "\"solved\" from the fear-response-shape note",
         "measured_at_the_pair": "MEASURED, and explicitly untouched by the "
                                 "mark. At `vix_mean_reversion` 0.27 with "
                                 "this dial at 8.83 the realised same-day "
@@ -2567,7 +2552,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
 
     # ---- the four dials pt-v19 moves off pt-v18, composed 2026-09-10 ------
-    # All four MEASURED, on the design repository's record, and every
+    # All four MEASURED, on the record in the project's unpublished design
+    # notes, and every
     # figure below is either read from a result note that names its box or
     # recomputed from that box's per-seed panels with the library's own
     # nineteen-row rule at fix/dn3-error-bar (`loss.scoring_rule`, blind on
@@ -2596,12 +2582,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "rows in band at BOTH horizons and pt-v18 reproduces its "
                   "published certification to four places in the same run",
         "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (cert4b)",
-        "script": "programme/scripts/resolve120-jobs.sh (design repo), arm C "
-                  "on pin 3d6462a, registered in resolve120-registration.md "
-                  "before the box; the composition chosen on "
-                  "sector-corr-result.md section 3 (run sectorcomp, thirty "
-                  "seeds); certified by cert4-jobs.sh (cert4-registration.md, "
-                  "run cert4b, i-04ce864fc91b0ab3e)",
+        "script": "a 120-seed paired run against pt-v18 on pin 3d6462a, "
+                  "registered before the box; the composition chosen on a "
+                  "thirty-seed run; certified on the varying-roster "
+                  "protocol. All three are recorded in the project's "
+                  "unpublished design notes",
         "residual": "A SWITCH, so there is no error bar on the value; the "
                     "residual is what it leaves and what it cannot be "
                     "separated from. The three-dial cell against pt-v18, "
@@ -2614,14 +2599,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "alone on the four-dial base at thirty seeds it costs "
                     "S_19 23.6 -> 50.8 / 23.5 -> 69.2 (volumescreen cell 3), "
                     "and the identity x decay interaction measures -14.7 on "
-                    "S_504 (jointsolve-i, DECISIONS 2026-09-09), so this "
+                    "S_504 (jointsolve-i, decided 2026-09-09), so this "
                     "dial and `vix_decay_ratio` are one regime with two "
                     "names. What it leaves: `vix_ar1_debiased` +1.77 se "
                     "HIGH at 252 and -2.35 se LOW at 504 on the four-dial "
                     "base -- opposite directions, so no VIX-side dial "
                     "centres both -- and `cross_sectional_corr` LOW by 1.1 "
                     "/ 5.2 tape se, of which the identity alone carries "
-                    "-0.2 / -1.0 (crosscorr-result.md section 2)",
+                    "-0.2 / -1.0",
         "estimator": "per-row medians across seeds (mean for the level row, "
                      "the pooled median for fear_gauge_dn3, the pooled rate "
                      "for the tail), model error the across-seed spread, "
@@ -2632,14 +2617,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "(19.53 on the certified roster against the dial's 15.98) "
                 "and the mean VIX moves 16.8 -> 21.5. Alone on pt-v18 at "
                 "the shipped decay 0.6 it makes the VIX too persistent (AR1 "
-                "0.9867 against the 252 ruler 0.9299, level-fix-arms.md), "
+                "0.9867 against the 252 ruler 0.9299), "
                 "which is why it ships only with the decay ratio beside it. "
                 "In that regime `fear_gauge_dn3` centres: 5.8162 against "
                 "5.73, z_tape +0.13 on the varying roster (cert4b), from "
                 "pt-v18's 3.2473 (z -3.80). Charter bar B4 -- a fear "
                 "response that RISES across the graded range -- is NOT met "
-                "by this switch or by any dial (programme/"
-                "code-work-required.md section 1)",
+                "by this switch or by any dial",
         "stale": "THE BAND VERDICT ABOVE NO LONGER DESCRIBES THIS DIAL'S "
                  "REGIME, and the dial is not the reason. `cert4b` measured "
                  "a build whose index-variance read-back carried neither the "
@@ -2674,10 +2658,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "dominated point of the two measured",
         "date": "2026-09-09 (sectorcomp, resolve120); 2026-09-10 (cert4b, "
                 "crosscorr)",
-        "script": "programme/scripts/resolve120-jobs.sh (design repo), arm C; "
-                  "sector-corr-result.md section 3 for the composition; "
-                  "crosscorr-prior.py / crosscorr-result.md section 2 for "
-                  "the attribution of what it costs",
+        "script": "the same 120-seed paired run as `vix_level_identity`, "
+                  "and a cross-correlation attribution of what it costs, "
+                  "both in the project's unpublished design notes",
         "residual": "Measured at TWO LEVELS ONLY, 0.6 and 1.0, in the 2 x 2 "
                     "x 3 composition and at 120 seeds; nothing between them "
                     "was measured, so the value is located to an endpoint of "
@@ -2695,8 +2678,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "base: three dials move it 3-4 tape se with the sector "
                     "row held and every one pays `vix_ar1_debiased`, "
                     "`corr_persistence_acf1` and `excess_kurtosis` back by "
-                    "as much at 120 seeds (crosscorr-result.md section 4, "
-                    "stop condition X9 triggered). At 1.0 the VIX sits at "
+                    "as much at 120 seeds (stop condition X9 triggered). "
+                    "At 1.0 the VIX sits at "
                     "its floor on 3.0 per cent of days (loopgain2, arm D)",
         "estimator": "as `vix_level_identity`",
         "note": "mechanism: the VIX reverts at the full rate rising and at "
@@ -2706,9 +2689,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "fired the crisis blend on six per cent of days; at 1.0 the "
                 "mean falls under the anchor (0.70) and the market factor's "
                 "variance runs at 0.71 of base while a name's own stays at "
-                "0.96, which is the whole of the cross-sectional cost "
-                "(sector-corr-result.md section 1, crosscorr-result.md "
-                "section 1)",
+                "0.96, which is the whole of the cross-sectional cost",
     },
     "sector_loading": {
         # THE ENTRY DESCRIBED 0.8 AND THE PRESET SHIPS 0.60. Until
@@ -2742,8 +2723,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "at 252 and 0.6271 at 504 with the level ON, against "
                   "0.5958 and 0.6056 with it off. THE TARGET AND THE RULER "
                   "ARE ONE BASIS after R1: the target is the whole-tape "
-                  "centre of `sector_excess_corr`, 0.1178 "
-                  "(whole-tape.md's resolved table), and "
+                  "centre of `sector_excess_corr`, 0.1178, and "
                   "`facts.RULED_BY_HORIZON` is `REAL_MARKETS_RULED`, whose "
                   "`sector_excess_corr` band is built by the same rule over "
                   "the same 1987-2025 32-name windows that centre is. The "
@@ -2752,13 +2732,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "this entry. pt-v16 and pt-v18 ship 0.58821442, set by an "
                   "earlier preset without provenance",
         "date": "2026-09-14 (transmit1, the measurement this entry rests "
-                "on); 2026-09-13 (sector-loading.md section 6.3, the "
-                "derivation it agrees with)",
-        "script": "programme/results/whole-tape/scripts/transmit1_analyse.py "
-                  "(design repo), applying F3's rule unchanged from "
-                  "levelsec1_analyse.py; whole-tape/scripts/score_wt.py for "
-                  "the objective, through `facts.aggregate_value` "
-                  "(transmit1-result.md section 3)",
+                "on); 2026-09-13 (the sector-loading derivation it agrees "
+                "with)",
+        "script": "F3's rule, applied unchanged to the two ladders' "
+                  "recordings, and the objective scored through "
+                  "`facts.aggregate_value`, as recorded in the project's "
+                  "unpublished design notes",
         "residual": "THE COMPOSITION CORRECTION, AND IT IS A TENTH OF WHAT "
                     "THE TAPE CAN SEE. Turning the level on moves L* by "
                     "+0.0210 at 252 and +0.0215 at 504 on the varying "
@@ -2775,7 +2754,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "reads 13.2 at 252 and 9.7 at 504 against C060's 13.0 "
                     "and 9.2, so 0.60 is at the minimum of the ladder",
         "estimator": "median across rosters, which is the estimator "
-                     "`score_wt.py` applies through `facts.aggregate_value`; "
+                     "the whole-tape objective applies through `facts.aggregate_value`; "
                      "errors on the transmission statistic are a "
                      "delete-one-roster jackknife paired across windows. "
                      "The sector row's tape error is `facts.rule_row`'s "
@@ -2790,7 +2769,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                        "0.62 is a question THE TAPE CANNOT ANSWER, and this "
                        "field is where that is recorded rather than being "
                        "left to look like an oversight",
-        "derivation_it_agrees_with": "sector-loading.md section 6.3 inverts "
+        "derivation_it_agrees_with": "the sector-loading derivation inverts "
                                      "`odds(E) = c L^p` onto the whole-tape "
                                      "centre from the reading the shipping "
                                      "arm produces at L = 0.8, giving L* = "
@@ -2836,22 +2815,18 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                       "centred the row on the 2015-2025 forty-name centre "
                       "of 0.1640, and it was the whole-tape re-centring of "
                       "that target to 0.1178 that moved the value, not a "
-                      "defect in the measurement. Scripts: "
-                      "programme/scripts/atlas16-jobs.sh with "
-                      "AXES_SET=sectorcomp on the factorial runner, cells "
-                      "and effects by factorial-cells.py "
-                      "(sector-corr-result.md section 3); crosscorr-jobs.sh "
-                      "and crosscorr-analyse.py (crosscorr-result.md "
-                      "section 3.3, prediction X5); resolve120-jobs.sh arm "
-                      "C. What the record says of pt-v16 and pt-v18's "
+                      "defect in the measurement. The scripts were the "
+                      "factorial runner for the composition and a "
+                      "cross-correlation screen (prediction X5), both in "
+                      "the project's unpublished design notes. What the "
+                      "record says of pt-v16 and pt-v18's "
                       "0.58821442 is the sectorcomp cell in pt-v18's own "
                       "regime (identity off, decay 0.6, thirty seeds): S_19 "
                       "32.5 / 34.2 at 0.588 against 32.9 / 31.8 at 0.7 and "
                       "43.6 / 42.5 at 0.8, flat between 0.588 and 0.7 and "
                       "worse at 0.5 and 0.85, so on pt-v18 that value sits "
                       "on a plateau whose floor is somewhere in 0.6-0.75 "
-                      "and was not located (sector-corr-result.md section "
-                      "6). Also on the old basis, and kept for the "
+                      "and was not located. Also on the old basis, and kept for the "
                       "mechanism rather than the figure: on the composed "
                       "base the identity and the decay ratio take "
                       "`sector_excess_corr` from -3.5 to -6.7 tape se at "
@@ -2874,8 +2849,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "volume_idio_variance_gain": {
         "kind": "measured",
         "presets": {"pt-v19": 0.20, "pt-v20": 0.2},
-        "source": "`volume_change_acf1` traced (volume-acf-result.md section "
-                  "1) to a per-name volume-variance channel every earlier "
+        "source": "`volume_change_acf1` traced to a per-name "
+                  "volume-variance channel every earlier "
                   "preset ships at 0.0 -- a name's volume following its OWN "
                   "GARCH variance over its sector's base, market/tick.rs "
                   "`volume_multiplier` -- and this dial found to centre the "
@@ -2888,12 +2863,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "crosscorr-confirm centre) and certified on the varying "
                   "roster (cert4b)",
         "date": "2026-09-09 (volumescreen, iterate5); 2026-09-10 (cert4b)",
-        "script": "programme/scripts/iterate5-jobs.sh (design repo), arms "
-                  "E and F on pin 3d6462a, registered in "
-                  "iterate5-registration.md before the box "
-                  "(i-02c66532c89dbc295); the screen by volumescreen-jobs.sh "
-                  "and volumescreen-analyse.py; the paired figures below "
-                  "recomputed from the iterate5 per-seed panels with "
+        "script": "a 120-seed paired run, arms E and F on pin 3d6462a, "
+                  "registered before the box in the project's unpublished "
+                  "design notes; the screen a nine-dial thirty-seed run; "
+                  "the paired figures below "
+                  "recomputed from the per-seed panels with "
                   "`loss.scoring_rule` at fix/dn3-error-bar on 2026-09-10",
         "residual": "Two levels at 120 seeds and a five-cell ridge at "
                     "thirty, so the value is located to a PLATEAU and not to "
@@ -2905,8 +2879,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "and its 4 x 3 composition with `volume_variance_gain` "
                     "put five cells from (0.15, 0.2) to (0.3, 0.028) inside "
                     "one sd of each other, recommending 0.2-0.3 with the "
-                    "partner left at its shipped 0.028 (volume-acf-result.md "
-                    "section 4). 0.20 is the lower of two doses the "
+                    "partner left at its shipped 0.028. 0.20 is the lower "
+                    "of two doses the "
                     "objective cannot tell apart. What it buys, paired over "
                     "120 seeds "
                     "against the three-dial cell: S_252 32.58 -> 22.53 "
@@ -2922,7 +2896,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "registered bar of one; nothing else moves by more "
                     "than 0.15 tape se. THE ROSTER QUESTION, which the "
                     "registration named as the prediction most likely to "
-                    "fail (cert4-registration.md Q4): on the VARYING roster "
+                    "fail (Q4): on the VARYING roster "
                     "the row reads -0.2701 at 252, z -1.52 on the rule "
                     "against the registered bar of 1.5 (z_tape -2.35), and "
                     "-0.2508 at 504, z -0.14. The letter of Q4 fails at 252 "
@@ -2946,7 +2920,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "memoryless (engine.rs update_volume_idio) and this is a "
                 "stateless channel. Every other mover of the row in the "
                 "nine-dial screen pays on `volume_abs_return_corr` by the "
-                "same mechanism (volume-acf-result.md section 3.2); this "
+                "same mechanism; this "
                 "one is the cheapest on that row at equal row effect at "
                 "every level measured, which is why it is the one that "
                 "ships",
@@ -3398,9 +3372,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                       "has measured",
     },
     # ---- pt-v19's FIFTH COMPOSITION (2026-09-23). Twenty-three dials, the
-    # design programme's candidate LMN-Q25A375 (programme/results/
-    # candidate-arm.txt, results/ptv19-fifth/RESULT.md section 4, design
-    # repository); eighteen of them arrive here, fifteen from OUT_OF_SCOPE
+    # design programme's candidate LMN-Q25A375, recorded in the project's
+    # unpublished design notes; eighteen of them arrive here, fifteen from OUT_OF_SCOPE
     # and three from POST_BASELINE, and four more moved existing entries
     # above (`market_vol_vix_exponent`, `vix_level_sigma`,
     # `vix_level_loop_gain`, `market_beta_down_asym_lag`). Kinds as the
@@ -3420,22 +3393,18 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "= 0.376, shipped 0.375",
         "terms": {
             "theta 0.655 [0.61, 0.69]": "the tape's elasticity of log VIX on "
-                                        "log realised volatility "
-                                        "(programme/results/calm-regime/"
-                                        "RESULT.md section 4, design "
-                                        "repository)",
+                                        "log realised volatility",
             "k 1.05": "0.578 / 0.55: the transmission measured on the Q20 "
-                      "arm, whose weight is 0.45 (calm-regime section 4)",
+                      "arm, whose weight is 0.45",
         },
-        "source": "programme/results/calm-regime/RESULT.md sections 4 and 7 "
-                  "(design repository); LAW2's procedure (theta pins the "
-                  "weight) re-applied on the new base, as "
-                  "results/vix-law-levels/RESULT.md section 4 pinned the "
-                  "earlier 0.45",
+        "source": "the calm-regime derivation in the project's unpublished "
+                  "design notes; LAW2's procedure (theta pins the "
+                  "weight) re-applied on the new base, as the VIX-law "
+                  "levels derivation pinned the earlier 0.45",
         "date": "2026-09-23",
         "note": "Measured theta on the LAW2C-based Q25A375 arm is 0.617, "
                 "inside the tape's interval; theta was not re-read on "
-                "pt-v19's own base (ptv19-fifth/RESULT.md section 4). Not the "
+                "pt-v19's own base. Not the "
                 "slow-pole closed form in `ModelParams::vix_anchor_weight` "
                 "(0.6099 at exponent 4.0), a different identity no preset "
                 "ships",
@@ -3447,8 +3416,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "of the VIX from the level realised variance implies persists "
             "before it is pulled back. FITTED: 1/18 was read off a ladder "
             "against the certification's VIX persistence gate in route 1 "
-            "(programme/results/route1-blend/RESULT.md sections 8.1, 8.3 and "
-            "8.4, design repository). At 1/15 the 504-session VIX row fails "
+            "(the project's unpublished design notes). At 1/15 the "
+            "504-session VIX row fails "
             "by one seed, so the value sits on an edge, not in a basin",
     },
     "vix_anchor_centre": {
@@ -3463,8 +3432,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                      "volatility",
             "1.076": "the same relation pooled over the whole tape",
         },
-        "source": "programme/results/vix-law-levels/RESULT.md sections 3, 4 "
-                  "and 7 (design repository): two tape measurements, no "
+        "source": "the VIX-law levels derivation in the project's "
+                  "unpublished design notes: two tape measurements, no "
                   "model run chose it; the free-running zero-drift level "
                   "lands at 17.6 against the tape's 18.3",
         "date": "2026-09-23",
@@ -3479,9 +3448,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "tape's reversion toward its median is "
                     "level-independent)",
         "terms": {"1.06": "the measured log-slope on the engine's held-VIX "
-                          "map, rounded to 1.0 (vix-law-levels section 3)"},
-        "source": "programme/results/vix-law-levels/RESULT.md sections 3, 4 "
-                  "and 7 (design repository): LAW's law, the knee at g = 1. "
+                          "map, rounded to 1.0"},
+        "source": "the VIX-law levels derivation in the project's "
+                  "unpublished design notes: LAW's law, the knee at g = 1. "
                   "Read off the ENGINE's held map at "
                   "`market_vol_vix_exponent` 4.0, not off the tape",
         "date": "2026-09-23",
@@ -3496,12 +3465,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {
             "k 0.2609": "ln(24.015 / 18.5), LAW's knee (where the held map's "
                         "gain crosses one) as a log offset below the anchor "
-                        "(vix-law-levels sections 3 and 4)",
+                        "(the VIX-law levels derivation)",
             "0.55, 0.625": "1 - 0.45, the base weight the knee was read "
                            "at; 1 - 0.375, pt-v19's",
         },
-        "source": "programme/results/calm-regime/RESULT.md section 6b "
-                  "(design repository)",
+        "source": "the calm-regime derivation in the project's unpublished "
+                  "design notes",
         "date": "2026-09-23",
     },
     "vix_anchor_weight_level_cap": {
@@ -3510,13 +3479,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "identity": "r' = r (1 - a') / (1 - a): the cap held at the same VIX "
                     "as the knee moves, 1.95 * 0.625 / 0.55 = 2.2159",
         "terms": {"r 1.95": "36 / 18.5, where the held map's gain reaches 95 "
-                            "per cent of its peak (vix-law-levels section 4)"},
-        "source": "programme/results/calm-regime/RESULT.md section 6b "
-                  "(design repository)",
+                            "per cent of its peak"},
+        "source": "the calm-regime derivation in the project's unpublished "
+                  "design notes",
         "date": "2026-09-23",
-        "note": "vix-law-levels found LAW's cap inert at its settings; "
-                "nobody has checked whether 2.2159 binds on pt-v19 "
-                "(ptv19-fifth/RESULT.md section 4)",
+        "note": "The VIX-law levels derivation found LAW's cap inert at its "
+                "settings; nobody has checked whether 2.2159 binds on pt-v19",
     },
     "market_vol_vix_exponent_below": {
         "kind": "undetermined",
@@ -3526,23 +3494,22 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "shared variance scales as VIX^2.25 [1.95, 2.57] and its calm "
             "share over its mid-VIX share is 0.45 [0.38, 0.50]; on the LAW2C "
             "base both hold for exponents of about 2 to 2.6, and 2.5 is the "
-            "least change from 4.0 inside that window "
-            "(programme/results/calm-regime/RESULT.md sections 4 and 7, "
-            "design repository). On the adopted vector the slope reads 1.94, "
-            "just under the window, and the ratio 0.42, inside it "
-            "(ptv19-fifth/RESULT.md section 4)",
+            "least change from 4.0 inside that window (the calm-regime "
+            "derivation in the project's unpublished design notes). On the "
+            "adopted vector the slope reads 1.94, "
+            "just under the window, and the ratio 0.42, inside it",
     },
     "market_beta_down_asym_lag_live": {
         "kind": "undetermined",
         "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
-        "what_would_determine_it": "the diagnostic registered in "
-            "programme/results/corr-asymmetry-repair.md section 8 (design "
-            "repository), which would rule on the form and is unrun. A FORM "
+        "what_would_determine_it": "the diagnostic registered in the "
+            "correlation-asymmetry repair (the project's unpublished design "
+            "notes), which would rule on the form and is unrun. A FORM "
             "dial with two admissible values and no number to derive: 1.0 "
             "samples the down-day wire on the live session, and pt-v19 takes "
             "it because that is what shows the tape's same-day "
-            "`corr_asymmetry` (k 25 of 30 against 19 without it; "
-            "route1-blend/RESULT.md section 8.2). CHOSEN for the mechanism "
+            "`corr_asymmetry` (k 25 of 30 against 19 without it). CHOSEN "
+            "for the mechanism "
             "it shows, not derived",
     },
     "macro_compound_days_per_year": {
@@ -3553,10 +3520,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "received 252/365 of its annual GDP and CPI growth",
         "terms": {"252": "sessions in a trading year"},
         "source": "rust/src/params.rs `ModelParams::macro_compound_days_per_"
-                  "year`; programme/results/longrun-drift/RESULT.md section "
-                  "4 and results/macro-cycle/RESULT.md section 7 (design "
-                  "repository): the long-run index return 3.83 -> 4.92 per "
-                  "cent from this alone",
+                  "year`; the long-run drift and macro-cycle results in "
+                  "the project's unpublished design notes: the long-run "
+                  "index return 3.83 -> 4.92 per cent from this alone",
         "date": "2026-09-23",
     },
     "macro_calendar_days_per_year": {
@@ -3567,8 +3533,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "and rounded, because the economy steps once per session",
         "terms": {"252": "sessions in a trading year"},
         "source": "rust/src/params.rs `ModelParams::macro_calendar_days_per_"
-                  "year`; programme/results/macro-cycle/RESULT.md sections 2 "
-                  "and 7 (design repository)",
+                  "year`; the macro-cycle result in the project's "
+                  "unpublished design notes",
         "date": "2026-09-23",
     },
     "cycle_us_calibration": {
@@ -3581,12 +3547,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {"the table": "rust/src/economy/state.rs "
                                "`us_phase_characteristics`, each number's "
                                "derivation in its docstring"},
-        "source": "programme/results/macro-cycle/RESULT.md sections 3 and 7 "
-                  "(design repository): 1.13 recessions a decade, 8.7 months "
+        "source": "the macro-cycle result in the project's unpublished "
+                  "design notes: 1.13 recessions a decade, 8.7 months "
                   "long, against the real 1.11 and 9.0",
         "date": "2026-09-23",
         "note": "Two choices inside the table, recorded as such by "
-                "macro-cycle section 3: the hazard cap raised from 0.3 to "
+                "the macro-cycle result: the hazard cap raised from 0.3 to "
                 "1.0, and the 5.5 / 3.5 contraction-to-trough split taken "
                 "from the model's own occupancy",
     },
@@ -3599,8 +3565,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "of waiting for inflation a point over target",
         "terms": {"2.61": "the model's mean fed funds rate with it, against "
                           "1.68 without and the real 2.88"},
-        "source": "programme/results/macro-cycle/RESULT.md sections 4 and 7 "
-                  "(design repository)",
+        "source": "the macro-cycle result in the project's unpublished "
+                  "design notes",
         "date": "2026-09-23",
     },
     "market_pe_buybacks": {
@@ -3612,8 +3578,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "buyback yield a year",
         "terms": {"21.3": "market_pe in year 21 with it, against 28.1 "
                           "without"},
-        "source": "programme/results/macro-cycle/RESULT.md sections 4 and 7 "
-                  "(design repository)",
+        "source": "the macro-cycle result in the project's unpublished "
+                  "design notes",
         "date": "2026-09-23",
     },
     "cycle_stationary_opening": {
@@ -3627,12 +3593,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "age zero",
         "terms": {"7.83 -> 7.35": "the certified index_drift_pct from the "
                                   "boom opening and from a drawn one, "
-                                  "against a band centre of 7.37 "
-                                  "(programme/results/macro-cycle/RESULT.md "
-                                  "section 6, design repository)"},
-        "source": "the verdict ledger's standing ruling "
-                  "`ruling-certification-runs-open-at-a-random-point-in-the-"
-                  "business-cycle` (design repository, recorded 2026-09-23): "
+                                  "against a band centre of 7.37"},
+        "source": "a standing ruling in the verdict ledger of the "
+                  "project's unpublished design notes, recorded 2026-09-23: "
                   "certification runs open at a random point in the cycle, "
                   "because a bot may start trading in any phase. The law is "
                   "derived; turning it on is the owner's ruling",
@@ -3652,8 +3615,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                                 "one minute and by the "
                                                 "close, 2008-2020 and "
                                                 "2016-2020"},
-        "source": "programme/results/news-speed/RESULT.md section 2 and "
-                  "derive.txt (design repository)",
+        "source": "the news-speed derivation in the project's unpublished "
+                  "design notes, from the published table cited under `terms`",
         "date": "2026-09-23",
         "note": "Set by the one-minute share, the first point a one-minute "
                 "tick can express; the least-squares fit over 1 to 5 minutes "
@@ -3668,8 +3631,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {"1.58, 1.80": "per cent earned by five minutes and by the "
                                 "close, 2008-2020 (Christensen, Timmermann "
                                 "and Veliyev, Table 7)"},
-        "source": "programme/results/news-speed/RESULT.md section 2 and "
-                  "derive.txt (design repository)",
+        "source": "the news-speed derivation in the project's unpublished "
+                  "design notes, from the published table cited under `terms`",
         "date": "2026-09-23",
     },
     "news_absorption_drift_half_life": {
@@ -3680,8 +3643,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "is a 60-minute mean life (60 ln 2 = 41.6), which lands 92 per "
             "cent of the drift in 2.5 hours; the 60 minutes is chosen to fit "
             "Patell and Wolfson (1984)'s disturbances lasting 'several "
-            "hours', not measured (programme/results/news-speed/RESULT.md "
-            "section 2, design repository)",
+            "hours', not measured (the news-speed derivation in the "
+            "project's unpublished design notes)",
     },
     "news_quote_revision": {
         "kind": "derived",
@@ -3693,17 +3656,19 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "0.605; without it the book walk leaves 0.086, and the "
                     "tick-1 headline edge is +123 bp against +49",
         "terms": {"0.615, 0.086": "share of the event in the printed price "
-                                  "after one tick, with and without "
-                                  "(news-speed section 3)"},
-        "source": "programme/results/news-speed/RESULT.md section 3 (design "
-                  "repository)",
+                                  "after one tick, with and without"},
+        "source": "the news-speed result in the project's unpublished "
+                  "design notes; the edge script is published at "
+                  "validation/pt-v20/programme/results/news-speed/edge.py",
         "date": "2026-09-23",
     },
     # pt-v20 (2026-09-24): the tape, the closing cross, the fair-value share,
     # the stationary opening and the stop ladder's scale. Rows, bands and
-    # predictions registered before the grading box in the design
-    # repository's programme/ptv20-registration.md; the desk runs behind
-    # every figure below are programme/results/ptv20/desk/.
+    # predictions registered before the grading box in
+    # validation/pt-v20/programme/ptv20-registration.md; the desk runs
+    # behind the figures below are in the project's unpublished design
+    # notes, and the desk script is
+    # validation/pt-v20/programme/results/ptv20/desk.py.
     "quote_model_weight": {
         "kind": "derived",
         "presets": {"pt-v20": 1.0},
@@ -3716,11 +3681,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "skew carried it past",
         "terms": {"-0.135 -> -0.03": "lag-one autocorrelation of 65-minute "
                                      "print returns, median name, certified "
-                                     "roster (meanrev-edge section 4; ptv20 "
-                                     "desk r1-r6)",
+                                     "roster, desk runs",
                   "5.8x -> 1.3-1.5x": "Roll spread over the quoted spread"},
-        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 4 "
-                  "(design repository, unpublished) and "
+        "source": "a mean-reversion edge study of pt-v19 on 2026-09-24, in "
+                  "the project's unpublished design notes, and "
                   "validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-24",
     },
@@ -3761,18 +3725,19 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                    "20 sessions (real +0.009; C6)",
                   "-0.17 -> -0.01": "12-1 month momentum rank IC (real "
                                     "+0.027; C7)"},
-        "source": "programme/meanrev-edge-ptv19-2026-09-24.md section 8 and "
-                  "programme/ptv20-registration.md; ptv20 desk r1-r6 "
-                  "(design repository)",
+        "source": "a mean-reversion edge study of pt-v19 on 2026-09-24 and "
+                  "the desk runs, in the project's unpublished design "
+                  "notes; validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-24",
     },
     "opening_mispricing_sigma": {
         "kind": "measured",
         "presets": {"pt-v20": 0.016},
-        "source": "programme/results/ptv20/desk/r5.json and r6b.json "
-                  "(design repository)",
+        "source": "two desk runs of the shipped vector, in the project's "
+                  "unpublished design notes",
         "date": "2026-09-24",
-        "script": "programme/results/ptv20/desk.py, row s_xsd_stationary",
+        "script": "validation/pt-v20/programme/results/ptv20/desk.py, row "
+                  "s_xsd_stationary",
         "estimator": "the cross-sectional sd of s after the cross-sectional "
                      "mean is taken out, averaged over sessions 250-2660, "
                      "certified roster, untraded, seeds 201-212, at the "
@@ -3795,7 +3760,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "arm, passing all 40 rows on held-out seeds (ptv20vr9) with V1 "
             "at 0.80 (2y/1y, band 0.75 to 1.15) and 0.66 (5y/1y, band 0.55 "
             "to 1.20), where the leading arm without it read 0.70 and 0.42 "
-            "(design repository, programme/ptv20-registration.md, twelfth "
+            "(validation/pt-v20/programme/ptv20-registration.md, twelfth "
             "registration, V1 and 'The graded arm')",
         "superseded": "0.0 on every preset until 2026-09-26, recorded in "
                       "POST_BASELINE as a choice with a measured cost (B9) "
@@ -3818,8 +3783,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "superseded": {
             "value": 0.1,
             "kind": "measured",
-            "source": "programme/results/ptv20/ (desk, mkts.py; design "
-                      "repository), 2026-09-24",
+            "source": "a desk run recorded in the project's unpublished "
+                      "design notes, 2026-09-24",
             "estimator": "the stationary spread of the market's own "
                          "mispricing: the sd over sessions of the "
                          "cap-weighted s, certified roster, untraded, seeds "
@@ -3835,7 +3800,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "measured",
         "presets": {"pt-v20": 0.75},
         "source": "tools/calibration/impact_curve.py (feature/order-book-depth; "
-                  "pt-v20's run in the design repository, programme/results/ptv20/)",
+                  "pt-v20's run is recorded in the project's unpublished "
+                  "design notes)",
         "date": "2026-09-24",
         "script": "tools/calibration/impact_curve.py --base pt-v20",
         "estimator": "the latent depth's scale at which the median average cost "
@@ -3911,8 +3877,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "Almgren et al. 2005; feature/order-book-depth hand-off (E4)",
         "date": "2026-09-24",
     },
-    # Two dials pt-v20 FITTED on the design repo's co-tune grid (box
-    # ptv20e4, 90 pooled 21-year histories; programme/ptv20-registration.md)
+    # Two dials pt-v20 FITTED on the co-tune grid (box
+    # ptv20e4, 90 pooled 21-year histories;
+    # validation/pt-v20/programme/ptv20-registration.md)
     # and graded by name on box ptv20g3. The ledger has no `fitted` kind, so
     # they are entered as measured: the estimator is the grid's selection
     # rule and the residual is what the grid read. The pt-v16 to pt-v19
@@ -3923,10 +3890,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "presets": {"pt-v16": 0.007593024924589399,
                     "pt-v18": 0.007593024924589399,
                     "pt-v19": 0.007593024924589399, "pt-v20": 0.006454071},
-        "source": "programme/ptv20-registration.md, the co-tune grid; "
-                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "source": "validation/pt-v20/programme/ptv20-registration.md, the "
+                  "co-tune grid; the grid's result is in the project's "
+                  "unpublished design notes",
         "date": "2026-09-24",
-        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): 17 arms of "
+        "script": "box ptv20e4: 17 arms of "
                   "pt-v20 with the earnings cycle, crossed with this dial at "
                   "x1.0, x0.85 and x0.70 of pt-v19's, 90 pooled histories",
         "estimator": "FITTED: the arm that passes every long-run row and B9's "
@@ -3941,10 +3909,11 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "measured",
         "presets": {"pt-v16": 0.0565753337, "pt-v18": 0.0565753337,
                     "pt-v19": 0.0565753337, "pt-v20": 0.02828766685},
-        "source": "programme/ptv20-registration.md, the co-tune grid; "
-                  "programme/results/ptv20/grid-e4.txt (design repository)",
+        "source": "validation/pt-v20/programme/ptv20-registration.md, the "
+                  "co-tune grid; the grid's result is in the project's "
+                  "unpublished design notes",
         "date": "2026-09-24",
-        "script": "box ptv20e4 (results/ptv20/arms-e4.txt): the market jump "
+        "script": "box ptv20e4: the market jump "
                   "rate at x1.0 and x0.5 of pt-v19's, crossed with the grid's "
                   "other levers, 90 pooled histories",
         "estimator": "FITTED: the chosen arm D35m85j50 halves the rate",
@@ -3955,12 +3924,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "treasury_2y_noise": {
         "kind": "measured",
         "presets": {"pt-v20": 0.022},
-        "source": "programme/results/ptv20/real_rates.json and the desk curve "
-                  "runs (design repository)",
+        "source": "the tape's Treasury yields (FRED) and the desk curve "
+                  "runs, in the project's unpublished design notes",
         "date": "2026-09-24",
-        "script": "the desk's rates.py: sd of the daily change of the 2-year, "
-                  "certified roster, seeds 204-209, 1008 sessions; the tape's "
-                  "from FRED DGS2 2015-2025 (real_rates.py)",
+        "script": "the desk's rates script: sd of the daily change of the "
+                  "2-year, certified roster, seeds 204-209, 1008 sessions; "
+                  "the tape's from FRED DGS2 2015-2025",
         "estimator": "the noise at which the model's 2-year daily change sd "
                      "meets the tape's 5.23 bp",
         "residual": "5.33 bp against 5.23 at 0.022; 5.73 at 0.028",
@@ -3968,9 +3937,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "treasury_10y_noise": {
         "kind": "measured",
         "presets": {"pt-v20": 0.038},
-        "source": "programme/results/ptv20/real_rates.json (the tape, FRED "
-                  "DGS10) and the grading boxes ptv20vr4-vr9 (design "
-                  "repository)",
+        "source": "the tape (FRED DGS10) and the grading boxes "
+                  "ptv20vr4-vr9, recorded in the project's unpublished "
+                  "design notes",
         "date": "2026-09-26",
         "script": "validation/pt-v20/programme/longrun/criteria.py, row "
                   "R2: the sd of the "
@@ -3986,17 +3955,17 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "residual": "5.12 bp against 5.41 at 0.038 on 90 held-out histories "
                     "(box ptv20vr9, arm K40g35h5); 5.15 and 5.16 on the "
                     "arms of vr6 to vr8",
-        "superseded": "0.025 (2026-09-24, desk rates.py, seeds 204-209): "
+        "superseded": "0.025 (2026-09-24, desk rates script, seeds 204-209): "
                       "6.1 bp at 0.03 with the flight to quality on, "
                       "against 5.41; 0.025 trimmed it",
     },
     "flight_to_quality_gain": {
         "kind": "measured",
         "presets": {"pt-v20": 0.008},
-        "source": "programme/results/ptv20/real_rates.json and the desk curve "
-                  "runs (design repository)",
+        "source": "the tape's yields and the desk curve runs, in the "
+                  "project's unpublished design notes",
         "date": "2026-09-24",
-        "script": "the desk's rates.py: correlation of the roster index's "
+        "script": "the desk's rates script: correlation of the roster index's "
                   "daily return with minus the 10-year's change",
         "estimator": "the gain at which that correlation meets the tape's "
                      "-0.16 (SPY against IEF, 2015-2025). 0.02 through "
@@ -4015,7 +3984,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {"+0.02 -> -0.20": "correlation of the index's daily return "
                                     "with minus the 10-year's change (tape "
                                     "-0.16)"},
-        "source": "programme/results/ptv20/ (design repository)",
+        "source": "the pt-v20 desk runs in the project's unpublished design notes",
         "date": "2026-09-24",
     },
     "corporate_yield_daily": {
@@ -4029,14 +3998,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "terms": {"+0.03 -> +0.22": "correlation of the index's daily return "
                                     "with minus the corporate yield's change "
                                     "(tape +0.27, SPY against LQD)"},
-        "source": "programme/results/ptv20/ (design repository)",
+        "source": "the pt-v20 desk runs in the project's unpublished design notes",
         "date": "2026-09-24",
     },
     "earnings_cycle_depth": {
         "kind": "measured",
         "presets": {"pt-v20": 0.2},
-        "source": "the grading boxes ptv20vr3b, vr4 and vr9 (design "
-                  "repository, unpublished); the twelfth registration and "
+        "source": "the grading boxes ptv20vr3b, vr4 and vr9 (the "
+                  "project's unpublished design notes); the twelfth registration and "
                   "'The graded arm' in "
                   "validation/pt-v20/programme/ptv20-registration.md",
         "date": "2026-09-26",
@@ -4107,10 +4076,10 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "cascade_gain": {
         "kind": "measured",
         "presets": {"pt-v20": 0.1},
-        "source": "programme/results/ptv20/desk/r4.json, r5.json (design "
-                  "repository)",
+        "source": "two desk runs in the project's unpublished design notes",
         "date": "2026-09-24",
-        "script": "programme/results/ptv20/desk.py, row lm1_bps",
+        "script": "validation/pt-v20/programme/results/ptv20/desk.py, row "
+                  "lm1_bps (computed by xsec.py beside it)",
         "estimator": "the daily Lo-MacKinlay one-day contrarian book on the "
                      "certified roster's closes, median over histories of "
                      "2660 sessions, against the certified forty's -1.74; "
@@ -4126,8 +4095,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "standard_error": 0.11,
         "estimate": 0.12,
     },
-    # pt-v20's graded arm (2026-09-26): the design repository's twelfth
-    # registration, programme/ptv20-registration.md, "The graded arm", with
+    # pt-v20's graded arm (2026-09-26): the twelfth registration,
+    # validation/pt-v20/programme/ptv20-registration.md, "The graded arm", with
     # the grids behind each value (ptv20e6-e8 for the valuation, ptv20vr1-vr9
     # for the market's long horizon, chosen on held-out seeds 201-230,
     # 501-530 and 801-830). The grade seeds had not been run on it when
@@ -4143,7 +4112,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "NBER dates a recession. With the phase in real time no arm of "
             "grid ptv20e8 passed C10 (out in peak and contraction beat "
             "holding by +0.2 to +1.3 points a year); read 252 sessions late, "
-            "every arm did (design repository, programme/ptv20-registration.md, "
+            "every arm did (validation/pt-v20/programme/ptv20-registration.md, "
             "eleventh registration)",
     },
     "gdp_publication_lag": {
@@ -4224,7 +4193,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "driven 2020 fall is too shallow (F1), and 126 with a rate "
             "sensitivity of 3 and a buyback share of 0.75 passed all 33 "
             "rows of grid e7. On the graded arm L1 reads +20 sessions "
-            "against the real +68 (box ptv20vr9) (design repository, "
+            "against the real +68 (box ptv20vr9) "
+            "(validation/pt-v20/programme/ptv20-registration.md, "
             "eighth to eleventh registrations)",
     },
     "rate_pe_sensitivity": {
@@ -4239,8 +4209,9 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "but failed B3 on grid ptv20e6, and at 3 the arm with H126 and "
             "buybacks 0.75 passed all 33 rows of grid e7; the graded arm reads R6 at -4.02 against a band of "
             "-10.4 to -2.6 (box ptv20vr9). It costs the one-year drift "
-            "about 0.8 points a year at 3 (design repository, "
-            "programme/ptv20-scenario-size.md section 5; eighth to "
+            "about 0.8 points a year at 3 (a scenario-size study in the "
+            "project's unpublished design notes; "
+            "validation/pt-v20/programme/ptv20-registration.md, eighth to "
             "eleventh registrations)",
         "superseded": "1.5 on every preset through pt-v19, the constant "
                       "that stood before it was a dial, which no record "

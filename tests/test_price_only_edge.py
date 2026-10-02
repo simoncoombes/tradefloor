@@ -1,6 +1,6 @@
 """C4b: price-only rules on the published suite, against their line.
 
-The long-run criteria (design repo, ``programme/longrun/CRITERIA.md``) gained
+The long-run criteria (``validation/pt-v20/programme/longrun/CRITERIA.md``) gained
 C4 on 2026-09-24: no price-only edge. C4b runs the simple rules a user
 would try first through ``tf.evaluate`` on the published suite,
 tf-suite-2026.1: 20 markets of 60 days, 20 companies, pt-v19, six 65-tick

@@ -128,7 +128,7 @@ from tradefloor import atlas                 # noqa: E402
 from tradefloor.facts import REAL_MARKETS, aggregate_panels  # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
-#: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
+#: as `<stat>_<days>` beside the thirteen.
 DIAGNOSTIC_STATS = ("corr_persistence_acf1",)
 from tradefloor.loss import dual_horizon_loss  # noqa: E402
 
@@ -172,8 +172,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the interior has no reading. Stops at 1.0; the sign control at 2.0 is a
     # diagnostic arm, not a point of the search surface.
     "market_beta_down_asym_lag_live": (0.0, 1.0),
-    # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
-    # design repository): the idiosyncratic shock is suppressed by `1 - c`
+    # The variance-neutral down-tick reallocation (the project's unpublished
+    # design notes): the idiosyncratic shock is suppressed by `1 - c`
     # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on
     # an up tick, which holds the unconditional variance exactly and raises
     # the factor's share where `corr_asymmetry` looks.
@@ -200,8 +200,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # end.
     "market_vol_alpha_excursion": (0.0, 0.5),
     # The slow variance LEVEL's two dials. Both are bounded by the tape
-    # rather than by convention (`programme/results/cascade-fourth-moment.md`
-    # section 4.3, design repository): the derived pair is persistence
+    # rather than by convention (a fit to the S&P 500 tape in the project's
+    # unpublished design notes): the derived pair is persistence
     # 0.9977 [0.9945, 0.9992] and sigma 0.047 [0.035, 0.064].
     #
     # The persistence box has to CONTAIN the shipped 0.0 -- every range here
@@ -285,7 +285,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
     # pt-v20's tape, closing cross, fair-value share, opening spread and
-    # stop-ladder scale (design repository, programme/ptv20-registration.md).
+    # stop-ladder scale (validation/pt-v20/programme/ptv20-registration.md).
     "quote_model_weight": (0.0, 1.0),
     "closing_auction": (0.0, 1.0),
     "fair_value_news_share": (0.0, 1.0),
@@ -472,7 +472,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
     "vix_jump_intensity": (0.0, 12.0),
     "vix_jump_scale": (0.0, 30.0),
-    # The VIX-dynamics dials (programme/results/vix-dynamics.md), each
+    # The VIX-dynamics dials, each
     # shipped at the value where its branch is not taken and each MEASURED
     # on the tape with an error bar, so the box is drawn around the
     # measurement rather than searched: a Latin hypercube over it maps the
@@ -485,7 +485,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_innovation_return_sigma": (0.0, 0.04),
     "vix_jump_level_scale": (0.0, 4.0),
     "vix_jump_return_intensity": (0.0, 12.0),
-    # The per-component states (vix-dynamics.md 19), boxes around the
+    # The per-component states, boxes around the
     # measured values; the same hypercube caveat as the rows above.
     "sector_vol_alpha": (0.0, 0.2),
     "sector_vol_beta": (0.0, 0.98),
@@ -588,7 +588,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the monotonic valuation; anything between is a partial floor.
     "fair_value_book_floor": (0.0, 1.0),
     # Where the crisis blend takes from, and whether sector variance follows
-    # VIX. Both blend weights, whole domain (§60, CRISIS-BLEND-SECTOR.md).
+    # VIX. Both blend weights, whole domain.
     "crisis_blend_source": (0.0, 1.0),
     "sector_vix_coupling": (0.0, 1.0),
     # Ships at 0.0 and its whole content is the far end: at 1.0 omega goes
@@ -801,7 +801,7 @@ def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
 
     A power law is a straight line on log-log axes and a sum of exponentials
     bends. Real markets read about -0.436 over these lags; the shipped preset
-    reads about -0.95 (CALIBRATION-FOLLOWUPS §54, §56).
+    reads about -0.95.
 
     This exists because the survey measured the region containing the answer
     and could not report it. `garch_persistence` spans (0.21, 0.99) in

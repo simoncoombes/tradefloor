@@ -215,7 +215,7 @@ def cmd_ladder(args):
 
 #: The seventh measurement defect, made visible where it happens.
 #:
-#: `pin-ladder-burn.md` (2026-09-11): the 40-session default was sized by a
+#: Found on 2026-09-11: the 40-session default was sized by a
 #: comment claiming "about a dozen half-lives" at a persistence of 0.97. The
 #: half-life at 0.97 is 23 sessions, so forty is under two; at pt-v19's GJR
 #: triple, `alpha + gamma/2 + beta` = 0.979, it is 33. The factor variance
@@ -224,7 +224,7 @@ def cmd_ladder(args):
 #: ladders on the record are 8 to 17 per cent low, one-sidedly, which makes
 #: `C - implied(C)` high and the ceiling's crossing early.
 #:
-#: That note asked for three things. `--burn` and `--scored` arrived with
+#: The finding asked for three things. `--burn` and `--scored` arrived with
 #: b4fix7; the DEFAULT was deliberately left alone so that every ladder on
 #: the record reproduces, and it is still 40/80, so a run that does not pass
 #: `--burn` is still under-burned. What was missing was any way to TELL --
@@ -232,7 +232,7 @@ def cmd_ladder(args):
 #: settled. This is that statement, and it costs nothing: the rows are
 #: already in hand.
 _SETTLING_NOTE = (
-    "\ndrift/se is the settling check (pin-ladder-burn.md): the mean v_f of "
+    "\ndrift/se is the settling check: the mean v_f of "
     "the scored\nwindow's first quarter minus its last, over the standard "
     "error of that difference.\nUnder two it is settled. A ladder that has "
     "not settled reports a LEVEL biased toward\nthe state's opening, which "
@@ -406,8 +406,7 @@ def main():
     # was sized for a persistence of 0.97 (a half-life of 23 sessions) and
     # pt-v19's factor persists at 0.979 (33 sessions), so a ladder at the
     # default reads the settled level low at every pin; a settled ladder
-    # needs a burn of several half-lives. Recorded in
-    # programme/pin-ladder-burn.md in the design repository.
+    # needs a burn of several half-lives.
     lad.add_argument("--burn", type=int, default=BURN,
                      help=f"sessions discarded before scoring (default {BURN})")
     lad.add_argument("--scored", type=int, default=SCORED,

@@ -23,7 +23,7 @@ on the current roster generator and was five defaults old while `CERTIFIED`
 a hundred and forty lines below it read 0.0017. The sentence warning against
 quoting a stale point estimate was quoting one, which is the plainest case
 this module contains for why a published number needs a producer rather than
-a careful author (`programme/results/stale-constants.md`). It then read
+a careful author. It then read
 +0.0017 until 2026-09-23, when the fifth composition moved `CERTIFIED` to
 0.0085 and the sentence stayed behind again.
 
@@ -713,10 +713,10 @@ MEASURED_504: dict[str, float | None] = {
 #:
 #: pt-v19's curve (docs080, engine `ed15e73`, the same protocol) read 0.0486,
 #: 0.0336, 0.0359, 0.0237, 0.0208, 0.0185, 0.0085, 0.0033, -0.0074 and
-#: -0.0044 at lags 1, 2, 3, 5, 8, 12, 20, 30, 45 and 60. The script this
-#: comment used to name, `programme/scripts/decay-curve.py`, is in no commit
-#: of the design repository; `decay.py` ships inside each run's
-#: `scripts-as-run.tgz`.
+#: -0.0044 at lags 1, 2, 3, 5, 8, 12, 20, 30, 45 and 60. The script that
+#: measures the curve is `decay.py`, which ships inside each run's scripts;
+#: this run's copy is
+#: `tools/calibration/results/envgaps-085-2026-09-26/scripts/decay.py`.
 #:
 #: The table read the 2026-09-14 pt-v19 vector's curve until pt-v19's own
 #: re-measurement:
@@ -754,7 +754,7 @@ MEASURED_504: dict[str, float | None] = {
 #: formatting: `tools/presets/envelope_tables.py` rewrites
 #: `dict[str, float]` literals one row per line and this is a
 #: `dict[int, float]`. It is written one lag per line so that a fifth entry
-#: in that tool's `TABLES` reaches it. See `stale-constants.md` section 6.
+#: in that tool's `TABLES` reaches it.
 DECAY_252: dict[int, float] = {
     1: 0.0282,
     2: 0.0306,
@@ -859,7 +859,9 @@ ROSTER_SHAPES: dict[str, dict[str, int]] = {
 #: is not passed, so a new default loses the grant until it is measured
 #: again. Since 0.8.5 the default is pt-v20 and the mixes are pt-v19's, so
 #: a caller whose run names pt-v19 keeps the grant and every other caller
-#: is refused.
+#: is refused. The same run on pt-v20 is kept as
+#: `measurements/roster-shapes-pt-v20.json` and grants nothing: two mixes
+#: miss `volume_abs_return_corr` at 504 days there.
 ROSTER_MEASUREMENT: dict[str, Any] = {
     "preset": "pt-v19",
     "run": "docs080b",
@@ -983,7 +985,7 @@ GAPS: tuple[Gap, ...] = (
     # band and was the only row of fourteen to miss at that horizon. pt-v12
     # reads -0.2572 at 504 days against a band of -0.29 to -0.21 and -0.2656
     # at 252, comfortably inside both, so the restriction it carried is
-    # lifted rather than reworded (§114).
+    # lifted rather than reworded.
     #
     # Worth remembering what this gap claimed before it was closed. Its first
     # version said the row was UNREACHABLE without spending a passing
@@ -1249,7 +1251,7 @@ GAPS: tuple[Gap, ...] = (
             "half-life under a month. That coefficient and the 6.0% clamp "
             "are dials since 0.1.4, `inflation_reversion` and "
             "`inflation_ceiling`, shipped at the old values so every preset "
-            "reproduces. Measured (calibration record §65): at reversion "
+            "reproduces. Measured: at reversion "
             "0.15 the endogenous series matches the real mean and sd to the "
             "second decimal (2.85 / 2.10 against 2.87 / 2.18) and then sits "
             "on the clamps; persistence does not move with the dial because "
@@ -1327,10 +1329,16 @@ GAPS: tuple[Gap, ...] = (
             "names pt-v19 as its preset (`preset=\"pt-v19\"`), the horizon "
             "is 504 days or less, and every named statistic is a shape row "
             "that mix held at that horizon (`ROSTER_SHAPE_ROWS`). The "
-            "default has been pt-v20 since 0.8.5 and the mixes have not "
-            "been measured on it, so `check` refuses a concentrated roster "
-            "on pt-v20, and on any preset but pt-v19, and says the mixes "
-            "were measured on pt-v19 only. Two limits remain and come back as "
+            "default has been pt-v20 since 0.8.5. The same run on pt-v20 "
+            "(measurements/roster-shapes-pt-v20.json) held "
+            "every shape row the bands could grade at 252 days for all four "
+            "mixes, but at 504 days the S&P-like and technology-heavy mixes "
+            "read volume_abs_return_corr at 0.6367 and 0.6332 against a "
+            "ceiling of 0.63, where the balanced roster reads 0.6266. So the "
+            "mixes do not hold on pt-v20 as they did on pt-v19, and `check` "
+            "refuses a concentrated roster on pt-v20, and on any preset but "
+            "pt-v19, and says the grant is measured on pt-v19 only. Two "
+            "limits remain and come back as "
             "warnings: each mix is one roster draw, and the bands come from "
             "broad real-market windows, so a single-sector portfolio is "
             "graded on a broad market's ruler.\n\n"
@@ -1344,10 +1352,8 @@ GAPS: tuple[Gap, ...] = (
             "concentrated mixes at 252 days, against a ruled band of 1.1 to "
             "10.3 (`ROSTER_INDEX_DRIFT`). sector_excess_corr on an "
             "all-technology roster and corr_persistence_acf1 past 252 days "
-            "were not graded, for the reasons above. The measurement ran no "
-            "horizon past 504 days and no preset but pt-v19. Measuring the "
-            "mixes on pt-v20 is the same run on the new default: thirty "
-            "seeds, five mixes, 252 and 504 days."
+            "were not graded, for the reasons above. Neither run went past "
+            "504 days."
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
@@ -1598,10 +1604,11 @@ def _roster_refusal(shape: str | None, horizon_days: int,
     if preset != m["preset"]:
         return (
             f"the {shape} mix was {_roster_source()}, and the question is "
-            f"on {preset}. The four mixes were measured on {m['preset']} "
-            f"only. Re-run {m['tool']} on {preset} before citing it for a "
-            f"concentrated roster, or pass preset={m['preset']!r} if the "
-            f"run names {m['preset']}")
+            f"on {preset}. The grant is measured on {m['preset']} only "
+            f"(the roster-concentration gap says why pt-v20's run of "
+            f"{m['tool']} is not granted). Measure {preset} before citing it "
+            f"for a concentrated roster, or pass preset={m['preset']!r} if "
+            f"the run names {m['preset']}")
     h = _roster_horizon(horizon_days)
     if h is None:
         return (
@@ -1885,7 +1892,7 @@ def check(
         # 14 ... missing only volume_change_acf1" and stayed that way after
         # pt-v12 brought that row inside its 504-day band, so `check` was
         # telling callers a statistic missed while quoting a number that is
-        # plainly inside the band printed beside it (§114).
+        # plainly inside the band printed beside it.
         # OVER THE ROWS THIS TABLE CAN BE GRADED BY, which since 2026-09-22
         # is not every row it carries. `crisis_sector_dispersion` has no
         # entry in `BANDS_504` -- its 504 band is on the ruled basis,
@@ -2006,7 +2013,7 @@ def check(
         # pt-v12 brought it inside the 504-day band (-0.2572 against
         # -0.29..-0.21). The arm is deleted rather than made conditional: a
         # gap that no longer exists in GAPS cannot be looked up, and the
-        # lookup is what failed when the gap was retired (§114).
+        # lookup is what failed when the gap was retired.
         #
         # The short lags fire the decay-shape gap too, since 0.8.5. Its
         # statistics named lag 20 alone, so a question on one-to-five-day
@@ -3207,7 +3214,7 @@ def structure_bar(fresh: Mapping[str, Any] | None,
     Simon's ruling and settles it. The second is the form's: the sign test
     has no width, its separation is bought by treating the tape's centre as
     exact, and at thirty seeds the tape's standard error is 1.29 times the
-    test's own resolution (`facts.STRUCTURE`, `programme/widthless-design.md`).
+    test's own resolution (`facts.STRUCTURE`).
     A gate that REFUSED a release on that would be ruling a 0.03 offset a
     ship-stopper on a ruler known to be softer than the offset it is
     measuring. Non-regression asks a question the form can answer: it
@@ -3522,7 +3529,7 @@ def regressions(panel: Mapping[str, float], *,
     the shipped preset closed it too -- and it surrenders
     `return_acf1` at the certified horizon, on training seeds, held-out
     seeds and a held-out universe alike. It was called a win twice before
-    anyone counted (CALIBRATION-FOLLOWUPS §33).
+    anyone counted.
 
     The trade pt-v4 pays was later shown to be a wiring accident rather
     than a law. A jump landed on `mispricing_s` after the momentum roll had
@@ -3530,9 +3537,9 @@ def regressions(panel: Mapping[str, float], *,
     re-rating and continued it: fattening the tail and adding return
     continuation were the same write. `pt-v5` separates them and holds both,
     nine of the original ten at the certified horizon with the 504-day tail
-    closed (§38,
-    §45). That does not soften the policy below. pt-v5 passes the controls
-    and is still not the default, because passing §8 is not certification
+    closed. That does not soften the policy below. pt-v5 passes the
+    controls and is still not the default, because passing the controls is
+    not certification
     and `CERTIFIED` is measured on the shipped preset.
 
     So the count is a function now rather than a judgement. An empty list

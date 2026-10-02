@@ -1,6 +1,6 @@
 """The certification scoring path, checked against a second implementation of it.
 
-`measurement-integrity.md` section 3 asked for this file by name. Its
+The 2026-09-12 measurement-integrity audit asked for this file by name. Its
 argument, in one line: the scoring path itself was measured and found sound
 -- 456 per-row fields at zero relative difference on four real certification
 panels -- and every one of the eight measurement defects that campaign found
@@ -13,9 +13,9 @@ So `_independent` below is a second implementation of the whole path -- the
 aggregation kind per row, the model-side error and its degrees of freedom,
 the Welch combination, the t term, the sum, the blind list, the band
 verdicts and their denominators, the pooled tail rate -- with no import from
-`tradefloor` anywhere inside it. It is `scratchpad/indscore.py` from the
-2026-09-12 audit, carried here verbatim in substance so that the check runs
-on every commit instead of once.
+`tradefloor` anywhere inside it. It is the independent scorer the audit
+wrote, carried here verbatim in substance so that the check runs on every
+commit instead of once.
 
 WHAT IT DOES AND DOES NOT PROVE. The tape side -- each row's centre, error
 and degrees of freedom, and the band edges -- is an INPUT, read from
@@ -27,9 +27,9 @@ exactly one `S`, and it is not an accident of either implementation.
 THE FIXTURES ARE REAL. `tests/fixtures/scoring/b4fix7-*.json` are the four
 `b4fix7` certification panels, thirty seeds each, on both roster protocols
 at both horizons, trimmed to the fields the rule reads. Their `expected.S`
-values are the numbers `b4fix7-result.md` published -- 25.812560 and
+values are the numbers the `b4fix7` run published -- 25.812560 and
 38.721165 on the varying roster -- so this file also pins the published
-record against the library, which is the other half of what section 3 asked
+record against the library, which is the other half of what the audit asked
 for: a score in a note and a score in the code that cannot drift apart
 silently.
 
@@ -210,7 +210,7 @@ def test_the_independent_scorer_agrees_with_loss_scoring_rule(path):
     The three rows that are not medians are why this exists.
     `index_tail_dn3_pct` is a pooled RATE, `fear_gauge_dn3` a pooled median
     over sessions and `index_drift_pct` a MEAN; medianing all three -- which
-    is what `mrarm.py` and `armboth.py` did -- moved `S` by up to six points
+    is what two earlier arm-scoring scripts did -- moved `S` by up to six points
     and understated the tail term threefold to ninefold. Nothing in this
     test would have let that through.
     """
@@ -289,7 +289,7 @@ def test_the_independent_scorer_agrees_with_the_tail_block(path):
 
 @pytest.mark.parametrize("path", PANELS, ids=lambda p: p.stem)
 def test_the_fixture_still_scores_what_the_record_published(path):
-    """`b4fix7-result.md`'s published `S`, against the library, today.
+    """The `b4fix7` run's published `S`, against the library, today.
 
     This is the half of the check that a second implementation cannot do.
     Two implementations agreeing proves the arithmetic; only a stored number

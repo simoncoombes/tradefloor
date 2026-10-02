@@ -54,7 +54,7 @@ def walk(engine, days, pins=None):
 
 
 # Every preset through pt-v19. pt-v20 sets cycle_publication_lag to 252 since its graded
-# arm (2026-09-26; design repository, programme/ptv20-registration.md),
+# arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
 @pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
 def test_off_on_every_shipped_preset(preset):

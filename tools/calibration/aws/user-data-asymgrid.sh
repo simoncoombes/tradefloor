@@ -9,7 +9,14 @@ shutdown -h +240
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/asymgrid
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/asymgrid
 # `main`, and the run needs 55e1909 or later: that is 0.4.1, where pt-v14
 # stops reporting a 68.26-day mispricing half-life it never ran. `v14ship`
 # below is built from the FROZEN preset, so a branch without the fix would
@@ -55,7 +62,7 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 # candidate list alone is past it. The list lives in S3 and the instance
 # fetches it, which also means a survey's inputs are recoverable afterwards
 # from the same bucket as its outputs rather than only from the launcher.
-if ! aws s3 cp "s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/cands-asymgrid.json" \
+if ! aws s3 cp "s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/in/cands-asymgrid.json" \
       /home/ec2-user/candidates.json; then
   echo "ABORTING: cannot fetch the candidate list"
   shutdown -h now

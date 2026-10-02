@@ -25,10 +25,9 @@ panels and shipped, because there was no prior record to regress from. The
 tests below assert that pair of facts together, because either alone reads
 as a different design.
 
-WHAT IT GATES SINCE 2026-09-23. The owner's ruling (design repo
-`programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-
-would-notice-programme-longrun-criteria`) makes the pass bar the fifteen
-long-run criteria and every ruled band: "the certification's VIX persistence
+WHAT IT GATES SINCE 2026-09-23. The owner's ruling
+(`validation/pt-v20/programme/longrun/CRITERIA.md`) makes the pass bar the
+fifteen long-run criteria and every ruled band: "the certification's VIX persistence
 rows ... are reported and investigated but do not gate". The bar's logic is
 unchanged and still tested to fire -- on a FIXED HISTORICAL RECORD, pt-v18's
 and pt-v19's fourth composition's certificates as they stood that day
@@ -73,15 +72,16 @@ HISTORICAL = (pathlib.Path(__file__).resolve().parent / "fixtures"
 PRICE_ONLY_EDGE = ("C4a", "C4b")
 
 #: The fifteen long-run criteria adopted on 2026-09-23, which pt-v19 was
-#: adopted under (design repo `programme/longrun/CRITERIA.md`).
+#: adopted under (`validation/pt-v20/programme/longrun/CRITERIA.md`).
 ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
            "C1", "C2", "C3", "D1")
 
 #: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
 #: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
 #: fifth registration) and eleven from the twelfth registration, graded on
-#: box ptv20g6 (the record's `criteria` field names design repo
-#: `programme/ptv20-registration.md`). pt-v20's record carries all forty;
+#: box ptv20g6 (the record's `criteria` field names
+#: `validation/pt-v20/programme/ptv20-registration.md`). pt-v20's record
+#: carries all forty;
 #: pt-v19's carries the other seventeen.
 REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
                      "R4", "E1", "D2",
@@ -366,9 +366,8 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     """THE SECOND GATE'S CERTIFICATE, REPORTED BESIDE THE SHIP BAR, BY NAME.
 
     This test used to hold the shipped preset to non-regression on its own
-    structural certificate. The owner's ruling of 2026-09-23 (design repo
-    `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-
-    user-would-notice-programme-longrun-criteria`) moved that: the pass bar
+    structural certificate. The owner's ruling of 2026-09-23
+    (`validation/pt-v20/programme/longrun/CRITERIA.md`) moved that: the pass bar
     is the fifteen long-run criteria plus every ruled band, and "the
     certification's VIX persistence rows ... are reported and investigated
     but do not gate".
@@ -417,8 +416,9 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
 
     # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
     # record carries forty: the fifteen pt-v19 was adopted under on
-    # 2026-09-23, C4a and C4b (added 2026-09-24, design repo
-    # `programme/longrun/CRITERIA.md`, section C4), and the twenty-three more
+    # 2026-09-23, C4a and C4b (added 2026-09-24,
+    # `validation/pt-v20/programme/longrun/CRITERIA.md`, section C4), and the
+    # twenty-three more
     # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
     # became the default. pt-v19's record reads 15 of 17 with the verdict
     # "fail": it passes the fifteen and fails C4a and C4b, the tape's

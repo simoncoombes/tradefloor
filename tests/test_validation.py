@@ -2,8 +2,8 @@
 
 The owner's decision of 2026-09-26 (item 2): publish the grading scripts and
 the grade run's inputs, and point the preset record and MODEL.md at them.
-Until then `tf.preset_record("pt-v20")["long_run"]` named twelve files in a
-private repository, `programme/longrun/criteria.py` among them, and a reader
+Until then `tf.preset_record("pt-v20")["long_run"]` named twelve files that
+were not published, the grading script `criteria.py` among them, and a reader
 could check none of it.
 
 These tests hold four things. The scripts here are byte for byte the ones
@@ -125,7 +125,7 @@ def test_every_path_the_record_names_is_in_this_repository():
     named = set()
     for s in _strings(block):
         assert not re.search(r"(?<![\w./-])programme/", s), (
-            f"a design-repository path a reader cannot open: {s!r}")
+            f"an unpublished path a reader cannot open: {s!r}")
         named.update(re.findall(r"validation/[\w./-]+\.(?:py|md|json)", s))
     # criteria.py, CRITERIA.md, the registration and nine files it graded.
     assert len(named) == 12, sorted(named)

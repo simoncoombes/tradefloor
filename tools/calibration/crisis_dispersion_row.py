@@ -1,7 +1,6 @@
 """The tape side of `crisis_sector_dispersion`, derived from ^VIX and 32 names.
 
-The row, from `programme/crisis-dispersion-row-design-2026-09-22.md`
-section 2: inside a window, how much more the hardest-hit sector moves than
+The row, as designed on 2026-09-22: inside a window, how much more the hardest-hit sector moves than
 the typical sector once the volatility index is above the engine's own
 crisis threshold.
 

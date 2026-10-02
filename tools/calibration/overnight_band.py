@@ -45,7 +45,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import data  # noqa: E402
 
 START, END = "2015-07-01", "2025-08-01"
-#: The reference panel's first window opens on this session (REALISM-BANDS.md).
+#: The reference panel's first window opens on this session.
 FIRST_WINDOW = "2015-07-10"
 WINDOW_BARS = 253
 WINDOWS = 10

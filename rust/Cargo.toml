@@ -1,6 +1,6 @@
 [package]
 name = "tradefloor"
-version = "0.8.5"
+version = "0.8.6"
 edition = "2021"
 rust-version = "1.83"
 description = "A reproducible evaluation environment for financial AI agents."
@@ -73,7 +73,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 libm = "0.2.16"
 
-# For the ModelParams fingerprint (CALIBRATION.md §5.1/§9.2): sha256 over the
+# For the ModelParams fingerprint: sha256 over the
 # canonical preset serialisation, in the core, so a non-shipped preset can
 # never present as a shipped one on any surface, Rust or Python. Pure Rust,
 # no_std-capable, deterministic; already in the tree as a dev-dependency.

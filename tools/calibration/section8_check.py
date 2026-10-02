@@ -10,8 +10,8 @@ through the same check. MEASURED 2026-08-25: pt-v3 with no override is
 REJECTED by the horizon flip test (abs_return_acf5 room -0.76 sd,
 excess_kurtosis -0.60 sd at 504 days), so any pt-v3 based candidate fails
 here whatever it changes. Run the base as a control and compare the rooms;
-the difference between the two is what the candidate did. §60 in
-CALIBRATION-FOLLOWUPS.md records the first time this was nearly misread.
+the difference between the two is what the candidate did. This was once
+nearly misread.
 """
 import sys, statistics, multiprocessing as mp
 import numpy as np

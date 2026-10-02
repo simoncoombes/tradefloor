@@ -6,8 +6,8 @@
 # compiled — run what the package will run), the Python suite, and the
 # known-answer digest printed where the console watcher can read it.
 #
-# Launched by fleet.py, which substitutes __BRANCH__ / __BUCKET_RUN__ /
-# __DEADMAN_MIN__ and refuses to launch with a placeholder left over.
+# The project's spot-box launcher fills in __BRANCH__, __BUCKET_RUN__ and
+# __DEADMAN_MIN__, and refuses to launch with a placeholder left over.
 #
 # Dead-man switch first, before anything that can fail. Runbook §10.
 shutdown -h +__DEADMAN_MIN__

@@ -1,5 +1,5 @@
 //! `ModelParams`, the settable half of the model preset, on the Python
-//! surface (PYTHON-API-DESIGN.md §3, CALIBRATION.md §5.1).
+//! surface.
 //!
 //! ```python
 //! eng = pt.Engine(seed=42, universe=u, model="pt-v1")          # default
@@ -122,7 +122,8 @@ impl PyModelParams {
     ///
     /// The vector it returns is the same frozen type with the same bits. A
     /// caller that uses it owes the reader the waiver beside the number;
-    /// `dialarm.py --allow-identity-break` writes it into the arm record.
+    /// the arm tooling writes it into the arm record when run with
+    /// `--allow-identity-break`.
     #[staticmethod]
     #[pyo3(signature = (name = crate::params::DEFAULT_PRESET_NAME, **overrides))]
     fn from_preset_unchecked(

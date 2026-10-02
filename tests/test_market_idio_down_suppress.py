@@ -19,9 +19,9 @@ is the two claims that are only true of the ENGINE:
 2. it takes no draw at any value, on any stream, which is what makes the
    zero arm a control rather than a different random world.
 
-Neither is a measurement of what the dial BUYS. That is
-`programme/results/asymneut-registration.md` in the design repository and it
-wants thirty seeds, not one.
+Neither is a measurement of what the dial BUYS. That measurement is a
+registered thirty-seed run, recorded in the project's unpublished design
+notes; one seed cannot make it.
 """
 
 from __future__ import annotations

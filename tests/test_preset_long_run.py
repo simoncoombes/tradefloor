@@ -1,10 +1,10 @@
 """The `long_run` block of a preset record: written, refused, carried, kept.
 
 A record's `long_run` block is the owner's adopted long-run pass bar
-(`programme/longrun/CRITERIA.md`), graded by
-`programme/longrun/criteria.py --verdict` and written by
-`tools/presets/record.py --long-run`. pt-v20's grade, those two files
-included, is published under `validation/pt-v20/`. The trading server reads it to say
+(`validation/pt-v20/programme/longrun/CRITERIA.md`), graded by
+`validation/pt-v20/programme/longrun/criteria.py --verdict` and written by
+`tools/presets/record.py --long-run`. pt-v20's grade is published under
+`validation/pt-v20/`. The trading server reads it to say
 whether the preset passes. These tests run against copies of a committed
 record in a temporary directory; no committed file is touched.
 """
@@ -30,7 +30,7 @@ def verdict(fingerprint="pt-v19", passes=(True,) * 15):
     rows = [{"id": f"R{i}", "words": "a criterion", "value": 1.0, "real": 1.0,
              "rule": "a rule", "pass": p} for i, p in enumerate(passes)]
     n = sum(passes)
-    return {"criteria": "programme/longrun/CRITERIA.md (adopted 2026-09-23)",
+    return {"criteria": "validation/pt-v20/programme/longrun/CRITERIA.md (adopted 2026-09-23)",
             "verdict": "pass" if n == len(rows) else "fail", "passed": n, "of": len(rows),
             "rows": rows,
             "measured": {"engine_commit": "abc", "seeds": 30, "years": 21, "box": "test",

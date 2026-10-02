@@ -58,11 +58,11 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     is a decision, not a drift."""
     # GRADED ON THE BASIS, NOT ON `REAL_MARKETS`. This read the shipped
     # decade pair directly, which made the test a band path of its own and
-    # pinned the bar to the ruler `ruling-three-rows.md` R1 superseded. The
-    # row it tripped on was `sector_excess_corr`, whose shipped floor is one
-    # decade's cut on a forty-name roster; on the ruled basis it is in band
-    # and 0.74 scale units below the whole-tape centre. A change to this
-    # count is still a decision -- that decision is R1 and R4.
+    # pinned the bar to the ruler that ruling R1 on the three rows
+    # superseded. The row it tripped on was `sector_excess_corr`, whose
+    # shipped floor is one decade's cut on a forty-name roster; on the ruled
+    # basis it is in band and 0.74 scale units below the whole-tape centre. A
+    # change to this count is still a decision -- that decision is R1 and R4.
     bands, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
     # `certified_panel()` and not `CERTIFIED`, since 2026-09-22: the table
@@ -232,8 +232,9 @@ def test_the_roster_grant_is_refused_on_the_default(mix):
 
     The grant the test above asks on pt-v19 is refused on pt-v20, whether
     the caller names it or leaves the default, and the reason says which
-    preset the mixes were measured on. The refusal holds until
-    tools/calibration/roster_shapes.py runs on pt-v20.
+    preset the grant was measured on. The same run on pt-v20 misses a shape
+    row at 504 days for two mixes
+    (`test_the_pt_v20_roster_run_does_not_hold`), so the refusal stays.
     """
     assert env.PRESET == "pt-v20" and ROSTER_PRESET == "pt-v19"
     rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
@@ -370,6 +371,51 @@ def test_the_roster_tables_are_the_committed_measurement():
         assert got == drift, mix
 
 
+def test_the_pt_v20_roster_run_does_not_hold():
+    """measurements/roster-shapes-pt-v20.json, re-scored with this build.
+
+    The run behind the pt-v19 grant, repeated on pt-v20 at 0.8.6. Its
+    balanced mix reads pt-v20's certified panels to four places, so it is
+    the certified roster on the default. Every concentrated mix holds every
+    shape row the bands can grade at 252 days, and at 504 days the S&P-like
+    and technology-heavy mixes miss `volume_abs_return_corr` on its ceiling.
+    The roster-concentration gap quotes those two readings, and `check`
+    grants no mix on pt-v20 because of them.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    record = json.loads((root / "measurements" / "roster-shapes-pt-v20.json")
+                        .read_text(encoding="utf-8"))
+    assert record["preset"] == env.PRESET == "pt-v20"
+    assert tuple(record["seeds"]) == env.ROSTER_MEASUREMENT["seeds"]
+    assert record["shapes"] == {"balanced": {}, **env.ROSTER_SHAPES}
+    certified = tradefloor.preset_record("pt-v20")
+    for h, panel in ((252, "panel_252"), (504, "panel_504")):
+        med = record["results"][f"balanced@{h}"]["median"]
+        for k in SHAPE:
+            assert round(med[k], 4) == round(certified[panel][k], 4), (h, k)
+
+    misses = {}
+    for mix in env.ROSTER_SHAPES:
+        for h in env.ROSTER_MEASUREMENT["horizons"]:
+            r = record["results"][f"{mix}@{h}"]
+            rows = env.score(r["median"], horizon_days=h,
+                             basis="ruled")["statistics"]
+            out = [k for k in SHAPE
+                   if k in rows and rows[k]["in_band"] is False]
+            if out:
+                misses[(mix, h)] = {k: round(r["median"][k], 4) for k in out}
+    assert misses == {
+        ("sp500_like", 504): {"volume_abs_return_corr": 0.6367},
+        ("tech_heavy", 504): {"volume_abs_return_corr": 0.6332},
+    }
+    detail = {g.id: g for g in env.GAPS}["roster-concentration"].detail
+    for reading in misses.values():
+        assert f"{reading['volume_abs_return_corr']:.4f}" in detail
+
+
 def test_the_volume_change_row_is_now_inside_at_both_horizons():
     """Three eras of one statistic, and this test has pinned all of them.
 
@@ -382,8 +428,8 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     So the `volume-change` gap is retired, and `check` must stop reporting it
     at BOTH horizons. A retired gap that a `check` still returns would deny a
     caller a certification the measurements support, which is the same class
-    of error as granting one they do not (§114 and the two gaps retired at
-    the previous boundary for the same reason).
+    of error as granting one they do not. Two gaps were retired at the
+    previous boundary for the same reason.
     """
     inside = env.check(horizon_days=252, statistics=["volume_change_acf1"])
     assert inside.inside
@@ -399,7 +445,7 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
     assert not any(g.id == "volume-change" for g in env.GAPS)
 
     # And the horizon gap's own reason must not claim a row misses while
-    # quoting a number inside the band it prints beside it (§114).
+    # quoting a number inside the band it prints beside it.
     #
     # This asserted `"missing" not in reasons`, which is a PROXY for that
     # property and only holds while no row misses at 504 at all. It was true
@@ -468,7 +514,7 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
 def test_the_stale_sentence_assertion_actually_bites():
     """The control for the assertions in the test above.
 
-    §114's defect was a hardcoded sentence naming a row as missing while
+    The defect was a hardcoded sentence naming a row as missing while
     quoting a number inside the band printed beside it. The sentence is
     computed now, so the assertions that guard it pass by construction, and an
     assertion that cannot fail is not a test. This replays the defect against
@@ -736,8 +782,8 @@ def test_a_panel_that_loses_a_statistic_is_named():
     It halves the dual-horizon objective and is the first vector to close
     the thin-tails gap, which was retired at 0.2.0 when the shipped preset
     closed it too -- and it surrenders `return_acf1` at the certified
-    horizon. It was called a win twice before anyone counted the panel
-    (CALIBRATION-FOLLOWUPS §33), so this is a function now.
+    horizon. It was called a win twice before anyone counted the panel, so
+    this is a function now.
     """
     panel = env.certified_panel()
     low, high = REAL_MARKETS["return_acf1"]

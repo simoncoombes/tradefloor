@@ -5,7 +5,7 @@ Four properties, each with the test that fails if it is lost:
 - **Bit-identity at defaults** — the phase-1 acceptance gate. An engine
   built from an explicit `ModelParams.from_preset("pt-v1")` reproduces the
   const build's market bit for bit, draw for draw. This is the known-answer
-  machinery gaining a second subject (CALIBRATION.md §5.3), NOT a change to
+  machinery gaining a second subject, NOT a change to
   the KAT itself: `known_answer.py` stays untouched, its committed v8
   digest guards the const build, and this file proves the preset build is
   that build.
@@ -705,8 +705,8 @@ PERTURBATIONS = [
     ("inflation_reversion", 0.15, True),  # was False; the burn-in reaches it (see above)      # monthly; reaches prices via the bond yield at the first meeting (day 45)
     # INERT again at 0.8.0, and NOT because the gate moved or the VIX did --
     # because `crisis_blend_gain` derives to 0.0 and the blend it gates is
-    # retired (programme/results/vix-dynamics.md sections 13 and 14: the tape
-    # has no crisis attractor, its conditional drift is negative in every
+    # retired (the VIX-dynamics measurement on the tape: the tape has no
+    # crisis attractor, its conditional drift is negative in every
     # level bin above 22.5, and the model's stable fixed point at VIX 33-36
     # was the blend's).
     #
@@ -1253,7 +1253,7 @@ PERTURBATIONS = [
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
-    # The VIX-dynamics dials (programme/results/vix-dynamics.md). The three
+    # The VIX-dynamics dials, fitted to the tape. The three
     # form dials move on the probe because the default runs the identity:
     # the down side's level factor reads the VIX on a falling session, and
     # the up side's exponent and level factor enter the zero-mean
@@ -1279,7 +1279,7 @@ PERTURBATIONS = [
     # close enough to it to move nothing; 0.0 moves and 12.0 does not, so
     # the dial reads as a switch on this vector rather than as a rate.
     ("vix_jump_return_intensity", 0.0, True),
-    # The two per-component states of vix-dynamics.md section 19 and the
+    # The two per-component states of the VIX-dynamics fit and the
     # idiosyncratic-rate switch. The sector state moves on the first tick
     # (either dial switches it on and the sector draw's sigma is the
     # state's); the excitation moves only if a name jumps inside the

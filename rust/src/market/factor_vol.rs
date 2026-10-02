@@ -251,7 +251,7 @@ pub fn update_market_variance(current_variance: f64, day_factor: f64, vix: f64) 
 }
 
 /// [`update_market_variance`] under explicit model parameters (the runtime
-/// seam, CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the
+/// seam). At [`crate::params::PT_V1`] this is the
 /// shipped arithmetic bit for bit: same values, same operations, same
 /// order — the constants above remain the definition of the preset.
 pub fn update_market_variance_with(
@@ -434,8 +434,8 @@ fn alpha_beta_at(
     // THE BOUND IS THE SINGLE COMPONENT'S AND THIS FUNCTION RUNS ON THE FAST
     // ONE OF TWO. That is conservative rather than wrong, and the direction
     // matters: the composed mixture's own fourth-moment operator allows a
-    // rotation of about 0.1285 where this allows 0.0280
-    // (`cascade-fourth-moment.md`, design repository), so the clamp binds
+    // rotation of about 0.1285 where this allows 0.0280,
+    // so the clamp binds
     // 4.6 times earlier than the condition it is protecting requires. It
     // refuses rotations the mixture would tolerate and never permits one it
     // would not.
@@ -976,8 +976,7 @@ impl MarketVarianceState {
     /// displaced by a factor whose log has a standard deviation of 1.25 --
     /// and they reach it on their own memory, 48 sessions for the fast
     /// component and 115 for the slow. MEASURED, that transient is the
-    /// whole of the 252/504 gap the level's calibration was read through:
-    /// `programme/results/level-sigma-horizon.md` (design repository).
+    /// whole of the 252/504 gap the level's calibration was read through.
     ///
     /// # The recursion, and why it is the MEAN one
     ///
@@ -1021,7 +1020,7 @@ impl MarketVarianceState {
     /// three sessions on the shipped 0.27 -- so it is two orders of
     /// magnitude faster than the states being warmed and is already at
     /// whatever the opening asks for; treating it as a constant over the
-    /// warm-up is the same approximation `level-sigma-horizon.md` 2.2 makes
+    /// warm-up is the same approximation that measurement makes
     /// in the other direction when it treats the LEVEL as flat over the
     /// engine's relaxation.
     ///

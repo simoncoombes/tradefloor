@@ -210,7 +210,7 @@ import tradefloor
 # anchor's own regime ratio of exactly 1.0 -- and `vix_target_shock_cap`
 # moves from 45.0 to 255.0, the image of `vix_return_clamp` under the spike,
 # because the cap had been the brake standing in for the missing read-back
-# (`loopgain-report.md` section 8.2) and no longer needs to be.
+# and no longer needs to be.
 #
 # `metadataSha256` does NOT move here, for the third boundary running:
 # neither the cap nor the read-back is among the mispricing and crowd
@@ -276,17 +276,16 @@ import tradefloor
 # trajectory moved a fifth time, deliberately, and the fixture went on
 # claiming `c0b3c357`.
 #
-# THE GAP IS THE FINDING and it is recorded as one. `gate-run-2026-09-13.md`
-# in the design repository: every box since `wtcomp1` was launched with
+# THE GAP IS THE FINDING and it is recorded as one, in the project's
+# unpublished design notes. Every box in that stretch was launched with
 # `SKIP_GATE_IF_KAT`, which skips the whole suite when the digest matches
 # the value it is handed. The digest matched on every one of them, so the
 # gate reported green by not running, and this test -- which exists to say
 # exactly this -- was one of seventy-eight nobody saw.
 #
 # TWO ARCHITECTURES, per RELEASING.md item 3. `1cc1c4088a05` is the reading
-# on Windows x86_64 and on Amazon Linux x86_64 (the `levelsec1` box,
-# `i-0dc725e36108e6322`, whose own transcript is committed under
-# `programme/results/levelsec1/known-answer.txt`). Character for character.
+# on Windows x86_64 and on Amazon Linux x86_64 (a calibration box, which
+# printed the digest in its own transcript). Character for character.
 #
 # `metadataSha256` does NOT move, for the sixth boundary running: none of
 # the eighteen is among the mispricing and crowd coefficients
@@ -299,8 +298,7 @@ import tradefloor
 # v20: the SLOW VARIANCE LEVEL and the SECTOR LOADING are adopted into
 # pt-v19 (2026-09-14). `market_vol_level_persistence` 0.9977,
 # `market_vol_level_sigma` 0.085 and `sector_loading` 0.8 to 0.60, measured
-# on 22 arms across three boxes and 120 rosters at both horizons
-# (`levelsec1-result.md`, `levsec2-result.md`, `levsec3-result.md`).
+# on 22 arms across three boxes and 120 rosters at both horizons.
 #
 # The level consumes its own normal once a session on the ninth stream, so
 # this boundary moves the trajectory for a reason no previous one has: not a
@@ -323,9 +321,8 @@ import tradefloor
 # pt-v19 RECOMPOSED (2026-09-20). Nine dials return to pt-v18's values: the
 # GJR triple, the slow pole, the stochastic level and the three
 # idiosyncratic jump dials. The 2^6 factorial over the six families that
-# separate pt-v18 from the 2026-09-14 composition (design repo,
-# programme/results/bestof, 64 cells at 252 and 504 days, registered before
-# it ran) measured the market variance family away from the tape on four
+# separate pt-v18 from the 2026-09-14 composition (64 cells at 252 and 504
+# days, registered before it ran) measured the market variance family away from the tape on four
 # rows in 32 of 32 pairs at both horizons and the jump family moving nothing
 # beyond noise. The level's ninth-stream draw is still taken and multiplied
 # by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
@@ -338,21 +335,20 @@ import tradefloor
 # clock with the NBER/BEA cycle table, the Fed's lift-off rule and buybacks
 # in market_pe, news absorbed within minutes with the maker re-quoting, the
 # calm-side variance exponent, and the certification opening drawn from the
-# cycle. Taken on the owner's adopted long-run pass bar (design repo,
-# programme/longrun/CRITERIA.md: the fourth composition fails 8 of 15, this
-# one passes 15 of 15), and bit-identical to the fourth composition with
-# those dials set (programme/results/ptv19-fifth/bitident.py, five seeds x
-# 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
+# cycle. Taken on the owner's adopted long-run pass bar
+# (validation/pt-v20/programme/longrun/CRITERIA.md, then 15 rows: the fourth
+# composition fails 8 of 15, this one passes 15 of 15), and bit-identical to
+# the fourth composition with those dials set (five seeds x 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
 # it replay exactly. `metadataSha256` does NOT move.
 #
 # v28: pt-v20 IS THE DEFAULT (0.8.5, 2026-09-24). pt-v19 with a tape that
 # follows the model price, a closing cross, every stock- and sector-specific
 # shock in fair value, the agent-facing book on, the curve dials, the
 # aggregate earnings cycle and a smaller stop ladder, taken on all 28 rows
-# registered for it (design repo, programme/ptv20-registration.md, box
-# ptv20g3). Every seeded default trajectory changes. pt-v19 and every
-# preset before it replay exactly, which tests/known_answer_presets.py now
-# checks one preset at a time; pt-v20's own row there is 149d72de... and
+# registered for it (validation/pt-v20/programme/ptv20-registration.md).
+# Every seeded default trajectory changes. pt-v19 and every preset before it
+# replay exactly, which tests/known_answer_presets.py now checks one preset
+# at a time; pt-v20's own row there is 149d72de... and
 # does not move with this bump. `metadataSha256` does NOT move: pt-v20
 # carries pt-v19's mispricing and crowd coefficients.
 KAT_VERSION = 28

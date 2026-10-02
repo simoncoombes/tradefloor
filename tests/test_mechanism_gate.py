@@ -12,7 +12,7 @@ median passes the band with probability 1.000 on three of them and 0.50 on a
 fourth. "Fourteen of fourteen in band" was true and answered a different
 question from the one it was read as answering.
 
-So the tests below are written the way DECISIONS requires of a gate that
+So the tests below are written the way the project requires of a gate that
 replaces one which could not fail: for every rule, the input that should fail
 it is CONSTRUCTED and the failure asserted. A null model must read NOT SHOWN.
 A model with a real effect backwards must read REVERSED and not merely
@@ -88,15 +88,16 @@ CHEAP = {"bootstrap_draws": 2}
 PRICE_ONLY_EDGE = ("C4a", "C4b")
 
 #: The fifteen long-run criteria adopted on 2026-09-23, which pt-v19 was
-#: adopted under (design repo `programme/longrun/CRITERIA.md`).
+#: adopted under (`validation/pt-v20/programme/longrun/CRITERIA.md`).
 ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
            "C1", "C2", "C3", "D1")
 
 #: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
 #: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
 #: fifth registration) and eleven from the twelfth registration, graded on
-#: box ptv20g6 (the record's `criteria` field names design repo
-#: `programme/ptv20-registration.md`). pt-v20's record carries all forty;
+#: box ptv20g6 (the record's `criteria` field names
+#: `validation/pt-v20/programme/ptv20-registration.md`). pt-v20's record
+#: carries all forty;
 #: pt-v19's carries the other seventeen.
 REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
                      "R4", "E1", "D2",
@@ -745,11 +746,11 @@ def test_the_recorded_models_the_row_refuses_are_ones_the_kurtosis_row_passes():
     tail_low, tail_high = REAL_MARKETS[TAIL_ROW]
     kurt_low, kurt_high = REAL_MARKETS["excess_kurtosis"]
     recorded = [
-        # pt-v16, year two of the 1,008-day settle1 run: the same seeds and
-        # the same preset as the year that certifies (settle1.md, with the
-        # per-name kurtosis from open3-504.md and settle2-panel-years.md).
+        # pt-v16, year two of a 1,008-day run: the same seeds and the same
+        # preset as the year that certifies, with the per-name kurtosis from
+        # two later runs (the project's unpublished design notes).
         ("pt-v16 year two", 2.500, (7.42, 8.08)),
-        # pt-v1 on a plain 252-day run, open3's `v1held_ctl`.
+        # pt-v1 on a plain 252-day run, a control arm.
         ("pt-v1 at 252 days", 3.012, (3.24,)),
     ]
     for name, tail, kurtoses in recorded:
@@ -876,14 +877,13 @@ def test_a_panel_without_the_counts_gets_no_tail_block_rather_than_a_guess():
 # FORM. A preset's `not_shown` must be a subset of the set its own committed
 # record carries -- more mechanisms than the record, never fewer, and never a
 # DIFFERENT one at the same count. Every test below constructs the input that
-# should fail it, which is what `DECISIONS` requires of a gate.
+# should fail it, which the project requires of every gate.
 #
-# WHAT IT GATES SINCE 2026-09-23. The owner's ruling (design repo
-# `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-
-# would-notice-programme-longrun-criteria`) makes the pass bar for a preset
-# the fifteen long-run criteria and every ruled band: "the certification's
-# VIX persistence rows, the mechanism certificate ... are reported and
-# investigated but do not gate". So the bar's LOGIC below is unchanged and
+# WHAT IT GATES SINCE 2026-09-23. The owner's ruling
+# (`validation/pt-v20/programme/longrun/CRITERIA.md`) makes the pass bar for
+# a preset the fifteen long-run criteria and every ruled band: "the
+# certification's VIX persistence rows, the mechanism certificate ... are
+# reported and investigated but do not gate". So the bar's LOGIC below is unchanged and
 # still tested to fire, on a FIXED HISTORICAL RECORD rather than on whatever
 # the shipped preset measures today, and the shipped preset's own test reads
 # its certificate as a REPORT beside the verdict that gates.
@@ -1141,9 +1141,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
 
     This test used to be the mechanism half of the ship bar: the shipped
     preset had to show every mechanism its committed record shows. The
-    owner's ruling of 2026-09-23 (design repo `programme/longrun/
-    CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-would-notice-
-    programme-longrun-criteria`) moved that: the pass bar is the fifteen
+    owner's ruling of 2026-09-23
+    (`validation/pt-v20/programme/longrun/CRITERIA.md`) moved that: the
+    pass bar is the fifteen
     long-run criteria plus every ruled band, and "the mechanism certificate
     ... [is] reported and investigated but do[es] not gate".
 
@@ -1181,8 +1181,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
 
     # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
     # record carries forty: the fifteen pt-v19 was adopted under on
-    # 2026-09-23, C4a and C4b (added 2026-09-24, design repo
-    # `programme/longrun/CRITERIA.md`, section C4), and the twenty-three more
+    # 2026-09-23, C4a and C4b (added 2026-09-24,
+    # `validation/pt-v20/programme/longrun/CRITERIA.md`, section C4), and the
+    # twenty-three more
     # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
     # became the default. pt-v19's record reads 15 of 17 with the verdict
     # "fail": it passes the fifteen and fails C4a and C4b, the tape's
@@ -1211,9 +1212,10 @@ def test_the_fifth_composition_loses_a_held_out_mechanism_and_it_is_reported():
     against the cut of 21). Under the subset rule that is a refusal, and it
     is the one the record box met: the fourth composition's record was
     retired on purpose to write the fifth's. By the owner's ruling of
-    2026-09-23 (`programme/longrun/CRITERIA.md`, "reported and investigated
-    but do not gate") it stops nothing -- and it is asserted here so the
-    loss stays visible in the suite rather than only in a retired file.
+    2026-09-23 (`validation/pt-v20/programme/longrun/CRITERIA.md`,
+    "reported and investigated but do not gate") it stops nothing -- and it
+    is asserted here so the loss stays visible in the suite rather than only
+    in a retired file.
     """
     fifth = record("pt-v19")
     fourth = historical("pt-v19-fourth")
@@ -1288,9 +1290,9 @@ def test_the_record_tool_writes_a_regression_and_carries_it_rather_than_refusing
         tmp_path, monkeypatch, capsys):
     """What the record tool does with a lost mechanism since 2026-09-23.
 
-    Until the owner's ruling of that day (design repo `programme/longrun/
-    CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-would-notice-
-    programme-longrun-criteria`: the mechanism certificate is "reported and
+    Until the owner's ruling of that day
+    (`validation/pt-v20/programme/longrun/CRITERIA.md`: the mechanism
+    certificate is "reported and
     investigated but do[es] not gate") the write paths REFUSED a certificate
     that showed less than the one on disk, and every record box since the
     third composition retired the committed record on purpose to get past

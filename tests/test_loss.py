@@ -533,11 +533,11 @@ THIRTY_SEED_LEVEL_PANELS = {
 #: and two seeds are re-measured live below to keep it honest.
 #:
 #: Measured on 2026-09-06 at pt-v1 on this file's roster fixture, seeds 101
-#: to 130, by programme/scripts/hruler-seedsd504.py in the design
-#: repository. The table it replaces was pt-v3 on a roster the generator
-#: reconciliation retired, and nothing in this suite re-derived it. The two
-#: volume rows were re-measured on 2026-09-30, when 0.8.5 fixed the day
-#: bar's volume; the other twelve reproduced unchanged.
+#: to 130, by a thirty-seed run of the 504-day panels. The table it replaces
+#: was pt-v3 on a roster the generator reconciliation retired, and nothing in
+#: this suite re-derived it. The two volume rows were re-measured on
+#: 2026-09-30, when 0.8.5 fixed the day bar's volume; the other twelve
+#: reproduced unchanged.
 THIRTY_SEED_PANELS_504 = {
     "seeds": tuple(range(101, 131)),
     "annualised_vol_pct": [

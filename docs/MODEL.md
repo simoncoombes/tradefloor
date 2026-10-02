@@ -612,7 +612,7 @@ of pt-v20, which found that timing rules on the reported macro data beat
 buy-and-hold. Holding the roster and going to cash while
 `macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
 over holding, in 30 of 30 21-year histories (pt-v20 audit, finding 1; the
-audit is in the private design repository and is not published).
+audit is in the project's unpublished design notes).
 
 | Figure | The true value is read by | The published value is read by |
 |---|---|---|
