@@ -17,13 +17,6 @@ Real market data can't tell you what would have happened if you had traded
 differently, or what caused a move. tradefloor can, because it computed every
 price.
 
-Use it to test how a strategy or an agent handles risk, execution and events.
-It can't tell you whether a price signal has an edge. Good results here do not
-predict real returns: the prices come from a known model, and the model holds
-rules that read only prices to no edge (criteria C4a and C4b in
-[docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)).
-12-1 momentum has a rank IC of -0.003 here against 0.027 in real markets.
-
 ## Documentation
 
 Documentation is at https://tradefloor.dev. It covers install, core
