@@ -396,7 +396,8 @@ def test_a_schema_violation_is_a_decision_error_carrying_its_cause():
     assert isinstance(excinfo.value.__cause__, UnexpectedModelBehavior)
     assert isinstance(excinfo.value.__cause__.__cause__,
                       PydanticValidationError)
-    assert "'BUY', 'SELL' or 'HOLD'" in str(excinfo.value.__cause__.__cause__)
+    assert "'BUY', 'SELL', 'HOLD' or 'CANCEL'" in str(
+        excinfo.value.__cause__.__cause__)
 
 
 def test_a_text_answer_produces_the_same_message_and_a_different_cause():
@@ -619,6 +620,21 @@ def test_a_provider_failure_keeps_its_chain_through_the_real_framework():
     assert "provider unreachable" in str(excinfo.value)
 
 
+def _needs_the_openai_sdk() -> None:
+    """Skip unless the OpenAI SDK is importable.
+
+    Two tests below build a real `openai:` model to check what happens
+    before a request. `pip install "tradefloor[pydantic-ai]"` installs
+    `pydantic-ai-slim` without the SDK, and in that environment both
+    failed: `Agent("openai:...")` raised ImportError ("Please install the
+    `openai` package") where they expect a RuntimeError or a missing-key
+    message.
+    """
+    pytest.importorskip(
+        "openai", reason="a real OpenAI model needs the openai package, "
+                         "which pydantic-ai-slim does not install")
+
+
 def test_a_real_provider_under_the_flag_raises_a_plain_runtime_error(
         monkeypatch):
     """The rail this module runs on, pinned. `ALLOW_MODEL_REQUESTS = False`
@@ -629,7 +645,13 @@ def test_a_real_provider_under_the_flag_raises_a_plain_runtime_error(
     A dummy key is set because the flag is checked when the request is MADE:
     without one, model construction fails first and the flag is never
     reached, which would make this test pass for the wrong reason.
+
+    Skips without the `openai` package. The extra installs
+    `pydantic-ai-slim`, which has no OpenAI SDK, and there the model fails
+    to build with an ImportError before any rail is reached. CI has the SDK
+    through `openai-agents`, so the test runs there.
     """
+    _needs_the_openai_sdk()
     from pydantic_ai import AgentRunError
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-not-a-real-key")
@@ -650,7 +672,9 @@ def test_a_missing_api_key_is_refused_before_any_request(monkeypatch):
     """The other half of the pair above: with no key at all the framework
     refuses during model construction, as a `UserError`, and the adapter
     turns that into one actionable FrameworkError rather than letting it
-    arrive double-wrapped."""
+    arrive double-wrapped. Skips without the `openai` package, for the
+    reason the test above gives."""
+    _needs_the_openai_sdk()
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     adapter = PydanticAIAdapter(Agent("openai:gpt-5.2",
                                       defer_model_check=True))
@@ -736,27 +760,32 @@ def test_the_frameworks_own_sync_entry_point_would_have_failed_here():
     asyncio.run(notebook_cell())
 
 
-def test_an_override_set_outside_does_not_cross_the_bridge():
-    """A documented trap, pinned so it stays documented rather than becoming
-    a surprise. `Agent.override` is built on context variables, and the
-    shared bridge runs the coroutine on another thread when a loop is
-    already running -- and `concurrent.futures` does not propagate context.
-    The adapter never relies on it: the model is a per-run argument. A user
-    reaching for `override` in a notebook is meeting this, not a bug."""
+def test_an_override_set_outside_crosses_the_bridge_in_both_modes():
+    """`Agent.override` is built on context variables. Until 0.8.5 it
+    reached the run in a script, where the bridge was `asyncio.run` in the
+    caller's thread, and not in a notebook, where it crossed a thread
+    without the context; this test pinned that as a documented trap. The
+    bridge now runs every call on one long-lived loop and carries the
+    caller's context in both cases, so the override wins in both, as
+    PydanticAI documents it winning over a per-run model. The adapter still
+    never relies on it: the model is a per-run argument."""
     agent = Agent("test", output_type=str)
     inside = {}
 
-    async def notebook_cell():
-        with agent.override(model=TestModel(custom_output_text="overridden")):
-            def look(messages, info: AgentInfo) -> ModelResponse:
-                inside["reached"] = True
-                return ModelResponse(parts=[TextPart("not overridden")])
+    def look(messages, info: AgentInfo) -> ModelResponse:
+        inside["reached"] = True
+        return ModelResponse(parts=[TextPart("not overridden")])
 
+    def script():
+        with agent.override(model=TestModel(custom_output_text="overridden")):
             return ci.run_sync(agent.run("x", model=FunctionModel(look)))
 
-    result = asyncio.run(notebook_cell())
-    assert inside.get("reached"), "the per-run model did not take effect"
-    assert result.output == "not overridden"
+    async def notebook_cell():
+        return script()
+
+    assert script().output == "overridden"
+    assert asyncio.run(notebook_cell()).output == "overridden"
+    assert not inside, "the per-run model ran under an override"
 
 
 # -- recording and replay ----------------------------------------------------
@@ -833,9 +862,19 @@ def test_the_mandate_names_both_size_limits():
     assert "max_order_shares" in MANDATE
     assert "buying_power" in MANDATE
     assert "max_leverage" in MANDATE
-    assert MANDATE_VERSION == "2", (
+    assert MANDATE_VERSION == "3", (
         "the mandate changed meaning, so the version must move with it -- a "
         "transcript recorded under the old text is a different experiment")
+
+
+def test_the_mandate_describes_limit_orders_and_cancel():
+    """Version 3: the decision contract accepts limit orders and CANCEL
+    (decision schema 2), so the mandate stops saying there are none, and
+    points at the waiting orders in the payload."""
+    assert "no limit prices" not in MANDATE
+    assert "`limit_price`" in MANDATE
+    assert "CANCEL" in MANDATE
+    assert "`portfolio.open_orders`" in MANDATE
 
 
 def test_a_recording_stamps_what_it_ran_under_without_being_asked():

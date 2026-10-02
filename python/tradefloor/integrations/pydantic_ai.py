@@ -192,15 +192,13 @@ already running` inside a notebook -- measured -- so this adapter calls the
 async `Agent.run` and hands the coroutine to `common.run_sync`, the one
 shared bridge.
 
-The trap: when a loop IS already running, that bridge runs the coroutine on
-a separate thread, and `concurrent.futures` does not propagate context
-variables. `Agent.override(...)` is implemented with context variables, so
-an override set around `World.run` inside a notebook does NOT reach the run.
-This adapter never depends on that -- the model is passed per run through
-`model=`, which is a plain argument -- but a test or notebook that sets a
-model with `override` and then wonders why the real provider was called is
-meeting this and not a bug in the adapter. Pass `model=` to the adapter
-instead.
+`Agent.override(...)` is implemented with context variables, and since
+0.8.5 the bridge carries the caller's context to the coroutine in a script
+and in a notebook alike, so an override set around `World.run` reaches the
+run either way. Until then it reached it in a script and not in a notebook,
+where the bridge crossed a thread without the context. This adapter never
+depends on either: the model is passed per run through `model=`, a plain
+argument, which is still the clearer way to choose one.
 """
 
 from __future__ import annotations
@@ -239,9 +237,13 @@ Seek attractive risk-adjusted returns while controlling downside risk. You \
 may buy, sell, resize or maintain positions. You are not required to trade: \
 an empty action list means change nothing, and is a valid answer.
 
-Every order is a market sweep of the live book. There are no limit prices \
-and no order types. Quantities are SHARES, always positive -- the side \
-carries the direction.
+An order without a `limit_price` trades now against the live book. Give a \
+BUY or SELL a `limit_price` to trade only at that price or better: what does \
+not fill at once waits in the book, and a new limit order on the same symbol \
+replaces it. Your waiting orders are in `portfolio.open_orders`, and CANCEL \
+withdraws every waiting order on a symbol. Quantities are SHARES, always \
+positive, because the side carries the direction. An action that breaks a \
+rule is refused on its own and the rest of your decision still trades.
 
 Two separate limits bind your orders, and you must respect BOTH.
 
@@ -282,7 +284,9 @@ class UsageLimitReached(FrameworkError):
 #:    independent agents sized to the stated cap and were refused at the
 #:    unstated one; a mandate that names one of two limits is a trap, and a
 #:    run recorded under version 1 is measuring the trap, not the agent.
-MANDATE_VERSION = "2"
+#: 3: limit orders and CANCEL (decision schema 2, 0.8.5). Version 2 said
+#:    every order was a market sweep and there were no limit prices.
+MANDATE_VERSION = "3"
 
 #: Requests one decision may cost. A decision is normally two model requests
 #: -- one round of tool calls, one final answer -- and eight leaves room for
@@ -308,10 +312,8 @@ class PydanticAIAdapter(FrameworkAdapter):
     :meth:`_run` and names the extra if that import fails.
 
     ``model`` overrides the model for every run this adapter makes, as a
-    plain per-run argument rather than through :meth:`Agent.override`. That
-    is what makes an offline test work in a notebook as well as a script:
-    ``override`` is built on context variables, and the shared async bridge
-    crosses a thread boundary where those do not propagate. Pass
+    plain per-run argument rather than through :meth:`Agent.override`, so
+    nothing about it depends on context variables reaching the run. Pass
     ``TestModel()`` or ``FunctionModel(...)`` here for an offline run.
 
     ``deps`` is handed to ``run(deps=...)`` verbatim. The adapter never

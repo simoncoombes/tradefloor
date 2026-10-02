@@ -44,6 +44,14 @@ from tradefloor.integrations.pydantic_ai import (MANDATE, MANDATE_VERSION,
                                                  PydanticAIAdapter)
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+
+
+#: Recorded before 0.8.5 decision 11, when a World's portfolios borrowed for
+#: free. Charging margin changes the cash a levered agent is shown, so the
+#: replay misses (step 12, day 2).
+#: Its replay tests are skipped with the other fixtures that wait on a
+#: live re-record (decisions 4 and 11).
+
 FIXTURE = REPO / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "integrations" / "pydantic_ai" / "rate_shock.py"
 
@@ -74,6 +82,7 @@ def _load_example():
     return module
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_recorded_run_replays_end_to_end():
     """The whole recorded experiment: shared history, fork, one intervention,
@@ -102,7 +111,10 @@ def test_the_recorded_run_replays_end_to_end():
 
     control, shock = world.fork("control", "+200bps")
     control.agent.arm, shock.agent.arm = "control", "+200bps"
-    assert bool(agree(control, shock)), "the arms diverged before the shock"
+    # `.identical`, not the Agreement itself: it has no truth value of its
+    # own, so `bool(agree(...))` is True whatever the checks found.
+    assert agree(control, shock).identical, (
+        "the arms diverged before the shock")
 
     shock.intervene(federal_funds_rate=example.SHOCKED_POLICY_RATE,
                     corporate_bond_yield=example.SHOCKED_DISCOUNT_RATE)
@@ -123,6 +135,7 @@ def test_the_recorded_run_replays_end_to_end():
         != shock.agent.record[-1]["decision"]
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_committed_fixture_still_matches_the_shipped_mandate():
     """The last mile of the replay guard, asserted against the real artefact.

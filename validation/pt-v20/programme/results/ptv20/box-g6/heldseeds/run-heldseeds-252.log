@@ -1,0 +1,4 @@
+BUILD {"so": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/_core.pyi", "so_mtime": "2026-09-26 05:30:18", "rust_commit": "2026-09-26 01:27:25 b899019", "rust_dirty": "", "branch": "HEAD", "python": "3.11.16", "engine_file": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/__init__.py"}
+BASE pt-v19
+SHIPPED  vol 22.18 sector 0.0840 dn3 nan ar1 0.9314 lever nanx  (6s, 7s total)
+pt-v20  vol 20.05 sector 0.1091 dn3 nan ar1 0.9271 lever nanx  (7s, 14s total)

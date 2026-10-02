@@ -3,7 +3,7 @@ parameter vectors, one build, no rebuilds — and the wall-clock bill.
 
 Under the compile-time regime this file could not exist. Sweeping one
 constant across eight values cost eight wheel builds tonight (~60 s per
-vector serially: patch, build, reinstall, measure — CALIBRATION.md §7.2);
+vector serially: patch, build, reinstall, measure);
 sweeping a VECTOR was priced at worktree parallelism, 5x disk and the
 stale-wheel hazard class. Post-seam, a parameter vector is an argument:
 
@@ -173,7 +173,7 @@ def main() -> None:
         assert len(counts) == 1, (
             f"seed {seed}: draw counts differ across vectors ({counts}) — "
             "a parameter moved the draw schedule, which no preset member "
-            "may (CALIBRATION.md section 5.2)"
+            "may"
         )
     print("CRN guard: draws_consumed identical across vectors for every "
           f"seed ({', '.join(str(s) for s in sorted(by_seed))})")

@@ -34,7 +34,9 @@ from pathlib import Path
 
 import tradefloor as pt
 import pyarrow as pa
-from tradefloor.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
+from tradefloor.baselines import (BuyAndHold, Momentum, Oracle, capture_ratio,
+                                  capture_withheld, reference_agents,
+                                  versus_buy_and_hold)
 from tradefloor.scenario import Scenario, compare, run_scenario
 
 
@@ -216,8 +218,9 @@ def g_arith(ctx: Ctx) -> dict:
 def g_truth_residual(ctx: Ctx) -> dict:
     """The factor columns sum to the change in mispricing_s.
 
-    Every page that states this sums all of `Engine.FACTORS`, which is ten
-    names since the circuit breaker, jump and overnight columns were added,
+    Every page that states this sums all of `Engine.FACTORS`, which is
+    eleven names since 0.8.5 added fair_value_shift (ten before it, since
+    the circuit breaker, jump and overnight columns were added),
     and the glossary states the WORST residual over the run. This summed a
     hard-coded seven and was graded on the median, so it checked a sum no
     page describes: on any day a jump or the breaker fired, seven columns
@@ -369,14 +372,28 @@ def g_horizon(ctx: Ctx) -> dict:
     The agent is mean_reversion because that is the agent the page's
     sentence is about. This measured momentum, left over from an era when
     the bullet was written about momentum, and reported the horizon captures
-    as MOVED ever since against prose that was correct."""
+    as MOVED ever since against prose that was correct.
+
+    On pt-v20 `capture_ratio` reports nothing, because the Oracle is not a
+    ceiling there (`baselines.ORACLE_NOT_A_CEILING`), so `capture_{days}d`
+    read None on the default from 0.8.5 and this group measured nothing. The
+    capture is kept for a preset where the Oracle is a ceiling, and beside
+    it the comparison the library quotes on pt-v20: mean reversion's P&L
+    less buy-and-hold's over the same horizon (`versus_buy_and_hold`), with
+    `capture_withheld` saying which reading applies. The bullet itself is
+    retired from the register (no page states it since 0.8.1); a page that
+    restates it on pt-v20 quotes `excess_{days}d`.
+    """
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
         out[f"capture_{days}d"] = capture_ratio(scores).get("mean_reversion")
+        out[f"excess_{days}d"] = versus_buy_and_hold(scores).get(
+            "mean_reversion")
         out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
+        out["capture_withheld"] = capture_withheld(scores) is not None
     return out
 
 
@@ -430,13 +447,17 @@ def g_ranking(ctx: Ctx) -> dict:
 
     # the prose behind the table: mean-reversion's one win is barely above
     # 1.0, buy-and-hold's is the largest per-seed capture on the whole grid
+    # A capture exists only where the reference made money, as in
+    # `capture_ratio`: on pt-v20 the ten-day Oracle can lose on a seed.
     def beat_captures(name):
         return [pnl / ref for pnl, ref in zip(records[name].pnls,
-                                              rk.reference_pnls) if pnl > ref]
-    grid_max = max(pnl / ref
-                   for name in ("momentum", "mean_reversion", "buy_and_hold",
-                                "random")
-                   for pnl, ref in zip(records[name].pnls, rk.reference_pnls))
+                                              rk.reference_pnls)
+                if ref > 0 and pnl > ref]
+    grid_max = max((pnl / ref
+                    for name in ("momentum", "mean_reversion", "buy_and_hold",
+                                 "random")
+                    for pnl, ref in zip(records[name].pnls, rk.reference_pnls)
+                    if ref > 0), default=float("nan"))
     mr_beat = max(beat_captures("mean_reversion"), default=float("nan"))
     bh_beat = max(beat_captures("buy_and_hold"), default=float("nan"))
 
@@ -474,11 +495,29 @@ def g_ranking(ctx: Ctx) -> dict:
         "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
         "mr3_gt1_count": len(gt1),
         "mr3_gt1_on_thin4": len(gt1 & thin4),
-        "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
+        # Over the seeds where a capture exists (`AgentRecord.measured`).
+        "mr3_mean_of_ratios": (sum(mr3.measured) / len(mr3.measured)
+                               if mr3.measured else float("nan")),
+        # None on pt-v20, where the ranking withholds every capture
+        # (`Ranking.capture_withheld`); `capture_range` is None there too,
+        # and indexing it took the whole group down on the default.
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
-        "momentum_capture_lo": mom.capture_range[0],
-        "momentum_capture_hi": mom.capture_range[1],
+        "momentum_capture_lo": (mom.capture_range[0]
+                                if mom.capture_range else None),
+        "momentum_capture_hi": (mom.capture_range[1]
+                                if mom.capture_range else None),
+        # The comparison the pages quote where the capture is withheld:
+        # P&L less buy-and-hold's, averaged over the twelve markets, and
+        # momentum's per-market range of it. Read from the same records the
+        # docs' experiments.py writes into experiments.json.
+        "capture_withheld": rk.capture_withheld is not None,
+        "excess_momentum": mom.mean_excess_pnl,
+        "excess_mean_reversion": mr.mean_excess_pnl,
+        "momentum_excess_lo": min(v for v in mom.excess_pnls if v is not None),
+        "momentum_excess_hi": max(v for v in mom.excess_pnls if v is not None),
+        "momentum_seeds_ahead": mom.seeds_ahead,
+        "mr_seeds_ahead": mr.seeds_ahead,
         "momentum_wins": mom.wins,
         "mr_wins": mr.wins,
         "seeds": len(rk.seeds) if hasattr(rk, "seeds") else 12,
@@ -675,7 +714,7 @@ def g_macro_chain(ctx: Ctx) -> dict:
     per: dict[int, set] = defaultdict(set)
     reprice_days: set[int] = set()
     # Per instrument, the days its fair value changed. The page's table says
-    # fundamental_value moves "every day" on pt-v19, which is a claim about
+    # fundamental_value moves "every day" on pt-v20, which is a claim about
     # each name rather than about the roster as a whole.
     changed_on: dict[int, set] = defaultdict(set)
     last: dict[int, float] = {}
@@ -901,10 +940,12 @@ _TCA_SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 def g_tca_example(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's worked figures, method stated on the
     page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
-    one six-step day. Entry: 97 shares (1% ADV) at the first step costs
-    +16.71 bps on every seed measured. Round trip (sell three steps later):
-    a seed range, -17.72 to +2.03 bps over sim seeds 2026,1,2,3,4,5,7,11,
-    negative on 7 of 8, median -12.40. Partial fill: a request for 4,856
+    one six-step day. Round trip (sell three steps later) on pt-v20 at
+    0.8.5: +13.65 to +21.62 bps over sim seeds 2026,1,2,3,4,5,7,11, a cost
+    on all 8, median +18.22 (pt-v19: +12.67 to +28.75, median +18.01).
+    Entry on pt-v19: 97 shares (1% ADV) at the first step costs +20.18 bps
+    on every seed measured. Before 0.8.5 the fill was counted on every tick
+    of the step and the range crossed zero. Partial fill: a request for 4,856
     shares (half ADV, sim seed 2026) fills 483 - the whole displayed
     depth - and requests of 9,713 and 48,563 fill the same 483, on every
     seed measured."""
@@ -954,11 +995,17 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. The agent trades 57 names; all 3 untouched names move (-10.72,
-    +1.97 and +2.00 bps) against a 9.71 bps median direct impact, so the
-    largest ripple now EXCEEDS the median direct impact. The channel needs a
-    horizon: nothing leaks at one or two days, nine untouched names leak at
-    three and eighteen at four. Pinning VIX returns untouched_moved() to
+    days. Measured on pt-v20's graded arm at 0.8.5 (2026-09-26): the agent
+    trades 57 names, all three untouched names move by under 3e-5 bps, and
+    the median direct impact is 0.0020 bps (pt-v20 as first composed: 58
+    names, both untouched under 3e-6 bps, 0.0018; pt-v19: 57 names, none of
+    3 untouched moves, 10.10 bps).
+    Before 0.8.5 the agent's fills were counted on every tick of the step,
+    and that flow was large enough to reach the untouched names through
+    the VIX. On pt-v20 the flight to quality carries the session's return
+    into the corporate yield too, so the control pins both, as
+    `Execution.moved` says: hold(vix=15.0) alone leaves two names moved, and
+    hold(vix=15.0, corporate_bond_yield=0.055) returns untouched_moved() to
     empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
@@ -969,7 +1016,8 @@ def g_tca_ripple(ctx: Ctx) -> dict:
 
     jobs = {
         "full": lambda: analyse(10),
-        "pinned": lambda: analyse(10, Scenario().hold(vix=15.0)),
+        "pinned": lambda: analyse(10, Scenario().hold(
+            vix=15.0, corporate_bond_yield=0.055)),
         "d1": lambda: analyse(1),
         "d2": lambda: analyse(2),
         "d3": lambda: analyse(3),

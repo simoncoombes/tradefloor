@@ -28,6 +28,7 @@ from tradefloor.boundary import (COLUMNS, FLOOR_CALLS, STATUSES, BoundaryMap,
 from tradefloor.counterfactual import World, resample
 from tradefloor.integrations.callable import CallableAgentAdapter
 from tradefloor.integrations.common import Transcript, refuse_replay_reask
+from tradefloor.interventions import true_macro_fields
 from tradefloor.manifest import market_digest
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -672,7 +673,9 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
     target = tf.TARGETS[name]
     field = macro_field_of(target)
     engine = tf.Engine(seed=3, universe=list(tf.Universe.random(2, seed=1)))
-    if name == "market.liquidity":
+    if name in ("market.liquidity", "market.earnings"):
+        # Company columns, not macro fields: the book's depth and the
+        # reported earnings.
         assert field is None
         return
     assert field in engine.macro_fields
@@ -681,7 +684,13 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
     target.write(engine, value)
     # The engine carries rates in percent and hands them back as
     # fractions, so a written level comes back to the last bit or so.
-    assert engine.macro_fields[field] == pytest.approx(value)
+    # Read as the TRUE field: on pt-v20, the default, `gdp_publication_lag`
+    # and `cycle_publication_lag` hold `macro_fields["gdp_growth"]` and
+    # `macro_fields["cycle"]` at the figure last released, so the published
+    # value does not show a write until it is published. The field is the
+    # same name either way; what moves at once is the value the economy
+    # holds, which is the one the target writes.
+    assert true_macro_fields(engine)[field] == pytest.approx(value)
     assert target.read(engine) == pytest.approx(value)
 
 
@@ -718,6 +727,7 @@ needs_fixture = pytest.mark.skipif(
     reason="no recorded FinRobot run at tests/fixtures/finrobot/")
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
     """Exact replay. A target the prompt shows misses the recording at the
@@ -900,6 +910,7 @@ def test_the_runner_help_renders():
     assert "usage:" in proc.stdout
 
 
+@pytest.mark.needs_live_model
 @needs_fixture
 def test_the_runner_replays_the_recording_and_writes_the_map(tmp_path):
     proc = subprocess.run(

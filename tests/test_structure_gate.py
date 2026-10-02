@@ -25,10 +25,9 @@ panels and shipped, because there was no prior record to regress from. The
 tests below assert that pair of facts together, because either alone reads
 as a different design.
 
-WHAT IT GATES SINCE 2026-09-23. The owner's ruling (design repo
-`programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-user-
-would-notice-programme-longrun-criteria`) makes the pass bar the fifteen
-long-run criteria and every ruled band: "the certification's VIX persistence
+WHAT IT GATES SINCE 2026-09-23. The owner's ruling
+(`validation/pt-v20/programme/longrun/CRITERIA.md`) makes the pass bar the
+fifteen long-run criteria and every ruled band: "the certification's VIX persistence
 rows ... are reported and investigated but do not gate". The bar's logic is
 unchanged and still tested to fire -- on a FIXED HISTORICAL RECORD, pt-v18's
 and pt-v19's fourth composition's certificates as they stood that day
@@ -66,6 +65,30 @@ RECORDS = (pathlib.Path(__file__).resolve().parent.parent
 
 HISTORICAL = (pathlib.Path(__file__).resolve().parent / "fixtures"
               / "records" / "certificates-2026-09-23.json")
+
+#: The long-run criteria added on 2026-09-24, after the fifteen the shipped
+#: preset was adopted under: no price-only edge, on the tape and through
+#: `tf.evaluate` on the published suite.
+PRICE_ONLY_EDGE = ("C4a", "C4b")
+
+#: The fifteen long-run criteria adopted on 2026-09-23, which pt-v19 was
+#: adopted under (`validation/pt-v20/programme/longrun/CRITERIA.md`).
+ADOPTED = ("A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8",
+           "C1", "C2", "C3", "D1")
+
+#: The twenty-three more rows pt-v20's long-run verdict grades: twelve from
+#: box ptv20g4b (commit 40f3f39, D2 the driven 2020-21 market added in the
+#: fifth registration) and eleven from the twelfth registration, graded on
+#: box ptv20g6 (the record's `criteria` field names
+#: `validation/pt-v20/programme/ptv20-registration.md`). pt-v20's record
+#: carries all forty;
+#: pt-v19's carries the other seventeen.
+REGISTERED_PT_V20 = ("B9", "C5", "C6", "C7", "C8", "C9", "R1", "R2", "R3",
+                     "R4", "E1", "D2",
+                     # The twelfth registration's eleven more, graded on
+                     # pt-v20's arm (box ptv20g6, 40 of 40).
+                     "C10", "F1", "L1", "R5", "R6", "R7a", "R7b", "S1a",
+                     "S1b", "S2", "V1")
 
 
 def record(name: str) -> dict:
@@ -343,9 +366,8 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     """THE SECOND GATE'S CERTIFICATE, REPORTED BESIDE THE SHIP BAR, BY NAME.
 
     This test used to hold the shipped preset to non-regression on its own
-    structural certificate. The owner's ruling of 2026-09-23 (design repo
-    `programme/longrun/CRITERIA.md`, ledger `ruling-the-pass-bar-is-what-a-
-    user-would-notice-programme-longrun-criteria`) moved that: the pass bar
+    structural certificate. The owner's ruling of 2026-09-23
+    (`validation/pt-v20/programme/longrun/CRITERIA.md`) moved that: the pass bar
     is the fifteen long-run criteria plus every ruled band, and "the
     certification's VIX persistence rows ... are reported and investigated
     but do not gate".
@@ -354,8 +376,8 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     the row on both panels and the rise, readable by the bar and rendered in
     the line a reader sees; the reading is pinned so it cannot change in
     silence; the published table agrees with it; and beside it sit the two
-    things that do gate -- the long-run verdict, which passes, and every
-    ruled band in on all four protocols.
+    things that do gate -- the long-run criteria, which pass, and every
+    ruled band in on all four protocols. The record is pt-v20's since 0.8.5.
     """
     rec = record(envelope.PRESET)
     for field in envelope.STRUCTURE_BAR_PANELS:
@@ -369,8 +391,11 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert "structure bar" in line and "PASS" in line
 
     # The reading the release carries, REPORTED, and asserted so it cannot
-    # change in silence. Re-pinned at the fifth composition of 2026-09-23:
-    # PASS on both panels, k 18 at 252 and k 17 held out (cut 21). The
+    # change in silence. RE-PINNED on pt-v20's graded arm (box ptv20g6):
+    # PASS on both panels, k 15 at 252 and k 15 held out (cut 21), median
+    # 0.930223 against the tape's 0.929939; the same k and 0.932337 before
+    # the arm (box ptv20g3). pt-v19's fifth composition of 2026-09-23
+    # read PASS on both at k 18 and k 17, median 0.933726. The
     # fourth composition read PASS at 19 and REFUSED above at 23 held out;
     # the second 20 and 21 (at the cut), the 2026-09-20 record 25 and 22,
     # the 2026-09-14 one 21 and 28. The fifth composition's 504-session
@@ -378,21 +403,34 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     # reports beside the verdict and which the ruling does not gate.
     row = rec["structure_252"]["rows"][VIX_AR1_ROW]
     assert rec["structure_252"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (18, 21, None)
+    assert (row["k"], row["cut"], row["side"]) == (15, 21, None)  # pt-v19: 18
     assert rec["structure_252"]["at_the_cut"] == []
     row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
     assert rec["structure_heldout_seeds"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (17, 21, None)
+    assert (row["k"], row["cut"], row["side"]) == (15, 21, None)  # pt-v19: 17
     assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)
             == envelope.CERTIFIED_STRUCTURE[VIX_AR1_ROW])
 
-    # WHAT GATES, beside it: the adopted long-run criteria, all passed ...
+    # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
+    # record carries forty: the fifteen pt-v19 was adopted under on
+    # 2026-09-23, C4a and C4b (added 2026-09-24,
+    # `validation/pt-v20/programme/longrun/CRITERIA.md`, section C4), and the
+    # twenty-three more
+    # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
+    # became the default. pt-v19's record reads 15 of 17 with the verdict
+    # "fail": it passes the fifteen and fails C4a and C4b, the tape's
+    # 65-minute reversal and two price-only rules on the published suite,
+    # which the brief that added them gave to pt-v20 to pass.
     lr = rec["long_run"]
-    assert lr["verdict"] == "pass" and lr["passed"] == lr["of"] == 15
-    assert all(r["pass"] for r in lr["rows"])
+    ids = [r["id"] for r in lr["rows"]]
+    assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
+    assert all(r["pass"] for r in lr["rows"]), [
+        r["id"] for r in lr["rows"] if not r["pass"]]
+    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
+    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
     assert set(rec["misses"]) == {"252", "504", "heldout_universe",
@@ -492,7 +530,10 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         # 2026-09-21 composition: +0.0116 [+0.0007, +0.0270] against the
         # tape's paired +0.0120, on the record box; +0.0071 on the fourth
         # composition and +0.0143 [+0.0064, +0.0280] on the fifth (2026-09-23),
-        # reported and not gated by the owner's ruling of that day. (The
+        # reported and not gated by the owner's ruling of that day. pt-v20,
+        # the default since 0.8.5, reads +0.0146 [+0.0032, +0.0241] on its
+        # graded arm (box ptv20g6), +0.0156 [+0.0041, +0.0270] before it
+        # (box ptv20g3). (The
         # 2026-09-20 record read -0.0024 [-0.0058, +0.0065]: one pole. The
         # regime level on the VIX law is what makes calm years and a rise.)
         assert row["verdict"] == "matches", row

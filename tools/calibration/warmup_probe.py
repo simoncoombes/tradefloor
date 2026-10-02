@@ -1,6 +1,6 @@
 """Which engine states are still relaxing at session 252?
 
-The brief for the market-side warm-up (`level-sigma-horizon.md`) names six
+The brief for the market-side warm-up names six
 candidates -- the factor's fast and slow variance components, the per-name
 GARCH variances, the sector variance state, the jump excitation, the
 smoothed VIX and the volume states -- and asks which of them are actually

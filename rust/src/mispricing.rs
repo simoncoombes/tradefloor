@@ -168,8 +168,8 @@ pub fn crowd_lean(s: f64, momentum: f64) -> f64 {
     crowd_lean_with(&crate::params::PT_V1, s, momentum)
 }
 
-/// [`crowd_lean`] under explicit model parameters (the runtime seam,
-/// CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the shipped
+/// [`crowd_lean`] under explicit model parameters (the runtime seam).
+/// At [`crate::params::PT_V1`] this is the shipped
 /// arithmetic bit for bit: same values, same operations, same order.
 pub fn crowd_lean_with(params: &crate::params::ModelParams, s: f64, momentum: f64) -> f64 {
     // The unary minus binds to the GAIN, so `s = -0` gives `+0` here

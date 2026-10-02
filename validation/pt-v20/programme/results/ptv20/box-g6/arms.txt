@@ -1,0 +1,4 @@
+# ptv20 final grade box (ptv20g6), long run: pt-v19 (the control, by name) and pt-v20 (by name, with the
+# twelfth registration's publication dials). Registered in programme/ptv20-registration.md.
+pt-v19:
+pt-v20@pt-v20:

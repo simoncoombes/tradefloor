@@ -1,0 +1,459 @@
+{
+ "kind": "ptv20-r7-eval",
+ "seeds": "101-130",
+ "years": 10,
+ "roster": "Universe.random(40, seed=<seed>)",
+ "tradefloor_version": "0.8.5",
+ "steps_per_day": 6,
+ "max_leverage": 2.0,
+ "arms": {
+  "pt-v19": {
+   "base": "pt-v19",
+   "dials": {},
+   "fingerprint": "pt-v19",
+   "n": 30,
+   "mean_excess_pts_yr": 1.3342769025829144,
+   "se": 0.18238657377938045,
+   "median_excess_pts_yr": 1.3179929406210378,
+   "ahead": 28,
+   "ahead_cap": 20.0,
+   "pass": false,
+   "per_seed": {
+    "101": {
+     "hold_pct": 113.08676800000002,
+     "ratenews_pct": 129.39059,
+     "excess_pts_yr": 0.7981465043697122,
+     "trades": 1880,
+     "rejected": 0
+    },
+    "102": {
+     "hold_pct": 75.40082400000003,
+     "ratenews_pct": 76.48472600000007,
+     "excess_pts_yr": 0.06518638514936281,
+     "trades": 280,
+     "rejected": 0
+    },
+    "103": {
+     "hold_pct": 101.69035600000002,
+     "ratenews_pct": 130.20713199999997,
+     "excess_pts_yr": 1.4279907809187087,
+     "trades": 2520,
+     "rejected": 0
+    },
+    "104": {
+     "hold_pct": 87.98150700000002,
+     "ratenews_pct": 126.04506800000001,
+     "excess_pts_yr": 1.9822613783502252,
+     "trades": 1480,
+     "rejected": 0
+    },
+    "105": {
+     "hold_pct": 78.26217099999997,
+     "ratenews_pct": 103.2511009999999,
+     "excess_pts_yr": 1.3990974020513747,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "106": {
+     "hold_pct": 114.60358799999999,
+     "ratenews_pct": 114.60358799999999,
+     "excess_pts_yr": 0.0,
+     "trades": 40,
+     "rejected": 0
+    },
+    "107": {
+     "hold_pct": 120.03444799999995,
+     "ratenews_pct": 175.07009499999958,
+     "excess_pts_yr": 2.4427628963548775,
+     "trades": 2600,
+     "rejected": 0
+    },
+    "108": {
+     "hold_pct": 84.23244299999996,
+     "ratenews_pct": 96.03133899999997,
+     "excess_pts_yr": 0.6619285510665263,
+     "trades": 600,
+     "rejected": 0
+    },
+    "109": {
+     "hold_pct": 106.898709,
+     "ratenews_pct": 136.1140219999999,
+     "excess_pts_yr": 1.4298887135758331,
+     "trades": 1640,
+     "rejected": 0
+    },
+    "110": {
+     "hold_pct": 85.369479,
+     "ratenews_pct": 170.48717699999978,
+     "excess_pts_yr": 4.096205357571359,
+     "trades": 3960,
+     "rejected": 0
+    },
+    "111": {
+     "hold_pct": 66.79076200000004,
+     "ratenews_pct": 110.95051599999984,
+     "excess_pts_yr": 2.501382373726102,
+     "trades": 2840,
+     "rejected": 0
+    },
+    "112": {
+     "hold_pct": 128.973943,
+     "ratenews_pct": 138.99798100000012,
+     "excess_pts_yr": 0.46647533297896615,
+     "trades": 1080,
+     "rejected": 0
+    },
+    "113": {
+     "hold_pct": 77.68025900000005,
+     "ratenews_pct": 123.46548399999975,
+     "excess_pts_yr": 2.456415026910941,
+     "trades": 3480,
+     "rejected": 0
+    },
+    "114": {
+     "hold_pct": 101.549036,
+     "ratenews_pct": 129.15934099999993,
+     "excess_pts_yr": 1.385934587923332,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "115": {
+     "hold_pct": 86.71142399999997,
+     "ratenews_pct": 118.92436100000003,
+     "excess_pts_yr": 1.7077227113357685,
+     "trades": 2440,
+     "rejected": 0
+    },
+    "116": {
+     "hold_pct": 85.38601400000002,
+     "ratenews_pct": 99.94690500000006,
+     "excess_pts_yr": 0.8073080663306031,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "117": {
+     "hold_pct": 63.639754,
+     "ratenews_pct": 74.29196499999985,
+     "excess_pts_yr": 0.6645745885597298,
+     "trades": 1560,
+     "rejected": 0
+    },
+    "118": {
+     "hold_pct": 114.820333,
+     "ratenews_pct": 133.35224300000016,
+     "excess_pts_yr": 0.8969293016734659,
+     "trades": 920,
+     "rejected": 0
+    },
+    "119": {
+     "hold_pct": 61.529815000000035,
+     "ratenews_pct": 90.80150100000004,
+     "excess_pts_yr": 1.7618764084829763,
+     "trades": 3000,
+     "rejected": 0
+    },
+    "120": {
+     "hold_pct": 78.77588400000005,
+     "ratenews_pct": 79.14253400000013,
+     "excess_pts_yr": 0.021715666976751535,
+     "trades": 280,
+     "rejected": 0
+    },
+    "121": {
+     "hold_pct": 99.51412400000002,
+     "ratenews_pct": 109.7119810000005,
+     "excess_pts_yr": 0.5354831389654757,
+     "trades": 2600,
+     "rejected": 0
+    },
+    "122": {
+     "hold_pct": 100.9743,
+     "ratenews_pct": 115.44628999999999,
+     "excess_pts_yr": 0.7482140235740564,
+     "trades": 1400,
+     "rejected": 0
+    },
+    "123": {
+     "hold_pct": 91.78568500000003,
+     "ratenews_pct": 143.60680000000033,
+     "excess_pts_yr": 2.583478848448517,
+     "trades": 2440,
+     "rejected": 0
+    },
+    "124": {
+     "hold_pct": 74.64438100000001,
+     "ratenews_pct": 97.90476800000006,
+     "excess_pts_yr": 1.3303380413163035,
+     "trades": 1480,
+     "rejected": 0
+    },
+    "125": {
+     "hold_pct": 75.40177700000005,
+     "ratenews_pct": 98.02850099999988,
+     "excess_pts_yr": 1.2912645358332364,
+     "trades": 2040,
+     "rejected": 0
+    },
+    "126": {
+     "hold_pct": 78.01088999999996,
+     "ratenews_pct": 123.37706700000012,
+     "excess_pts_yr": 2.4324336618713804,
+     "trades": 2920,
+     "rejected": 0
+    },
+    "127": {
+     "hold_pct": 69.97926299999997,
+     "ratenews_pct": 68.86783299999996,
+     "excess_pts_yr": -0.06915236726836582,
+     "trades": 280,
+     "rejected": 0
+    },
+    "128": {
+     "hold_pct": 101.94637499999999,
+     "ratenews_pct": 127.91457500000001,
+     "excess_pts_yr": 1.305647839925772,
+     "trades": 1399,
+     "rejected": 0
+    },
+    "129": {
+     "hold_pct": 74.25570599999996,
+     "ratenews_pct": 125.42559299999982,
+     "excess_pts_yr": 2.757033062565606,
+     "trades": 2120,
+     "rejected": 0
+    },
+    "130": {
+     "hold_pct": 89.64239900000001,
+     "ratenews_pct": 92.14332899999975,
+     "excess_pts_yr": 0.13976425794883784,
+     "trades": 1000,
+     "rejected": 0
+    }
+   }
+  },
+  "pt-v20": {
+   "base": "pt-v20",
+   "dials": {},
+   "fingerprint": "pt-v20",
+   "n": 30,
+   "mean_excess_pts_yr": -0.3218751269663359,
+   "se": 0.07360093021262351,
+   "median_excess_pts_yr": -0.18370490778348847,
+   "ahead": 2,
+   "ahead_cap": 20.0,
+   "pass": true,
+   "per_seed": {
+    "101": {
+     "hold_pct": 90.87780197931828,
+     "ratenews_pct": 88.52819297534944,
+     "excess_pts_yr": -0.13204853000887695,
+     "trades": 1720,
+     "rejected": 0
+    },
+    "102": {
+     "hold_pct": 34.64589819564335,
+     "ratenews_pct": 34.64589819564335,
+     "excess_pts_yr": 0.0,
+     "trades": 40,
+     "rejected": 0
+    },
+    "103": {
+     "hold_pct": 228.48746533804868,
+     "ratenews_pct": 223.6635908476908,
+     "excess_pts_yr": -0.16650082364733088,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "104": {
+     "hold_pct": 72.08978287642533,
+     "ratenews_pct": 71.96914398130379,
+     "excess_pts_yr": -0.0074036318484571595,
+     "trades": 118,
+     "rejected": 0
+    },
+    "105": {
+     "hold_pct": 241.618337883423,
+     "ratenews_pct": 220.16208363090715,
+     "excess_pts_yr": -0.7310861343597486,
+     "trades": 1000,
+     "rejected": 0
+    },
+    "106": {
+     "hold_pct": 59.77267563994209,
+     "ratenews_pct": 58.86533163012294,
+     "excess_pts_yr": -0.0596667189086908,
+     "trades": 1320,
+     "rejected": 0
+    },
+    "107": {
+     "hold_pct": 147.33379836939312,
+     "ratenews_pct": 140.32379656209554,
+     "excess_pts_yr": -0.31431652272091437,
+     "trades": 2680,
+     "rejected": 0
+    },
+    "108": {
+     "hold_pct": 165.82174433625698,
+     "ratenews_pct": 153.11216607801387,
+     "excess_pts_yr": -0.538928999663435,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "109": {
+     "hold_pct": 25.90872573434475,
+     "ratenews_pct": 25.61839647476305,
+     "excess_pts_yr": -0.023620638213439626,
+     "trades": 2360,
+     "rejected": 0
+    },
+    "110": {
+     "hold_pct": 133.38611158621768,
+     "ratenews_pct": 112.01529027829986,
+     "excess_pts_yr": -1.0402962073296607,
+     "trades": 3160,
+     "rejected": 0
+    },
+    "111": {
+     "hold_pct": 149.34752958497592,
+     "ratenews_pct": 134.7890233789959,
+     "excess_pts_yr": -0.65718053789392,
+     "trades": 1160,
+     "rejected": 0
+    },
+    "112": {
+     "hold_pct": 212.58681424035055,
+     "ratenews_pct": 202.7881938876049,
+     "excess_pts_yr": -0.35636696924603584,
+     "trades": 1400,
+     "rejected": 0
+    },
+    "113": {
+     "hold_pct": 168.78221614940745,
+     "ratenews_pct": 146.30172258503706,
+     "excess_pts_yr": -0.9600162606156148,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "114": {
+     "hold_pct": 38.71638751533667,
+     "ratenews_pct": 38.08073709848919,
+     "excess_pts_yr": -0.047446105267479055,
+     "trades": 2040,
+     "rejected": 0
+    },
+    "115": {
+     "hold_pct": 130.5791257876668,
+     "ratenews_pct": 111.67947006603475,
+     "excess_pts_yr": -0.9257600790795406,
+     "trades": 3560,
+     "rejected": 0
+    },
+    "116": {
+     "hold_pct": 162.92316432611565,
+     "ratenews_pct": 162.92316432611565,
+     "excess_pts_yr": 0.0,
+     "trades": 40,
+     "rejected": 0
+    },
+    "117": {
+     "hold_pct": 47.62954888525526,
+     "ratenews_pct": 41.190178791919394,
+     "excess_pts_yr": -0.4626661783654118,
+     "trades": 2120,
+     "rejected": 0
+    },
+    "118": {
+     "hold_pct": 149.47363341326653,
+     "ratenews_pct": 149.47363341326653,
+     "excess_pts_yr": 0.0,
+     "trades": 40,
+     "rejected": 0
+    },
+    "119": {
+     "hold_pct": 111.26457075833859,
+     "ratenews_pct": 96.22658211932662,
+     "excess_pts_yr": -0.792828122869671,
+     "trades": 1800,
+     "rejected": 0
+    },
+    "120": {
+     "hold_pct": 146.9751861371276,
+     "ratenews_pct": 116.5708978562126,
+     "excess_pts_yr": -1.4286033900641426,
+     "trades": 2040,
+     "rejected": 0
+    },
+    "121": {
+     "hold_pct": 85.79875553757157,
+     "ratenews_pct": 82.31978901380171,
+     "excess_pts_yr": -0.20090899191964606,
+     "trades": 2520,
+     "rejected": 0
+    },
+    "122": {
+     "hold_pct": 46.28610649183062,
+     "ratenews_pct": 44.989373994907275,
+     "excess_pts_yr": -0.09244987096139745,
+     "trades": 2040,
+     "rejected": 0
+    },
+    "123": {
+     "hold_pct": 103.96722926940805,
+     "ratenews_pct": 102.0364034635149,
+     "excess_pts_yr": -0.10209299925640902,
+     "trades": 520,
+     "rejected": 0
+    },
+    "124": {
+     "hold_pct": 60.58203255359316,
+     "ratenews_pct": 59.583864943514655,
+     "excess_pts_yr": -0.0653573008614794,
+     "trades": 3480,
+     "rejected": 0
+    },
+    "125": {
+     "hold_pct": 66.0586004612892,
+     "ratenews_pct": 59.24543533352269,
+     "excess_pts_yr": -0.4398146672651482,
+     "trades": 1160,
+     "rejected": 0
+    },
+    "126": {
+     "hold_pct": 18.551482277466008,
+     "ratenews_pct": 19.361386027239867,
+     "excess_pts_yr": 0.06927646211354332,
+     "trades": 2040,
+     "rejected": 0
+    },
+    "127": {
+     "hold_pct": -10.153468816336197,
+     "ratenews_pct": -12.667684704224754,
+     "excess_pts_yr": -0.2804037422339256,
+     "trades": 3240,
+     "rejected": 0
+    },
+    "128": {
+     "hold_pct": 68.98703263715429,
+     "ratenews_pct": 68.65393269211364,
+     "excess_pts_yr": -0.020791798501718084,
+     "trades": 120,
+     "rejected": 0
+    },
+    "129": {
+     "hold_pct": -30.659039425759822,
+     "ratenews_pct": -27.93586592787914,
+     "excess_pts_yr": 0.37207429532174485,
+     "trades": 2760,
+     "rejected": 0
+    },
+    "130": {
+     "hold_pct": 106.08282682169138,
+     "ratenews_pct": 101.32030358854563,
+     "excess_pts_yr": -0.25104934532327317,
+     "trades": 1640,
+     "rejected": 0
+    }
+   }
+  }
+ }
+}

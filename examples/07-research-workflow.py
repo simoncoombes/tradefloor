@@ -1,9 +1,8 @@
-"""A complete research workflow, start to finish, in ten to twenty seconds.
+"""A complete research workflow, start to finish, in about forty seconds of CPU.
 
-It said "about ten seconds" until 2026-09-05 and "about forty" until 0.8.0;
-the run prints its own total on the last line, which is the number to trust.
-Roughly half of it is step 8, the realism panel, which runs the 252 days its
-bands were derived at.
+That is user plus system time, measured with /usr/bin/time at 0.8.5 and
+rounded up; the run prints its own wall-clock total on the last line. Step
+8, the realism panel, runs the 252 days its bands were derived at.
 
 Run it:
 
@@ -30,7 +29,8 @@ import struct
 import time
 
 import tradefloor as tf
-from tradefloor.baselines import Momentum, capture_ratio, reference_agents
+from tradefloor.baselines import (Momentum, capture_ratio, capture_withheld,
+                                  reference_agents, versus_buy_and_hold)
 
 
 def main() -> dict:
@@ -66,21 +66,40 @@ def main() -> dict:
         print(f"     {card.name:16s} {card.return_pct:+7.2f}%  "
               f"impact {card.impact_bps:+8.2f} bps")
 
-    # The number worth reporting. Raw P&L is not comparable across markets,
-    # since a seed with more dispersion pays every strategy more, and dividing by
-    # what a perfectly-informed reference earned in THAT market removes
-    # exactly that.
+    # Raw P&L is not comparable across markets, so read each agent against a
+    # reference that traded the same one. Buy-and-hold first: did the agent
+    # earn more than owning the market did?
+    versus = versus_buy_and_hold(scores)
+    report["versus_buy_and_hold"] = versus
+    print(f"     P&L over buy-and-hold: "
+          f"{ {k: round(v) for k, v in versus.items()} }")
+
+    # Then the Oracle, where it is a ceiling. On pt-v19 and before, dividing
+    # by what a perfectly-informed reference earned in THAT market removes
+    # the market's dispersion from the score. On pt-v20, the default, market
+    # moves mostly stick, the Oracle's P&L follows the market's month, and
+    # `capture_ratio` returns nothing; `capture_withheld` says why.
     #
-    # A ratio above 1.0 is legal and does happen, in roughly 9% of measured
-    # agent-seed pairs. The Oracle is not an upper bound: it gets the same
-    # gross exposure as everyone else and spends it on a naive equal-weight
-    # rule, so an agent with a better portfolio under the same constraint
-    # out-earns it. That is a finding about portfolio construction, not a
-    # broken denominator, so nothing here clamps it.
-    ratios = capture_ratio(scores)
+    # A ratio above 1.0 is legal. The Oracle is not an upper bound: it gets
+    # the same gross exposure as everyone else and spends it on a naive
+    # equal-weight rule, so a better portfolio under the same constraint
+    # out-earns it -- the same information on three names a side instead of
+    # five does, on 6 of 8 markets in the baselines module's grid. From an
+    # agent that reads only prices it is now rare: 0 of 48 agent-seed pairs
+    # on that grid since 0.8.5, against 5 of 48 before, when every agent was
+    # marked to its own impact counted on each tick of a step. It is a
+    # finding about portfolio construction, not a broken denominator, so
+    # nothing here clamps it.
+    # Asked for only where there is one: on pt-v20 capture_ratio returns {}
+    # and warns with the reason, which capture_withheld gives as text.
+    withheld = capture_withheld(scores)
+    ratios = capture_ratio(scores) if withheld is None else {}
     report["capture"] = ratios
-    print(f"     capture vs the oracle: "
-          f"{ {k: round(v, 3) for k, v in ratios.items()} }")
+    if withheld is None:
+        print(f"     capture vs the oracle: "
+              f"{ {k: round(v, 3) for k, v in ratios.items()} }")
+    else:
+        print(f"     {withheld}")
 
     # ...and that table ranks the SEED at least as much as the agents. Twelve
     # markets, and a single seed picks the top agent half the time. So the
@@ -92,9 +111,17 @@ def main() -> dict:
     mark = time.time()
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(8),
                       universe=universe, days=5, workers=8)
-    report["ranking"] = {r.name: r.pooled_capture for r in ranking.table()}
+    # The headline: pooled capture where the Oracle is a ceiling, and mean
+    # P&L over buy-and-hold's where it is not.
+    report["ranking"] = {
+        r.name: (r.mean_excess_pnl if ranking.capture_withheld
+                 else r.pooled_capture)
+        for r in ranking.table()}
     print(f"     ranked across 8 seeds in {time.time() - mark:.1f}s")
     for line in ranking.report().splitlines()[1:]:
+        # The report ends on the same no-capture note step 3 printed.
+        if withheld is not None and line.strip() == withheld:
+            continue
         print(f"  {line}")
 
     # The table has a winner. The statistics may not, and reporting only the
@@ -107,19 +134,32 @@ def main() -> dict:
           f"{verdict['wins_b']} across seeds, p={verdict['p_value']:.3f}"
           f"{'' if verdict['decisive'] else '  (not separated)'}")
 
-    # The spread of the leader across single seeds is wider than its whole
-    # margin over the runner-up. That is the finding, asserted so that a
-    # change which quietly narrows the spread has to explain itself.
-    span = first.capture_range[1] - first.capture_range[0]
-    margin = first.pooled_capture - second.pooled_capture
+    # The spread of the leader across single seeds against its margin over
+    # the runner-up. Until 0.8.5 the spread was always the wider, and this
+    # asserted it. On pt-v20, the default from 0.8.5, the Oracle is no
+    # ceiling and the table reads P&L over buy-and-hold's, so the spread is
+    # the leader's per-seed P&L range and the margin the gap in mean P&L:
+    # buy-and-hold leads random by 25,044 a seed against a range of
+    # 38,450, and wins all eight paired seeds. So what is asserted is that a
+    # margin wider than the spread only stands where the paired test backs
+    # it: a leader that is neither inside its own noise nor separated would
+    # be the coin flip in nicer clothes this section warns about.
+    if ranking.capture_withheld is None:
+        span = first.capture_range[1] - first.capture_range[0]
+        margin = first.pooled_capture - second.pooled_capture
+        unit = ".3f"
+    else:
+        span = max(first.pnls) - min(first.pnls)
+        margin = first.mean_excess_pnl - second.mean_excess_pnl
+        unit = ",.0f"
     report["span_exceeds_margin"] = span > margin
-    assert span > margin, (
-        f"per-seed spread {span:.3f} no longer exceeds the {margin:.3f} "
-        "margin between the top two -- if that is real, single-seed "
-        "evaluation just became defensible and this warning should change"
-    )
-    print(f"     one seed swings the leader by {span:.3f}, against a "
-          f"{margin:.3f} margin over second place")
+    assert span > margin or verdict["p_value"] < 0.05, (
+        f"per-seed spread {span:{unit}} is under the {margin:{unit}} margin "
+        f"between the top two and the sign test does not separate them "
+        f"(p={verdict['p_value']:.3f}): the table names a leader nothing "
+        "supports")
+    print(f"     one seed swings the leader by {span:{unit}}, against a "
+          f"{margin:{unit}} margin over second place")
 
     # 4. What did the winner's trading cost? Every fill priced against a market
     #    where it never traded, the benchmark real TCA cannot have.
@@ -170,17 +210,24 @@ def main() -> dict:
           f"fear gauge, the largest {largest:.1f} bps against a "
           f"{median_direct:.1f} bps median direct impact")
 
-    # And with VIX pinned the macro channel is closed, so the subtraction is
-    # byte-exact, the guarantee the RNG stream split actually makes, now
-    # demonstrated at the boundary where it holds.
-    pinned = tf.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
-                            scenario=tf.Scenario().hold(vix=15.0))
+    # And with the macro channels pinned the subtraction is byte-exact, the
+    # guarantee the RNG stream split actually makes, now demonstrated at the
+    # boundary where it holds. Two channels on pt-v20, the default from
+    # 0.8.5: the VIX, and the corporate bond yield, which follows the
+    # 10-year every session while the flight to quality moves the 10-year
+    # with the session's return (`flight_to_quality_day`,
+    # `corporate_yield_daily`). With the VIX alone pinned, one untouched
+    # name here closes apart; with both pinned none does.
+    pinned = tf.tca.analyse(
+        Momentum(), seed=7, universe=universe, days=10,
+        scenario=tf.Scenario().hold(vix=15.0, corporate_bond_yield=0.055))
     report["leaked_pinned"] = pinned.untouched_moved()
     assert not report["leaked_pinned"], (
-        f"impact leaked into untraded names under a pinned VIX: "
+        f"impact leaked into untraded names under a pinned macro: "
         f"{report['leaked_pinned']}"
     )
-    print("     under a pinned VIX: none, byte-exact, as they must be")
+    print("     under a pinned VIX and corporate yield: none, byte-exact, "
+          "as they must be")
 
     # 4b. The book that made those costs. Impact here is not a formula applied
     #     to a size -- it is depth being consumed, so it can be watched
@@ -240,7 +287,7 @@ def main() -> dict:
     print("     what the book quoted is what the portfolio paid, exactly")
 
     # 5. Ground truth for the same market. One row per instrument per tick,
-    #    and the nine components sum to the change in mispricing, so the
+    #    and the eleven components sum to the change in mispricing, so the
     #    label can be checked rather than trusted.
     mark = time.time()
     engine = tf.Engine(seed=7, universe=universe)

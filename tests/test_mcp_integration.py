@@ -24,6 +24,7 @@ would spend more time on Python startup than on the assertions.
 """
 
 import asyncio
+import os
 import sys
 
 import pytest
@@ -57,9 +58,12 @@ CALLS = {
     "rank_strategies": {"strategies": {"m": MOMENTUM}, "seeds": [1, 2],
                         "days": 1, "universe_size": 8},
     # By NAME, from the pack that ships inside the wheel -- the path a model
-    # takes when it has no clone to read files from.
-    "run_stress_scenario": {"scenario": "liquidity_crisis", "days": 2,
-                            "universe_size": 8},
+    # takes when it has no clone to read files from. `policy_regime_shift`
+    # because its first event (day 30) is the earliest in the pack, and a
+    # run must reach it: until 0.8.5 this ran `liquidity_crisis` for two
+    # days, 48 before its first shock, and passed on a result of 0.0.
+    "run_stress_scenario": {"scenario": "policy_regime_shift", "days": 31,
+                            "universe_size": 4},
     "explain_price_move": {"universe_size": 8, "day": 1, "top_n": 2},
     # A small roster and one day, because this tool replays the day once
     # per distinct draw set to check its own tree and a tool call answers
@@ -81,9 +85,21 @@ def _structured(result):
     return None
 
 
+def _server():
+    """The server as a subprocess, in THIS process's environment.
+
+    `StdioServerParameters` without `env` hands the child only the SDK's
+    short list of inherited variables, which leaves out PYTHONPATH. A run
+    that points PYTHONPATH at a checkout then spawned whichever tradefloor
+    was installed and tested that instead, with nothing to show for it.
+    """
+    return StdioServerParameters(command=sys.executable,
+                                 args=["-m", "tradefloor.mcp"],
+                                 env=dict(os.environ))
+
+
 async def _drive():
-    params = StdioServerParameters(command=sys.executable,
-                                   args=["-m", "tradefloor.mcp"])
+    params = _server()
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             init = await session.initialize()
@@ -153,7 +169,9 @@ def test_a_shipped_scenario_runs_by_name_over_the_wire(live):
     # readable: a return under a scenario alone could be the scenario or
     # could be the market.
     assert out["comparison"]
-    assert out["scenario"] == "liquidity_crisis"
+    assert out["scenario"] == "policy_regime_shift"
+    assert any(row["difference"] != 0.0 for row in out["comparison"]), (
+        "the run reached the document's first event, so something moved")
 
 
 def test_an_authored_intervention_survives_the_round_trip(live):
@@ -248,8 +266,7 @@ def test_a_bad_argument_comes_back_as_a_result_not_a_crash():
     """A refusal has to reach the model as something it can act on. An
     exception reaches it as a transport error with no guidance."""
     async def go():
-        params = StdioServerParameters(command=sys.executable,
-                                       args=["-m", "tradefloor.mcp"])
+        params = _server()
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -265,3 +282,49 @@ def test_a_bad_argument_comes_back_as_a_result_not_a_crash():
     assert "momentum" in structured["error"], (
         "the error must list the valid kinds, or a model cannot self-correct"
     )
+
+
+def test_every_parameter_reaches_a_client_with_a_description(live):
+    """What a model reads before it calls. Until 0.8.5 no property carried
+    one, and the grammars, the caps and the sector spelling were guesses."""
+    _init, tools, _results = live
+    for tool in tools:
+        schema = getattr(tool, "input_schema", None) or tool.inputSchema
+        for name, prop in schema.get("properties", {}).items():
+            assert prop.get("description"), f"{tool.name}.{name}"
+
+
+#: Inputs that raised inside a tool before 0.8.5, and reached the client as
+#: a bare "Error executing tool <name>" with nothing to correct from.
+BAD_CALLS = {
+    "hold with a list": ("build_scenario", {
+        "steps": [{"kind": "hold", "fields": [1, 2]}]}, "fields"),
+    "ramp with a word": ("build_scenario", {
+        "steps": [{"kind": "ramp", "field": "vix", "start": "a",
+                   "end": 45, "over": 10}]}, "must be a number"),
+    "job with a word for days": ("start_job", {
+        "tool": "evaluate_strategies",
+        "arguments": {"strategies": {"m": MOMENTUM}, "days": "abc"}},
+        "days"),
+    "job with an unknown argument": ("start_job", {
+        "tool": "evaluate_strategies",
+        "arguments": {"strategies": {"m": MOMENTUM}, "days": 1,
+                      "bogus": 1}}, "bogus"),
+}
+
+
+def test_a_malformed_input_comes_back_as_a_refusal_it_can_act_on():
+    async def go():
+        async with stdio_client(_server()) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return {label: await session.call_tool(tool, args)
+                        for label, (tool, args, _) in BAD_CALLS.items()}
+
+    results = asyncio.run(go())
+    for label, (_tool, _args, named) in BAD_CALLS.items():
+        res = results[label]
+        assert getattr(res, "is_error", False) is False, label
+        structured = _structured(res)
+        assert structured is not None and structured["ok"] is False, label
+        assert named in structured["error"], (label, structured["error"])

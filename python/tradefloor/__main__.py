@@ -4,10 +4,13 @@ A scenario is configuration, and configuration that can only be checked by
 running a hundred-day simulation is configuration nobody checks. These
 commands parse, validate, resolve and fingerprint a file in milliseconds:
 
-    tradefloor scenario validate scenarios/liquidity_crisis.yml
-    tradefloor scenario show     scenarios/oil_price_spike.yml
-    tradefloor scenario diff     scenarios/rate_shock.yml scenarios/recession.yml
+    tradefloor scenario validate liquidity_crisis ./my-scenario.yml
+    tradefloor scenario show     oil_price_spike
+    tradefloor scenario diff     rate_shock recession
     tradefloor scenario targets
+
+A name from `tradefloor scenario list` reads the file that ships with the
+library, and anything else is a path.
 
 `python -m tradefloor ...` is the same thing without the console script, for
 a checkout or an environment where scripts are not on PATH.
@@ -73,6 +76,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     return _targets()
 
 
+#: What a bad scenario file raises. A file that is not UTF-8 raises
+#: UnicodeDecodeError, a ValueError, which is neither of the other two, so
+#: `validate a.yml b.yml` used to stop at it with a traceback instead of
+#: reporting it and reading the next file.
+_UNREADABLE = (ValidationError, OSError, UnicodeDecodeError)
+
+
 def _load(target: str) -> Scenario:
     """A path to a file, or the name of one that ships with the library.
 
@@ -99,7 +109,7 @@ def _validate(paths: Sequence[str]) -> int:
             print()
         try:
             scenario = _load(path)
-        except (ValidationError, OSError) as exc:
+        except _UNREADABLE as exc:
             failed += 1
             print(f"{path}\nScenario invalid.\n\n{exc}")
             continue
@@ -118,7 +128,7 @@ def _validate(paths: Sequence[str]) -> int:
 def _show(path: str) -> int:
     try:
         print(_load(path).describe())
-    except (ValidationError, OSError) as exc:
+    except _UNREADABLE as exc:
         print(f"Scenario invalid.\n\n{exc}")
         return 1
     return 0
@@ -127,7 +137,7 @@ def _show(path: str) -> int:
 def _diff(left_path: str, right_path: str) -> int:
     try:
         left, right = _load(left_path), _load(right_path)
-    except (ValidationError, OSError) as exc:
+    except _UNREADABLE as exc:
         print(f"Scenario invalid.\n\n{exc}")
         return 1
 
@@ -201,6 +211,31 @@ def _targets() -> int:
             print(f"    {line}")
         print()
     return 0
+
+
+def mcp_main() -> None:
+    """Entry point for `tradefloor-mcp`: the MCP server, or one line on why not.
+
+    The script used to point at `tradefloor.mcp:main` directly, so without
+    the extra the module-level import failed and the user saw about fifteen
+    lines of chained ModuleNotFoundError and ImportError tracebacks before
+    the one line that mattered. Users start it through a client
+    (`claude mcp add tradefloor -- tradefloor-mcp`), so that noise lands in
+    a client log where the last line is easy to miss.
+
+    Only the `mcp` import is caught. Any other ImportError from
+    `tradefloor.mcp` is a defect in tradefloor and keeps its traceback.
+    """
+    try:
+        from mcp.server import MCPServer  # noqa: F401
+    except ImportError as exc:
+        print("tradefloor-mcp needs the mcp package, 2.0 or later, which "
+              f"tradefloor does not install by default ({exc}). Install it "
+              "with: pip install \"tradefloor[mcp]\"", file=sys.stderr)
+        raise SystemExit(1) from None
+    from .mcp import main as serve
+
+    serve()
 
 
 if __name__ == "__main__":

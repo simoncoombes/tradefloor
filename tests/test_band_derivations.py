@@ -113,10 +113,11 @@ def test_every_universal_band_is_the_fixed_rule_plus_its_named_adjustment(
 
     THIS IS THE TEST THE UNIVERSAL TABLES DID NOT HAVE. Before
     `UNIVERSAL_WINDOWS` landed, both tables were typed numbers whose readings
-    lived in the design repository, and nothing in this suite read either
-    one. Every edge below is `band_from_windows_fixed` on the non-crisis
-    windows at the multiplier for that count, plus whichever of the two
-    inward clamps `REAL_MARKETS_UNIVERSAL_ADJUSTMENTS` names for the row.
+    lived in the project's unpublished design notes, and nothing in this
+    suite read either one. Every edge below is `band_from_windows_fixed` on
+    the non-crisis windows at the multiplier for that count, plus whichever
+    of the two inward clamps `REAL_MARKETS_UNIVERSAL_ADJUSTMENTS` names for
+    the row.
 
     REFUSES: an edge nobody derived, which is what both tables were made of.
     """
@@ -171,7 +172,7 @@ def test_the_campbell_ceiling_is_absent_because_it_would_round_inward():
     """The retired literature move, asserted as arithmetic rather than prose.
 
     `REAL_MARKETS_ADJUSTMENTS` moves the decade band's volatility ceiling out
-    to Campbell's 36.0. REALISM-BANDS.md allows a literature move OUTWARD
+    to Campbell's 36.0. The band rules allow a literature move OUTWARD
     only, and the universal rule's own ceiling is past 36.0, so applying it
     would tighten the band. `BAND_BASIS` states this in a sentence; this is
     the sentence as arithmetic.
@@ -693,7 +694,7 @@ def test_both_drift_bands_are_the_rule_on_their_legs(name, legs):
 def test_each_drift_leg_carries_no_standard_error_of_its_own():
     """`se` is `sd / sqrt(n)` and is not stored, so it cannot disagree.
 
-    The design repository's drift-band.json carries `se` beside `sd` and `n`
+    The drift band's source data carries `se` beside `sd` and `n`
     on every leg and the three agree to ten places. Storing all three here
     would be a third number saying what two already say, and a band edge
     moves if the stored one drifts.

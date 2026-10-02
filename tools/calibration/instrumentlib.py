@@ -1,4 +1,4 @@
-"""Shared machinery for the calibration instrument (CALIBRATION.md §4).
+"""Shared machinery for the calibration instrument.
 
 Phase 2 builds three measurements on top of the phase-1 seam, and this
 module is what they share:
@@ -59,7 +59,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-#: The published panel method (facts.py, CALIBRATION.md §1).
+#: The published panel method (facts.py).
 PANEL_UNIVERSE_N = 40
 PANEL_UNIVERSE_SEED = 111
 PANEL_DAYS = 252
@@ -149,7 +149,7 @@ PARAM_SPECS: dict[str, dict] = {
     # the condition is read at the open or read live, and there is no half
     # sampling, so the step is the whole interval and a search either takes
     # the form or leaves it. The range stops at 1.0 on purpose -- 2.0 is the
-    # registered SIGN CONTROL of `corr-asymmetry-repair.md` F4, a diagnostic
+    # registered SIGN CONTROL of the asymmetry repair, a diagnostic
     # arm and never a shipping value, so no search may land on it.
     "market_beta_down_asym_lag_live": {"kind": "abs", "step_unit": 1.0,
                                        "hard_range": (0.0, 1.0)},
@@ -158,6 +158,13 @@ PARAM_SPECS: dict[str, dict] = {
     # drift of its own, which is the defect inverted rather than a
     # richer model.
     "market_beta_down_asym_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "fair_value_market_linear": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "fair_value_market_vol_cap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 32.0)},
+    "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
+    "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down
@@ -279,7 +286,7 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_decay_ratio": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.2, 1.5)},
     "vix_jump_intensity": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 24.0)},
     "vix_jump_scale": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
-    # The VIX-dynamics dials (programme/results/vix-dynamics.md). Each is a
+    # The VIX-dynamics dials. Each is a
     # measured quantity with its own error bar, so the box is the measured
     # value's neighbourhood and not a search range: the tape decides them.
     # The level exponents are the response's power in the VIX (down
@@ -297,7 +304,7 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_jump_level_scale": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
     "vix_jump_return_intensity": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 24.0),
                                   "derived": True},
-    # The per-component states (vix-dynamics.md 19): measured on the
+    # The per-component states: measured on the
     # reference panel with their bars, so the boxes are the measurements'
     # neighbourhoods, not search ranges.
     "sector_vol_alpha": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.3)},
@@ -356,9 +363,9 @@ PARAM_SPECS: dict[str, dict] = {
     # both eras, and the search's step is multiplicative so the width costs
     # nothing at either end.
     #
-    # `vix-dynamics.md` 2.3 does NOT supply a bar for this. Its `gain_u`
+    # The tape's VIX-dynamics fit does NOT supply a bar for this. Its `gain_u`
     # column (0.0365 to 0.0683 per era) is the TAPE's up gain; the dial is
-    # that net of the read-back at `vix_mean_reversion`, and the same note's
+    # that net of the read-back at `vix_mean_reversion`, and the same fit's
     # memory table runs the dial from 0.008 to 0.450 across the plausible
     # memory range. Neither is an error bar on the dial at a fixed memory.
     "vix_return_gain_up": {"kind": "log", "hard_range": (0.012, 250.0)},
@@ -468,7 +475,7 @@ PARAM_SPECS: dict[str, dict] = {
     # A blend weight over its whole domain; 0.1 steps span it in ten.
     "fair_value_book_floor": {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 1.0)},
-    # Two blend weights over their whole domain (§60, CRISIS-BLEND-SECTOR.md).
+    # Two blend weights over their whole domain.
     "crisis_blend_source": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 1.0)},
     "sector_vix_coupling": {"kind": "abs", "step_unit": 0.1,
@@ -556,7 +563,7 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 0.15)},
     # The VIX's own slow log-level (2026-09-21): a lognormal AR(1) on what
     # the VIX prices. DERIVED from the two-pole fit to log VIX's ACF
-    # (design repo, vix-level-derivation.txt): 0.9965 and 0.0256.
+    # (the project's unpublished design notes): 0.9965 and 0.0256.
     "vix_level_persistence": {"kind": "abs", "step_unit": 0.01,
                               "hard_range": (0.0, 0.9995), "derived": True},
     "vix_level_sigma":        {"kind": "abs", "step_unit": 0.005,
@@ -620,8 +627,8 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_anchor_weight_level_knee_fixed": {"kind": "abs", "step_unit": 1.0,
                                           "hard_range": (0.0, 1.0), "derived": False},
     # How fast an endogenous news event's move is priced (2026-09-23,
-    # news-speed). Derived from intraday event studies (design repository,
-    # programme/results/news-speed/): 0.6-tick half-life, 12% drift at a
+    # news-speed). Derived from intraday event studies (the project's
+    # unpublished design notes): 0.6-tick half-life, 12% drift at a
     # 42-tick half-life, the maker re-quoting on news.
     "news_absorption_half_life": {"kind": "abs", "step_unit": 0.05,
                                   "hard_range": (0.0, 5.0), "derived": True},
@@ -631,6 +638,61 @@ PARAM_SPECS: dict[str, dict] = {
                                         "hard_range": (0.0, 120.0), "derived": True},
     "news_quote_revision": {"kind": "abs", "step_unit": 1.0,
                             "hard_range": (0.0, 1.0), "derived": True},
+    # pt-v20 (2026-09-24, validation/pt-v20/programme/ptv20-registration.md).
+    # The two tape switches and the fair-value share are derived as the
+    # values that make the mechanism what it says (1.0 each); the opening
+    # spread and the ladder's scale are measured.
+    "quote_model_weight": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": True},
+    "closing_auction": {"kind": "abs", "step_unit": 1.0,
+                        "hard_range": (0.0, 1.0), "derived": True},
+    "fair_value_news_share": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 1.0), "derived": True},
+    "opening_mispricing_sigma": {"kind": "abs", "step_unit": 0.002,
+                                 "hard_range": (0.0, 0.3)},
+    "opening_market_sigma": {"kind": "abs", "step_unit": 0.005,
+                             "hard_range": (0.0, 0.3)},
+    "fair_value_market_share": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 1.0)},
+    "treasury_10y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "treasury_2y_noise": {"kind": "abs", "step_unit": 0.0025, "hard_range": (0.0, 0.1)},
+    "flight_to_quality_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
+    "flight_to_quality_day": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "corporate_yield_daily": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
+    "earnings_cycle_depth": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.5)},
+    "earnings_cycle_upside": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "earnings_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (1.0, 2520.0)},
+    "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
+    "earnings_anticipation_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 5040.0)},
+    "rate_pe_sensitivity": {"kind": "rel", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": False},
+    # A switch whose identity is the value: 1.0 prices a macro decision the
+    # moment it is readable (pt-v20 audit finding 3).
+    "macro_publication_repricing": {"kind": "abs", "step_unit": 1.0,
+                                    "hard_range": (0.0, 1.0), "derived": True},
+    "cascade_gain": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The agent-facing book (2026-09-24, feature/order-book-depth). Read only
+    # on an agent's path, so no untraded statistic moves with any of them.
+    "book_depth_coefficient": {"kind": "abs", "step_unit": 0.05,
+                               "hard_range": (0.0, 10.0), "derived": False},
+    "book_depth_exponent": {"kind": "abs", "step_unit": 0.05,
+                            "hard_range": (0.0, 1.0), "derived": False},
+    "book_depth_reach": {"kind": "abs", "step_unit": 0.25,
+                         "hard_range": (0.0, 10.0), "derived": False},
+    "book_shared": {"kind": "abs", "step_unit": 1.0,
+                    "hard_range": (0.0, 1.0), "derived": False},
+    "book_refill_half_life": {"kind": "abs", "step_unit": 1.0,
+                              "hard_range": (0.0, 390.0), "derived": True},
+    "book_resting": {"kind": "abs", "step_unit": 1.0,
+                     "hard_range": (0.0, 1.0), "derived": False},
+    "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
+                                "hard_range": (0.0, 5.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,
@@ -645,7 +707,7 @@ PARAM_SPECS: dict[str, dict] = {
                                       "hard_range": (0.0, 63.0)},
     # The market-side warm-up, in SESSIONS, so the step unit is a step in
     # sessions and not a fraction: 63 is one quarter, the block the
-    # transient was traced in (`level-sigma-horizon.md` 2.2), and anything
+    # transient was traced in, and anything
     # finer is below the resolution at which the envelope was measured.
     # The top is twice the registered 504; see `atlas_survey`'s entry for
     # why the map is flat past about 700.
@@ -692,9 +754,9 @@ PARAM_SPECS: dict[str, dict] = {
     #
     # That is why `ptv4`'s certificate reported `market_vol_ceiling_multiple`
     # = 2.0 "driven to its box floor". Nothing drove it. The clamp put it
-    # there before the first search step ran, and CALIBRATION-FOLLOWUPS §16
+    # there before the first search step ran, and an earlier write-up
     # attributed a halved crisis lever to an optimiser trade that never
-    # happened. §24 retracts that.
+    # happened, later retracted.
     #
     # The ranges below are floors and ceilings on a variance clamp expressed
     # as a multiple of the long-run level, so the honest bound is "wide
@@ -836,14 +898,14 @@ PARAM_SPECS: dict[str, dict] = {
                                     "hard_range": (1.0, 50.0)},
     "market_vol_floor_multiple": {"kind": "log",
                                   "hard_range": (0.001, 1.0)},
-    # The two floor dials (programme/idio-vol-floor.md). Both must be able
+    # The two floor dials. Both must be able
     # to reach the END of their range, not a multiple of the shipped value:
     # the whole content of each is what happens at one endpoint, so a
     # convention box around the ship would explore everything except the
     # answer.
     "garch_omega_sector_scaled": {"kind": "abs", "step_unit": 0.1,
                                   "hard_range": (0.0, 1.0)},
-    # The stationary day-zero opening (programme/stationary-opening-design.md).
+    # The stationary day-zero opening.
     # A switch: 0.0 and 1.0 are the only values that mean anything, so the
     # step is the whole interval and a search either takes the mechanism or
     # leaves it.
@@ -904,8 +966,8 @@ LEGACY_OVERRIDES: dict[str, float] = {
 
 
 #: The dials `provenance.py` marks `derived` AND that are closed forms or
-#: rule-derivations over something the vector carries -- design note
-#: `derived-dial-enforcement.md` classes A and B. They come off the search
+#: rule-derivations over something the vector carries (classes A and B in
+#: the project's unpublished design notes). They come off the search
 #: surface: a Jacobian column for one of them measures the response to
 #: BREAKING an identity, which is a reading of the break rather than of the
 #: model. The eleven class-C switches stay, because a switch has no identity

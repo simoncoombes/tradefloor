@@ -57,22 +57,53 @@ question it was not asked, so a floor over one is not offered here.
 ## The battery
 
 :data:`BATTERY_VERSION` names the cell set :func:`battery` returns by
-default. A version is immutable: `battery(1)` builds the same six cells,
-byte for byte, on every call and on every future release, because a
-fingerprint is only comparable to another taken against the SAME worlds.
-Extending the battery -- another cell, a different roster size, a longer
-run -- is a new version, never an edit to `1`.
+default, which is version 2 from 0.8.5. A version is immutable:
+`battery(1)` and `battery(2)` build the same cells, byte for byte, on
+every call and on every future release, because a fingerprint is only
+comparable to another taken against the SAME worlds. Extending the
+battery -- another cell, a different roster size, a longer run -- is a new
+version, never an edit to an old one. A fingerprint records its version,
+and :meth:`Fingerprint.compare` refuses two versions, so a version 1
+fingerprint taken before 0.8.5 is compared against `battery(1)` and not
+against the default.
 
 Each cell is one :class:`~tradefloor.counterfactual.World`, seeded and
 rostered by :func:`tradefloor.Universe.random`, running one shipped
 :class:`~tradefloor.Scenario` from day zero at the library's own six
-steps a day. The six cells cover the six scenarios `Scenario.available()`
-ships today; a battery version pins their NAMES, not the live directory,
-so a scenario added to the package later changes nothing this version
-already committed to. Sixty days puts every shipped scenario's own shock
-(day 30 to day 55, across the six) behind the run, not only its
-run-up -- see the per-cell seeds and days named in
-`tests/test_fingerprint.py`.
+steps a day.
+
+Version 2 has seven cells, one for each scenario the package ships:
+``curve_shock``, ``geopolitical_conflict``, ``liquidity_crisis``,
+``oil_price_spike``, ``policy_regime_shift``, ``rate_shock`` and
+``recession``. Every cell runs 120 days, the length the scenario files
+were measured over. Six of the seven fire their main shock at day 50, so
+their cells see seventy days after it, and ``policy_regime_shift`` moves
+credit at day 30, tariffs at day 40 and inflation at day 50. That covers
+the whole of ``liquidity_crisis``'s depth and volatility shock (to day
+74) and its earnings fall (to day 91), ``geopolitical_conflict``'s
+volatility (to day 79), ``oil_price_spike``'s supply ramp (to day 74) and
+``recession``'s tripled volatility (to day 109). Two shocks are still
+running when a cell stops: ``liquidity_crisis``'s earnings recovery runs
+to day 175, and ``recession``'s contraction to day 364. The
+``curve_shock`` cell's roster carries the three rate indices
+(``Universe.random(6, seed=..., bonds=True)``), because that scenario is
+a stress for a bond book; every other cell is six equities.
+
+Version 1 has six cells of 60 days, one for each scenario that shipped
+when it was fixed. ``curve_shock``, packaged later, is not in version 1
+and cannot be added to it. Five of its six fire their
+main shock at day 50, so a version 1 fingerprint hashes how an agent
+reacts in the first ten days of a shock and says nothing about how it
+trades through the rest. ``liquidity_crisis`` holds its depth and
+volatility shock to day 74, ``geopolitical_conflict`` its volatility to
+day 79, and ``recession`` its contraction to day 364, all past the end
+of a version 1 cell. The ``at:`` and ``duration:`` fields under
+``python/tradefloor/scenarios/`` give each day, and
+`tests/test_fingerprint.py` checks the ones quoted here.
+
+A version 2 run is twice as long as a version 1 run: 840 days of six
+steps against 360, so an LLM agent asked once a day makes 840 calls
+instead of 360.
 
 A :class:`Cell` is one un-forked :meth:`~tradefloor.counterfactual.World.run`
 and cannot express a checkpoint-fork-intervene experiment -- two arms
@@ -101,20 +132,38 @@ asserting either silently.
 
 ## Commit-reveal
 
-:func:`commit` hashes a sorted, caller-salted seed LIST -- the set of
-per-cell market seeds a battery will run with -- and is meant to be
-published before the run it describes. :func:`reveal` recomputes the same
-hash from a later-disclosed `(seeds, salt)` and says whether it matches;
-it refuses silently rather than raising, because "does this reveal match
-that commitment" is exactly the boolean a verifier asks.
-:func:`sealed_battery` builds the battery those seeds describe, in the
-order given, everything else -- roster seed, scenario, days, steps --
-staying whatever the named `version` already pins. The commitment binds
-the SET of seeds a run used, not their assignment to cells: two reveals of
-the same set in a different order both satisfy the same commitment and
-build two different batteries, and a verifier that cares which cell got
-which seed checks the reveal's order against a record kept alongside it,
-not against the commitment alone.
+Commit-reveal keeps a battery's market seeds secret until after the run,
+so the agent's author cannot tune against them, and lets anyone check
+afterwards that the seeds were fixed before the results were in. Draw the
+seeds, publish the commitment, run, then publish the seeds and the salt:
+
+```python
+import secrets
+
+seeds = [secrets.randbits(64) for _ in tf.battery().cells]
+salt = secrets.token_bytes(16)
+commitment = tf.commit(seeds, salt)          # publish this before the run
+result = tf.fingerprint.fingerprint(agent, tf.sealed_battery(seeds, salt))
+# Later, publish seeds and salt. Anyone can then check them:
+assert tf.reveal(commitment, seeds, salt)
+```
+
+:func:`commit` is sha256 over the sorted seed list and the salt.
+:func:`reveal` recomputes it and answers True or False. :func:`sealed_battery`
+puts the seeds into the cells in the order given and keeps everything else
+(roster seed, scenario, days, steps) as the battery version pins it. The
+commitment covers the set of seeds and not which cell got which, so the
+same seeds in another order also pass :func:`reveal` and build a different
+battery. A verifier who cares about that assignment has to get the order
+from a record kept with the reveal.
+
+Draw sealed seeds from the whole range, ``secrets.randbits(64)`` for each
+cell. A seed is any integer from 0 to ``2**64 - 1``, and a hidden seed is
+only as hidden as the range it was drawn from: below ``2**32`` there are
+2**32 markets per roster, few enough to find by simulating every one
+against a market's first prices, and a sealed battery drawn there can be
+opened without the reveal. Across 64 bits that search is 2**32 times
+longer.
 """
 
 from __future__ import annotations
@@ -122,9 +171,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import numbers
 from typing import TYPE_CHECKING, Any, NamedTuple, Sequence
 
-from ._core import ValidationError
+from ._core import ValidationError, check_seed
 from .counterfactual import Resample, World, _gross, _net, _shape
 from .render import TextRenderer
 from .scenario import Scenario
@@ -139,15 +189,15 @@ if TYPE_CHECKING:
     from .integrations.common import Action, Decision
 
 #: The cell set :func:`battery` returns by default. Bump this, and add a
-#: new entry to the version table below, to ship a different battery; `1`
-#: itself never changes shape. See the module docstring.
-BATTERY_VERSION = 1
+#: new entry to the version table below, to ship a different battery; an
+#: existing version never changes shape. See the module docstring.
+BATTERY_VERSION = 2
 
-#: Instruments per cell. Fixed across every cell and every version so that
+#: Equities per cell. Fixed across every cell and every version so that
 #: only the seed varies what a roster IS, not how big it is. Small enough
-#: to keep the whole six-cell, sixty-day battery cheap against a scripted
-#: agent, large enough that a decision naming one symbol is not a coin
-#: flip.
+#: to keep a whole battery cheap against a scripted agent, large enough
+#: that a decision naming one symbol is not a coin flip. A cell with
+#: ``bonds=True`` adds the three rate indices after them.
 _ROSTER_SIZE = 6
 
 
@@ -161,7 +211,10 @@ class Cell(NamedTuple):
     companies" separately citable. ``scenario`` is a name
     :meth:`~tradefloor.Scenario.load` accepts. ``days`` is how long the
     cell runs; ``steps`` is
-    :attr:`~tradefloor.counterfactual.World.steps_per_day`.
+    :attr:`~tradefloor.counterfactual.World.steps_per_day`. ``bonds``
+    adds the three rate indices to the roster
+    (``Universe.random(..., bonds=True)``); it is False on every version 1
+    cell and True only on version 2's ``curve_shock`` cell.
     """
 
     seed: int
@@ -169,6 +222,7 @@ class Cell(NamedTuple):
     scenario: str
     days: int
     steps: int
+    bonds: bool = False
 
 
 class Battery:
@@ -202,12 +256,12 @@ class Battery:
 #: to the package after this version shipped must not silently grow it.
 #: Seeds are well clear of the ones the shipped examples and fixtures use
 #: (4242, 11, 101, ...), so a battery run can never collide with a
-#: recorded transcript's own world. `days=60` and `steps=6` are named
-#: once, here, rather than per cell: every shipped scenario's own shock
-#: fires between day 30 and day 55 (`tests/test_fingerprint.py` names the
-#: six `at:` values it was measured against), and 6 steps a day is the
-#: library's own decision cadence -- see `World`'s default and
-#: `examples/rate-shock/counterfactual.py`.
+#: recorded transcript's own world. `days=60` and `steps=6` are fixed for
+#: every cell. Five of the six scenarios fire their main shock at day 50,
+#: so those cells see ten days after it (see the module docstring). 6 steps
+#: a day is the library's own decision cadence -- see `World`'s default
+#: and `examples/rate-shock/counterfactual.py`. Never edit these. A longer
+#: or different set is a new version.
 _CELLS: dict[int, tuple[Cell, ...]] = {
     1: (
         Cell(90_000, 91_000, "geopolitical_conflict", 60, 6),
@@ -216,6 +270,19 @@ _CELLS: dict[int, tuple[Cell, ...]] = {
         Cell(90_003, 91_003, "policy_regime_shift", 60, 6),
         Cell(90_004, 91_004, "rate_shock", 60, 6),
         Cell(90_005, 91_005, "recession", 60, 6),
+    ),
+    #: Version 2 (0.8.5): every shipped scenario, 120 days each, so the
+    #: day-50 shocks have seventy days after them. New seeds, so no cell
+    #: replays a version 1 cell's first sixty days. `curve_shock` trades
+    #: with the rate indices on the roster.
+    2: (
+        Cell(90_100, 91_100, "curve_shock", 120, 6, bonds=True),
+        Cell(90_101, 91_101, "geopolitical_conflict", 120, 6),
+        Cell(90_102, 91_102, "liquidity_crisis", 120, 6),
+        Cell(90_103, 91_103, "oil_price_spike", 120, 6),
+        Cell(90_104, 91_104, "policy_regime_shift", 120, 6),
+        Cell(90_105, 91_105, "rate_shock", 120, 6),
+        Cell(90_106, 91_106, "recession", 120, 6),
     ),
 }
 
@@ -239,8 +306,16 @@ def battery(version: int = BATTERY_VERSION) -> Battery:
     stored as a literal, so it cannot drift from what P6 actually
     considers its default. See the module docstring for what the battery
     pins and what depending on P6 means here.
+
+    ``version`` is a whole number. ``battery(True)`` is refused rather than
+    read as version 1, which is what Python's ``True == 1`` would give.
     """
-    return _build(version)
+    if isinstance(version, bool) or not isinstance(version, numbers.Integral):
+        from ._checks import describe
+        raise ValidationError(
+            f"battery version must be a whole number, such as "
+            f"{BATTERY_VERSION}; got {describe(version)}.")
+    return _build(int(version))
 
 
 # ---------------------------------------------------------------------------
@@ -339,8 +414,8 @@ def _group_by_cell(
 def _decision_from_shape(shape: Sequence[Sequence[Any]]) -> Decision:
     from .integrations.common import Action, Decision
 
-    return Decision([Action(symbol, side, quantity)
-                     for symbol, side, quantity in shape])
+    # A limit order's shape carries its price as a fourth element.
+    return Decision([Action(*action) for action in shape])
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +467,8 @@ def fingerprint(agent: Any,
     for index, cell in enumerate(battery.cells):
         cell_agent = (agent.fork() if callable(getattr(agent, "fork", None))
                      else copy.deepcopy(agent))
-        roster = Universe.random(_ROSTER_SIZE, seed=cell.roster_seed)
+        roster = Universe.random(_ROSTER_SIZE, seed=cell.roster_seed,
+                                 bonds=cell.bonds)
         world = World(seed=cell.seed, universe=list(roster), agent=cell_agent,
                      steps_per_day=cell.steps, on_refusal="skip",
                      label=f"fingerprint battery {battery.version} cell "
@@ -632,14 +708,24 @@ class FingerprintComparison:
 # ---------------------------------------------------------------------------
 
 def commit(seeds: Sequence[int], salt: bytes) -> str:
-    """sha256 of the sorted seed list plus ``salt``. Publish before the run.
+    """sha256 of the sorted seed list and ``salt``, in hex. Publish it
+    before the run.
 
-    ``salt`` is caller-supplied and never stored: the library only ever
-    recomputes this same hash, in :func:`reveal`, from a later-disclosed
-    ``(seeds, salt)``. It must be ``bytes`` -- a ``str`` silently encoded
-    would make two salts that read identically on screen hash
-    differently, and a commitment scheme that can fail that way for a
-    typo is not one worth calling a commitment.
+    ``salt`` must be ``bytes``. A ``str`` is refused because it would have
+    to be encoded, and two salts that look the same on screen could then
+    hash differently. Keep the salt private until the reveal. The library
+    never stores it.
+
+    Each seed must be an integer from 0 to ``2**64 - 1``. They are checked
+    here, so a list the engine would refuse cannot be committed to. Draw
+    them with ``secrets.randbits(64)``; the module docstring says why the
+    full range matters.
+
+    ```python
+    seeds = [secrets.randbits(64) for _ in tf.battery().cells]
+    salt = secrets.token_bytes(16)
+    commitment = tf.commit(seeds, salt)
+    ```
     """
     if isinstance(salt, str):
         raise ValidationError(
@@ -647,42 +733,53 @@ def commit(seeds: Sequence[int], salt: bytes) -> str:
             "hashed as raw bytes; encoding a str implicitly is a choice "
             "this function will not make silently, because two salts "
             "that read identically could then hash differently.")
-    canonical = json.dumps(sorted(int(s) for s in seeds),
+    canonical = json.dumps(sorted(check_seed(s) for s in seeds),
                            separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical + bytes(salt)).hexdigest()
 
 
 def reveal(commitment: str, seeds: Sequence[int], salt: bytes) -> bool:
-    """Whether ``(seeds, salt)`` reproduces ``commitment``.
+    """Whether ``seeds`` and ``salt`` reproduce ``commitment``.
 
-    Refuses by returning ``False`` rather than raising: a verifier checks
-    a reveal, and the answer to "does this match" is exactly the boolean
-    this returns, for a different seed list, a different salt, or both.
+    Returns False for a different seed list or a different salt, and for a
+    list holding something that could never have been committed to (a
+    negative integer, one of ``2**64`` or more, a float). It raises only for
+    a ``str`` salt, as :func:`commit` does. The order of ``seeds`` does not
+    matter, because :func:`commit` sorts them.
+
+    ```python
+    tf.reveal(commitment, seeds, salt)         # True
+    tf.reveal(commitment, seeds[::-1], salt)   # also True
+    tf.reveal(commitment, seeds, b"other")     # False
+    ```
     """
+    try:
+        seeds = [check_seed(s) for s in seeds]
+    except ValidationError:
+        return False
     return commit(seeds, salt) == commitment
 
 
 def sealed_battery(seeds: Sequence[int], salt: bytes,
                    version: int = BATTERY_VERSION) -> Battery:
-    """The named battery, its cells' market seeds replaced by ``seeds``.
+    """Battery ``version`` with ``seeds`` as its cells' market seeds.
 
-    ``seeds`` are assigned to cells IN THE ORDER GIVEN, one per cell,
-    after :func:`reveal` -- called separately, against whatever
-    commitment was published -- has already said they match. ``salt`` is
-    accepted for the same reason :func:`reveal` takes one: a caller
-    revealing a run passes the ``(seeds, salt)`` pair it was given as one
-    unit. This function does not itself check a commitment, because it is
-    handed no commitment to check; nothing here re-derives anything from
-    ``salt`` beyond that symmetry. Everything but the market seed --
-    roster seed, scenario, days, steps, the reference renderer key --
-    stays whatever ``version`` already pins.
+    The seeds go to the cells in the order given, one per cell, and a list
+    of any other length is refused. Everything else (roster seed, scenario,
+    days, steps, the reference renderer key) stays as ``version`` pins it.
 
-    Raises if ``seeds`` is not exactly one entry per cell: a shorter or
-    longer reveal cannot be a reveal of THIS battery's commitment, whatever
-    :func:`reveal` says about the set.
+    This does not check a commitment, because it is not given one. Call
+    :func:`reveal` for that. ``salt`` is taken so the same ``(seeds, salt)``
+    pair passes through all three functions, and a ``str`` salt is refused
+    as in :func:`commit`. Nothing else is done with it.
+
+    ```python
+    sealed = tf.sealed_battery(seeds, salt)
+    result = tf.fingerprint.fingerprint(agent, sealed)
+    ```
     """
     base = _build(version)
-    seeds = [int(s) for s in seeds]
+    seeds = [check_seed(s) for s in seeds]
     if len(seeds) != len(base.cells):
         raise ValidationError(
             f"sealed_battery needs {len(base.cells)} seeds for battery "

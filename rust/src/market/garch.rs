@@ -14,7 +14,7 @@
 //! is how much MORE a negative surprise feeds through than a positive one
 //! of the same size — the leverage effect, which real equities have and a
 //! symmetric GARCH structurally cannot (the return enters squared, so its
-//! sign is destroyed; design finding 8, CALIBRATION.md §3.5). The effective
+//! sign is destroyed). The effective
 //! persistence is `ALPHA + BETA + GAMMA/2`, the asymmetry term being live on
 //! roughly half of days.
 //!
@@ -177,7 +177,7 @@ pub const CASCADE_MAX: usize = 8;
 /// ```
 ///
 /// which is why the legacy term reads component 0's previous variance. With
-/// that spelling the fourth-moment operator `cascade-crossing.md` publishes
+/// that spelling the fourth-moment operator the cascade derivation gives
 /// for the flat blend is the operator at every `w` in [0, 1]; substitute `wt`
 /// for the flat `1/K` and no new algebra is needed. The radius rises
 /// monotonically in `w`, because tilting weight onto component 0 tilts it
@@ -192,8 +192,8 @@ pub const CASCADE_MAX: usize = 8;
 /// feed this recursion the name's own return, so the shock is attenuated by
 /// `kappa^2 = idio_sigma_scale^2 * cap_mult^2 * volatility_multiplier^2 *
 /// intraday_variance_factor`, which is 0.182366 to 0.729463 across the four
-/// cap tiers at pt-v19's `idio_sigma_scale` of 0.5125981926
-/// (`cascade-crossing.md` section 4). The worst radius over every `w` in
+/// cap tiers at pt-v19's `idio_sigma_scale` of 0.5125981926.
+/// The worst radius over every `w` in
 /// [0, 1], every `K` up to [`CASCADE_MAX`] and every tier is 0.940249.
 ///
 /// THAT RANGE IS A PROPERTY OF THE PRESET AND NOT OF THE ENGINE.
@@ -257,7 +257,7 @@ pub fn update_garch_cascade(
     let previous_component_0 = cascade[0];
 
     let mut total = 0.0;
-    for i in 0..k {
+    for (i, slot) in cascade.iter_mut().enumerate().take(k) {
         let half_life = base_half_life * powi(params.garch_cascade_ratio, i);
         // beta that puts THIS component at that half-life, with alpha and
         // gamma/2 already spending part of the persistence budget.
@@ -266,12 +266,12 @@ pub fn update_garch_cascade(
         let beta_i = if beta_i < 0.0 { 0.0 } else { beta_i };
         let pers_i = params.garch_alpha + beta_i + params.garch_gamma / 2.0;
         let omega_i = sector_base_variance * (1.0 - pers_i);
-        let raw = omega_i + shock + beta_i * cascade[i];
-        cascade[i] = mathx::max(
+        let raw = omega_i + shock + beta_i * *slot;
+        *slot = mathx::max(
             mathx::min(raw, sector_base_variance * params.garch_ceiling_multiple),
             sector_base_variance * params.garch_floor_multiple,
         );
-        total += cascade[i];
+        total += *slot;
     }
     let cascade_variance = total / (k as f64);
 
@@ -412,7 +412,7 @@ pub fn update_garch_variance(
 }
 
 /// [`update_garch_variance`] under explicit model parameters (the runtime
-/// seam, CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the
+/// seam). At [`crate::params::PT_V1`] this is the
 /// shipped arithmetic bit for bit: same values, same operations, same
 /// order — the constants above remain the definition of the preset.
 pub fn update_garch_variance_with(
@@ -654,7 +654,7 @@ mod tests {
     ///
     ///     h = sum_i wt_i v_i,   wt_i = w/K + (1 - w) [i == 0]
     ///
-    /// which is the identity that makes `cascade-crossing.md`'s operator on
+    /// which is the identity that makes the cascade derivation's operator on
     /// `E[v v']` the right operator at every `w` and not only at `w = 1`. At
     /// the settings below the old spelling misses by 6 to 16 per cent of `h`,
     /// against a tolerance of 1e-12.
@@ -746,7 +746,7 @@ mod tests {
     /// recursion is attenuated by `idio_sigma_scale^2 * cap_mult^2 *
     /// volatility_multiplier^2 * intraday_variance_factor`, at most 0.729463,
     /// and the ceiling beta reads 0.900957 there. A failure here is therefore
-    /// a prompt to read `cascade-crossing.md` section 4 and decide, not proof
+    /// a prompt to redo the cascade's fourth-moment derivation and decide, not proof
     /// that the preset diverges. It is written at `kappa^2 = 1` because that
     /// is the condition for a caller that supplies `daily_innovations`
     /// itself, and because a bound that moves with the cap tier does not
@@ -761,9 +761,8 @@ mod tests {
     /// without someone editing it, and a listed preset cannot drift.
     #[test]
     fn the_widest_beta_a_preset_admits_has_a_finite_fourth_moment() {
-        // The presets that are over the bound, with what they read. See
-        // `garchlatent.md` in the design repository for what it costs them:
-        // an excess kurtosis that is set by `garch_ceiling_multiple` rather
+        // The presets that are over the bound, with what they read. What it
+        // costs them is an excess kurtosis that is set by `garch_ceiling_multiple` rather
         // than by the GJR coefficients.
         const OVER: [(&str, f64); 2] = [
             ("pt-v1", 1.1390000000000002),
@@ -803,7 +802,7 @@ mod tests {
                 "{name}: garch_beta_for reaches beta {worst_beta} at some \
                  cap, whose fourth-moment coefficient is {worst} at \
                  kappa^2 = 1. GARCH_PERSISTENCE_CEILING is a first-moment \
-                 guard and admits it. Read cascade-crossing.md section 4 and \
+                 guard and admits it. Redo the fourth-moment derivation and read \
                  the note on GARCH_PERSISTENCE_CEILING before widening \
                  garch_beta_dispersion further. Check the WIRED attenuation \
                  too: it is `idio_sigma_scale^2 * cap_mult^2 * \

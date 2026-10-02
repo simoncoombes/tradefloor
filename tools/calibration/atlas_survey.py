@@ -128,7 +128,7 @@ from tradefloor import atlas                 # noqa: E402
 from tradefloor.facts import REAL_MARKETS, aggregate_panels  # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
-#: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
+#: as `<stat>_<days>` beside the thirteen.
 DIAGNOSTIC_STATS = ("corr_persistence_acf1",)
 from tradefloor.loss import dual_horizon_loss  # noqa: E402
 
@@ -172,8 +172,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the interior has no reading. Stops at 1.0; the sign control at 2.0 is a
     # diagnostic arm, not a point of the search surface.
     "market_beta_down_asym_lag_live": (0.0, 1.0),
-    # The variance-neutral down-tick reallocation (`corr-asymmetry.md` §10,
-    # design repository): the idiosyncratic shock is suppressed by `1 - c`
+    # The variance-neutral down-tick reallocation (the project's unpublished
+    # design notes): the idiosyncratic shock is suppressed by `1 - c`
     # on a down tick of the factor and inflated by `sqrt(2 - (1 - c)^2)` on
     # an up tick, which holds the unconditional variance exactly and raises
     # the factor's share where `corr_asymmetry` looks.
@@ -200,8 +200,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # end.
     "market_vol_alpha_excursion": (0.0, 0.5),
     # The slow variance LEVEL's two dials. Both are bounded by the tape
-    # rather than by convention (`programme/results/cascade-fourth-moment.md`
-    # section 4.3, design repository): the derived pair is persistence
+    # rather than by convention (a fit to the S&P 500 tape in the project's
+    # unpublished design notes): the derived pair is persistence
     # 0.9977 [0.9945, 0.9992] and sigma 0.047 [0.035, 0.064].
     #
     # The persistence box has to CONTAIN the shipped 0.0 -- every range here
@@ -284,6 +284,38 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_absorption_drift_share": (0.0, 0.5),
     "news_absorption_drift_half_life": (0.0, 120.0),
     "news_quote_revision": (0.0, 1.0),
+    # pt-v20's tape, closing cross, fair-value share, opening spread and
+    # stop-ladder scale (validation/pt-v20/programme/ptv20-registration.md).
+    "quote_model_weight": (0.0, 1.0),
+    "closing_auction": (0.0, 1.0),
+    "fair_value_news_share": (0.0, 1.0),
+    "opening_mispricing_sigma": (0.0, 0.3),
+    "opening_market_sigma": (0.0, 0.3),
+    "fair_value_market_share": (0.0, 1.0),
+    "treasury_2y_noise": (0.0, 0.1),
+    "flight_to_quality_day": (0.0, 1.0),
+    "corporate_yield_daily": (0.0, 1.0),
+    "earnings_cycle_depth": (0.0, 0.6),
+    "earnings_cycle_upside": (0.0, 0.3),
+    "earnings_cycle_sigma": (0.0, 0.005),
+    "earnings_anticipation_half_life": (0.0, 504.0),
+    # Moves what the engine reports as the phase, never a price.
+    "cycle_publication_lag": (0.0, 504.0),
+    # Moves what the engine reports as GDP growth, never a price.
+    "gdp_publication_lag": (0.0, 126.0),
+    # Unemployment's partial adjustment, 0 to half a year.
+    "unemployment_adjustment_half_life": (0.0, 126.0),
+    # A switch: the fear/greed index reads the published phase and growth.
+    "fear_greed_published_inputs": (0.0, 1.0),
+    "macro_publication_repricing": (0.0, 1.0),
+    # The agent-facing book (2026-09-24): read only on an agent's path.
+    "book_depth_coefficient": (0.0, 2.0),
+    "book_depth_exponent": (0.0, 1.0),
+    "book_depth_reach": (0.0, 2.0),
+    "book_shared": (0.0, 1.0),
+    "book_refill_half_life": (0.0, 120.0),
+    "book_resting": (0.0, 1.0),
+    "fill_impact_coefficient": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
@@ -330,6 +362,23 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # entries around it there is no strong-to-implausible top to choose:
     # the top is where the correction is exact.
     "market_beta_down_asym_recentre": (0.0, 1.0),
+    # The same share for the lagged wire's multiple of the tilt. Its top is
+    # where the correction is exact, as for the entry above.
+    "market_beta_down_asym_lag_recentre": (0.0, 1.0),
+    # A switch: which part of a market shock the market share takes.
+    "fair_value_market_linear": (0.0, 1.0),
+    # A multiple of the market factor's base sigma; 1 to 3 is where the
+    # market's daily sigma spends most of its time (median 0.78, 99th
+    # percentile 4.9 on pt-v20).
+    "fair_value_market_vol_cap": (0.0, 4.0),
+    # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
+    # about a quarter off fair value, past any measured feedback.
+    "fair_value_vix_discount": (0.0, 0.3),
+    # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
+    "fair_value_vix_half_life": (0.0, 63.0),
+    # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
+    # name's (real ones run to a few per cent).
+    "buyback_yield_cap": (0.0, 0.3),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
@@ -423,7 +472,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
     "vix_jump_intensity": (0.0, 12.0),
     "vix_jump_scale": (0.0, 30.0),
-    # The VIX-dynamics dials (programme/results/vix-dynamics.md), each
+    # The VIX-dynamics dials, each
     # shipped at the value where its branch is not taken and each MEASURED
     # on the tape with an error bar, so the box is drawn around the
     # measurement rather than searched: a Latin hypercube over it maps the
@@ -436,7 +485,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_innovation_return_sigma": (0.0, 0.04),
     "vix_jump_level_scale": (0.0, 4.0),
     "vix_jump_return_intensity": (0.0, 12.0),
-    # The per-component states (vix-dynamics.md 19), boxes around the
+    # The per-component states, boxes around the
     # measured values; the same hypercube caveat as the rows above.
     "sector_vol_alpha": (0.0, 0.2),
     "sector_vol_beta": (0.0, 0.98),
@@ -539,7 +588,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the monotonic valuation; anything between is a partial floor.
     "fair_value_book_floor": (0.0, 1.0),
     # Where the crisis blend takes from, and whether sector variance follows
-    # VIX. Both blend weights, whole domain (§60, CRISIS-BLEND-SECTOR.md).
+    # VIX. Both blend weights, whole domain.
     "crisis_blend_source": (0.0, 1.0),
     "sector_vix_coupling": (0.0, 1.0),
     # Ships at 0.0 and its whole content is the far end: at 1.0 omega goes
@@ -634,6 +683,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The stop and squeeze ladders' scale: 1.0 on every preset through
+    # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
+    # The whole unit range, off to full.
+    "cascade_gain": (0.0, 1.0),
+    # The 10-year's noise and the flight to quality's size: 0.03 and 0.02
+    # through pt-v19, 0.025 and 0.008 on pt-v20.
+    "treasury_10y_noise": (0.0, 0.1),
+    # The earnings cycle's half-life in sessions: 60 through every preset
+    # (unread there), a quarter to two years around it.
+    "earnings_cycle_half_life": (20.0, 504.0),
+    "flight_to_quality_gain": (0.0, 0.05),
     # The macro calendar's year in steps: 365 as shipped, 252 the session
     # calendar (21-step months, 63-step quarters).
     "macro_calendar_days_per_year": (252.0, 365.0),
@@ -741,7 +801,7 @@ def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
 
     A power law is a straight line on log-log axes and a sum of exponentials
     bends. Real markets read about -0.436 over these lags; the shipped preset
-    reads about -0.95 (CALIBRATION-FOLLOWUPS §54, §56).
+    reads about -0.95.
 
     This exists because the survey measured the region containing the answer
     and could not report it. `garch_persistence` spans (0.21, 0.99) in

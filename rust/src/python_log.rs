@@ -34,8 +34,19 @@ use pyo3::types::{PyDict, PyList};
 /// One recorded call.
 #[derive(Debug, Clone)]
 pub enum LogEntry {
-    OpenMarket,
+    /// `day` is the label the day was opened under, present only when it
+    /// is not the engine's own counter (`run_days(first_day=...)`,
+    /// `open_market(day=...)`), so every log of a run that numbered its
+    /// days from the counter reads as it always did. A label moves no
+    /// price; it is logged because the book stamps fills with it.
+    OpenMarket {
+        day: Option<i64>,
+    },
     CloseMarket,
+    /// `set_day`: the label the draws and fills from here on carry.
+    SetDay {
+        day: i64,
+    },
     Tick {
         hour: i64,
         minute: i64,
@@ -52,7 +63,10 @@ pub enum LogEntry {
         volatility: f64,
         close_at_end: bool,
         news: Vec<(Option<String>, Option<String>, f64)>,
+        /// `flow_per_tick`: held on every tick of the session.
         flow: Vec<(String, f64, f64)>,
+        /// `fills`: applied once, on the session's first tick.
+        fills: Vec<(String, f64, f64)>,
     },
     PinMacro {
         fields: Vec<(String, f64)>,
@@ -74,6 +88,20 @@ pub enum LogEntry {
     /// rebuild a market with its original depth and call it the same run.
     SetAvgVolume {
         values: Vec<f64>,
+    },
+    /// Every company's fair-value inputs, as `Engine.set_fundamentals` wrote
+    /// them: reported earnings, book value and revenue growth per share, one
+    /// value each in roster order, NaN where absent.
+    ///
+    /// An input for the reason `SetAvgVolume` is: the `market.earnings`
+    /// scenario target writes through it, nothing in the engine writes these
+    /// figures back, and a replay that did not carry them rebuilt the market
+    /// with its original earnings and failed its digest. NaN goes out as
+    /// `None`, which JSON can carry.
+    SetFundamentals {
+        eps: Vec<f64>,
+        book_value_per_share: Vec<f64>,
+        revenue_growth: Vec<f64>,
     },
     ListInstrument {
         ticker: String,
@@ -103,6 +131,30 @@ pub enum LogEntry {
     },
     Record {
         day: u32,
+    },
+    /// An agent's order sent to the book. `quantity` is signed, positive to
+    /// buy. The id is logged only when the caller chose it: an id the
+    /// engine assigned is a consequence of the log, and replaying the log
+    /// assigns it again.
+    Submit {
+        agent: String,
+        ticker: String,
+        quantity: f64,
+        limit_price: Option<f64>,
+        order_id: Option<String>,
+    },
+    Cancel {
+        order_id: String,
+        agent: Option<String>,
+    },
+    /// Fills collected by `take_fills`. Logged because collecting them is a
+    /// change of state (the book no longer owes them), so a replay that did
+    /// not collect at the same point would hash differently.
+    TakeFills {
+        agent: Option<String>,
+    },
+    TakeImpacts {
+        agent: Option<String>,
     },
 }
 
@@ -138,11 +190,18 @@ impl LogEntry {
     pub fn to_py(&self, py: Python<'_>) -> PyResult<PyObject> {
         let d = PyDict::new_bound(py);
         match self {
-            LogEntry::OpenMarket => {
+            LogEntry::OpenMarket { day } => {
                 d.set_item("op", "open_market")?;
+                if let Some(day) = day {
+                    d.set_item("day", day)?;
+                }
             }
             LogEntry::CloseMarket => {
                 d.set_item("op", "close_market")?;
+            }
+            LogEntry::SetDay { day } => {
+                d.set_item("op", "set_day")?;
+                d.set_item("day", day)?;
             }
             LogEntry::Tick {
                 hour,
@@ -169,6 +228,7 @@ impl LogEntry {
                 close_at_end,
                 news,
                 flow,
+                fills,
             } => {
                 d.set_item("op", "run_session")?;
                 d.set_item("hour", hour)?;
@@ -178,7 +238,12 @@ impl LogEntry {
                 d.set_item("volatility", volatility)?;
                 d.set_item("close_at_end", close_at_end)?;
                 d.set_item("news", news_to_py(py, news)?)?;
-                d.set_item("order_flow", flow_to_py(py, flow)?)?;
+                // Named after the arguments that carried them. A log written
+                // before 0.8.5 has `order_flow` here instead, which meant the
+                // per-tick flow, and the replays read it as `flow_per_tick`,
+                // so an archived run replays into the market it described.
+                d.set_item("flow_per_tick", flow_to_py(py, flow)?)?;
+                d.set_item("fills", flow_to_py(py, fills)?)?;
             }
             LogEntry::PinMacro { fields, cycle, epicentre, vix_sets_variance } => {
                 d.set_item("op", "pin_macro")?;
@@ -225,6 +290,15 @@ impl LogEntry {
                 d.set_item("op", "set_avg_volume")?;
                 d.set_item("values", values.to_vec())?;
             }
+            LogEntry::SetFundamentals { eps, book_value_per_share, revenue_growth } => {
+                let absent = |v: &Vec<f64>| -> Vec<Option<f64>> {
+                    v.iter().map(|x| if x.is_nan() { None } else { Some(*x) }).collect()
+                };
+                d.set_item("op", "set_fundamentals")?;
+                d.set_item("eps", absent(eps))?;
+                d.set_item("book_value_per_share", absent(book_value_per_share))?;
+                d.set_item("revenue_growth", absent(revenue_growth))?;
+            }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;
                 d.set_item("index", index)?;
@@ -235,6 +309,27 @@ impl LogEntry {
             LogEntry::Record { day } => {
                 d.set_item("op", "record")?;
                 d.set_item("day", day)?;
+            }
+            LogEntry::Submit { agent, ticker, quantity, limit_price, order_id } => {
+                d.set_item("op", "submit")?;
+                d.set_item("agent", agent)?;
+                d.set_item("ticker", ticker)?;
+                d.set_item("quantity", quantity)?;
+                d.set_item("limit_price", limit_price)?;
+                d.set_item("order_id", order_id)?;
+            }
+            LogEntry::Cancel { order_id, agent } => {
+                d.set_item("op", "cancel")?;
+                d.set_item("order_id", order_id)?;
+                d.set_item("agent", agent)?;
+            }
+            LogEntry::TakeFills { agent } => {
+                d.set_item("op", "take_fills")?;
+                d.set_item("agent", agent)?;
+            }
+            LogEntry::TakeImpacts { agent } => {
+                d.set_item("op", "take_impacts")?;
+                d.set_item("agent", agent)?;
             }
         }
         Ok(d.into())

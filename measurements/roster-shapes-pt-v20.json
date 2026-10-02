@@ -1,0 +1,429 @@
+{
+  "preset": "pt-v20",
+  "seeds": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130
+  ],
+  "shapes": {
+    "balanced": {},
+    "sp500_like": {
+      "technology": 13,
+      "financial_services": 5,
+      "healthcare": 5,
+      "consumer_discretionary": 4,
+      "industrials": 3,
+      "consumer_staples": 3,
+      "energy": 2,
+      "telecommunications": 2,
+      "utilities": 1,
+      "real_estate": 1,
+      "materials": 1
+    },
+    "tech_heavy": {
+      "technology": 24,
+      "consumer_discretionary": 6,
+      "healthcare": 5,
+      "financial_services": 5
+    },
+    "all_technology": {
+      "technology": 40
+    },
+    "defensive": {
+      "consumer_staples": 10,
+      "utilities": 10,
+      "healthcare": 10,
+      "real_estate": 10
+    }
+  },
+  "results": {
+    "balanced@252": {
+      "in_band": 17,
+      "of": 18,
+      "unreadable": [],
+      "shape_in_band": 14,
+      "shape_of": 14,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 2,
+      "crisis_of": 3,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 20.54560081128141,
+        "excess_kurtosis": 18.107195610605967,
+        "return_acf1": 0.013047362706143227,
+        "abs_return_acf1": 0.028160301158231635,
+        "abs_return_acf5": 0.018790612377805556,
+        "abs_return_acf20": 0.004371874907452167,
+        "cross_sectional_corr": 0.3053070585467387,
+        "volume_abs_return_corr": 0.5957559827755767,
+        "leverage_effect": -0.03408630734147653,
+        "volume_change_acf1": -0.2680742414842928,
+        "corr_asymmetry": 0.07913016551255084,
+        "corr_asymmetry_lagged": 0.08604970113916167,
+        "sector_excess_corr": 0.11646248225083947,
+        "corr_persistence_acf1": 0.23027242290000327,
+        "index_drift_pct": 9.729815918748063,
+        "fear_gauge_dn1": 1.8298201623966204,
+        "fear_gauge_dn3": 4.209501381667296,
+        "index_tail_dn3_pct": 0.398406374501992
+      }
+    },
+    "balanced@504": {
+      "in_band": 16,
+      "of": 17,
+      "unreadable": [
+        "corr_persistence_acf1"
+      ],
+      "shape_in_band": 13,
+      "shape_of": 13,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 2,
+      "crisis_of": 3,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 21.112789608485784,
+        "excess_kurtosis": 19.214071036765304,
+        "return_acf1": 0.025044014357505584,
+        "abs_return_acf1": 0.03843752226091246,
+        "abs_return_acf5": 0.02464237616436159,
+        "abs_return_acf20": 0.009182124973647517,
+        "cross_sectional_corr": 0.3115951084568531,
+        "volume_abs_return_corr": 0.6266212356596669,
+        "leverage_effect": -0.03646917706711736,
+        "volume_change_acf1": -0.26064701954947683,
+        "corr_asymmetry": 0.04891070336470894,
+        "corr_asymmetry_lagged": 0.08420972515102017,
+        "sector_excess_corr": 0.11024877167474248,
+        "corr_persistence_acf1": 0.2777893104110264,
+        "index_drift_pct": 8.127464762663411,
+        "fear_gauge_dn1": 1.7600907779261976,
+        "fear_gauge_dn3": 4.215982317112857,
+        "index_tail_dn3_pct": 0.4970178926441352
+      }
+    },
+    "sp500_like@252": {
+      "in_band": 17,
+      "of": 18,
+      "unreadable": [],
+      "shape_in_band": 14,
+      "shape_of": 14,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 2,
+      "crisis_of": 3,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 20.87052294110255,
+        "excess_kurtosis": 17.594685055386776,
+        "return_acf1": 0.016894139871445567,
+        "abs_return_acf1": 0.03230714241737161,
+        "abs_return_acf5": 0.015591010454305967,
+        "abs_return_acf20": 0.0014648503350635877,
+        "cross_sectional_corr": 0.3093235733824147,
+        "volume_abs_return_corr": 0.5888919765758903,
+        "leverage_effect": -0.039228993095100334,
+        "volume_change_acf1": -0.2744490699330536,
+        "corr_asymmetry": 0.06082781936547131,
+        "corr_asymmetry_lagged": 0.08398337309515685,
+        "sector_excess_corr": 0.10096979274799192,
+        "corr_persistence_acf1": 0.14928577819146097,
+        "index_drift_pct": 8.675892959029197,
+        "fear_gauge_dn1": 1.8137587914492062,
+        "fear_gauge_dn3": 4.488180775508379,
+        "index_tail_dn3_pct": 0.398406374501992
+      }
+    },
+    "sp500_like@504": {
+      "in_band": 16,
+      "of": 17,
+      "unreadable": [
+        "corr_persistence_acf1"
+      ],
+      "shape_in_band": 12,
+      "shape_of": 13,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 3,
+      "crisis_of": 3,
+      "out": [
+        "volume_abs_return_corr"
+      ],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 21.544896977114046,
+        "excess_kurtosis": 18.766555598860048,
+        "return_acf1": 0.027529522591592383,
+        "abs_return_acf1": 0.03662715318182293,
+        "abs_return_acf5": 0.02518112700369703,
+        "abs_return_acf20": 0.006371978538217792,
+        "cross_sectional_corr": 0.31953265001334574,
+        "volume_abs_return_corr": 0.6367486189103071,
+        "leverage_effect": -0.037554680027021246,
+        "volume_change_acf1": -0.2677112442226407,
+        "corr_asymmetry": 0.049795069278611916,
+        "corr_asymmetry_lagged": 0.07895966297654536,
+        "sector_excess_corr": 0.09724537595136529,
+        "corr_persistence_acf1": 0.21780133342489677,
+        "index_drift_pct": 8.080963952047606,
+        "fear_gauge_dn1": 1.7695155592692036,
+        "fear_gauge_dn3": 3.5095606294046693,
+        "index_tail_dn3_pct": 0.6958250497017893
+      }
+    },
+    "tech_heavy@252": {
+      "in_band": 16,
+      "of": 17,
+      "unreadable": [],
+      "shape_in_band": 14,
+      "shape_of": 14,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 1,
+      "crisis_of": 2,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [
+        "fear_gauge_dn3"
+      ],
+      "median": {
+        "annualised_vol_pct": 21.285302498100116,
+        "excess_kurtosis": 16.93893888082592,
+        "return_acf1": 0.013030495165578738,
+        "abs_return_acf1": 0.03574682174947254,
+        "abs_return_acf5": 0.01899485941277955,
+        "abs_return_acf20": 0.00245624169547066,
+        "cross_sectional_corr": 0.32796018055773535,
+        "volume_abs_return_corr": 0.5911675795035932,
+        "leverage_effect": -0.042403846946608884,
+        "volume_change_acf1": -0.2817589073008894,
+        "corr_asymmetry": 0.060432998730771285,
+        "corr_asymmetry_lagged": 0.06320335329308646,
+        "sector_excess_corr": 0.08306180049109718,
+        "corr_persistence_acf1": 0.17934379872436462,
+        "index_drift_pct": 7.3047389770405795,
+        "fear_gauge_dn1": 1.802822881014622,
+        "index_tail_dn3_pct": 0.0
+      }
+    },
+    "tech_heavy@504": {
+      "in_band": 15,
+      "of": 17,
+      "unreadable": [
+        "corr_persistence_acf1"
+      ],
+      "shape_in_band": 12,
+      "shape_of": 13,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 2,
+      "crisis_of": 3,
+      "out": [
+        "volume_abs_return_corr",
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 22.049034038064512,
+        "excess_kurtosis": 16.935697472936994,
+        "return_acf1": 0.021749379226675074,
+        "abs_return_acf1": 0.04073534018707227,
+        "abs_return_acf5": 0.025133003099673645,
+        "abs_return_acf20": 0.008406208619105564,
+        "cross_sectional_corr": 0.33005661433945777,
+        "volume_abs_return_corr": 0.6332151638410612,
+        "leverage_effect": -0.03902884924886754,
+        "volume_change_acf1": -0.27586924179873573,
+        "corr_asymmetry": 0.03058126199442971,
+        "corr_asymmetry_lagged": 0.06618838467735656,
+        "sector_excess_corr": 0.0844119900353035,
+        "corr_persistence_acf1": 0.21075503849347338,
+        "index_drift_pct": 6.537748548107671,
+        "fear_gauge_dn1": 1.731000752468578,
+        "fear_gauge_dn3": 3.8892311596562763,
+        "index_tail_dn3_pct": 0.5964214711729622
+      }
+    },
+    "all_technology@252": {
+      "in_band": 16,
+      "of": 17,
+      "unreadable": [],
+      "shape_in_band": 13,
+      "shape_of": 13,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 2,
+      "crisis_of": 3,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [
+        "sector_excess_corr"
+      ],
+      "median": {
+        "annualised_vol_pct": 21.823256824014337,
+        "excess_kurtosis": 15.516892670706843,
+        "return_acf1": 0.010194889256986476,
+        "abs_return_acf1": 0.0364930296095866,
+        "abs_return_acf5": 0.02212412413970611,
+        "abs_return_acf20": 0.002358145560694389,
+        "cross_sectional_corr": 0.3783270243375304,
+        "volume_abs_return_corr": 0.5946637893711062,
+        "leverage_effect": -0.03626629671473931,
+        "volume_change_acf1": -0.2814369349838941,
+        "corr_asymmetry": 0.044929194021942426,
+        "corr_asymmetry_lagged": 0.05219915962795274,
+        "corr_persistence_acf1": 0.18347386421233453,
+        "index_drift_pct": 4.793283833309684,
+        "fear_gauge_dn1": 1.6452516911792605,
+        "fear_gauge_dn3": 3.951837360578523,
+        "index_tail_dn3_pct": 0.398406374501992
+      }
+    },
+    "all_technology@504": {
+      "in_band": 16,
+      "of": 16,
+      "unreadable": [
+        "corr_persistence_acf1"
+      ],
+      "shape_in_band": 12,
+      "shape_of": 12,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 3,
+      "crisis_of": 3,
+      "out": [],
+      "undefined": [
+        "sector_excess_corr"
+      ],
+      "median": {
+        "annualised_vol_pct": 22.63172894984695,
+        "excess_kurtosis": 15.605781047047861,
+        "return_acf1": 0.021361479451728848,
+        "abs_return_acf1": 0.04207835294066518,
+        "abs_return_acf5": 0.024766170424559017,
+        "abs_return_acf20": 0.009740109875892404,
+        "cross_sectional_corr": 0.4029455475464173,
+        "volume_abs_return_corr": 0.6152193716718193,
+        "leverage_effect": -0.03966204480907409,
+        "volume_change_acf1": -0.27862461713902764,
+        "corr_asymmetry": 0.06677685894303345,
+        "corr_asymmetry_lagged": 0.046047935336291396,
+        "corr_persistence_acf1": 0.20705348562721868,
+        "index_drift_pct": 3.4173506921044954,
+        "fear_gauge_dn1": 1.6634893280562562,
+        "fear_gauge_dn3": 3.202117173893406,
+        "index_tail_dn3_pct": 0.7952286282306164
+      }
+    },
+    "defensive@252": {
+      "in_band": 16,
+      "of": 17,
+      "unreadable": [],
+      "shape_in_band": 14,
+      "shape_of": 14,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 1,
+      "crisis_of": 2,
+      "out": [
+        "index_tail_dn3_pct"
+      ],
+      "undefined": [
+        "fear_gauge_dn3"
+      ],
+      "median": {
+        "annualised_vol_pct": 20.33210422650655,
+        "excess_kurtosis": 18.182393117997687,
+        "return_acf1": 0.014493311846101052,
+        "abs_return_acf1": 0.03788363613281272,
+        "abs_return_acf5": 0.0211335093954653,
+        "abs_return_acf20": 0.0024984450442170555,
+        "cross_sectional_corr": 0.3372430980100195,
+        "volume_abs_return_corr": 0.5837912207364787,
+        "leverage_effect": -0.03348461576432955,
+        "volume_change_acf1": -0.2546606431975511,
+        "corr_asymmetry": 0.05954011132507907,
+        "corr_asymmetry_lagged": 0.0749543519316006,
+        "sector_excess_corr": 0.11495177376418536,
+        "corr_persistence_acf1": 0.13907682339115873,
+        "index_drift_pct": 7.01568832832189,
+        "fear_gauge_dn1": 1.7381846345820442,
+        "index_tail_dn3_pct": 0.0
+      }
+    },
+    "defensive@504": {
+      "in_band": 17,
+      "of": 17,
+      "unreadable": [
+        "corr_persistence_acf1"
+      ],
+      "shape_in_band": 13,
+      "shape_of": 13,
+      "level_in_band": 1,
+      "level_of": 1,
+      "crisis_in_band": 3,
+      "crisis_of": 3,
+      "out": [],
+      "undefined": [],
+      "median": {
+        "annualised_vol_pct": 20.947081666166916,
+        "excess_kurtosis": 20.985357269673173,
+        "return_acf1": 0.02574791787070318,
+        "abs_return_acf1": 0.041853352378797254,
+        "abs_return_acf5": 0.029346200086206184,
+        "abs_return_acf20": 0.011743690677146661,
+        "cross_sectional_corr": 0.3433698943284147,
+        "volume_abs_return_corr": 0.615387759492411,
+        "leverage_effect": -0.03973076851529013,
+        "volume_change_acf1": -0.2496650613180465,
+        "corr_asymmetry": 0.06600193601736394,
+        "corr_asymmetry_lagged": 0.08652665104312293,
+        "sector_excess_corr": 0.10879339343050229,
+        "corr_persistence_acf1": 0.23458604416474602,
+        "index_drift_pct": 6.3130712743998805,
+        "fear_gauge_dn1": 1.7254596412491239,
+        "fear_gauge_dn3": 4.417996654786876,
+        "index_tail_dn3_pct": 0.6958250497017893
+      }
+    }
+  }
+}

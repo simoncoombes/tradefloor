@@ -13,8 +13,8 @@ __pycache__/
 # It gets an environment of its own.
 .venv-finrobot/
 
-# Internal design material lives in the private tradefloor-design repo,
-# never in this one. The public documentation lives in the private
+# Internal design material is kept outside this repository. The exception is validation/: the grade the default
+# preset shipped on, published by the owner's decision of 2026-09-26. The public documentation lives in the private
 # tradefloor-docs repo, which Vercel serves as tradefloor.dev.
 
 # Spike artifacts
@@ -23,9 +23,8 @@ dist-spike/
 
 # Golden vectors ARE committed: they are the parity contract, and a research
 # library whose tests cannot run on a fresh clone is not checkable by anyone.
-# 135 MB raw. See rust/sync-goldens.py for how they are produced, and
-# tradefloor-design/CONTINUE.md for the compression decision still to make
-# (85% available).
+# 135 MB raw. See rust/sync-goldens.py for how they are produced. Whether
+# to compress them is still undecided (about 85% would be saved).
 
 # Build artefacts from `maturin develop`, which writes the compiled extension
 # and its debug symbols straight into the source tree. They are 2 MB, they

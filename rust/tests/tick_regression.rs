@@ -79,6 +79,7 @@ fn company(id: &str, price: f64) -> TickCompany {
             mispricing_s: None,
             mispricing_s_prev_close: None,
             mispricing_momentum: None,
+            fair_value_offset: None,
             maker_inventory: None,
             garch_variance: 0.000625,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -177,6 +178,8 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             settle_draws: SettleDrawPolicy::FourAlways,
             // The depth counterfactual, off. It reaches no company field.
             settle_depth_counterfactual: false,
+            resting_orders: &[],
+            fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick
@@ -281,7 +284,7 @@ fn run_day(engine: &mut Engine, day: i64, ticks: i64) {
     });
 }
 
-fn engine(seed: u32) -> Engine {
+fn engine(seed: u64) -> Engine {
     let companies = (0..8)
         .map(|i| company(&format!("C{i}"), 80.0 + 10.0 * i as f64))
         .collect();

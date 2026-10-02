@@ -63,9 +63,9 @@ How far a `federal_funds_rate` pin reaches inside the first central-bank
 meeting window **depends on the preset**. Measured on this build, on
 ``Universe.random(20, seed=4)`` at sim seed 5, with a 250bp policy-only ramp
 over thirty days read at 40 days: pt-v12 and pt-v14 move twenty instruments
-by exactly 0.00%, and the shipped default, pt-v19, moves the median one down
-2.56% (pt-v16 2.67%, pt-v18 2.15%; this read 3.34% for the default of
-2026-08-30).
+by exactly 0.00%, and the shipped default, pt-v20, moves the median one down
+3.38% (pt-v19 2.56%, pt-v16 2.67%, pt-v18 2.15%; this read 3.34% for the
+default of 2026-08-30).
 
 `daily_credit_floor_gain` is the difference. It re-asserts both credit floors
 on every daily step rather than at meeting cadence, so from pt-v15 onward the
@@ -292,6 +292,7 @@ from . import yaml_subset
 from .interventions import (
     SCENARIO_SCHEMA,
     TARGETS,
+    VIX_CEILING,
     Firing,
     Intervention,
     ScenarioValidationError,
@@ -334,15 +335,25 @@ FIELDS = (
     # ships 1.93, so on the default the pin takes effect. This read "every
     # shipped preset" until 2026-09-24.
     "epicentre",
+    # The treasury curve the simulated rate indices read. Equities reach it
+    # only through the corporate yield the central bank sets from the
+    # 10-year, so on a roster without rate indices these move nothing on the
+    # day they are pinned. See ``tradefloor.bonds``.
+    "treasury_yield_2y",
+    "treasury_yield_10y",
 )
 
 #: Fields the engine validates as fractions in [-0.05, 0.50]. Listed so a
 #: scenario can reject 5.0-meaning-5% at construction, where the mistake is
 #: visible, rather than sixty days into a run.
 RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate",
-               "gdp_growth", "unemployment_rate", "tariff_rate")
+               "gdp_growth", "unemployment_rate", "tariff_rate",
+               "treasury_yield_2y", "treasury_yield_10y")
 
 RATE_MIN, RATE_MAX = -0.05, 0.50
+#: `gdp_growth` alone may fall to -10 per cent (the engine's
+#: `units::check_rate`; US real GDP -7.4 per cent year on year in 2020Q2).
+GROWTH_MIN = -0.10
 
 #: The business-cycle phases the engine accepts. Duplicated from
 #: ``_core.CycleName`` so a misspelt phase is caught where it is WRITTEN
@@ -401,11 +412,20 @@ def _check(field: str, value: Any) -> None:
             )
         return
     if field in RATE_FIELDS and isinstance(value, (int, float)):
-        if not RATE_MIN <= value <= RATE_MAX:
+        low = GROWTH_MIN if field == "gdp_growth" else RATE_MIN
+        if not low <= value <= RATE_MAX:
             raise ValidationError(
                 f"{field} = {value} is outside the plausible range "
-                f"[{RATE_MIN}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
+                f"[{low}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
                 "0.052, not 5.2."
+            )
+    if field == "vix" and isinstance(value, (int, float)):
+        if not 0 < value <= VIX_CEILING:
+            raise ValidationError(
+                f"vix = {value} is not a level a shipped model holds. It is "
+                f"above zero and at most {VIX_CEILING:g}, the default "
+                "preset's vix_ceiling, which its close clamps the VIX to. A "
+                "hold at 1000 made the index NaN."
             )
     if field == "oil_price" and isinstance(value, (int, float)):
         if value <= 0:
@@ -1296,6 +1316,10 @@ class Scenario:
         # arrived -- so `add -500` on macro.vix wrote a VIX of -485 and the
         # market traded a session against it, since (vix/15)^2 squares the
         # sign away rather than raising anything.
+        # What a shipped chain can hold, first: a VIX computed above the
+        # default preset's ceiling (181.33) is written at that ceiling, and
+        # the firing below records what was written.
+        new = target.bound(engine, new)
         reason = target.outside_domain(new)
         if reason is not None:
             raise ScenarioValidationError(
@@ -1536,7 +1560,10 @@ class Scenario:
 
         A string that names a readable file is read as one; anything else is
         treated as the document itself, so a scenario can be written inline
-        in a notebook or a test.
+        in a notebook or a test. A one-line string that looks like a path
+        (it ends in ``.yml`` or ``.yaml``, or holds a path separator, and has
+        no ``:``) and names no file raises :class:`FileNotFoundError`. Until
+        0.8.5 it was parsed as YAML text and refused as a syntax error.
 
         The reader is :mod:`tradefloor.yaml_subset`, which implements the
         block-style subset this schema uses and REFUSES everything else by
@@ -1558,6 +1585,12 @@ class Scenario:
                     text = handle.read()
                 path = source
             except OSError:
+                if _looks_like_path(source):
+                    import os
+                    raise FileNotFoundError(
+                        f"No file at {source!r} (looked in {os.getcwd()}). "
+                        "from_yaml takes the path to a .yml file or the YAML "
+                        "text itself.") from None
                 text = source
         return cls.from_document(yaml_subset.read(text), source=path)
 
@@ -1857,6 +1890,20 @@ class Scenario:
     ))
 
 
+def _looks_like_path(source: str) -> bool:
+    """A one-line string that is a file name rather than YAML text.
+
+    YAML text for a scenario has a ``key: value`` line, and a path has no
+    colon, except a Windows drive (``C:\\...``), which is allowed for."""
+    body = source.strip()
+    if len(body) > 2 and body[1] == ":" and body[2] in "\\/":
+        body = body[2:]
+    if ":" in body:
+        return False
+    return (body.lower().endswith((".yml", ".yaml"))
+            or "/" in body or "\\" in body)
+
+
 def run_scenario(
     scenario: Scenario,
     *,
@@ -1879,9 +1926,14 @@ def run_scenario(
     :class:`tradefloor.ModelParams`, defaulting to the shipped preset. The
     returned engine reports it as ``model_fingerprint``, like any other.
     """
-    if days < 1:
-        raise ValidationError("days must be at least 1")
-    hour, minute, day_of_week = start
+    from . import _checks
+    _checks.scenario(scenario)
+    if scenario is None:
+        raise ValidationError(
+            "run_scenario needs a scenario, such as "
+            "tf.Scenario.load('liquidity_crisis').")
+    days = _checks.whole_number("days", days)
+    hour, minute, day_of_week = _checks.start_clock(start)
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     for day in range(days):
@@ -2015,9 +2067,71 @@ def _refuse_self_comparison(scenario: Scenario, days: int) -> None:
         f"values held flat -- which for a constant path IS the scenario. "
         f"The default baseline isolates a PATH from the level it starts at, "
         f"so it only means anything for a scenario that moves. To measure a "
-        f"held level, name the world WITHOUT it: "
-        f"compare(scenario, ..., baseline=Scenario().hold(<the calm levels>)). "
-        f"To measure a path, give the scenario one."
+        f"held level on a preset whose opening does not book the day-0 gap "
+        f"into fair value (every preset through pt-v19), name the world "
+        f"WITHOUT it: compare(scenario, ..., "
+        f"baseline=Scenario().hold(<the calm levels>)). On a preset that "
+        f"does (pt-v20, the default from 0.8.5) a level held from day 0 is "
+        f"priced in at the open: apply it as a step after day 0 instead, "
+        f"for example Scenario().step('federal_funds_rate', before=0.02, "
+        f"after=0.03, at=5). To measure a path, give the scenario one."
+    )
+
+
+def _opening_books_day_zero(model: Any) -> bool:
+    """Whether this model opens the market at fair value under any day-0 levels.
+
+    Read from the dial, not the preset name. Off zero,
+    `opening_market_sigma` opens the market's common mispricing at a draw of
+    its own and books the rest of each name's day-zero premium into its
+    fair-value level, so the levels a world holds on day 0 are its starting
+    state and every price opens as if they had always held.
+    """
+    if model is None:
+        params = ModelParams.from_preset()
+    elif isinstance(model, str):
+        params = ModelParams.from_preset(model)
+    else:
+        params = model
+    return params.to_dict().get("opening_market_sigma", 0.0) != 0.0
+
+
+def _refuse_day_zero_levels(scenario: Scenario, baseline: Scenario,
+                            days: int, model: Any) -> None:
+    """Refuse a comparison whose worlds differ only in what holds on day 0.
+
+    On a model that opens at fair value (`_opening_books_day_zero`), two
+    worlds whose day-0 levels differ open at the same prices relative to
+    their own fair values, so a level held from day 0 moves nothing and the
+    comparison reports a confident 0.00%. The level is part of the world's
+    starting state there, and its effect is measured by applying it later.
+    A scenario that also moves after day 0, or fires an intervention after
+    it, measures that and is let through.
+    """
+    if not _opening_books_day_zero(model):
+        return
+    horizon = range(1, days)
+    moves_later = (
+        any(scenario.at(d) != scenario.at(0) for d in horizon)
+        or any(baseline.at(d) != baseline.at(0) for d in horizon)
+        or any(0 < item.at < days for item in scenario.interventions)
+        or any(0 < item.at < days for item in baseline.interventions))
+    if scenario.at(0) == baseline.at(0) or moves_later:
+        return
+    differ = sorted(field for field in set(scenario.at(0)) | set(baseline.at(0))
+                    if scenario.at(0).get(field) != baseline.at(0).get(field))
+    raise ValidationError(
+        f"compare() would report a confident 0.00%: the two worlds differ only "
+        f"in the levels they hold from day 0 ({', '.join(differ)}), and on "
+        f"this model the opening books the day-0 gap into fair value "
+        f"(opening_market_sigma is off zero, as on pt-v20, the default from "
+        f"0.8.5). A level held from day 0 is priced in at the open, so both "
+        f"worlds open at fair value and nothing moves. To measure a level's "
+        f"effect, apply it as a step after day 0, for example "
+        f"Scenario().step('federal_funds_rate', before=0.02, after=0.03, at=5), "
+        f"against the same world without the step. On a preset without that "
+        f"opening (every preset through pt-v19, model='pt-v19') the held level "
+        f"measures against a calm-levels baseline as before."
     )
 
 
@@ -2092,6 +2206,8 @@ def compare(
             f"rather than as 'no shock was applied'. Give the baseline the "
             f"levels the shocked world does NOT have."
         )
+    else:
+        _refuse_day_zero_levels(scenario, baseline, days, kwargs.get("model"))
 
     def run(which: Scenario):
         return run_scenario(which, seed=seed, universe=universe, days=days,

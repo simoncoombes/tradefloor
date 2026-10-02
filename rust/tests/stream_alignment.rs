@@ -75,6 +75,7 @@ fn company(id: &str, price: f64, avg_volume: f64, shares: f64) -> TickCompany {
             mispricing_s: None,
             mispricing_s_prev_close: None,
             mispricing_momentum: None,
+            fair_value_offset: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -152,6 +153,8 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 settle_draws: policy,
                 // The depth counterfactual, off. It reaches no company field.
                 settle_depth_counterfactual: false,
+                resting_orders: &[],
+                fill_impact: &[],
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick

@@ -1,0 +1,31 @@
+real {'vix': -0.005, 'credit': 0.39514, 'valuation': 1.27185} corr {'vix': -0.622, 'credit': 0.009, 'valuation': 0.803} sd 0.02358
+pt-v20 beta vix       median -0.00001  range -0.00045 .. +0.00087  real -0.00500  ratio 0.003
+pt-v20 beta credit    median -4.91396  range -8.18268 .. -2.17867  real +0.39514  ratio -12.436
+pt-v20 beta valuation median -0.02910  range -0.10496 .. +0.19369  real +1.27185  ratio -0.023
+pt-v20 corr vix       median -0.001  real -0.622
+pt-v20 corr credit    median -0.100  real +0.009
+pt-v20 corr valuation median -0.015  real +0.803
+pt-v20 sd ratio median 1.146 range 1.080 .. 1.329
+pt-v20 |r| vs VIX median +0.325
+pt-v20 seed 2020 event study: sign agreement 3/6
+    2020-02-19 S&P peak, selloff begins     sim -6.1% real -9.6% yes
+    2020-03-03 Fed emergency cut 50bp       sim +13.4% real -1.4% NO
+    2020-03-16 VIX record close 82.69       sim +1.4% real -7.4% NO
+    2020-03-23 trough, unlimited QE         sim +1.5% real +13.6% yes
+    2020-11-09 vaccine efficacy             sim -3.1% real +3.4% NO
+    2021-11-26 Omicron                      sim +1.1% real +3.2% yes
+pt-v19 beta vix       median -0.00021  range -0.00064 .. +0.00058  real -0.00500  ratio 0.043
+pt-v19 beta credit    median -1.19756  range -3.82049 .. +1.04894  real +0.39514  ratio -3.031
+pt-v19 beta valuation median +0.00909  range -0.05540 .. +0.22850  real +1.27185  ratio 0.007
+pt-v19 corr vix       median -0.027  real -0.622
+pt-v19 corr credit    median -0.026  real +0.009
+pt-v19 corr valuation median +0.005  real +0.803
+pt-v19 sd ratio median 1.098 range 0.974 .. 1.249
+pt-v19 |r| vs VIX median +0.301
+pt-v19 seed 2020 event study: sign agreement 3/6
+    2020-02-19 S&P peak, selloff begins     sim -5.1% real -9.6% yes
+    2020-03-03 Fed emergency cut 50bp       sim +16.6% real -1.4% NO
+    2020-03-16 VIX record close 82.69       sim +10.3% real -7.4% NO
+    2020-03-23 trough, unlimited QE         sim +2.3% real +13.6% yes
+    2020-11-09 vaccine efficacy             sim -2.5% real +3.4% NO
+    2021-11-26 Omicron                      sim +0.8% real +3.2% yes

@@ -1,0 +1,32 @@
+{
+ "real": {
+  "peak": 9.0,
+  "sd": 2.18,
+  "mean": 2.87,
+  "ar1": 0.978
+ },
+ "seeds": 30,
+ "years": 5,
+ "candidates": {
+  "pt-v20": {
+   "overrides": {},
+   "peak_median": 3.0171487657350236,
+   "peak_max": 4.183197891209531,
+   "sd_median": 0.6150408133290801,
+   "mean_median": 2.5077707570118406,
+   "ar1_median": 0.9570709851599453,
+   "crisis_day_pct": 0.0,
+   "seeds_reaching_4pct": 4
+  },
+  "pt-v19": {
+   "overrides": {},
+   "peak_median": 3.108534745100579,
+   "peak_max": 4.16418068360295,
+   "sd_median": 0.5911782363618012,
+   "mean_median": 2.704227963189229,
+   "ar1_median": 0.921656198958673,
+   "crisis_day_pct": 0.0,
+   "seeds_reaching_4pct": 2
+  }
+ }
+}

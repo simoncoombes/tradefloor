@@ -269,15 +269,38 @@ def test_a_flat_scenario_against_its_default_baseline_is_refused():
 
 
 def test_a_held_level_measures_against_an_explicit_baseline():
-    """The fix the refusal names, and the exactness claim it used to carry."""
+    """The fix the refusal names, and the exactness claim it used to carry,
+    on a preset whose opening adopts the day-zero premium as mispricing
+    (every preset through pt-v19). pt-v19 reads -0.204 here."""
     result = run(Scenario().hold(federal_funds_rate=0.03,
                                  corporate_bond_yield=0.05),
                  baseline=Scenario().hold(federal_funds_rate=0.02,
-                                          corporate_bond_yield=0.04))
+                                          corporate_bond_yield=0.04),
+                 model="pt-v19")
     assert result["draw_delta"] == 0
     assert result["exact"] is True
     # And it is a measurement rather than a tautology: the worlds differ.
     assert result["median_pct"] != 0.0
+
+
+def test_a_level_held_from_day_zero_is_refused_where_the_opening_prices_it_in():
+    """On pt-v20, the default from 0.8.5, `opening_market_sigma` books the
+    day-zero gap into fair value, so a level held from day 0 is the world's
+    starting state and both worlds open at fair value. The comparison used
+    to come back at a confident 0.00% (worst 0.0, best +0.007); it is
+    refused now, and the message names the step that measures the level.
+    The step does measure it: -1.73 per cent at 40 days."""
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
+        run(Scenario().hold(federal_funds_rate=0.03, corporate_bond_yield=0.05),
+            baseline=Scenario().hold(federal_funds_rate=0.02,
+                                     corporate_bond_yield=0.04))
+    message = str(excinfo.value)
+    assert "priced in at the open" in message
+    assert "step('federal_funds_rate', before=0.02, after=0.03, at=5)" in message
+    assert "pt-v19" in message
+    stepped = run(Scenario().step("federal_funds_rate", before=0.02, after=0.03, at=5)
+                  .step("corporate_bond_yield", before=0.04, after=0.05, at=5))
+    assert stepped["median_pct"] < -0.5
 
 
 def test_a_shock_that_starts_after_the_run_ends_is_refused_by_name():
@@ -803,3 +826,37 @@ def test_an_undefined_percentage_move_is_refused_rather_than_sorted():
     assert sorted(values)[0] != min(values) or max(values) != 3.0, (
         "a NaN no longer breaks sort/min/max; the guard in compare() can go"
     )
+
+
+def test_the_packaged_recession_ends():
+    """The recession holds contraction for fifteen months, writes a trough,
+    then a recovery on the NBER's trough date, and lets the cycle go on
+    (audit major 4: it used to pin contraction, growth and credit for good,
+    so the index never recovered). Nothing in it is permanent, its last word
+    on the cycle is a recovery written once on day 428 (June 2009), and the
+    model's own cycle then carries the economy on. The recovery is written
+    rather than left to the trough's hazards, which on one seed in thirty
+    held the economy in trough for thirteen months."""
+    scenario = Scenario.load("recession")
+    assert all(item.shape != "permanent" for item in scenario.interventions)
+    cycle = sorted((item for item in scenario.interventions
+                    if item.target == "macro.cycle"), key=lambda item: item.at)
+    assert [(item.value, item.shape) for item in cycle] == [
+        ("contraction", "hold"), ("trough", "impulse"),
+        ("recovery", "impulse")]
+    assert cycle[1].at == cycle[0].last_day + 1
+    assert cycle[2].at == 428
+
+    engine = tradefloor.Engine(
+        seed=2, universe=list(tradefloor.Universe.random(8, seed=1)))
+    phases = []
+    for day in range(460):
+        scenario.apply(engine, day)
+        engine.run_days(1)
+        # The TRUE phase: pt-v20, the default, publishes the phase 252
+        # sessions late since its graded arm (2026-09-26), and the scenario
+        # sets the phase the economy is in. Was macro_fields["cycle"].
+        phases.append(engine.state_snapshot()["economy"]["cycle_phase"])
+    assert phases[cycle[1].at] == "trough"
+    assert phases[cycle[2].at] == "recovery"
+    assert phases[-1] in ("recovery", "expansion")

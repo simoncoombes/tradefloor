@@ -10,7 +10,7 @@ attached rather than an impression.
 
 `Survey.sensitivity` already ranks parameters. What it cannot do is tell you
 which KIND of "moves nothing" you are looking at, and the four kinds imply
-different actions (CALIBRATION-FOLLOWUPS §25):
+different actions:
 
 1. **untestable here** -- the mechanism cannot fire in the measured
    configuration at any parameter value. `regime_stress_points` is the
@@ -137,7 +137,7 @@ UNTESTABLE_HERE = {"regime_stress_points"}
 #: `universe_stress_weight` multiplies remembered stress; `universe_stress_decay`
 #: is what makes stress persist overnight. At the shipped decay of 0.0 the
 #: weight multiplies zero at any value. Together at decay 0.97 they move the
-#: transient +0.021. See CALIBRATION-FOLLOWUPS §29.
+#: transient +0.021.
 COUPLED_WITH = {
     "universe_stress_weight": "universe_stress_decay",
     "universe_stress_decay": "universe_stress_weight",
@@ -280,7 +280,7 @@ def main() -> int:
     print("  parameter does nothing, nor grounds for deletion:")
     print("  the preset fingerprint hashes the sorted parameter NAMES, so")
     print("  removing one changes every preset's fingerprint and orphans")
-    print("  every published manifest. See CALIBRATION-FOLLOWUPS §25.")
+    print("  every published manifest.")
     return 0
 
 

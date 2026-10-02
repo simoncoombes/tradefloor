@@ -1,9 +1,525 @@
-# Changelog
+## 0.8.6
 
-## Unreleased
+A patch release on the 0.8 long-term support line. No coefficient, default
+or trajectory changes. Every known-answer digest is 0.8.5's, and `pt-v20`
+stays the default.
 
-No coefficient, default or trajectory changes, and the known-answer digest
-stays at `1e683b96`.
+`envelope.check` still refuses a sector-concentrated roster on pt-v20, and
+now says why. The run behind the pt-v19 grant was repeated on pt-v20 with
+`tools/calibration/roster_shapes.py`: the same four mixes, seeds 101 to 130,
+252 and 504 days. At 252 days every mix held every shape row the bands can
+grade. At 504 days the S&P-like and technology-heavy mixes read
+`volume_abs_return_corr` at 0.6367 and 0.6332 against a ceiling of 0.63,
+where the balanced roster reads 0.6266. The run is committed as
+`measurements/roster-shapes-pt-v20.json`, and the `roster-concentration` gap
+and the refusal quote it. A question that passes `preset="pt-v19"` keeps the
+pt-v19 grant.
+
+<!-- release-note-ends -->
+
+### The dev branch
+
+`dev` carried six commits that `main` never took by merge: the roster mixes
+in `envelope.check`, the claim register read from `tradefloor-docs`, the
+register procedure in `RELEASING.md`, `decay-curve-504.json` under
+`measurements/`, the `forced_flow_threshold` summary, and a 2026-09-08
+re-record of the openai-agents notebook. The first five reached 0.8.5 under
+other commits, and 0.8.5's live re-record replaced the sixth. `dev` is now
+merged into `main` with 0.8.5's files kept, so the merge changes nothing a
+user installs.
+
+## 0.8.5
+
+0.8.5 is the first long-term support release. The 0.8 line gets fixes that
+leave every known-answer digest unchanged for 24 months from this tag
+(`docs/SUPPORT.md`). `pt-v20` is the default. Its tape follows the model
+price, a stock's own news and the market's plain shocks move fair value for
+good, fear discounts fair value while the VIX is high, and agents trade in a
+book with depth. It passes all 40 rows registered for it.
+`model="pt-v19"` keeps 0.8.1's market; every preset replays as it did.
+
+On pt-v20 macro data is published late, as the agencies publish it. Agents
+see a read-only `MarketView` (`trusted_agents=True` gives the live engine),
+and tampering is flagged. pt-v20 reports no capture ratio; use
+`versus_buy_and_hold`. Seeds take any 64-bit integer.
+`Universe.random(n, bonds=True)` adds three rate indices.
+
+**What breaks.** Orders reach the market once, not every tick, so traded
+results move; `run_session(order_flow=...)` raises (pass `fills=` or
+`flow_per_tick=`). Borrowing pays the policy rate, and a bar's volume is
+what traded inside it. Older LLM recordings do not replay. The Rust crate
+breaks 0.8.1 code; pin `=0.8.1`.
+
+**Nearest the edge.** The two-year volume-return correlation at 0.627
+against a ceiling of 0.63; a macro timing rule at 92 per cent of its
+tolerance; the price trough leading the earnings trough by 10 sessions
+against a real 68; the two-year yield's daily move at 3.87 bp against 5.23;
+a recession winning back 49 per cent of its fall in a year against 2009's
+62. The crisis lever is 5.1x against a real 6.2x.
+
+<!-- release-note-ends -->
+
+### pt-v20
+
+pt-v20 is pt-v19 with the market-behaviour faults found by the
+mean-reversion investigation fixed. The investigation is in the project's
+unpublished design notes; the registered rows and the grade are published
+in `validation/pt-v20/`. `ModelParams.pt_v20` in
+`rust/src/params.rs` documents every dial, and `python/tradefloor/provenance.py`
+gives each value's derivation or measurement.
+
+- The tape. The maker quoted around the last print, so 65-minute returns
+  carried a lag-one autocorrelation of -0.135 and a one-step reversal rule
+  beat buy-and-hold after costs. `quote_model_weight` 1.0 centres the book on
+  the model price, and `closing_auction` 1.0 prints the session's last tick
+  at the model price.
+- The cross-section. `fair_value_news_share` 1.0 moves the stock- and
+  sector-specific part of every shock into fair value, so a value screen on
+  published fundamentals no longer ranks the next 20 days at an IC of +0.38
+  against a real +0.01. `opening_mispricing_sigma` and `opening_market_sigma`
+  open the market at its stationary spread.
+- The curve. `treasury_2y_noise`, `flight_to_quality_day` and `_gain`,
+  `corporate_yield_daily` and `treasury_10y_noise`.
+- The market's years. An aggregate earnings cycle (`earnings_cycle_depth`
+  0.2, `_upside` 0.09) with `market_factor_sigma` and
+  `jump_intensity_market` lowered by as much, and `volume_move_response` 0.6.
+- The market's long horizon and looking ahead, below: the market's plain
+  shocks permanent up to a volatility ceiling, volatility feedback, the
+  earnings cycle's expected path in fair value, the rate sensitivity and the
+  buyback share.
+- The book. The seven book dials at depth 0.75, exponent 0.5, reach 1,
+  shared, resting, refill 27 ticks and fill impact 0.314, so an agent's
+  orders execute in the engine's own book on the default.
+- `cascade_gain` scales the stop and squeeze ladders to the certified
+  forty's daily Lo-MacKinlay reading.
+
+Measured on the final grade box (ptv20g6, 90 pooled 21-year histories) and
+recorded in `python/tradefloor/presets/pt-v20.json`: 15 of 15 on the
+fixed-roster panel at 252 days, 14 of 14 at 504, 15 of 15 on held-out seeds
+and on a held-out roster, 10 of 10 mechanisms on the panel (9 of 10 on
+held-out seeds, where `corr_asymmetry_lagged` is not shown), and all 40
+long-run rows registered for it: the 17 of `CRITERIA.md` and 23 more (the
+rate indices against FRED and SPY, IEF and LQD, the earnings cycle against
+Shiller, value and momentum signals, the one-day reversal book, the cost of
+size, the driven 2020-21 and 2022 markets, the packaged recession, timing
+rules on published macro data, the rate-news agent and the long-horizon
+variance ratio). The level and crisis block comes from a paired
+level-protocol run on one build, pt-v20 against pt-v19 on seeds 101 to 130,
+whose control reproduced every row pt-v19 publishes to four places
+(`tools/presets/results/level-rows-pt-v20-2026-09-26.json`). On it the index
+drift is +7.70 per cent a year (pt-v19 +7.65), inside the ruled band of 1.1
+to 10.3, and the three crisis rows are inside their bands.
+
+`KAT_VERSION` is 28. `simulationSha256` moves from `1e683b96` to `72485a9f`,
+`sha256` from `c22d4a02` to `ac004fea` and `bondsSha256` from `522aeb76` to
+`cac3ff44`. `metadataSha256` does not move, because pt-v20 carries pt-v19's
+mispricing and crowd coefficients. No per-preset digest moves, and pt-v20's
+row is `07ab6e0c`.
+
+### Macro data as the agencies publish it
+
+An independent audit of pt-v20 found that timing rules on the reported macro
+data beat buy-and-hold. Holding the roster and going to cash while
+`macro_fields["cycle"]` read contraction or trough gained 4.39 points a year
+over holding, in 30 of 30 21-year histories. The owner decided that macro
+data is published the way the real agencies publish it. The true state
+drives prices, and observers read the published state. Five dials do this,
+each 0 on every preset before pt-v20, and `docs/MODEL.md` gives their rules
+under "True and published state". The snapshot and the state hash carry the
+state a dial adds (`cycle_history`, `gdp_publication`,
+`unemployment_impulse`) only while that dial is set, so every preset before
+pt-v20 replays and hashes as it did.
+
+`cycle_publication_lag` publishes the business-cycle phase that many
+sessions late, as the NBER dates a turn about a year after it happens.
+`macro_fields["cycle"]`, `macro_state.cycle`, a World's trace rows and the
+LLM adapters' observations report the phase of that many sessions before,
+and the opening phase until the lag has passed. Prices, the earnings cycle,
+the cycle's hazards and the central bank read the true phase. A scenario
+that sets the phase sets the true one at once, so `recession.yml`'s
+contraction on day 50 acts on the model that day and is published that many
+sessions later. pt-v20 sets 252 sessions.
+
+`gdp_publication_lag` reports GDP growth as the BEA does, as the mean of the
+true daily growth over each quarter of the macro calendar (63 sessions on
+pt-v20), released that many sessions after the quarter's last day.
+`macro_fields["gdp_growth"]` and `macro_table()`, and so a dataset export's
+`macro.arrow`, carry that figure, and the opening growth before the first
+release. Output, earnings, unemployment and the central bank read the true
+daily growth, and a `macro.growth` intervention and the Oracle's drift now
+read it from `state_snapshot()`. pt-v20 sets 21 sessions.
+
+`unemployment_adjustment_half_life` makes unemployment respond to a turn
+over months. The monthly step moved the rate by the whole of what the
+phase's trend and Okun's law asked for, so the first step after a
+contraction began rose about 1.2 points, four times the spread of a monthly
+change otherwise, and announced the turn. Off zero, an impulse closes
+`1 - 0.5^(month / half_life)` of its gap to that drive at each monthly step,
+with a month of 21 sessions on pt-v20. At 84 sessions the first rise is
+about 0.16 points. It moves the true rate, and so inflation, the central
+bank and the cycle's hazards. pt-v20 sets 84 sessions.
+
+`fear_greed_published_inputs` makes the fear and greed index read the
+published phase and growth. Its target carried a phase bonus (+15 in an
+expansion, -25 in a contraction) and three times the true daily growth, so
+it fell about 35 points in the five sessions after a contraction began. With
+the switch on it moves when the turn is published. Nothing on the price path
+reads the index, so the switch moves no price. pt-v20 sets 1.
+
+`macro_publication_repricing` prices the close's macro step at the moment it
+is published. The policy rate, the corporate yield and the cycle could be
+read after the close, but prices took them only at the next session's first
+tick, so an agent that read a hike sold at the price from before it. With
+the switch on, each traded name is re-marked as the step ends to the price
+its mispricing implies on the new state, and `pin_macro` re-marks the same
+way. The mispricing itself is unchanged and no draw is taken. pt-v20 sets
+1.
+
+The re-mark moves a price between the day's last print and the next
+session, and the tools that read prices now account for it. `prints()` has a
+column, `repriced`: what was written to the price between the last print and
+the tick. `repriced + shock + absorbed` is the print's move from the last
+print. The column is zero through pt-v19, and NaN on the first print after
+`restore_state` on a model that can write a price between prints, since the
+snapshot does not carry it. `Engine.explain` has a fourteenth contribution,
+`repricing`: the change over the day in the gap from the last print to the
+price the close left. `book` is now measured to the last print, and
+`check()` compares last prints. `externalities` prices each fill against the
+prices its step opened on, which a World now records. It used the previous
+step's row, which on pt-v20 is the print before the re-mark, so a fill on a
+day's first step was priced against the wrong baseline (-24.48 against
+tca's 8.77 on one measured trade). `boundary.macro_field_of` compares true
+values, so it finds a field for `macro.cycle` and `macro.growth` under the
+publication lags. None of this moves a price, and every digest is unchanged.
+
+A one-day counterfactual on pt-v20 (`flow_impact`, `tca.analyse`,
+`externalities`) moves untraded names at the first close. The flow moves the
+index return, the close's macro step reads it, and the re-mark prices every
+name at the result. The sessions are identical on those names to the bit,
+and the moves are small (3.4e-5 bps against 0.80 on the traded name in one
+measured analysis). To compare on the same macro path, pin the VIX and the
+corporate yield in both worlds (`tca.analyse(scenario=...)`,
+`World(pins=...)`). `flow_impact` cannot pin; a model with
+`macro_publication_repricing` at 0 writes no price at the close. A World's
+last trace row marks the portfolio before the last close, while `summary()`
+and `evaluate` mark it after. A forked arm's `summary()["pnl_since"]` and
+`value_at_start` start from the net worth marked at the fork, after the last
+shared close. They started from the last trace row, so on pt-v20 each arm's
+P&L carried the shared re-mark: +267.51 on a buy-and-hold arm that had not
+run a step (`tests/test_counterfactual.py`). A difference between two arms
+is unchanged, since both carried it.
+
+For users, the change is in what an observer reads. On pt-v20,
+`macro_fields["cycle"]` and `macro_fields["gdp_growth"]` report published
+values, and a turn of the cycle reaches `macro_fields`, `macro_state`, trace
+rows and a hosted market log's cycle events that many sessions after it
+happens. A phase or a growth rate written with `pin_macro` reads back from
+`macro_fields` only once it is published. `state_snapshot()["economy"]`
+still holds the true phase and growth. Sandboxed agents cannot read it. Code
+that needs the true state, such as an oracle or a regime label, reads it
+there. Nothing changes on pt-v19 or any earlier preset.
+
+### The market's long horizon
+
+The same audit found the index mean-reverting far faster than the S&P 500.
+Every market-wide shock sat in the mispricing, which reverts, so the ratio
+of the index's five-year variance to five times its one-year variance read
+0.42 against the S&P 500's 0.87 over 1871-2023. Three dials, 0 on every
+preset before pt-v20, change what is permanent.
+
+`fair_value_market_share` moves that share of each market-wide shock into
+the company's fair-value level, beside the stock-level share
+`fair_value_news_share` already moves. `fair_value_market_linear` makes only
+the plain loading on the market draw permanent, which has zero mean in every
+regime; the down-tick tilt, the lagged wire, the crisis injection and the
+crash amplifier stay in the mispricing and revert. `fair_value_market_vol_cap`
+cuts the share above a ceiling on the market's daily sigma, in multiples of
+`market_factor_sigma`, so the excess a fear regime adds reverts, as mean
+reversion in real index returns concentrates in turbulent periods. pt-v20
+sets 1, 1 and 1.5. The earnings cycle then carries less of the index's
+yearly spread, and `earnings_cycle_depth` goes from 0.35 to 0.2, where the
+aggregate fall in a contraction matches Shiller's median of 17 per cent.
+`opening_market_sigma` goes from 0.10 to 0.001.
+
+`fair_value_vix_discount` is a volatility-feedback discount: while the VIX
+is above `fair_value_vix_knee`, every company's fair value is scaled by
+`exp(-gain * beta * ln(vix / knee))`, read from a VIX exposure smoothed over
+`fair_value_vix_half_life` sessions. It has no permanent part, so it
+deepens a crash while fear is high and gives it back as the VIX falls. pt-v20
+sets 0.35, 40 and 5. The snapshot and the state hash carry the smoothed
+exposure only while the gain and the half-life are both set.
+
+`buyback_yield_cap` caps the buyback yield the fair-value term compounds.
+The term reads the yield at today's price, so a company near the 0.01 floor
+read a yield in the hundreds, and on one held-out history the index rose
+86-fold in one close. pt-v20 sets 0.15.
+
+Fair value also looks ahead. `earnings_anticipation_half_life` makes it read
+the earnings cycle's expected path from the cycle's own hazards, so a turn
+of phase moves prices at once and a price trough leads the earnings trough;
+pt-v20 sets 126 sessions. `rate_pe_sensitivity`, the constant 1.5 until
+now, is the P/E compression per unit of yield; pt-v20 sets 3. Both cost the
+index about 1.5 points a year of drift, and pt-v20's `buyback_payout_share`
+goes from a third to 0.75 to restore it. That value is calibrated to the
+drift, not measured: it is a buyback yield of about 4.2 per cent against a
+real 1.5 to 2.0. `treasury_10y_noise` goes from 0.025 to 0.038.
+
+pt-v20's values are the twelfth registration's graded arm
+(`validation/pt-v20/programme/ptv20-registration.md`), chosen on held-out seeds,
+where it passes all 40 registered rows. `python/tradefloor/provenance.py`
+gives each value's kind and source. Every preset before pt-v20 replays and
+hashes as it did.
+
+### No capture ratio on pt-v20
+
+On pt-v20 market moves mostly stick: each shock moves fair value for good,
+so even perfect knowledge of the model's fair value leaves little edge. The
+Oracle made money in 10 of 14 test markets over 30 days (rosters
+`Universe.random(20, seed=s)` for s in 3, 42 and 11), and its P&L follows
+the market's month. A capture ratio there would measure the month. The
+Oracle stays in `reference_agents` as a reference agent, and the library
+reports no capture ratio on pt-v20. Scores are read against buy-and-hold
+instead.
+
+`baselines.ORACLE_NOT_A_CEILING` names the presets without a ceiling, each
+with the reason a result gives, and holds pt-v20 alone. The check reads a
+scorecard's `model_fingerprint`, so a custom model keeps the ratio whatever
+preset it was built from. On pt-v20:
+- `capture_ratio` returns an empty mapping, whatever the Oracle earned.
+  `capture_withheld` returns the reason, and the new `versus_buy_and_hold`
+  gives each agent's P&L less buy-and-hold's.
+- `rank` sets `Ranking.capture_withheld`, lists no seed as unmeasurable and
+  leaves the capture keys out of `as_dict()`. The table sorts on
+  `AgentRecord.mean_excess_pnl`, the mean P&L over buy-and-hold's, with
+  `seeds_ahead` beside it, and `report()` prints both and the reason.
+- The MCP tools `evaluate_strategies` and `rank_strategies` send no capture
+  field. They send the buy-and-hold comparison and the reason
+  (`capture_ratio_withheld`, `capture_withheld`), and the Oracle caveat
+  calls it a reference agent.
+
+On pt-v19 and every earlier preset each of these reports the capture ratio
+as before. `oracle_is_ceiling(model)` answers for a preset name, a
+`ModelParams` or the default.
+
+### The flow fix and its measurement
+
+Every harness passed an agent's fills to `run_session` as `order_flow`,
+which the session held on every tick. At six steps a day one order was
+counted 65 times, after the agent had filled at the price before it, so
+agents were marked to their own impact. The spec mean-reversion rule beat
+buy-and-hold on all 20 markets of the published suite by a median 42 points
+in 60 days. With fills applied once it reads +0.5 points, ahead in 10 of 20.
+
+`run_session(order_flow=...)` now raises. Pass an agent's trades as
+`fills=`, applied once on the session's first tick, or a standing rate as
+`flow_per_tick=`, the old meaning of `order_flow=`. `tick(order_flow=)` is
+unchanged. `evaluate`, the gym environment, `tca.analyse` and `World` use
+`fills`, and logs written by 0.8.x replay as they were recorded.
+
+Untraded runs are identical, and under pt-v19 the known-answer digest stays
+at `1e683b96`. Every traded result changes: scorecards, rankings, TCA and
+the recorded agent fixtures. No price-only reference agent now beats the
+Oracle on the reference grids, and a round trip no longer recoups its own
+impact.
+
+`Engine.run_session` takes `fills`, carried to the core as
+`SessionRequest.fills` and summed with any standing flow on the session's
+first tick only. A session with fills is the same market, to the bit, as one
+`tick(order_flow=...)` followed by the rest of the session without it. The
+fill is still priced against the book standing at the step boundary, so the
+agent pays the spread and the depth its order walks, and the order's
+permanent impact reaches the market on the next minute. On every shipped
+preset, both sides, at 0.1% to 5% of daily volume, a fill's premium over the
+mid is at least the permanent impact its own flow leaves behind
+(`tests/test_agent_flow.py`). No round trip of one share, 1% or 2% of daily
+volume on 60 names profits from its own impact; with the flow held for the
+step, as before, a quarter of them did.
+
+The run log names a session's flows `fills` and `flow_per_tick`. A log that
+names one `order_flow` is read as `flow_per_tick`, so checkpoints and
+manifests from 0.8.x replay into the market they recorded.
+
+Re-measured on the fix: the reference grids in `baselines`, `ranking` and
+`tca` and their docstrings, the notebooks that trade, and the tests that
+pinned a traded number. Tests that asserted the old behaviour as a finding,
+that a round trip recoups its impact and that price-only agents beat the
+Oracle, now assert its absence. C4 is defined in
+`validation/pt-v20/programme/longrun/CRITERIA.md`, measured by
+`validation/pt-v20/programme/longrun/c4.py`, and carried on the pt-v19
+record's `long_run` block, 17 rows. The ship-bar tests
+gate on the fifteen criteria pt-v19 was adopted under and pin C4a and C4b as
+failing.
+
+The long-run check gains C4a and C4b, no price-only edge. pt-v19 fails both
+and reads 15 of 17. Its 65-minute returns reverse too much (autocorrelation
+-0.187), so a mean-reversion rule that trades every 65 minutes still beats
+buy-and-hold in 18 of 20 suite markets, and five-day momentum in 17.
+
+`World.fork` copied an agent with no `fork()` by `copy.deepcopy`, which
+raised on the random baseline's generator, on the engine the Oracle keeps,
+and on any spec-built agent inside a daily-cadence wrapper. `RandomTrader`
+and `Oracle` now have `fork()`, `GameRng` copies at its position, and a
+`StrategySpec`, being immutable, copies to itself.
+
+The five LLM agent recordings behind the integration examples were
+re-recorded live on the fix, on the models they used before, and their
+notebooks' prose re-read against the new runs. The liquidity-crisis study's
+canonical FinRobot run was recorded again on 2026-10-01 and its notebook
+executes again. Its resample, four replications and five-arm decomposition
+are summaries of runs made under the 0.8.x harness and were not recorded
+again; the README and notebook say so. `run_sync`, the bridge every adapter uses to
+call an async framework, now runs every call on one long-lived event loop,
+so a client a framework caches between calls keeps working; the OpenAI
+Agents SDK's did not, and a live five-day run recorded 3 of 5 decisions.
+
+The README, `rust/README.md` and the `facts` docstrings now name three
+counts consistently: 19 graded rows in the one-year realism table, 18 of them
+read by `facts.measure()`, and 17 long-run criteria.
+
+### The agent-facing book
+
+Seven `ModelParams` dials, 0.0 on every preset before pt-v20.
+`book_depth_coefficient`, `book_depth_exponent` and `book_depth_reach` put
+latent depth beside the maker's ladder, priced so that its own Q-th share
+costs Y sigma (Q/V)^delta over the touch. `book_shared` makes agents' orders
+execute in the engine's book and consume it: the ladder refills when the
+maker re-quotes, and the latent depth at `book_refill_half_life`.
+`book_resting` rests an unfilled limit order behind the depth at its price,
+to fill against the model's flow or another agent. `fill_impact_coefficient`
+adds each agent's permanent impact, gamma sigma Q/V on the mispricing, and
+attributes it to the agent.
+
+None of the seven is read by the model's own flow, so an untraded market is
+the same at any setting and the known-answer simulation digest does not
+move. The book's state is absent from the state hash and the snapshot on
+every engine no agent has sent an order to.
+
+The model's flow fills a resting order only at a price inside the maker's
+quote for that tick. In the pre-release builds, a slice of flow that
+emptied the settlement ladder walked on into whatever rested past it and
+filled it at its own limit. A persona review found a buy at 4% of the bid filling
+thousands of shares, sells at ten times the ask filling on a third of the
+names in a day, an agent scoring +403% in ten days through `evaluate`, and
+the order's price printed on the tape. The flow now stops at the ladder's
+last price. A market with no resting orders settles exactly as before, so
+no untraded digest moved. The book known answer moved (version 2): one of
+its bids filled 0.8% below the last print and set the next print. The
+traded known answer moved for the scripted limit-order agent only, from
+its 148th fill. A resting order the maker's re-quote crosses is still
+recorded as `liquidity="taker"` against `"mm"`, at the maker's price;
+`docs/MODEL.md` says why. The leverage refusal now prints the projected and
+allowed leverage to enough places that they differ, rather than reading
+"2.00x, above the 2.00x limit".
+
+An agent no longer trades with itself in the settlement book. A persona's
+quoter rested a bid and an offer at 23.66 on AAC, and the next tick matched
+the later sell against the earlier buy, both fills naming the agent: a wash
+trade that added to its trades and turnover. Each tick posts the resting
+orders in arrival order, and one that crosses now passes over its own
+agent's orders and matches the next order behind them. Neither is
+cancelled, so both rest until the flow or another agent fills them, and
+`Engine.book` can show an agent's bid at or above its own offer. Between
+ticks an agent's order already met a book without its own orders. No
+known answer moved: none of their agents rests both sides at one price.
+
+A resting fill can sit below the day's low or above its high, because a
+bar keeps only each tick's last print and the flow can fill the order
+earlier in the tick at its limit, inside the maker's quote. On 40 names
+over four sessions 2% of resting fills did, every one inside the maker's
+quote around the previous print. `tf.Limit`, `History` and
+`docs/MODEL.md` say so, because a check of fills against bars will flag
+them.
+
+The Python surface is `Engine.submit`, `submit_many` (by agent label, then
+list order), `cancel`, `open_orders`, `take_fills`, `take_impacts` and
+`book_live`, all recorded in the order log and replayed. `Portfolio.execute`
+routes through the engine when the book is live, and `Portfolio.submit_limit`,
+`cancel` and `sync` join it. `World` takes `tf.Limit` and `tf.Cancel` in an
+`act()` mapping and collects resting fills after each session, and
+`externalities()` reports the levels one agent takes from another.
+
+`tests/test_order_book_depth.py` holds the claims: off is off, price for
+size follows the square-root law, consumption and refill, linear and
+attributed permanent impact, round trips from one share to a whole day's
+volume, the queue and partial fills, two agents crossing, and determinism
+under replay, fork and restore. `tests/known_answer_book.py` is the book's
+own determinism gate with every dial on, beside `known_answer.py`, and the
+determinism workflow runs it on every target.
+`tools/calibration/impact_curve.py` measures the impact curve against the
+estimates in Toth and coauthors (2011) and Almgren and coauthors (2005).
+
+### Bonds
+
+Three simulated rate indices can join a roster: `UST2Y` and `UST10Y`,
+constant-maturity 2-year and 10-year treasury indices, and `IGCORP`, an
+investment-grade corporate bond index. None is a real security.
+`Universe.random(n, seed=..., bonds=True)` appends them after the equities
+and `tf.bonds()` builds them. Each returns `yield / 252 - D * dy + 0.5 * C *
+dy^2` a day off the engine's own curve, with duration and convexity of 1.9
+and 4.6, 8.5 and 84, and 7.0 and 100. They trade through the same fills,
+portfolio, tape and TCA as the equities, on their own books: the
+agent-facing book above holds equities only.
+
+`pin_macro` and the scenario registry take the 2-year and 10-year yields,
+and `curve_shock.yml` moves the whole curve 200bp on day 50: `UST10Y`
+-15.35%, `UST2Y` -3.71% and `IGCORP` -12.30% that day. `rate_shock.yml` is
+unchanged and reaches the 10-year only over the weeks after.
+`baselines.Balanced` is a 60/40 book with a drift band, and
+`evaluate(..., cash_interest=True)` pays cash the policy rate.
+
+Without the indices, every digest and every preset is unchanged. With them,
+every equity price, draw and macro value is identical to the run without,
+because they take no draws and write nothing back. A new `bondsSha256` in
+`tests/known_answer.json` covers a session with them.
+
+Under pt-v19 the engine's curve is quieter than the real one: the 2-year
+moves 0.46bp a day against 5.2bp over 2015-2025 and the 10-year 3.1bp
+against 5.35bp, and bond and stock returns are uncorrelated where IEF reads
+-0.16 and LQD +0.27. pt-v20's curve dials fix most of that: the 2-year
+moves 4.48bp a day against 5.23bp and the 10-year 4.72bp against 5.41bp,
+and the index's daily correlation with a Treasury bond's return is -0.154
+against -0.161 and with an IG bond's +0.231 against +0.272 (long-run
+criteria R1 to R4).
+
+`rust/src/rates.rs` holds the pricing, the curve reads and the books, and
+documents every number. An index level reprices whenever the yield it reads
+has moved: at the open after the close's macro step, and on the first tick
+after a pin. Carry accrues once, at the first open after a close. Nothing
+interpolates toward a later yield, and no tracking noise is added, so no
+price can reveal a yield before the close that sets it. `IGCORP` reads the
+10-year plus a credit spread that is re-marked whenever the engine sets the
+corporate yield or a caller pins it, so it carries rate risk between
+central-bank meetings and reads a held corporate yield exactly.
+
+The books are the equity maker's ladder around the index level, with a
+0.6bp spread before cent rounding for the treasuries and 0.8bp for the
+corporate index, widening with the VIX by the equity rule, and depth from
+the median dollar volume of SHY, IEF and LQD over 2015-2025. A trade leaves
+the maker holding inventory that skews its quotes by up to a half spread and
+decays with a 15-minute half-life, so impact on an index is transient.
+
+Every packaged scenario's effect on the three indices is in
+`tests/test_bonds.py` and in each scenario file's notes. A 60/40 book of
+equal-weight equities and a 6.5-year bond sleeve through each scenario is
+`tools/bonds/sixty_forty.py`; the comparison with real bond markets is
+`tools/bonds/realism.py`, against FRED's DGS2 and DGS10 and Yahoo's SPY,
+SHY, IEF and LQD.
+
+### The book and the rate indices together
+
+The two branches were written apart, and two behaviours needed settling when
+they merged. The agent-facing book holds equities only: `Engine.submit`
+refuses a rate index by name, `Portfolio.execute` prices an index off its
+own book whatever the book dials say (its flow waits in `pending_flow` for
+`fills=`), and `Portfolio.submit_limit` on an index is refused. Under
+`fill_impact_coefficient`, `run_session` had queued every external fill as
+book flow, where the linear law skips a rate index, so an index's fills no
+longer reached it. Rate-index fills now stay on the first tick's flow, where
+the indices' books read them. `tests/test_bonds_with_book.py` covers both.
+The state hash takes the rate instruments after every equity field and
+before the agent-facing book, in the engine and in `manifest.state_hash`.
+
+### Concentrated rosters in `envelope.check`
 
 `envelope.check()` accepts a sector-concentrated roster when
 `sector_concentrated` names one of the four mixes measured on pt-v19
@@ -17,10 +533,960 @@ mix name raises `ValidationError`. The measurement is thirty seeds at 252 and
 504 days from fleet run `docs080b`, and its output is
 `measurements/roster-shapes-pt-v19.json`. The `roster-concentration` gap now
 lists the rows it still refuses as its statistics, where it listed three
-shape rows.
+shape rows. The four mixes were measured on pt-v19 only, so `check()`
+accepts them for pt-v19 and refuses them on pt-v20 until they are measured
+there.
 
 The `forced_flow_threshold` summary that the parameter table reads is
-reworded in plain terms.
+reworded in plain terms, and `decay-curve-504.json` moves into
+`measurements/`.
+
+### Growth's floor
+
+`gdp_growth` alone now has a floor of -10%. The other rates keep -5%. The
+engine's `check_rate`, `pin_macro`, scenario checks and the fire-time check on
+a relative change all use it. US real GDP fell 7.4% year on year to 2020 Q2,
+and 10.0% at an annualised quarterly rate in 1958 Q1 (FRED GDPC1), so -5%
+refused real downturns. The packaged `recession.yml` holds growth three points
+lower. It was refused whenever the economy it met was already contracting
+faster than 2%, which happened to one of the twenty published suite markets
+under pt-v20. A run that worked before gives the same result: the change only
+lets through runs that used to fail. `tests/test_suite_markets.py` runs all
+twenty markets on pt-v19 and pt-v20.
+
+### Found and fixed on the way to the default
+
+Making pt-v20 the default exposed defects the suite could not see while it
+ran pt-v19, each fixed without moving a digest that had already shipped.
+
+- The agent-facing Oracle had no edge on pt-v20: moving each name's own
+  shocks into fair value shrinks the cross-sectional spread of the
+  mispricing from 0.30 to 0.015. `baselines.Oracle` now picks its rule from
+  the preset's dials. Where the edge is cross-sectional it trades it as
+  before; otherwise it trades each equity's expected return over the
+  session, as a net position plus a residual cross-sectional book. On
+  pt-v20 over 30 days it is positive on 12 of 12 markets. Capture is quoted
+  on a 30-day fixture, and a blend's oracle component reads the same rule.
+- `truth()` and `attribution` gain an eleventh factor, `fair_value_shift`,
+  last in `Engine.FACTORS`, so the columns sum to the change in
+  `mispricing_s` on every preset (pt-v20 missed by up to 0.0087 a row).
+- Under `corporate_yield_daily` a pinned VIX leaked into the corporate
+  yield, which fell from 2.809 to 2.421 per cent over five sessions of
+  `hold(vix=45)`. A pinned session now takes no VIX term, a pinned
+  corporate yield holds through the close, and the yield's daily move is
+  capped at 0.50 points (Moody's Baa never moved more than 0.48 in a
+  session, 1986-2026). `bondsSha256` moves to `cd6d532d` because its
+  session pins the corporate yield.
+- Snapshots carry pt-v20's unapplied opening draws, and the Python state
+  hash and the ledger know its new keys.
+- `compare()` refuses a comparison whose worlds differ only in levels held
+  from day 0 on a preset whose opening books the day-0 gap into fair value
+  (`opening_market_sigma` off zero), and names the step that measures the
+  level instead.
+- A macro path that leaves out the business-cycle phase lets pt-v20 run its
+  own cycle. Notebook 09's real 2020-21 path now carries the NBER phases,
+  and on it pt-v20's simulated index falls 28.5 per cent and is back at its
+  high by 17 June 2020.
+
+### Two packaged scenarios recalibrated
+
+The owner's decision, from a measurement on pt-v20 on the certified
+roster, each figure paired against the same seed with no scenario, seeds
+301 to 330 (box ptv20g3).
+
+`recession.yml` holds growth at -2 per cent rather than shifting it three
+points, triples the VIX for sixty days where it went x1.5, widens credit 150
+basis points as before, and cuts every company's earnings 40 per cent over
+four quarters, holds them two and restores them over four. The index is
+-44.7 per cent at 120 sessions, the depth of 2008 (-45 from Lehman to March
+2009), where the old file read -5.8 on pt-v19 and -28.7 on pt-v20.
+
+The recession also ends. As first recalibrated it held the cycle in
+contraction for good, so the index was still about 60 per cent (log) under
+its unshocked twin two years on. It now holds contraction for 15 months,
+sets the cycle to trough on day 365 and to recovery on day 428, the NBER's
+trough in June 2009, then lets the model's own cycle run. Growth is
+released at the trough. Credit comes back over the following 30 months
+along Moody's Baa yield of 2009-11. The file's earnings cut stacked on
+pt-v20's own earnings cycle, so it now flattens to x0.65 after its first
+121 sessions. It holds there to September 2009, the quarter in which S&P
+500 trailing operating earnings bottomed ($39.61 against $91.47 in 2007),
+and recovers to x0.96 by June 2010 and x1 by June 2011, so earnings
+average 0.92 of their pre-shock level over 2010, as the S&P's did ($84).
+The first 120 sessions, and every figure above, are unchanged. On the
+leading dials with the permanent market of audit major 5, the index gains
+back 54 per cent of its fall against its twin within a year of its lowest
+point (the S&P 500 gained back 62 per cent after March 2009) and rises 64
+per cent from its own low (the S&P 69), on seeds 301-330; 51 and 70 on
+seeds 201-230. The file records the whole path.
+
+`liquidity_crisis.yml` takes the VIX x3.5 where it went x2.0 and cuts
+earnings 15 per cent over two months, back over four, with depth and credit
+as before. The index is -10.0 per cent at 21 sessions and -33.9 at worst,
+against March 2020's -28.8 and -33.9, where the old file read -1.5 at 21
+sessions. The model prices a company off its current earnings with no
+forward-looking valuation, so it cannot fall as fast as March 2020 did, and
+each file says so. The fingerprints are `sha256:c0cbfcb7...` and
+`sha256:7d8c8cc8...`. `rate_shock.yml` keeps its shocks and its fingerprint.
+
+The earnings shocks write through `Engine.set_fundamentals`, which the order
+log did not record, so a `RunManifest` of such a run failed its own digest.
+The log now carries the write as `set_fundamentals`, and replay restores it.
+
+The new `liquidity_crisis.yml` broke `examples/11-scenario-fork.py`. It read
+the book around the last day of any intervention in the file, which the
+earnings recovery moved to day 175, past the end of its 80-day run, so it
+took no reading and stopped on a `TypeError`. It reads around the depth
+window now, and the default test run executes it, along with a check that
+names the test that runs each example script.
+
+### The model specification and the support policy
+
+`docs/MODEL.md` states the pt-v20 model as equations read off the code: the
+macro economy and central bank, fair value and its level, the mispricing and
+its factor structure, news, jumps, the three variance processes, the VIX,
+crisis regimes, the market maker and the agent-facing book, agent order flow,
+volume, the rate indices and scenarios. Each equation names its source line,
+and each parameter carries its pt-v20 value, timescale and how it was set
+(measured, derived, fitted, chosen or guard). A pt-v19 section gives every
+equation and value where the earlier default differs.
+
+`docs/STATISTICS.md` names the sets of realism statistics behind the counts
+the documentation quotes, with every member: the one-year table (19, of
+which `facts.measure()` reads 18), the two-year panel (15 rows, 14 graded)
+and the long-run criteria (17 from this release, 15 in 0.8.x records), with
+the 40 rows registered for pt-v20.
+
+`docs/SUPPORT.md` takes effect with this tag. The LTS line covers 0.8.5 and
+the patch releases after it, with fixes that leave every known-answer digest
+unchanged for 24 months. A preset is frozen when it first ships and is never
+removed. From this line on a new default comes only in a minor release, and
+0.8.5 is the one exception because the policy starts here. `SECURITY.md`
+names the line in its table of supported versions.
+
+The policy's first precondition is in place. `tests/known_answer_presets.py`
+runs one fixed 60-session market on every shipped preset and hashes each on
+its own, `tests/known_answer_presets.json` holds the eighteen digests, and
+`test_known_answer.py` checks them on every wheel target, so the
+determinism workflow now compares five digests per platform. With the two
+treasury yields left out, which 0.8.1 does not report, the harness gives the
+same eighteen digests on the published 0.8.1 wheel as on 0.8.5.
+pt-v20's row was added when it merged, with the eighteen before it
+unchanged.
+
+`.zenodo.json` carries what Zenodo's GitHub integration needs to mint a DOI
+for each published release, once the owner switches it on (`RELEASING.md`,
+"DOI (Zenodo)"). `CITATION.cff` asks for the preset beside the version, and
+the README gains a section on citing a version and a preset, with a BibTeX
+entry whose DOI is a placeholder until Zenodo mints one.
+
+### pt-v20's grade in the repository
+
+`tf.preset_record("pt-v20")["long_run"]` named twelve files in the
+project's unpublished design notes, `criteria.py` among them, so nobody
+outside could check the 40 of 40. `validation/pt-v20/` now holds that grade
+(box `ptv20g6`, 2026-09-26): the adopted criteria, the twelfth
+registration, `criteria.py`, `certgrade_box.py` and `v1.py`, the 31 scripts
+and data files the box ran, and every file it wrote except 93 MB of raw
+histories. The files keep the layout the box ran them in, so the recorded
+commands run unchanged. `scripts-as-run.txt` gives each box file's sha256,
+and they match the archive the box unpacked.
+
+`validation/README.md` says how to check the grade. `criteria.py` needs
+only Python, runs in under a second and writes `criteria-g6.txt`,
+`criteria-g6.json` and the verdict again byte for byte;
+`tests/test_validation.py` runs it on every test run. `certgrade_box.py`
+also reproduces its grade byte for byte on the 0.8.5 tree.
+`validation/pt-v20/run-box.sh` runs the whole grade again on a machine of
+your own: it clones the engine at b89901979e5a, checks the simulation
+digest, runs the jobs and grades the output. It has not been run end to end
+outside the original box, which took 25 minutes on 96 cores.
+
+The `long_run` block in pt-v20's record now names those published paths.
+`tools/presets/record.py --long-run` rewrites a verdict's paths for any box
+in its `PUBLISHED_GRADES` table, and the test holds the record to the
+published verdict. pt-v19's block describes its 2026-09-23 grade, which
+is not published. `provenance.py` entries that
+cite `criteria.py` or the twelfth registration point at the same files.
+Nothing about the simulation changed; every known-answer digest is the same.
+
+`docs/MODEL.md` gains a section on the reference implementation the engine
+was ported from. It is not published, and it stays unpublished until the
+owner names it, so a value whose source is "reference implementation" has
+no source a reader can check and should be read as an assumption. The
+parity vectors it produced are in `rust/goldens/`; the code is not.
+
+### 64-bit seeds
+
+A seed is any integer from 0 to 2**64 - 1, on every surface that takes one:
+`Engine`, `EngineBatch`, `Universe.random`, `GameRng`, `evaluate`, the
+reference agents, `World` and its surgery seeds, the gym, `run_many`,
+`sweep`, `rank`, the battery and its commit and reveal, `Checkpoint`,
+`RunManifest`, the local MCP server and the WebAssembly build. Until now the
+engine refused anything from 2**32 up with pyo3's "out of range integral
+type conversion attempted". A reviewer who builds AI evaluations pointed out
+what that allowed: a hidden seed has 2**32 values per roster, so a sealed
+battery could be opened by simulating every seed against a market's first
+prices, about 19,000 core-hours per market with the published engine.
+
+Every seed below 2**32 gives the market it gave before. Their high 32 bits
+are zero, and the derivation lets those bits in only when they are non-zero,
+so no digest in `tests/known_answer.json`, `known_answer_book.json` or the
+nineteen rows of `known_answer_presets.json` moved. A seed from 2**32 up
+gets its own streams: every stream starts from all 64 bits of a SplitMix64
+mix of the whole seed, on a PCG sequence no 32-bit seed uses, and for one
+stream the map from seed to starting state is a bijection, so two seeds
+never share a stream. `rust/src/rng.rs` states the formula, and
+`docs/MODEL.md` has it under "Seeds". `tests/known_answer_seed64.py` hashes
+a market on seed 2**63 + 12345, and the determinism workflow now compares
+six digests per platform.
+
+A seed outside the range, a negative one, a float or a bool raises
+`ValidationError` naming the range, where a float was truncated before in
+several Python surfaces. `manifest.verify` masked its sampling seed to 32
+bits, so a seed of 2**32 + 5 drew seed 5's days and -1 drew 2**32 - 1's;
+it now takes the whole seed and refuses a negative one. `reveal` returns
+False for a list holding a value the engine would refuse. In WebAssembly a
+seed is a Number up to `Number.MAX_SAFE_INTEGER` or a BigInt, and a larger
+Number is refused rather than rounded. Draw a sealed seed with
+`secrets.randbits(64)`.
+
+### A digest for a traded run
+
+Until now every known-answer digest covered the engine, and none covered a
+run through `evaluate`. An agent benchmark reports that run.
+`tests/known_answer_traded.py` runs the five reference agents and one
+scripted agent that sends limit orders and cancels them through `evaluate`
+on pt-v20, seed 20260930, a fixed 12-name roster and 10 days of 6 steps. For
+each agent it hashes the order log (what `act()` returned at each step, the
+prices the agent was shown, and what `explain()` answered), every fill with
+the closing prices of that agent's market, and every scorecard field. The
+lines in `errors` and `partial_fills` are hashed as counts, so rewording a
+message moves nothing. `tests/known_answer_traded.json` keeps a digest per
+agent and per part, and `test_known_answer.py` checks them on every wheel
+target, naming the agent and part that moved. `known_answer.py` prints the
+combined digest as its seventh line, so the determinism workflow now
+compares seven digests per platform. The digest is the same on Python 3.11,
+3.12 and 3.13.
+
+The run names pt-v20, so a later default leaves it alone. A change to
+pt-v20 before it ships, to a reference agent or to what `evaluate` scores
+moves it, and is re-based with `python tests/known_answer_traded.py
+--write` and a sentence in the baseline's note. The baseline records
+pt-v20's row from `known_answer_presets.json` and fails when the two
+disagree. Adding it moved none of the simulation digests in
+`known_answer.json`, `known_answer_book.json` or `known_answer_presets.json`.
+
+### Agents see a read-only market
+
+An independent audit found that every harness handed agents the live engine
+as `obs.engine`. An agent that forked it and ran the fork one step ahead made
+11.4 per cent in five days on four seeds of four, and one that called
+`set_fundamentals` on a name it held made 184 per cent. Neither scorecard
+carried an error or a flag.
+
+`obs.engine` is now a read-only `tradefloor.MarketView` in `evaluate`,
+`rank`, `World` and its cohorts, and `tca.analyse`. It serves prices, the
+public columns, each book, bars, the published macro fields without
+`qe_pe_boost`, the curve and which names have news today. `obs.portfolio` is
+a read-only `PortfolioView`. Anything else raises `tf.SandboxError`, which
+names the opt-in. An agent with `privileged = True`, as the Oracle and an
+`oracle` strategy signal have, also gets `obs.hidden`, a read-only
+`HiddenState`, and its scorecard says `uses_hidden_state`.
+`trusted_agents=True` hands every agent the live engine and portfolio as
+before. The scorecard says `trusted`, `rank` marks the row and a World's
+manifest records it under `agent_access`.
+
+Each harness also compares the engine's state hash, fundamentals and
+recording counters, and each portfolio, before and after every `act` and
+`explain`. An agent that changed anything is scored `tampered` with an error
+line naming the step, `rank` leaves it out of its table and says so, and
+`tca.analyse` refuses it. The check reads and draws nothing, so every
+known-answer digest is unchanged. `tests/test_sandbox.py` reproduces both of
+the audit's agents.
+
+A later review reached the live engine from a sandboxed agent through the
+view's private slot, forked it and traded on the fork, and the card was
+clean, because a fork writes nothing to the engine it came from. The engine
+now counts calls to `fork`, `state_snapshot` and `restore_state`
+(`Engine.copy_count`, not market state), and a sandboxed agent that moved
+the count is scored `tampered` however it reached the engine.
+`Engine.economy()` returns the snapshot's economy block without counting,
+for `HiddenState`. `run_session`, `run_days` and `run_until` refuse a
+day of the week outside 0 to 6, a volatility that is negative or not
+finite, and a start outside the day. The start's minute may still carry
+into the hour (09:60 is 10:00), as it always could.
+
+The same review bounded what a hostile input can cost. The MCP run tools
+cap `steps_per_day` at 22 and days x steps at the day cap's six steps a
+day, and `start_job` checks a job's arguments before it takes a worker. A
+replayed log (a received `RunManifest` or `Checkpoint`) is checked whole
+before it runs, and a day in it may run at most 23,400 ticks
+(`replay(max_ticks_per_day=...)` for a trusted log). The scenario reader
+reads any line in linear time, refuses blocks nested over 32 deep and
+integers past Python's digit limit, and `tradefloor scenario validate`
+reports a bad file and reads the next. `Portfolio` refuses infinite cash
+and leverage.
+
+A second probe, on pt-v20, read three more things through the live engine:
+the economy block of `state_snapshot()` (the true business-cycle phase,
+`months_in_current_phase`, `phase_gdp_target`, `recession_probability` and
+`earnings_cycle`), `Engine.earnings_anticipation`, which jumps on the close
+of every true turn, and the fundamental, as log price less `mispricing_s`.
+The view refuses all three, and its macro fields are now an allowlist of
+published figures (`tf.sandbox.PUBLISHED_MACRO`), so a field the engine gains
+later is refused until it is listed. The gym environment's policy sees only
+arrays, but `env.engine` and `env.portfolio` were the live objects to any
+training code holding the env; they are now the same views, and
+`TradingEnv(trusted_agents=True)` gives the live ones back. The framework
+adapters are agents under `evaluate` and `World`, so they hold the view and
+their frameworks are shown the same payload as before. The MCP tools run
+strategies with `trusted_agents=False`, stated at each call. One test per
+route holds the refusals and the reads a trader keeps. The view's `curve`
+and `rate_instruments` are properties now, as the engine's are; as methods
+they raised on every call.
+
+This is a guard and not a security boundary. Code in the same process can
+still walk the interpreter to the engine, and any write it makes is caught,
+but a second engine it builds and runs ahead writes nothing and is not. It
+need not guess the seed: the harness's frames hold `seed` and `universe` as
+locals, and `sys._getframe` reaches them from inside `act`.
+
+**What breaks.** An agent that called anything on `obs.engine` beyond the
+view, or wrote to `obs.portfolio`, now records a `SandboxError` on its
+scorecard, or stops a `World`. Declare `privileged = True` for hidden state,
+or pass `trusted_agents=True`.
+
+### Orders an agent may send
+
+The five 0.8.5 pre-release reviewers found that a bad order could end an
+evaluation for every agent in it. `evaluate` crashed on a list return, a
+non-string ticker, a complex quantity, and on `tf.Limit` or `tf.Cancel`,
+which `World` already took. A stale recording scored as an agent holding
+cash, and `"100"` and `True` traded 100 shares and one share.
+
+`act()` returns a mapping of ticker to order, or `None` or `{}` to trade
+nothing. A share count is anything `float()` reads as a finite number, so an
+int, a float, a numpy scalar or 0-d array, a `Decimal`, a `Fraction` and a
+torch scalar tensor all trade as before. A bool (Python's or numpy's), a
+string, bytes, a complex number, NaN and an infinity are refused. In
+`evaluate` a bad entry is a rejection with a line in the scorecard's
+`errors`, and the rest of the mapping still trades. A list, a string or a
+number returned in place of a mapping trades nothing that step and gets its
+own error line. `tf.Limit` and `tf.Cancel` work in `evaluate` as they do
+in `World`. A `ReplayMiss` now stops the run with the step, the agent and
+the seed named.
+
+The scorecard gains `equity_curve`, `max_drawdown_pct`, `ruined`,
+`leverage_refusals` and `explanation_baseline`, and its repr shows
+`errors=N`. `leaderboard` sorts tampered cards last, and
+`versus_buy_and_hold` and `capture_ratio` leave them out. `evaluate` builds
+one engine and forks it for the baseline and each agent, so pt-v20's
+burn-in is paid once. None of this changes a price, and every known-answer
+digest is unchanged.
+
+**What breaks.** `True` and `"100"` as quantities, which traded, are now
+refused. A falsy return such as `[]`, `0`, `""` or `False` used to pass as
+a step with no trade. `evaluate` now records it as an error, and a `World`
+on the default `on_refusal="raise"` raises `ValidationError` and ends the
+run. Return `None` or `{}` instead, or build
+the World with `on_refusal="skip"`.
+
+### History before day 0
+
+A 0.8.5 reviewer's 20-day breakout rule sat in cash for the first 21 of 252
+days of every run while buy-and-hold was invested. Every `evaluate` and
+`rank` run started at day 0 with no history, and `obs.engine.bars()` refuses
+when nothing is recorded.
+
+`evaluate`, `rank` and `World` take `history_days=N`, which runs the market
+for N days before day 0 with nobody trading. The observation has a new
+`obs.history` (`tf.History`) holding a daily bar per name and the published
+macro figures for every day the run has closed. A bar's open, high, low and
+close are the ones `Engine.bars(grain="day")` gives for a recorded day, and
+its volume is the day's total in shares. The warm-up days are labelled -N
+to -1 and are there at the first decision, and each scored day joins after
+its close. `history.bars(ticker, last=20)` and `history.macro(last=20)`
+return lists of dicts, so no extra package is needed. `tca.analyse` hands
+agents the same history with no warm-up, and the `bars()` refusal now
+points to it.
+
+The warm-up runs before any scenario, pin or intervention, whose day 0 is
+still the first scored day, and the untraded baseline in `evaluate` runs it
+too. In a `World` the engine's order log holds the warm-up, so a manifest
+rebuilds it, and a fork carries the history. The scored days continue the
+warmed market, so on the same seed they are different days from a run
+without the warm-up. The scorecard records `history_days`, and leaves it
+out of `as_dict()` when it is 0.
+
+With `history_days` at 0, the default, no price moves and the scorecard is
+the one it was, so every known-answer digest and the scorecard digest in
+`tests/test_python_versions.py` are unchanged. The reference agents and
+`StrategySpec` strategies keep their own price history and do not read
+`obs.history`. The MCP tools and the LLM adapters' payload do not carry it.
+`tests/test_history.py` checks the warm-up against a market run by hand.
+
+### Limit orders from LLM agents and the frozen payload
+
+The framework adapters (callable, FinRobot, LangGraph, OpenAI Agents,
+PydanticAI) sent market orders only, and one bad action refused the whole
+decision. A reviewer porting a copilot that quotes at the bid could not
+run it, and a decision with one hallucinated ticker lost every other order
+in it.
+
+Decision schema 2 (`DECISION_SCHEMA_VERSION = "2"`). An action may carry a
+`limit_price`, with or without `order_type: "limit"`, and becomes a
+`tf.Limit`: it trades at that price or better, and what does not fill waits
+in the book until it fills, a new limit order on the symbol replaces it, or
+the agent sends `side: "CANCEL"`, which becomes a `tf.Cancel()`. The
+participation cap clips a limit order as it clips a market order. A bad
+action is refused on its own, the other actions trade, and the refusal and
+its reason are in the decision's `refused` list, the adapter's `record` and
+the World trace. `tf.evaluate` writes each refusal to the scorecard's
+`errors` through a new optional agent method, `refusals()`. A response with
+no JSON object, no `actions` list or an unknown top-level key still refuses
+the step. `decision_model()` no longer checks
+the rules a JSON Schema cannot state, so the OpenAI Agents SDK, which raises
+on the first invalid output, no longer loses a whole decision to one HOLD
+that carries a quantity. FinRobot's `Action` and `Decision` are now
+subclasses of the shared ones, so both parsers apply one set of rules.
+`resample`, `flip` and `fingerprint` compare decisions by shape, and a limit
+order's shape carries its price, so a buy at a limit and a buy at the market
+count as different answers.
+
+Observation payload 1 (`OBSERVATION_SCHEMA_VERSION = "1"`) is frozen for
+the 0.8.x line: `docs/SUPPORT.md` lists every key, and
+`tests/test_integrations.py` pins them. Three changes went in before the
+freeze, and the first is that `portfolio.open_orders` lists the agent's
+waiting limit orders.
+`portfolio.gross_exposure`, a multiple of net worth with the name of the
+`Portfolio` method that returns dollars, is renamed `leverage`. And
+`return_5d` covers 30 step intervals, where the 30-row price memory made it
+29 (4.83 days); the memory is 31 rows. Each recording made from 0.8.5
+carries `observation_schema_version` and `decision_schema_version` in its
+`meta`, and a replay refuses a recording made under another payload
+version, naming both, before it looks anything up. The FinRobot mandate
+(version 2), the PydanticAI mandate (version 3) and the LangGraph
+instructions describe limit orders and CANCEL. The OpenAI Agents brief does
+not change; the bound schema carries the new fields.
+
+`tf.Limit` and `tf.Cancel` compare by value. They compared by identity,
+and a fork copies a World's trace, so `agree` reported the shared history of
+any World that had sent a limit order as different.
+
+None of this changes a price. The traded scorecards of
+`reference_agents` on a fixed seed are byte-identical before and after, and
+every known-answer digest is unchanged.
+
+**What breaks.** Code reading `payload["portfolio"]["gross_exposure"]`
+reads `["leverage"]`. `parse_decision` returns a `Decision` with refused
+actions where it raised `DecisionError` for a bad action, and
+`orders_from` refuses an unlisted symbol into the `refused` list it is
+given (it still raises `MarketRefusalError` when given none). The adapter's
+`act()` may return `tf.Limit` and `tf.Cancel` values, and its `record`
+holds a limit order as `{"quantity", "limit_price"}`. The callable,
+OpenAI Agents and PydanticAI examples' rule reads `return_5d`, so their
+scorecard rows moved (`examples/integrations/README.md`). Every committed
+LLM recording was made under the old payload and misses at step 0, so a
+recording of your own made before 0.8.5 will not replay. Six of the seven
+in `tests/fixtures/` were recorded again live on this build: the callable,
+OpenAI Agents, PydanticAI and LangGraph runs on pt-v20 and FinRobot's
+rate shock on pt-v20 and liquidity crisis on pt-v16, the study's market.
+`finrobot/rate-ladder.json` was not, because nothing replays it; the
+liquidity-crisis study only reads it as the run that prompted
+`on_refusal`. The 20 tests that replay the fixtures run again.
+
+### The gym environment
+
+`TradingEnv.reset()` without a seed used to replay the constructor's market
+every time, even straight after `reset(seed=99)`, so a loop of 1000 resets
+trained on one market 1000 times. The first `reset()` still runs the
+constructor's seed. Each later `reset()` without a seed now runs a new seed
+below `2**32`, drawn from the env's generator, so the loop meets 1000
+markets and the same 1000 on every run. `reset(seed=n)` runs seed `n` and
+reseeds that generator. `info["seed"]` is the seed an episode ran, and
+`reset(seed=info["seed"])` replays it.
+
+The generator is Gymnasium's `np_random`. The first `reset()` without a seed
+used to leave it seeded from the operating system, so it differed on every
+run. It is now seeded from the constructor's seed, which makes it
+deterministic. Without Gymnasium installed the env builds the same
+generator itself, so the drawn seeds are the same either way.
+
+An action whose absolute weights add up to more than `max_leverage` allows
+is now scaled down, every weight by one factor, to a gross of 1.96x under
+the default 2x cap, and the step's `info["scaled"]` is `True`. The gap below
+2x leaves room for fills that cost up to 1 per cent of what they buy. Before,
+the env traded names in roster order until the cap refused one, so
+`[1, 1, 1, 1, 1]` bought the first name at 1x and refused the other four.
+The step also trades every position it shrinks before any it grows, so
+moving 1.9x from one name into another no longer has the purchase refused
+when the new name comes first in the roster.
+
+**What breaks.** Training code that relied on `reset()` replaying one
+market now sees a new one each time, and should call `reset(seed=n)` with
+the seed it wants. An episode whose actions went over the cap trades a
+different book and earns a different reward. Notebook 5's random policy
+loses 83,412 over its episode where it lost 83,236, and its 0.40 row in the
+size sweep now reads the scaled book. The change is in the env's Python
+code and leaves the engine alone, so no known-answer digest moves.
+
+### Speed
+
+`evaluate` of five momentum strategies on 40 names over 20 days took 11.0 s
+of CPU on pt-v20 and now takes 3.95 s. `rank` of the five reference agents
+over 12 seeds of 5 days went from 66 s to 12 s. Every digest and every
+scorecard is the same as before.
+
+Building a pt-v20 engine took 0.70 s and takes about 0.01 s. The earnings
+anticipation asks for the business cycle's stationary phase shares on every
+close, 755 times in the burn-in alone, and each answer walked the survival
+function of every phase. The answer depends only on the cycle's dials, so
+the engine now keeps the last one.
+
+`Engine.state_hash` took 1.2 ms and takes 0.09 ms, because each engine works
+out its model fingerprint once. The harness hashes the engine before and
+after every call into agent code, so this was a quarter of `evaluate`.
+`Observation.position` no longer copies every holding on each call, through
+a new `quantity_of(ticker)` on `Portfolio` and `PortfolioView`. The maker's
+ladder, rebuilt every tick, makes two allocations a level instead of four,
+which takes `run_days(20)` from 0.51 s to 0.42 s.
+
+### Python versions and installs
+
+Python 3.12 made built-in `sum()` over floats compensated, and the Python
+code between the engine and the orders used it for net worth, gross
+exposure, rebalancing weights and the scores. On `Universe.random(40,
+seed=111)`, seed 7, ten days, the random baseline's orders split between
+3.11 and 3.12 at step 29 in the last digit, and 557 of 2,428 logged orders
+differed. The engine digests did not move, because the engine is Rust. The
+package now adds floats left to right as 3.11 did (`tradefloor._arith`), so
+3.11 results are unchanged and 3.12 and 3.13 match them. On 3.12 and later
+an LLM agent's observation can change in its last digit, to the 3.11 value.
+`tests/test_python_versions.py` compares an agent-driven run with digests
+taken on 3.11 and runs in CI on 3.12 and 3.13. A run manifest records the
+Python version.
+
+`pip install "tradefloor[mcp]"` now installs pyarrow, which the `explain`
+tool needs. Without the extra, `tradefloor-mcp` prints one line naming it
+instead of two tracebacks. The README says to clone the repository before
+running an example, since `examples/` is not in the package, and says the
+`finrobot` extra installs only on Python 3.11 and only `--live` needs it.
+
+`examples/08-claude-agent.py` replays a recorded Claude run by default
+(owner decision 10), so it runs with no key and no network. The recording is
+`tests/fixtures/claude/example-08.json`, and its `meta` names the model, the
+preset, and digests of the system prompt and the answer schema. With
+`TRADEFLOOR_LIVE_EXAMPLES=1` and a key the example calls Claude, once per
+simulated day, and `--record` rewrites the recording. A replay refuses a
+recording made under another prompt, schema or preset, and stops at the
+first day whose prompt it holds no answer for.
+
+### Wrong arguments and broken agents
+
+A review of what a new user is told found wrong arguments reaching Python's
+internals first ("'int' object is not iterable") and several mistakes that
+ran to the end without a word. `evaluate`, `rank`, `World`, `tca.analyse`
+and `Engine` now check their arguments and refuse a wrong one by name, with
+a call that works. A class, a function or an uncalled `StrategySpec` factory passed as an agent
+is refused before any market runs; it used to score `pnl=0.00`. So is a
+scenario passed by name (`tf.Scenario.load(name)` loads it), a list of ticker
+strings as a universe, a single number as `seeds`, a dict as `macro`, and
+positional arguments to `Engine`. `Scenario.from_yaml` on a path that names
+no file raises `FileNotFoundError`; it used to report a YAML syntax error.
+`obs.price` and `obs.book` name an unknown ticker and, for a case slip, the
+one meant. A negative count to `run_days` or `Universe.random` is refused in
+words, not as an `OverflowError`, and a preset or sector name in the wrong
+case says which name was meant.
+
+`evaluate` warns, and changes nothing it runs, when an agent failed on every
+step (its card read like one that held cash), when every order in a step was
+a fraction of a share (portfolio weights sent as shares), and when a spec's
+`top_k` is more than half the universe, which the ranked agents cap. A market
+order the book could not fill in full is listed in the new
+`Scorecard.partial_fills`, and the repr counts errors and partial fills.
+`versus_buy_and_hold` and `capture_ratio` warn with the reason whenever they
+return `{}`. `Checkpoint.of(..., verify=True)` replays the log and refuses a
+checkpoint that does not reach the engine, which catches a wrong seed.
+`ArrowStream`'s repr says how to read it, and `tradefloor.gym` names the `rl`
+extra whether numpy or gymnasium is missing.
+
+**What breaks.** Calls that valid runs never make are refused: `open_market()`
+or `run_days()` on an engine whose day is open (each silently reopened the
+day and moved the state hash; call `close_market()` first, and a day closed
+by `run_session(close_at_end=True)` counts as closed), a ticker listed
+twice in one universe (the second could never be traded), and a negative VIX
+in `Macro` or `pin_macro`. Runs that were valid before run as they did, and
+every known-answer digest is unchanged.
+
+### Changes from the third pre-release review
+
+None of these moves a known-answer digest or the market.
+
+- An action an LLM adapter refuses is a rejected action. Since decision
+  schema 2 an adapter refuses a bad action on its own, such as a ticker the
+  roster does not have, and trades the rest of the decision. `evaluate`
+  wrote the refusal to `Scorecard.errors` and did not count it in
+  `rejected`, so `rank` reported it as a step where `act()` raised, with no
+  first error. It is counted in `rejected` now, `AgentRecord.refused` holds
+  the count per seed, and the report names the agent on a REFUSED line with
+  the first refusal. An exception in `act()` is still reported as RAISED. A
+  scorecard from an adapter run with refusals has a higher `rejected` than
+  before.
+- The rank report names the benchmark it read. Its rows say
+  `vs buy_and_hold`, or `vs flat` under `benchmark="flat"`, where every row
+  said "vs buy-and-hold" whatever was chosen.
+- A seed on which an agent failed at every step and traded nothing has no
+  score in the rank report. It is left out of the agent's excess P&L and
+  its count of seeds ahead, the row says on how many seeds it failed, and
+  the agent cannot win that seed. An agent that raised on every step of
+  three seeds printed "ahead 2/3" in a falling market.
+- On pt-v20 the rank report says that the Oracle ran and has no row, with
+  its P&L over the benchmark's and the number of seeds it was ahead.
+- `Scorecard` has `sharpe`, `volatility_pct`, `time_in_market` and
+  `avg_gross_exposure`. They are read-only properties, shown in the repr
+  and left out of `as_dict()`. Sharpe and volatility are annualised from
+  the daily returns of `equity_curve`, with no risk-free rate subtracted.
+  The other two read the new `exposure_curve`, gross exposure over net
+  worth after each step. `tests/known_answer_traded.py` lists
+  `exposure_curve` as read off fields it hashes, and does not hash it.
+- The `Scorecard` repr prints `sharpe=n/a (short run)` for a run of fewer
+  than `Scorecard.SHARPE_MIN_DAYS` (20) scored days, where the standard
+  error of an annualised Sharpe ratio is 3.5 or more. The `sharpe`
+  property still returns the figure.
+- An agent whose `act()` returns something other than a mapping, such as a
+  list of pairs, is reported on an UNUSABLE line with its count and the
+  first seed and step, where it was a RAISED line saying `act()` raised,
+  with no first error. `AgentRecord.unusable` and `first_unusable` hold
+  them, and they are no longer in `AgentRecord.errors`. The REFUSED line
+  no longer ends the refusal's own sentence with a second full stop.
+- A `CallableAgentAdapter` replaying a transcript that names an
+  instructions digest, built with no `AdapterInfo` or one without
+  `instructions_digest`, warns that the check refusing a replay under a
+  changed prompt is off.
+- `from tradefloor.integrations import Transcript` works. It loads
+  `integrations.common` when the name is asked for, so importing the
+  subpackage still imports no adapter.
+- `tf.tca.analyse` takes `history_days`, as `evaluate` and `rank` do. Both
+  worlds start day 0 from the warmed market, and `Execution.history_days`
+  records the warm-up.
+- `envelope.check` refuses a question on short-lag clustering. The
+  decay-shape gap's statistics were `abs_return_acf20` alone, so
+  `check(horizon_days=252, statistics=["abs_return_acf1",
+  "abs_return_acf5"])` read inside the envelope while the gap's own text
+  said lag 1 reads a quarter of real. They are lags 1, 5 and 20 now, and
+  each row's band warning still prints beside the refusal.
+- A horizon past 252 days gets a reason that opens with one plain
+  sentence, "A 450-day run is longer than the 252 days this model is
+  certified for, so the certification does not cover it.", before the
+  504-day and ten-year figures.
+- The five gaps in `envelope.GAPS` state the current finding and nothing
+  else. Their dated correction notes and run ids are below. The
+  measurements they cited are the engine repository's fleet runs
+  envgaps-085 (ba3f020, 2026-09-26, artefacts in
+  `tools/calibration/results/envgaps-085-2026-09-26/`) and envgaps-pt-v20
+  (2026-09-24), and three earlier runs whose output is not published.
+
+What the gap texts carried before:
+
+- horizon. From 2026-09-14 to 2026-09-20 it read "one row out at 504 days:
+  sector_excess_corr, 0.10421 against a floor of 0.11", a decade-band
+  verdict on an earlier vector. Before 2026-09-14 it read "the shipped
+  pt-v19 holds ALL FOURTEEN at 504 days", measured on pt-v18 plus four dials
+  with sector_loading 0.8. The first pt-v20 composition missed
+  volume_abs_return_corr on the ruled bands from 1260 days and held 13 of
+  14 on the decade bands. Until 2026-09-24 it quoted pt-v12's ten-year
+  volatility, flat at 31.5 to 31.6 per cent, and pt-v12's 10 of 14 on the
+  decade bands at 2520 days.
+- decay-shape. Until 2026-09-24 it read "log-log slope -0.859 +/- 0.199, a
+  ratio of 1.97", resolved to lag 12 and negative by lag 45, which was the
+  2026-09-14 vector's curve. Before 2026-09-14 it read "about 2.2x steeper,
+  and the curve turns NEGATIVE by lag 30", pt-v14's curve. The first pt-v20
+  composition read 0.0342 at lag 1 and a slope of -0.615 +/- 0.129, and
+  kept 61%, 47% and 23% of lags 1, 5 and 20 after de-trending. pt-v12's
+  de-trended run of 2026-08-26 kept 86%, 77% and 29%, with a GJR shock
+  half-life of 3.9 days, and read a raw slope of -0.597 at 2520 days and
+  -0.867 de-trended.
+- scenario-magnitude. Until 2026-09-24 it said a scenario's expected size
+  was calibrated and the dispersion around it was not, which was pt-v10's
+  and pt-v12's reading. Until 2026-09-23 the lever read 2.07x, the
+  2026-09-14 vector's, with pt-v18 at 6.53x, pt-v16 6.23x and pt-v10 5.05x
+  read with no burn-in. Before 2026-09-14 it read 5.28x, measured on a
+  pt-v18 variant that never shipped (ptv19panel). The first pt-v20
+  composition's driven gains were 0.16, 0.22 and 0.14. The event study
+  agreed on five of six until 2026-08-27, two until 2026-09-24 and three
+  until 2026-09-26. Before 2026-09-14 the text said sector structure was
+  closed at 0.2081 and 0.1817; 0.1817 was pt-v13's 504-day reading and the
+  shipped preset missed both horizons. Until 2026-08-26 it said industries
+  held together in a crisis about a third as tightly as real ones, +0.035 on
+  pt-v10 and +0.064 on pt-v7. pt-v3's driven correlations were -0.423,
+  -0.496, +0.573 and +0.512, and pt-v10's residual sd was 1.76x real.
+- macro-range. Until 2026-09-23 it read "peaks at 4.0% on every seed, with
+  sd 1.2 around a mean of 2.0%", pt-v12's figures. The first pt-v20
+  composition peaked at a median 3.1%, passed 4% on 5 seeds of 30 and
+  reached the crisis cadence's condition on 29 days.
+- roster-concentration. Until 2026-09-24 `check` refused every concentrated
+  question, and the gap's statistics were cross_sectional_corr,
+  annualised_vol_pct and corr_persistence_acf1. On pt-v12 (2026-08-26)
+  every mix held 14 of 14 at 252 days, and at 504 days S&P-like held 13 of
+  14, technology-heavy 11 of 14 and all-technology 10 of 13.
+
+### Bar volume
+
+`Engine.bars()` reported volume wrongly at every grain coarser than a tick.
+The engine counts each name's volume as a running total that the open
+resets to zero, and the tick rows served that total. `bars(minutes=N)` and
+`bars(grain="day")` then summed it, so a day bar read about two hundred
+times the day's volume and the five-minute profile climbed all day instead
+of forming a U. Two reviewers found it: one seed's day bar read 296 times
+the name's average daily volume while `column("volume")` read 1.5 times.
+
+A bar's volume is now the running total at its last tick minus the total
+before its first, at every grain. A tick row holds that minute's volume, so
+the tick rows of a day add up to its five-minute bars and to its day bar,
+and the day bar equals `column("volume")` at the close. A day run as several
+sessions keeps one count, and with nothing recorded the fallback to the
+last session subtracts what earlier sessions of the day traded. If you read
+the tick column as a running total, take its cumulative sum per name and
+day. `session_volumes()` still returns the running totals.
+
+Prices, the tape and every known-answer digest are unchanged. Two certified
+rows read day-bar volume through `facts.measure`. On pt-v20 over the held
+roster and seeds 101 to 130, `volume_abs_return_corr` moves from 0.508 to
+0.596 at one year and from 0.561 to 0.627 at two, and `volume_change_acf1`
+from -0.254 to -0.268 and from -0.241 to -0.261. All four stay inside their
+ruled bands, the two-year correlation 0.003 under its ceiling of 0.63.
+`envelope.CERTIFIED`, `envelope.MEASURED_504` and `presets/pt-v20.json`
+now carry these readings, re-measured on the fixed bars in every cell of
+the certification run. The other rows reproduced to the last digit. Held-out
+seeds read 0.612 and -0.266, the held-out universe 0.590 and -0.267, and
+the level protocol 0.603 and -0.267, all inside their ruled bands.
+`volume_abs_return_corr` is no longer at the real centre of 0.536 in the
+mechanism blocks (2.9 to 3.2 standard errors above it), so the at-centre
+count falls from 9 to 8 of 14 on both 252-day cells and from 11 to 10 on
+the level protocol.
+`facts.SEED_SD` and `facts.SEED_SD_504` are re-measured for the two rows on
+their own pt-v1 protocol: `volume_abs_return_corr` falls from 0.0416 to
+0.0143 at one year and from 0.0190 to 0.0087 at two, so a distance on that
+row in seed standard deviations is now about 2.9 and 2.2 times larger.
+`volume_change_acf1` moves from 0.0108 to 0.0119 and from 0.0085 to 0.0071.
+
+### Found by the 0.8.5 audit
+
+None of these moves a known-answer digest. A run that numbers its days from
+the engine's counter, closes its days with `close_market`, never calls
+`set_fundamentals` and runs no variance cascade hashes and logs as it did,
+and its snapshots gain one key, `session_tick`. Scores of levered agents in
+`evaluate`, `rank` and `World` move.
+
+- The day number is a label. `run_days(first_day=N)` and `set_day(N)` were
+  documented as labels, but the buyback factor read the same field as its
+  elapsed time, so on pt-v20 `first_day=1000` moved prices by 0.17 in log
+  within thirty days and `set_day(5000)` mid-day moved the next session by
+  0.21, with no log entry and the state hash unchanged. The valuation now
+  counts the days the engine has run. The label goes into the order log
+  (`open_market` carries `day` when a run numbered the day its own way, and
+  `set_day` is an entry of its own), so a replay numbers the days as the run
+  did.
+  `open_market` takes `day=`. A negative day is refused.
+- A restore puts back the day stamp and the session tick. After a close the
+  restore set the day one ahead of the original, so a pin after it
+  re-marked prices off the wrong elapsed time and a fill was stamped day 4
+  tick 0 where the original said day 3 tick 390. Snapshots carry
+  `session_tick`, and `current_day` and `elapsed_days` where they differ
+  from the counter. `session_tick` is not hashed: it moves no price, and
+  hashing it would have moved every ledger leaf already written. A run that
+  closes its sessions with `run_session(close_at_end=True)` leaves the
+  session flag set, so its snapshots now carry the day just closed and its
+  leaves move; the restore set that day one ahead.
+- `set_fundamentals` is in the snapshot and the state hash, once the figures
+  differ from the ones the engine was built with. A restore brought back the
+  construction earnings while the hash check passed, so an earnings shock
+  resumed at day 30 left the index 1.35 times the uninterrupted run twenty
+  sessions later.
+- The variance cascade (`garch_cascade_components` at 1 or more) is in the
+  snapshot and the hash. Off on every shipped preset.
+  `tests/test_restore_dial_sweep.py` restores every dial moved off pt-v20
+  and runs in the slow lane.
+- Inputs that made every price NaN are refused. `pin_macro(vix=...)` takes
+  a level above zero and at most the higher of the model's `vix_ceiling`
+  and the default preset's, 181.33, so presets that clamp at 80 still take
+  the real March 2020 close of 82.69. `run_days`, `run_session` and
+  `run_until` check volatility and day_of_week as `tick` does, and refuse a
+  start at or past 24:00 (a start written as 9:60 still runs, as it always
+  has). `patch_draws` refuses a non-finite normal or a uniform outside
+  [0, 1]; `set_fundamentals` refuses an infinite value. `ModelParams`
+  refuses `price_hard_cap` at or below zero and `buyback_payout_share`
+  outside [0, 1]. A scenario refuses a VIX `set` or `hold` above 181.33,
+  and a relative VIX shock that computes a level above it writes 181.33.
+  A hold at 1000 made the index NaN on 9 of 30 seeds, and holds of 400 to
+  800 turned a fear shock into a rally.
+- Borrowing pays the policy rate in `evaluate` and `rank`.
+  `Portfolio.accrue` charged a negative cash balance only with
+  `cash_interest` on, which both leave off, so levered agents borrowed for
+  free. On the 90 graded pt-v20 histories 1.8 times the index beat the
+  index by 2.33 points a year that way, against 0.21 with the rate charged.
+  `accrue` now charges a negative balance whether `cash_interest` is on or
+  off, unless the portfolio was built with `margin_interest=False`. Idle
+  cash still earns nothing unless `cash_interest` is on. Scores of levered
+  agents move and the market does not. A levered agent's cash, which its
+  observation shows, now falls by a day's interest at each close, so a
+  prompt built from it changes once the balance is negative.
+- A `World` never called `accrue`, so its portfolios earned and paid
+  nothing. It now books a day's interest before each close, as `evaluate`
+  does: a negative balance pays the policy rate, which is owner decision
+  11 below, and a positive one earns it only with `cash_interest=True`.
+- `Engine.fundamentals` had `set_avg_volume`'s docstring and
+  `set_avg_volume` had none. `pin_macro`'s docstring says it writes today's
+  value and points to `Scenario.hold` for a hold.
+
+### Scoring changes from the owner decisions of 26 September
+
+Owner decisions 8, 9 and 11 of 2026-09-26. None of them changes a price or a
+known-answer digest.
+
+- `explanation_accuracy` is scored on the question an agent is asked: which
+  factor moved prices most that day. The scorer ranked all eleven
+  attribution columns, and `fair_value_shift` moves no price. It books the
+  part of a shock that left the mispricing for fair value, while the
+  shock's own column holds the whole move, so every permanent shock counted
+  twice and `fair_value_shift` was the answer on 102 of 300 days over three
+  rosters and five seeds. The scorer now ranks the ten factors in
+  `harness.DRIVER_NAMES`. It also read the attribution before the close, so
+  a jump at the close never counted and `jump` could not be the answer; it
+  now reads it after the close, and `explain(day)` is called there. On
+  pt-v20 `random_noise` is the answer on 294 of those 300 days and `jump`
+  on 5, so a constant answer scores 0.95 to 1.0, and `explanation_baseline`
+  says what it scored on the same days. Example 08 offers Claude the ten
+  names and describes the rule.
+- Because a constant answer scores near the top on pt-v20, the accuracy is
+  no longer shown alone. `Scorecard.explanation_edge` is the accuracy minus
+  the baseline. The repr prints all three for an agent with `explain`,
+  such as `explanation=0.967 vs baseline 0.983 (edge -0.016)`, and example
+  08's table has a column for each. The rule itself does not change again.
+- Fingerprint battery version 2 is the default (`tf.BATTERY_VERSION == 2`).
+  It has seven cells, one per shipped scenario including `curve_shock`,
+  each 120 days long, so a day-50 shock has seventy days after it instead
+  of ten. The `curve_shock` cell's roster carries the three rate indices,
+  and `Cell` has a `bonds` field for it. `tf.battery(1)` builds version 1
+  unchanged, and its digests are the ones it gave before. A version 2 run
+  is 840 days against 360, so an LLM agent asked once a day costs 840
+  calls. `tf.sealed_battery` takes seven seeds for version 2.
+- A `World` charges borrowing the policy rate before each close, as
+  `evaluate` and `rank` already did, so a levered agent's score there is
+  the one `evaluate` gives it. `evaluate`, `rank`, `World` and `Portfolio`
+  take `margin_interest=False` to borrow for free. A scorecard from such a
+  run has `margin_interest=False` and its repr says `free-borrowing`; a
+  World's summary and manifest record it. The charge changes the cash a
+  levered LLM agent is shown in a World, so two recorded runs stopped
+  replaying, `tests/fixtures/finrobot/rate-shock.json` from step 228 (day
+  38) and `tests/fixtures/pydantic_ai/rate-shock.json` from step 12 (day
+  2). Both were recorded again, with the other LLM fixtures below.
+- `margin_interest` and `cash_interest` must be True or False. `evaluate`,
+  `rank`, `World` and `Portfolio` refuse None and strings, because
+  `bool("False")` is True. `tf.battery(True)` is refused rather than read as
+  version 1. `history_days` takes at most 2520, ten 252-day years.
+
+### The MCP server after review
+
+A review of the MCP server over stdio found results that read as answers and
+were not. Every shipped scenario starts on day 30 or later, and each one, run
+through `run_stress_scenario` at the default 20 days, came back `ok` with a
+difference of 0.0 for every entrant. The tool now refuses a run that ends
+before the scenario's first event and says how long a run reaches it, and
+`build_scenario` refuses the same case. A result names the events that start
+after the run or are still under way when it ends, and `list_scenarios` gives
+each document's `first_event_day` and `last_event_day`.
+
+`peak_day` reached `vix_shock` under its own name, which that constructor does
+not take, and the `rate_shock` constructor lost to the shipped document of the
+same name, so neither constructor could be timed. The constructors are now
+`vix_shock` and `rate_ramp`, which calls `Scenario.rate_shock`. `vol_shock`
+still runs `vix_shock` and is no longer listed.
+
+A strategy named after a baseline replaced it, so `versus_buy_and_hold` was
+measured against the caller's own strategy. The run tools refuse the five
+baseline names. An authored instrument with neither `eps` nor
+`book_value_per_share` is refused too, because the model values such a row
+at the one-cent fair-value floor and its price falls toward it every day. On
+a two-name roster buy-and-hold lost 26 per cent on day one.
+
+`start_job` checks a job's arguments against the tool's signature and types
+before the job starts. An unknown argument used to be accepted and fail later,
+and a universe given as JSON text made the estimate raise after the job had
+started, so the caller never saw its id. The estimate counts
+`rank_strategies`' six default seeds and the steps per day, its costs were
+measured again on pt-v20 after the engine build fell to about 0.02 s, and
+`rank_strategies(seeds=[])` is refused. An exception that escapes
+any tool comes back as a refusal with its type and message, where the SDK sent
+only `Error executing tool <name>`.
+
+Provenance carries the preset's `model_fingerprint`, which was an empty
+string, and `tradefloor_version`; `pretium_version` stays for the 0.8 line.
+Every tool parameter has a description in its input schema, `scenario` is typed
+as a name or a document, and `start_job.tool` as the three jobbable tools.
+`check_envelope` takes a mix name for `sector_concentrated` and a
+`macro_regime` flag, and `run_stress_scenario` sets `macro_regime` when a
+scenario drives inflation, growth or the cycle. The concentrated-roster caveat
+points at `check_envelope` instead of an argument no run tool has.
+`explain_price_move` no longer describes seven factors (pt-v20 has eleven).
+
+**What breaks.** A stress run shorter than its scenario's first event, a
+strategy named after a baseline, an authored row with nothing to value it on,
+`rank_strategies(seeds=[])` and `explain_price_move(top_n=0)` are refused.
+`list_scenarios` lists `rate_ramp` and `vix_shock` as the constructors.
+
+### The Rust crate since 0.8.1
+
+The crate takes the Python package's version, so it is 0.8.5 too, and Cargo
+treats 0.8.5 as a compatible update to 0.8.1: `tradefloor = "0.8"` moves to
+it on `cargo update`. It is not compatible. Code written against the 0.8.1
+crate can stop compiling, and code that still compiles runs a different
+default market. To stay on the old API, pin `tradefloor = "=0.8.1"`.
+
+These signatures changed:
+
+- Seeds are `u64` where they were `u32`: `Engine::new` and the other
+  `Engine` constructors, `universe::random_universe`, `GameRng::new`,
+  `GameRng::from_seed`, `GameRng::substream`, `GameRng::surgery` (both
+  seeds), `Pcg32::new` and `engine::fixed_simulation_digest` (both
+  seeds). A `u32` argument needs `u64::from(seed)`.
+- `Engine::tick_components` returns rows of
+  `market::factors::TICK_COMPONENT_COUNT` (9) entries, where it returned
+  `[f64; 8]`. The ninth is the tick's fair-value shift.
+- `market::factors::COMPONENT_COUNT` is one larger, for the new
+  `FAIR_VALUE_SLOT`.
+- `Engine::state_hash_with_pending` takes a fifth argument,
+  `pending_fair_value`.
+
+These public structs gained public fields, so a struct literal written for
+0.8.1 no longer compiles: `SessionRequest` (`fills`), `TickInputs`
+(`resting_orders`, `fill_impact`), `TickStock` (`fair_value_offset`),
+`TickOutcome` (`agent_fills`), `LiveFactors` (`company_news_market`,
+`noise_market_linear`), `DailyInputs` (`unemployment_adjustment`,
+`fear_greed_published`, `yields`), `EconomyState` (`earnings_cycle`,
+`vix_feedback`, `earnings_anticipation`, `unemployment_impulse`),
+`OrderBook` (`cap`), `SessionBuffer` and `TickTruth` (`repriced`), and
+`ModelParams` (37 fields, one per new coefficient). Build a `ModelParams`
+with `ModelParams::preset` and `with_override`, and a
+`SessionRequest` with the new `SessionRequest::new`, which fills in a quiet
+session.
+
+So that adding a field is no longer a breaking change, `ModelParams`,
+`SessionRequest`, `SessionBuffer`, `SessionOutcome`, `TickTruth` and both
+`TickOutcome` structs are now `#[non_exhaustive]`. Outside the crate they
+cannot be written as struct literals or with `..base` update syntax. Use the
+constructors above and `SessionBuffer::new`, then set or read fields on the
+value. A pattern that destructures one needs a trailing `..`.
+
+`params::DEFAULT_PRESET_NAME` is `pt-v20`, so `Engine::new` builds a
+different market from the same seed than it did on 0.8.1. Pass
+`ModelParams::preset("pt-v19")` to `Engine::with_params` for the old one.
+
+The crate also declares `rust-version = "1.83"`, its README example now runs
+a trading day (the 0.8.1 example called only `close_day`, which moves no
+prices) and is compiled and run by `cargo test`, and the docs build without
+warnings.
 
 ## 0.8.1
 
@@ -233,8 +1699,7 @@ changes, and pt-v19 still reads below.
 **pt-v19 is recomposed: nine dials return to pt-v18's values, and every
 seeded pt-v19 trajectory changes a third time.** A 2^6 factorial over the
 six dial families that separate pt-v18 from the 2026-09-14 composition
-(design repository, `programme/results/bestof/RESULT.md` and
-`RESULT-504.md`, registered before it ran, 64 cells at 252 and 504 days,
+(registered before it ran, 64 cells at 252 and 504 days,
 both parents reproducing their committed records bit for bit) measured the
 market variance family -- the GJR triple, the slow pole and the stochastic
 level -- away from the tape on volatility level, cross-sectional
@@ -253,7 +1718,7 @@ for the eighth boundary running. The six dials that return to 0.0 leave
 `DIAL_PROVENANCE` for `OUT_OF_SCOPE` with the gate each names, except
 `jump_idio_vix_decoupled`, which is live on its own and is recorded as
 `undetermined` in `POST_BASELINE`. The derivations the returned values
-replace stay in the design repository. The record, the envelope tables
+replace stay in the project's unpublished design notes. The record, the envelope tables
 and the level block are regenerated on the certification box, and the
 figures above this marker describe the previous vector until they are.
 
@@ -264,8 +1729,8 @@ now carry `fear_gauge_dn1` at its whole-tape band, (0.39, 3.03) and
 provenance block rather than typed; and `fear_gauge_dn3` at its shipped
 whole-record ruler, (2.60, 9.58) at both horizons, as
 `facts.RULED_FEAR_DN3_BAND`. The first was ruled on 2026-09-15
-(`ruling-nineteen-rows-with-dn3-re-derived`, design-repo verdict ledger)
-and had sat in `RULED_UNREADABLE` since, waiting for a ruling already
+(`ruling-nineteen-rows-with-dn3-re-derived`, in the verdict ledger kept
+in the project's unpublished design notes) and had sat in `RULED_UNREADABLE` since, waiting for a ruling already
 made. The second was ruled on 2026-09-19 on the ruler's own construction
 and power: over 173 retained arm readings the shipped band rejects 8, the
 one section 14 form valid at the project's own window anchor rejects 5,
@@ -358,8 +1823,8 @@ rows are always available.
 
 **More figures describing an earlier pt-v19 than the one that ships,
 corrected 2026-09-14.** The slow level's `sigma` opened this note as 0.047.
-`cascade-fourth-moment.md` derived that figure and `level-phi.md` then
-found the derivation in error; the shipped value is 0.085, and the `S`
+A derivation of the fourth-moment cascade produced that figure and a
+later study of the level's persistence found the derivation in error; the shipped value is 0.085, and the `S`
 figures quoted beside it were measured at 0.047 and are now labelled as
 such. Two others were corrected outside this file, and both were the same
 mistake. The crisis lever read 5.28x in `README.md` and in `envelope.py`'s
@@ -371,14 +1836,14 @@ real, and under a third of pt-v18's 6.5258. And the 504-day
 four-dial preset's figure, surviving four regenerations of the table
 beneath it; it reads 23.3899. The paragraphs below this marker are the
 working log of a vector that moved several times, and a figure in one of
-them describes the preset of its own day and not necessarily this one. The
-rule for reading a band result is in `programme/band-count-rule.md` in the
-design repository.**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
+them describes the preset of its own day and not necessarily this one.
+
+**pt-v19 takes three more dials.** `market_vol_vix_excursion` 1.0 makes the
 market factor's variance target read the VIX's excursion above the level the
 index's own conditional variance implies, instead of the VIX's level against
 a fixed anchor. Under `vix_level_identity` the old form fed the factor's own
-variance back to itself, which `garch-derive-design.md` finding 4 measured
-as the loop counting its memory twice. Cutting it takes the loop's
+variance back to itself, which the GARCH derivation measured as the loop
+counting its memory twice. Cutting it takes the loop's
 amplification of a standing bias from about 2.7x to about 1.1x, and the
 static map from asymptotically linear to sublinear: `implied(v)/v` at a
 pinned VIX of 80 reads 0.474 against 0.651, and `ratio(80)/ratio(40)` reads
@@ -652,9 +2117,9 @@ The chain, measured and each step separately:
 - the market factor's variance process makes excursions of twenty to fifty
   times its target lasting tens of sessions, **and they are ordinary**. The
   fast component alone fails the fourth-moment condition -- `3 alpha^2 +
-  2 alpha beta + beta^2` = **1.1035**, a figure already on the record in the
-  design repository's `garch-derive-design.md` -- but that document also
-  says what would otherwise have been got wrong here: the SHIPPED process is
+  2 alpha beta + beta^2` = **1.1035**, a figure already on the record in
+  the GARCH derivation in the project's unpublished design notes, which
+  also says what would otherwise have been got wrong here: the SHIPPED process is
   a 0.65/0.35 mixture, its own condition is the spectral radius of a 4x4
   matrix, and that reads **0.9870**, under one. The shipped factor variance
   has a finite fourth moment. Every dial it depends on is identical from
@@ -712,7 +2177,7 @@ in `market::index_var`'s module docs: normalise `crash_amplifier`'s
 `factors.rs` weighs, rejects and has already costed, and which
 makes `E[z^2 A^2]` flat in the regime and removes the superlinear term from
 the condition; or recalibrate `market_vol_alpha` and `market_vol_beta`,
-which `garch-derive-design.md` has already derived from the tape (0.1059 and
+which the GARCH derivation has already derived from the tape (0.1059 and
 0.8787 against the shipped 0.28035 and 0.69245) and which every preset from
 pt-v13 on carries; or give `crisis_blend_variance_damp` a moment, which asks for an
 incomplete-gamma integral where the rest of the module needs only `phi` and
@@ -852,9 +2317,9 @@ and 9.7 times the priced figures and the kurtosis sign flips;
 stays in band. No row leaves its band because of them,
 and the row that is out of band is the tail, which the switch improves.
 
-`programme/results/b4fix1-result.md` in the design repository carries the
-per-roster table, the seven acceptance criteria scored one by one, and the
-full prediction ledger. At that commit three of the seven were met and three
+The project's unpublished design notes carry the per-roster table, the
+seven acceptance criteria scored one by one, and the full prediction
+ledger. At that commit three of the seven were met and three
 were not: there was no fixed point below the ceiling on five rosters, the
 tail row was out of band, and the panel was 17 of 18. Every figure in this
 section describes the preset as it stood then, and three more dials have
@@ -875,7 +2340,7 @@ occurring, because a size is a second moment of the variance the VIX reads;
 `vix_variance_premium` and `vix_return_gain_up` are read where they were
 not; and `crisis_vix_threshold` is reachable at values the old anchor put
 out of range. `tests/test_model_params.py` carries the traced reason for
-each, and the design repository holds the note.
+each, and the project's unpublished design notes hold the note.
 
 **The VIX anchor is now roster-dependent, and a short run opens above it.**
 pt-v18 anchored every market at 15.98 whatever it held. pt-v19 derives the
@@ -1306,12 +2771,12 @@ is the one path from the night to fair value, found by the merge gate at
 a millionth on a name whose open had gapped, and none from the night
 back to its own size. And `volume_abs_return_corr` goes red at any ratio
 above zero because a gap carries no volume against it. No preset carries
-the dial; the response curve is in the design repository's
-`programme/overnight-process.md`.
+the dial; the response curve is in the project's unpublished design
+notes.
 
 ### One band rule with a named centre
 
-REALISM-BANDS.md's rule for a window-derived band drops "the single most
+The project's rule for a window-derived band drops "the single most
 extreme window" before taking the noise scale, and never said from what.
 Two implementations answered differently: the fear and overnight band tools
 trimmed around the median of the windows, the leave-one-window-out test and

@@ -35,12 +35,12 @@ each adapter's own choice, not this module's. A :class:`Renderer` renders
 
 :class:`JSONRenderer` is what LangGraph, PydanticAI and OpenAI Agents send
 today: `payload`, `json.dumps`-ed with sorted keys. :class:`TextRenderer`
-is what FinRobot sends today, generalised over the four axes
-`P6-observation-invariance.md` studies -- `detail`, `units`, `order` and
-`language` -- so the same knobs that vary FinRobot's prompt can be turned
-on any adapter's. Neither is privileged by the :class:`Renderer` protocol;
-an adapter's default is whichever reproduces what it already sends, and
-`invariance` takes any object with `render` and `key`.
+is what FinRobot sends today, generalised over four axes of the
+observation (`detail`, `units`, `order` and `language`), so the same knobs
+that vary FinRobot's prompt can be turned on any adapter's. Neither is
+privileged by the :class:`Renderer` protocol; an adapter's default is
+whichever reproduces what it already sends, and `invariance` takes any object
+with `render` and `key`.
 """
 
 from __future__ import annotations
@@ -48,6 +48,7 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol, Sequence, runtime_checkable
 
+from ._arith import ordered_sum
 from ._core import ValidationError
 
 #: The values :class:`TextRenderer` accepts for `units`, `order` and
@@ -179,7 +180,9 @@ _LABELS: dict[str, dict[str, str]] = {
         "max_order_shares": "  max order this step",
         "cash": "cash",
         "net_worth": "net worth",
-        "gross_exposure": "gross exposure",
+        "leverage": "leverage",
+        "open_orders": "Waiting limit orders:",
+        "at": "at",
         "max_leverage": "max leverage",
         "buying_power": "buying power",
         "col_symbol": "symbol",
@@ -223,7 +226,9 @@ _LABELS: dict[str, dict[str, str]] = {
         "max_order_shares": "  ordre maximal ce pas",
         "cash": "liquidites",
         "net_worth": "valeur nette",
-        "gross_exposure": "exposition brute",
+        "leverage": "levier",
+        "open_orders": "Ordres a cours limite en attente :",
+        "at": "a",
         "max_leverage": "levier maximal",
         "buying_power": "capacite d'achat",
         "col_symbol": "symbole",
@@ -321,8 +326,10 @@ def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
             "sector": sector,
             "names": len(members),
             "held": sum(1 for m in members if m["position"]),
-            "exposure": sum(m["position"] * m["price"] for m in members),
-            "return_5d": (sum(returns) / len(returns)) if returns else None,
+            "exposure": ordered_sum(m["position"] * m["price"]
+                                    for m in members),
+            "return_5d": ((ordered_sum(returns) / len(returns))
+                          if returns else None),
         })
     return rows
 
@@ -539,7 +546,7 @@ class TextRenderer:
             "-" * len(L["portfolio"]),
             f"{L['cash']:<23}{_money(book['cash'])}",
             f"{L['net_worth']:<23}{_money(book['net_worth'])}",
-            f"{L['gross_exposure']:<23}{_num(book['gross_exposure'])}x",
+            f"{L['leverage']:<23}{_num(book['leverage'])}x",
             f"{L['max_leverage']:<23}{_num(book['max_leverage'])}"
             + ("" if book["max_leverage"] is None else "x"),
             f"{L['buying_power']:<23}{_money(book['buying_power'])}",
@@ -553,6 +560,17 @@ class TextRenderer:
             out.append(f"  {asset['symbol']:<8} {_qty(asset['position'])} "
                        f"{L['shares']}  "
                        f"({_money(asset['position'] * asset['price'])})")
+        # The agent's limit orders still waiting, so an agent that sends
+        # them can see which are working. `.get`, for a payload built
+        # before the key existed.
+        out += ["", L["open_orders"]]
+        waiting = book.get("open_orders") or []
+        if not waiting:
+            out.append(f"  {L['none']}")
+        for order in waiting:
+            out.append(f"  {order['symbol']:<8} {order['side']:<4} "
+                       f"{_qty(order['remaining'])} {L['shares']} "
+                       f"{L['at']} {_money(order['limit_price'])}")
         return "\n".join(out)
 
     def _price_line(self, asset: dict[str, Any]) -> tuple[str, str]:

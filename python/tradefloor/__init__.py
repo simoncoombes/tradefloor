@@ -17,10 +17,12 @@ import json
 from typing import Any, Iterable, Sequence
 
 from . import _core
-from .portfolio import Portfolio, Position
+from .portfolio import Cancel, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
-from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
+from .harness import Agent, History, Observation, Scorecard, evaluate, leaderboard
+from . import sandbox
+from .sandbox import HiddenState, MarketView, PortfolioView, SandboxError
 from .replay import replay
 from . import edgar
 from . import envelope
@@ -59,7 +61,8 @@ from .interventions import (
 )
 from . import yaml_subset
 from .tca import Execution
-from .baselines import capture_ratio, reference_agents
+from .baselines import (capture_ratio, capture_withheld, oracle_is_ceiling,
+                        reference_agents, versus_buy_and_hold)
 from .ranking import AgentRecord, Ranking, rank
 from . import fingerprint
 from .fingerprint import (
@@ -89,6 +92,7 @@ from ._core import (  # noqa: F401
     apply_mispricing,
     characteristic_root_moduli,
     check_rate,
+    check_seed as _check_seed,
     crisis_epicentre_solve,
     crowd_adjusted_root_moduli,
     fair_value,
@@ -113,9 +117,11 @@ __all__ = [
     "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
-    "flow_impact", "Portfolio", "Position", "Agent", "Observation",
+    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "History", "Observation",
+    "sandbox", "MarketView", "HiddenState", "PortfolioView", "SandboxError",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
-    "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
+    "baselines", "reference_agents", "capture_ratio", "capture_withheld",
+    "oracle_is_ceiling", "versus_buy_and_hold", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
@@ -137,6 +143,7 @@ __all__ = [
     "crisis_epicentre_solve", "crowd_adjusted_root_moduli", "fair_value",
     "impulse_response",
     "market_status", "model_preset", "preset_names", "run_many",
+    "bonds", "rate_specs", "RATE_TICKERS", "RATE_SECTOR",
     "sector_daily_sigma", "sectors",
     "stationary_sigma", "step_mispricing_daily", "version",
     "__version__",
@@ -172,8 +179,16 @@ class Universe(list):
     """
 
     @classmethod
-    def random(cls, n: int = 108, *, seed: int = 0) -> "Universe":
+    def random(cls, n: int = 108, *, seed: int = 0,
+               bonds: bool = False) -> "Universe":
         """Generate ``n`` plausible instruments.
+
+        ``bonds=True`` appends the three simulated rate indices, ``UST2Y``,
+        ``UST10Y`` and ``IGCORP``, after the ``n`` equities (see
+        :func:`tradefloor.bonds`). The equities are the same ``n`` names
+        either way, and so is their market: the indices take no draws and
+        write nothing back to the economy, so every equity price is
+        bit-identical with or without them. Off by default.
 
         A generator is not a convenience here. A realistic study needs on the
         order of a hundred names, and nobody hand-authors a hundred rosters,
@@ -183,7 +198,9 @@ class Universe(list):
         ``seed`` is the UNIVERSE seed and is independent of the simulation
         seed. That separation is what makes "same universe, different market
         draws" expressible, which is the standard design for variance
-        estimation.
+        estimation. It is any integer from 0 to ``2**64 - 1``, like the
+        simulation seed, and every seed below ``2**32`` draws the roster it
+        drew when seeds were 32-bit.
 
         The generated cross-section is plausible rather than uniform: market
         caps are log-distributed across all four spread tiers, P/E ratios
@@ -193,7 +210,30 @@ class Universe(list):
         what IS guaranteed is that ``(n, seed)`` gives the same universe on
         every platform, so ``random(108, seed=7)`` is citable.
         """
-        return cls(_core.random_instruments(n, seed=seed))
+        universe = cls(_core.random_instruments(n, seed=seed))
+        if bonds:
+            universe.extend(_core.rate_instruments())
+        return universe
+
+    def with_bonds(self, tickers: Sequence[str] | None = None) -> "Universe":
+        """This universe with the simulated rate indices appended.
+
+        ``tickers`` picks among ``UST2Y``, ``UST10Y`` and ``IGCORP`` and
+        defaults to all three, in that order. Returns a new universe and
+        leaves this one alone. Refuses a universe that already holds one of
+        them, since each index is one instrument.
+        """
+        wanted = list(RATE_TICKERS) if tickers is None else list(tickers)
+        held = {inst.ticker for inst in self if inst.sector == RATE_SECTOR}
+        repeated = sorted(held & set(wanted))
+        if repeated:
+            raise ValidationError(
+                f"this universe already holds {', '.join(repeated)}")
+        return Universe(list(self) + list(_core.rate_instruments(wanted)))
+
+    def equities(self) -> "Universe":
+        """The equities, without any rate indices, in roster order."""
+        return Universe(inst for inst in self if inst.sector != RATE_SECTOR)
 
     @classmethod
     def from_edgar(cls, snapshot, **kwargs: Any) -> "Universe":
@@ -304,6 +344,47 @@ class Universe(list):
 
 def _rebuild(instruments: Sequence[Instrument]) -> Universe:
     return Universe(instruments)
+
+
+# --------------------------------------------------------------------------
+# Rate instruments
+# --------------------------------------------------------------------------
+
+#: The sector a rate index carries. Not an equity sector: an engine splits
+#: these instruments out before any equity code sees them.
+RATE_SECTOR = "rates"
+
+#: The simulated rate indices this build prices, in their default order.
+RATE_TICKERS: tuple[str, ...] = tuple(s["ticker"] for s in _core.rate_specs())
+
+
+def bonds(tickers: Sequence[str] | None = None) -> list[Instrument]:
+    """The simulated rate indices, as instruments with their default terms.
+
+    ``UST2Y``, ``UST10Y`` and ``IGCORP`` are simulated constant-maturity
+    indices, not real securities: a 2-year and a 10-year treasury index and
+    an investment-grade corporate bond index, priced off the engine's own
+    curve (``treasury_yield_2y``, ``treasury_yield_10y``, and the 10-year
+    plus the credit spread the engine sets). Each day an index returns
+
+        carry - D * dy + 0.5 * C * dy**2,  carry = yield / 252,
+
+    with duration and convexity of 1.9 and 4.6, 8.5 and 84, and 7.0 and 100.
+    :func:`rate_specs` returns every term, and ``rust/src/rates.rs`` documents
+    where each comes from.
+
+    They trade like any other instrument: ``engine.book(ticker)``,
+    ``Portfolio.execute``, ``fills=`` on ``run_session``, the tape, TCA. They
+    must come after every equity in a roster, which :meth:`Universe.with_bonds`
+    and ``Universe.random(..., bonds=True)`` arrange.
+    """
+    return list(_core.rate_instruments(None if tickers is None else list(tickers)))
+
+
+def rate_specs() -> list[dict[str, Any]]:
+    """Each rate index's fixed terms: name, curve point, duration,
+    convexity, quoted spread in basis points, and default depth and level."""
+    return list(_core.rate_specs())
 
 
 # --------------------------------------------------------------------------
@@ -458,8 +539,11 @@ def run_many(
     would be a poor default dressed as a good one.
 
     A single seed always runs in-process, whatever ``workers`` says.
+
+    Each seed is any integer from 0 to ``2**64 - 1``, checked here before any
+    worker starts.
     """
-    seeds = list(seeds)
+    seeds = [_check_seed(s) for s in seeds]
     if not seeds:
         raise ValidationError("no seeds given")
     if days < 1 or ticks < 1:
@@ -621,11 +705,27 @@ class FlowImpact:
     def untouched_moved(self) -> list[str]:
         """Instruments the trader did not touch, whose price still moved.
 
-        EMPTY on a one-day run, and the reason is what makes this
-        measurement clean: order flow consumes no draws. It is an input to
-        the factor calculation, not a call on the generator, so adding flow
-        to one name leaves the shared draw schedule byte-identical and
-        every other name sees exactly the noise it would have seen.
+        EMPTY on a one-day run where the close writes no price, and the
+        reason is what makes this measurement clean: order flow consumes no
+        draws. It is an input to the factor calculation, not a call on the
+        generator, so adding flow to one name leaves the shared draw
+        schedule byte-identical and every other name sees exactly the noise
+        it would have seen: its prints through the session are the same to
+        the bit on every preset.
+
+        The prices compared here are read after the close, and on pt-v20,
+        the default, the close re-marks every name to the macro state it
+        publishes (``macro_publication_repricing``). The close's macro step
+        reads the session's index return, which the flow moved (the VIX,
+        the 10-year's flight to quality, the corporate yield that follows
+        it), so on a one-day run the untouched names end apart by the
+        difference in their re-marks: +0.03 to +0.04 bps against +2.3 on
+        the traded name in ``tests/test_flow_impact.py``. That is the
+        market-wide channel below arriving at the first close, not a leak.
+        This function cannot pin the macro path; ``tradefloor.tca.analyse``
+        with ``scenario=Scenario().hold(vix=..., corporate_bond_yield=...)``
+        can, and a model with ``macro_publication_repricing`` 0 writes no
+        price at the close.
 
         Measured, not assumed: a 390-tick session consumes 19,110 draws with
         or without flow. (Adding an INSTRUMENT is a different matter and does
@@ -641,12 +741,15 @@ class FlowImpact:
         shares against the first name of ``Universe.random(20, seed=7)``
         run for ten days leaks nothing at sim seeds 2026 and 7 and moves
         one untouched name +22.8 bps at sim seed 11. Pin VIX in both
-        worlds to restore byte-exactness; ``tradefloor.tca``'s ``moved()``
-        docstring carries the full measurement of the channel.
+        worlds to restore byte-exactness, and on pt-v20 the corporate bond
+        yield too, which that preset moves at every close with the market;
+        ``tradefloor.tca``'s ``moved()`` docstring carries the full
+        measurement of the channel.
 
         So on a one-day run impact is exactly attributable to the names
-        traded, and on a longer one it is attributable up to the fear
-        gauge. This accessor exists to prove that rather than to explain
+        traded up to the close's re-mark on pt-v20 (exactly, where the
+        close writes no price), and on a longer one it is attributable up
+        to the fear gauge. This accessor exists to prove that rather than to explain
         it away: a result a pinned VIX does not empty means something
         leaked, and is worth investigating.
         """
@@ -680,6 +783,13 @@ def flow_impact(
     Runs the same seed twice, once with ``order_flow`` and once without, and
     returns both worlds plus their difference.
 
+    ``order_flow`` is a STANDING rate: ``{ticker: (bought, sold)}`` shares
+    on every tick of each day's session, the ``flow_per_tick`` argument of
+    :meth:`Engine.run_session`. So ``(6e6, 0.0)`` over the default 390 ticks
+    is a day-long program of 2.34 billion shares, not one order. One agent's
+    one trade is ``fills`` instead, which reaches the market once;
+    :func:`tradefloor.tca.analyse` measures that.
+
     The two runs are otherwise identical by construction: same seed, same
     universe, same macro, same session, and the same ``model``, either a preset
     name or a :class:`tradefloor.ModelParams`, applied to BOTH worlds, since a
@@ -699,7 +809,7 @@ def flow_impact(
                         model=model)
         for _ in range(days):
             engine.open_market()
-            engine.run_session(*start, ticks, order_flow=flow)
+            engine.run_session(*start, ticks, flow_per_tick=flow)
             engine.close_market()
         return engine
 

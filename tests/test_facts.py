@@ -201,9 +201,25 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # floor, which is the honest single-seed claim; the shape defect is
     # carried by the ordering assertion after it, which is what this test
     # was always really pinning.
+    #
+    # THE FULL ORDERING ON ONE SEED WENT THE SAME WAY AT pt-v20 (0.8.5).
+    # Seed 3 reads lags 1, 5 and 20 at +0.0488, +0.0064 and +0.0068, lag
+    # five a hair under lag twenty (pt-v19: +0.0451, +0.0171, -0.0008).
+    # Over seeds 1 to 12 on this roster the three-way order holds on 8 under
+    # pt-v20 and on 9 under pt-v19, and the seeds that break it differ
+    # between the two, so it is a property of the draw on both. What holds
+    # on every one of those 24 runs is lag twenty below lag one, and that
+    # is the single-seed claim now. The full order is asserted where it is
+    # a property of the model: the thirty-seed medians in `envelope`, at
+    # 252 days (pt-v20's graded arm: 0.0282, 0.0188, 0.0044) and at 504
+    # (0.0384, 0.0246, 0.0092). pt-v20's first composition read 0.0342,
+    # 0.0221 and 0.0101 at 252 days and 0.0416, 0.0328 and 0.0117 at 504.
     assert -0.04 < facts["abs_return_acf20"] < 0.03
-    assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
-        "abs_return_acf1"]
+    assert facts["abs_return_acf20"] < facts["abs_return_acf1"]
+    from tradefloor import envelope
+    for table in (envelope.CERTIFIED, envelope.MEASURED_504):
+        assert (table["abs_return_acf20"] < table["abs_return_acf5"]
+                < table["abs_return_acf1"]), table
 
 
 def test_volatility_is_in_band_so_raw_percentages_mean_something_now():
@@ -600,7 +616,7 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     six windows, a float when it is not, and in every judged table.
 
     It joined REAL_MARKETS on 2026-08-25 with a thirty-seed baseline and a
-    reference band at both horizons (CALIBRATION-FOLLOWUPS.md §64). Twelve
+    reference band at both horizons. Twelve
     non-overlapping 21-day windows in a year is a noisy series and the real
     windows scatter from -0.05 to +0.40, so the 252-day band is wide enough
     to admit every preset; the 504-day band is the ruler. Its seed sd is the
@@ -638,8 +654,8 @@ def test_the_index_drift_row_measures_what_the_graded_rows_cannot_see():
     barely notices: nine of the fourteen are exactly invariant because they
     centre their arguments, and the five built on an absolute return move by
     a fraction of their own seed noise. So a market losing a fifth of its
-    value a year can read fourteen of fourteen, which is what
-    `tradefloor-design/programme/index-drift-investigation.md` found.
+    value a year can read fourteen of fourteen, which is what the project's
+    investigation of index drift found.
 
     This row is the one that moves, and it moves by exactly the drift added.
     """

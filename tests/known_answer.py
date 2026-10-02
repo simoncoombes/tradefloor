@@ -210,7 +210,7 @@ import tradefloor
 # anchor's own regime ratio of exactly 1.0 -- and `vix_target_shock_cap`
 # moves from 45.0 to 255.0, the image of `vix_return_clamp` under the spike,
 # because the cap had been the brake standing in for the missing read-back
-# (`loopgain-report.md` section 8.2) and no longer needs to be.
+# and no longer needs to be.
 #
 # `metadataSha256` does NOT move here, for the third boundary running:
 # neither the cap nor the read-back is among the mispricing and crowd
@@ -276,17 +276,16 @@ import tradefloor
 # trajectory moved a fifth time, deliberately, and the fixture went on
 # claiming `c0b3c357`.
 #
-# THE GAP IS THE FINDING and it is recorded as one. `gate-run-2026-09-13.md`
-# in the design repository: every box since `wtcomp1` was launched with
+# THE GAP IS THE FINDING and it is recorded as one, in the project's
+# unpublished design notes. Every box in that stretch was launched with
 # `SKIP_GATE_IF_KAT`, which skips the whole suite when the digest matches
 # the value it is handed. The digest matched on every one of them, so the
 # gate reported green by not running, and this test -- which exists to say
 # exactly this -- was one of seventy-eight nobody saw.
 #
 # TWO ARCHITECTURES, per RELEASING.md item 3. `1cc1c4088a05` is the reading
-# on Windows x86_64 and on Amazon Linux x86_64 (the `levelsec1` box,
-# `i-0dc725e36108e6322`, whose own transcript is committed under
-# `programme/results/levelsec1/known-answer.txt`). Character for character.
+# on Windows x86_64 and on Amazon Linux x86_64 (a calibration box, which
+# printed the digest in its own transcript). Character for character.
 #
 # `metadataSha256` does NOT move, for the sixth boundary running: none of
 # the eighteen is among the mispricing and crowd coefficients
@@ -299,8 +298,7 @@ import tradefloor
 # v20: the SLOW VARIANCE LEVEL and the SECTOR LOADING are adopted into
 # pt-v19 (2026-09-14). `market_vol_level_persistence` 0.9977,
 # `market_vol_level_sigma` 0.085 and `sector_loading` 0.8 to 0.60, measured
-# on 22 arms across three boxes and 120 rosters at both horizons
-# (`levelsec1-result.md`, `levsec2-result.md`, `levsec3-result.md`).
+# on 22 arms across three boxes and 120 rosters at both horizons.
 #
 # The level consumes its own normal once a session on the ninth stream, so
 # this boundary moves the trajectory for a reason no previous one has: not a
@@ -323,9 +321,8 @@ import tradefloor
 # pt-v19 RECOMPOSED (2026-09-20). Nine dials return to pt-v18's values: the
 # GJR triple, the slow pole, the stochastic level and the three
 # idiosyncratic jump dials. The 2^6 factorial over the six families that
-# separate pt-v18 from the 2026-09-14 composition (design repo,
-# programme/results/bestof, 64 cells at 252 and 504 days, registered before
-# it ran) measured the market variance family away from the tape on four
+# separate pt-v18 from the 2026-09-14 composition (64 cells at 252 and 504
+# days, registered before it ran) measured the market variance family away from the tape on four
 # rows in 32 of 32 pairs at both horizons and the jump family moving nothing
 # beyond noise. The level's ninth-stream draw is still taken and multiplied
 # by 0.0, so no other preset's trajectory moves; pt-v19's does, and this is
@@ -338,13 +335,23 @@ import tradefloor
 # clock with the NBER/BEA cycle table, the Fed's lift-off rule and buybacks
 # in market_pe, news absorbed within minutes with the maker re-quoting, the
 # calm-side variance exponent, and the certification opening drawn from the
-# cycle. Taken on the owner's adopted long-run pass bar (design repo,
-# programme/longrun/CRITERIA.md: the fourth composition fails 8 of 15, this
-# one passes 15 of 15), and bit-identical to the fourth composition with
-# those dials set (programme/results/ptv19-fifth/bitident.py, five seeds x
-# 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
+# cycle. Taken on the owner's adopted long-run pass bar
+# (validation/pt-v20/programme/longrun/CRITERIA.md, then 15 rows: the fourth
+# composition fails 8 of 15, this one passes 15 of 15), and bit-identical to
+# the fourth composition with those dials set (five seeds x 300 sessions). Every seeded pt-v19 trajectory changes; named presets before
 # it replay exactly. `metadataSha256` does NOT move.
-KAT_VERSION = 27
+#
+# v28: pt-v20 IS THE DEFAULT (0.8.5, 2026-09-24). pt-v19 with a tape that
+# follows the model price, a closing cross, every stock- and sector-specific
+# shock in fair value, the agent-facing book on, the curve dials, the
+# aggregate earnings cycle and a smaller stop ladder, taken on all 28 rows
+# registered for it (validation/pt-v20/programme/ptv20-registration.md).
+# Every seeded default trajectory changes. pt-v19 and every preset before it
+# replay exactly, which tests/known_answer_presets.py now checks one preset
+# at a time; pt-v20's own row there is 149d72de... and
+# does not move with this bump. `metadataSha256` does NOT move: pt-v20
+# carries pt-v19's mispricing and crowd coefficients.
+KAT_VERSION = 28
 
 SEED = 20260820
 DAYS = 250
@@ -545,6 +552,89 @@ def simulation_buffer() -> bytes:
     return bytes(buf)
 
 
+def bonds_buffer() -> bytes:
+    """A session with the simulated rate indices, hashed on its own.
+
+    Kept out of `simulation_buffer` so that adding the indices moved none of
+    the three digests the gate already carries: a roster without them is the
+    market it was, and this buffer is the claim that a roster WITH them is the
+    same market on every platform too.
+
+    The twelve KAT equities plus UST2Y, UST10Y and IGCORP, under the section-5
+    macro, for five sessions. The whole curve moves 100bp on day 2 (the
+    repricing path), an agent's fills reach the UST10Y and IGCORP books on
+    days 1 and 3 (the ladder, the maker's inventory and its decay), and
+    carry accrues at every open after the first. Hashed per day: every
+    column for every instrument, the curve, and the four rate components;
+    then the last session's prices and the draw count, which the rate
+    indices must not have moved.
+    """
+    buf = bytearray()
+    sector_names = tradefloor.sectors()
+    instruments = [
+        tradefloor.Instrument(
+            f"KAT{i}",
+            sector_names[i % 12],
+            initial_price=20.0 + i * 7.5,
+            shares_outstanding=2.5e8 + i * 1e7,
+            eps=(-1.0 if i in (5, 11) else 1.0 + i * 0.6),
+            book_value_per_share=10.0 + i * 2.0,
+            revenue_growth=-0.02 + i * 0.03,
+            avg_volume=250_000 + i * 100_000,
+            beta=0.7 + i * 0.1,
+        )
+        for i in range(12)
+    ] + tradefloor.bonds()
+    engine = tradefloor.Engine(
+        seed=SEED,
+        universe=instruments,
+        macro_state=tradefloor.Macro(
+            vix=19.5, federal_funds_rate=0.0425, corporate_bond_yield=0.0610,
+            inflation_rate=0.031, qe_pe_boost=0.0, fear_greed_index=38.0,
+            cycle="contraction",
+        ),
+    )
+    n = len(instruments)
+    for day in range(5):
+        if day == 2:
+            curve = engine.macro_fields
+            engine.pin_macro(
+                federal_funds_rate=curve["federal_funds_rate"] + 0.01,
+                treasury_yield_2y=curve["treasury_yield_2y"] + 0.01,
+                treasury_yield_10y=curve["treasury_yield_10y"] + 0.01,
+                corporate_bond_yield=curve["corporate_bond_yield"] + 0.01,
+            )
+        engine.open_market()
+        fills = ({"UST10Y": (60_000.0, 0.0), "IGCORP": (0.0, 90_000.0)}
+                 if day in (1, 3) else None)
+        engine.run_session(9, 30, 3, 78, volatility=1.0, fills=fills)
+        engine.close_market()
+        for field in (
+            "price", "previous_close", "open", "high", "low", "volume",
+            "market_cap", "mispricing_s", "maker_inventory", "avg_volume",
+        ):
+            for value in struct.unpack("<%dd" % n, engine.column(field)):
+                _f64(buf, value)
+        for key in sorted(engine.curve):
+            _f64(buf, engine.curve[key])
+        for component in ("carry", "duration", "convexity", "flow"):
+            for value in struct.unpack(
+                "<%dd" % n, engine.rate_attribution(component)
+            ):
+                _f64(buf, value)
+    for value in struct.unpack(
+        "<%dd" % (engine.session_ticks_written * n), engine.session_prices()
+    ):
+        _f64(buf, value)
+    _f64(buf, float(engine.draws_consumed))
+    return bytes(buf)
+
+
+def bonds_digest() -> str:
+    """The rate indices' gate, beside the simulation's rather than in it."""
+    return hashlib.sha256(bonds_buffer()).hexdigest()
+
+
 def metadata_buffer() -> bytes:
     """The REPORTED model preset, hashed separately from the simulation.
 
@@ -603,3 +693,19 @@ if __name__ == "__main__":
     print(f"  sha256   {known_answer_digest()}")
     print(f"  sim      {simulation_digest()}")
     print(f"  meta     {metadata_digest()}")
+    print(f"  bonds    {bonds_digest()}")
+    # Every shipped preset's own digest, combined into one line, so the
+    # determinism workflow's cross-target comparison covers them. Which
+    # preset disagrees is what test_known_answer.py reports on each target.
+    import known_answer_presets
+    print(f"  presets  "
+          f"{known_answer_presets.combined_digest(known_answer_presets.preset_digests())}")
+    # A seed above 2**32 (0.8.5), so the cross-target comparison covers
+    # 64-bit seeding as well as the 32-bit seeds every line above runs on.
+    import known_answer_seed64
+    print(f"  highseed {known_answer_seed64.high_seed_digest()}")
+    # A traded run through tradefloor.evaluate (0.8.5): the reference
+    # agents' orders, fills and scorecards, so the cross-target comparison
+    # covers the Python harness as well as the engine.
+    import known_answer_traded
+    print(f"  traded   {known_answer_traded.traded_digest()}")

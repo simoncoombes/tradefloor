@@ -75,9 +75,49 @@ def test_there_are_notebooks_to_check():
     assert len(NOTEBOOKS) >= 4, f"found {[p.name for p in NOTEBOOKS]}"
 
 
+#: Notebooks whose recorded agent runs were made under a harness this build
+#: no longer runs, and which have not been re-recorded, with the reason. A
+#: replay is keyed to the exact text the agent was sent, so from the first
+#: trade on the prompts differ and the replay misses. Each entry is a
+#: follow-up, not a pass: it names what has to be re-recorded to remove it.
+#: Empty since 2026-10-01, when the liquidity-crisis study's canonical run
+#: was recorded again live on 0.8.5 and its notebook executes again.
+STALE_RECORDINGS: dict = {}
+
+
+def test_a_stale_study_says_so_where_it_says_how_to_re_execute():
+    """A study skipped above must not tell its reader the rebuild works.
+
+    At 0.8.5 the liquidity-crisis README carried a banner saying its
+    recordings no longer replay, and further down, under "Reading it", the
+    old instructions: run `build_notebook.py`, no model call, every decision
+    replayed from the fixture. The same page also still named pt-v19 as the
+    shipped default. A reader following the instructions got a traceback.
+    """
+    import re
+
+    import tradefloor as tf
+    default = tf.ModelParams.from_preset().fingerprint
+    for notebook in STALE_RECORDINGS:
+        readme = (notebook.parent / "README.md").read_text(encoding="utf-8")
+        assert "## Reading it" in readme, notebook.parent
+        section = readme.split("## Reading it", 1)[1].split("\n## ", 1)[0]
+        assert "fails" in section, (
+            f"{notebook.parent.name}/README.md tells the reader how to "
+            f"re-execute a notebook this suite skips as stale, and does not "
+            f"say that it fails")
+        for preset in re.findall(r"shipped default from \S+ is\s+`(pt-v\d+)`",
+                                 readme):
+            assert preset == default, (
+                f"{notebook.parent.name}/README.md names {preset} as the "
+                f"shipped default; it is {default}")
+
+
 @SLOW
 @pytest.mark.parametrize("path", NOTEBOOKS, ids=lambda p: p.name)
 def test_the_notebook_executes_without_error(path):
+    if path in STALE_RECORDINGS:
+        pytest.skip(STALE_RECORDINGS[path])
     nbformat = pytest.importorskip("nbformat")
     pytest.importorskip("nbclient")
     from nbclient import NotebookClient
@@ -153,6 +193,10 @@ def test_the_research_workflow_runs_end_to_end():
                           capture_output=True, text=True, timeout=600)
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
     assert "total" in done.stdout.lower()
+    # On pt-v20 the evaluation and the ranking each carry the note that no
+    # capture ratio is reported, and until 0.8.5 the script printed both,
+    # so the same paragraph appeared twice six lines apart.
+    assert done.stdout.count("No capture ratio on") <= 1, done.stdout
 
 
 def test_the_forking_demo_runs_end_to_end():
@@ -180,6 +224,99 @@ def test_the_forking_demo_runs_end_to_end():
     assert "FAIL" not in done.stdout
 
 
+def test_the_scenario_fork_runs_end_to_end():
+    """Example 11, run whole, and NOT behind the slow flag.
+
+    It takes about two seconds. At 0.8.5 it had stopped working with
+    nothing noticing: `liquidity_crisis.yml` gained an earnings ramp that
+    runs to day 175, the script took its reading days from the last day of
+    ANY intervention, both fell past the end of its eighty-day loop, and
+    it died on a TypeError after printing half its report. The only check
+    on it was the syntax check above, which that passes.
+
+    Same reading as the forking demo: the return code, then the summary
+    line, then no FAIL anywhere.
+    """
+    import subprocess
+    script = EXAMPLES / "11-scenario-fork.py"
+    if not script.exists():
+        pytest.fail(f"{script.name} is missing; examples/ has "
+                    f"{[p.name for p in SCRIPTS]}")
+    done = subprocess.run([sys.executable, str(script)],
+                          capture_output=True, text=True, timeout=600)
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    assert "scenario fork      PASS" in done.stdout, done.stdout[-2000:]
+    assert "FAIL" not in done.stdout
+
+
+#: Who runs each script under `examples/`, as `file::test`, or why nothing
+#: does. The README says the test suite runs the examples, and until 0.8.5
+#: the syntax check above was all that touched `11-scenario-fork.py`, which
+#: is how it could crash on every run and still pass. Every script has an
+#: entry here, and the test below fails on one that arrives without one.
+RUN_BY: dict[str, str] = {
+    "07-research-workflow.py":
+        "test_examples.py::test_the_research_workflow_runs_end_to_end",
+    "08-claude-agent.py":
+        "test_examples.py::"
+        "test_the_claude_example_refuses_when_every_decision_fails",
+    "10-forking-a-market.py":
+        "test_examples.py::test_the_forking_demo_runs_end_to_end",
+    "11-scenario-fork.py":
+        "test_examples.py::test_the_scenario_fork_runs_end_to_end",
+    "experiments/liquidity-crisis/experiment.py":
+        "test_examples.py::"
+        "test_the_liquidity_crisis_study_replays_its_recording",
+    "integrations/callable/five_days.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "integrations/finrobot/rate_shock.py":
+        "test_finrobot.py::test_the_recorded_run_replays_end_to_end",
+    "integrations/langgraph/rate_shock.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "integrations/openai_agents/five_days.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "integrations/pydantic_ai/rate_shock.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "rate-shock/counterfactual.py":
+        "test_rate_shock_demo.py::"
+        "test_the_demo_runs_end_to_end_and_writes_readable_artifacts",
+}
+
+#: Scripts nothing executes on purpose, with the reason.
+NOT_RUN: dict[str, str] = {
+    "experiments/liquidity-crisis/build_notebook.py":
+        "rewrites the committed notebook; the notebook test executes the "
+        "same cells without writing",
+    "experiments/liquidity-crisis/charts.py":
+        "a module of figures the study notebook imports",
+    "rate-shock/agent.py":
+        "the agent counterfactual.py imports and runs",
+}
+
+
+def test_every_example_script_is_run_by_a_named_test():
+    """The guard on the claim that the suite runs the examples.
+
+    A new script with no entry fails here, and so does an entry whose test
+    has been renamed away or no longer mentions the script, because either
+    would leave the claim true on paper and the script unchecked.
+    """
+    on_disk = {p.relative_to(EXAMPLES).as_posix() for p in SCRIPTS}
+    assert on_disk == set(RUN_BY) | set(NOT_RUN), (
+        f"no entry for {sorted(on_disk - set(RUN_BY) - set(NOT_RUN))}; "
+        f"stale entries {sorted((set(RUN_BY) | set(NOT_RUN)) - on_disk)}. "
+        "Name the test that runs the script in RUN_BY, or say in NOT_RUN "
+        "why nothing does.")
+    assert not set(RUN_BY) & set(NOT_RUN)
+    tests = Path(__file__).resolve().parent
+    for script, where in RUN_BY.items():
+        module, name = where.split("::")
+        source = (tests / module).read_text(encoding="utf-8")
+        assert f"def {name}(" in source, f"{script}: no {where}"
+        assert Path(script).name in source, (
+            f"{script}: {module} never names {Path(script).name}")
+
+
 def test_the_claude_example_refuses_when_every_decision_fails():
     """A run that never happened must not be presented as a result.
 
@@ -194,6 +331,9 @@ def test_the_claude_example_refuses_when_every_decision_fails():
     closed local port. Removing the variables alone is not enough -- the
     SDK also resolves a stored `ant auth login` profile, which on a
     developer machine would turn this test into twenty billed calls.
+
+    The example replays its recording unless the live opt-in is set, so
+    this sets it: the refusal under test is the live run's.
     """
     import os
     import subprocess
@@ -203,6 +343,7 @@ def test_the_claude_example_refuses_when_every_decision_fails():
     env = {k: v for k, v in os.environ.items()
            if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
     env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    env["TRADEFLOOR_LIVE_EXAMPLES"] = "1"
     done = subprocess.run([sys.executable, str(script)],
                           capture_output=True, text=True, timeout=300, env=env)
     combined = done.stdout + done.stderr
@@ -215,6 +356,7 @@ def test_the_claude_example_refuses_when_every_decision_fails():
         f"printed the leaderboard for a run Claude was never reached in. Output: {tail}")
 
 
+@pytest.mark.needs_live_model
 def test_the_liquidity_crisis_study_replays_its_recording():
     """The study's first shared day, replayed from its fixture, NOT behind
     the slow flag.
@@ -257,3 +399,360 @@ def test_the_liquidity_crisis_study_replays_its_recording():
     assert not missed, missed[0][:300]
     assert [e["step"] for e in agent.record] == list(
         range(0, ex.STEPS_PER_DAY, ex.DECISION_EVERY))
+
+
+# -- the Claude example, without a model ------------------------------------
+#
+# Every check above that touches `08-claude-agent.py` runs it with no model
+# reachable. These load it as a module and drive `ClaudeTrader` with a stand-in
+# client, so what it offers Claude and when it asks are checked on every run
+# without a key or a bill.
+
+
+def _load_claude_example(monkeypatch):
+    pytest.importorskip("anthropic")
+    pytest.importorskip("pydantic")
+    import importlib.util
+    script = EXAMPLES / "08-claude-agent.py"
+    spec = importlib.util.spec_from_file_location("claude_example", script)
+    module = importlib.util.module_from_spec(spec)
+    # Registered first so pydantic can resolve the `Factor` annotation, which
+    # `from __future__ import annotations` leaves as a string.
+    monkeypatch.setitem(sys.modules, "claude_example", module)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_claude_example_offers_every_factor_the_harness_scores(monkeypatch):
+    """The answer Claude may give is the list `evaluate` scores against.
+
+    It was a list typed out in the example, and it fell behind the harness
+    three times. The schema Claude is handed and the prompt it reads must
+    both carry every name the harness can score, and no other:
+    `fair_value_shift` moves no price and is never the answer (decision 8),
+    so offering it would only offer a wrong answer.
+    """
+    import typing
+    from tradefloor.harness import DRIVER_NAMES
+
+    ex = _load_claude_example(monkeypatch)
+    assert typing.get_args(ex.Factor) == DRIVER_NAMES
+    schema = ex.Decision.model_json_schema()["properties"]["driver"]
+    assert schema["enum"] == list(DRIVER_NAMES)
+    missing = [name for name in DRIVER_NAMES if name not in ex.SYSTEM]
+    assert not missing, f"the system prompt never names {missing}"
+    assert "fair_value_shift" not in ex.SYSTEM
+
+
+class _StandInMessages:
+    """`client.messages` for `ClaudeTrader`: one scripted answer per call.
+
+    An answer of None raises, the way an unreachable provider does.
+    """
+
+    def __init__(self, ex, answers):
+        self.ex, self.answers, self.calls = ex, answers, 0
+
+    def parse(self, **kwargs):
+        import types
+        driver = self.answers[self.calls]
+        self.calls += 1
+        if driver is None:
+            raise ConnectionError("provider unreachable")
+        decision = self.ex.Decision(weights={}, driver=driver,
+                                    reasoning="stand-in")
+        return types.SimpleNamespace(stop_reason="end_turn",
+                                     parsed_output=decision)
+
+
+def test_the_claude_example_names_the_driver_of_the_day_it_is_scored_on(
+        monkeypatch):
+    """Asked on the day's last step, and scored on that day only.
+
+    `evaluate` calls `explain(day)` after the day's close and checks the
+    answer against that day's attribution. The example used to ask Claude at
+    the open, when all it could see was yesterday's moves, so its answer was
+    about one day and scored on the next. A day whose call failed also
+    reported the previous day's answer, which scored a stale guess as a new
+    one. Here every call must land on a last step, each scored answer must
+    be the one given that day, and the failed day must go unscored.
+    """
+    import types
+    import tradefloor as tf
+
+    ex = _load_claude_example(monkeypatch)
+    answers = ["jump", None, "random_noise"]
+    messages = _StandInMessages(ex, answers)
+    trader = ex.ClaudeTrader(client=types.SimpleNamespace(messages=messages))
+    asked_at = []
+
+    class Watched:
+        def act(self, obs):
+            before = messages.calls
+            try:
+                return trader.act(obs)
+            finally:
+                if messages.calls > before:
+                    asked_at.append((obs.day, obs.step_of_day))
+
+        def explain(self, day):
+            return trader.explain(day)
+
+    card = tf.evaluate({"claude": Watched()}, seed=2026,
+                       universe=tf.Universe.random(4, seed=7),
+                       days=len(answers))["claude"]
+
+    last = 5                         # the harness default, six steps a day
+    assert asked_at == [(day, last) for day in range(len(answers))], asked_at
+    assert [claimed for claimed, _ in card.explanations] == [
+        a for a in answers if a is not None], card.explanations
+    assert len(card.errors) == 1 and "provider unreachable" in card.errors[0]
+
+
+class _ScriptedMessages(_StandInMessages):
+    """A stand-in that also takes a position, so a replay has P&L to match.
+
+    An answer of "refuse" is a refused turn, which is recorded too.
+    """
+
+    def __init__(self, ex, answers, ticker):
+        super().__init__(ex, answers)
+        self.ticker = ticker
+
+    def parse(self, **kwargs):
+        import types
+        driver = self.answers[self.calls % len(self.answers)]
+        self.calls += 1
+        if driver == "refuse":
+            return types.SimpleNamespace(stop_reason="refusal",
+                                         parsed_output=None)
+        decision = self.ex.Decision(weights={self.ticker: 0.3},
+                                    driver=driver, reasoning="stand-in")
+        return types.SimpleNamespace(stop_reason="end_turn",
+                                     parsed_output=decision)
+
+
+def test_the_claude_example_replays_what_it_recorded(monkeypatch, tmp_path):
+    """Record with a stand-in client, save, load, and replay with no client.
+
+    The replay must give the same scorecard and the same answers, and a
+    replay on another seed must stop at the first day it has no answer
+    for, rather than play an answer to a different prompt. Nothing here
+    calls a model, so it runs on every test run, and the committed
+    recording's own replay below is the only part that waits for one.
+    """
+    import types
+    import tradefloor as tf
+    from tradefloor.integrations.common import ReplayMiss, Transcript
+
+    ex = _load_claude_example(monkeypatch)
+    universe = tf.Universe.random(4, seed=7)
+    messages = _ScriptedMessages(ex, ["jump", "refuse", "random_noise"],
+                                 ticker=list(universe)[0].ticker)
+    recorder = Transcript()
+    live = ex.ClaudeTrader(client=types.SimpleNamespace(messages=messages),
+                           recorder=recorder)
+    first = tf.evaluate({"claude": live}, seed=ex.SEED, universe=universe,
+                        days=4)["claude"]
+    assert messages.calls == 4 and len(recorder) == 4
+    meta = recorder.meta
+    assert meta["model"] == "claude-opus-5"
+    assert meta["model_preset"] == tf.ModelParams.from_preset().fingerprint
+    assert meta["instructions_digest"] and meta["decision_schema_digest"]
+    assert meta["tradefloor_version"] == tf.__version__
+
+    path = tmp_path / "example-08.json"
+    recorder.save(path)
+    replayer = ex.ClaudeTrader(transcript=Transcript.load(path))
+    assert replayer.client is None
+    again = tf.evaluate({"claude": replayer}, seed=ex.SEED, universe=universe,
+                        days=4)["claude"]
+    assert again.pnl == first.pnl and first.trades > 0
+    assert again.explanations == first.explanations
+    assert replayer._log == live._log
+
+    with pytest.raises(ReplayMiss, match="day 0"):
+        tf.evaluate({"claude": ex.ClaudeTrader(
+            transcript=Transcript.load(path))},
+            seed=ex.SEED + 1, universe=universe, days=1)
+
+    moved = Transcript.load(path)
+    moved.meta["instructions_digest"] = "0" * 16
+    with pytest.raises(ReplayMiss, match="instructions_digest"):
+        ex.ClaudeTrader(transcript=moved)
+
+
+def test_the_claude_example_says_how_to_get_a_recording_it_cannot_find(
+        tmp_path):
+    """A copy outside the repository finds no recording and says so.
+
+    It must name the file and the opt-in, with no traceback and no table,
+    and `--record` without the opt-in must refuse before any call.
+    """
+    import os
+    import shutil
+    import subprocess
+    copy = tmp_path / "08-claude-agent.py"
+    shutil.copy(EXAMPLES / "08-claude-agent.py", copy)
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                        "TRADEFLOOR_LIVE_EXAMPLES")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    for args in ([], ["--record"]):
+        done = subprocess.run([sys.executable, str(copy), *args],
+                              capture_output=True, text=True, timeout=120,
+                              env=env)
+        combined = done.stdout + done.stderr
+        assert done.returncode != 0, combined[-1500:]
+        assert "example-08.json" in combined, combined[-1500:]
+        assert "TRADEFLOOR_LIVE_EXAMPLES=1" in combined, combined[-1500:]
+        assert "Traceback" not in combined, combined[-1500:]
+        assert "why-right" not in combined, combined[-1500:]
+
+
+#: The command that makes the committed recording, and the reason a test
+#: that needs it skips while it is missing.
+_RECORD_08 = ("TRADEFLOOR_LIVE_EXAMPLES=1 ANTHROPIC_API_KEY=... "
+              "python examples/08-claude-agent.py --record")
+
+
+def _committed_08_recording() -> Path:
+    path = (Path(__file__).resolve().parent / "fixtures" / "claude"
+            / "example-08.json")
+    if not path.is_file():
+        pytest.skip(f"example 08 has no recording yet at "
+                    f"tests/fixtures/claude/{path.name}; make it with "
+                    f"{_RECORD_08}")
+    return path
+
+
+@pytest.mark.needs_live_model
+def test_the_claude_example_replays_its_committed_recording():
+    """The default run replays the committed recording end to end.
+
+    No key, no opt-in, and the provider pointed at a closed port, so a
+    single live call would fail the run. Every one of the twenty days must
+    come from the recording and the leaderboard must print.
+    """
+    import os
+    import subprocess
+    _committed_08_recording()
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                        "TRADEFLOOR_LIVE_EXAMPLES")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
+    done = subprocess.run([sys.executable,
+                           str(EXAMPLES / "08-claude-agent.py")],
+                          capture_output=True, text=True, timeout=300,
+                          env=env)
+    combined = done.stdout + done.stderr
+    assert done.returncode == 0, combined[-3000:]
+    assert "Replaying 20 answers" in done.stdout, done.stdout[:500]
+    assert "why-right" in done.stdout
+    assert "Traceback" not in combined
+
+
+@pytest.mark.needs_live_model
+def test_the_claude_example_recording_says_what_made_it(monkeypatch):
+    """The recording names its model, prompt, schema and market.
+
+    Twenty entries, one per day on the day's last step, carrying only the
+    conventional fields and no credential, with meta that matches this
+    build: the default preset, this file's system prompt and answer schema.
+    """
+    import tradefloor as tf
+    from tradefloor.integrations.common import Transcript, digest
+
+    path = _committed_08_recording()
+    ex = _load_claude_example(monkeypatch)
+    recording = Transcript.load(path)
+    meta = recording.meta
+    for field in ("model", "recorded_utc", "tradefloor_version"):
+        assert meta.get(field), f"meta is missing {field}"
+    assert meta["model_preset"] == tf.ModelParams.from_preset().fingerprint
+    assert meta["instructions_digest"] == digest(ex.SYSTEM)
+    assert meta["decision_schema_digest"] == digest(
+        ex.Decision.model_json_schema())
+    assert (meta["seed"], meta["days"]) == (ex.SEED, ex.DAYS)
+    assert sorted(e["day"] for e in recording.entries) == list(range(ex.DAYS))
+    allowed = {"arm", "step", "day", "digest", "prompt", "response"}
+    for entry in recording.entries:
+        assert set(entry) == allowed, set(entry) ^ allowed
+        assert entry["step"] % meta["decision_every_steps"] == (
+            meta["decision_every_steps"] - 1)
+    text = path.read_text(encoding="utf-8")
+    for secret in ("sk-ant-", "Bearer ", "Authorization", "api_key"):
+        assert secret not in text, secret
+
+
+# -- what the pages say about the runs ---------------------------------------
+
+
+def _flat(page: str) -> str:
+    return " ".join((EXAMPLES.parent / page).read_text(encoding="utf-8").split())
+
+
+def test_the_liquidity_crisis_study_names_the_default_it_is_not_on():
+    """The study pins pt-v16, and says which preset it is NOT on.
+
+    It said the shipped default was pt-v19 through 0.8.5, a release whose
+    default is pt-v20. The sentence exists to tell a reader why the study's
+    numbers differ from a fresh run, so a stale name sends them to the wrong
+    preset to compare against.
+    """
+    import re
+    import tradefloor as tf
+    default = tf.ModelParams.from_preset().fingerprint
+    for page, pattern in (
+            ("examples/experiments/liquidity-crisis/README.md",
+             r"shipped default from [0-9.]+ is `(pt-v\d+)`"),
+            ("examples/experiments/liquidity-crisis/build_notebook.py",
+             r"it is `(pt-v\d+)` from [0-9.]+"),
+            ("examples/experiments/liquidity-crisis/notebook.ipynb",
+             r"it is `(pt-v\d+)` from [0-9.]+")):
+        named = re.findall(pattern, _flat(page))
+        assert named == [default], (
+            f"{page} names the shipped default as {named}; it is {default}")
+
+
+#: What each page says a run costs: CPU time, user plus system, measured with
+#: /usr/bin/time on the release venv at 0.8.5 and rounded up. Measured first
+#: on a loaded 10-core Mac at 7 to 9 s for the rate-shock demo (reviewers saw
+#: 6 to 8), 85 to 114 s for 07, and about 4.5 s for the FinRobot replay, when
+#: every pt-v20 engine cost about 0.7 s to build. qa085/performance took that
+#: to about 0.02 s, and on the merged candidate the same runs took 4.3 s,
+#: 37.6 s and 0.6 s, and 10 and 11 under a second each. Before the first
+#: measurement the pages gave the rate-shock demo "about a second" in one
+#: place and "two seconds" in another, and 07 "ten to twenty seconds".
+CPU_CLAIMS = {
+    "examples/README.md": ("under five seconds of CPU",
+                           "07-research-workflow.py` takes about forty seconds",
+                           "rate_shock.py` takes about a second"),
+    "examples/rate-shock/README.md": ("under five seconds of CPU",),
+    "examples/rate-shock/counterfactual.py": ("under five seconds of CPU",),
+    "examples/07-research-workflow.py": ("about forty seconds of CPU",),
+    "examples/integrations/finrobot/README.md": ("about a second of CPU",),
+}
+
+#: The figures those pages carried before, each of which is now wrong: the
+#: early ones understated the run, and the 0.7 s engine build is gone.
+STALE_TIMINGS = ("in about a second", "runs in about a second",
+                 "Two seconds, no keys", "ten to twenty seconds",
+                 "each run in about a second", "0.7 seconds",
+                 "about two minutes", "under ten seconds")
+
+
+@pytest.mark.parametrize("page", sorted(CPU_CLAIMS))
+def test_the_pages_agree_on_what_a_run_costs(page):
+    """One figure per run, in CPU time, on every page that states one.
+
+    A wall-clock figure depends on the machine and on what else it is
+    doing, and the reviewers who found these ran on a machine shared with
+    dozens of other jobs. CPU time is the figure a reader can check with
+    /usr/bin/time wherever they are.
+    """
+    text = _flat(page)
+    missing = [claim for claim in CPU_CLAIMS[page] if claim not in text]
+    assert not missing, f"{page} no longer says {missing}"
+    stale = [claim for claim in STALE_TIMINGS if claim in text]
+    assert not stale, f"{page} still says {stale}"

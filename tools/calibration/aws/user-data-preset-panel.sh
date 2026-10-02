@@ -10,7 +10,14 @@ shutdown -h +90
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/preset-panel-060
+# The S3 bucket the box reads its inputs from and writes its results to.
+# The launcher sets TRADEFLOOR_BOX_BUCKET to the bucket's name.
+if [ -z "${TRADEFLOOR_BOX_BUCKET:-}" ]; then
+  echo "ABORTING: TRADEFLOOR_BOX_BUCKET is unset; set it to the name of the run bucket"
+  shutdown -h now
+  exit 1
+fi
+BUCKET=s3://${TRADEFLOOR_BOX_BUCKET}/pretium-calib/out/preset-panel-060
 # The release branch: this run measures the panel for the preset the release
 # makes the default, and `envelope.py` on that branch is what the numbers land
 # in.

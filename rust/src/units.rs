@@ -52,6 +52,19 @@ pub fn percent_to_fraction(percent: f64) -> f64 {
 const RATE_MIN: f64 = -0.05;
 const RATE_MAX: f64 = 0.50;
 
+/// The floor for `gdp_growth` alone, which falls further than any rate.
+///
+/// US real GDP fell 7.4 per cent year on year to 2020Q2, and at an
+/// annualised quarterly rate 8.5 per cent in 2008Q4 and 10.0 in 1958Q1
+/// (FRED GDPC1). Under the rates' -5 per cent the packaged recession
+/// scenario, which holds growth three points lower, was refused whenever
+/// the economy it met was already contracting at more than two per cent,
+/// and one of the published suite's recession markets did under pt-v20.
+/// Like the band above, the floor catches no unit error, since the slip
+/// passes positive percents; it only decides which real downturns can be
+/// written.
+const GROWTH_MIN: f64 = -0.10;
+
 /// Validate a fractional rate, returning a message describing the likely
 /// mistake rather than merely reporting a range.
 ///
@@ -62,7 +75,8 @@ pub fn check_rate(name: &str, fraction: f64) -> Result<f64, String> {
     if fraction.is_nan() {
         return Err(format!("{name} is NaN"));
     }
-    if !(RATE_MIN..=RATE_MAX).contains(&fraction) {
+    let floor = if name == "gdp_growth" { GROWTH_MIN } else { RATE_MIN };
+    if !(floor..=RATE_MAX).contains(&fraction) {
         let hint = if fraction > 1.0 && fraction <= 100.0 {
             format!(
                 " - this looks like a percent value. Rates are FRACTIONAL \
@@ -75,7 +89,7 @@ pub fn check_rate(name: &str, fraction: f64) -> Result<f64, String> {
         };
         return Err(format!(
             "{name} = {fraction} is outside the plausible range \
-             [{RATE_MIN}, {RATE_MAX}]{hint}"
+             [{floor}, {RATE_MAX}]{hint}"
         ));
     }
     Ok(fraction)

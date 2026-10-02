@@ -13,19 +13,295 @@ seed requires.
 the same book the tick settles through, so slippage is real levels consumed.
 That tells you what *you* paid. It tells the market nothing.
 
-The market learns about your trading through ``order_flow`` on the next tick,
-and :meth:`Portfolio.pending_flow` accumulates it. A harness that
-executes without feeding the flow back has a trader whose fills are realistic
-and whose footprint is invisible, profitable in a way no real trader could be.
+The market learns about your trading through the flow
+:meth:`Portfolio.pending_flow` accumulates, handed to the next session as
+``Engine.run_session(..., fills=...)``, which applies it ONCE, on the
+session's first tick (or as ``order_flow`` to a single ``Engine.tick``). A
+harness that executes without feeding the flow back has a trader whose fills
+are realistic and whose footprint is invisible, profitable in a way no real
+trader could be.
+
+A harness that feeds it back on every tick of a step is the opposite error,
+and every harness here made it until 0.8.5: ``run_session``'s old
+``order_flow`` held the flow for the whole session, so one order was counted
+65 times at six steps a day, after the agent had already filled at the
+pre-trade book. The agent collected its own impact instead of paying it. A
+buy of 1% of daily volume, sold the next step, beat a one-share control by
+12 to 52 bp in 10 of the 20 names of ``Universe.random(20, seed=93001)`` that
+way, measured on 2026-09-24 on pt-v19.
+``run_session`` now refuses ``order_flow`` and names the two arguments that
+replace it.
+
+## When the book is live, the engine executes
+
+Under a model with ``book_shared`` or ``book_resting`` on
+(``Engine.book_live``), :meth:`Portfolio.execute` sends the order to the
+engine's own book instead of pricing it off a snapshot. What it takes is
+gone for every trader after it until the book refills, its fills can be
+another trader's resting order, and the engine applies its flow to the
+market itself, once, on the next tick; :meth:`pending_flow` then holds
+nothing for that trade, so a harness that passes ``fills=pending_flow()``
+counts it once either way. The portfolio's ``owner`` is the label its
+orders carry in the book, which is how several portfolios share one.
+
+A limit order (:meth:`submit_limit`) always goes to the engine. Its
+unfilled part waits: in the book's queue with ``book_resting`` on, for the
+traded range with it off. What fills later, during a session, reaches the
+portfolio through :meth:`sync`.
+
+The simulated rate indices (``UST2Y``, ``UST10Y``, ``IGCORP``) are not in
+that book: they quote their own ladder whatever the dials say. An order on
+one is priced off its book as before and its flow waits in
+:meth:`pending_flow` for ``run_session``'s ``fills``, and a limit order on
+one is refused.
 """
 
 from __future__ import annotations
 
+import math
+import numbers
 import struct
-from typing import Literal
+from typing import Any, Literal
 
 from . import _core
+from ._arith import ordered_sum
 from ._core import Engine, OrderError, ValidationError
+from ._core import rate_specs as _rate_specs
+
+#: The simulated rate indices. They quote their own ladder and are not in the
+#: engine's agent-facing book, so an order on one is priced off its book and
+#: its flow goes to ``run_session``'s ``fills`` whatever the book's dials say.
+_RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
+
+
+class LeverageError(OrderError):
+    """An order refused because it would take the portfolio past
+    ``max_leverage``.
+
+    A subclass of :class:`OrderError`, so code that catches that still
+    catches this. It exists so a harness can count leverage refusals apart
+    from the other reasons an order is refused (``Scorecard.leverage_refusals``).
+    """
+
+
+def _leverage_refusal(projected: float, limit: float) -> str:
+    """The refusal message, with the two leverages printed to as many places
+    as it takes for them to differ.
+
+    At two places a trade projected at 2.004x against a 2.0x limit read
+    "2.00x, above the 2.00x limit". A refusal is only raised when the
+    projection is strictly above the limit, so some precision separates
+    them; past twelve places the shortest repr does.
+    """
+    for places in range(2, 13):
+        shown, allowed = f"{projected:.{places}f}", f"{limit:.{places}f}"
+        if shown != allowed:
+            break
+    else:
+        shown, allowed = repr(float(projected)), repr(float(limit))
+    return f"trade would take leverage to {shown}x, above the {allowed}x limit"
+
+
+def _describe(value: Any) -> str:
+    """A short ``repr`` of what an agent sent, with its type."""
+    text = repr(value)
+    if len(text) > 80:
+        text = text[:77] + "..."
+    return f"{text} ({type(value).__name__})"
+
+
+def _not_a_count(value: Any) -> bool:
+    """Whether ``value`` is refused as a share count before ``float()`` is
+    tried: a ``bool`` (Python's or numpy's), a string, bytes, or a complex
+    number. ``float()`` would take ``True`` and ``"100"``, and a numpy or
+    torch value carries its kind in ``dtype``, so a 0-d bool, complex or
+    string array is refused the same way.
+    """
+    if isinstance(value, (bool, str, bytes, bytearray)):
+        return True
+    if isinstance(value, numbers.Complex) and not isinstance(value,
+                                                             numbers.Real):
+        return True
+    dtype = getattr(value, "dtype", None)
+    if dtype is None:
+        return False
+    # numpy names a dtype "bool" or "complex128", torch "torch.bool" or
+    # "torch.complex64"; numpy's string kinds are "U" and "S".
+    name = str(dtype).rsplit(".", 1)[-1]
+    return (name == "bool" or name.startswith("complex")
+            or getattr(dtype, "kind", None) in ("U", "S"))
+
+
+def shares(value: Any, *, what: str = "quantity",
+           expected: str = "a number of shares") -> float:
+    """``value`` as a signed number of shares, or a :class:`ValidationError`.
+
+    Whatever ``float()`` turns into a finite number counts: an int, a
+    float, a numpy scalar or 0-d array, a ``Decimal``, a ``Fraction``, a
+    torch scalar tensor. A ``bool``, a string, bytes and a complex number
+    do not, although ``float()`` takes the first two. Before 0.8.5 ``True``
+    and ``"100"`` traded 1 and 100 shares, while the framework adapters
+    refused ``"100"`` as not a number of shares. Zero passes, and the
+    caller decides what it means. The message shows the value with its
+    sign, so ``-inf`` reads as ``-inf``. ``expected`` is what the message
+    says the value should have been.
+    """
+    if _not_a_count(value):
+        raise ValidationError(
+            f"{what} must be {expected}, got {_describe(value)}")
+    try:
+        quantity = float(value)
+    except OverflowError:
+        raise ValidationError(
+            f"{what} must be finite, got {_describe(value)}") from None
+    except Exception:                                   # noqa: BLE001
+        # float() on an arbitrary object can raise anything; what matters
+        # to the reader is what was sent.
+        raise ValidationError(
+            f"{what} must be {expected}, got {_describe(value)}") from None
+    if not math.isfinite(quantity):
+        raise ValidationError(f"{what} must be finite, got {quantity}")
+    return quantity
+
+
+def order_items(orders: Any) -> list[tuple[Any, Any]]:
+    """The ``(ticker, order)`` pairs of what an agent's ``act()`` returned.
+
+    ``act()`` returns a mapping of ticker to order. ``None`` and an empty
+    mapping trade nothing. Anything else, a list of pairs, a string, a
+    number, raises :class:`ValidationError` with what came back, and the
+    harness that asked decides what that costs the agent:
+    :func:`tradefloor.evaluate` writes it to the scorecard's ``errors`` and
+    trades nothing that step, :class:`tradefloor.World` raises it or, under
+    ``on_refusal="skip"``, records the step as unusable, and
+    :func:`tradefloor.tca.analyse` raises it.
+
+    The entries themselves are not checked here. :func:`check_order` checks
+    one at a time, so one bad entry is refused and the rest still trade.
+    """
+    if orders is None:
+        return []
+    items = getattr(orders, "items", None)
+    if isinstance(orders, (str, bytes)) or not callable(items):
+        raise ValidationError(_shape_message(orders))
+    try:
+        return [(ticker, order) for ticker, order in items()]
+    except Exception:                                   # noqa: BLE001
+        # A mapping-like object whose items() does not give pairs. What it
+        # raised is less useful to the reader than what it was.
+        raise ValidationError(_shape_message(orders)) from None
+
+
+def _shape_message(orders: Any) -> str:
+    kind = type(orders).__name__
+    return ("act() must return a mapping of ticker to order, such as "
+            "{'AAA': 100} or {'AAA': tf.Limit(100, 25.0)}, or None to trade "
+            f"nothing. It returned a {kind}: {_describe(orders)}")
+
+
+def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
+    """One entry of an ``act()`` mapping, checked.
+
+    Returns a :class:`Limit` or :class:`Cancel` as given, a market order's
+    signed share count as a float, or ``None`` for an entry that trades
+    nothing (``None`` or zero). A market order's count is checked by
+    :func:`shares`. Raises :class:`ValidationError`, naming the ticker, for
+    a ticker that is not a string and for a value :func:`shares` refuses: a
+    ``bool``, a string, a complex number, NaN, an infinity, or anything
+    ``float()`` cannot read. Whether the ticker is listed is left to the
+    engine, which refuses an unknown one with its own
+    :class:`ValidationError`.
+    """
+    if not isinstance(ticker, str):
+        raise ValidationError(
+            f"a ticker must be a string, got {_describe(ticker)}")
+    if order is None or isinstance(order, (Limit, Cancel)):
+        return order
+    quantity = shares(order, what=f"the order for {ticker!r}",
+                      expected="a number of shares, a tf.Limit or a "
+                               "tf.Cancel")
+    return quantity if quantity != 0 else None
+
+def _finite_positive(value: object) -> bool:
+    """Whether ``value`` is a finite number above zero. False for NaN, the
+    infinities, and anything that is not a number."""
+    try:
+        return math.isfinite(value) and value > 0  # type: ignore[arg-type]
+    except (TypeError, OverflowError):
+        return False
+
+
+class Limit:
+    """A limit order, as a value in an agent's ``act()`` mapping.
+
+    ``{"AAA": tf.Limit(500, 101.25)}`` buys up to 500 shares at 101.25 or
+    better; a negative quantity sells. What does not fill at once waits
+    (see :meth:`Portfolio.submit_limit`), and a new ``Limit`` for the same
+    ticker from the same agent replaces the one waiting. A plain number in
+    the mapping is a market order, as it always was.
+
+    The part that waits fills at its own price when the market's flow
+    reaches it inside a tick, and a bar keeps only each tick's last print,
+    so a check of fills against bars will find some below the day's low or
+    above its high (2% of resting fills on 40 names over four sessions)
+    that the engine made as docs/MODEL.md describes.
+
+    :func:`tradefloor.evaluate` and :class:`tradefloor.World` take it from
+    a Python agent. :func:`tradefloor.tca.analyse` refuses it, because the
+    part that waits fills inside a session, where the untraded market has
+    no price to compare it with. The framework adapters in
+    :mod:`tradefloor.integrations` send one for an LLM's action that carries
+    a ``limit_price`` (decision schema 2, from 0.8.5).
+    """
+
+    __slots__ = ("quantity", "price")
+
+    def __init__(self, quantity: float, price: float) -> None:
+        quantity = shares(quantity, what="a Limit's quantity")
+        if quantity == 0:
+            raise ValidationError(
+                f"a Limit needs a non-zero, finite quantity, got {quantity}")
+        try:
+            limit_price = shares(price, what="a Limit's price")
+        except ValidationError:
+            limit_price = float("nan")
+        if not limit_price > 0:
+            raise ValidationError(
+                f"a Limit needs a finite positive price, got {price!r}")
+        self.quantity = quantity
+        self.price = limit_price
+
+    def __repr__(self) -> str:
+        return f"Limit({self.quantity:g}, {self.price:g})"
+
+    # A value, compared by what it says. A World's trace holds the orders
+    # each step sent, and `agree` compares two forks' traces: compared by
+    # identity, the copies a fork makes reported every shared history that
+    # held a limit order as DIFFERENT.
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Limit):
+            return NotImplemented
+        return self.quantity == other.quantity and self.price == other.price
+
+    def __hash__(self) -> int:
+        return hash((Limit, self.quantity, self.price))
+
+
+class Cancel:
+    """Cancel every waiting order on a ticker: ``{"AAA": tf.Cancel()}``."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "Cancel()"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Cancel):
+            return NotImplemented
+        return True
+
+    def __hash__(self) -> int:
+        return hash(Cancel)
 
 
 class Position:
@@ -61,11 +337,24 @@ class Portfolio:
     """Cash, positions and P&L for one trader."""
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
-                 "max_leverage", "_stamp")
+                 "max_leverage", "_stamp", "cash_interest", "interest",
+                 "owner", "_in_book", "margin_interest")
 
     def __init__(self, cash: float = 1_000_000.0,
-                 *, max_leverage: float | None = None) -> None:
+                 *, max_leverage: float | None = None,
+                 cash_interest: bool = False,
+                 owner: str = "agent",
+                 margin_interest: bool = True) -> None:
         """
+        ``cash_interest`` makes cash earn the policy rate, one day at a time,
+        when :meth:`accrue` is called; the harness and a World call it once a
+        day before the close. Off by default, and with it off cash earns
+        nothing.
+
+        ``margin_interest`` charges a negative balance, which is borrowing,
+        the same policy rate in the same call. On by default. Pass False to
+        borrow for free, as every run did before 0.8.5. See :meth:`accrue`.
+
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
         defaults to ``None``, meaning unconstrained, because a bare simulator should
         not impose a broker's risk policy on a researcher studying, say, what
@@ -79,19 +368,37 @@ class Portfolio:
         what makes the impact constraint bite economically rather than only
         mechanically.
         """
-        if cash != cash or cash <= 0:
+        # `x != x or x <= 0` let +inf through, and an infinite cash balance
+        # or leverage cap is not a portfolio anybody can hold.
+        if not _finite_positive(cash):
             raise ValidationError(f"cash must be finite and positive, got {cash}")
-        if max_leverage is not None and (max_leverage != max_leverage or max_leverage <= 0):
+        if max_leverage is not None and not _finite_positive(max_leverage):
             raise ValidationError(
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
+        from . import _checks
+        self.cash_interest = _checks.flag("cash_interest", cash_interest)
+        self.margin_interest = _checks.flag("margin_interest",
+                                            margin_interest)
+        # Interest credited so far, net of any charged on a negative balance.
+        self.interest = 0.0
         self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
         self.positions: dict[str, Position] = {}
         self._flow: dict[str, list[float]] = {}
         self.fills: list[dict] = []
+        if not isinstance(owner, str) or not owner:
+            raise ValidationError(
+                f"owner is the label this portfolio's orders carry in the "
+                f"book, a non-empty string, got {owner!r}")
+        #: The label this portfolio's orders carry in the engine's book.
+        self.owner = owner
+        # Whether this portfolio has sent anything to the engine's book, so
+        # `sync` has something to collect. A portfolio that never has asks
+        # the engine nothing, and its run's order log is the one it was.
+        self._in_book = False
 
     # -- trading ----------------------------------------------------------
 
@@ -108,11 +415,19 @@ class Portfolio:
         made-up price. Filling the remainder at the last level would be
         inventing liquidity that was not there, the kind of convenience that
         makes a backtest profitable and a live strategy not.
+
+        ``quantity`` is a finite real number, numpy scalars included. A
+        string or a ``bool`` is refused with a :class:`ValidationError`
+        (see :func:`shares`).
         """
-        if quantity != quantity or quantity == 0:
+        quantity = shares(quantity)
+        if quantity == 0:
             raise ValidationError(
                 f"quantity must be non-zero and finite, got {quantity}"
             )
+
+        if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
+            return self._execute_in_book(engine, ticker, float(quantity), None)
 
         side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
         size = abs(float(quantity))
@@ -132,10 +447,7 @@ class Portfolio:
             # entering it.
             projected = self._projected_leverage(engine, ticker, filled, price, notional)
             if projected > self.max_leverage:
-                raise OrderError(
-                    f"trade would take leverage to {projected:.2f}x, above the "
-                    f"{self.max_leverage:.2f}x limit"
-                )
+                raise LeverageError(_leverage_refusal(projected, self.max_leverage))
 
         position = self.positions.setdefault(ticker, Position(ticker))
         self._apply(position, filled, price)
@@ -152,6 +464,184 @@ class Portfolio:
             "notional": notional,
             "requested": float(quantity),
             "partial": size < abs(quantity),
+            "day": self._stamp[0],
+            "step": self._stamp[1],
+            "tick": self._stamp[2],
+        }
+        self.fills.append(fill)
+        return fill
+
+    def submit_limit(self, engine: Engine, ticker: str, quantity: float,
+                     price: float) -> dict:
+        """Send a limit order to the engine's book. Returns the engine's report.
+
+        What the book holds at ``price`` or better fills at once and is
+        applied here. The rest waits: in the book's queue, behind the depth
+        already at its price, with ``book_resting`` on; outside it, to fill
+        in full at ``price`` when a print reaches it, with it off. Either
+        way its later fills reach this portfolio through :meth:`sync`.
+
+        The leverage limit is checked against the whole order filling at
+        its limit, before anything is sent, because a resting order that
+        fills during a session cannot be refused then.
+
+        The part that fills at once is recorded in :attr:`fills` as one
+        fill, the way :meth:`execute` records a market order, with the
+        engine's ``order_id``, ``liquidity="taker"`` and ``limit=True``. The
+        part that waits is recorded fill by fill as :meth:`sync` collects
+        it. So an agent's own ``obs.portfolio.fills``, :meth:`fills_table`
+        and the scorecard's impact see every share a limit order traded.
+        """
+        quantity = shares(quantity)
+        if quantity == 0:
+            raise ValidationError(
+                f"quantity must be non-zero and finite, got {quantity}")
+        if not (price > 0) or price != price:
+            raise ValidationError(f"price must be finite and positive, got {price}")
+        if ticker in _RATE_TICKERS:
+            raise ValidationError(
+                f"{ticker} is a simulated rate index, which the engine's book "
+                "does not hold: a limit order cannot wait on it. Trade it with "
+                "execute().")
+        return self._execute_in_book(engine, ticker, float(quantity), float(price),
+                                     report=True)
+
+    def cancel(self, engine: Engine, *, ticker: str | None = None,
+               order_id: str | None = None) -> int:
+        """Cancel this portfolio's waiting orders: one by id, every one on a
+        ticker, or all of them. Returns how many were cancelled."""
+        count = 0
+        for order in engine.open_orders(self.owner):
+            if order_id is not None and order["order_id"] != order_id:
+                continue
+            if ticker is not None and order["ticker"] != ticker:
+                continue
+            count += bool(engine.cancel(order["order_id"], agent=self.owner))
+        return count
+
+    def open_orders(self, engine: Engine) -> list[dict]:
+        """This portfolio's waiting orders, in arrival order."""
+        return engine.open_orders(self.owner)
+
+    def sync(self, engine: Engine) -> list[dict]:
+        """Apply every fill the engine holds for this portfolio.
+
+        A resting or waiting order fills during a session, when the
+        portfolio is not being called, so the engine keeps the fills until
+        they are collected. A harness calls this after each session. It is
+        a no-op, and asks the engine nothing, for a portfolio that has
+        never sent an order to the book. Returns the fills applied.
+        """
+        if not self._in_book:
+            return []
+        return self._drain(engine)
+
+    def _drain(self, engine: Engine, skip_order: str | None = None) -> list[dict]:
+        """Collect this portfolio's fills and apply them.
+
+        Each is recorded in :attr:`fills` as it happened, except those of
+        ``skip_order``, the order :meth:`execute` is reporting as one fill.
+        """
+        taken = engine.take_fills(self.owner)
+        for f in taken:
+            signed = f["quantity"] if f["side"] == "buy" else -f["quantity"]
+            position = self.positions.setdefault(f["ticker"], Position(f["ticker"]))
+            self._apply(position, signed, f["price"])
+            self.cash -= signed * f["price"]
+            if f["order_id"] == skip_order and f["liquidity"] == "taker":
+                continue
+            self.fills.append({
+                "ticker": f["ticker"],
+                "quantity": signed,
+                "price": f["price"],
+                "worst_price": f["price"],
+                "notional": signed * f["price"],
+                "requested": signed,
+                "partial": False,
+                "day": int(f["day"]),
+                "step": self._stamp[1],
+                "tick": int(f["tick"]),
+                "order_id": f["order_id"],
+                "liquidity": f["liquidity"],
+                "counterparty": f["counterparty"],
+            })
+        return taken
+
+    def _execute_in_book(self, engine: Engine, ticker: str, quantity: float,
+                         limit: float | None, report: bool = False) -> dict:
+        """:meth:`execute` and :meth:`submit_limit` against the engine's book.
+
+        Priced first off the book as it stands, read-only, so an order the
+        book cannot fill at all, or that would break the leverage limit, is
+        refused before anything is sent: the same order of checks the
+        snapshot path makes.
+        """
+        side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
+        size = abs(quantity)
+        if limit is None:
+            cost = engine.book(ticker).sweep_cost(side, size)
+            if cost is None or cost.filled <= 0:
+                raise OrderError(
+                    f"the book for {ticker!r} could not fill {size:g} shares")
+            price = cost.average_price
+            expected = min(size, cost.filled)
+        else:
+            # Checked as though it all filled at its limit: a resting order
+            # that fills during a session cannot be refused then.
+            price = limit
+            expected = size
+        if self.max_leverage is not None:
+            filled = expected if side == "buy" else -expected
+            projected = self._projected_leverage(engine, ticker, filled, price,
+                                                 filled * price)
+            if projected > self.max_leverage:
+                raise LeverageError(_leverage_refusal(projected, self.max_leverage))
+        out = engine.submit(self.owner, ticker, quantity, limit_price=limit)
+        self._in_book = True
+        self._drain(engine, skip_order=out["order_id"])
+        if report:
+            if out["filled"] > 0:
+                # The part of a limit order that filled at once, as one
+                # fill. `_drain` skipped these taker fills so they would not
+                # be counted twice, and for a market order the block below
+                # records them; a limit order returned here before it did.
+                signed = out["filled"] if side == "buy" else -out["filled"]
+                self.fills.append({
+                    "ticker": ticker,
+                    "quantity": signed,
+                    "price": out["average_price"],
+                    "worst_price": out["worst_price"],
+                    "notional": ordered_sum(
+                        (f["quantity"] if side == "buy" else -f["quantity"])
+                        * f["price"] for f in out["fills"]),
+                    "requested": quantity,
+                    "partial": out["filled"] < size,
+                    "day": self._stamp[0],
+                    "step": self._stamp[1],
+                    "tick": self._stamp[2],
+                    "order_id": out["order_id"],
+                    "liquidity": "taker",
+                    "limit": True,
+                })
+            return out
+        if out["filled"] <= 0:
+            # The preview filled and the book did not: the only difference
+            # between them is this portfolio's own resting orders, which an
+            # order never trades against.
+            raise OrderError(
+                f"the book for {ticker!r} could not fill {size:g} shares "
+                f"against anyone but this portfolio's own orders")
+        filled = out["filled"] if side == "buy" else -out["filled"]
+        fill = {
+            "ticker": ticker,
+            "quantity": filled,
+            "price": out["average_price"],
+            "worst_price": out["worst_price"],
+            "notional": ordered_sum(
+                (f["quantity"] if side == "buy" else -f["quantity"])
+                * f["price"] for f in out["fills"]),
+            "requested": quantity,
+            "partial": out["filled"] < size,
             "day": self._stamp[0],
             "step": self._stamp[1],
             "tick": self._stamp[2],
@@ -204,7 +694,7 @@ class Portfolio:
             gross += abs(quantity) * prices.get(held.ticker, held.avg_cost)
         if ticker not in self.positions:
             gross += abs(filled) * price
-        equity = (self.cash - notional) + sum(
+        equity = (self.cash - notional) + ordered_sum(
             (held.quantity + (filled if held.ticker == ticker else 0.0))
             * prices.get(held.ticker, held.avg_cost)
             for held in self.positions.values()
@@ -224,7 +714,7 @@ class Portfolio:
         trader and a reckless one as identical.
         """
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             abs(p.quantity) * prices[p.ticker]
             for p in self.positions.values()
             if p.ticker in prices
@@ -237,6 +727,16 @@ class Portfolio:
 
     # -- valuation --------------------------------------------------------
 
+    def quantity_of(self, ticker: str) -> float:
+        """Shares held in ``ticker``, signed, or 0.0 with no position.
+
+        :meth:`Observation.position <tradefloor.harness.Observation.position>`
+        reads this, and so does the sandbox's
+        :class:`~tradefloor.sandbox.PortfolioView`.
+        """
+        held = self.positions.get(ticker)
+        return held.quantity if held else 0.0
+
     def marks(self, engine: Engine) -> dict[str, float]:
         """Current price per ticker, from the engine."""
         values = struct.unpack("<%dd" % len(engine.tickers), engine.prices())
@@ -244,7 +744,7 @@ class Portfolio:
 
     def market_value(self, engine: Engine) -> float:
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             p.market_value(prices[p.ticker])
             for p in self.positions.values()
             if p.ticker in prices
@@ -260,22 +760,66 @@ class Portfolio:
 
     def unrealised(self, engine: Engine) -> float:
         prices = self.marks(engine)
-        return sum(
+        return ordered_sum(
             p.unrealised(prices[p.ticker])
             for p in self.positions.values()
             if p.ticker in prices
         )
 
     def realised(self) -> float:
-        return sum(p.realised for p in self.positions.values())
+        return ordered_sum(p.realised for p in self.positions.values())
+
+    # -- cash -------------------------------------------------------------
+
+    def accrue(self, engine: Engine) -> float:
+        """Book one trading day's interest on cash.
+
+        ``cash * policy_rate / 252``, at the policy rate in force now
+        (``engine.macro_fields["federal_funds_rate"]``), added to cash and to
+        :attr:`interest`. Returns the amount.
+
+        A positive balance earns it only with ``cash_interest`` on, and earns
+        nothing otherwise. A negative balance, which is borrowing to hold
+        more than the account is worth, is charged it while
+        ``margin_interest`` is on, which is the default, whatever
+        ``cash_interest`` says. That is cheaper than any broker lends, so a
+        levered strategy's financing cost is a floor here, not an estimate.
+
+        Until 0.8.5 nothing charged borrowing by default:
+        :func:`tradefloor.evaluate`, :func:`tradefloor.rank` and
+        :class:`tradefloor.World` all let a levered run borrow for free. On
+        the 90 graded pt-v20 histories, 1.8 times the index beat the index
+        by 2.33 points a year and was ahead in 64% of one-year windows that
+        way, against 0.21 points and 57% with the policy rate charged.
+        ``margin_interest=False`` restores free borrowing.
+
+        Call it once per trading day. The harness calls it just before the
+        close, so the day's interest is at the rate the day traded under and
+        the close's macro step, which may move the rate, applies to the next
+        day. Before ``cash_interest`` existed cash earned nothing: a
+        portfolio holding cash through a rate shock gained nothing from the
+        higher rate, and a 60/40 portfolio's bond sleeve was compared against
+        cash that paid zero.
+        """
+        if self.cash >= 0 and not self.cash_interest:
+            return 0.0
+        if self.cash < 0 and not self.margin_interest:
+            return 0.0
+        rate = engine.macro_fields["federal_funds_rate"]
+        amount = self.cash * rate / 252.0
+        self.cash += amount
+        self.interest += amount
+        return amount
 
     # -- impact -----------------------------------------------------------
 
     def pending_flow(self) -> dict[str, tuple[float, float]]:
         """Order flow accumulated since the last :meth:`clear_flow`.
 
-        Feed this to the next ``tick`` or ``run_session`` as ``order_flow`` so
-        the market feels the trading.
+        Feed this to the next ``run_session`` as ``fills``, or to the next
+        single ``tick`` as ``order_flow``, so the market feels the trading
+        once, on the minute after the fills. Then call :meth:`clear_flow`:
+        flow left in place is sent again with the next step's.
         """
         return {
             ticker: (buy, sell)

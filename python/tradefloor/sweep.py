@@ -47,6 +47,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Iterator, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
+from ._core import check_seed
 from .universe_util import as_universe
 
 #: What a sweep can stream. Both are per-day batched by the engine, so a
@@ -104,8 +105,10 @@ def sweep(
     The tables carry no provenance columns (they never have; the engine is
     dropped as each yields), so a caller sweeping a custom model should
     record ``model.fingerprint`` beside whatever it keeps.
+
+    Each seed is any integer from 0 to ``2**64 - 1``.
     """
-    seeds = list(seeds)
+    seeds = [check_seed(s) for s in seeds]
     if not seeds:
         raise ValidationError("no seeds given")
     if collect not in COLLECT:

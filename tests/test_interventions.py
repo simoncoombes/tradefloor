@@ -195,10 +195,16 @@ def test_every_registered_target_reads_and_writes_the_engine():
             target.write(engine, "contraction")
             assert target.read(engine) == "contraction"
             continue
+        # A target that reads zero is written 0.01, a value inside every
+        # numeric target's domain. It was 1.0 until 0.8.5, and no rate read
+        # zero until pt-v20 became the default: pt-v20's burn-in at seed 1
+        # reaches the zero bound, so `macro.policy_rate` reads 0.0, and 1.0
+        # is a rate of 100 per cent, which `pin_macro` refuses. On pt-v19
+        # only `macro.qe_pe_boost` read zero.
         if isinstance(before, tuple):
             after = tuple(v * 0.5 for v in before)
         else:
-            after = (before * 0.5) if before else 1.0
+            after = (before * 0.5) if before else 0.01
         target.write(engine, after)
         assert target.read(engine) == pytest.approx(after), name
 
@@ -681,9 +687,13 @@ def test_applying_a_scenario_to_one_fork_does_not_touch_another():
         if day == 3:
             inside_window = (stress.column("avg_volume"),
                              control.column("avg_volume"))
+            # Inside the window, where the scenario acts. After it closes the
+            # two converge: on pt-v20 the close prints at the model price and
+            # the thinner book's effect on the mispricing decays, so by day
+            # ten every rounded close agrees again on this roster.
+            assert prices(stress) != prices(control)
 
     assert prices(control) == prices(lonely)
-    assert prices(stress) != prices(control)
     assert control.column("avg_volume") == lonely.column("avg_volume")
     # Thin INSIDE the window. Asserting this at the end of the run instead is
     # what an earlier version of this test did, and it passed for the wrong
@@ -810,8 +820,12 @@ def test_the_manifest_records_the_resolved_scenario_not_the_filename():
     assert doc["name"] == "liquidity_crisis"
     assert doc["fingerprint"] == scenario.fingerprint
     assert doc["source"] == "liquidity_crisis.yml"
+    # From 0.8.5 the packaged file carries an earnings shock in two
+    # contiguous windows (0.8.1: market.liquidity and macro.vix only), and
+    # the manifest's reproduce() below rebuilds it through the logged
+    # set_fundamentals writes.
     assert [s["target"] for s in doc["shocks"]] == [
-        "market.liquidity", "macro.vix"]
+        "market.liquidity", "macro.vix", "market.earnings", "market.earnings"]
     assert doc["transmission"][0]["target"] == "macro.corporate_yield"
 
     # It survives the round trip, and it reproduces.

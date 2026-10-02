@@ -38,6 +38,9 @@ PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
 rendered page that prints the version. Bump it there, rebuild, and
 push that repo as part of the same release pass.
 
+The BibTeX entry in the README's "Citing tradefloor" section carries the
+version too, with the preset beside it, so bump the version in both places.
+
 `CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
 the day the version was tagged. A version without the date it shipped is half
 a citation.
@@ -163,11 +166,11 @@ partial run now labels itself `PARTIAL RUN: n of N`, and `meta.groups_run` in
 **Run it on AWS, not here.** A 504-day 40-name measurement holds about 1.6 GB
 per worker, so eight workers is roughly 13 GB, and it has taken this machine
 out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
-96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents. It
-is launched with `fleet.py` from `tradefloor-design`, and its header gives the
-three commands. The docs repository is private, so the box gets the register
-from S3, as a tarball holding the register and the data files its bound rows
-read.
+96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
+The project's box launcher fills in the script's placeholders and starts the
+box, and the script's header lists the placeholders and the steps. The docs
+repository is private, so the box gets the register from S3, as a tarball
+holding the register and the data files its bound rows read.
 Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
 the ceiling is how much of the engine releases the GIL, not the core
 count.
@@ -402,6 +405,23 @@ new digest on two architectures before committing it; the baseline note
 records that it was, and at 0.6.0 a Windows build and a Graviton box agreed
 before the five-target gate ever ran.
 
+The new preset also adds its row to `tests/known_answer_presets.json`, from
+`python tests/known_answer_presets.py`, and `test_known_answer.py` fails
+until it does. Add the row and nothing else: every other row belongs to a
+frozen preset, and one that moved is a defect in the change, never a
+baseline to regenerate. The combined `sha256` in that file moves with the
+new row.
+
+`tests/known_answer_traded.json` runs the reference agents through
+`evaluate` on pt-v20 by name, so a new preset leaves it where it was. It
+moves when pt-v20 changes before it ships, when a reference agent changes,
+or when `evaluate` scores differently, and `test_known_answer.py` names the
+agent and the part (orders, fills or scorecard). Re-base it with `python
+tests/known_answer_traded.py --write` and add a sentence to its note saying
+what moved. Its `presetRow` must equal pt-v20's row in
+`known_answer_presets.json`, so re-basing that row fails this test until
+the traded run is re-based too.
+
 **4. Test expectations pinned to the old default.** NEW, and the largest
 unplanned piece of 0.6.0, where six broke in three shapes:
 
@@ -626,13 +646,32 @@ environments must be constrained to a single environment name on the registry
 side**, or any workflow in the repository with `id-token: write` can publish.
 
 The crate job packages and runs the packaged crate's own tests before
-uploading. That check matters more than it sounds: sixteen of nineteen
+uploading. That check matters more than it sounds: sixteen of 22
 integration tests read the 140 MB parity corpus that `exclude` deliberately
-keeps out, and they panic when it is absent. What remains is `circuit_breaker`,
-`roster_mutation` and `stream_alignment` plus the unit tests. They are excluded
+keeps out, and they panic when it is absent. What remains is six integration
+tests (`circuit_breaker`, `depth_counterfactual`, `maker_ladder_allocations`,
+`platform_maths`, `roster_mutation` and `stream_alignment`), the unit tests and the doctests,
+among them the README example. The others are excluded
 **by name**, so a new test is not silently dropped: add one that reads
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.
+
+**Check the Rust API against the last published crate.** The crate takes
+the Python package's version, so a patch release reaches every user who wrote
+`tradefloor = "0.8"` on their next `cargo update`. 0.8.5 broke code written
+for 0.8.1 (seeds went from `u32` to `u64`, structs gained fields) and nothing
+caught it until a review of the published crate. Before every publish, run
+cargo-semver-checks against the newest version on crates.io:
+
+```
+cargo install cargo-semver-checks --locked   # once
+cd rust && cargo semver-checks check-release
+```
+
+If it reports a break, either take it out or list every item in the
+CHANGELOG, as 0.8.5's "The Rust crate since 0.8.1" does, and in the crate
+README. A new public struct that will grow should be `#[non_exhaustive]`
+with a constructor, as `ModelParams` and `SessionRequest` are.
 
 Unlike PyPI, the crate upload is not idempotent. PyPI's `skip-existing` lets a
 re-run finish a partial upload; crates.io refuses a version that already
@@ -679,6 +718,36 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
+
+## DOI (Zenodo)
+
+`.zenodo.json` is the metadata Zenodo's GitHub integration reads when a
+GitHub release is published. Zenodo then mints a DOI for that release, and
+one concept DOI that always resolves to the newest. It reads `.zenodo.json`
+before `CITATION.cff`, so keep the two saying the same thing. It takes the
+version from the release tag, so `.zenodo.json` has no
+`version` field.
+
+Switching it on is the owner's job, once, in the owner's own accounts:
+
+1. Sign in at https://zenodo.org with "Log in with GitHub" and allow the
+   Zenodo app to see the repositories.
+2. Open the GitHub page of the Zenodo account settings
+   (https://zenodo.org/account/settings/github/), press "Sync now", and
+   switch `simoncoombes/tradefloor` on.
+3. Merge the branch that adds `.zenodo.json` before the next release.
+   Zenodo archives only releases published after the switch, and only a
+   published GitHub release (not a bare tag or a draft) triggers it. The
+   release workflow already publishes one per tag.
+4. After that release, open the new record on Zenodo and check the title,
+   author and licence. Copy the concept DOI.
+5. Put the concept DOI in `CITATION.cff` (`doi:`), in the README's "Citing
+   tradefloor" section in place of the placeholder, and on the docs site's
+   Install page.
+
+A release published before the switch gets no DOI, so the first DOI is
+the next release's. If 0.8.1 needs one, its source archive can be uploaded
+to Zenodo by hand.
 
 ## Past failures and their checks
 

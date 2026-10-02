@@ -1,0 +1,35 @@
+# The 31 files of scripts-as-run.tgz, the archive box ptv20g6 unpacked into
+# /home/ec2-user/scripts before it ran. The archive's sha256 is in
+# programme/results/ptv20/box-g6/scripts-sha256.txt. Columns: the file's
+# sha256, its path in the archive, and its path in this folder.
+1f8a27eb098fa25dc456905d3d93c788e4701e091f0b874c91203f82771756fd  scripts/longrun/DBAA.csv  programme/results/ptv20/edgar/DBAA.csv
+4bd51068fa08c4797d5827f6a08a366de6a3982b63588c61ac13f0e928c0b7e3  scripts/longrun/arms.txt  programme/results/ptv20/arms-g6.txt
+0ba8e031133cf4d3f6735ae6fc618d5b5b96f241b2e16b20d79217e37550bdaa  scripts/longrun/bands.json  programme/results/ptv20/bands.json
+2b06f19785965f765c3af093d8534f8fb563b0a66358ff3ca70ef920e9ff6624  scripts/longrun/box-jobs.sh  programme/longrun/box-jobs.sh
+405ae7fa20717a18c87ac4c261bff0af293d67cb7bf3085f5af4559868c0829d  scripts/longrun/c10.py  programme/results/ptv20/c10.py
+776eb0223988f6628359014982df1fbcacccba2e97c433659268ca5bb1d0c4b9  scripts/longrun/c4.py  programme/longrun/c4.py
+2d078855c33497620406c0f30a58d6bbf21cf495856490fbd1d3ea136d7233de  scripts/longrun/cert-arms.txt  programme/results/ptv20/cert-arms-g6.txt
+fa01a0d44e1b601f951d5a7a6b177fd96aae1b804b3c5d3df5716c2da337e44d  scripts/longrun/certrun_box.py  programme/longrun/certrun_box.py
+d0c465e7a1e822beede63483d10eea1adbc2970346c794088d4beed82c7d393c  scripts/longrun/covid-2020-2021.json  programme/results/ptv20/data/covid-2020-2021.json
+1f5208df2f384d9e706be957226f0b0a452f9bcee46e6d3e3524e27209a47481  scripts/longrun/crisisext_box.py  programme/longrun/crisisext_box.py
+99c1ef3a6052a5f1cf90bccbe27237ff92c1a88114f418bba077b1f33d2b371b  scripts/longrun/data/tape-side-B200-s20260923.json  programme/longrun/data/tape-side-B200-s20260923.json
+86320974c856db514d8e00fa852a6097673ece3166b73551aedb089aaf5b0e59  scripts/longrun/data/tape-side-B50-s20260923.json  programme/longrun/data/tape-side-B50-s20260923.json
+65c4174a8786a9a576f826bea2ee446b2c236503423770123476a272d7b473de  scripts/longrun/data/tape.json.gz  programme/longrun/data/tape.json.gz
+54c7c991620a6f9767651d820bccaabd1f543c2215d6f088382e392d533fd96f  scripts/longrun/desk.py  programme/results/ptv20/desk.py
+a931411ba16ded6bf12ecf73c6b3c53e3353ea84be1b6c0c679250faa65d8b66  scripts/longrun/driven-2022.json  programme/results/ptv20/data/driven-2022.json
+9012027797a4e18e977c7c7b185834451da5afd0bd6582736b7ce12a7b9c7de7  scripts/longrun/driven2020.py  programme/results/ptv20/driven2020.py
+0d197651f61e34fdc40a575556a5a38865087d8345c540b540d05646a4745f5c  scripts/longrun/driven2022.py  programme/results/ptv20/driven2022.py
+0e6f6cb727eea0efd1e5260075fe8dd95478439aa259e31595bc9025d01a8c48  scripts/longrun/edge.py  programme/results/news-speed/edge.py
+f562b758985cbf4597ffab176d5130c613e40156b8a738b05400122e69f48102  scripts/longrun/estimators.py  programme/longrun/estimators.py
+2cc45edf247e37a4f37ae2775f8629225ebab16d0cc3b1b26371141463df9ae2  scripts/longrun/grade_xsec.py  programme/results/ptv20/grade_xsec.py
+cab50c93a83d7619aa45b581b6c811d7ce147dc5e0d816f01be793957508fbfb  scripts/longrun/liquidity_crisis_proposed.yml  programme/results/ptv20/scenarios/liquidity_crisis_proposed.yml
+44af73b9d05724c22e66c249004a0e6501b108cb981d47037d2ff32d1fd5d483  scripts/longrun/longrun-jobs.sh  programme/longrun/longrun-jobs.sh
+6ccdc08046a9b0fb77827ba166b9e2757dd2a40c43b2339d7f57e49008525b2a  scripts/longrun/longrun.py  programme/longrun/longrun.py
+02166417f3cbf1464652a7ddbb2536758dfff5bc66cc96664352e637d0b5e4c4  scripts/longrun/ptv20-grade-jobs.sh  programme/results/ptv20/ptv20-grade-jobs.sh
+9c16f2dba59f3bd4b39c3ffcb5e6920ef7f2fcfc84c7e1d8a7f5e6d3fbc8c040  scripts/longrun/r7_eval.py  programme/results/ptv20/r7_eval.py
+433862711ee8171f88b39521f6787cc0cf7e7f8aa3f2adb74be183cacf133329  scripts/longrun/r7_event.py  programme/results/ptv20/r7_event.py
+c5e86fc95a9fcd5be22a8e64ddba747d363a14b83a909685a5344fb4dea0ce5d  scripts/longrun/recession_proposed.yml  programme/results/ptv20/scenarios/recession_proposed.yml
+34764fef268aec3bb407af39691f7320ae0a1fe927b2ebda9f831af83d394c21  scripts/longrun/recession_rows.py  programme/results/ptv20/recession_rows.py
+ce6b5350b77c3c41f841b0928afbeba11ea3823eaf8ac8db9f0022e7c32699c7  scripts/longrun/scenario_size.py  programme/results/ptv20/scenario_size.py
+358fdf6187584608d6bca43d705f74ee29aefd2fa65b2ccd078dec4727ea29b7  scripts/longrun/tape.py  programme/longrun/tape.py
+a0cb893fda0165cff7bbfc1f078890864be5cb1418b0dcb774b15d323645a89d  scripts/longrun/xsec.py  programme/results/ptv20/xsec.py

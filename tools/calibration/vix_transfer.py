@@ -13,13 +13,13 @@ at a held VIX 45 the model reads 96.0 against a real 106.1, so it is not a
 simple deficit at the crisis end either. Both ends are close and the middle
 has never been looked at.
 
-`real_vix_lever.py` already measured the real side in seven buckets, from
-the same forty-name roster, and `real-vix-lever.json` holds it. This
+The real side was already measured in seven buckets, from the same
+forty-name roster (the project's unpublished design notes). This
 measures the model at those buckets' midpoints on the same estimator, so
 the two curves can be laid side by side.
 
 The construction difference is stated rather than hidden, and stays the same
-one `real_vix_lever.py` records: a real bucket mixes days whose VIX arrived
+one the real measurement records: a real bucket mixes days whose VIX arrived
 from different directions, while a held run is a steady state real markets
 never occupy. A gap that appears only in the middle of the curve is
 therefore evidence about the model's steady-state transfer function, and a
@@ -46,9 +46,9 @@ from tradefloor import Scenario
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import gate_pick  # noqa: E402
 
-#: The real curve, from `real_vix_lever.py` via `real-vix-lever.json`, keyed
-#: by the bucket's midpoint. Quoted rather than re-fetched: that script is
-#: the measurement of record and a second copy would be a second thing to
+#: The real curve, from that measurement, keyed
+#: by the bucket's midpoint. Quoted rather than re-fetched: that measurement is
+#: the one of record and a second copy would be a second thing to
 #: drift. The last bucket is open-ended at 45+ and its VIX mean over the
 #: sample is nearer 55 than its nominal midpoint, so it reads 55.
 REAL = {

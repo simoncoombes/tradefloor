@@ -644,8 +644,15 @@ def test_the_jacobian_refresh_is_reached(short_days):
     # exactly that at 0.7.0: 28 evaluations either way. Requiring one strict
     # separation across the set says the branch ran somewhere, and requiring
     # no seed to come out FASTER with refresh on says what it costs.
+    #
+    # SEEDS 6 AND 8 JOIN AT 0.8.5, when pt-v20 became the default: all three
+    # of 11, 21 and 13 converge inside the refresh interval there (28, 28
+    # and 27 evaluations either way; pt-v19 read 28/28, 35/56 and 30/48), so
+    # the set stopped separating anywhere. Over seeds 1 to 25 on pt-v20, 6
+    # reads 34 against 57 with refresh and 8 reads 29 against 48, the two
+    # cheapest that separate, and every solve on those five converges.
     separated = []
-    for seed in (11, 21, 13):
+    for seed in (11, 21, 13, 6, 8):
         engine = tf.Engine(seed=seed, universe=UNIVERSE)
         fwd = shadow.Forward(engine, 0, len(UNIVERSE))
         x_true = np.random.default_rng(9).normal(size=fwd.layout.size)
@@ -1033,8 +1040,7 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # time: seed 15 at -4.00 now reads a plain trial of 30.91 against a
     # no-jump 34.19, so it finds the jump alone and the premise inverted for
     # the fifth time in seven. The same seventy cells re-swept on the same
-    # recipe (design repo, programme/results/ptv19recomp/shadow-sweep.json):
-    # TWO are decisive, against one at the last two sweeps.
+    # recipe: TWO are decisive, against one at the last two sweeps.
     #
     # The day chosen is the wider by its narrower side, and it is the widest
     # any sweep has produced: seed 17, planted normal -1.50. The reused
@@ -1050,9 +1056,8 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # law ships). Re-dealt an eighth time: seed 17 at -1.50 now reads a
     # plain trial of 5.69 against a no-jump 21.69, so it finds the jump
     # alone and the premise inverted for the sixth time in eight. The same
-    # seventy cells re-swept on the same recipe (design repo,
-    # programme/results/ptv19gjr/shadow-sweep.json): TWO are decisive, as at
-    # the seventh sweep.
+    # seventy cells re-swept on the same recipe: TWO are decisive, as at the
+    # seventh sweep.
     #
     # The day chosen is the wider by its narrower side: seed 15, planted
     # normal -3.50. The reused Jacobian leaves the trial at 66.72 against a
@@ -1067,8 +1072,7 @@ def test_the_market_jump_retry_recovers_a_jump_the_plain_path_misses(
     # seed 15 at -3.50 now reads a plain trial of 12.00 against a no-jump
     # 32.89, so it finds the jump alone and the premise inverted for the
     # seventh time in nine. The same seventy cells re-swept on the same
-    # recipe (design repo, programme/results/ptv19fix/shadow-sweep.json):
-    # ONE is decisive, seed 18 at -3.10. The reused Jacobian leaves the
+    # recipe: ONE is decisive, seed 18 at -3.10. The reused Jacobian leaves the
     # trial at 147.21 against a no-jump 40.72, 106 nats worse, so it is
     # rejected, and a Jacobian of its own reaches 34.99, 5.7 nats better,
     # so it is accepted. It recovers a normal of -2.129, clear of the 0.6

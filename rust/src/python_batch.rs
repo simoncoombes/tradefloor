@@ -55,7 +55,7 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 pub struct PyEngineBatch {
     engines: Vec<Engine>,
     buffers: Vec<SessionBuffer>,
-    seeds: Vec<u32>,
+    seeds: Vec<u64>,
     tickers: Vec<String>,
     /// Whether `open_market` has been called and a day is in progress.
     ///
@@ -78,6 +78,7 @@ impl PyEngineBatch {
     /// Seeds must be distinct. Two members with the same seed would be the
     /// same market twice, which is almost always a mistake in a sweep and is
     /// silent if allowed: the results look like two samples and are one.
+    /// Each is any integer from 0 to `2**64 - 1`, as on `Engine`.
     ///
     /// `model` selects the coefficient set, exactly as on `Engine`: one
     /// model for every member, because a batch is N seeds of the same
@@ -86,17 +87,33 @@ impl PyEngineBatch {
     #[new]
     #[pyo3(signature = (*, seeds, universe, macro_state = None, model = None))]
     fn new(
-        seeds: Vec<u32>,
+        seeds: Vec<crate::python::Seed>,
         universe: Vec<crate::python_engine::PyInstrument>,
         macro_state: Option<crate::python_engine::PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let seeds: Vec<u64> = seeds.into_iter().map(|s| s.0).collect();
         if seeds.is_empty() {
             return Err(ValidationError::new_err("no seeds given"));
         }
         if universe.is_empty() {
             return Err(ValidationError::new_err("universe is empty"));
         }
+        // Rate instruments are a single-engine surface. The batch's columns
+        // are per company and it has no book or flow path for an index, so
+        // accepting one would either drop it silently or price it as an
+        // equity; neither is the instrument.
+        if let Some(rate) = universe.iter().find(|i| i.is_rate()) {
+            return Err(ValidationError::new_err(format!(
+                "{} is a rate index, and EngineBatch runs equities only. Run a \
+                 roster with rate instruments on Engine, or through run_many, \
+                 one seed per engine.",
+                rate.ticker
+            )));
+        }
+        // Equities only by now, so `split_roster` refuses nothing here but a
+        // ticker listed twice, in the words `Engine` uses.
+        crate::python_engine::split_roster(&universe)?;
         let mut sorted = seeds.clone();
         sorted.sort_unstable();
         sorted.dedup();
@@ -226,6 +243,7 @@ impl PyEngineBatch {
                     news: &[],
                     news_impact_queue: &[],
                     order_volumes: &[],
+                    fills: &[],
                     close_at_end: false,
                     // False, matching `Engine`. The day is opened once, above.
                     //
@@ -284,7 +302,7 @@ impl PyEngineBatch {
     /// constructor builds every engine from the same coefficient set.
     #[getter]
     fn model_fingerprint(&self) -> String {
-        self.engines[0].params().fingerprint()
+        self.engines[0].model_fingerprint().to_string()
     }
 
     /// The model every member runs, as a `ModelParams`.
@@ -296,7 +314,7 @@ impl PyEngineBatch {
     }
 
     #[getter]
-    fn seeds(&self) -> Vec<u32> {
+    fn seeds(&self) -> Vec<u64> {
         self.seeds.clone()
     }
 

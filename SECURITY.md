@@ -2,13 +2,16 @@
 
 ## Supported versions
 
-The latest release on PyPI and crates.io. Earlier versions stay published
-permanently, because results recorded against them replay under those exact
-versions, and they receive no fixes.
+The latest release on PyPI and crates.io, and the long-term support (LTS)
+line, which gets fixes for 24 months from the day 0.8.5 is tagged
+([docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)).
+Earlier versions stay published permanently, because results recorded
+against them replay under those exact versions, and they receive no fixes.
 
 | version | supported |
 |---|---|
-| 0.8.x | yes |
+| 0.8.5 and the 0.8 patches after it | yes, the first LTS line, with pt-v20 as the default |
+| 0.8.0 to 0.8.4 | yes until 0.8.5 is released, then no, and published forever |
 | 0.7.x and earlier | no, and published forever |
 
 ## Reporting a vulnerability

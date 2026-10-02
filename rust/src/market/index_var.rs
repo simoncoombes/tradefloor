@@ -73,7 +73,7 @@
 //! idiosyncratic shock by `1 - c` on a down tick and by
 //! `sqrt(2 - (1 - c)^2)` on an up tick, so the two SQUARED scales sum to 2
 //! and average to exactly one over an even split of the half-lines.
-//! [`name_noise_variance`]'s `idio * idio` is that unconditional variance,
+//! `name_noise_variance`'s `idio * idio` is that unconditional variance,
 //! and this dial holds it exactly at every `c` -- so the identity needs no
 //! term for it, and needs none because of an exact cancellation rather than
 //! a small one. See `ModelParams::market_idio_down_suppress`.
@@ -129,8 +129,7 @@
 //! for what each buys.
 //!
 //! The consequence of leaving them out was not a rounding error. The
-//! loop-gain run (`programme/results/loopgain2/loopgain-report.md`, P3)
-//! measured the index realising **4.0 to 4.9 times** the variance `V_t`
+//! loop-gain run measured the index realising **4.0 to 4.9 times** the variance `V_t`
 //! priced at pins above the crisis threshold, against 1.22 to 1.44 below
 //! it — a step, in the one place the read-back was blind. `vix_target_shock_cap`
 //! was the brake holding the resulting divergence, which made a boundary
@@ -241,8 +240,8 @@
 //! the factor variance's own peak over baseline separates them sevenfold,
 //! 21.68 against 3.05. The blend is a multiplier and a large one — the
 //! shipped gain takes 11 runs of 120 to 30, and 164 ceiling days to 1,477 —
-//! and it is not the cause. Measured by `b4read1`, whose registration and
-//! result live in the design repository.
+//! and it is not the cause. That was measured in a run registered before
+//! it ran, recorded in the project's unpublished design notes.
 //!
 //! The chain, measured:
 //!
@@ -286,8 +285,8 @@
 //! the alternative `factors.rs` weighs and rejects, whose cost it has
 //! already measured — which makes `E[z^2 A^2]` flat in the regime and
 //! removes the superlinear term from (S) entirely; or recalibrate
-//! `market_vol_alpha` and `market_vol_beta`, which the design repository has
-//! already derived from the tape at 0.1059 and 0.8787 against the shipped
+//! `market_vol_alpha` and `market_vol_beta`, which have
+//! already been derived from the tape at 0.1059 and 0.8787 against the shipped
 //! 0.28035 and 0.69245, and which moves every preset from pt-v13 on; or give `crisis_blend_variance_damp` a moment so it can be used to
 //! bound the blend's own level effect, which is an incomplete-gamma
 //! integral rather than the `phi` and `Phi` the rest of this module needs.
@@ -349,8 +348,11 @@ pub fn intraday_variance_factor() -> f64 {
 /// this module in the form `factors.rs` asserts `SQRT_TWO_PI`.
 const INV_SQRT_TWO_PI: f64 = 0.3989422804014327;
 
-/// `sqrt(2)`, the argument scale between `erfc` and the normal's tail.
-const SQRT_TWO: f64 = 1.4142135623730951;
+/// `sqrt(2)`, the argument scale between `erfc` and the normal's tail. The
+/// standard library's constant, which is the same double as the literal
+/// `1.4142135623730951` this used to spell out (bits `0x3FF6A09E667F3BCD`,
+/// asserted in the tests below).
+const SQRT_TWO: f64 = std::f64::consts::SQRT_2;
 
 /// The standard normal density at `c`.
 fn standard_normal_pdf(c: f64) -> f64 {
@@ -578,7 +580,7 @@ fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
         (p.jump_intensity_market, p.jump_intensity_idio)
     } else if p.jump_idio_vix_decoupled != 0.0 {
         // The tape's idiosyncratic jump rate does not rise with variance
-        // (vix-dynamics.md 19.1: `var^-0.20` on the name's own, `var^0.05`
+        // (measured: `var^-0.20` on the name's own, `var^0.05`
         // on the market's, in sd units), so the VIX-squared scale stays on
         // the market jump alone. `engine.rs::apply_jumps` takes the same
         // branch.
@@ -779,6 +781,7 @@ impl IndexVarianceTerms {
 /// `sector_count` bounds the sector accumulator; a name whose sector index
 /// is outside it contributes no sector term, which is
 /// `SharedFactors::sector`'s own "an absent sector is zero, not a panic".
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance(
     p: &ModelParams,
     names: &[NameVariance],
@@ -808,6 +811,7 @@ pub fn index_conditional_variance(
 ///
 /// Nothing here is computed that the summing form did not compute. This is
 /// a read-only instrument: it adds no draw, no state and no term.
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance_terms(
     p: &ModelParams,
     names: &[NameVariance],
@@ -831,7 +835,7 @@ pub fn index_conditional_variance_terms(
 }
 
 /// [`index_conditional_variance_terms`] with the two per-component STATES
-/// `programme/results/vix-dynamics.md` section 19 derives: a variance per
+/// the VIX-dynamics measurement derives: a variance per
 /// sector (`sector_sigmas`, one daily sigma per sector key, the sector
 /// draw's own GARCH state when `sector_vol_alpha` / `_beta` are set) and a
 /// jump-excitation level per name (`jump_excitations`, in `names`' order;
@@ -840,6 +844,7 @@ pub fn index_conditional_variance_terms(
 /// 0.72, and a read-back that priced the stateless forms while the tick
 /// ran the stateful ones would be the same defect this module was written
 /// to close.
+#[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance_terms_with_states(
     p: &ModelParams,
     names: &[NameVariance],
@@ -1195,6 +1200,18 @@ mod tests {
     use super::*;
     use crate::params::PT_V18;
 
+    /// `SQRT_TWO` scales every `erfc` argument in the tail probability, so
+    /// its bits are part of the simulation. It is the standard library's
+    /// `SQRT_2` now, and before that it was the literal `1.4142135623730951`
+    /// (which clippy's `approx_constant` refuses). Both are this double.
+    #[test]
+    fn sqrt_two_is_the_double_the_literal_was() {
+        assert_eq!(SQRT_TWO.to_bits(), 0x3FF6_A09E_667F_3BCD);
+        #[allow(clippy::approx_constant)]
+        let literal: f64 = 1.4142135623730951;
+        assert_eq!(SQRT_TWO.to_bits(), literal.to_bits());
+    }
+
     fn roster() -> Vec<NameVariance> {
         (0..8)
             .map(|i| NameVariance {
@@ -1541,7 +1558,7 @@ mod tests {
         let beta_w: f64 = names.iter().map(|n| n.weight * n.beta).sum();
         assert_eq!(terms.factor_raw, beta_w * beta_w * v_f, "factor_raw");
 
-        let mut loaded = vec![0.0; 3];
+        let mut loaded = [0.0; 3];
         for n in names.iter() {
             if n.sector < 3 {
                 loaded[n.sector] +=
@@ -2359,7 +2376,7 @@ mod tests {
     ///
     /// # What this test used to assert
     ///
-    /// P3 of `loopgain-report.md` measured realised variance over `V_t` at
+    /// The loop-gain run measured realised variance over `V_t` at
     /// nine pins: 1.22 to 1.44 at or below x 1.5 of base factor variance,
     /// then 3.99, 4.30 and 4.92 at x 1.75, 2.0 and 2.5. The ratio was flat
     /// under `crisis_vix_threshold` and stepped about 2.8x across it, and
@@ -2371,7 +2388,7 @@ mod tests {
     /// `beta_i` to `beta_i + crisis_blend_source * crisis_blend_gain *
     /// spike`, and the run that produced them carried pt-v18's gain of
     /// 0.8275881. pt-v19 derives `crisis_blend_gain` to exactly 0.0 on tape
-    /// evidence (`programme/crisis-blend-derivation.md`: cross-sectional
+    /// evidence (cross-sectional
     /// correlation is a function of realised common volatility, `rho =
     /// -0.366 + 0.277 log(sigma_ann%)`, R^2 0.69, and the VIX level adds
     /// nothing once volatility is in). With no lift there is no step, in

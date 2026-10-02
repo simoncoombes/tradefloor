@@ -17,15 +17,20 @@ are nearly copies of each other.
 
 Reported alongside the naive standard error, deliberately. The gap between the
 two is the size of the mistake that overlapping windows invite.
+
+    python tools/calibration/civ_real_panel.py real_closes.json
+
+The one argument is a JSON file of daily closes for the real roster, keyed by
+ticker, each entry holding parallel lists `ts` (session timestamps) and `adj`
+(adjusted closes, null where the name did not trade). Only the sessions every
+name traded are used.
 """
 import json, math, random, statistics as st, sys, os
 
-SP = "/private/tmp/claude-503/-Users-simoncoombes-nw-Dev/76cab463-16f4-4a89-baac-68bc86680c4c/scratchpad"
-CACHE = f"{SP}/civ/real_closes.json"
 WINDOW, STEP = 252, 21
 
-def load():
-    data = json.load(open(CACHE))
+def load(path):
+    data = json.load(open(path))
     tick = sorted(data)
     common = None
     for t in tick:
@@ -61,7 +66,9 @@ def slope(pts):
     return sum((x-mx)*(y-my) for x, y in zip(xs, ys))/den
 
 if __name__ == "__main__":
-    tick, rets, R = load()
+    if len(sys.argv) != 2:
+        sys.exit("usage: civ_real_panel.py <real closes JSON>")
+    tick, rets, R = load(sys.argv[1])
     print(f"{len(tick)} names, {R} daily returns\n")
 
     non = [window_stats(rets, tick, i*WINDOW, (i+1)*WINDOW) for i in range(R//WINDOW)]

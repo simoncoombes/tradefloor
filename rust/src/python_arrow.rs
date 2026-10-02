@@ -75,11 +75,12 @@ pub fn bars_schema() -> SchemaRef {
 /// `mispricing_s` isolates the valuation gap. Three quantities that are easy
 /// to conflate, kept apart on purpose.
 ///
-/// **The decomposition.** Ten columns, in `FACTOR_NAMES` order, giving
+/// **The decomposition.** Eleven columns, in `FACTOR_NAMES` order, giving
 /// every contribution to this tick's change in `s`: the eight
 /// `S_COMPONENT_KEYS`, then the daily jump and the overnight move, which
 /// land outside the tick loop and are booked onto the row where each is
-/// observed. `reversion`, `momentum` and `crowd_lean` are the model's own
+/// observed, then `fair_value_shift`, minus the part of the shocks that
+/// moved the name's fair value instead of `s` (pt-v20's permanent share). `reversion`, `momentum` and `crowd_lean` are the model's own
 /// dynamics; `company_news`, `order_flow_impact`, `short_squeeze_effect`
 /// and `random_noise` are the shocks. They sum to `Δs`.
 ///
@@ -129,6 +130,15 @@ pub fn truth_schema() -> SchemaRef {
         DataType::Float64,
         false,
     ));
+    // The fair-value shift: minus what left `s` for the name's fair value
+    // under the permanent share (pt-v20), on each tick and, beside the jump,
+    // on the row where the close's jump is observed. Zero on every preset
+    // through pt-v19. With it every component column sums to `Δs`.
+    fields.push(Field::new(
+        crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
+        DataType::Float64,
+        false,
+    ));
     Arc::new(Schema::new(fields))
 }
 
@@ -143,12 +153,21 @@ pub fn bars_batch(
     instruments: usize,
     prices: &[f64],
     volumes: &[f64],
+    volume_base: &[f64],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if prices.len() < rows || volumes.len() < rows {
         return Err(format!(
             "buffer shorter than {ticks} ticks x {instruments} instruments"
         ));
+    }
+    // One tick is a bar of one tick: its own volume, the running total less
+    // the total a tick earlier. See [`bar_volume`].
+    let mut volume_col = Vec::with_capacity(rows);
+    for t in 0..ticks {
+        for i in 0..instruments {
+            volume_col.push(bar_volume(volumes, volume_base, instruments, i, t, t + 1));
+        }
     }
 
     let mut day_col = Vec::with_capacity(rows);
@@ -167,9 +186,41 @@ pub fn bars_batch(
         Arc::new(UInt32Array::from(tick_col)),
         Arc::new(UInt32Array::from(id_col)),
         Arc::new(Float64Array::from(prices[..rows].to_vec())),
-        Arc::new(Float64Array::from(volumes[..rows].to_vec())),
+        Arc::new(Float64Array::from(volume_col)),
     ];
     RecordBatch::try_new(bars_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// The volume traded in ticks `first..last` of one instrument's tape.
+///
+/// The engine keeps volume as a running total that the open resets to zero,
+/// and the tape records that total after each tick. So a bar's volume is the
+/// total at its last tick minus the total before its first, and the bar
+/// grain changes nothing about the rule: one tick, five minutes and a day
+/// are all the same subtraction.
+///
+/// The total before a tape's first tick is not on the tape. It is
+/// `volume_base[i]`, zero after an open and the count so far for a session
+/// that starts part way through a day; an empty `volume_base` reads as zero.
+///
+/// Until 0.8.5 the bucketed bars SUMMED these running totals, which made a
+/// day bar about two hundred times the day's volume and made the five-minute
+/// profile climb all day, and the tick rows served the running total as
+/// though it were the minute's volume.
+pub fn bar_volume(
+    volumes: &[f64],
+    volume_base: &[f64],
+    instruments: usize,
+    i: usize,
+    first: usize,
+    last: usize,
+) -> f64 {
+    let before = if first == 0 {
+        volume_base.get(i).copied().unwrap_or(0.0)
+    } else {
+        volumes[(first - 1) * instruments + i]
+    };
+    volumes[(last - 1) * instruments + i] - before
 }
 
 /// Build the `truth` batch from a session's ground-truth buffers.
@@ -309,6 +360,7 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
         Field::new("shock", DataType::Float64, false),
         Field::new("absorbed", DataType::Float64, false),
         Field::new("clamp", DataType::Float64, false),
+        Field::new("repriced", DataType::Float64, false),
     ];
     if depth == DepthColumns::Present {
         fields.push(Field::new("unbounded_print", DataType::Float64, false));
@@ -322,7 +374,14 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
                     breaker's own part and book = absorbed - clamp is the \
                     book's. Read them apart: on a halted print the two pull \
                     opposite ways and often cancel exactly, so absorbed alone \
-                    reads zero on a name the breaker had just moved. ";
+                    reads zero on a name the breaker had just moved. \
+                    repriced is what was written to the price between the \
+                    last print and the tick: the close's re-mark to a \
+                    published macro figure, a pin_macro's re-mark and the \
+                    overnight opening print. repriced + shock + absorbed is \
+                    the print's log move from the last print; it is NaN \
+                    where not known, on the first print after a restore on a \
+                    model that can write a price between prints. ";
     let caveat = match depth {
         DepthColumns::Present => format!(
             "{absorbed}unbounded_print is the same tick settled against every \
@@ -369,6 +428,7 @@ pub fn prints_batch(
     shock: &[f64],
     absorbed: &[f64],
     clamp: &[f64],
+    repriced: &[f64],
     unbounded_print: &[f64],
     liquidity_share: &[f64],
     depth: DepthColumns,
@@ -380,6 +440,7 @@ pub fn prints_batch(
         ("shock", shock.len()),
         ("absorbed", absorbed.len()),
         ("clamp", clamp.len()),
+        ("repriced", repriced.len()),
     ] {
         if len < rows {
             return Err(format!(
@@ -418,6 +479,7 @@ pub fn prints_batch(
         Arc::new(Float64Array::from(shock[..rows].to_vec())),
         Arc::new(Float64Array::from(absorbed[..rows].to_vec())),
         Arc::new(Float64Array::from(clamp[..rows].to_vec())),
+        Arc::new(Float64Array::from(repriced[..rows].to_vec())),
     ];
     if depth == DepthColumns::Present {
         columns.push(Arc::new(Float64Array::from(unbounded_print[..rows].to_vec())));
@@ -514,8 +576,14 @@ impl PyArrowStream {
     }
 
     fn __repr__(&self) -> String {
+        // The reading hint is in the repr because the repr is what a user
+        // sees at the prompt, and `pandas.DataFrame(stream)` fails with
+        // "DataFrame constructor not properly called!", which names no
+        // reader.
         format!(
-            "ArrowStream({:?}, {} rows in {} batch(es))",
+            "ArrowStream({:?}, {} rows in {} batch(es)). Read it with \
+             pyarrow.table(stream) or polars.from_arrow(stream); pip install \
+             \"tradefloor[arrow]\" for pyarrow.",
             self.name,
             self.num_rows(),
             self.batches.len()
@@ -692,7 +760,14 @@ pub struct RecordedDay {
     pub ticks: usize,
     pub instruments: usize,
     pub prices: Vec<f64>,
+    /// Each instrument's running volume total after each tick, reset to
+    /// zero at the open. A bar's own volume is a difference of these; see
+    /// [`bar_volume`].
     pub volumes: Vec<f64>,
+    /// Each instrument's running total before the tape's first tick: zero
+    /// on a day recorded from its open, the count so far on a tape that
+    /// starts later. One per instrument, or EMPTY for zero.
+    pub volume_base: Vec<f64>,
     /// The price each instrument's SESSION opened at, before its first
     /// tick: the engine's `open` mark, taken at `open_market`. One per
     /// instrument, or EMPTY when the recording predates the field, in which
@@ -711,6 +786,7 @@ pub struct RecordedDay {
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
     pub clamp: Vec<f64>,
+    pub repriced: Vec<f64>,
     /// The depth counterfactual, EMPTY on a day that ran without it. A day
     /// carries its own answer because the arm can be switched between days,
     /// and a table that reported one day's setting for all of them would be
@@ -742,6 +818,8 @@ pub fn ohlc_schema() -> SchemaRef {
 ///
 /// `bucket` is ticks per bar; a bucket at or beyond the day's length produces
 /// exactly one bar, which is the day-grain case.
+///
+/// A bar's volume is what traded inside it; see [`bar_volume`].
 ///
 /// The final bucket is kept even when short. Dropping a partial bar would
 /// silently discard the end of every session whose length is not a multiple of
@@ -802,7 +880,6 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
             let mut high = if session_open.is_nan() { f64::NEG_INFINITY } else { session_open };
             let mut low = if session_open.is_nan() { f64::INFINITY } else { session_open };
             let mut close = f64::NAN;
-            let mut volume = 0.0;
             for t in first..last {
                 let price = day.prices[t * n + i];
                 if t == first && open.is_nan() {
@@ -817,8 +894,8 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
                     low = price;
                 }
                 close = price;
-                volume += day.volumes[t * n + i];
             }
+            let volume = bar_volume(&day.volumes, &day.volume_base, n, i, first, last);
             day_c.push(day.day);
             bar_c.push(bar as u32);
             id_c.push(i as u32);

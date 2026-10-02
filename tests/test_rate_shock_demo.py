@@ -16,6 +16,7 @@ and reproduced by somebody who was not there.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -31,7 +32,7 @@ demo = pytest.importorskip("counterfactual")
 from agent import MacroAwareAgent  # noqa: E402
 
 
-def build() -> World:
+def build(model=None) -> World:
     roster = demo.universe()
     agent = MacroAwareAgent(
         duration={row[0]: row[7] for row in demo.ROSTER})
@@ -40,11 +41,11 @@ def build() -> World:
         pins={"federal_funds_rate": demo.POLICY_RATE,
               "corporate_bond_yield": demo.DISCOUNT_RATE},
         cash=demo.CASH, steps_per_day=demo.STEPS_PER_DAY,
-        ticks_per_step=demo.TICKS_PER_STEP, label="root")
+        ticks_per_step=demo.TICKS_PER_STEP, label="root", model=model)
 
 
-def experiment():
-    world = build()
+def experiment(model=None):
+    world = build(model)
     world.run(days=demo.WARMUP_DAYS)
     control, shock = world.fork("control", f"+{demo.SHOCK_BPS}bps")
     agreement = agree(control, shock)
@@ -141,11 +142,22 @@ def test_the_agent_cuts_risk_on_the_step_the_rate_moves(run):
     one-in-five split one particular step happened to land.
 
     So assert the thing that is actually load-bearing. At the fork the two
-    arms differ in the policy rate and in nothing else, so their volatility
-    channels are equal and CANCEL: the whole difference in target gross is
-    the intervention. That is a stronger statement than a still control, and
-    it holds on every preset rather than on the ones whose step 120 was
-    quiet.
+    arms differ in the intervention and in nothing else, so the whole
+    difference in target gross is the intervention. That is a stronger
+    statement than a still control, and it holds on every preset rather
+    than on the ones whose step 120 was quiet.
+
+    On pt-v20, the default, the intervention reaches the volatility
+    channel too. `macro_publication_repricing` prices a pinned rate the
+    moment it is written, so the shocked arm's fork step opens on
+    cross-section the hike has already re-marked (every name lower), and a
+    window ending on that cross-section reads the jump: vol_excess 0.905
+    against the control's 0.261. The price histories before the fork are
+    the same to the bit, so that difference is still the intervention's,
+    through the price rather than through the rate the agent reads. Where
+    the price does not take the rate until the next tick (the re-mark off,
+    below) the two channels' inputs at the fork are identical and the
+    volatility channel cancels exactly, as it did before pt-v20.
     """
     world, control, shock, _agreement = run
     fork = world.step
@@ -157,11 +169,12 @@ def test_the_agent_cuts_risk_on_the_step_the_rate_moves(run):
     assert at_control["tightening_bps"] == 0, (
         f"the control read {at_control['tightening_bps']}bp of tightening; "
         "its rate was not supposed to move at all")
-    assert at_control["vol_excess"] == at_shock["vol_excess"], (
-        f"the arms read different volatility excess at the fork "
-        f"({at_control['vol_excess']} against {at_shock['vol_excess']}), so "
-        "the second channel no longer cancels and the difference in gross "
-        "cannot be attributed to the rate alone")
+    # The only difference the volatility channel can see is the fork step's
+    # opening cross-section, which the shocked arm's re-mark moved down.
+    assert control.trace[fork - 1]["prices"] == shock.trace[fork - 1]["prices"]
+    opened_c, opened_s = control._step_opens[fork], shock._step_opens[fork]
+    assert all(s < c for c, s in zip(opened_c, opened_s)), (
+        "the shocked arm did not open on a re-marked cross-section")
     # The control may move on the shared channel, and must not move MUCH: a
     # control that de-risked materially of its own accord would leave the
     # comparison measuring two things even with the channel equalised.
@@ -173,6 +186,27 @@ def test_the_agent_cuts_risk_on_the_step_the_rate_moves(run):
         f"the shocked arm cut gross exposure from {before:.3f} to "
         f"{after_shock:.3f}, which is not the material de-risking the demo "
         "describes")
+
+
+def test_without_the_re_mark_the_volatility_channel_cancels_at_the_fork():
+    """The same experiment on pt-v20 with `macro_publication_repricing` at
+    0, where the price takes the rate at the next tick: the arms' fork
+    steps open on one cross-section, so their volatility channels are equal
+    and cancel, and the difference in gross is the rate channel alone."""
+    world, control, shock, _agreement = experiment(
+        tf.ModelParams.from_preset("pt-v20", macro_publication_repricing=0.0))
+    fork = world.step
+    assert control._step_opens[fork] == shock._step_opens[fork]
+    at_control = control.trace[fork]["decision"]
+    at_shock = shock.trace[fork]["decision"]
+    assert at_control["tightening_bps"] == 0
+    assert at_control["vol_excess"] == at_shock["vol_excess"], (
+        f"the arms read different volatility excess at the fork "
+        f"({at_control['vol_excess']} against {at_shock['vol_excess']}), so "
+        "the second channel no longer cancels and the difference in gross "
+        "cannot be attributed to the rate alone")
+    before = control.trace[fork - 1]["decision"]["gross"]
+    assert at_shock["gross"] < before * 0.75
 
 
 def test_the_cut_is_deepest_in_the_longest_duration_name(run):
@@ -289,3 +323,93 @@ def test_the_demo_completes_quickly(tmp_path, capsys):
     report = demo.main(out=tmp_path, chart=False)
     capsys.readouterr()
     assert report["seconds"] < 30.0
+
+
+# ---------------------------------------------------------------------------
+# The walkthrough quotes the demo
+# ---------------------------------------------------------------------------
+
+WALKTHROUGH = STUDY / "README.md"
+
+
+@pytest.fixture(scope="module")
+def printed(tmp_path_factory) -> str:
+    """What the demo prints, from one run shared by the checks below."""
+    import contextlib
+    import io
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        demo.main(out=tmp_path_factory.mktemp("walkthrough"), chart=False)
+    return out.getvalue()
+
+
+def _squash(line: str) -> str:
+    return " ".join(line.split())
+
+
+def _plain_blocks(text: str) -> list[list[str]]:
+    """The fenced blocks with no language, line by line. A regex pairs a
+    closing fence with the next opening one as readily as with its own."""
+    blocks, body, plain = [], None, False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            if body is None:
+                body, plain = [], line.strip() == "```"
+            else:
+                if plain:
+                    blocks.append(body)
+                body = None
+        elif body is not None:
+            body.append(line)
+    return blocks
+
+
+def test_the_walkthrough_quotes_what_the_demo_prints(printed):
+    """Every output block in the walkthrough is lines the demo printed.
+
+    The walkthrough is the page the README sends a first-time reader to, and
+    at 0.8.5 every block of output in it was from an older market: prices,
+    book levels, the cut table, the forty-day prices and both books, none of
+    which the script printed any more. A reader comparing the page with the
+    terminal would conclude the install was broken.
+
+    A plain fenced block whose first line the demo prints is taken as quoted
+    output, and then all of it must be. Blocks whose first line it does not
+    print (the diagram, the formula, the directory listing) are left alone.
+    """
+    text = WALKTHROUGH.read_text(encoding="utf-8")
+    lines = {_squash(line) for line in printed.splitlines() if line.strip()}
+    quoted = 0
+    for block in _plain_blocks(text):
+        body = [_squash(line) for line in block if line.strip()]
+        if not body or body[0] not in lines:
+            continue
+        quoted += 1
+        stale = [line for line in body if line not in lines]
+        assert not stale, (
+            f"examples/rate-shock/README.md quotes lines the demo no longer "
+            f"prints: {stale}. Paste the current output of "
+            f"counterfactual.py into that block.")
+    # The four blocks: the agreement, the cut, the prices and the books.
+    assert quoted >= 4, f"found {quoted} quoted output blocks, expected 4"
+
+
+def test_the_walkthrough_states_the_checkpoint_size_it_writes(printed):
+    """'About 21 kB' stood beside a checkpoint of 29,809 bytes."""
+    text = WALKTHROUGH.read_text(encoding="utf-8")
+    claimed = re.search(r"about (\d+) kB of JSON", text)
+    assert claimed, "the walkthrough no longer states the checkpoint's size"
+    written = re.search(r"([\d,]+) bytes of JSON", printed)
+    assert written, printed[:2000]
+    size = int(written.group(1).replace(",", ""))
+    assert abs(int(claimed.group(1)) * 1000 - size) <= 0.1 * size, (
+        f"the walkthrough says about {claimed.group(1)} kB and the demo "
+        f"writes {size:,} bytes")
+
+
+def test_the_printed_rate_sensitivity_is_the_presets(printed):
+    """The line that explains the rate channel names the running preset's
+    coefficient. It said 1.5 after the default moved to pt-v20, whose 3 is
+    what the forty-day price table shows."""
+    sensitivity = tf.ModelParams.from_preset().to_dict()["rate_pe_sensitivity"]
+    assert f"(discount - neutral) x {sensitivity:g} x" in printed, printed[:2000]

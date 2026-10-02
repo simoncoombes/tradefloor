@@ -63,7 +63,7 @@ from tradefloor import envelope, facts, loss  # noqa: E402
 #: measurement is documented and a second copy is a second thing to drift.
 CRISIS_COMOVEMENT_REAL = (0.664, 0.727)
 
-#: Real markets' crisis volatility lever, from `real_vix_lever.py`: 17.2%
+#: Real markets' crisis volatility lever, measured on the forty-name roster: 17.2%
 #: annualised at VIX under 12 against 106.1% at VIX 45 and above.
 CRISIS_LEVER_REAL = 6.16
 

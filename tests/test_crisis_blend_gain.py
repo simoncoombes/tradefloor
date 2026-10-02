@@ -6,7 +6,7 @@ The spike is capped at `crisis_blend_cap` (0.98), so the extra market
 loading a crisis could ever produce was 0.49 of beta, fixed in the source.
 
 That ceiling is why crisis co-movement could not be raised. Measured at
-thirty seeds (CALIBRATION-FOLLOWUPS.md §94 to §96), every route to a
+thirty seeds, every route to a
 real-sized crisis lever adds variance that is NOT the market factor, and
 crisis-state cross-sectional correlation IS the market factor's share of
 total variance, so the two traded against each other. The one channel that

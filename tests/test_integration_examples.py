@@ -51,18 +51,22 @@ NEEDS: dict[str, str | None] = {
 #: rather than inferred, so a sixth integration cannot slip in unseen.
 NOT_IN_THE_TABLE = {"finrobot"}
 
-#: A row of the scorecard table: the linked file name, then trades, return
-#: and impact exactly as the examples print them.
+#: A row of the scorecard table: the linked file name, then days, trades,
+#: return and impact exactly as the examples print them. Days since 0.8.5,
+#: when the page said all four ran five days and three of them ran twenty.
 ROW = re.compile(
     r"^\|\s*\[`(?P<file>[a-z_]+/[a-z_]+\.py)`\]\([^)]*\)\s*\|"
+    r"\s*(?P<days>\d+)\s*\|"
     r"\s*(?P<trades>\d+)\s*\|"
     r"\s*(?P<ret>[-+][0-9.]+)%\s*\|"
     r"\s*(?P<impact>[-+][0-9.]+) bps\s*\|\s*$",
     re.M,
 )
 
-#: The three lines of the printed scorecard the table quotes.
+#: The lines of the printed output the table quotes: the horizon from the
+#: header, then three lines of the scorecard.
 PRINTED = {
+    "days": re.compile(r"^seed \d+, (\d+) days,", re.M),
     "trades": re.compile(r"^trades\s+(\d+)\s*$", re.M),
     "ret": re.compile(r"^return\s+([-+][0-9.]+)%\s*$", re.M),
     "impact": re.compile(r"^impact\s+([-+][0-9.]+) bps\s*$", re.M),
@@ -72,7 +76,7 @@ PRINTED = {
 def table() -> dict[str, dict[str, str]]:
     text = README.read_text(encoding="utf-8")
     return {m.group("file"): {k: m.group(k)
-                              for k in ("trades", "ret", "impact")}
+                              for k in ("days", "trades", "ret", "impact")}
             for m in ROW.finditer(text)}
 
 
@@ -104,6 +108,11 @@ def test_the_table_matches_a_real_run(name: str):
     With the API keys stripped from the environment, so the page's other
     claim -- that these need no key, no provider account and no network -- is
     checked by the same run rather than asserted beside it.
+
+    Without `CI` and `PYTEST_VERSION` either, because pydantic-ai stays quiet
+    when it sees them, and a reader's shell has neither: at 0.8.5 the
+    pydantic_ai example opened on a nine-line Logfire banner that no test
+    run could see.
     """
     framework = NEEDS[name]
     if framework:
@@ -114,11 +123,15 @@ def test_the_table_matches_a_real_run(name: str):
     assert claimed, f"{name} has no row in the README scorecard table"
 
     env = {k: v for k, v in os.environ.items()
-           if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY")}
+           if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+                        "CI", "PYTEST_VERSION")}
     done = subprocess.run([sys.executable, str(EXAMPLES / name)],
                           capture_output=True, text=True, timeout=600,
                           env=env)
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    assert "NO_BANNER" not in done.stdout + done.stderr, (
+        f"{name} printed a framework's promotional banner above its own "
+        f"output:\n{done.stderr[:1500]}")
 
     for field, pattern in PRINTED.items():
         found = pattern.search(done.stdout)
@@ -132,3 +145,159 @@ def test_the_table_matches_a_real_run(name: str):
             "Update the table in that README, or the example, so the page "
             "states what the code does."
         )
+
+
+# -- a copy outside the repository -------------------------------------------
+#
+# A pip user who copies an example into their own project has the library and
+# not the repository. The two examples below used to look for the
+# repository's `pyproject.toml` at import, so a copy raised "no pyproject.toml
+# above this file" before running a line, even where the run it was asked for
+# never reads a recording. The recordings live in `tests/fixtures/` and are
+# not installed, so the paths that need one must say that, and every other
+# path must run.
+#
+# `openai_agents/five_days.py`, `pydantic_ai/rate_shock.py` and
+# `langgraph/rate_shock.py` still resolve their fixture at import. Adding one
+# here is the check that it has been fixed.
+COPY_SAFE = ("callable/five_days.py", "finrobot/rate_shock.py")
+
+
+def _copied(name: str, tmp_path: pathlib.Path) -> pathlib.Path:
+    """The example alone, in a folder with nothing of the repository above
+    it. `tmp_path` sits under the system temp directory, which no checkout
+    contains."""
+    target = tmp_path / "my-project" / pathlib.Path(name).name
+    if REPO in target.parents:
+        pytest.skip("the temp directory is inside the checkout (--basetemp?), "
+                    "so a copy there is not outside the repository")
+    target.parent.mkdir(parents=True)
+    target.write_bytes((EXAMPLES / name).read_bytes())
+    return target
+
+
+def _load(path: pathlib.Path, name: str):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("name", COPY_SAFE, ids=lambda n: n[:-3])
+def test_a_copied_example_imports_and_names_where_its_recording_lives(
+        name: str, tmp_path: pathlib.Path):
+    """Importing a copy works; asking it for its recording names the place.
+
+    The message has to send the reader somewhere: the repository path of
+    the recording, and the clone that has it.
+    """
+    copy = _load(_copied(name, tmp_path), "copied_" + name.replace("/", "_")[:-3])
+    with pytest.raises(FileNotFoundError) as refused:
+        copy.fixture_path()
+    assert "tests/fixtures/" in str(refused.value)
+    assert "github.com/simoncoombes/tradefloor" in str(refused.value)
+
+    # In the checkout the same lookup finds the committed file, so the
+    # notebooks' `example.FIXTURE` reads what it always read.
+    here = _load(EXAMPLES / name, "in_repo_" + name.replace("/", "_")[:-3])
+    assert here.FIXTURE == here.fixture_path()
+    assert here.FIXTURE.is_file()
+    assert here.FIXTURE.relative_to(REPO).parts[:2] == ("tests", "fixtures")
+
+
+def test_a_copied_callable_example_runs_whole(tmp_path: pathlib.Path):
+    """The repro from the 0.8.5 user review: copy the file out and run it.
+
+    `main()` never reads the recording, so the copy must run to the end and
+    print the same scorecard the table above states.
+    """
+    copy = _copied("callable/five_days.py", tmp_path)
+    done = subprocess.run([sys.executable, str(copy)], capture_output=True,
+                          text=True, timeout=600, cwd=tmp_path)
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    claimed = table()["callable/five_days.py"]
+    found = PRINTED["trades"].search(done.stdout)
+    assert found and found.group(1) == claimed["trades"], done.stdout[-1500:]
+
+
+def test_a_copied_finrobot_study_refuses_readably_without_its_recording(
+        tmp_path: pathlib.Path):
+    """The default run replays the recording, which the copy does not have.
+
+    It must stop with the message and no traceback, before any market runs.
+    """
+    copy = _copied("finrobot/rate_shock.py", tmp_path)
+    done = subprocess.run([sys.executable, str(copy)], capture_output=True,
+                          text=True, timeout=600, cwd=tmp_path)
+    combined = done.stdout + done.stderr
+    assert done.returncode != 0, combined[-1500:]
+    assert "Traceback" not in combined, combined[-3000:]
+    assert "tests/fixtures/finrobot/rate-shock.json" in combined, combined
+    assert "Shared history" not in combined, "it ran the market first"
+
+
+# -- the page itself ---------------------------------------------------------
+
+
+def test_the_page_reaches_usage_before_its_history():
+    """How to run and call the adapters first; how the table moved, last.
+
+    The page used to follow its scorecard with about sixty lines on how each
+    row had moved across presets and compositions, so a reader looking for
+    how to call an adapter read a changelog first. The old rows are kept,
+    under the page's last heading.
+    """
+    text = README.read_text(encoding="utf-8")
+    headings = re.findall(r"(?m)^## (.+)$", text)
+    assert headings[-1] == "History", headings
+    usage = text[:text.index("## Plain Python")]
+    old = re.findall(r"Re-measured|pt-v1\d|composition", usage)
+    assert not old, f"the usage part of the page still carries history: {old}"
+
+
+def test_the_page_states_the_order_vocabulary_and_the_exposure_unit():
+    """What an agent may send, and what `leverage` is measured in.
+
+    Two questions a reader had to answer from the source. From decision
+    schema 2 an adapter sends what a native agent sends, a market order, a
+    `tf.Limit` or a `tf.Cancel()`, and a bad action is refused on its own.
+    And the payload's `leverage` is a multiple of net worth, while
+    `Portfolio.gross_exposure` is dollars.
+    """
+    text = " ".join(README.read_text(encoding="utf-8").split())
+    for needed in ("`limit_price`, which makes it a `tf.Limit`",
+                   "CANCEL is a `tf.Cancel()`", "refused on its own",
+                   "`open_orders`", "multiple of net worth"):
+        assert needed in text, f"the page no longer says {needed!r}"
+
+
+def test_the_payload_states_leverage_as_a_multiple():
+    """The unit the page states, read off a real payload.
+
+    A rule that buys on day 0 and records what it is shown: on day 1 the
+    payload's `leverage` must equal the positions' value over net
+    worth, computed from the same payload.
+    """
+    import tradefloor as tf
+    from tradefloor.integrations.callable import callable_agent
+
+    seen = []
+
+    def buy_once(payload: dict) -> dict:
+        seen.append(payload)
+        if payload["day"] > 0:
+            return {"actions": []}
+        asset = payload["assets"][0]
+        return {"actions": [{"symbol": asset["symbol"], "side": "BUY",
+                             "quantity": asset["max_order_shares"]}]}
+
+    agent = callable_agent(buy_once)
+    tf.evaluate({"a": agent}, seed=4242,
+                universe=tf.Universe.random(3, seed=1), days=2)
+    later = seen[-1]
+    book = later["portfolio"]
+    held = sum(abs(a["position"]) * a["price"] for a in later["assets"])
+    assert held > 0, "the rule never bought, so this checks nothing"
+    assert book["leverage"] == pytest.approx(held / book["net_worth"],
+                                             rel=1e-9)

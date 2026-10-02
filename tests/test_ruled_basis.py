@@ -13,8 +13,8 @@ That silence is what this file removes. `envelope.RULERS_BY_BASIS` and the
 composed `facts.REAL_MARKETS_RULED` tables repaired the routing; until this
 file landed, not one test in `tests/` referred to `RULERS_BY_BASIS`,
 `REAL_MARKETS_RULED`, `RULED_UNREADABLE` or `BAND_EDGE_LIVENESS`, so the
-repair was held in place by a guard in the design repository and by nothing
-here.
+repair was held in place by a guard kept outside this repository and by
+nothing here.
 
 Every test below constructs the failure it is meant to catch. Registration is
 checked BAND FOR BAND rather than key for key, because at `b66e691`
@@ -61,8 +61,8 @@ HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 #: edit is the record that the count moved on purpose.
 #:
 #: THE TWO `vix_ar1_debiased` CELLS NAMED A CLOSED BLOCKER until 2026-09-18.
-#: `vix-ar1-band-not-adopted` was closed on 2026-09-15 by the design repo's
-#: `closes-vix-ar1-band-not-adopted`, on Simon's `ruling-vix-ar1-band-adopted`.
+#: `vix-ar1-band-not-adopted` was closed on 2026-09-15, on Simon's ruling
+#: that adopted the band.
 #: The CELLS did not move, because the ruling adopted a band that never landed
 #: in these tables, so the count below is unchanged and the row count is still
 #: seven. What changed is only which entry is honestly named: a closed blocker

@@ -149,14 +149,17 @@ OFF = dict(news_absorption_half_life=0.0, news_absorption_drift_share=0.0,
            news_absorption_drift_half_life=0.0, news_quote_revision=0.0)
 
 #: The presets that price news within minutes, and at what. pt-v19 takes the
-#: derived profile (Christensen, Timmermann and Veliyev's Table 7, design
-#: repository programme/results/news-speed/) with the maker's re-quote since
-#: its fifth composition. Written out, so a preset added without a decision
+#: derived profile (from Christensen, Timmermann and Veliyev's Table 7) with
+#: the maker's re-quote since its fifth composition. Written out, so a preset added without a decision
 #: about these dials fails below.
 NEWS_PRICED = {"pt-v19": dict(news_absorption_half_life=0.6,
                               news_absorption_drift_share=0.12,
                               news_absorption_drift_half_life=42.0,
                               news_quote_revision=1.0)}
+# pt-v20 is built on pt-v19 and inherits the profile and the re-quote. Its
+# book is centred on the model price every tick (`quote_model_weight`), which
+# subsumes the news re-quote, and the switch stays on as inherited.
+NEWS_PRICED["pt-v20"] = dict(NEWS_PRICED["pt-v19"])
 
 
 def test_it_ships_inert_on_every_preset_but_pt_v19():

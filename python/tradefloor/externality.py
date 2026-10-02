@@ -45,7 +45,7 @@ An effect on b is b's P&L change. It arrives as prices, by three routes,
 and the number holds all three without separating them.
 
 The direct one: a's flow reaches the market as part of the merged
-``order_flow`` of a session, and the prices of the names a traded come out
+``fills`` of a session, and the prices of the names a traded come out
 different. b holds or trades some of those names.
 
 The market-wide one: a's flow moves the cap-weighted index, the fear gauge
@@ -55,9 +55,16 @@ the nudge reaches every name's volatility two closes later.
 says plainly that it is not a rounding error. It reaches b through names a
 never touched, so ``matrix[a][b]`` is non-zero even when nothing a traded
 is anything b traded or held, and it grows with the horizon because the
-reaction has to cross two closes. :meth:`Externality.caveats` names those
-entries when a result carries them, and hands over the control `tca.py`
-gives, which is to pin the gauge in both worlds.
+reaction has to cross two closes. On pt-v20, the default, part of it
+arrives at the first close: the close's macro step reads the session's
+index return (the VIX, the 10-year's flight to quality, the corporate
+yield that follows it) and ``macro_publication_repricing`` re-marks every
+name to that step before b's holdings are marked, so one day is enough
+(``tests/test_externality.py``: 0.0120 and 0.0586 on its disjoint pair at
+one day). :meth:`Externality.caveats` names those entries when a result
+carries them, and hands over the control `tca.py` gives, which is to pin
+the gauge in both worlds, and on pt-v20 the corporate yield too; that
+holds them at zero at one day as at ten.
 
 The comparison is ``traded`` against ``exposure`` and not ``traded``
 against ``traded``. A removed agent reaches the market through the names
@@ -71,10 +78,17 @@ And b's own reaction to the market a made, which is in the number too.
 Separating that one needs a third arm in which b sees a's prices and
 answers as though it did not, and there is no such arm.
 
-None of the three is the order book. Agents in a cohort take no levels
-from each other, because :meth:`Portfolio.execute` reads the ladder and
-removes nothing, so nothing here is a queue. `counterfactual.py` carries
-that measurement.
+None of the three is the order book. On every preset through pt-v19 agents
+in a cohort take no levels from each other, because
+:meth:`Portfolio.execute` reads the ladder and removes nothing. Under a
+model with ``book_shared`` on, as pt-v20, the default, has it, they do: an
+agent later in a step's arrival order meets the book an earlier one left.
+That arrives through fills rather than prices, so it is measured apart, as
+:attr:`Externality.levels`: ``levels[a][b]`` is what b's
+execution cost against each step's opening mid changes by when a stops
+trading, positive when a made b's fills dearer. It is zero, to the cent,
+wherever the book is not shared, and it is in ``matrix`` as well, where it
+is one of the things a P&L change holds.
 
 Removal is inaction from the fork day on. The removed agent keeps the
 positions it held at the fork, and a frozen holding sends no flow, so it
@@ -111,7 +125,7 @@ class Externality:
 
     __slots__ = ("labels", "matrix", "diagonal", "diagonal_bps", "cohort_pnl",
                  "trades", "traded", "exposure", "agreement", "days",
-                 "fork_day", "fork_step", "held_at_fork")
+                 "fork_day", "fork_step", "held_at_fork", "levels", "live")
 
     #: The columns :meth:`table` produces, in order. One row per ordered
     #: pair of labels, so an N-agent cohort is N squared rows.
@@ -119,7 +133,7 @@ class Externality:
 
     def __init__(self, *, labels, matrix, diagonal, diagonal_bps, cohort_pnl,
                  trades, traded, exposure, agreement, days, fork_day,
-                 fork_step, held_at_fork) -> None:
+                 fork_step, held_at_fork, levels=None, live=False) -> None:
         self.labels = tuple(labels)
         self.matrix = matrix
         self.diagonal = diagonal
@@ -147,6 +161,16 @@ class Externality:
         #: The agents holding a position when the fork was taken. Their
         #: removal freezes those positions rather than unwinding them.
         self.held_at_fork = tuple(held_at_fork)
+        #: ``levels[a][b]``: b's execution cost against each step's opening
+        #: mid with the whole cohort, minus the same in the arm without a,
+        #: in currency. Positive when a's orders made b's fills dearer by
+        #: taking the levels b then met. The diagonal is a's own cost
+        #: against those mids. Zero off the diagonal wherever agents do not
+        #: share the book.
+        self.levels = levels if levels is not None else {
+            a: {b: 0.0 for b in self.labels} for a in self.labels}
+        #: Whether the cohort's book was shared (``Engine.book_live``).
+        self.live = bool(live)
 
     # -- reading it -------------------------------------------------------
 
@@ -202,10 +226,17 @@ class Externality:
                 f"fear gauge reacts same-day to the cap-weighted market "
                 f"return, VIX sets the shared factor's variance target, and "
                 f"the nudge reaches every name's volatility two closes "
-                f"later. tradefloor.Execution.moved documents and measures "
+                f"later; on a model that re-marks prices to the published "
+                f"macro step at the close (macro_publication_repricing, "
+                f"pt-v20) the step that return moved reaches every price "
+                f"at that close. tradefloor.Execution.moved documents and "
+                f"measures "
                 f"that channel. To hold those entries at zero, pin the "
                 f"gauge in both worlds by building the cohort with "
-                f"pins={{'vix': 15.0}} and running this again.")
+                f"pins={{'vix': 15.0}} and running this again, and on "
+                f"pt-v20, whose flight to quality moves the 10-year and so "
+                f"the corporate bond yield with the session's return, pin "
+                f"'corporate_bond_yield' too.")
         idle = [b for b in self.labels if not self.trades[b]]
         if idle:
             out.append(
@@ -277,6 +308,8 @@ class Externality:
             "exposure": {b: list(names)
                          for b, names in self.exposure.items()},
             "matrix": {a: dict(row) for a, row in self.matrix.items()},
+            "levels": {a: dict(row) for a, row in self.levels.items()},
+            "live": self.live,
             "diagonal": dict(self.diagonal),
             "diagonal_bps": dict(self.diagonal_bps),
             "held_at_fork": list(self.held_at_fork),
@@ -319,6 +352,22 @@ class Externality:
         for a in self.labels:
             out.append(f"    {a:<{width}}{self.diagonal[a]:>+{cell},.0f}"
                        f"   {self.diagonal_bps[a]:+.2f} bps")
+        if self.live:
+            out += [
+                "",
+                "  levels taken: change in the column agent's execution "
+                "cost from the row agent, in dollars",
+                "    " + " " * width + "".join(f"{b:>{cell}}"
+                                               for b in self.labels),
+            ]
+            for a in self.labels:
+                row = "".join(
+                    f"{self.levels[a][b]:>+{cell - 1},.0f}*" if a == b
+                    else f"{self.levels[a][b]:>+{cell - 1},.0f} "
+                    for b in self.labels)
+                out.append(f"    {'remove ' + a:<{width}}{row}")
+            out.append("  * the row agent's own cost against each step's "
+                       "opening mid")
         out += ["", "  arms at the fork"]
         for line in self.agreement.render(width).splitlines():
             out.append("  " + line)
@@ -438,13 +487,41 @@ def externalities(world: World, days: int = 1) -> Externality:
                 else arm.summary(agent=b)["pnl_since"] - cohort_pnl[b])
             for b in labels}
 
+    # Execution against each step's opening mid, per agent and arm. The
+    # full arm's figure for b against the arm without a is what a's orders
+    # did to b's fills.
+    cost_full = {b: _slippage(full, b, fork_step) for b in labels}
+    levels = {a: {b: (cost_full[a] if b == a
+                      else cost_full[b] - _slippage(arms[a], b, fork_step))
+                  for b in labels} for a in labels}
+
     return Externality(labels=labels, matrix=matrix, diagonal=diagonal,
                        diagonal_bps=diagonal_bps, cohort_pnl=cohort_pnl,
                        trades=trades, traded=traded,
                        exposure=exposure,
                        agreement=agreement, days=days,
                        fork_day=fork_day, fork_step=fork_step,
-                       held_at_fork=held)
+                       held_at_fork=held, levels=levels,
+                       live=bool(getattr(world.engine, "book_live", False)))
+
+
+def _slippage(world: World, label: str, fork_step: int) -> float:
+    """One agent's taker fills since the fork, costed against the mid each
+    step opened on, in currency: positive for a cost.
+
+    Read off the trace, whose fills carry that mid (``World._execute``).
+    A resting order's later fills are not in it: they are liquidity the
+    agent provided, and nobody took a level to make them.
+    """
+    total = 0.0
+    for row in world.trace[fork_step:]:
+        fills = (row["agents"][label]["fills"] if "agents" in row
+                 else row["fills"])
+        for f in fills:
+            if f.get("mid") is None or f.get("price") is None:
+                continue
+            total += (f["price"] - f["mid"]) * f["quantity"]
+    return total
 
 
 def _arm_check(arm: Agreement) -> tuple[bool, str]:
@@ -496,13 +573,27 @@ def _path(world: World, fork_step: int,
     """The cross-section every measured step opened on, then the final one.
 
     The shape :func:`tradefloor.tca.analyse` builds: one row per step, read
-    before that step's orders, and the end-of-run row appended. A trace row
-    records the prices its own session left, so row k-1 carries step k's
-    opening cross-section and the fork state carries step zero's.
+    before that step's orders, and the end-of-run row, read after the last
+    close, appended.
 
-    Crossing a day boundary costs nothing here because ``close_market`` and
-    ``open_market`` move no price, which ``tests/test_externality.py`` pins
-    directly rather than leaving to this comment.
+    Each step's row is the cross-section the world showed its agents when
+    that step opened (``World._step_opens``). Reconstructing it from the
+    trace instead, as the row the previous step's session left, is right
+    within a day and wrong across a close on pt-v20, the default: its close
+    re-marks every traded name to the macro state it publishes
+    (``macro_publication_repricing``), so the next day's first step opens
+    at the re-marked price, not the last print. A fill on a day's first
+    step was priced against the wrong baseline: -24.48 against tca's 8.77
+    on ``Universe.random(8, seed=99)``, seed 42, a 200-share buy at step 6
+    (tests/test_externality.py). ``at_fork`` stands in for a step the world
+    never recorded, which only a world restored from outside can lack.
     """
-    return [at_fork] + [list(row["prices"])
-                        for row in world.trace[fork_step:]]
+    opens = world._step_opens
+    rows = []
+    previous = at_fork
+    for k, row in enumerate(world.trace[fork_step:]):
+        step = fork_step + k
+        rows.append(list(opens[step]) if step in opens else previous)
+        previous = list(row["prices"])
+    rows.append(_f64(world.engine.prices()))
+    return rows

@@ -1,6 +1,6 @@
 """The fourth verdict, measured: endogenous VIX against the crisis trigger.
 
-CALIBRATION.md §3.7 argued from source that the crisis-correlation
+The calibration design argued from source that the crisis-correlation
 trigger was unreachable from inside the old model: the daily VIX target
 tops out near 26 without exogenous shocks, against a trigger at 40, so
 the blend could only ever be measured under `pin_macro`. The threshold

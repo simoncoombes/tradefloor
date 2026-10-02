@@ -56,9 +56,9 @@ not the other is trap 15 in the second count.
                 pins 120 days on a 20-name roster and answers a different
                 question with a similar-looking number.
 
-                The burn arrived on 2026-09-14 and it is the eighth
-                measurement defect of `programme/results/measurement-integrity.md`
-                closed. Every `crisis_lever` block committed before that
+                The burn arrived on 2026-09-14 and it closes the eighth
+                measurement defect logged in the project's unpublished
+                design notes. Every `crisis_lever` block committed before that
                 date was read from a cold open, is low by four to eight per
                 cent, and is low by a DIFFERENT amount on each preset --
                 see `LEVER_BURN`. Those blocks are not corrected in place;
@@ -269,13 +269,16 @@ ABSENT_IS_NOT_A_MISS = (
 )
 
 #: The crisis lever's two endpoints, and the real-market figure it is read
-#: against (17.2% annualised below VIX 12 against 106.1% above VIX 45, from
-#: `real_vix_lever.py`; the ratio is 6.16).
+#: against (17.2% annualised below VIX 12 against 106.1% above VIX 45; the
+#: ratio is 6.16). The real figure pools the daily log returns of the
+#: realism-band roster from 2004 to mid-2025 and buckets the days by that
+#: day's VIX close.
 LEVER_LO, LEVER_HI = 5.0, 65.0
 REAL_LEVER = 6.16
 
 #: Sessions traded and discarded before the lever's window, and this is the
-#: EIGHTH measurement defect of `measurement-integrity.md`, fixed.
+#: EIGHTH measurement defect logged in the project's unpublished design
+#: notes, fixed.
 #:
 #: `Scenario().hold(vix=)` pins the VIX from day zero. The factor variance
 #: does not start there: it opens at the preset's unconditional level and
@@ -297,8 +300,9 @@ REAL_LEVER = 6.16
 #: two of that run is the settled reading, and `facts.measure(days=252,
 #: burn=252)` reproduces it to the bit, the burn being the same traded
 #: sessions with the recorder switched off. The real figure the lever is
-#: read against (6.16, `real_vix_lever.py`) is a regime-conditional STEADY
-#: STATE, so a settled window is also the only like-for-like comparison.
+#: read against (6.16, the VIX-bucketed tape figure above) is a
+#: regime-conditional STEADY STATE, so a settled window is also the only
+#: like-for-like comparison.
 LEVER_BURN = 252
 
 
@@ -1041,8 +1045,8 @@ def main() -> None:
         #
         # Read off `ModelParams.from_preset` on the build this process
         # loaded, and the same object the run read `cycle_stationary_opening`
-        # from, for HARNESS-NOTES.md item 2's reason: a header field that is
-        # stamped rather than measured misattributes its own build.
+        # from, because a header field that is stamped rather than measured
+        # misattributes its own build.
         "model_vectors": vectors,
         "wall_s": time.time() - started,
         "workers": args.workers,
@@ -1061,11 +1065,12 @@ def main() -> None:
                 f"annualised vol at held VIX {LEVER_HI:.0f} over held VIX "
                 f"{LEVER_LO:.0f}, certified roster, 252 days, thirty seeds, "
                 f"after {LEVER_BURN} discarded sessions at the pin. The burn "
-                f"is the eighth measurement defect of measurement-integrity.md "
-                f"repaired: without it each pin's window averages the factor "
-                f"variance's walk toward the pinned target, the two pins walk "
-                f"in opposite directions, and the ratio reads 4 to 8 per cent "
-                f"low by an amount that is a property of the preset"
+                f"repairs the eighth measurement defect logged in the project's "
+                f"unpublished design notes. Without it each pin's window "
+                f"averages the factor variance's walk toward the pinned "
+                f"target, the two pins walk in opposite directions, and the "
+                f"ratio reads 4 to 8 per cent low by an amount that is a "
+                f"property of the preset"
             ),
             "crisis_lever_burn": LEVER_BURN,
             "real_crisis_lever": REAL_LEVER,

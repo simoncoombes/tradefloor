@@ -9,7 +9,7 @@
 //! the simulation diverges for a reason that has nothing to do with the
 //! economy.
 //!
-//! Worse than a count: [`GameRng::next_normal`] caches a **spare**. Box-Muller
+//! Worse than a count: [`GameRng::next_normal`](crate::rng::GameRng::next_normal) caches a **spare**. Box-Muller
 //! produces two normals per pair of uniforms, so an extra or missing normal
 //! call flips the parity of the cache and changes which uniforms every
 //! subsequent normal anywhere in the engine is built from. The count and the
@@ -277,6 +277,76 @@ pub struct DailyInputs<'a> {
     /// shipped behaviour exactly. See
     /// [`crate::params::ModelParams::phase_target_range_draw`].
     pub phase_target_range_draw: f64,
+    /// The share of the gap between the cyclical drive and the unemployment
+    /// impulse closed at each monthly release: `1 - 0.5^(month / half_life)`
+    /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
+    /// and the release adds the drive whole, as it always has.
+    pub unemployment_adjustment: f64,
+    /// The business-cycle phase and the GDP growth (percent) the fear/greed
+    /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
+    /// or `None` for the economy's own, as it always read them.
+    pub fear_greed_published: Option<(CyclePhase, f64)>,
+    /// The yield curve's daily dials (pt-v20). See [`YieldDials`].
+    pub yields: YieldDials,
+}
+
+/// The yield curve's daily step, as dials. [`YieldDials::default`] is the
+/// arithmetic that always stood, bit for bit: the 10-year's 0.03 noise, the
+/// 2-year as the formula of the policy rate and the 10-year, the flight to
+/// quality at 0.02 read off the PREVIOUS day's closing-minute return behind a
+/// 0.5 per cent gate (which that return never crosses, so it never fires),
+/// and the corporate yield moved only at a central-bank meeting.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct YieldDials {
+    /// The 10-year's daily noise, percentage points. See
+    /// [`crate::params::ModelParams::treasury_10y_noise`].
+    pub treasury_10y_noise: f64,
+    /// The 2-year's own daily noise; 0.0 is the formula. See
+    /// [`crate::params::ModelParams::treasury_2y_noise`].
+    pub treasury_2y_noise: f64,
+    /// Percentage points of yield per per cent of index return. See
+    /// [`crate::params::ModelParams::flight_to_quality_gain`].
+    pub flight_to_quality_gain: f64,
+    /// A switch: 1.0 reads the session's own index return. See
+    /// [`crate::params::ModelParams::flight_to_quality_day`].
+    pub flight_to_quality_day: f64,
+    /// A switch: 1.0 moves the corporate yield every session. See
+    /// [`crate::params::ModelParams::corporate_yield_daily`].
+    pub corporate_yield_daily: f64,
+    /// A caller pinned the VIX before this session (`Engine::vix_pinned_today`).
+    /// The close's VIX move is then the VIX law's reversion from a level the
+    /// caller wrote, which the next pin discards, so the corporate yield
+    /// takes no VIX term from it. Read only with `corporate_yield_daily` on.
+    pub vix_pinned: bool,
+    /// A caller pinned the corporate yield before this session. The pinned
+    /// level then holds through the close, as it does on every preset
+    /// without `corporate_yield_daily`: the daily move is not applied.
+    pub corporate_pinned: bool,
+}
+
+/// The largest move the corporate yield takes in one session under
+/// `corporate_yield_daily`, in percentage points either way. The VIX term
+/// is 2 bp a point times the cycle's multiplier (2.8 in a contraction), so a
+/// 20-point VIX session would move it 1.1 points unbounded. Moody's Baa
+/// yield (FRED DBAA, 10,624 sessions 1986-2026) never moved more than 0.48
+/// in a session (18 March 2020; 0.43 on 10 October 2008), its 99.99th
+/// percentile is 0.43 and its 99.9th 0.25. 0.50 sits just above the largest
+/// recorded move. Read only with `corporate_yield_daily` on, so no preset
+/// through pt-v19 reads it.
+pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
+
+impl Default for YieldDials {
+    fn default() -> Self {
+        Self {
+            treasury_10y_noise: 0.03,
+            treasury_2y_noise: 0.0,
+            flight_to_quality_gain: 0.02,
+            flight_to_quality_day: 0.0,
+            corporate_yield_daily: 0.0,
+            vix_pinned: false,
+            corporate_pinned: false,
+        }
+    }
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -288,6 +358,9 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
+            unemployment_adjustment: 0.0,
+            fear_greed_published: None,
+            yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_decay_ratio: 1.0,
             vix_anchor_reversion: 0.0,
@@ -517,6 +590,7 @@ pub fn anchor_weight_at_level(a: f64, eta: f64, cap: f64, below: f64, vix: f64, 
     mathx::max(0.0, 1.0 - one_minus)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn return_spike_at_level(
     current: f64,
     gain: f64,
@@ -556,6 +630,7 @@ pub fn return_spike_at_level(
 /// are the Gaussian ones `expected_return_spike` already carries, with the
 /// up side's own order. Same branch as the spike: at the three defaults it
 /// IS `expected_return_spike`, evaluated by that function.
+#[allow(clippy::too_many_arguments)]
 pub fn expected_return_spike_at_level(
     sigma_pct: f64,
     gain: f64,
@@ -580,6 +655,24 @@ pub fn expected_return_spike_at_level(
     0.5 * (gain * down * moment(exponent) - gain_up * up * moment(exponent_up))
 }
 
+/// The monthly change in unemployment its cyclical drivers ask for: the
+/// phase's trend, Okun's law on `growth` (1 pp of growth below 2% is 0.2 pp
+/// a month) and the recovery's hiring above 1% growth. The three terms of
+/// the monthly release beside the NAIRU pull and the noise, with the same
+/// arithmetic; read by the release under `unemployment_adjustment_half_life`
+/// and by the engine to seed the impulse.
+pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f64) -> f64 {
+    let gdp_effect = (2.0 - growth) * 0.20;
+    let recovery_effect = if (phase == CyclePhase::Expansion || phase == CyclePhase::Recovery)
+        && growth > 1.0
+    {
+        -growth * 0.08
+    } else {
+        0.0
+    };
+    unemployment_trend * 0.3 + gdp_effect + recovery_effect
+}
+
 /// One simulated day of the macro chain.
 ///
 /// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
@@ -588,7 +681,6 @@ pub fn expected_return_spike_at_level(
 /// the "reads `economy.x`, writes `newState.x`" distinction — which is
 /// load-bearing throughout, since many lines read the OLD value after a new
 /// one has been written — impossible to express faithfully.
-
 pub fn update_economy_daily(
     economy: &EconomyState,
     inputs: &DailyInputs,
@@ -733,16 +825,38 @@ pub fn update_economy_daily(
         {
             recovery_effect = -new_state.gdp_growth * 0.08;
         }
-        new_state.unemployment_rate = clamp(
-            economy.unemployment_rate
-                + phase.unemployment_trend * 0.3
-                + gdp_effect
-                + nairu_pull
-                + recovery_effect
-                + random_normal(rng, 0.0, 0.06 * volatility),
-            2.5,
-            15.0,
-        );
+        // `unemployment_adjustment_half_life`: the cyclical drive reaches
+        // the rate through a partial adjustment, so a turn's step in growth
+        // and in the phase's trend builds into the monthly change over
+        // months, as unemployment rises through a real recession. A branch,
+        // so 0.0 is the expression that stood, operation for operation; the
+        // one noise draw is taken in the same place either way.
+        new_state.unemployment_rate = if inputs.unemployment_adjustment == 0.0 {
+            clamp(
+                economy.unemployment_rate
+                    + phase.unemployment_trend * 0.3
+                    + gdp_effect
+                    + nairu_pull
+                    + recovery_effect
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        } else {
+            let drive = unemployment_drive(
+                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth);
+            let impulse = economy.unemployment_impulse
+                + inputs.unemployment_adjustment * (drive - economy.unemployment_impulse);
+            new_state.unemployment_impulse = impulse;
+            clamp(
+                economy.unemployment_rate
+                    + impulse
+                    + nairu_pull
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        };
 
         let unemployment_change = new_state.unemployment_rate - economy.unemployment_rate;
         new_state.jobs_created = clamp(
@@ -1445,21 +1559,52 @@ pub fn update_economy_daily(
     new_state.treasury_yield_10y = clamp(
         current_10y
             + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
-            + random_normal(rng, 0.0, 0.03 * volatility),
+            + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
         0.5,
         12.0,
     );
-    new_state.treasury_yield_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    // THE 2-YEAR. The formula has no noise of its own: between meetings the
+    // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
+    // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
+    // own process, pulled at the 10-year's rate toward the formula, with
+    // its own noise: one more normal on the economy stream, taken only
+    // under the dial.
+    let target_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    let own_2y = inputs.yields.treasury_2y_noise != 0.0;
+    new_state.treasury_yield_2y = if own_2y {
+        clamp(
+            economy.treasury_yield_2y
+                + (target_2y - economy.treasury_yield_2y) * 0.05
+                + random_normal(rng, 0.0, inputs.yields.treasury_2y_noise * volatility),
+            0.0,
+            12.0,
+        )
+    } else {
+        target_2y
+    };
 
     // Bond-stock correlation regime: inflation sets the sign.
-    let prev_mkt_ret = economy.previous_day_market_return;
-    if prev_mkt_ret.abs() > 0.5 {
+    //
+    // WHICH RETURN, AND WHEN. The shipped rule reads the PREVIOUS session's
+    // closing-minute return behind a 0.5 per cent gate, which that return
+    // never crosses, so the rule has never fired and the curve has no
+    // stock-bond correlation at all. `flight_to_quality_day` 1.0 reads THIS
+    // session's index return (the step runs after the close, so the yield
+    // it writes is the session's own close) with no gate: the relation is
+    // linear in the move.
+    let (prev_mkt_ret, ftq_gate) = if inputs.yields.flight_to_quality_day != 0.0 {
+        (inputs.market_day_return_pct, 0.0)
+    } else {
+        (economy.previous_day_market_return, 0.5)
+    };
+    let ftq_gain = inputs.yields.flight_to_quality_gain;
+    if prev_mkt_ret.abs() > ftq_gate {
         let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
             // Positive correlation: stocks down, yields up.
-            -prev_mkt_ret * 0.02
+            -prev_mkt_ret * ftq_gain
         } else if economy.inflation_rate < 3.0 {
             // Flight to quality.
-            prev_mkt_ret * 0.02
+            prev_mkt_ret * ftq_gain
         } else {
             0.0
         };
@@ -1468,12 +1613,74 @@ pub fn update_economy_daily(
             0.5,
             12.0,
         );
-        new_state.treasury_yield_2y =
-            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15;
+        new_state.treasury_yield_2y = if own_2y {
+            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
+        } else {
+            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+        };
+    }
+
+    // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
+    // central-bank meeting, so fair value's discount rate, and an IG bond
+    // priced off it, sat still for six weeks at a time. Off zero it moves
+    // every session by the 10-year's move and by the meeting formula's own
+    // VIX slope (2 bp a point, times the cycle phase's multiplier) on the
+    // session's VIX change: increments, so a scenario's write to the level
+    // survives, and the next meeting re-anchors the level to the formula.
+    //
+    // A PINNED VIX TAKES NO VIX TERM. When a caller wrote the VIX before the
+    // session (`Scenario().hold(vix=...)`, `pin_macro(vix=...)`), the close
+    // moves it by the VIX law's reversion from the written level, and the
+    // next morning's pin writes the level back without passing through here.
+    // Charging the close's move to the credit spread then ratchets it: under
+    // hold(vix=45) the corporate yield fell 2.81 -> 2.42 per cent in five
+    // sessions with the 10-year flat. It also carried the market return,
+    // which moves the close's VIX, into every name's discount rate, so two
+    // worlds that differ only by one agent's trades no longer agreed on the
+    // names it never touched, against the advice to pin the VIX for exactly
+    // that. The 10-year's own move still passes through, and with it the
+    // flight to quality (`flight_to_quality_day`), which reads the session's
+    // index return: that is a second path from one agent's flow to names it
+    // never touched, which a VIX pin does not hold (`tca.Execution.moved`).
+    //
+    // A PINNED CORPORATE YIELD HOLDS THROUGH THE CLOSE. A caller that wrote
+    // the level wants that level for the session and the night after it,
+    // which is what every preset without the daily move gives: without this
+    // the close moved it by the 10-year's change and the next morning's pin
+    // put it back, so it was never the pinned value overnight.
+    if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
+        let cycle_spread_multiplier = match economy.cycle_phase {
+            CyclePhase::Contraction => 2.8,
+            CyclePhase::Trough => 3.5,
+            CyclePhase::Recovery => 1.4,
+            CyclePhase::Peak => 1.1,
+            CyclePhase::Expansion => 1.0,
+        };
+        let vix_term = if inputs.yields.vix_pinned {
+            0.0
+        } else {
+            0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
+        };
+        let moved = clamp(
+            (new_state.treasury_yield_10y - economy.treasury_yield_10y) + vix_term,
+            -CORPORATE_DAILY_MOVE_CAP,
+            CORPORATE_DAILY_MOVE_CAP,
+        );
+        new_state.corporate_bond_yield = mathx::max(
+            economy.corporate_bond_yield + moved,
+            new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
+        );
     }
 
     // ── Fear/greed ────────────────────────────────────────────────────────
-    let fear_greed_phase_bonus = match economy.cycle_phase {
+    // `fear_greed_published_inputs`: the phase and growth the index reads
+    // are the published ones the engine passes in, the economy's own with
+    // the switch off (`None`), which is the expression that stood.
+    let (fear_greed_phase, fear_greed_growth) = match inputs.fear_greed_published {
+        Some((phase, growth)) => (phase, growth),
+        None => (economy.cycle_phase, economy.gdp_growth),
+    };
+    let fear_greed_phase_bonus = match fear_greed_phase {
         CyclePhase::Expansion => 15.0,
         CyclePhase::Peak => 5.0,
         CyclePhase::Contraction => -25.0,
@@ -1481,7 +1688,7 @@ pub fn update_economy_daily(
         CyclePhase::Recovery => 10.0,
     };
     let market_sentiment = inputs.market_return_pct * 5.0;
-    let fear_greed_base = 50.0 + economy.gdp_growth * 3.0 - (economy.vix - 15.0) * 0.8
+    let fear_greed_base = 50.0 + fear_greed_growth * 3.0 - (economy.vix - 15.0) * 0.8
         + fear_greed_phase_bonus
         + market_sentiment;
     new_state.fear_greed_index = clamp(
@@ -1714,6 +1921,52 @@ mod vix_level_identity {
             assert_eq!(vix_after(&inputs), want, "moved at sigma = {}",
                        i as f64 * 0.05);
         }
+    }
+
+    /// `unemployment_adjustment`: off, a monthly release moves the rate by
+    /// the whole drive and leaves the impulse alone; on, it moves it by the
+    /// impulse, which closes that share of its gap to the drive, and every
+    /// other term (the NAIRU pull, the noise) is the one that stood.
+    #[test]
+    fn the_unemployment_release_adds_the_partially_adjusted_impulse() {
+        let mut e = economy();
+        e.cycle_phase = CyclePhase::Contraction;
+        e.gdp_growth = -1.5;
+        e.unemployment_impulse = 0.05;
+        // A month start.
+        let off_inputs = DailyInputs { game_day: DAYS_PER_MONTH, ..Default::default() };
+        let off = update_economy_daily(&e, &off_inputs, &mut Silent(0.5));
+        assert_eq!(off.unemployment_impulse, 0.05);
+        let a = 0.2;
+        let on_inputs = DailyInputs {
+            game_day: DAYS_PER_MONTH,
+            unemployment_adjustment: a,
+            ..Default::default()
+        };
+        let on = update_economy_daily(&e, &on_inputs, &mut Silent(0.5));
+        // Growth is set before unemployment reads it, the same in both.
+        assert_eq!(on.gdp_growth, off.gdp_growth);
+        // The drive the release read, from the two rises: off moves the rate
+        // by drive + pull + noise and on by impulse + pull + noise, with
+        // impulse = 0.05 + a (drive - 0.05), so the gap is (1 - a)(drive - 0.05).
+        let gap = (off.unemployment_rate - e.unemployment_rate)
+            - (on.unemployment_rate - e.unemployment_rate);
+        let drive = 0.05 + gap / (1.0 - a);
+        assert!((on.unemployment_impulse - (0.05 + a * (drive - 0.05))).abs() < 1e-12);
+        // It is the drive `unemployment_drive` gives on the release's growth
+        // (read before the day's later adjustments to growth, hence the
+        // tolerance): the contraction's trend and Okun's law on a growth
+        // near -4 per cent, about 1.3 pp a month, of which a fifth arrives.
+        let phase = phase_characteristics_for(e.cycle_phase, false);
+        let approx = unemployment_drive(phase.unemployment_trend, e.cycle_phase, on.gdp_growth);
+        assert!((drive - approx).abs() < 0.01, "{drive} {approx}");
+        assert!(drive > 1.0 && on.unemployment_rate - off.unemployment_rate < -0.9);
+        // Off a month start nothing moves either way.
+        let mid = DailyInputs { game_day: DAYS_PER_MONTH + 1, unemployment_adjustment: a,
+                                ..Default::default() };
+        let quiet = update_economy_daily(&e, &mid, &mut Silent(0.5));
+        assert_eq!(quiet.unemployment_impulse, 0.05);
+        assert_eq!(quiet.unemployment_rate, e.unemployment_rate);
     }
 
     /// And the mirror: at the identity it is read, monotonically, because
@@ -2115,8 +2368,8 @@ mod vix_return_shape {
 /// THE FEAR RESPONSE MUST KEEP RISING, and for nine shipped presets it
 /// does not.
 ///
-/// The defect this module makes permanent was measured on 2026-09-06
-/// (`programme/results/wsa17-result.md` in the design repository).
+/// The defect this module makes permanent was measured on 2026-09-06 and
+/// is recorded in the project's unpublished design notes.
 /// `vix_target_shock_cap` is documented as a boundary condition, but at
 /// pt-v16 — [`crate::params::DEFAULT_PRESET_NAME`] — it is 45.0 against a
 /// `vix_return_gain` of 17.0, so it BINDS at 2.647 per cent of session
@@ -2147,7 +2400,7 @@ mod vix_return_shape {
 /// anything this market produces.
 ///
 /// **What made that affordable is one level down.** The cap was not an
-/// arbitrary brake: `loopgain-report.md` §8.2 measured the index realising
+/// arbitrary brake: the loop-gain run measured the index realising
 /// four to five times the variance `V_t` priced above
 /// `crisis_vix_threshold`, so the fear arm had nothing balancing it there
 /// and the cap was holding the divergence. `market::index_var` now prices
@@ -2166,7 +2419,7 @@ mod fear_response_shape {
     /// chosen, and past it the property is not asserted, because past it
     /// there is no real number to compare with.
     ///
-    /// That bucket is the one `wsa17-result.md` records as MISMATCHED: on
+    /// That bucket is the one the 2026-09-06 measurement records as MISMATCHED: on
     /// a pt-v16 arm the model put 336 of 7,560 sessions past -5 per cent
     /// against the tape's 22 of 8,959, at an index sd of 3.135 against
     /// about 1.1. The mismatch makes the bucket useless for comparing a
@@ -2302,8 +2555,8 @@ mod fear_response_shape {
     /// and the up side is CONCAVE in the move and is PROPORTIONAL to the
     /// level, `level_exponent_up` being exactly -1.
     ///
-    /// The measurement is `programme/results/vix-dynamics.md` section 2,
-    /// on 8,959 sessions of ^GSPC: `g_dn` = +0.49 +/- 0.12 with
+    /// The measurement is a fit of the VIX's session change to the index
+    /// return, on 8,959 sessions of ^GSPC: `g_dn` = +0.49 +/- 0.12 with
     /// P(g > 0) = 1.000, `p_dn` = 1.44 +/- 0.08, `g_up` = -0.85 +/- 0.12,
     /// `p_up` = 0.60 +/- 0.04. The level-blind power form is refused
     /// against the free form at F = 118 on 2 dof and the linear
@@ -2471,7 +2724,7 @@ mod fear_response_shape {
             let mut earliest: Option<(f64, f64)> = None;
             for &vix in LEVELS {
                 if let Some(at) = flattens_at(&p, vix) {
-                    if earliest.map_or(true, |(best, _)| at < best) {
+                    if earliest.is_none_or(|(best, _)| at < best) {
                         earliest = Some((at, vix));
                     }
                 }
@@ -2583,7 +2836,7 @@ mod fear_response_shape {
     /// 2026-09-14, which is how the level-blind spellings survived the
     /// preset that replaced them.
     ///
-    /// `programme/results/vix-dynamics.md` section 2.4 measures it without
+    /// A second reading of the same tape measures it without
     /// a fit, as conditional medians of `dV` by level tertile within an
     /// `|r|` bin: in the 2 to 3 per cent bin the tape's down response is
     /// 3.32 at a VIX of 18.8, 2.52 at 24.5 and 2.17 at 32.1, and its up
@@ -2606,7 +2859,7 @@ mod fear_response_shape {
             p.vix_return_level_exponent > 0.0,
             "the down response no longer falls with the level. The tape puts g_dn at \
              +0.49 +/- 0.12 with P(g > 0) = 1.000 and refuses the level-blind power form \
-             at F = 118 on 2 dof (vix-dynamics.md 2.1, 2.2)."
+             at F = 118 on 2 dof."
         );
         assert!(
             p.vix_return_level_exponent_up < 0.0,
@@ -2861,7 +3114,7 @@ mod fear_response_shape {
     /// reach a state at the ceiling is `8.83 * 15^1.4483 * 181.3295^-0.4483`
     /// = 43.333 points. So the ceiling is reachable at all only from a
     /// settled read-back above `C - 43.333 + E[S|C]` = 134.74 at sigma 1
-    /// and 133.20 at sigma 3. `ceiling-and-omega.md` section 0 records the
+    /// and 133.20 at sigma 3. The ceiling's derivation records the
     /// headroom as "any settled read-back below 168.74"; that number is the
     /// condition evaluated at the top of the GRADED range, `r` = 6.39,
     /// where the fear term is 12.59, and the domain the update admits runs
@@ -3106,7 +3359,7 @@ mod fear_response_shape {
         }
         // NON-STICKINESS ON THE MAP, which is what the ceiling's `derived`
         // kind rests on. 75.9 is the highest settled `implied(181.3295)` of
-        // the three rosters in `ceiling-and-omega.md` section 4, and this
+        // the three rosters the ceiling's derivation measured, and this
         // drives the largest session the clamp admits from it.
         let worst = vix_after_one_session(c, 75.9, 2.5, -p.vix_return_clamp);
         assert!(
@@ -3127,7 +3380,7 @@ mod fear_response_shape {
     /// read-back at a pin, the level the map sustains when the VIX is held
     /// at `C`; it is not the read-back the state carries on a variance
     /// excursion, and the condition is sufficient for the settled map only
-    /// (`ceiling-derivation-independent.md` sections 8 to 14). What the
+    /// (an independent re-derivation of the ceiling shows this). What the
     /// record shows at gain 0 is a clip rate of zero over 30,240 seed-days
     /// with a highest VIX of 73.9 and a highest read-back of 93.2.
     ///
@@ -3141,8 +3394,8 @@ mod fear_response_shape {
     /// neither preempts the other at any pair of values. A cap under the
     /// ceiling in fact makes the ceiling LESS sticky, which is the
     /// direction the ceiling's own derivation wants.
-    /// `programme/results/ceiling-and-omega.md` sections 2 and 3 establish
-    /// that and `provenance.py` carries the withdrawal.
+    /// The ceiling's derivation establishes that, and `provenance.py`
+    /// carries the withdrawal.
     ///
     /// AND THE CONDITION STOPPED CHOOSING A VALUE, which is the honest
     /// state of the derivation. Re-solved on the shipping law the smallest

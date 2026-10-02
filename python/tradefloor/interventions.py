@@ -72,7 +72,10 @@ new: 115.00` rather than restating the recipe.
 That read and that write have to be in the same units, or a `multiply` by 1.4
 is a factor of a hundred out on a plausible-looking trajectory. Both go
 through `Engine.macro_fields`, which is the read side of `pin_macro` in
-`pin_macro`'s own denomination, for exactly this reason.
+`pin_macro`'s own denomination, for exactly this reason. One field reads
+elsewhere: under `gdp_publication_lag`, `macro_fields["gdp_growth"]` is the
+last quarter's published mean, so a `macro.growth` operation reads the true
+growth from `state_snapshot()["economy"]`, in the same units.
 """
 
 from __future__ import annotations
@@ -83,7 +86,8 @@ import json
 import struct
 from typing import Any, Callable, Sequence
 
-from ._core import Engine, ValidationError
+from ._arith import ordered_sum
+from ._core import Engine, ModelParams, ValidationError
 
 #: The version of the YAML/JSON scenario document this build reads. A document
 #: that names a newer one is refused rather than read on a best-effort basis:
@@ -134,6 +138,10 @@ ROLES = ("shock", "transmission")
 CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
 
 _RATE_MIN, _RATE_MAX = -0.05, 0.50
+#: GDP growth's floor, lower than the rates' because growth falls further:
+#: -7.4 per cent year on year in 2020Q2, -10.0 annualised in 1958Q1 (FRED
+#: GDPC1). The engine's `units::check_rate` carries the same number.
+_GROWTH_MIN = -0.10
 
 
 class ScenarioValidationError(ValidationError):
@@ -161,7 +169,7 @@ class Target:
     """
 
     __slots__ = ("name", "units", "note", "numeric", "restores", "_read",
-                 "_write", "_check", "_domain", "_format")
+                 "_write", "_check", "_domain", "_format", "_bound")
 
     def __init__(self, name: str, *, units: str, note: str,
                  read: Callable[[Engine], Any],
@@ -169,7 +177,8 @@ class Target:
                  check: Callable[[str, Any], None],
                  format: Callable[[float], str],
                  domain: Callable[[Any], str | None] | None = None,
-                 numeric: bool = True, restores: bool = True) -> None:
+                 numeric: bool = True, restores: bool = True,
+                 bound: Callable[[Engine, Any], Any] | None = None) -> None:
         self.name = name
         self.units = units
         self.note = note
@@ -192,9 +201,22 @@ class Target:
         self._check = check
         self._domain = domain
         self._format = format
+        self._bound = bound
 
     def read(self, engine: Engine) -> Any:
         return self._read(engine)
+
+    def bound(self, engine: Engine, value: Any) -> Any:
+        """The COMPUTED value this engine's model can hold, before it is
+        written.
+
+        One target has a bound today, the VIX: a relative write can compute
+        a level above :data:`VIX_CEILING` (x3.5 on a VIX already at 55), a
+        level no shipped chain produces. The ceiling is written instead, and
+        the firing records it, so the trail says what the market traded at.
+        Every other target returns the value unchanged.
+        """
+        return value if self._bound is None else self._bound(engine, value)
 
     def write(self, engine: Engine, value: Any) -> None:
         self._write(engine, value)
@@ -234,6 +256,42 @@ class Target:
         return f"Target({self.name!r}, units={self.units!r})"
 
 
+#: The `macro_fields` keys whose published value can lag the one `pin_macro`
+#: writes, each with the snapshot's economy key that holds the true value.
+#: Under `gdp_publication_lag` `macro_fields["gdp_growth"]` is the last
+#: quarter released, and under `cycle_publication_lag` `macro_fields["cycle"]`
+#: is the phase as published; the engine's own state carries the true ones.
+TRUE_MACRO_FIELDS: dict[str, str] = {"gdp_growth": "gdp_growth",
+                                     "cycle": "cycle_phase"}
+
+
+def true_macro_value(engine: Engine, field: str) -> Any:
+    """The TRUE value of one `macro_fields` key, in `pin_macro`'s units.
+
+    The value `pin_macro` writes. For the keys in :data:`TRUE_MACRO_FIELDS`
+    it is read from ``state_snapshot()["economy"]``, since `macro_fields`
+    reports the published one; for every other key the two are the same
+    field and it is read from `macro_fields`. With both publication lags at
+    0.0 the two reads agree to the bit: the growth is the core's percent
+    over 100 either way, and the phase is the same name.
+    """
+    if field not in TRUE_MACRO_FIELDS:
+        return engine.macro_fields[field]
+    value = engine.state_snapshot()["economy"][TRUE_MACRO_FIELDS[field]]
+    return value / 100.0 if field == "gdp_growth" else value
+
+
+def true_macro_fields(engine: Engine) -> dict[str, Any]:
+    """`Engine.macro_fields` with the true value in place of each published
+    one that can lag (:data:`TRUE_MACRO_FIELDS`): what the economy holds,
+    rather than what has been released of it."""
+    fields = dict(engine.macro_fields)
+    for field in TRUE_MACRO_FIELDS:
+        if field in fields:
+            fields[field] = true_macro_value(engine, field)
+    return fields
+
+
 def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any], None]]:
     """Read and write one pinnable macro field, in `pin_macro`'s own units.
 
@@ -242,9 +300,14 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit.
+    field for field and unit for unit, with two exceptions: `gdp_growth` and
+    `cycle` read the true values from the snapshot, because under
+    `gdp_publication_lag` and `cycle_publication_lag` `macro_fields` reports
+    the published ones.
     """
     def read(engine: Engine) -> Any:
+        if field in TRUE_MACRO_FIELDS:
+            return true_macro_value(engine, field)
         return engine.macro_fields[field]
 
     def write(engine: Engine, value: Any) -> None:
@@ -315,6 +378,48 @@ def _range_check(low: float, high: float, what: str) -> Callable[[str, Any], Non
     return check
 
 
+#: The highest VIX the shipped model's chain holds: its ``vix_ceiling``,
+#: 181.33 on pt-v20. The close clamps the VIX to it, so a level above it is
+#: one the model never produces. A scenario that sets or holds one is
+#: refused where it is written, and one that computes one writes this
+#: ceiling (:meth:`Target.bound`). A hold at 1000 made the index NaN on 9 of
+#: 30 seeds, and holds of 400 to 800 turned a fear shock into a rally.
+#: Presets before pt-v19 clamp at 80, and a scenario may still take them to
+#: this level for the days it holds it, as it always could.
+VIX_CEILING: float = ModelParams.from_preset().vix_ceiling
+
+
+def _vix_check(operation: str, value: Any) -> None:
+    """A VIX `set` above zero and at most the ceiling; any multiplier."""
+    _finite(value)
+    if operation == "multiply":
+        _positive_multiplier(value)
+    elif operation == "set" and not 0 < value <= VIX_CEILING:
+        raise ScenarioValidationError(
+            f"set {value} is not a VIX level a shipped model holds. It is "
+            f"above zero and at most {VIX_CEILING:g}, the default preset's "
+            f"vix_ceiling, which its close clamps the VIX to."
+        )
+
+
+def _domain_vix(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or value != value:
+        return f"{value!r} is not a number"
+    if value <= 0:
+        return f"{value:g} is not a positive VIX level"
+    if value > VIX_CEILING:
+        return (f"{value:g} is above {VIX_CEILING:g}, the highest VIX the "
+                f"model's chain holds")
+    return None
+
+
+def _bound_vix(engine: Engine, value: Any) -> Any:
+    """A computed VIX, at most :data:`VIX_CEILING`."""
+    if not isinstance(value, (int, float)) or value != value:
+        return value
+    return VIX_CEILING if value > VIX_CEILING else value
+
+
 def _finite_check(operation: str, value: Any) -> None:
     """Any finite number, including zero and negatives.
 
@@ -365,13 +470,17 @@ def _domain_between(low: float, high: float, what: str) -> Callable[[Any], str |
     return domain
 
 
-def _domain_rate(value: Any) -> str | None:
+def _domain_rate(value: Any, low: float = _RATE_MIN) -> str | None:
     if not isinstance(value, (int, float)) or value != value:
         return f"{value!r} is not a number"
-    if not _RATE_MIN <= value <= _RATE_MAX:
+    if not low <= value <= _RATE_MAX:
         return (f"{value:g} is outside the plausible rate band "
-                f"[{_RATE_MIN}, {_RATE_MAX}]")
+                f"[{low}, {_RATE_MAX}]")
     return None
+
+
+def _domain_growth(value: Any) -> str | None:
+    return _domain_rate(value, _GROWTH_MIN)
 
 
 def _domain_finite(value: Any) -> str | None:
@@ -440,11 +549,13 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
                        check: Callable[[str, Any], None],
                        format: Callable[[float], str],
                        domain: Callable[[Any], str | None] | None = None,
-                       numeric: bool = True, restores: bool = True) -> Target:
+                       numeric: bool = True, restores: bool = True,
+                       bound: Callable[[Engine, Any], Any] | None = None,
+                       ) -> Target:
     read, write = _macro(field)
     return Target(name, units=units, note=note, read=read, write=write,
                   check=check, format=format, domain=domain, numeric=numeric,
-                  restores=restores)
+                  restores=restores, bound=bound)
 
 
 #: Every intervention target this build supports, and nothing else.
@@ -461,7 +572,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the twelve targets are
+#: Read them before believing a scenario. Four of the fifteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -525,10 +636,12 @@ _register(_make_macro_target(
         "the lever widens the spread of outcomes far more than it moves the "
         "median. Held for the whole run it measures +4.46% median with a "
         "+62.7% best, which is also a dispersion effect rather than a "
-        "crisis. Use a duration for a crisis."
+        "crisis. Use a duration for a crisis. A level is at most 181.33, "
+        "pt-v20's vix_ceiling: a `set` above it is refused, and a relative "
+        "write that computes one writes 181.33, which the firing records."
     ),
-    check=_positive_check("VIX level"), format=_points,
-    domain=_domain_positive("VIX level"),
+    check=_vix_check, format=_points,
+    domain=_domain_vix, bound=_bound_vix,
 ))
 
 _register(_make_macro_target(
@@ -553,7 +666,9 @@ _register(_make_macro_target(
         "The business-cycle phase. Immediate through the universe's stress "
         "intensity, and it retargets GDP growth, unemployment and the "
         "recession probability at the next monthly step. `set` only: a "
-        "phase is a name. Measured, set to contraction: -3.61%."
+        "phase is a name. Measured, set to contraction: -3.61%. It sets "
+        "the true phase at once; under `cycle_publication_lag` "
+        "`macro_fields[\"cycle\"]` reports it that many sessions later."
     ),
     check=_cycle_check, format=str, numeric=False,
 ))
@@ -587,6 +702,104 @@ _register(Target(
     # for the rest of the run.
     restores=False,
     format=_shares,
+))
+
+# -- the treasury curve: what the rate indices read -------------------------
+
+_register(_make_macro_target(
+    "macro.treasury_2y", "treasury_yield_2y",
+    units="fraction",
+    note=(
+        "The 2-year treasury yield. The UST2Y rate index reads it and nothing in "
+        "the equity market does. On pt-v20, the default from 0.8.5, the 2-year "
+        "is its own process, closing 5% of its gap to 0.85 x the policy rate + "
+        "0.15 x the 10-year each session, so a write decays over weeks; on "
+        "every preset through pt-v19 the chain recomputes it as that formula at "
+        "every close, so a write lasts until that close. Hold it, or move the "
+        "policy rate with it. Measured, +200bp at day 50 on Universe.random(20, "
+        "seed=101, bonds=True), median of seeds 3, 11 and 29 against the same "
+        "seed unshocked: UST2Y -3.71% on the day under either shape on both "
+        "presets; by day 120 +0.14% as an impulse and -3.16% held on pt-v20 "
+        "(pt-v19 +0.05% and -3.17%). Equities 0.00% either way."
+    ),
+    check=_rate_check(), format=_pp, domain=_domain_rate,
+))
+
+_register(_make_macro_target(
+    "macro.treasury_10y", "treasury_yield_10y",
+    units="fraction",
+    note=(
+        "The 10-year treasury yield. UST10Y reads it, and IGCORP reads it with "
+        "the credit spread on top. It closes 5% of its gap to the policy rate "
+        "plus a term premium every session, so an impulse decays over weeks "
+        "unless the policy rate moves with it, which is what "
+        "scenarios/curve_shock.yml does. Equities see it only when the "
+        "central bank's next meeting, or the daily credit floor, carries it "
+        "into the corporate yield. Measured, +200bp: UST10Y -15.32% and "
+        "IGCORP -12.01% on the day; by day 120 +0.49% and +1.40% as an "
+        "impulse and -14.76% and -9.62% held, with the median equity "
+        "-0.01% and -3.12%."
+    ),
+    check=_rate_check(), format=_pp, domain=_domain_rate,
+))
+
+def _earnings_read(engine: Engine) -> tuple[float, ...]:
+    eps, _, _ = engine.fundamentals()
+    return tuple(eps)
+
+
+def _earnings_write(engine: Engine, values: Sequence[float]) -> None:
+    # Book value moves by each name's own factor, so a loss-maker, valued off
+    # book, falls with the rest rather than being the one name an earnings
+    # recession cannot touch. A zero or absent EPS has no factor and keeps
+    # its book.
+    eps, book, growth = engine.fundamentals()
+    new_book = []
+    for old, new, b in zip(eps, values, book):
+        factor = (new / old) if (old == old and old != 0.0 and new == new) else 1.0
+        new_book.append(b * factor if b == b else b)
+    engine.set_fundamentals(list(values), new_book, list(growth))
+
+
+def _earnings_check(operation: str, value: Any) -> None:
+    _finite(value)
+    if operation != "multiply":
+        raise ScenarioValidationError(
+            "market.earnings takes `multiply` only: it scales every company's "
+            "reported earnings (and book, by the same factor), and a level or a "
+            "shift in dollars means a different thing for every name.")
+    _positive_multiplier(value)
+
+
+_register(Target(
+    "market.earnings",
+    units="earnings per share, every company",
+    note=(
+        "Every company's reported earnings per share, and its book value by "
+        "the same factor, so fair value -- earnings times the target multiple, "
+        "or book for a loss-maker -- scales with it and every price follows "
+        "from the next tick. The channel a recession's earnings fall takes: "
+        "S&P reported earnings fell 29, 54, 92 and 33 per cent around the "
+        "1990, 2001, 2008 and 2020 recessions (operating earnings about 40 in "
+        "2008-09), and held in 2022, whose fall came through rates and "
+        "multiples. Use a `ramp` for a fall over quarters, a `hold` at "
+        "`multiply 1` to stay at the low, and a `ramp` back. Nothing in the "
+        "engine writes these figures back, so the pre-shock earnings are "
+        "restored when the LAST window on this target closes: keep the "
+        "windows contiguous, or the earnings jump back in the gap. Measured "
+        "on pt-v20, the certified roster, one seed: x0.6 over 60 sessions "
+        "took the index -39.6 per cent against the same seed without it. "
+        "Inert unless a scenario names it. `multiply` only."
+    ),
+    read=_earnings_read,
+    write=_earnings_write,
+    check=_earnings_check,
+    # Any finite figure: a loss-maker's earnings are negative before the
+    # shock and after it.
+    domain=lambda v: None if isinstance(v, (int, float)) and v == v and abs(v) != float("inf")
+    else f"{v!r} is not a finite earnings figure",
+    restores=False,
+    format=_plain,
 ))
 
 # -- the chain levers: real, and slower than a short study ------------------
@@ -639,7 +852,7 @@ _register(_make_macro_target(
         "which pt-v14 measured on its own at +0.36%. `macro.cycle` is the "
         "lever a downturn scenario actually wants."
     ),
-    check=_rate_check(), format=_pp, domain=_domain_rate,
+    check=_rate_check(low=_GROWTH_MIN), format=_pp, domain=_domain_growth,
 ))
 
 _register(_make_macro_target(
@@ -756,7 +969,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of twelve names is shorter
+    else gets the whole registry, because a list of fifteen names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:
@@ -1157,7 +1370,7 @@ def apply_operation(operation: str, current: Any, value: Any) -> Any:
 def summarise(value: Any) -> Any:
     """What goes in the audit trail: a scalar, or a column's total."""
     if isinstance(value, tuple):
-        return sum(value)
+        return ordered_sum(value)
     return value
 
 

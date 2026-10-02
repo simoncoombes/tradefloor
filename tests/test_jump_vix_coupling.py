@@ -3,7 +3,7 @@
 Gap: both jump intensities are per-day probabilities that ignore the VIX, so
 the number of jump days in a dead-calm market and in a panic is the same.
 Decomposing the nine attribution components under a pinned VIX measured the
-cost (CALIBRATION-FOLLOWUPS.md §84): jumps carry 40.5% of the variance of a
+cost: jumps carry 40.5% of the variance of a
 market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on 3003 and 2998
 jump day-cells. Real markets cluster their jumps into crises, and this
 also the floor under the calm end of the crisis lever.

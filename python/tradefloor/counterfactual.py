@@ -99,37 +99,50 @@ engine, which `portfolio.py` was written to allow. Within a step every agent
 sees the same prices and the same book, each over its own portfolio; they are
 asked in label order, they execute in label order against the shared book,
 and every portfolio's pending flow is merged per ticker and reaches the
-market as the one ``order_flow`` argument of the one session. Agents see each
+market as the one ``fills`` argument of the one session. Agents see each
 other's impact and never each other's orders, and :meth:`Scenario.apply` runs
 once a day for the whole cohort.
 
-## Agents do not take each other's liquidity within a step
+## Whether agents take each other's liquidity depends on the model
 
-:meth:`Portfolio.execute` prices a fill through ``book.sweep_cost``, which
-walks the levels to compute an average and removes nothing from the book. So
-two agents buying the same name on the same step meet the same ladder and
-fill at the same price, and the ladder after both of them is the ladder
-before either. Measured on this build, on ``Universe.random(8, seed=99)``
-at seed 42, two agents each buying 10,000 shares of the first name at step
-0: both fill at 83.96118999999999 against a first ask level of 9,762 shares
-at 83.96 that neither of them moved, and the sweep walks past that level to
-a worst price of 84.01, so the equality is a claim about a ladder that did
-not move rather than two fills at the top of the book.
-``test_externality.py`` pins it.
+On every preset through pt-v19 they do not. :meth:`Portfolio.execute` prices
+a fill through ``book.sweep_cost``, which walks the levels to compute an
+average and removes nothing from the book. So two agents buying the same
+name on the same step meet the same ladder and fill at the same price, and
+the ladder after both of them is the ladder before either. Measured on this
+build under pt-v19, on ``Universe.random(8, seed=99)`` at seed 42, two
+agents each buying 10,000 shares of the first name at step 0: both fill at
+83.971666 against a first ask level of 9,762 shares at 83.97 that neither of
+them moved, and the sweep walks past that level to a worst price of 84.04,
+so the equality is a claim about a ladder that did not move rather than two
+fills at the top of the book. ``test_externality.py`` pins it. The cohort's
+whole footprint reaches the market once, as the merged ``fills`` of that
+step's session, on its first tick, so an agent meets another's trading from
+the next step on and never inside the step it happened.
 
-The cohort's whole footprint reaches the market once, as the merged
-``order_flow`` of that step's session, so an agent meets another's trading
-from the next step on and never inside the step it happened. Order priority
-within a step is a queue this engine does not run, and a cohort does not
-introduce one.
+Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20,
+the default, has it, each portfolio's orders execute in the engine's book,
+under the portfolio's label (its ``owner``). Label order is then arrival
+order: the second agent meets the book the first left, pays for the levels
+the first took, and can hit the first's resting limit order. Each agent's
+flow reaches the market once, on the next tick, and is attributed to it
+(``Engine.take_impacts``). An agent's value in the ``act()`` mapping may be
+a :class:`tradefloor.Limit` as well as a number: it takes what the book
+holds at its price and the rest waits, in the book's queue with
+``book_resting`` on, until it fills, is replaced by the agent's next
+``Limit`` on that name, or is cancelled with :class:`tradefloor.Cancel`.
+What fills during a session is collected into the agent's portfolio after
+the session, and a live-book row carries it under ``book_fills``.
+``tests/test_order_book_depth.py`` measures both regimes.
 
-Label order therefore decides three things and no price: the order agents are
-asked, the order their flows are summed into the merged mapping, and the
-order :attr:`World.rejected` is written. It is sorted order, so the same
-labels give the same market whatever order the mapping was built in. A dict
-literal's own order would make the market a property of how the caller typed
-it, and with three or more agents on one ticker the summation order is a
-float-associativity question rather than a cosmetic one.
+Label order therefore decides, off, three things and no price: the order
+agents are asked, the order their flows are summed into the merged mapping,
+and the order :attr:`World.rejected` is written; and on, the arrival order at
+the book as well. It is sorted order, so the same labels give the same market
+whatever order the mapping was built in. A dict literal's own order would
+make the market a property of how the caller typed it, and with three or
+more agents on one ticker the summation order is a float-associativity
+question rather than a cosmetic one.
 
 The single-agent form is a one-element cohort under its old names.
 :attr:`World.agent` and :attr:`World.portfolio` read that one element and
@@ -165,12 +178,15 @@ import struct
 from collections import Counter
 from typing import Any, Sequence
 
+from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
-                    ValidationError)
+                    ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
-from .harness import Observation, session_clock
+from .harness import History, Observation, _warm_up, session_clock
 from .manifest import RunManifest, market_digest
-from .portfolio import Portfolio
+from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
+from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
+                      declares_hidden_state)
 from .interventions import Intervention
 from . import noise as _noise
 from .render import Renderer, check_renderer
@@ -179,7 +195,9 @@ from .universe_util import fingerprint_of
 
 #: Macro fields reported in a trace row and in the fork agreement. Not every
 #: field the engine carries -- these are the ones a macro experiment is about,
-#: and a row is meant to be readable.
+#: and a row is meant to be readable. They are read from `macro_state`, so
+#: `cycle` is the phase as published: under `cycle_publication_lag` a trace
+#: row shows a turn that many sessions after it happens.
 MACRO_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "vix",
                 "inflation_rate", "cycle")
 
@@ -234,8 +252,15 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
             "a World takes agent= or agents=, and exactly one of them. "
             "agent=MyAgent() is one trader with one portfolio; "
             "agents={'a': A(), 'b': B()} is a cohort in one market, each "
-            "with its own portfolio and its own leverage limit.")
+            "with its own portfolio, the same starting cash and the same "
+            "leverage limit.")
+    from . import _checks
     if agents is None:
+        # Checked here, before an engine is built. A class passed for an
+        # instance used to fail on the first step with "act() missing 1
+        # required positional argument", which never says a class was
+        # passed.
+        _checks.agent("agent=", agent, specs=False)
         return True, {SOLO: agent}
     if not isinstance(agents, dict):
         raise ValidationError(
@@ -252,6 +277,7 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
                 f"agent labels are non-empty strings, got {key!r}. The "
                 f"empty label is the single-agent form's own, so a cohort "
                 f"cannot take it.")
+        _checks.agent(f"Agent {key!r}", agents[key], specs=False)
     return False, {key: agents[key] for key in sorted(agents)}
 
 
@@ -275,6 +301,20 @@ class World:
     trades cost more through the book, but arbitrarily large is always
     available and "trade everything" wins.
 
+    ``margin_interest`` charges borrowing the policy rate, as
+    :func:`tradefloor.evaluate` and :func:`tradefloor.rank` do, and is on by
+    default from 0.8.5. A portfolio whose cash is negative before a close
+    pays a day's interest on the balance at the policy rate the market
+    publishes that day (:meth:`Portfolio.accrue`). It changes cash, net
+    worth and P&L, never a price: the engine runs the same market either
+    way. It does change what a levered agent is shown, because its
+    observation carries its cash, so a run recorded before 0.8.5 replays
+    only with ``margin_interest=False``, which lets every portfolio the
+    world builds borrow for free and is recorded in :meth:`summary` and the
+    manifest. Cash earns nothing unless the world is given a portfolio built
+    with ``cash_interest=True`` (``world.portfolio = Portfolio(...,
+    cash_interest=True)``).
+
     ``on_refusal`` decides what an agent that cannot produce a decision
     costs. ``"raise"`` is the default and ends the run, which is what this
     class has always done. ``"skip"`` records the refusal, trades nothing
@@ -284,10 +324,30 @@ class World:
 
     ``agents`` is the cohort form, ``{label: agent}``, and exactly one of it
     and ``agent`` is given. Each label gets its own portfolio against this
-    one engine, on the terms the module docstring sets out. ``cash`` and
-    ``max_leverage`` are per agent, so a three-agent cohort starts with
-    three times the capital of a one-agent world and each of the three is
-    capped on its own book.
+    one engine, on the terms the module docstring sets out. Every agent
+    starts with the same cash: ``cash`` is one number, and each label gets
+    that amount in its own account, so a three-agent cohort starts with
+    three times the capital of a one-agent world. There is no per-agent
+    cash; ``cash={"a": 1e6, "b": 5e6}`` is refused. ``max_leverage`` is
+    one setting for the whole cohort, applied to each agent's own book.
+
+    Agents are sandboxed as :func:`tradefloor.evaluate` sandboxes them: each
+    observation carries a read-only market view and a read-only view of the
+    agent's own portfolio, a ``privileged`` agent also gets ``obs.hidden``,
+    and ``trusted_agents=True`` hands over the live engine and portfolio
+    instead. The engine's state hash is compared around every ``act``; a
+    change is recorded in :attr:`tampered` under the agent's label, in its
+    :meth:`summary` and in :meth:`manifest`. See :mod:`tradefloor.sandbox`.
+
+    ``history_days=N`` runs the market for N days, with nobody trading,
+    when the world is built, so an agent that needs a lookback has one at
+    its first decision. ``obs.history`` (:class:`tradefloor.History`) holds
+    those days' bars and published macro, labelled ``-N`` to ``-1``, and
+    adds each day :meth:`run` closes. ``day``, ``step``, the trace and every
+    scenario, pin and intervention count from the first day after the
+    warm-up, while the engine's own day count and its order log include
+    the warm-up, so a manifest or a replay rebuilds it. A fork carries the
+    history. Left at 0, a world is the one it always was.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
@@ -296,7 +356,9 @@ class World:
                  "trace", "pins",
                  "interventions", "applied", "rejected", "fork_step",
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
-                 "_adv", "_ran")
+                 "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
+                 "trusted_agents", "tampered", "history_days", "_history",
+                 "margin_interest")
 
     def __init__(
         self,
@@ -315,17 +377,25 @@ class World:
         model: str | ModelParams | None = None,
         label: str = "",
         on_refusal: str = "raise",
+        trusted_agents: bool = False,
+        history_days: int = 0,
+        margin_interest: bool = True,
     ) -> None:
-        if steps_per_day < 1 or ticks_per_step < 1:
-            raise ValidationError(
-                "steps_per_day and ticks_per_step must be >= 1")
+        from . import _checks
+        steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
+        ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
+        history_days = _checks.history_days(history_days)
+        margin_interest = _checks.flag("margin_interest", margin_interest)
+        _checks.number("cash", cash)
+        macro = _checks.macro(macro)
+        _checks.start_clock(start)
         if on_refusal not in ("raise", "skip"):
             raise ValidationError(
                 f"on_refusal must be 'raise' or 'skip', got {on_refusal!r}")
         self._single, self._agents = _cohort(agent, agents)
         self._frozen: frozenset[str] = frozenset()
         self.label = label
-        self.seed = int(seed)
+        self.seed = check_seed(seed)
         self.universe = list(universe)
         self.macro = macro
         self.model = model
@@ -335,6 +405,16 @@ class World:
         self.ticks_per_step = int(ticks_per_step)
         self.start = start
         self.on_refusal = on_refusal
+        #: Agents are handed the live engine and portfolio rather than the
+        #: read-only views. Recorded in the summary and the manifest.
+        self.trusted_agents = bool(trusted_agents)
+        #: Borrowing pays the policy rate in the portfolios this world
+        #: builds. Recorded in the summary and the manifest when off.
+        self.margin_interest = bool(margin_interest)
+        #: Every step on which agent code changed the engine or a portfolio,
+        #: by label, as the error line that says what changed. Empty on an
+        #: honest run.
+        self.tampered: dict[str, list[str]] = {}
         if on_refusal == "skip":
             # Resolved here rather than on the step it first matters, so a
             # missing integrations layer is a construction error and not a
@@ -358,12 +438,25 @@ class World:
         self._expected: dict[int, list[tuple]] = {}
         self.engine = Engine(seed=self.seed, universe=self.universe,
                              macro_state=macro, model=model)
+        #: How many untraded days ran before day 0. See the class docstring.
+        self.history_days = history_days
+        # What every agent is shown as `obs.history`: the warm-up days,
+        # run here, then each day `run` closes.
+        self._history = History(history_days)
+        _warm_up(self.engine, history_days, steps_per_day=self.steps_per_day,
+                 ticks_per_step=self.ticks_per_step, start=start,
+                 history=self._history)
         # One book per label, against the one engine above. `cash` and
         # `max_leverage` are per agent: a cohort is several traders in one
         # market, and pooling their capital would make each one's limit a
         # function of how many others happened to be in the room.
+        # Each portfolio's orders carry its label in the engine's book; the
+        # single-agent form's empty label is "agent" there, since the book
+        # needs a name to attribute a fill to.
         self._portfolios: dict[str, Portfolio] = {
-            key: Portfolio(cash=self.cash, max_leverage=max_leverage)
+            key: Portfolio(cash=self.cash, max_leverage=max_leverage,
+                           owner=key or "agent",
+                           margin_interest=self.margin_interest)
             for key in self._agents}
         self.trace: list[dict[str, Any]] = []
         self.rejected: list[str] = []
@@ -373,6 +466,13 @@ class World:
         # history, so counting it into both inflates every level in both
         # columns and buries the difference between them.
         self.fork_step: int | None = None
+        #: Each portfolio's net worth at the fork, marked at the prices the
+        #: arm starts from, or None for a root. `summary` measures
+        #: `pnl_since` from it. The last trace row before the fork marks
+        #: before that day's close, and on pt-v20
+        #: `macro_publication_repricing` re-marks every name at the close,
+        #: so a P&L from the row would carry the shared re-mark into the arm.
+        self._fork_worth: dict[str, float] | None = None
         self._day = 0
         self._step = 0
         #: The depth the agent is shown and the participation cap is sized
@@ -385,6 +485,18 @@ class World:
         #: clip that exists to keep an order realistic was sized against a
         #: market that no longer existed.
         self._adv = [instrument.avg_volume for instrument in self.universe]
+        # The mid each name's book showed when the current step opened,
+        # before any agent's order. See `_execute`.
+        self._step_mids: dict[str, float | None] = {}
+        #: The cross-section each step opened on, keyed by step: the prices
+        #: every agent was shown before it acted. A trace row records the
+        #: prices its session LEFT, which is the next step's opening
+        #: cross-section within a day but not across a close: on pt-v20
+        #: `macro_publication_repricing` re-marks every traded name at the
+        #: close, and a scenario's pins before the open re-mark it again.
+        #: Bookkeeping, not state: no row, digest or snapshot carries it.
+        #: `tradefloor.externality` prices fills against it.
+        self._step_opens: dict[int, list[float]] = {}
 
     # -- who is in this world ---------------------------------------------
 
@@ -583,6 +695,7 @@ class World:
 
             for _ in range(self.steps_per_day):
                 prices = _f64(self.engine.prices())
+                self._step_opens[self._step] = prices
                 tick = ((self._step % self.steps_per_day)
                         * self.ticks_per_step)
                 # Every agent is shown the same cross-section and the same
@@ -593,18 +706,28 @@ class World:
                 # other's orders from this one.
                 observed: dict[str, Observation] = {}
                 for label, portfolio in self._portfolios.items():
-                    observed[label] = Observation(
-                        self._step, day, tickers, prices, portfolio,
-                        self.engine, self._adv, self.steps_per_day)
+                    observed[label] = self._observation(
+                        label, portfolio, day, tickers, prices)
                     portfolio.stamp(day, self._step, tick)
 
-                asked = {label: self._ask_agent(label, obs)
-                         for label, obs in observed.items()}
-                # Execution in label order, against the one book. The order
-                # fixes which agent's rejection is written first and nothing
-                # about price: `sweep_cost` reads the ladder and removes
-                # nothing, so both agents meet the same levels and fill at
-                # the same price. See the module docstring.
+                guard = TamperGuard(self.engine, self._portfolios.values(),
+                                    trusted=self.trusted_agents)
+                asked = {}
+                for label, obs in observed.items():
+                    with guard:
+                        asked[label] = self._ask_agent(label, obs)
+                    if guard.tampered:
+                        self.tampered.setdefault(label, []).append(
+                            f"step {self._step}: tampered: agent code "
+                            f"changed or copied the market during act() "
+                            f"({guard.what})")
+                self._step_mids = {}
+                # Execution in label order, against the one book. Off a live
+                # book the order fixes which agent's rejection is written
+                # first and nothing about price: `sweep_cost` reads the
+                # ladder and removes nothing, so both agents meet the same
+                # levels and fill at the same price. On one, it is the
+                # arrival order at the book. See the module docstring.
                 done = {label: self._execute(asked[label][0], tickers, label)
                         for label in self._agents}
 
@@ -613,13 +736,28 @@ class World:
                                    self._step % self.steps_per_day,
                                    self.ticks_per_step),
                     self.ticks_per_step,
-                    order_flow=self._merged_flow())
+                    fills=self._merged_flow())
                 for portfolio in self._portfolios.values():
                     portfolio.clear_flow()
+                # Resting and waiting orders filled during the session,
+                # collected into each portfolio in label order. Nothing is
+                # asked of an engine no portfolio has sent an order to.
+                synced = {label: self._portfolios[label].sync(self.engine)
+                          for label in self._agents}
 
-                self.trace.append(self._row(day, macro, asked, done))
+                self.trace.append(self._row(day, macro, asked, done, synced))
                 self._step += 1
 
+            # A day's interest before the close, as `tradefloor.evaluate`
+            # books it: a negative balance pays the policy rate unless the
+            # portfolio was built with `margin_interest=False`, and a
+            # positive one earns it only with `cash_interest=True`. Until
+            # 0.8.5 a World's own portfolios borrowed for free.
+            for portfolio in self._portfolios.values():
+                portfolio.accrue(self.engine)
+            # The day's bars and published macro for `obs.history`, read
+            # before the close re-marks the prices.
+            self._history._close(self.engine, day)
             if record:
                 self.engine.record(day)
             self.engine.close_market()
@@ -629,8 +767,50 @@ class World:
             self._day += 1
         return self
 
-    def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict
-             ) -> dict[str, Any]:
+    def _observation(self, label: str, portfolio: Portfolio, day: int,
+                     tickers: Sequence[str],
+                     prices: list[float]) -> Observation:
+        """What one agent is shown this step.
+
+        Built per step, because :meth:`fork` swaps the engine and the
+        ``portfolio`` setter swaps a book after construction. Every list is
+        the agent's own copy, so one agent in a cohort cannot edit what the
+        next is shown.
+        """
+        agent = self._agents[label]
+        hidden = (HiddenState(self.engine)
+                  if declares_hidden_state(agent) else None)
+        if self.trusted_agents:
+            return Observation(self._step, day, tickers, prices, portfolio,
+                               self.engine, self._adv, self.steps_per_day,
+                               hidden=hidden, history=self._history)
+        return Observation(self._step, day, list(tickers), list(prices),
+                           PortfolioView(portfolio, self.engine),
+                           MarketView(self.engine), tuple(self._adv),
+                           self.steps_per_day, hidden=hidden,
+                           history=self._history)
+
+    def _agent_access(self) -> dict[str, Any] | None:
+        """How agents were given the market, when that is not the default.
+
+        None for a sandboxed run with no privileged agent and no tampering,
+        so the documents of every such run are the ones they were.
+        """
+        access: dict[str, Any] = {}
+        if self.trusted_agents:
+            access["trusted_agents"] = True
+        if not self.margin_interest:
+            access["margin_interest"] = False
+        hidden = [label for label, agent in self._agents.items()
+                  if declares_hidden_state(agent)]
+        if hidden:
+            access["hidden_state"] = hidden
+        if self.tampered:
+            access["tampered"] = {k: list(v) for k, v in self.tampered.items()}
+        return access or None
+
+    def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict,
+             synced: dict | None = None) -> dict[str, Any]:
         """One trace row, in whichever of the two shapes this world has.
 
         A single-agent row carries the per-agent fields at the top level, in
@@ -649,10 +829,19 @@ class World:
             "step_of_day": self._step % self.steps_per_day,
             "macro": macro,
         }
+        # What resting and waiting orders filled during the session, per
+        # agent, only when any did: a row of a run that never used the book
+        # is the row it always was.
+        book_fills = {label: [
+            {k: f[k] for k in ("ticker", "order_id", "side", "quantity",
+                               "price", "liquidity", "counterparty", "tick")}
+            for f in fills] for label, fills in (synced or {}).items() if fills}
         if not self._single:
             row["prices"] = prices
             row["agents"] = {label: self._fields(label, asked, done)
                              for label in self._agents}
+            for label, fills in book_fills.items():
+                row["agents"][label]["book_fills"] = fills
             return row
         fields = self._fields(SOLO, asked, done)
         for name in ("decision", "orders", "fills", "refused", "unusable"):
@@ -660,6 +849,8 @@ class World:
         row["prices"] = prices
         for name in ("cash", "net_worth", "exposure", "positions"):
             row[name] = fields[name]
+        if SOLO in book_fills:
+            row["book_fills"] = book_fills[SOLO]
         return row
 
     def _fields(self, label: str, asked: dict, done: dict) -> dict[str, Any]:
@@ -688,7 +879,7 @@ class World:
     def _merged_flow(self) -> dict[str, tuple[float, float]]:
         """Every portfolio's pending flow, summed per ticker.
 
-        One `order_flow` argument reaches the session, so a cohort's
+        One `fills` argument reaches the session, so a cohort's
         footprint is what the market sees rather than one agent's. The sum
         runs in label order, which fixes the order the floats are added in.
 
@@ -719,7 +910,7 @@ class World:
         if label in self._frozen:
             return {}, None, None
         agent = self._agents[label]
-        orders, unusable = self._ask(agent, obs)
+        orders, unusable = self._ask(agent, obs, label)
         # No decision on a refused step. The adapter's last decision is
         # still the one BEFORE this step, and reading it here would put a
         # decision the agent did not take into the row that records it not
@@ -727,8 +918,8 @@ class World:
         # comparing exactly this field.
         return orders, unusable, (None if unusable else self._decision(agent))
 
-    def _ask(self, agent: Any,
-             obs: "Observation") -> tuple[dict[str, float], str | None]:
+    def _ask(self, agent: Any, obs: "Observation",
+             label: str = SOLO) -> tuple[dict[str, float], str | None]:
         """The agent's orders for this step, and its refusal if it gave one.
 
         Under ``on_refusal="raise"`` -- the default, and what this module
@@ -748,9 +939,11 @@ class World:
         broken one, and nobody asked for it.
 
         :class:`~tradefloor.integrations.common.DecisionError` only, which
-        covers both stages a decision can fail at -- output that does not
-        parse, and a well-formed order in a symbol this market does not
-        list. A :class:`FrameworkError` is not caught: the call never
+        is output that is not a decision at all. From decision schema 2 a
+        bad action inside a decision (an unknown side, a symbol this market
+        does not list) is refused on its own by the adapter, the rest of
+        the decision trades, and the refusal is in the step's ``decision``
+        rather than here. A :class:`FrameworkError` is not caught: the call never
         completed, the agent produced nothing to judge, and charging it a
         step would score a dropped connection as bad behaviour.
 
@@ -762,16 +955,44 @@ class World:
         and publishes that. Measured, before this exemption: two arms
         replayed against a transcript covering neither, reported twenty
         refusals each, and produced an empty series.
+
+        A return that is not an order mapping, such as a list of pairs or
+        a string, is the same failure seen from this side: output that was
+        never an order. Under ``"raise"`` it raises
+        :class:`ValidationError` naming the step and what came back, and
+        under ``"skip"`` the step is recorded as unusable with that text.
+        An empty list, ``0`` and ``False`` count as bad returns too. Before
+        0.8.5 they passed as a step with no trade, and now a World on the
+        default ends the run on them; return ``None`` or ``{}`` to trade
+        nothing. :func:`tradefloor.evaluate` writes the same text to the
+        scorecard's ``errors``. See :func:`tradefloor.portfolio.order_items`.
         """
         if self.on_refusal == "raise":
-            return agent.act(obs) or {}, None
+            return self._order_mapping(agent.act(obs), obs, label), None
         refusal, miss = _refusal_types()
         try:
-            return agent.act(obs) or {}, None
+            orders = agent.act(obs)
         except miss:
             raise
         except refusal as exc:
             return {}, f"{type(exc).__name__}: {exc}"
+        try:
+            return self._order_mapping(orders, obs, label), None
+        except ValidationError as exc:
+            return {}, f"{type(exc).__name__}: {exc}"
+
+    def _order_mapping(self, orders: Any, obs: "Observation",
+                       label: str) -> dict[Any, Any]:
+        """What ``act()`` returned, as a plain dict, or a
+        :class:`ValidationError` naming the step, and the agent on a
+        cohort, when it is not a mapping.
+        """
+        try:
+            return dict(order_items(orders))
+        except ValidationError as exc:
+            where = (f"step {obs.step}" if self._single
+                     else f"step {obs.step} {label}")
+            raise ValidationError(f"{where}: {exc}") from None
 
     def _decision(self, agent: Any) -> Any:
         """Whatever the agent chose to publish about its last decision."""
@@ -789,7 +1010,10 @@ class World:
         Refused trades are recorded and counted, not raised. Being unable to
         size a position is information about the agent, and information the
         comparison wants -- an arm that hit its leverage cap and an arm
-        that did not are behaving differently.
+        that did not are behaving differently. An entry that is not an
+        order at all, an unknown ticker, a quantity of ``"100"`` or
+        ``True``, NaN, is refused the same way and the rest of the mapping
+        trades (:func:`tradefloor.portfolio.check_order`).
         """
         fills: list[dict] = []
         refused: list[str] = []
@@ -799,12 +1023,33 @@ class World:
         # a label to point at.
         where = f"step {self._step}" if self._single \
             else f"step {self._step} {label}"
-        for ticker, quantity in orders.items():
-            if not quantity:
-                continue
-            book = self.engine.book(ticker)
-            mid = book.mid_price
+        for ticker, value in orders.items():
             try:
+                quantity = check_order(ticker, value)
+                if quantity is None:
+                    continue
+                if isinstance(quantity, Cancel):
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    continue
+                # The step's arrival mid: the book's before ANY agent's order
+                # this step, read once per name. Off a live book every agent
+                # in the step reads the same book, so this is the mid the
+                # agent's own sweep started from, as it always was. On one, a
+                # later agent meets the book an earlier one left, and its
+                # slippage against the step's mid holds the levels the
+                # earlier one took, which is what `externalities` reads as
+                # `levels`. Read inside the `try`, because an unknown ticker
+                # is refused here, and outside it ended the run.
+                if ticker not in self._step_mids:
+                    self._step_mids[ticker] = self.engine.book(ticker).mid_price
+                mid = self._step_mids[ticker]
+                if isinstance(quantity, Limit):
+                    # A new limit on a name replaces the one waiting there.
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    report = portfolio.submit_limit(
+                        self.engine, ticker, quantity.quantity, quantity.price)
+                    fills.append(self._limit_fill(report, mid))
+                    continue
                 fill = portfolio.execute(self.engine, ticker, quantity)
             except (OrderError, ValidationError) as exc:
                 refused.append(f"{ticker}: {exc}")
@@ -820,6 +1065,24 @@ class World:
                 "mid": mid,
             })
         return fills, refused
+
+    @staticmethod
+    def _limit_fill(report: dict, mid: float | None) -> dict:
+        """A limit order's trace entry: what filled at once, and what waits."""
+        sign = 1.0 if report["side"] == "buy" else -1.0
+        notional = ordered_sum(f["quantity"] * f["price"] for f in report["fills"])
+        return {
+            "ticker": report["ticker"],
+            "quantity": sign * report["filled"],
+            "price": report["average_price"],
+            "worst_price": report["worst_price"],
+            "notional": sign * notional,
+            "partial": report["filled"] < report["requested"],
+            "mid": mid,
+            "limit": True,
+            "resting": report["resting"],
+            "order_id": report["order_id"],
+        }
 
     # -- the macro path ---------------------------------------------------
 
@@ -985,6 +1248,10 @@ class World:
                 f"fork labels must be distinct, got {list(labels)}. A "
                 "comparison between two arms with one name is unreadable.")
 
+        # Marked here, on the engine every arm is a copy of, after the
+        # day's close and so after any re-mark the close wrote.
+        worth_at_fork = {key: book.net_worth(self.engine)
+                         for key, book in self._portfolios.items()}
         engines = branch(self.engine, len(labels), universe=self.universe,
                          seed=self.seed, macro=self.macro)
         out: list[World] = []
@@ -1005,12 +1272,24 @@ class World:
                           # "raise" would die on output its sibling counted
                           # and continued past, and the surviving arm's
                           # column would be the only one anybody read.
-                          on_refusal=self.on_refusal)
+                          on_refusal=self.on_refusal,
+                          # Carried for the same reason, and the record of
+                          # tampering with it: both arms share the history
+                          # in which it happened.
+                          trusted_agents=self.trusted_agents,
+                          margin_interest=self.margin_interest)
+            child.tampered = copy.deepcopy(self.tampered)
             child.engine = engine
+            # Built with no warm-up of its own: the arm continues this
+            # world's market, warm-up and all, and its history with it.
+            child.history_days = self.history_days
+            child._history = self._history._copy()
             child._portfolios = {key: copy.deepcopy(book)
                                  for key, book in self._portfolios.items()}
             child._frozen = self._frozen
             child.trace = copy.deepcopy(self.trace)
+            child._step_opens = {step: list(row) for step, row
+                                 in self._step_opens.items()}
             child.rejected = list(self.rejected)
             child.interventions = copy.deepcopy(self.interventions)
             # Interventions are immutable value objects, so the list is
@@ -1024,6 +1303,7 @@ class World:
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
+            child._fork_worth = dict(worth_at_fork)
             out.append(child)
         return out
 
@@ -1057,6 +1337,12 @@ class World:
                 f"{', '.join(self._agents)}.")
         (child,) = self.fork(f"without {label}")
         child._frozen = self._frozen | {label}
+        # Inaction includes the orders it left waiting: a resting order is
+        # an order still being sent. Only an agent that has sent any has
+        # any, so a world that never used the book asks nothing here.
+        portfolio = child._portfolios[label]
+        if portfolio._in_book:
+            portfolio.cancel(child.engine)
         return child
 
     def remove(self, label: str) -> "World":
@@ -1068,19 +1354,18 @@ class World:
 
         :meth:`run` cannot leave one -- it takes whole days and closes each
         one -- so this guards against a caller who reached into ``.engine``
-        and drove it directly. The hazard it closes is documented in
-        `checkpoint.py`: an engine forked between two sessions of the same day
-        carries per-day accumulators the copy has to carry with it, and a copy
-        that misses one restores a market that looks right and prices
-        differently tomorrow. Refusing is cheap; finding that later is not.
+        and drove it directly. The engine itself forks mid-day exactly
+        (``Engine.fork`` and a mid-day ``Checkpoint.of`` continue as the
+        parent does), but a world's copy would go on with :meth:`run`, which
+        opens a new day, and since 0.8.5 the engine refuses to open a day
+        that is already open rather than silently reopening it.
         """
         if self.engine.state_snapshot()["market_open"]:
             raise ValidationError(
-                f"cannot {what} a world with the market open. Days are the "
-                "safe boundary: mid-day state includes the day's own "
-                "accumulators, and a fork taken there restores a market that "
-                "looks correct and diverges from its parent tomorrow. Close "
-                "the day first.")
+                f"cannot {what} a world with the market open. world.run() "
+                "takes whole days, so a world is only stopped mid-day when "
+                "its engine was driven directly. Close the day first with "
+                "world.engine.close_market().")
 
     # -- draw surgery -----------------------------------------------------
 
@@ -1239,7 +1524,8 @@ class World:
         ``rust/src/rng.rs`` (``GameRng::surgery``), which a golden test
         pins. The same ``surgery_seed`` on the same world reproduces the
         window; a different one is a different window; every other stream
-        delivers exactly what it did.
+        delivers exactly what it did. ``surgery_seed``, like the world's
+        own seed, is any integer from 0 to ``2**64 - 1``.
 
         # How the addresses are found
 
@@ -1257,6 +1543,7 @@ class World:
         stream, a log the size of the tape over the window.
         """
         self._refuse_open_market("window")
+        surgery_seed = check_seed(surgery_seed, "surgery_seed")
         first, last = _days(days)
         self._refuse_past(first, "window")
         stream = _noise.DrawAddress(stream, "uniform", 0).check().stream
@@ -1281,7 +1568,7 @@ class World:
         self.surgeries.append({
             "kind": "window", "day": first,
             "step": first * self.steps_per_day, "stream": stream,
-            "days": (first, last), "surgery_seed": int(surgery_seed),
+            "days": (first, last), "surgery_seed": surgery_seed,
             "draws": len(patches)})
         return self
 
@@ -1429,7 +1716,8 @@ class World:
                                         if self.pins or self.applied
                                         else None),
                               strategy=strategy,
-                              label=label or self.label)
+                              label=label or self.label,
+                              agent_access=self._agent_access())
 
     def replay(self) -> Engine:
         """A fresh engine rebuilt from this world's whole log.
@@ -1468,6 +1756,14 @@ class World:
         quantity. ``pnl_since`` is the windowed one, and for a forked arm it
         is the number the experiment is actually about.
 
+        ``pnl_since`` and ``value_at_start`` start from the net worth the
+        window opens on. Measured from the fork step, that is the worth
+        marked at the fork, after the last shared close. From any other
+        step it is the net worth of the trace row before it, which for a
+        step that opens a day marks before the previous close: on pt-v20,
+        where the close re-marks every name, that value misses the
+        re-mark.
+
         ``agent`` names which agent on a cohort, where every number here
         belongs to one of them, and is left out on a single-agent world. A
         cohort summary carries the label back under ``agent``.
@@ -1478,11 +1774,16 @@ class World:
         start = 0 if start is None else max(0, min(start, len(self.trace)))
         window = [_fields_of(row, label) for row in self.trace[start:]]
         fills = [f for row in window for f in row["fills"]]
-        turnover = sum(abs(f["notional"]) for f in fills)
+        turnover = ordered_sum(abs(f["notional"]) for f in fills)
         cost = _execution_cost(fills)
 
-        base = (_fields_of(self.trace[start - 1], label)["net_worth"]
-                if start > 0 else self.cash)
+        if (self._fork_worth is not None and start == self.fork_step
+                and label in self._fork_worth):
+            base = self._fork_worth[label]
+        elif start > 0:
+            base = _fields_of(self.trace[start - 1], label)["net_worth"]
+        else:
+            base = self.cash
         peak, drawdown = base, 0.0
         for row in window:
             peak = max(peak, row["net_worth"])
@@ -1527,6 +1828,16 @@ class World:
             # has always had, and those are pinned.
             out["agent"] = label
             out["frozen"] = label in self._frozen
+        # Only when they say something, for the same reason: a sandboxed,
+        # honest run's summary is the one it always was.
+        if self.trusted_agents:
+            out["trusted_agents"] = True
+        if not self.margin_interest:
+            out["margin_interest"] = False
+        if declares_hidden_state(self._agents[label]):
+            out["uses_hidden_state"] = True
+        if self.tampered.get(label):
+            out["tampered"] = list(self.tampered[label])
         return out
 
     def __repr__(self) -> str:
@@ -1571,12 +1882,14 @@ def _execution_cost(fills: Sequence[dict]) -> float:
     mid and a seller who received below it both add. Fills with no mid --
     a book with one side empty -- are skipped rather than priced against a
     guess, which is the same rule :class:`tradefloor.Execution` applies to a
-    fill it cannot reference.
+    fill it cannot reference. So are entries with no price: a limit order
+    that filled nothing when it was sent is in the trace with
+    ``price=None``, and it has no cost until something fills.
     """
     total = 0.0
     for fill in fills:
         mid = fill.get("mid")
-        if mid is None:
+        if mid is None or fill.get("price") is None:
             continue
         total += fill["quantity"] * (fill["price"] - mid)
     return total
@@ -1986,9 +2299,17 @@ def _shape(decision: Any) -> tuple:
     the same answer. The quantity is in, because "buy 2,000" and "buy 200"
     are different decisions and collapsing them would understate the
     spread this function exists to measure.
+
+    A limit order carries its price as a fourth element, because a buy at
+    the market and a buy at a limit are different answers. A market order
+    stays a three-tuple, so every shape recorded before decision schema 2
+    reads as it did.
     """
-    return tuple(sorted((action.symbol, action.side, float(action.quantity))
-                        for action in decision.actions))
+    return tuple(sorted(
+        (action.symbol, action.side, float(action.quantity))
+        + (() if getattr(action, "limit_price", None) is None
+           else (float(action.limit_price),))
+        for action in decision.actions))
 
 
 def _net(decision: Any) -> float:
@@ -2004,8 +2325,9 @@ def _net(decision: Any) -> float:
 
 def _gross(decision: Any) -> float:
     """Shares moved, both directions."""
-    return float(sum(abs(action.quantity) for action in decision.actions
-                     if action.side.upper() in ("BUY", "SELL")))
+    return float(ordered_sum(abs(action.quantity)
+                             for action in decision.actions
+                             if action.side.upper() in ("BUY", "SELL")))
 
 
 def _lines(prompt: Any) -> list[str]:
@@ -2075,14 +2397,16 @@ class Resample:
         #: large number, it is an undefined one, and `inf` in a published
         #: table reads as a result.
         self.separation = separation
-        #: True when the two inputs are BYTE-IDENTICAL, which means the
-        #: intervention had not reached the agent by this step. Worth
+        #: True when the two inputs are BYTE-IDENTICAL, which means no
+        #: market intervention had reached the agent by this step. Worth
         #: knowing before reading a gap: with identical inputs the two
-        #: arms answered the same question, so the whole gap is agent
-        #: noise and there is no intervention effect in it to find. False
-        #: is the ordinary case, and the differences are in
-        #: :attr:`differing_lines`; anything they cannot account for was
-        #: already refused.
+        #: arms were asked the same question, so there is no market
+        #: effect in the gap to find. What is left is the agent's own
+        #: noise, or a change made on the agent's side, such as a fork
+        #: whose arms run different prompts or models, which this cannot
+        #: see. False is the ordinary case for a market intervention, and
+        #: the differences are in :attr:`differing_lines`; anything they
+        #: cannot account for was already refused.
         self.identical_inputs = identical_inputs
         #: The lines the two inputs differ on, for the write-up. Every one
         #: of them is attributable to an intervened field, because a
@@ -2140,9 +2464,11 @@ class Resample:
                        f"{gap:+.2f} against a noise floor of {floor:.2f} "
                        f"-- {said}")
         if self.identical_inputs:
-            out.append("  the two inputs are identical: the intervention "
-                       "had not reached the agent by this step, so the "
-                       "gap above is agent noise and nothing else")
+            out.append("  the two inputs are identical: anything intervened "
+                       "on had not reached the agent by this step, and the")
+            out.append("  market did not differ. The gap above is the "
+                       "agent's own noise, or a change on the agent's side "
+                       "such as a different prompt")
         else:
             fields = ", ".join(self.intervened_fields) or "nothing"
             out.append(f"  inputs differ in {fields} and nowhere else")
@@ -2511,7 +2837,8 @@ class Invariance:
                 rate = matched / n
                 totals[a].append(rate)
                 totals[b].append(rate)
-        return {k: (sum(v) / len(v) if v else 0.0) for k, v in totals.items()}
+        return {k: (ordered_sum(v) / len(v) if v else 0.0)
+                for k, v in totals.items()}
 
     def most_agreed(self) -> str | None:
         """The renderer key with the STRICTLY highest :meth:`agreement_rate`,

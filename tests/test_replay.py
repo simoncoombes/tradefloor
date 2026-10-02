@@ -2,6 +2,7 @@
 
 import json
 import struct
+import sys
 
 import pytest
 
@@ -22,7 +23,7 @@ def busy_run(seed=99):
         e.open_market()
         e.run_session(9, 30, 3, 60,
                       news=[tradefloor.News(ticker=UNIVERSE[1].ticker, price_impact=0.03)],
-                      order_flow={UNIVERSE[0].ticker: (2e6, 5e5)})
+                      flow_per_tick={UNIVERSE[0].ticker: (2e6, 5e5)})
         e.tick(10, 45, 3)
         e.draw_uniform()
         e.draw_normal()
@@ -64,6 +65,33 @@ def test_replay_reproduces_ground_truth_too():
     for factor in tradefloor.Engine.FACTORS:
         assert arr(replayed.attribution(factor)) == arr(original.attribution(factor))
     assert arr(replayed.column("mispricing_s")) == arr(original.column("mispricing_s"))
+
+
+def test_a_fundamentals_write_is_logged_and_replayed():
+    """`set_fundamentals` is an input, and the log carries it.
+
+    The `market.earnings` scenario target writes through it and nothing in
+    the engine writes the figures back. Until 0.8.5 the log did not record
+    it, so a `RunManifest` of a run under the recalibrated recession replayed
+    the original earnings and failed its own digest. A NaN goes out as None
+    and comes back as NaN, through JSON.
+    """
+    e = tradefloor.Engine(seed=7, universe=UNIVERSE,
+                          macro_state=tradefloor.Macro(federal_funds_rate=0.03))
+    e.open_market()
+    e.run_session(9, 30, 3, 30)
+    eps, book, growth = e.fundamentals()
+    e.set_fundamentals([v * 0.6 for v in eps], book,
+                       [float("nan")] + list(growth[1:]))
+    e.run_session(10, 0, 3, 30)
+    e.close_market()
+    writes = [x for x in e.order_log if x["op"] == "set_fundamentals"]
+    assert len(writes) == 1 and writes[0]["revenue_growth"][0] is None
+    log = json.loads(json.dumps(e.order_log, allow_nan=False))
+    replayed = tradefloor.replay(log, seed=7, universe=UNIVERSE,
+                                 macro=tradefloor.Macro(federal_funds_rate=0.03))
+    assert arr(replayed.prices()) == arr(e.prices())
+    assert replayed.draws_consumed == e.draws_consumed
 
 
 def test_a_log_is_plain_data():
@@ -215,7 +243,7 @@ def test_the_log_round_trips_through_json_by_value():
     engine = tradefloor.Engine(seed=99, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30,
-                       order_flow={engine.tickers[0]: (5000.0, 0.0)},
+                       flow_per_tick={engine.tickers[0]: (5000.0, 0.0)},
                        news=[tradefloor.News(ticker=engine.tickers[1],
                                           price_impact=0.03)])
     engine.tick(10, 0, 3, order_flow={engine.tickers[2]: (100.0, 200.0)})
@@ -232,7 +260,7 @@ def test_a_log_that_has_been_through_json_replays_exactly():
     engine = tradefloor.Engine(seed=99, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30,
-                       order_flow={engine.tickers[0]: (5000.0, 0.0)})
+                       flow_per_tick={engine.tickers[0]: (5000.0, 0.0)})
     engine.close_market()
 
     archived = json.loads(json.dumps(engine.order_log))
@@ -321,3 +349,140 @@ def test_opening_the_day_by_hand_is_the_same_as_letting_it_happen():
 
     assert arr(auto.prices()) == arr(explicit.prices())
     assert auto.order_log == explicit.order_log
+
+
+# -- a received log is bounded before it runs --------------------------------
+#
+# A log is data that may come from somebody else: a RunManifest or a
+# Checkpoint someone sent. Before 0.8.5 was tagged a security review found
+# that `apply_log` passed each session's `ticks` straight to `run_session`,
+# so a 150-byte log naming ticks=10**12 ran for days. `from_json` checks only
+# fingerprints computed from the document's own content, which whoever wrote
+# the file recomputes.
+
+SESSION = dict(op="run_session", hour=9, minute=30, day_of_week=3, ticks=65,
+               volatility=1.0, close_at_end=False)
+
+
+def _refused_at_once(log, match, **kwargs):
+    """Replay on a thread, so a regression fails here instead of hanging."""
+    import threading
+
+    out = {}
+
+    def go():
+        try:
+            tradefloor.replay(log, seed=1, universe=UNIVERSE, **kwargs)
+            out["result"] = "ran"
+        except Exception as exc:                    # noqa: BLE001
+            out["result"] = exc
+
+    t = threading.Thread(target=go, daemon=True)
+    t.start()
+    t.join(30.0)
+    assert not t.is_alive(), f"the replay ran {log!r:.120}"
+    assert isinstance(out["result"], tradefloor.ValidationError), out
+    assert match in str(out["result"])
+
+
+def test_a_session_of_a_trillion_ticks_is_refused_before_it_runs():
+    _refused_at_once([dict(SESSION, ticks=10**12)], "more than the 23,400")
+
+
+def test_many_sessions_in_one_day_add_up_to_the_same_bound():
+    day = [{"op": "open_market"}] + [dict(SESSION, ticks=2_340)] * 11
+    _refused_at_once(day, "log entry 11")
+
+
+def test_a_close_starts_a_new_day_count():
+    replay_module = sys.modules["tradefloor.replay"]
+    cap = replay_module.MAX_TICKS_PER_DAY
+    closed = dict(SESSION, ticks=cap, close_at_end=True)
+    # Two full days, each closed: at the bound and not over it. Checked
+    # without running them, which would take a while.
+    replay_module._check([closed, closed, dict(SESSION, ticks=cap),
+                          {"op": "close_market"}, dict(SESSION, ticks=cap)])
+    with pytest.raises(tradefloor.ValidationError, match="log entry 1"):
+        replay_module._check([dict(SESSION, ticks=cap), {"op": "tick"}])
+
+
+@pytest.mark.parametrize("ticks", [0, -1, 2.5, "65", True, None])
+def test_a_session_whose_ticks_are_not_a_count_is_refused(ticks):
+    _refused_at_once([dict(SESSION, ticks=ticks)], "whole number")
+
+
+def test_a_refused_log_leaves_the_engine_untouched():
+    from tradefloor.replay import apply_log
+
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    before = engine.state_hash(), len(engine.order_log)
+    # The good entries come first, and none of them runs.
+    with pytest.raises(tradefloor.ValidationError, match="unknown operation"):
+        apply_log(engine, [{"op": "open_market"}, SESSION, {"op": "rm -rf"}])
+    assert (engine.state_hash(), len(engine.order_log)) == before
+
+
+def test_a_trusted_long_day_replays_once_the_bound_is_raised():
+    engine = tradefloor.Engine(seed=4, universe=UNIVERSE)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 500)
+    log = engine.order_log
+    with pytest.raises(tradefloor.ValidationError, match="max_ticks_per_day"):
+        tradefloor.replay(log, seed=4, universe=UNIVERSE,
+                          max_ticks_per_day=400)
+    again = tradefloor.replay(log, seed=4, universe=UNIVERSE,
+                              max_ticks_per_day=500)
+    assert again.prices() == engine.prices()
+
+
+def test_a_received_checkpoint_naming_a_huge_session_is_refused():
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(1, record=False)
+    point = tradefloor.Checkpoint.of(engine, universe=UNIVERSE, seed=5)
+    payload = json.loads(point.to_json())
+    for entry in payload["log"]:
+        if entry["op"] == "run_session":
+            entry["ticks"] = 10**12
+    received = tradefloor.Checkpoint.from_json(json.dumps(payload))
+    with pytest.raises(tradefloor.ValidationError, match="23,400"):
+        received.resume()
+
+
+@pytest.mark.parametrize("bad", [dict(hour=99), dict(hour=-1),
+                                 dict(hour=24, minute=0), dict(minute=-1),
+                                 dict(minute=999), dict(day_of_week=9),
+                                 dict(day_of_week=-1), dict(hour=2**62),
+                                 dict(volatility=float("nan")),
+                                 dict(volatility=float("inf")),
+                                 dict(volatility=-1.0)])
+def test_a_session_with_an_impossible_clock_is_refused_and_not_logged(bad):
+    """`tick` refused these and `run_session` ran them, so a log someone
+    sent could carry a session at 99:00 on day 9 with NaN volatility."""
+    args = dict(hour=9, minute=30, day_of_week=3, volatility=1.0)
+    args.update(bad)
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError):
+        engine.run_session(args["hour"], args["minute"], args["day_of_week"],
+                           65, volatility=args["volatility"])
+    assert engine.order_log == []
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.replay([dict(SESSION, **bad)], seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError):
+        engine.run_days(1, hour=args["hour"], minute=args["minute"],
+                        day_of_week=args["day_of_week"],
+                        volatility=args["volatility"])
+    # Refused before the first day opened.
+    assert engine.order_log == []
+
+
+def test_a_session_start_may_carry_its_minute_into_the_hour():
+    """`tick` refuses 09:60, but a session start has always carried the
+    minute, the way the session's own clock does after each tick, and
+    callers write `30 + i * 30`. The clock check keeps that."""
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    engine.run_session(9, 60, 3, 5)
+    engine.run_session(9, 90, 3, 5)
+    engine.run_session(0, 23 * 60 + 59, 3, 5)
+    assert len(engine.order_log) >= 3
+    with pytest.raises(tradefloor.ValidationError):
+        engine.tick(9, 60, 3)

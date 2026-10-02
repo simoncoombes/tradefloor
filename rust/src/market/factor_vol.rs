@@ -39,7 +39,7 @@
 //! # The process
 //!
 //! GARCH(1,1) on the factor's own daily innovation, at daily scale,
-//! reverting to the baseline [`MARKET_FACTOR_SIGMA`]²:
+//! reverting to the baseline [`MARKET_FACTOR_SIGMA`](crate::market::tick::MARKET_FACTOR_SIGMA)²:
 //!
 //! ```text
 //! v' = (1 − α − β)·target + α·ε² + β·v      then clamped to
@@ -107,6 +107,12 @@
 //! transcendentals, no RNG — the same discipline as `garch.rs`, and the
 //! reason GARCH was chosen over an EGARCH/log-variance form, which would
 //! have dragged `exp`/`log` into the daily state chain.
+//!
+//! That is the path every shipped preset takes. Two dials add a
+//! transcendental when a custom vector switches them on: the VIX response
+//! goes through `mathx::pow`, and `market_vol_alpha_excursion` through
+//! `mathx::log`. Both are `mathx`, never the platform's libm, and
+//! `tests/platform_maths.rs` fails on any call that is not.
 
 use crate::mathx;
 
@@ -245,7 +251,7 @@ pub fn update_market_variance(current_variance: f64, day_factor: f64, vix: f64) 
 }
 
 /// [`update_market_variance`] under explicit model parameters (the runtime
-/// seam, CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the
+/// seam). At [`crate::params::PT_V1`] this is the
 /// shipped arithmetic bit for bit: same values, same operations, same
 /// order — the constants above remain the definition of the preset.
 pub fn update_market_variance_with(
@@ -414,7 +420,10 @@ fn alpha_beta_at(
     if k == 0.0 || target_variance <= 0.0 || current_variance <= 0.0 {
         return (alpha, beta);
     }
-    let delta = k * (current_variance / target_variance).ln();
+    // `mathx::log`, not `f64::ln`: a dial a user sets with `with_override`
+    // must not reach the platform's libm, or their custom market stops being
+    // the same market on every platform. No shipped preset reaches this line.
+    let delta = k * mathx::log(current_variance / target_variance);
     // The largest rotation the fourth moment allows, from
     // `3a^2 + a(3g + 2b') + (1.5g^2 + b'g + b'^2) = 0.999` with the rotation
     // b' = beta - d and a = alpha + d substituted; solved numerically by
@@ -425,8 +434,8 @@ fn alpha_beta_at(
     // THE BOUND IS THE SINGLE COMPONENT'S AND THIS FUNCTION RUNS ON THE FAST
     // ONE OF TWO. That is conservative rather than wrong, and the direction
     // matters: the composed mixture's own fourth-moment operator allows a
-    // rotation of about 0.1285 where this allows 0.0280
-    // (`cascade-fourth-moment.md`, design repository), so the clamp binds
+    // rotation of about 0.1285 where this allows 0.0280,
+    // so the clamp binds
     // 4.6 times earlier than the condition it is protecting requires. It
     // refuses rotations the mixture would tolerate and never permits one it
     // would not.
@@ -967,8 +976,7 @@ impl MarketVarianceState {
     /// displaced by a factor whose log has a standard deviation of 1.25 --
     /// and they reach it on their own memory, 48 sessions for the fast
     /// component and 115 for the slow. MEASURED, that transient is the
-    /// whole of the 252/504 gap the level's calibration was read through:
-    /// `programme/results/level-sigma-horizon.md` (design repository).
+    /// whole of the 252/504 gap the level's calibration was read through.
     ///
     /// # The recursion, and why it is the MEAN one
     ///
@@ -1012,7 +1020,7 @@ impl MarketVarianceState {
     /// three sessions on the shipped 0.27 -- so it is two orders of
     /// magnitude faster than the states being warmed and is already at
     /// whatever the opening asks for; treating it as a constant over the
-    /// warm-up is the same approximation `level-sigma-horizon.md` 2.2 makes
+    /// warm-up is the same approximation that measurement makes
     /// in the other direction when it treats the LEVEL as flat over the
     /// engine's relaxation.
     ///
@@ -1159,7 +1167,7 @@ mod tests {
         // And the boundedness that replaces it: ordered bounds, and a
         // quiet-run fixed point ABOVE the floor, so the floor is a
         // worst-case guarantee rather than a regime.
-        assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE);
+        const { assert!(MARKET_VOL_FLOOR_MULTIPLE < MARKET_VOL_CEILING_MULTIPLE) };
         let quiet_fixed_point = (1.0 - persistence) / (1.0 - MARKET_VOL_BETA);
         assert!(
             quiet_fixed_point > MARKET_VOL_FLOOR_MULTIPLE,

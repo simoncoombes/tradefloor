@@ -97,6 +97,17 @@ def buy(payload):
             "rationale": "contract"}
 
 
+def rest(payload):
+    """A limit buy a tenth under the bid, which waits in the book."""
+    asset = payload["assets"][0]
+    return {"actions": [{"symbol": asset["symbol"], "side": "BUY",
+                         "quantity": 500,
+                         "limit_price": round(asset["best_bid"] * 0.9, 2)}]}
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
 # -- the ground-truth boundary ----------------------------------------------
 
 #: Everything on the engine that a trader in this market could not know.
@@ -146,6 +157,9 @@ PAYLOAD_KEYS = {"step", "day", "steps_per_day", "macro", "assets", "portfolio"}
 ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "best_bid", "best_ask", "avg_daily_volume", "max_order_shares",
               "position", "fundamentals"}
+PORTFOLIO_KEYS = {"cash", "net_worth", "leverage", "max_leverage",
+                  "buying_power", "open_orders"}
+OPEN_ORDER_KEYS = {"symbol", "side", "limit_price", "remaining"}
 
 
 def check_the_payload_reaches_the_framework(make_agent):
@@ -201,6 +215,55 @@ def check_multiple_orders_execute_in_one_decision(make_agent):
     world.run(days=1)
     assert world.portfolio.positions["TECH_A"].quantity > 0
     assert world.portfolio.positions["DEFENSIVE_A"].quantity < 0
+
+
+def check_a_bad_action_is_refused_on_its_own(make_agent):
+    """Decision schema 2. A HOLD carrying a quantity is refused, the BUY
+    beside it trades, the decision record says why, and under evaluate the
+    refusal is a line in the scorecard's errors."""
+    def respond(payload):
+        return {"actions": [
+            {"symbol": "DEFENSIVE_A", "side": "HOLD", "quantity": 500},
+            {"symbol": "TECH_A", "side": "BUY", "quantity": 2000},
+        ]}
+
+    agent = make_agent(respond)
+    world = make_world(agent)
+    world.run(days=1)
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+    assert "DEFENSIVE_A" not in world.portfolio.positions
+    refused = world.trace[0]["decision"]["refused"]
+    assert len(refused) == 1 and "HOLD" in refused[0]["reason"], refused
+
+    card = tf.evaluate({"a": make_agent(respond)}, seed=7,
+                       universe=universe(), days=1)["a"]
+    assert card.trades == 1
+    assert [e for e in card.errors if "refused action" in e], card.errors
+
+
+def check_a_limit_order_waits_and_cancel_withdraws_it(make_agent):
+    """Decision schema 2. An adapter sends what a Python agent sends: a
+    limit buy a tenth under the bid waits in the book, the next decision
+    sees it in `portfolio.open_orders`, and CANCEL withdraws it."""
+    def respond(payload):
+        asset = payload["assets"][0]
+        if payload["portfolio"]["open_orders"]:
+            return {"actions": [{"symbol": asset["symbol"],
+                                 "side": "CANCEL"}]}
+        if payload["day"] == 0:
+            return {"actions": [{"symbol": asset["symbol"], "side": "BUY",
+                                 "quantity": 400,
+                                 "limit_price": round(
+                                     asset["best_bid"] * 0.9, 2)}]}
+        return {"actions": []}
+
+    world = make_world(make_agent(respond))
+    world.run(days=1)
+    waiting = world.portfolio.open_orders(world.engine)
+    assert len(waiting) == 1 and waiting[0]["remaining"] == 400, waiting
+    world.run(days=1)
+    assert world.portfolio.open_orders(world.engine) == []
+    assert not world.rejected, world.rejected
 
 
 def check_invalid_output_is_refused(make_agent):
@@ -450,6 +513,84 @@ def check_a_recorded_decision_can_be_asked_again(make_agent):
     assert ci.parse_decision(again).actions
 
 
+#: What a probe of pt-v20 read through the live engine: the economy block's
+#: true business-cycle state, and the earnings cycle's anticipated offset,
+#: which jumps at the true turn. None may reach a framework or an adapter.
+HIDDEN_ECONOMY = ("cycle_phase", "months_in_current_phase",
+                  "phase_gdp_target", "recession_probability",
+                  "earnings_cycle", "earnings_anticipation")
+
+
+class _Holds:
+    """Hands the harness's observation to the adapter and keeps it, so the
+    check can ask what the adapter was holding."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.held = []
+
+    def act(self, obs):
+        self.held.append(obs)
+        return self.inner.act(obs)
+
+
+def check_the_adapter_is_handed_the_market_view(make_agent):
+    """Run by a harness, an adapter holds the read-only market view, as any
+    agent does: the true phase, the economy block, the anticipation, the
+    mispricing, the fundamentals, fork and writes are refused, and prices,
+    the book, the published macro and its own account are served. Under
+    ``trusted_agents=True`` it holds the live engine. The framework's
+    payload is the same bytes either way, so a recorded observation keeps
+    its shape and its replay key."""
+    from tradefloor.sandbox import MarketView, PortfolioView, SandboxError
+
+    payloads = {}
+    held = {}
+    for trusted in (False, True):
+        seen = []
+
+        def respond(payload, seen=seen):
+            seen.append(json.dumps(payload, sort_keys=True))
+            return {"actions": []}
+
+        holder = _Holds(make_agent(respond))
+        card = tf.evaluate({"a": holder}, seed=7, universe=universe(),
+                           days=1, trusted_agents=trusted)["a"]
+        assert not card.errors, card.errors
+        assert seen, "the framework was never consulted"
+        payloads[trusted] = seen
+        held[trusted] = holder.held[0]
+
+    assert payloads[False] == payloads[True], (
+        "the sandbox changed what the framework is shown")
+    for text in payloads[False]:
+        macro = json.loads(text)["macro"]
+        assert set(macro) == set(ci.OBSERVABLE_MACRO)
+        assert not set(macro) & set(HIDDEN_ECONOMY)
+
+    obs = held[False]
+    assert isinstance(obs.engine, MarketView)
+    assert isinstance(obs.portfolio, PortfolioView)
+    for name in ("state_snapshot", "earnings_anticipation", "fundamentals",
+                 "fork", "set_fundamentals", "pin_macro", "macro_table",
+                 "attribution", "truth", "model_params"):
+        with pytest.raises(SandboxError):
+            getattr(obs.engine, name)
+    with pytest.raises(SandboxError):
+        obs.engine.column("mispricing_s")
+    with pytest.raises(SandboxError):
+        obs.portfolio.execute
+    assert obs.engine.prices() and obs.engine.column("volume")
+    assert obs.book(obs.tickers[0]).mid_price is not None
+    assert not set(obs.engine.macro_fields) & set(HIDDEN_ECONOMY)
+    assert obs.engine.macro_state.cycle
+    assert obs.portfolio.net_worth(obs.engine) > 0
+
+    live = held[True]
+    assert isinstance(live.engine, tf.Engine)
+    assert "cycle_phase" in live.engine.state_snapshot()["economy"]
+
+
 #: Every check above, in one list, so an adapter's test file can parametrize
 #: over it and a failure names the clause that broke.
 CONTRACT_CHECKS = [
@@ -458,6 +599,8 @@ CONTRACT_CHECKS = [
     check_a_hold_produces_no_order,
     check_an_empty_action_list_is_a_no_op,
     check_multiple_orders_execute_in_one_decision,
+    check_a_bad_action_is_refused_on_its_own,
+    check_a_limit_order_waits_and_cancel_withdraws_it,
     check_invalid_output_is_refused,
     check_a_framework_envelope_is_refused_not_scored_as_hold,
     check_a_framework_exception_is_surfaced_with_its_chain,
@@ -471,6 +614,7 @@ CONTRACT_CHECKS = [
     check_the_replay_key_derives_from_the_input,
     check_the_state_carries_an_instructions_identity,
     check_the_adapter_never_reaches_ground_truth,
+    check_the_adapter_is_handed_the_market_view,
 ]
 
 
@@ -521,6 +665,11 @@ FIXTURE_KINDS = {
     "langgraph": "recordings",
     "openai_agents": "recordings",
     "pydantic_ai": "recordings",
+    #: Example 08's live Claude run, read by `tests/test_examples.py`. A
+    #: transcript, but its answers are the example's own `Decision` and not
+    #: the adapters' decision schema, so the recordings checks below would
+    #: refuse every one of them.
+    "claude": "example-08-recording",
     #: Four `b4fix7` certification panels, thirty seeds each, read by
     #: `tests/test_scoring_conformance.py`. Per-seed scoring rows, not a
     #: transcript.
@@ -622,10 +771,14 @@ def test_a_committed_recording_is_valid_without_its_framework(path):
     # A recording that declares nothing must still parse cleanly, so the
     # five fixtures committed before this are unchanged by it, and a
     # corrupted response in any of them still fails here.
+    #
+    # From decision schema 2 a bad action is refused on its own, so a
+    # response counts here when the validator refuses it whole OR refuses
+    # any action in it.
     refused = 0
     for entry in transcript.entries:
         try:
-            ci.parse_decision(entry["response"])
+            refused += bool(ci.parse_decision(entry["response"]).refused)
         except ci.DecisionError:
             refused += 1
     declared = transcript.meta.get("unparseable_responses", 0)
@@ -750,9 +903,49 @@ def test_the_serializer_emits_exactly_the_allowlisted_keys():
                                        history=agent.history)
     assert set(payload) == PAYLOAD_KEYS
     assert set(payload["assets"][0]) == ASSET_KEYS
-    assert set(payload["portfolio"]) == {"cash", "net_worth",
-                                         "gross_exposure", "max_leverage",
-                                         "buying_power"}
+    assert set(payload["portfolio"]) == PORTFOLIO_KEYS
+
+
+def test_the_payload_is_frozen_for_the_lts_line():
+    """The observation payload is frozen for 0.8.x (docs/SUPPORT.md). This
+    pins its version and every key at every level, so an edit that adds,
+    removes or renames one fails here and has to bump
+    OBSERVATION_SCHEMA_VERSION, update SUPPORT.md and re-record every
+    fixture, on purpose."""
+    assert ci.OBSERVATION_SCHEMA_VERSION == "1"
+    assert ci.DECISION_SCHEMA_VERSION == "2"
+    world = World(seed=7, universe=universe(), agent=callable_agent(rest),
+                  cash=1_000_000.0, max_leverage=2.0)
+    world.run(days=1)
+    payload = ci.serialize_observation(_observation(world))
+    assert set(payload) == PAYLOAD_KEYS
+    assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
+    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["portfolio"]) == PORTFOLIO_KEYS
+    assert payload["portfolio"]["open_orders"], "the limit order did not rest"
+    assert set(payload["portfolio"]["open_orders"][0]) == OPEN_ORDER_KEYS
+    support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
+    for key in sorted(PAYLOAD_KEYS | ASSET_KEYS | PORTFOLIO_KEYS
+                      | OPEN_ORDER_KEYS):
+        assert f"`{key}`" in support, (
+            f"docs/SUPPORT.md does not list the frozen payload key {key!r}")
+
+
+def test_the_payload_shows_the_agents_waiting_limit_orders():
+    """An agent that sends limit orders has to see which are still waiting
+    before it sends another or a CANCEL. The payload lists them from the
+    agent's own portfolio, with the remaining size and the price."""
+    world = World(seed=7, universe=universe(), agent=callable_agent(rest),
+                  cash=1_000_000.0, max_leverage=2.0)
+    world.run(days=1)
+    obs = _observation(world)
+    waiting = ci.serialize_observation(obs)["portfolio"]["open_orders"]
+    engine_side = world.portfolio.open_orders(world.engine)
+    assert [(o["symbol"], o["side"], o["limit_price"], o["remaining"])
+            for o in waiting] == [
+        (o["ticker"], o["side"].upper(), o["limit_price"], o["remaining"])
+        for o in engine_side]
+    assert waiting[0]["symbol"] == "TECH_A" and waiting[0]["side"] == "BUY"
 
 
 def test_the_payload_states_the_binding_size_limit():
@@ -790,6 +983,35 @@ def test_an_unconstrained_portfolio_is_stated_honestly():
     book = ci.serialize_observation(_observation(world))["portfolio"]
     assert book["max_leverage"] is None
     assert book["buying_power"] is None
+
+
+def test_the_payload_leverage_is_a_multiple_of_net_worth():
+    """`portfolio.leverage` in the payload is Portfolio.leverage(), a
+    multiple of net worth. Until 0.8.5 it was called `gross_exposure`,
+    the name of the Portfolio method that returns dollars, and a reviewer
+    read 2.02 as dollars. It was renamed when the payload was frozen."""
+    world = make_world(callable_agent(buy))
+    world.run(days=2)
+    obs = _observation(world)
+    book = ci.serialize_observation(obs)["portfolio"]
+    portfolio, engine = world.portfolio, world.engine
+    assert portfolio.gross_exposure(engine) > 10_000, "nothing was bought"
+    assert "gross_exposure" not in book
+    assert book["leverage"] == pytest.approx(portfolio.leverage(engine))
+    assert book["leverage"] < 10
+    assert book["buying_power"] == pytest.approx(
+        2.0 * portfolio.net_worth(engine) - portfolio.gross_exposure(engine))
+    doc = " ".join(ci.serialize_observation.__doc__.split())
+    assert "``leverage`` is gross exposure as a multiple of net worth" in doc
+
+
+def test_return_5d_spans_five_days():
+    """HISTORY_STEPS held 30 rows, so once the buffer was full return_5d
+    spanned 29 step intervals, 4.83 days at six steps a day. It holds 31
+    now, so the five-day return starts exactly five days back."""
+    assert ci.HISTORY_STEPS == 6 * 5 + 1
+    rows = [[100.0 + k] for k in range(ci.HISTORY_STEPS)]
+    assert ci._window_return(rows, 0, 30) == pytest.approx(130.0 / 100.0 - 1)
 
 
 def test_the_macro_allowlist_is_the_librarys_own():
@@ -888,31 +1110,15 @@ def test_a_fenced_answer_is_accepted():
     ("no json here at all", "no JSON object"),
     ("[1, 2, 3]", "got a list"),
     ({"actions": "TECH_A"}, "must be a list"),
-    ({"actions": [5]}, "not an object"),
-    ({"actions": [{"side": "BUY", "quantity": 1}]}, "no usable 'symbol'"),
-    ({"actions": [{"symbol": "A", "side": "SHORT", "quantity": 1}]},
-     "not one of"),
-    ({"actions": [{"symbol": "A", "side": "BUY", "quantity": -5}]},
-     "negative"),
-    ({"actions": [{"symbol": "A", "side": "BUY", "quantity": "lots"}]},
-     "not a number"),
-    ({"actions": [{"symbol": "A", "side": "HOLD", "quantity": 10}]}, "HOLD"),
-    ({"actions": [{"symbol": "A", "side": "BUY", "quantity": 1},
-                  {"symbol": "A", "side": "SELL", "quantity": 1}]},
-     "more than once"),
     ({"actions": [], "rationale": 5}, "must be a string"),
     (42, "cannot read a decision"),
     (None, "cannot read a decision"),
     ({}, "no 'actions' key"),
     ({"messages": ["done"], "next": "end"}, "no 'actions' key"),
     ('{"rationale": "thinking"}', "no 'actions' key"),
-    ({"actions": [{"symbol": "A", "side": "BUY", "quantity": 1,
-                   "stop_loss": 90}]}, "unknown fields"),
-    ({"actions": [{"symbol": "A", "side": "BUY", "quantity": 1,
-                   "time_in_force": "GTC"}]}, "no stop loss"),
     ({"actions": [], "confidence": 0.9}, "unknown keys"),
 ])
-def test_invalid_output_is_refused_readably(raw, match):
+def test_output_that_is_not_a_decision_is_refused_readably(raw, match):
     with pytest.raises(ci.DecisionError, match=match):
         ci.parse_decision(raw)
 
@@ -933,36 +1139,165 @@ def test_an_absent_actions_key_is_refused_and_an_empty_list_is_not():
     assert ci.parse_decision({"actions": None}).actions == []
 
 
-def test_an_order_type_other_than_market_is_refused_by_name():
-    """Tradefloor executes market sweeps only. A limit instruction silently
-    downgraded to market would execute a trade the agent priced as
-    protected, so the refusal has to name the missing capability."""
-    with pytest.raises(ci.DecisionError, match="market sweeps only"):
-        ci.parse_decision({"actions": [{"symbol": "A", "side": "BUY",
-                                        "quantity": 1,
-                                        "order_type": "limit"}]})
-    accepted = ci.parse_decision(
-        {"actions": [{"symbol": "A", "side": "BUY", "quantity": 1,
-                      "order_type": "MARKET"}]})
-    assert accepted.actions[0].quantity == 1.0
+#: Actions that break a rule, each beside one good action. Under decision
+#: schema 1 any of them refused the whole decision; under schema 2 the bad
+#: action is refused on its own with its reason, and the good one trades.
+_GOOD = {"symbol": "B", "side": "BUY", "quantity": 7}
+BAD_ACTIONS = [
+    (5, "not an object"),
+    ({"side": "BUY", "quantity": 1}, "no usable 'symbol'"),
+    ({"symbol": "A", "side": "SHORT", "quantity": 1}, "not one of"),
+    ({"symbol": "A", "side": "BUY", "quantity": -5}, "negative"),
+    ({"symbol": "A", "side": "BUY", "quantity": "lots"}, "not a number"),
+    ({"symbol": "A", "side": "BUY", "quantity": float("inf")}, "non-finite"),
+    ({"symbol": "A", "side": "HOLD", "quantity": 10}, "HOLD"),
+    ({"symbol": "A", "side": "CANCEL", "quantity": 10}, "CANCEL"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "stop_loss": 90},
+     "unknown fields"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "time_in_force": "GTC"},
+     "no stop loss"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "order_type": "stop"},
+     "order types are"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "order_type": "limit"},
+     "no limit_price"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "order_type": "market",
+      "limit_price": 99.0}, "ask for different orders"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "limit_price": 0},
+     "above zero"),
+    ({"symbol": "A", "side": "BUY", "quantity": 1, "limit_price": True},
+     "above zero"),
+    ({"symbol": "A", "side": "HOLD", "limit_price": 99.0},
+     "Only a BUY or a SELL"),
+]
 
 
-def test_a_limit_price_is_refused_by_name():
-    with pytest.raises(ci.DecisionError, match="no limit orders"):
-        ci.parse_decision({"actions": [{"symbol": "A", "side": "BUY",
-                                        "quantity": 1,
-                                        "limit_price": 99.5}]})
+@pytest.mark.parametrize("bad,match", BAD_ACTIONS,
+                         ids=[m for _, m in BAD_ACTIONS])
+def test_a_bad_action_is_refused_on_its_own(bad, match):
+    decision = ci.parse_decision({"actions": [bad, dict(_GOOD)],
+                                  "rationale": "two actions"})
+    assert decision.actions == [ci.Action("B", "BUY", 7)], (
+        "the good action must survive its neighbour's refusal")
+    assert len(decision.refused) == 1
+    refusal = decision.refused[0]
+    assert refusal["action"] == ci.jsonable(bad)
+    assert re.search(match, refusal["reason"]), refusal["reason"]
+    assert refusal["reason"].startswith("action 0 ")
+    assert decision.as_dict()["refused"] == decision.refused
+    assert decision.rationale == "two actions"
+
+
+def test_every_action_naming_a_duplicated_symbol_is_refused():
+    """Two instructions for one symbol have no defined order, so both are
+    refused, and a third action on another symbol still trades."""
+    decision = ci.parse_decision({"actions": [
+        {"symbol": "A", "side": "BUY", "quantity": 1},
+        dict(_GOOD),
+        {"symbol": "A", "side": "SELL", "quantity": 1}]})
+    assert decision.actions == [ci.Action("B", "BUY", 7)]
+    assert [r["action"]["side"] for r in decision.refused] == ["BUY", "SELL"]
+    assert all("also names" in r["reason"] for r in decision.refused)
+
+
+def test_a_decision_whose_every_action_is_refused_trades_nothing_and_says_why():
+    decision = ci.parse_decision(
+        {"actions": [{"symbol": "A", "side": "SHORT", "quantity": 1}]})
+    assert decision.actions == []
+    assert len(decision.refused) == 1
+    assert "refused" in repr(decision)
+
+
+def test_a_decision_with_a_refused_action_round_trips_through_a_recording():
+    """An adapter that records a parsed Decision (LangGraph's default
+    output parser returns one) writes `jsonable(decision)`. That has to be
+    what the model wrote, so the replay refuses the same action for the
+    same reason. Written as `as_dict()`, it carried a `refused` key the
+    validator refuses as unknown, and the whole replayed decision failed."""
+    text = json.dumps({"actions": [
+        {"symbol": "A", "side": "short", "quantity": 1},
+        {"symbol": "B", "side": "buy", "quantity": 7}], "rationale": "r"})
+    live = ci.parse_decision(text)
+    recorded = json.dumps(ci.jsonable(live))
+    replayed = ci.parse_decision(recorded)
+    assert replayed == live
+    assert replayed.refused == live.refused and len(live.refused) == 1
+    assert ci.parse_decision(live) == live
+    assert ci.jsonable(ci.Decision([ci.Action("B", "BUY", 7)])) == {
+        "actions": [{"symbol": "B", "side": "BUY", "quantity": 7.0}],
+        "rationale": ""}
+
+
+def test_resample_tells_a_limit_order_from_a_market_order():
+    """`resample` and `flip` compare decisions by shape. A buy at the
+    market and a buy at a limit are different answers, so a limit order's
+    shape carries its price, and a market order's shape is the three-tuple
+    it always was."""
+    from tradefloor.boundary import describe_shape
+    from tradefloor.counterfactual import _shape
+
+    market = ci.parse_decision({"actions": [dict(_GOOD)]})
+    limit = ci.parse_decision({"actions": [dict(_GOOD, limit_price=9.5)]})
+    assert _shape(market) == (("B", "BUY", 7.0),)
+    assert _shape(limit) == (("B", "BUY", 7.0, 9.5),)
+    assert describe_shape(_shape(limit)) == "BUY 7 B limit 9.5"
+    cancel = ci.parse_decision({"actions": [{"symbol": "B",
+                                             "side": "CANCEL"}]})
+    assert describe_shape(_shape(cancel)) == "CANCEL B"
+
+
+def test_a_clean_decision_has_the_schema_1_dict():
+    """A decision with nothing refused carries no `refused` key, so
+    `compare` and every recorded trace read as they did."""
+    decision = ci.parse_decision({"actions": [dict(_GOOD)]})
+    assert decision.as_dict() == {"actions": [
+        {"symbol": "B", "side": "BUY", "quantity": 7.0}], "rationale": ""}
+
+
+def test_a_limit_order_is_accepted():
+    """Decision schema 2: an action with a limit_price is a tf.Limit. The
+    order_type may say 'limit' as well, in any case, or be left out."""
+    for extra in ({"limit_price": 99.5},
+                  {"limit_price": 99.5, "order_type": "limit"},
+                  {"limit_price": 99.5, "order_type": "LIMIT"}):
+        decision = ci.parse_decision({"actions": [
+            {"symbol": "A", "side": "SELL", "quantity": 3, **extra}]})
+        assert decision.refused == []
+        action = decision.actions[0]
+        assert action == ci.Action("A", "SELL", 3, 99.5)
+        assert action.as_dict() == {"symbol": "A", "side": "SELL",
+                                    "quantity": 3.0, "limit_price": 99.5}
+    market = ci.parse_decision({"actions": [
+        {"symbol": "A", "side": "BUY", "quantity": 1,
+         "order_type": "MARKET"}]})
+    assert market.actions[0].limit_price is None
+
+
+def test_cancel_is_a_side():
+    decision = ci.parse_decision({"actions": [{"symbol": "A",
+                                               "side": "cancel"}]})
+    assert decision.actions == [ci.Action("A", "CANCEL")]
+    assert decision.actions[0].signed() == 0.0
+
+
+def test_the_action_constructor_refuses_a_bad_limit_price():
+    with pytest.raises(ci.DecisionError, match="above zero"):
+        ci.Action("A", "BUY", 5, float("nan"))
+    with pytest.raises(ci.DecisionError, match="BUY or SELL"):
+        ci.Action("A", "CANCEL", 0, 10.0)
 
 
 def test_the_json_schema_matches_the_validator():
     schema = ci.decision_schema()
     action = schema["properties"]["actions"]["items"]
     assert action["properties"]["side"]["enum"] == list(ci.SIDES)
+    assert action["properties"]["order_type"]["enum"] == list(ci.ORDER_TYPES)
+    assert action["properties"]["limit_price"]["exclusiveMinimum"] == 0
     assert action["additionalProperties"] is False, (
         "additionalProperties: false is what stops a schema-bound model "
-        "emitting order_type or limit_price")
+        "emitting stop_loss or time_in_force")
     assert schema["additionalProperties"] is False
     assert action["properties"]["quantity"]["minimum"] == 0
+    assert set(action["properties"]) == set(ci._ACTION_KEYS)
 
 
 def test_the_schema_is_a_fresh_copy_per_call():
@@ -982,121 +1317,140 @@ def test_the_pydantic_model_is_built_on_demand_and_round_trips():
     assert ci.decision_model() is model, (
         "two adapters asking for the model must get the same class, or an "
         "isinstance check between them means nothing")
-    instance = model(actions=[{"symbol": "A", "side": "buy", "quantity": 3}],
+    instance = model(actions=[{"symbol": "A", "side": "buy", "quantity": 3},
+                              {"symbol": "B", "side": "SELL", "quantity": 2,
+                               "order_type": "LIMIT", "limit_price": 9.5}],
                      rationale="why")
     decision = ci.parse_decision(instance.model_dump())
-    assert decision.actions == [ci.Action("A", "BUY", 3.0)]
+    assert decision.actions == [ci.Action("A", "BUY", 3.0),
+                                ci.Action("B", "SELL", 2.0, 9.5)]
+    assert decision.refused == []
     with pytest.raises(pydantic.ValidationError):
         model(actions=[{"symbol": "A", "side": "BUY", "quantity": 1,
-                        "order_type": "limit"}])
+                        "stop_loss": 90}])
 
 
 #: One corpus, driven through BOTH validation paths. Schema equality was
 #: necessary and not sufficient: parse_decision once silently dropped a
 #: stop_loss the model refused, the schemas still agreed, and the schema
-#: comparison passed -- so a LangGraph adapter on the dict path and a
-#: PydanticAI adapter binding the model would have validated the same
-#: output differently, two arms of one study running two contracts.
-#: Behavioural agreement is asserted here, on the inputs themselves. The
-#: three tolerated spellings excluded from the corpus are pinned in
-#: `test_the_documented_asymmetries_between_the_two_paths`.
+#: comparison passed. Behavioural agreement is asserted here, on the inputs
+#: themselves.
+#:
+#: Three outcomes on the dict path: "ok" (accepted whole), "action" (the
+#: decision is accepted and the bad action refused on its own) and
+#: "decision" (refused whole). The model path refuses what the JSON Schema
+#: rules out, which a strict-mode provider cannot emit anyway, and accepts
+#: the rules only code can state (a limit order with no price, HOLD with a
+#: quantity, a symbol named twice), so that parse_decision refuses that one
+#: action instead of the framework failing the whole output.
 _ACT = {"symbol": "A", "side": "BUY", "quantity": 5}
 DECISION_CORPUS = [
-    ("valid-buy", {"actions": [dict(_ACT)]}, True),
+    ("valid-buy", {"actions": [dict(_ACT)]}, "ok", True),
     ("valid-lowercase-side",
-     {"actions": [{"symbol": "A", "side": "sell", "quantity": 5}]}, True),
-    ("valid-hold", {"actions": [{"symbol": "A", "side": "HOLD"}]}, True),
-    ("valid-empty-actions", {"actions": []}, True),
-    ("valid-rationale", {"actions": [], "rationale": "waiting"}, True),
+     {"actions": [{"symbol": "A", "side": "sell", "quantity": 5}]}, "ok",
+     True),
+    ("valid-hold", {"actions": [{"symbol": "A", "side": "HOLD"}]}, "ok",
+     True),
+    ("valid-cancel", {"actions": [{"symbol": "A", "side": "CANCEL"}]}, "ok",
+     True),
+    ("valid-limit", {"actions": [dict(_ACT, limit_price=99.0)]}, "ok", True),
+    ("valid-limit-order-type",
+     {"actions": [dict(_ACT, order_type="limit", limit_price=99.0)]}, "ok",
+     True),
+    ("valid-market-order-type",
+     {"actions": [dict(_ACT, order_type="market")]}, "ok", True),
+    ("valid-nulls",
+     {"actions": [dict(_ACT, order_type=None, limit_price=None)]}, "ok",
+     True),
+    ("valid-empty-actions", {"actions": []}, "ok", True),
+    ("valid-rationale", {"actions": [], "rationale": "waiting"}, "ok", True),
     ("negative-quantity",
-     {"actions": [{"symbol": "A", "side": "BUY", "quantity": -5}]}, False),
+     {"actions": [{"symbol": "A", "side": "BUY", "quantity": -5}]},
+     "action", False),
     ("unknown-side",
-     {"actions": [{"symbol": "A", "side": "SHORT", "quantity": 5}]}, False),
+     {"actions": [{"symbol": "A", "side": "SHORT", "quantity": 5}]},
+     "action", False),
     ("empty-symbol",
-     {"actions": [{"symbol": "", "side": "BUY", "quantity": 5}]}, False),
+     {"actions": [{"symbol": "", "side": "BUY", "quantity": 5}]},
+     "action", False),
+    ("stop-loss", {"actions": [dict(_ACT, stop_loss=90.0)]}, "action",
+     False),
+    ("take-profit", {"actions": [dict(_ACT, take_profit=120.0)]}, "action",
+     False),
+    ("time-in-force", {"actions": [dict(_ACT, time_in_force="GTC")]},
+     "action", False),
+    ("unknown-order-type", {"actions": [dict(_ACT, order_type="stop")]},
+     "action", False),
+    ("zero-limit-price", {"actions": [dict(_ACT, limit_price=0.0)]},
+     "action", False),
+    ("infinite-quantity",
+     {"actions": [dict(_ACT, quantity=float("inf"))]}, "action", False),
+    ("nan-quantity",
+     {"actions": [dict(_ACT, quantity=float("nan"))]}, "action", False),
     ("hold-with-quantity",
-     {"actions": [{"symbol": "A", "side": "HOLD", "quantity": 10}]}, False),
+     {"actions": [{"symbol": "A", "side": "HOLD", "quantity": 10}]},
+     "action", True),
+    ("limit-without-price", {"actions": [dict(_ACT, order_type="limit")]},
+     "action", True),
+    ("market-with-price",
+     {"actions": [dict(_ACT, order_type="market", limit_price=99.0)]},
+     "action", True),
     ("duplicate-symbols",
      {"actions": [{"symbol": "A", "side": "BUY", "quantity": 1},
-                  {"symbol": "A", "side": "SELL", "quantity": 1}]}, False),
-    ("missing-actions", {"rationale": "an envelope with no actions"}, False),
-    ("framework-envelope", {"messages": ["I am done thinking."]}, False),
-    ("stop-loss", {"actions": [dict(_ACT, stop_loss=90.0)]}, False),
-    ("take-profit", {"actions": [dict(_ACT, take_profit=120.0)]}, False),
-    ("time-in-force", {"actions": [dict(_ACT, time_in_force="GTC")]}, False),
-    ("limit-order-type", {"actions": [dict(_ACT, order_type="limit")]},
-     False),
-    ("limit-price", {"actions": [dict(_ACT, limit_price=99.0)]}, False),
-    ("unknown-top-level-key", {"actions": [], "confidence": 0.9}, False),
-    # Pydantic's allow_inf_nan default admitted an INFINITE quantity
-    # through a field whose schema said minimum 0; parse_decision refused
-    # it all along. Both non-finite spellings are pinned on both paths.
-    ("infinite-quantity",
-     {"actions": [dict(_ACT, quantity=float("inf"))]}, False),
-    ("nan-quantity",
-     {"actions": [dict(_ACT, quantity=float("nan"))]}, False),
+                  {"symbol": "A", "side": "SELL", "quantity": 1}]},
+     "action", True),
+    ("missing-actions", {"rationale": "an envelope with no actions"},
+     "decision", False),
+    ("framework-envelope", {"messages": ["I am done thinking."]},
+     "decision", False),
+    ("unknown-top-level-key", {"actions": [], "confidence": 0.9},
+     "decision", False),
 ]
 
 
 @pytest.mark.parametrize(
-    "raw,accepted", [(raw, ok) for _, raw, ok in DECISION_CORPUS],
-    ids=[name for name, _, _ in DECISION_CORPUS])
-def test_the_two_validation_paths_agree_on_accept_versus_refuse(raw,
-                                                                accepted):
+    "raw,outcome,model_accepts",
+    [(raw, outcome, ok) for _, raw, outcome, ok in DECISION_CORPUS],
+    ids=[name for name, _, _, _ in DECISION_CORPUS])
+def test_the_two_validation_paths_on_one_corpus(raw, outcome, model_accepts):
     pydantic = pytest.importorskip("pydantic")
 
     try:
-        ci.parse_decision(raw)
-        dict_path = True
+        decision = ci.parse_decision(raw)
+        dict_path = "action" if decision.refused else "ok"
     except ci.DecisionError:
-        dict_path = False
+        dict_path = "decision"
     try:
-        ci.decision_model()(**raw)
+        instance = ci.decision_model()(**raw)
         model_path = True
     except pydantic.ValidationError:
         model_path = False
 
-    assert dict_path == accepted, "parse_decision disagrees with the corpus"
-    assert model_path == accepted, "the model disagrees with the corpus"
+    assert dict_path == outcome, "parse_decision disagrees with the corpus"
+    assert model_path == model_accepts, "the model disagrees with the corpus"
+    if model_path:
+        # What the model lets through, parse_decision judges the same way
+        # from the dump, so the two paths cannot trade different orders.
+        again = ci.parse_decision(instance.model_dump())
+        assert ("action" if again.refused else "ok") == outcome
 
 
-def test_the_documented_asymmetries_between_the_two_paths():
-    """Three spellings are tolerated on the dict path and unemittable on the
-    model path, deliberately, and this pins both halves so a drift in
-    either direction fails a test.
-
-    `order_type` of "market" or null, `limit_price` of null, and `actions`
-    of null all STATE THE DEFAULT: a market sweep, no limit, no trade. The
-    dict path serves unconstrained LLM text, where refusing a redundant
-    statement of the only execution mode that exists would score a correct
-    decision as a failure. The model path forbids the keys outright because
-    a schema-bound framework can always emit the constrained spelling, and
-    `additionalProperties: false` is what makes order_type unemittable at
-    the provider. No intent is dropped and no arms can diverge on it: every
-    tolerated spelling EXECUTES identically to its constrained form."""
+def test_the_documented_asymmetry_between_the_two_paths():
+    """`actions: null` is tolerated on the dict path and refused by the
+    model. It states the default (no trade) and the dict path serves
+    unconstrained LLM text; a schema-bound framework can always write the
+    empty list instead."""
     pydantic = pytest.importorskip("pydantic")
-    model = ci.decision_model()
-
-    market = {"actions": [dict(_ACT, order_type="MARKET")]}
-    nulls = {"actions": [dict(_ACT, order_type=None, limit_price=None)]}
-    assert ci.parse_decision(market).actions[0].quantity == 5.0
-    assert ci.parse_decision(nulls).actions[0].quantity == 5.0
     assert ci.parse_decision({"actions": None}).actions == []
-
-    for tolerated in (market, nulls, {"actions": None}):
-        with pytest.raises(pydantic.ValidationError):
-            model(**tolerated)
+    with pytest.raises(pydantic.ValidationError):
+        ci.decision_model()(actions=None)
 
 
 def test_the_two_renderings_of_the_contract_agree():
     """decision_schema() is the canonical statement and the Pydantic model
-    derives its constraints FROM it -- this asserts the derivation held, on
+    derives its constraints FROM it. This asserts the derivation held, on
     every field, its type, its constraints and its required-ness. The first
-    model repeated the constraints by hand and drifted on all of them:
-    quantity=-5 validated, HOLD with a quantity validated, duplicate
-    symbols validated, and a framework binding the model accepted decisions
-    that then died in parse_decision -- after its retry loop closed, where
-    it had one, and on the single call where it did not."""
+    model repeated the constraints by hand and drifted on all of them."""
     pytest.importorskip("pydantic")
     hand = ci.decision_schema()
     hand_action = hand["properties"]["actions"]["items"]
@@ -1119,6 +1473,20 @@ def test_the_two_renderings_of_the_contract_agree():
     assert quantity["type"] == "number"
     assert quantity["description"] == \
         hand_action["properties"]["quantity"]["description"]
+    # Optional in the model, so pydantic renders each as anyOf [the type,
+    # null]: the non-null branch must be the hand schema's.
+    order_type = action["properties"]["order_type"]
+    branch = next(b for b in order_type["anyOf"] if b.get("type") != "null")
+    assert branch["enum"] == hand_action["properties"]["order_type"]["enum"]
+    assert order_type["description"] == \
+        hand_action["properties"]["order_type"]["description"]
+    limit_price = action["properties"]["limit_price"]
+    branch = next(b for b in limit_price["anyOf"] if b.get("type") != "null")
+    assert branch["type"] == "number"
+    assert branch["exclusiveMinimum"] == \
+        hand_action["properties"]["limit_price"]["exclusiveMinimum"]
+    assert limit_price["description"] == \
+        hand_action["properties"]["limit_price"]["description"]
     symbol = action["properties"]["symbol"]
     assert symbol["minLength"] == \
         hand_action["properties"]["symbol"]["minLength"]
@@ -1297,6 +1665,83 @@ def test_a_transcript_round_trips():
     assert again.meta == {"framework": "x"}
     assert again.response_for("abc") == "hello"
     assert again.response_for("missing") is None
+
+
+def _entry(arm, day, step, digest, response="{}"):
+    return {"arm": arm, "day": day, "step": step, "digest": digest,
+            "prompt": {"step": step}, "response": response}
+
+
+def test_save_writes_the_same_file_whatever_order_entries_arrived_in(
+        tmp_path):
+    """rank(workers=4) appends to a shared recorder from four threads in
+    whatever order they finish, and three recordings of one run had three
+    sha256s. save() now sorts by arm, day, step and digest. The order in
+    memory is left as recorded."""
+    import random
+    entries = [_entry(arm, day, 6 * day, f"{arm}{day}{seed}")
+               for arm in ("control", "shock") for day in range(3)
+               for seed in range(4)]
+    written = set()
+    for trial in range(4):
+        shuffled = list(entries)
+        random.Random(trial).shuffle(shuffled)
+        transcript = ci.Transcript(meta={"recorded_utc": "fixed",
+                                         "model_preset": "pt-v20"},
+                                   entries=shuffled)
+        path = tmp_path / f"t{trial}.json"
+        transcript.save(path)
+        written.add(path.read_bytes())
+        assert transcript.entries == shuffled, "save reordered memory"
+    assert len(written) == 1, "the saved bytes depend on arrival order"
+    loaded = ci.Transcript.load(path)
+    assert [(e["arm"], e["day"], e["digest"]) for e in loaded.entries] \
+        == sorted((e["arm"], e["day"], e["digest"]) for e in entries)
+
+
+def test_save_keeps_the_answer_a_repeated_digest_replays(tmp_path):
+    """Lookup is by digest and the LAST recording of a digest wins. Two
+    forked arms shown one payload record it twice, and a plain sort by arm
+    would put the other answer last and change what the replay returns.
+    The sort keeps a repeated digest's entries in recorded order."""
+    transcript = ci.Transcript()
+    transcript.record(_entry("shock", 2, 12, "same", "shock's answer"))
+    transcript.record(_entry("control", 2, 12, "same", "control's answer"))
+    transcript.record(_entry("control", 0, 0, "first", "day zero"))
+    assert transcript.response_for("same") == "control's answer"
+    transcript.save(tmp_path / "t.json")
+    loaded = ci.Transcript.load(tmp_path / "t.json")
+    assert loaded.response_for("same") == "control's answer"
+    assert loaded.response_for("first") == "day zero"
+    assert [e["digest"] for e in loaded.entries] == ["first", "same", "same"]
+
+
+def test_a_rank_recording_saves_to_the_same_bytes_every_time(tmp_path):
+    """The reviewer's repro, end to end: the same rank(workers=4) recorded
+    three times must save to one file."""
+    def hold_fn(payload):
+        return {"actions": []}
+
+    written = set()
+    for trial in range(3):
+        recorder = ci.Transcript(meta={"recorded_utc": "fixed"})
+        tf.rank(lambda: {"v1": callable_agent(hold_fn, mode="live",
+                                              recorder=recorder)},
+                seeds=range(4), days=2, universe=universe(), workers=4)
+        assert len(recorder) == 8
+        path = tmp_path / f"rank{trial}.json"
+        recorder.save(path)
+        written.add(path.read_bytes())
+    assert len(written) == 1
+
+
+def test_saved_order_tolerates_a_hand_built_entry():
+    entries = [{"digest": "b", "response": "{}"},
+               {"digest": "a", "day": "later", "step": None,
+                "response": "{}"},
+               {"digest": "c", "arm": "x", "day": 1, "step": 6,
+                "response": "{}"}]
+    assert [e["digest"] for e in ci.saved_order(entries)] == ["b", "a", "c"]
 
 
 def test_replay_returns_the_recorded_response():
@@ -1508,13 +1953,13 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: was pt-v16. A blanket value across all seven would write a false
 #: provenance into two of them.
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v19",
+    "callable/five-days.json": "pt-v20",
     "finrobot/liquidity-crisis.json": "pt-v16",
     "finrobot/rate-ladder.json": "pt-v16",
-    "finrobot/rate-shock.json": "pt-v19",
-    "langgraph/rate-shock.json": "pt-v19",
-    "openai_agents/five-days.json": "pt-v19",
-    "pydantic_ai/rate-shock.json": "pt-v19",
+    "finrobot/rate-shock.json": "pt-v20",
+    "langgraph/rate-shock.json": "pt-v20",
+    "openai_agents/five-days.json": "pt-v20",
+    "pydantic_ai/rate-shock.json": "pt-v20",
 }
 
 
@@ -1574,8 +2019,11 @@ def test_the_day_zero_macro_dates_each_fixture_to_the_preset_it_names():
     root = pathlib.Path(__file__).parent / "fixtures"
     checked = 0
     for name, preset in FIXTURE_PRESETS.items():
-        prompt = json.loads((root / name).read_text(
-            encoding="utf-8"))["entries"][0].get("prompt")
+        # Day zero is the earliest step, not the first entry: a saved
+        # transcript is not kept in the order the decisions were made.
+        entries = json.loads((root / name).read_text(
+            encoding="utf-8"))["entries"]
+        prompt = min(entries, key=lambda e: e.get("step", 0)).get("prompt")
         text = prompt if isinstance(prompt, str) else json.dumps(prompt)
         found = re.search(r'"?vix"?["\s:]+([\d.]+)', text)
         if not found:
@@ -1644,6 +2092,76 @@ def test_the_adapter_assembles_transcript_provenance():
     assert provenance["max_participation"] == ci.MAX_PARTICIPATION
     assert provenance["framework"] == "callable"
     assert provenance["decision_schema_version"] == ci.DECISION_SCHEMA_VERSION
+    assert (provenance["observation_schema_version"]
+            == ci.OBSERVATION_SCHEMA_VERSION)
+
+
+def test_a_recording_is_stamped_with_both_schema_versions():
+    """Owner decision 5: the payload is frozen for 0.8.x and the schema
+    version is stamped in transcript meta. Stamped while the recording is
+    made, by every adapter's recorder path, so a saved recording says which
+    payload and which decision contract it was made under."""
+    recorder = ci.Transcript()
+    agent = callable_agent(buy, mode="live", recorder=recorder)
+    make_world(agent).run(days=1)
+    assert len(recorder) == 1
+    assert (recorder.meta["observation_schema_version"]
+            == ci.OBSERVATION_SCHEMA_VERSION)
+    assert recorder.meta["decision_schema_version"] == "2"
+
+
+def test_a_replay_under_another_payload_version_is_refused_by_name():
+    """A recording made under another payload version misses every key, so
+    the replay says so before the lookup instead of naming a digest."""
+    recorder = ci.Transcript()
+    make_world(callable_agent(buy, mode="live", recorder=recorder)).run(
+        days=1)
+    recorder.meta["observation_schema_version"] = "0"
+    replay = callable_agent(None, mode="replay", transcript=recorder)
+    with pytest.raises(ci.ReplayMiss, match="payload version 0") as excinfo:
+        make_world(replay).run(days=1)
+    assert f"builds version {ci.OBSERVATION_SCHEMA_VERSION}" in str(
+        excinfo.value)
+    # The same recording at the current version replays.
+    recorder.meta["observation_schema_version"] = \
+        ci.OBSERVATION_SCHEMA_VERSION
+    world = make_world(callable_agent(None, mode="replay",
+                                      transcript=recorder))
+    world.run(days=1)
+    assert world.portfolio.positions["TECH_A"].quantity > 0
+
+
+def test_evaluate_writes_an_agents_refusals_to_its_errors():
+    """The harness hook behind per-action refusal. An agent may define
+    refusals(), and evaluate writes each line it returns after act() to the
+    scorecard's errors. A plain Python agent can use it as well as the
+    adapters."""
+    class Refuser:
+        def act(self, obs):
+            self._last = [f"refused at step {obs.step}"] if obs.step == 2 \
+                else []
+            return {}
+
+        def refusals(self):
+            return self._last
+
+    card = tf.evaluate({"r": Refuser()}, seed=7, universe=universe(),
+                       days=1)["r"]
+    assert card.errors == ["step 2: refused at step 2"]
+
+
+def test_an_adapter_reports_no_refusals_on_a_step_without_a_decision():
+    agent = callable_agent(lambda p: {"actions": [
+        {"symbol": "TECH_A", "side": "SHORT", "quantity": 1}]})
+    world = make_world(agent)
+    world.run(days=1)
+    # The last act() ran on step 5, which is not a decision step.
+    assert agent.refusals() == []
+    card = tf.evaluate({"a": callable_agent(lambda p: {"actions": [
+        {"symbol": "TECH_A", "side": "SHORT", "quantity": 1}]})},
+        seed=7, universe=universe(), days=2)["a"]
+    assert [e.split(":")[0] for e in card.errors] == ["step 0", "step 6"]
+    assert all("not one of" in e for e in card.errors)
 
 
 @pytest.mark.parametrize("bad", [
@@ -1779,6 +2297,42 @@ def test_the_price_memory_is_bounded():
     world = make_world(agent)
     world.run(days=7)       # 42 steps, above HISTORY_STEPS
     assert len(agent.history) == ci.HISTORY_STEPS
+
+
+def test_reusing_an_adapter_for_a_second_run_warns():
+    """FrameworkAdapter.history persists, so a second evaluate() with the
+    same instance showed the agent five days of the first market. In a
+    replay that showed up as a few misses and in a live run as nothing. It
+    warns now, in evaluate() and in World alike."""
+    agent = callable_agent(hold)
+    tf.evaluate({"a": agent}, seed=7, universe=universe(), days=1)
+    with pytest.warns(UserWarning, match="fresh adapter"):
+        tf.evaluate({"a": agent}, seed=7, universe=universe(), days=1)
+    with pytest.warns(UserWarning, match="fresh adapter"):
+        make_world(agent).run(days=1)
+
+    # Warning only. Clearing the memory would change the payload, and the
+    # payload is what every recording is keyed on, so the reused agent
+    # still sees a one-day return at step 0 that a fresh one does not.
+    assert agent.record[1]["step"] == 0
+    assert agent.record[1]["payload"]["assets"][0]["return_1d"] is not None
+    assert agent.record[0]["payload"]["assets"][0]["return_1d"] is None
+
+
+def test_a_single_run_and_a_fork_do_not_warn():
+    """The warning fires only on the first step of a run with a memory
+    already in place. A forked arm starts past step 0 with its parent's
+    memory, which is correct, and must stay quiet."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        world = make_world(callable_agent(hold))
+        world.run(days=1)
+        control, shock = world.fork("control", "shock")
+        control.run(days=1)
+        shock.run(days=1)
+        tf.evaluate({"a": callable_agent(hold)}, seed=7,
+                    universe=universe(), days=2)
 
 
 def test_ask_is_abstract_on_the_base():
@@ -1921,3 +2475,104 @@ def test_a_custom_exchange_key_is_honoured():
     assert entry["digest"] == "cafe1234"
     assert entry["prompt"] == "the exact rendered input"
     assert entry["response"]["actions"][0]["symbol"] == "TECH_A"
+
+
+class _LoopBoundClient:
+    """A stand-in for a framework's cached async client.
+
+    The OpenAI Agents SDK keeps a default ``AsyncOpenAI`` client whose pool
+    is bound to the loop that first used it; awaited from another loop, or
+    after that loop closed, it raises "Event loop is closed". This does the
+    same, and nothing else, so the bridge can be tested without the SDK.
+    """
+
+    def __init__(self) -> None:
+        self.loop = None
+        self.calls = 0
+
+    async def complete(self, value: int) -> int:
+        import asyncio
+        here = asyncio.get_running_loop()
+        if self.loop is None:
+            self.loop = here
+        if self.loop.is_closed() or self.loop is not here:
+            raise RuntimeError("Event loop is closed")
+        await asyncio.sleep(0)
+        self.calls += 1
+        return value * 2
+
+
+def test_a_loop_bound_client_fails_across_fresh_loops():
+    """Non-vacuity: the stand-in fails exactly the way the SDK's client did
+    under the old bridge, one ``asyncio.run`` per call."""
+    import asyncio
+
+    client = _LoopBoundClient()
+    assert asyncio.run(client.complete(1)) == 2
+    with pytest.raises(RuntimeError, match="Event loop is closed"):
+        asyncio.run(client.complete(2))
+
+
+def test_run_sync_reuses_one_loop_across_calls_in_a_script():
+    """Five calls in a row, as a five-day live run makes them. Until 0.8.5
+    the second failed, and so did every other one after it."""
+    client = _LoopBoundClient()
+    assert [ci.run_sync(client.complete(k)) for k in range(5)] == [0, 2, 4, 6, 8]
+    assert client.calls == 5
+
+
+def test_run_sync_reuses_one_loop_across_calls_inside_a_running_loop():
+    """The notebook case: the caller's thread has its own loop running, and
+    the client is still reused across calls, on the bridge's loop."""
+    import asyncio
+
+    client = _LoopBoundClient()
+
+    async def outer():
+        return [ci.run_sync(client.complete(k)) for k in range(5)]
+
+    assert asyncio.run(outer()) == [0, 2, 4, 6, 8]
+    # And the same client keeps working from a plain call afterwards: one
+    # bridge loop per process, whichever context the call came from.
+    assert ci.run_sync(client.complete(10)) == 20
+    assert client.calls == 6
+
+
+def test_run_sync_carries_the_callers_context_variables():
+    """``asyncio.run`` ran the coroutine in the caller's context, and a
+    framework's tracing reads context variables, so the bridge must too."""
+    import contextvars
+
+    tag = contextvars.ContextVar("tag", default="unset")
+
+    async def read():
+        return tag.get()
+
+    token = tag.set("set by the caller")
+    try:
+        assert ci.run_sync(read()) == "set by the caller"
+    finally:
+        tag.reset(token)
+
+
+def test_run_sync_nested_inside_a_bridged_coroutine_does_not_deadlock():
+    """A coroutine on the bridge that calls a synchronous helper which calls
+    ``run_sync`` again cannot be given the bridge's own loop, which is busy
+    running it. It gets a fresh loop on its own thread instead."""
+    async def inner():
+        return "inner"
+
+    async def outer():
+        return "outer+" + ci.run_sync(inner())
+
+    assert ci.run_sync(outer()) == "outer+inner"
+
+
+def test_run_sync_keeps_the_chain_across_the_bridge_on_repeated_calls():
+    async def boom(k):
+        raise RuntimeError(f"call {k}") from KeyError(k)
+
+    for k in range(3):
+        with pytest.raises(RuntimeError, match=f"call {k}") as excinfo:
+            ci.run_sync(boom(k))
+        assert isinstance(excinfo.value.__cause__, KeyError)

@@ -1,7 +1,7 @@
 """Structural falsification as a first-class output: the emptiness certificate.
 
-CALIBRATION.md §4.4, built. The claim this tool earns or refuses is the
-strong negative one: *no parameter vector in the named box reaches the
+The calibration design's falsification step, built. The claim this tool
+earns or refuses is the strong negative one: *no parameter vector in the named box reaches the
 named targets jointly* — with the residual saying by how far, the box
 and budget saying what was searched, and every number re-runnable from
 the committed JSON (§7.3: the search is itself a citable run).

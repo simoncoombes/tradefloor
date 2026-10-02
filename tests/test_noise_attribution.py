@@ -307,16 +307,43 @@ def test_a_column_target_before_the_window_is_refused():
 
 # -- the horizon an event needs ----------------------------------------------
 
+#: pt-v20 with the close's re-mark off, where a jump reaches no price
+#: before the next open.
+NO_REMARK = tf.ModelParams.from_preset("pt-v20",
+                                       macro_publication_repricing=0.0)
+
+#: How much of a jump the close's re-mark carries into that close's price,
+#: as a share of what the next day reads. The re-mark scales each price by
+#: its fair value after the close's macro step over its fair value before
+#: it; a jump's permanent share (`fair_value_market_share`,
+#: `fair_value_news_share`) moves the name's fair-value level at that same
+#: close, and the ratio reads the level only through the buyback term's
+#: yield (`buyback_payout_share`), so the jump reaches the price in the
+#: second order. Measured on `world()` at seed 42: 6.4e-8 of the largest
+#: effect a day later for the price, 3.0e-8 for the P&L; with the buyback
+#: share at 0 it is 1.4e-14, and with both permanent shares at 0 it is 0.
+REMARK_SHARE = 1e-6
+
+
 def test_the_default_horizon_reaches_the_open_after_an_event():
     """A jump lands at its day's close and is first seen at the next open,
     so a horizon stopping on the window's last day measures every event row
-    as exactly zero."""
+    as exactly zero where the close writes no price (pt-v20 with
+    `macro_publication_repricing` at 0 here). On pt-v20 itself the close's
+    re-mark carries a second-order sliver of the jump into that close's
+    price (`REMARK_SHARE`), so the short horizon measures almost nothing
+    rather than nothing, and the default still reaches the open."""
     root = world()
     reached = noise.attribute(root, (1, 1), noise.column("price", 2),
                               "event", streams=["jumps"])
     assert reached.horizon == 2
     assert any(r["effect"] != 0.0 for r in reached.rows)
+    largest = max(abs(r["effect"]) for r in reached.rows)
+    sliver = noise.attribute(root, (1, 1), noise.column("price", 1),
+                             "event", streams=["jumps"], horizon=1)
+    assert max(abs(r["effect"]) for r in sliver.rows) < REMARK_SHARE * largest
 
+    root = world(model=NO_REMARK)
     short = noise.attribute(root, (1, 1), noise.column("price", 1), "event",
                             streams=["jumps"], horizon=1)
     assert short.horizon == 1
@@ -423,7 +450,8 @@ def test_the_day_effect_grows_with_the_tick_count():
     # THE CLAIM IS THAT THE DAY'S DRAW MATTERS MORE IN A LONGER DAY, and it
     # does: 0.0175, 0.1325, 0.4850, 0.4725 on pt-v19, a factor of 27 from
     # end to end, against 0.0375, 0.1525, 0.2925, 0.4950 on pt-v18, a factor
-    # of 13. MEASURED 2026-09-13.
+    # of 13. MEASURED 2026-09-13. pt-v20 reads 0.1300, 0.2200, 0.3025,
+    # 0.3175, a factor of 2.4 (0.8.5).
     #
     # THE SATURATION CLAIM IS WITHDRAWN, 2026-09-14, and the strict sort it
     # displaced is back. The claim was that the rise is steep to 80 ticks
@@ -476,7 +504,29 @@ def test_the_day_effect_grows_with_the_tick_count():
     # four-fold day, so four is a bar somebody chose and not one anybody
     # derived. Whoever moves this next should put it on the ten seeds the
     # way `test_the_leverage_effect_is_real_since_the_gjr_term` was.
-    assert effects[2] > 4 * effects[0], effects
+    #
+    # MOVED AT 0.8.5, on the ten seeds, when pt-v20 became the default and
+    # the bar of four failed: seed 42 reads 0.1300, 0.2200, 0.3025, 0.3175,
+    # a ratio of 2.33 (pt-v19: 4.36). The same ten seeds on pt-v20:
+    #
+    #   42  0.1300 0.2200 0.3025 0.3175   e2/e0 2.33
+    #   43  0.1500 0.2075 0.2750 0.3975   e2/e0 1.83
+    #   44  0.1450 0.1925 0.2325 0.6850   e2/e0 1.60
+    #   45  0.2250 0.3275 0.4325 0.5950   e2/e0 1.92
+    #   46  0.1550 0.2125 0.2875 0.4525   e2/e0 1.85
+    #   47  0.1475 0.2325 0.2775 0.3725   e2/e0 1.88
+    #   48  0.2650 0.3200 0.4925 0.5675   e2/e0 1.86
+    #   49  0.2275 0.3100 0.4400 0.4600   e2/e0 1.93
+    #   50  0.2400 0.2300 0.3525 0.3750   e2/e0 1.47
+    #   51  0.1300 0.2075 0.2825 0.4550   e2/e0 2.17
+    #
+    # The ratio runs 1.47 to 2.33 around the 2.0 the sqrt(T) premise
+    # predicts for a four-fold day, where pt-v19 ran 3.16 to 7.32 above it:
+    # pt-v20 grows as the premise says and pt-v19 grew faster. The strict
+    # sort holds on nine of the ten (seed 50 dips at 40 ticks). The bar is
+    # the premise's factor for a two-fold day, sqrt(2), which all ten clear
+    # and which a model whose day length stopped mattering would not.
+    assert effects[2] > math.sqrt(2) * effects[0], effects
 
 
 # -- the counted caveats can be restated over merged rows ---------------------
@@ -572,11 +622,23 @@ def test_the_default_horizon_holds_for_a_target_that_names_no_day():
     passes whether or not the default reaches past the window. A target
     that names no day takes the default and nothing else, which is what
     states the rule: at the window's last day every event row is exactly
-    zero, and one day past it they are not.
+    zero, and one day past it they are not. Exactly zero where the close
+    writes no price; on pt-v20 the close's re-mark carries the second-order
+    sliver `REMARK_SHARE` describes, measured here as a bound.
     """
-    root = world()
+    remarked = world()
+    root = world(model=NO_REMARK)
     for target in (noise.pnl(),
                    lambda arm: float(arm.summary()["pnl_since"])):
+        full = noise.attribute(remarked, (1, 1), target, "event",
+                               streams=["jumps"])
+        sliver = noise.attribute(remarked, (1, 1), target, "event",
+                                 streams=["jumps"], horizon=1)
+        largest = max(abs(r["effect"]) for r in full.rows)
+        assert largest > 0.0
+        assert (max(abs(r["effect"]) for r in sliver.rows)
+                < REMARK_SHARE * largest)
+
         reached = noise.attribute(root, (1, 1), target, "event",
                                   streams=["jumps"])
         assert reached.horizon == 2

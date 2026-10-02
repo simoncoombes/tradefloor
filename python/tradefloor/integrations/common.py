@@ -24,19 +24,22 @@ rationale. Tradefloor owns the market, the macro path, execution, the order
 book, fills, accounting, checkpoints, forks, interventions and the
 comparison. A framework MUST NOT mutate engine state, and every path from a
 framework RESPONSE to the engine runs through :func:`parse_decision` and
-:func:`orders_from` -- but that is validation, not confinement. ``act`` and
-``ask`` hold the Observation, the Observation carries the live engine, and
-the seam is not sandboxed: the adapter boundary is exactly an ordinary
-agent's, no tighter. The serializer's allowlist and the contract checks
-catch the accident of a cooperating author reading or writing what they
-should not; nothing in this package restrains an adapter that reaches for
-``obs.engine`` deliberately, and claiming otherwise would leave an author
+:func:`orders_from`. ``act`` and ``ask`` hold the Observation, and the
+adapter boundary is exactly an ordinary agent's, no tighter: since 0.8.5
+``obs.engine`` is a read-only :class:`~tradefloor.sandbox.MarketView` and
+the harness flags any change to the engine made inside ``act``, unless the
+run passed ``trusted_agents=True``, which hands over the live engine. The
+serializer's allowlist and the contract checks catch the accident of a
+cooperating author reading what they should not; neither restrains code
+that walks the interpreter to the engine deliberately (see
+:mod:`tradefloor.sandbox`), and claiming otherwise would leave an author
 believing in a property nobody enforces.
 
 ## The observation allowlist
 
-:class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
-knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
+:class:`~tradefloor.harness.Observation` carries ``.engine``. By default
+that is a read-only market view, but under ``trusted_agents=True`` it is the
+live engine, and the engine knows the answer key: :func:`tradefloor.fair_value`, the factor
 attribution of every price move, each company's ``mispricing_s``, and --
 through a :class:`~tradefloor.Scenario` -- the macro path the run has not
 reached yet. An agent reading any of those inverts the simulator, and the
@@ -49,26 +52,40 @@ allowlist survives that. ``tests/test_integrations.py`` runs the mapping
 against an engine proxy that raises on the forbidden attributes, so a future
 edit reaching for one fails on the access.
 
-## The decision is market-sweep only
+## The decision
 
-``Portfolio.execute`` sweeps the live book at whatever price it gives. There
-is no resting order, no order type and no limit price anywhere at the agent
-boundary, so the decision model carries a symbol, a side and a share count
-and nothing else. A framework that emits ``order_type`` or ``limit_price``
-is refused with a message naming the missing capability, and any other
-field the contract does not define is refused the same way, because
-silently dropping a field would execute an instruction the agent never
-gave.
+A decision is a list of actions and a rationale. An action names a symbol,
+a side (BUY, SELL, HOLD or CANCEL) and a share count. It is a market order
+unless it carries a ``limit_price``, in which case it is a
+:class:`tradefloor.Limit`: it trades at that price or better, and what does
+not fill at once waits in the book until it fills, the agent sends CANCEL
+for the symbol, or a new limit order on the symbol replaces it. These are
+the orders a Python agent's ``act()`` can return, so an LLM agent and a
+Python agent trade the same market. The waiting orders are in the
+observation, under ``portfolio.open_orders``.
+
+Any field the contract does not define (a stop loss, a time in force) is
+refused, because silently dropping it would execute an instruction the
+agent never gave. Until decision schema 2 (0.8.5) the adapters sent market
+orders only, and an ``order_type`` or ``limit_price`` was refused.
 
 ## Two-stage validation
 
 :func:`parse_decision` is structural: it checks that the output is a
 decision. :func:`orders_from` is market-shaped and needs the Observation: an
-unknown symbol raises, an oversized order is clipped to the participation cap
-with the clip returned as a note, and sub-one-share dust is dropped. The
-split matters because the two failures mean different things -- the first is
-the framework failing its output contract, the second is a well-formed
-decision the market cannot take -- and an experiment scores them differently.
+unlisted symbol is refused, an oversized order is clipped to the
+participation cap with the clip returned as a note, and sub-one-share dust is
+dropped. The split matters because the two failures mean different things
+(the first is the framework failing its output contract, the second is a
+well-formed decision the market cannot take) and an experiment scores them
+differently.
+
+Both stages refuse a bad ACTION on its own. The decision's other actions
+still trade, and each refusal is kept in :attr:`Decision.refused` with its
+reason, which the adapter's record, :meth:`FrameworkAdapter.decision` and,
+through :meth:`FrameworkAdapter.refusals`, the scorecard's ``errors`` all
+carry. Only output that is not a decision at all (no JSON object, no
+``actions`` list) refuses the whole decision.
 
 ## Replay
 
@@ -97,12 +114,15 @@ nothing here duplicates that.
 
 from __future__ import annotations
 
+import atexit
 import copy
 import hashlib
 import importlib
 import json
+import os
 import re
 import statistics
+import threading
 import warnings
 from typing import Any, Literal, Sequence
 
@@ -113,17 +133,28 @@ from ..counterfactual import MACRO_FIELDS
 #: ``counterfactual.MACRO_FIELDS`` itself, so the two cannot drift apart over
 #: what a macro experiment covers -- the library has already settled which
 #: macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
-#: model coefficient no exchange publishes.
+#: model coefficient no exchange publishes. ``cycle`` is the phase as
+#: published (``cycle_publication_lag``), so a framework learns of a turn
+#: of the cycle when it is announced.
 OBSERVABLE_MACRO = MACRO_FIELDS
 
 #: The sides a decision may name. HOLD carries no quantity and produces no
-#: order, so the agent can decline a decision period.
-SIDES = ("BUY", "SELL", "HOLD")
+#: order, so the agent can decline a decision period. CANCEL carries no
+#: quantity either: it withdraws every limit order still waiting on the
+#: symbol, the :class:`tradefloor.Cancel` a Python agent returns.
+SIDES = ("BUY", "SELL", "HOLD", "CANCEL")
 
-#: Price rows kept for the recent-return and volatility lines. Five days at
-#: the library's six steps a day: long enough for a realised-volatility number
-#: to mean something, short enough to describe recent conditions.
-HISTORY_STEPS = 30
+#: The order types an action may name. ``"market"`` sweeps the book now;
+#: ``"limit"`` is a :class:`tradefloor.Limit` and needs a ``limit_price``.
+#: Leaving the field out means market, unless a ``limit_price`` is given.
+ORDER_TYPES = ("market", "limit")
+
+#: Price rows kept for the recent-return and volatility lines: five days at
+#: the library's six steps a day, plus the row the five-day return starts
+#: from. It was 30 until 0.8.5, so ``return_5d`` spanned 29 intervals (4.83
+#: days) and was labelled five; the payload was frozen at 0.8.5 and the
+#: fixtures re-recorded, which is when the arithmetic was put right.
+HISTORY_STEPS = 31
 
 #: Fraction of an instrument's average daily volume one order may take.
 #: ``tradefloor.baselines.rebalance`` uses the same 2% for every shipped
@@ -135,9 +166,28 @@ MAX_PARTICIPATION = 0.02
 
 #: Version of the decision contract: the shape :func:`decision_schema`
 #: publishes and :func:`parse_decision` enforces. Recorded in adapter
-#: metadata and in :meth:`FrameworkAdapter.state`, so a replayed or compared
-#: run can say which contract its decisions were validated under.
-DECISION_SCHEMA_VERSION = "1"
+#: metadata, in :meth:`FrameworkAdapter.state` and in every saved
+#: transcript, so a replayed or compared run can say which contract its
+#: decisions were validated under.
+#:
+#: Version 2, from 0.8.5: an action may be a limit order (``order_type``,
+#: ``limit_price``) or a CANCEL, and a bad action is refused on its own
+#: while the rest of the decision trades. Version 1 was market orders only,
+#: and one bad action refused the whole decision. Fixed for the 0.8.x line
+#: (``docs/SUPPORT.md``).
+DECISION_SCHEMA_VERSION = "2"
+
+#: Version of the observation payload :func:`serialize_observation` builds
+#: and every adapter shows its framework. Stamped into every saved
+#: transcript, and a replay refuses a recording made under another version
+#: before it looks anything up, because every replay key is a digest of
+#: that payload and every lookup would miss.
+#:
+#: Version 1 is the payload frozen for the 0.8.x line (``docs/SUPPORT.md``).
+#: No key is added, removed or renamed, and no value changes meaning, in a
+#: 0.8.x patch release. Recordings made before 0.8.5 carry no version: their
+#: payload predates the freeze, and none of their keys match it.
+OBSERVATION_SCHEMA_VERSION = "1"
 
 
 # -- errors -------------------------------------------------------------------
@@ -181,9 +231,12 @@ class DecisionError(IntegrationError):
     """The framework returned something that is not an executable decision.
 
     Raised by :func:`parse_decision` for output that cannot be turned into a
-    well-formed :class:`Decision`: no JSON, an unknown side, a negative or
-    non-finite quantity, a symbol named twice, an order type the market does
-    not have.
+    decision at all: no JSON, no ``actions`` list, a key the contract does
+    not define at the top level. A bad ACTION inside a good decision (an
+    unknown side, a negative quantity, a symbol named twice, a limit order
+    with no price) does not raise, from decision schema 2. That action is
+    refused on its own, the refusal is recorded in
+    :attr:`Decision.refused`, and the other actions trade.
 
     It raises instead of repairing. A guess at what the model meant would be
     a second, unrecorded agent between the framework and the market, and
@@ -216,7 +269,10 @@ class ReplayMiss(DecisionError):
 class MarketRefusalError(DecisionError):
     """The decision was well-formed, and this market cannot take it.
 
-    Raised by :func:`orders_from` for a symbol the market does not list. A
+    Raised by :func:`orders_from` for a symbol the market does not list,
+    when the caller passes no ``refused`` list to collect the refusal in.
+    The adapters pass one, so in a run the unlisted action is refused on its
+    own and the rest of the decision trades. A
     subclass of :class:`DecisionError` rather than a sibling, because the
     FinRobot integration raises one class for both stages and callers written
     against that behaviour -- catch DecisionError, charge the agent a step --
@@ -266,31 +322,97 @@ def require(module: str, *, extra: str | None = None, pip: str | None = None,
         raise MissingDependencyError("\n".join(lines)) from exc
 
 
+#: The bridge's event loop, its thread, the process that started them, and
+#: the lock that starts them once. Module state because the point is ONE loop
+#: per process, shared by every adapter and every call.
+_BRIDGE_LOCK = threading.Lock()
+_BRIDGE: dict[str, Any] = {"loop": None, "thread": None, "pid": None}
+
+
+def _bridge_loop() -> Any:
+    """The process's one long-lived bridge loop, started on first use.
+
+    It runs forever on a daemon thread and is stopped at interpreter exit.
+    A process that inherits it through ``fork`` inherits the loop object but
+    not the thread running it, so a changed pid starts a fresh one rather
+    than submitting to a loop nobody is running.
+    """
+    import asyncio
+
+    with _BRIDGE_LOCK:
+        loop, thread = _BRIDGE["loop"], _BRIDGE["thread"]
+        if (loop is not None and _BRIDGE["pid"] == os.getpid()
+                and thread is not None and thread.is_alive()
+                and not loop.is_closed()):
+            return loop
+        loop = asyncio.new_event_loop()
+        ready = threading.Event()
+
+        def serve() -> None:
+            asyncio.set_event_loop(loop)
+            loop.call_soon(ready.set)
+            loop.run_forever()
+
+        thread = threading.Thread(target=serve, name="tradefloor-run-sync",
+                                  daemon=True)
+        thread.start()
+        ready.wait()
+        _BRIDGE.update(loop=loop, thread=thread, pid=os.getpid())
+        return loop
+
+
+def _stop_bridge() -> None:
+    """At exit: stop the bridge loop and let its thread finish. Pending
+    work is not awaited; a program exiting has stopped waiting for it."""
+    loop, thread = _BRIDGE["loop"], _BRIDGE["thread"]
+    if loop is None or thread is None or _BRIDGE["pid"] != os.getpid():
+        return
+    if not loop.is_closed():
+        loop.call_soon_threadsafe(loop.stop)
+    thread.join(timeout=1.0)
+
+
+atexit.register(_stop_bridge)
+
+
 def run_sync(awaitable: Any) -> Any:
     """Run one coroutine to completion from Tradefloor's synchronous loop.
 
     The ONE supported bridge from ``act()`` to an async framework API, and
-    it is shared because every framework needs it and the failure it guards
-    against only shows up in a notebook. The frameworks' own synchronous
-    entry points raise when called from a thread that already has a running
-    event loop -- the OpenAI Agents SDK's ``Runner.run_sync`` raises a bare
-    RuntimeError, and Jupyter runs everything inside a loop -- so an adapter
-    built on them works in a script and dies in the notebook the same reader
-    tries next. Call the framework's ASYNC entry point and hand the
-    coroutine here instead.
+    it is shared because every framework needs it and the failures it guards
+    against only show up away from the simple case. The frameworks' own
+    synchronous entry points raise when called from a thread that already
+    has a running event loop -- the OpenAI Agents SDK's ``Runner.run_sync``
+    raises a bare RuntimeError, and Jupyter runs everything inside a loop --
+    so an adapter built on them works in a script and dies in the notebook
+    the same reader tries next. Call the framework's ASYNC entry point and
+    hand the coroutine here instead.
 
-    With no loop running in this thread, this is ``asyncio.run``. With one
-    running, the coroutine runs on a separate thread with its own fresh
-    loop, and this call BLOCKS until it finishes; the result comes back, and
-    an exception comes back as the original exception object with its chain
-    intact, so ``FrameworkAdapter.act`` still wraps the real error.
+    Every call runs on ONE long-lived event loop per process, on a dedicated
+    background thread, whether or not the calling thread has a loop of its
+    own running. This call BLOCKS until the coroutine finishes. The result
+    comes back, and an exception comes back as the original exception
+    object with its chain intact, so ``FrameworkAdapter.act`` still wraps
+    the real error. The caller's context variables go with the coroutine,
+    as they would under ``asyncio.run``.
+
+    One loop and not a fresh one per call, since 0.8.5. Until then every
+    call got its own loop, closed when it returned, and this docstring told
+    adapters to create loop-bound resources inside the coroutine. The
+    frameworks do not: the OpenAI Agents SDK caches a default
+    ``AsyncOpenAI`` client whose connection pool is bound to the loop that
+    first used it, so the second decision of a live run raised "Event loop
+    is closed" and every other decision after it failed the same way (3 of
+    5 on the recorded example, found re-recording it on 2026-09-24). A
+    client, a session or a pool created in one call is now usable in the
+    next, because the next runs on the same loop.
 
     What this does not buy, stated plainly: it does not make Tradefloor
     concurrent. One decision runs at a time and the market waits for it, as
-    the run loop requires. And every call gets a FRESH event loop, so an
-    object bound to a loop -- an aiohttp session opened outside, a
-    framework client that caches its loop -- cannot be created once and
-    awaited across calls. Create loop-bound resources inside the coroutine.
+    the run loop requires. A coroutine running on the bridge that calls
+    ``run_sync`` itself cannot be given the bridge loop, which is busy
+    running it, so that nested call gets a fresh loop on its own thread, the
+    old behaviour, rather than deadlocking.
     """
     import asyncio
     import inspect as _inspect
@@ -303,66 +425,104 @@ def run_sync(awaitable: Any) -> Any:
     if _inspect.iscoroutine(awaitable):
         coro = awaitable
     else:
-        # asyncio.run accepts only a coroutine, and futures or task-like
-        # awaitables are bound to the loop that made them anyway.
+        # The loop runs coroutines, and a future or task-like awaitable is
+        # bound to the loop that made it anyway.
         async def _await(a: Any) -> Any:
             return await a
         coro = _await(awaitable)
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
+    if threading.current_thread() is _BRIDGE["thread"]:
+        # Nested: this thread is the bridge, running the coroutine that
+        # called us. Blocking it on its own loop would never return.
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
 
-    # A loop is already running in this thread -- a notebook, or a caller
-    # driving the World from inside async code. Nesting is not an option and
-    # neither is raising, so the coroutine gets its own thread and its own
-    # loop. `Future.result()` re-raises the exception OBJECT raised inside,
-    # `__cause__` and all, which is what keeps the chain honest across the
-    # boundary.
-    import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coro).result()
+    # `run_coroutine_threadsafe` schedules through `call_soon_threadsafe`,
+    # whose handle copies THIS thread's context, so context variables the
+    # caller set reach the coroutine. `Future.result()` re-raises the
+    # exception OBJECT raised inside, `__cause__` and all.
+    future = asyncio.run_coroutine_threadsafe(coro, _bridge_loop())
+    try:
+        return future.result()
+    except BaseException:
+        # An interrupt while waiting must not leave the decision running on
+        # the bridge behind the caller's back. A finished future ignores it.
+        future.cancel()
+        raise
 
 
 # -- the decision model -------------------------------------------------------
 
 
 class Action:
-    """One validated instruction: a symbol, a side, and a share count.
+    """One validated instruction: a symbol, a side, a share count, and for a
+    limit order the limit price.
 
-    The constructor validates the two fields that carry direction, because
-    :meth:`signed` returns 0.0 for any side it does not recognise -- so a
-    hand-built ``Action("A", "SHORT", 5)`` handed straight to
+    ``limit_price`` makes a BUY or SELL a :class:`tradefloor.Limit`: it
+    trades at that price or better, and what does not fill at once waits in
+    the book. Left as None, the action is a market order. CANCEL withdraws
+    every limit order waiting on the symbol and carries no quantity.
+
+    The constructor validates the fields that carry direction and price,
+    because :meth:`signed` returns 0.0 for any side it does not recognise,
+    so a hand-built ``Action("A", "SHORT", 5)`` handed straight to
     :func:`orders_from` would silently become a hold, and a negative
-    quantity would flip the trade's sign. Refused here instead; case is
-    normalised by :func:`parse_decision`, which is where lenient input
-    belongs.
+    quantity would flip the trade's sign. Case is normalised by
+    :func:`parse_decision`, which is where lenient input belongs.
     """
 
-    __slots__ = ("symbol", "side", "quantity")
+    __slots__ = ("symbol", "side", "quantity", "limit_price")
 
-    def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
+    #: The class raised for a bad field. The FinRobot adapter's own
+    #: ``Action`` subclass raises its own ``DecisionError``.
+    _error: type = None  # type: ignore[assignment]
+
+    def __init__(self, symbol: str, side: str, quantity: float = 0.0,
+                 limit_price: float | None = None) -> None:
+        error = self._error or DecisionError
         if side not in SIDES:
-            raise DecisionError(
+            raise error(
                 f"side must be one of {', '.join(SIDES)}, got {side!r}. "
                 "Action is built from validated input; parse_decision "
                 "normalises case and refuses the rest.")
         quantity = float(quantity)
         if not quantity >= 0 or quantity == float("inf"):
-            raise DecisionError(
+            raise error(
                 f"quantity must be a finite, non-negative share count, got "
                 f"{quantity}. The side carries the direction.")
+        if limit_price is not None:
+            if side not in ("BUY", "SELL"):
+                raise error(
+                    f"a limit price needs a BUY or SELL side, got {side}.")
+            if isinstance(limit_price, bool):
+                price = float("nan")
+            else:
+                try:
+                    price = float(limit_price)
+                except (TypeError, ValueError):
+                    price = float("nan")
+            if not 0 < price < float("inf"):
+                raise error(
+                    f"limit_price must be a finite price above zero, got "
+                    f"{limit_price!r}.")
+            limit_price = price
         self.symbol = symbol
         self.side = side
-        self.quantity = float(quantity)
+        self.quantity = quantity
+        self.limit_price = limit_price
 
     def as_dict(self) -> dict[str, Any]:
-        return {"symbol": self.symbol, "side": self.side,
-                "quantity": self.quantity}
+        """The action as a dict. ``limit_price`` appears only on a limit
+        order, so a market order's dict is the one schema 1 wrote."""
+        out: dict[str, Any] = {"symbol": self.symbol, "side": self.side,
+                               "quantity": self.quantity}
+        if self.limit_price is not None:
+            out["limit_price"] = self.limit_price
+        return out
 
     def signed(self) -> float:
-        """The share delta this action asks for. HOLD is zero."""
+        """The share delta this action asks for. HOLD and CANCEL are zero."""
         if self.side == "BUY":
             return self.quantity
         if self.side == "SELL":
@@ -373,47 +533,82 @@ class Action:
         return isinstance(other, Action) and self.as_dict() == other.as_dict()
 
     def __repr__(self) -> str:
-        if self.side == "HOLD":
-            return f"HOLD {self.symbol}"
+        if self.side in ("HOLD", "CANCEL"):
+            return f"{self.side} {self.symbol}"
+        if self.limit_price is not None:
+            return (f"{self.side} {self.quantity:,.0f} {self.symbol} "
+                    f"limit {self.limit_price:g}")
         return f"{self.side} {self.quantity:,.0f} {self.symbol}"
 
 
 class Decision:
     """What the framework decided at one decision point, after validation.
 
+    ``actions`` are the instructions that passed. ``refused`` lists the
+    ones that did not, each as ``{"action": <what the model wrote>,
+    "reason": <why it was refused>}``: from decision schema 2 a bad action
+    is refused on its own and the others still trade. The adapters add the
+    actions the market refused (a symbol it does not list) to the same
+    list.
+
     ``rationale`` is a short comment that never affects execution. It is
-    recorded -- :meth:`FrameworkAdapter.decision` publishes it, and the
-    counterfactual comparison reads it -- but no character of it reaches
+    recorded (:meth:`FrameworkAdapter.decision` publishes it, and the
+    counterfactual comparison reads it) but no character of it reaches
     :func:`orders_from`.
     """
 
-    __slots__ = ("actions", "rationale")
+    __slots__ = ("actions", "rationale", "refused", "source")
 
-    def __init__(self, actions: Sequence[Action], rationale: str = "") -> None:
+    def __init__(self, actions: Sequence[Action], rationale: str = "",
+                 refused: Sequence[dict[str, Any]] = ()) -> None:
         self.actions = list(actions)
         self.rationale = rationale
+        self.refused = [dict(r) for r in refused]
+        #: The mapping :func:`parse_decision` read this decision from, as
+        #: the model wrote it, or None for a decision built by hand. A
+        #: recording of the decision writes this, so a replay parses what
+        #: the model said and refuses the same actions for the same
+        #: reasons. :meth:`as_dict` cannot stand in for it, because the
+        #: refused actions are not actions any more.
+        self.source: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {"actions": [a.as_dict() for a in self.actions],
-                "rationale": self.rationale}
+        """``actions`` and ``rationale``, plus ``refused`` when an action
+        was refused. A decision with nothing refused has the dict schema 1
+        wrote, so ``compare`` and the recorded traces read as before."""
+        out: dict[str, Any] = {"actions": [a.as_dict() for a in self.actions],
+                               "rationale": self.rationale}
+        if self.refused:
+            out["refused"] = copy.deepcopy(self.refused)
+        return out
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, Decision) and self.as_dict() == other.as_dict()
 
     def __repr__(self) -> str:
+        refused = f", {len(self.refused)} refused" if self.refused else ""
         if not self.actions:
-            return "Decision(no change)"
-        return "Decision(" + ", ".join(repr(a) for a in self.actions) + ")"
+            return f"Decision(no change{refused})"
+        return ("Decision(" + ", ".join(repr(a) for a in self.actions)
+                + refused + ")")
 
 
 def decision_schema() -> dict[str, Any]:
     """The decision contract as a JSON Schema, for structured output.
 
     Hand this to whatever schema-binding mechanism a framework offers, and
-    the framework physically cannot emit a shape :func:`parse_decision` would
-    refuse. ``additionalProperties: false`` is load-bearing: it is what stops
-    a model inventing ``order_type`` or ``limit_price``, fields this market
-    has no execution path for.
+    the framework cannot emit a shape the schema rules out.
+    ``additionalProperties: false`` stops a model inventing fields this
+    market has no execution path for, such as ``stop_loss`` or
+    ``time_in_force``.
+
+    An action is a market order by default. ``order_type: "limit"`` with a
+    ``limit_price``, or a ``limit_price`` alone, makes it a
+    :class:`tradefloor.Limit`. ``side: "CANCEL"`` withdraws the limit
+    orders waiting on the symbol. The rules a JSON Schema cannot state (a
+    limit order needs a price, HOLD and CANCEL carry no quantity, a symbol
+    is named once) are applied by :func:`parse_decision`, which refuses the
+    action that breaks one and lets the rest of the decision trade.
 
     A fresh dictionary per call, because callers hand schemas to libraries
     that annotate them in place, and a shared module constant would let one
@@ -443,7 +638,26 @@ def decision_schema() -> dict[str, Any]:
                             "minimum": 0,
                             "description": "Shares, non-negative. The side "
                                            "carries the direction. Omit or "
-                                           "zero for HOLD.",
+                                           "zero for HOLD and CANCEL.",
+                        },
+                        "order_type": {
+                            "enum": list(ORDER_TYPES),
+                            "description": "'market' (the default) trades "
+                                           "now against the book. 'limit' "
+                                           "trades at limit_price or better "
+                                           "and needs limit_price.",
+                        },
+                        "limit_price": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "description": "For a limit order: the most a "
+                                           "BUY pays, or the least a SELL "
+                                           "accepts, per share. What does "
+                                           "not fill at once waits in the "
+                                           "book until it fills or you "
+                                           "CANCEL it, and a new limit "
+                                           "order on the same symbol "
+                                           "replaces it.",
                         },
                     },
                     "required": ["symbol", "side"],
@@ -470,28 +684,29 @@ def decision_model() -> Any:
 
     The canonical decision contract is stated ONCE, in
     :func:`decision_schema`, and this model reads every constraint out of
-    that schema -- the side enum, the quantity floor, the symbol length, the
-    field descriptions, which fields are required -- rather than repeating
-    them. The first version repeated them, drifted immediately, and the
-    drift was expensive in exactly the place a model is used: the
-    constraints a bound model carries land in the schema the provider is
-    shown, so an invalid decision becomes hard to GENERATE at all, and
-    where a framework retries on validation failure the model's refusal is
-    repaired inside the turn. Anything the model waves through instead dies
-    one layer later in :func:`parse_decision` and costs the step. Whether a
-    retry exists is framework-specific -- PydanticAI retries within the
-    turn; the OpenAI Agents SDK makes one call and raises on the first
-    invalid response -- so an adapter must not assume one.
-    ``tests/test_integrations.py`` asserts the two renderings agree field
-    by field, which is what actually protects this.
+    that schema (the side enum, the order types, the quantity floor, the
+    price floor, the symbol length, the field descriptions, which fields
+    are required) rather than repeating them. The first version repeated
+    them and drifted immediately. ``tests/test_integrations.py`` asserts
+    the two renderings agree field by field.
 
-    On top of what a JSON Schema can express, the model enforces the two
-    rules only code can state -- HOLD carries no quantity, no symbol named
-    twice -- and normalises a lowercase side before the enum check, because
-    case carries no meaning here and rejecting it would score a correct
-    decision as a failure. Belt and braces is deliberate:
-    :func:`parse_decision` stays total regardless of what any framework
-    validated, so convert with ``parse_decision(instance.model_dump())``.
+    The constraints a bound model carries land in the schema the provider
+    is shown, so a decision outside the schema is hard to GENERATE at all.
+    The rules only code can state (a limit order needs a price, HOLD and
+    CANCEL carry no quantity, a symbol is named once) are NOT enforced here,
+    from decision schema 2. A model validator fails the whole output, and
+    under the OpenAI Agents SDK, which makes one call and raises on an
+    invalid response, that lost every action in the decision for one bad
+    one. :func:`parse_decision` applies those rules action by action
+    instead, refusing the bad action and trading the rest, which is the
+    same outcome on every framework. So convert with
+    ``parse_decision(instance.model_dump())``.
+
+    ``order_type`` and ``limit_price`` are optional here and may be null,
+    which is how a strict-mode provider writes an optional field.
+    :func:`parse_decision` reads a null as the field left out. A lowercase
+    side and an uppercase order type are normalised before the enum check,
+    because case carries no meaning here.
 
     Pydantic is imported here, on the first call, never at module scope;
     the plain-Python :class:`Action` and :class:`Decision` remain the
@@ -506,9 +721,11 @@ def decision_model() -> Any:
     action_schema = schema["properties"]["actions"]["items"]
     props = action_schema["properties"]
     Side = Literal[tuple(props["side"]["enum"])]
+    OrderType = Literal[tuple(props["order_type"]["enum"])]
 
     class ActionModel(pydantic.BaseModel):
-        """One instruction: a symbol, a side, a non-negative share count."""
+        """One instruction: a symbol, a side, a share count, and for a
+        limit order a price."""
 
         model_config = pydantic.ConfigDict(extra="forbid")
 
@@ -517,24 +734,26 @@ def decision_model() -> Any:
         side: Side
         # allow_inf_nan=False, explicitly: pydantic's default admits an
         # INFINITE quantity through a field whose schema says minimum 0,
-        # and the model whose entire job is making an invalid decision
-        # hard to generate was accepting one parse_decision refuses.
+        # and parse_decision refuses one.
         quantity: float = pydantic.Field(
             0.0, ge=props["quantity"]["minimum"], allow_inf_nan=False,
             description=props["quantity"]["description"])
+        order_type: OrderType | None = pydantic.Field(
+            None, description=props["order_type"]["description"])
+        limit_price: float | None = pydantic.Field(
+            None, gt=props["limit_price"]["exclusiveMinimum"],
+            allow_inf_nan=False,
+            description=props["limit_price"]["description"])
 
         @pydantic.field_validator("side", mode="before")
         @classmethod
-        def _case_is_meaningless(cls, value: Any) -> Any:
+        def _side_case_is_meaningless(cls, value: Any) -> Any:
             return value.upper() if isinstance(value, str) else value
 
-        @pydantic.model_validator(mode="after")
-        def _hold_carries_no_quantity(self) -> "ActionModel":
-            if self.side == "HOLD" and self.quantity:
-                raise ValueError(
-                    "HOLD means no trade; a quantity beside it does not say "
-                    "whether the model wanted to buy it or to keep it")
-            return self
+        @pydantic.field_validator("order_type", mode="before")
+        @classmethod
+        def _type_case_is_meaningless(cls, value: Any) -> Any:
+            return value.lower() if isinstance(value, str) else value
 
     class DecisionModel(pydantic.BaseModel):
         """The decision contract, schema version %s.""" % (
@@ -546,15 +765,6 @@ def decision_model() -> Any:
             description=schema["properties"]["actions"]["description"])
         rationale: str = pydantic.Field(
             "", description=schema["properties"]["rationale"]["description"])
-
-        @pydantic.model_validator(mode="after")
-        def _symbols_named_once(self) -> "DecisionModel":
-            seen = [action.symbol for action in self.actions]
-            duplicated = sorted({s for s in seen if seen.count(s) > 1})
-            if duplicated:
-                raise ValueError(
-                    f"symbols named more than once: {', '.join(duplicated)}")
-            return self
 
     _PYDANTIC_MODEL.append(DecisionModel)
     return DecisionModel
@@ -574,29 +784,44 @@ def parse_decision(raw: Any) -> Decision:
     Accepts the three shapes framework output arrives in: a
     :class:`Decision` already built (revalidated, because "already a
     Decision" says nothing about what was put in it), a mapping with
-    ``actions`` and ``rationale`` keys -- which is also what a Pydantic
-    model's ``model_dump()`` produces -- and a text response holding a JSON
+    ``actions`` and ``rationale`` keys, which is also what a Pydantic
+    model's ``model_dump()`` produces, and a text response holding a JSON
     object, fences and trailing prose tolerated.
 
-    Structural validation only: this checks that the answer is a decision.
-    Whether the symbols exist and the sizes are executable belongs to
-    :func:`orders_from`, which has the observation needed to answer it.
+    Two levels of refusal. Output that is not a decision at all raises
+    :class:`DecisionError`: no JSON object, no ``actions`` key, ``actions``
+    not a list, a top-level key the contract does not define, a rationale
+    that is not a string. Inside a decision, each action is checked on its
+    own, and one that fails is left out and listed in
+    :attr:`Decision.refused` with the reason, while the others trade. Two
+    actions naming one symbol are both refused, because they have no
+    defined order. A decision whose every action is refused trades nothing
+    and says why.
+
+    Structural validation only. Whether the symbols are listed and the
+    sizes are executable belongs to :func:`orders_from`, which has the
+    observation needed to answer it.
 
     It never unwraps a framework's envelope. A mapping without an
-    ``actions`` key -- graph state, a result wrapper -- is refused rather
-    than read as a hold; extracting the decision from whatever a framework
+    ``actions`` key (graph state, a result wrapper) is refused rather than
+    read as a hold; extracting the decision from whatever a framework
     returns is the adapter's job, in ``ask()``, before this is called.
 
-    And it never drops a key it does not know, at either level. A
-    ``stop_loss`` or a ``time_in_force`` silently discarded would leave the
-    agent believing it has protection this market cannot give, and would
-    let the dict path accept output the schema-bound model path refuses --
-    two arms of one study running two contracts. The same inputs are driven
-    through both paths by ``tests/test_integrations.py``, which asserts
-    they agree on accept-versus-refuse.
+    And it never drops a key it does not know. A ``stop_loss`` or a
+    ``time_in_force`` silently discarded would leave the agent believing it
+    has protection this market cannot give, so the action carrying one is
+    refused. ``tests/test_integrations.py`` drives the same inputs through
+    this function and :func:`decision_model` and asserts what each path
+    accepts.
     """
     if isinstance(raw, Decision):
-        return _decision_from_mapping(raw.as_dict())
+        if raw.source is not None:
+            return _decision_from_mapping(raw.source)
+        decision = _decision_from_mapping(
+            {"actions": [a.as_dict() for a in raw.actions],
+             "rationale": raw.rationale})
+        decision.refused = [dict(r) for r in raw.refused] + decision.refused
+        return decision
     if isinstance(raw, dict):
         return _decision_from_mapping(raw)
     if isinstance(raw, str):
@@ -612,9 +837,9 @@ def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
     Standard JSON parsing keeps the LAST occurrence, so a response carrying
     '"actions": [], "actions": [...]' resolved to whichever the model
     emitted second, silently, and nothing recorded that a first statement
-    existed. `_decision_from_mapping` refuses duplicate SYMBOLS one layer
-    up for exactly this reason -- two instructions with no defined order --
-    and the JSON layer owed the same principle to duplicate keys.
+    existed. Duplicate SYMBOLS are refused one layer up for exactly this
+    reason (two instructions with no defined order) and the JSON layer owed
+    the same principle to duplicate keys.
     """
     keys = [key for key, _ in pairs]
     duplicated = sorted({key for key in keys if keys.count(key) > 1})
@@ -663,10 +888,7 @@ def _decision_from_text(text: str) -> Decision:
     return _decision_from_mapping(raw)
 
 
-#: The keys a decision and an action may carry. ``order_type`` and
-#: ``limit_price`` sit on the action list so their SPECIFIC refusals below,
-#: which explain the missing capability, fire instead of the generic
-#: unknown-key one, which can only report it.
+#: The keys a decision and an action may carry.
 _DECISION_KEYS = frozenset(("actions", "rationale"))
 _ACTION_KEYS = frozenset(("symbol", "side", "quantity", "order_type",
                           "limit_price"))
@@ -688,9 +910,9 @@ def _decision_from_mapping(raw: dict[str, Any]) -> Decision:
         raise DecisionError(
             f"no 'actions' key in the decision (keys present: {keys}). A "
             "decision that declines to trade says so with an EMPTY 'actions' "
-            "list; a mapping without the key is usually the framework's own "
-            "envelope -- graph state carrying 'messages', a result wrapper "
-            "-- and treating it as HOLD would score a plumbing failure as a "
+            "list. A mapping without the key is usually the framework's own "
+            "envelope (graph state carrying 'messages', a result wrapper), "
+            "and treating it as HOLD would score a plumbing failure as a "
             "considered choice. Unwrap the envelope in the adapter's ask() "
             "or output parser before it reaches parse_decision.")
     unknown = sorted(str(k) for k in raw if k not in _DECISION_KEYS)
@@ -709,124 +931,202 @@ def _decision_from_mapping(raw: dict[str, Any]) -> Decision:
         raise DecisionError(
             f"'actions' must be a list, got a {type(actions_raw).__name__}")
 
-    actions: list[Action] = []
-    for i, item in enumerate(actions_raw):
-        if not isinstance(item, dict):
-            raise DecisionError(
-                f"action {i} is a {type(item).__name__}, not an object with "
-                "'symbol' and 'side'")
-        symbol = item.get("symbol")
-        if not isinstance(symbol, str) or not symbol.strip():
-            raise DecisionError(
-                f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
-        side = item.get("side")
-        if not isinstance(side, str) or side.upper() not in SIDES:
-            raise DecisionError(
-                f"action {i} names side {side!r}, which is not one of "
-                f"{', '.join(SIDES)}")
-        side = side.upper()
-
-        # Refusals, never silent drops. Execution is a market sweep and
-        # nothing else, so an order type, a limit price, a stop loss or any
-        # field this contract does not define is an instruction the market
-        # cannot follow. Ignoring one would execute a trade the agent
-        # conditioned on a protection it never got, and the record would
-        # show a position taken with no sign that half the instruction
-        # evaporated. The two named fields get specific messages because
-        # they can EXPLAIN the missing capability; everything else gets the
-        # generic refusal after them.
-        order_type = item.get("order_type")
-        if order_type is not None and not (
-                isinstance(order_type, str) and order_type.lower() == "market"):
-            raise DecisionError(
-                f"action {i} asks for order_type {order_type!r}. Tradefloor "
-                "executes market sweeps only -- Portfolio.execute takes a "
-                "signed share count and sweeps the live book, and there is "
-                "no resting order at the agent boundary -- so only 'market' "
-                "is accepted.")
-        if item.get("limit_price") is not None:
-            raise DecisionError(
-                f"action {i} carries a limit_price, and this market has no "
-                "limit orders at the agent boundary: Portfolio.execute "
-                "sweeps the live book at whatever price it gives. Dropping "
-                "the field silently would execute at market a trade the "
-                "agent priced as protected, so it is refused instead.")
-        unknown = sorted(str(k) for k in item if k not in _ACTION_KEYS)
-        if unknown:
-            raise DecisionError(
-                f"action {i} carries unknown fields: {', '.join(unknown)}. "
-                "Tradefloor executes market sweeps of signed share deltas -- "
-                "there is no stop loss, no take profit and no time in force "
-                "at the agent boundary -- so an unknown field cannot mean "
-                "anything here, and dropping it silently would leave the "
-                "agent believing it has protection this market cannot give.")
-
-        quantity = item.get("quantity", 0)
-        if quantity is None:
-            quantity = 0
-        if isinstance(quantity, bool) or not isinstance(quantity, (int, float)):
-            raise DecisionError(
-                f"action {i} has quantity {quantity!r}, which is not a number "
-                "of shares")
-        quantity = float(quantity)
-        if quantity != quantity or quantity in (float("inf"), float("-inf")):
-            raise DecisionError(
-                f"action {i} has a non-finite quantity ({quantity})")
-        if quantity < 0:
-            raise DecisionError(
-                f"action {i} has quantity {quantity}, which is negative. The "
-                "side carries the direction, so a sell is SELL with a "
-                "positive quantity; a negative one is ambiguous about which "
-                "of the two the model meant.")
-        if side == "HOLD" and quantity:
-            raise DecisionError(
-                f"action {i} is a HOLD carrying quantity {quantity}. HOLD "
-                "means no trade; a quantity beside it does not say whether "
-                "the model wanted to buy it or to keep it.")
-        actions.append(Action(symbol.strip(), side, quantity))
-
-    seen = [a.symbol for a in actions]
-    duplicated = sorted({s for s in seen if seen.count(s) > 1})
-    if duplicated:
-        raise DecisionError(
-            f"symbols named more than once: {', '.join(duplicated)}. Two "
-            "instructions for one symbol have no defined order, so which one "
-            "reaches the market would depend on dict iteration.")
-
     rationale = raw.get("rationale", "")
     if rationale is None:
         rationale = ""
     if not isinstance(rationale, str):
         raise DecisionError(
             f"'rationale' must be a string, got a {type(rationale).__name__}")
-    return Decision(actions, rationale.strip())
+
+    actions, refused = _actions_from(actions_raw, Action)
+    decision = Decision(actions, rationale.strip(), refused)
+    decision.source = jsonable(raw)
+    return decision
+
+
+def _actions_from(items: Sequence[Any], action_type: type
+                  ) -> tuple[list[Action], list[dict[str, Any]]]:
+    """The actions that pass, and a refusal for each one that does not.
+
+    Shared with the FinRobot adapter, which passes its own ``Action``
+    subclass, so the two parsers apply one set of action rules.
+    """
+    actions: list[Action] = []
+    refused: list[tuple[int, dict[str, Any]]] = []
+    kept: list[tuple[int, Any]] = []
+    for i, item in enumerate(items):
+        try:
+            action = _action_from_item(i, item, action_type)
+        except DecisionError as exc:
+            refused.append((i, {"action": jsonable(item),
+                                "reason": str(exc)}))
+            continue
+        kept.append((i, item))
+        actions.append(action)
+
+    # Two instructions for one symbol have no defined order, so which one
+    # reached the market would depend on dict iteration. Both are refused,
+    # and an action naming the symbol once still trades.
+    seen = [a.symbol for a in actions]
+    duplicated = {s for s in seen if seen.count(s) > 1}
+    if duplicated:
+        survivors = []
+        for (i, item), action in zip(kept, actions):
+            if action.symbol in duplicated:
+                refused.append((i, {
+                    "action": jsonable(item),
+                    "reason": f"action {i} names {action.symbol!r}, which "
+                              "another action in this decision also names. "
+                              "Two instructions for one symbol have no "
+                              "defined order, so every action naming it is "
+                              "refused."}))
+            else:
+                survivors.append(action)
+        actions = survivors
+    refused.sort(key=lambda pair: pair[0])
+    return actions, [entry for _, entry in refused]
+
+
+def _action_from_item(i: int, item: Any, action_type: type) -> Action:
+    """One action, validated, or a :class:`DecisionError` saying why not."""
+    if not isinstance(item, dict):
+        raise DecisionError(
+            f"action {i} is a {type(item).__name__}, not an object with "
+            "'symbol' and 'side'")
+    symbol = item.get("symbol")
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise DecisionError(
+            f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
+    side = item.get("side")
+    if not isinstance(side, str) or side.upper() not in SIDES:
+        raise DecisionError(
+            f"action {i} names side {side!r}, which is not one of "
+            f"{', '.join(SIDES)}")
+    side = side.upper()
+
+    # Refused, never dropped. A stop loss, a take profit or a time in force
+    # is an instruction this market cannot follow, and ignoring one would
+    # execute a trade the agent conditioned on a protection it never got.
+    unknown = sorted(str(k) for k in item if k not in _ACTION_KEYS)
+    if unknown:
+        raise DecisionError(
+            f"action {i} carries unknown fields: {', '.join(unknown)}. An "
+            f"action has {', '.join(sorted(_ACTION_KEYS))} and nothing else. "
+            "There is no stop loss, no take profit and no time in force at "
+            "the agent boundary, so the field cannot mean anything here, and "
+            "dropping it would leave the agent believing it has protection "
+            "this market cannot give.")
+
+    quantity = item.get("quantity", 0)
+    if quantity is None:
+        quantity = 0
+    if isinstance(quantity, bool) or not isinstance(quantity, (int, float)):
+        raise DecisionError(
+            f"action {i} has quantity {quantity!r}, which is not a number "
+            "of shares")
+    quantity = float(quantity)
+    if quantity != quantity or quantity in (float("inf"), float("-inf")):
+        raise DecisionError(
+            f"action {i} has a non-finite quantity ({quantity})")
+    if quantity < 0:
+        raise DecisionError(
+            f"action {i} has quantity {quantity}, which is negative. The "
+            "side carries the direction, so a sell is SELL with a positive "
+            "quantity. A negative one is ambiguous about which of the two "
+            "the model meant.")
+    if side in ("HOLD", "CANCEL") and quantity:
+        what = ("means no trade" if side == "HOLD"
+                else "withdraws the limit orders waiting on the symbol")
+        raise DecisionError(
+            f"action {i} is a {side} carrying quantity {quantity}. {side} "
+            f"{what}, so a quantity beside it does not say what the model "
+            "wanted done with it.")
+
+    order_type = item.get("order_type")
+    if order_type is not None:
+        if (not isinstance(order_type, str)
+                or order_type.lower() not in ORDER_TYPES):
+            raise DecisionError(
+                f"action {i} asks for order_type {order_type!r}. The order "
+                f"types are {' and '.join(repr(t) for t in ORDER_TYPES)}.")
+        order_type = order_type.lower()
+
+    limit_price = item.get("limit_price")
+    if limit_price is not None:
+        if (isinstance(limit_price, bool)
+                or not isinstance(limit_price, (int, float))
+                or not 0 < float(limit_price) < float("inf")):
+            raise DecisionError(
+                f"action {i} has limit_price {limit_price!r}. A limit price "
+                "is a finite number above zero, per share.")
+        if side not in ("BUY", "SELL"):
+            raise DecisionError(
+                f"action {i} is a {side} with a limit_price. Only a BUY or a "
+                "SELL can be a limit order.")
+        if order_type == "market":
+            raise DecisionError(
+                f"action {i} has order_type 'market' and a limit_price. The "
+                "two fields ask for different orders, and executing either "
+                "would ignore the other.")
+    elif order_type == "limit":
+        raise DecisionError(
+            f"action {i} has order_type 'limit' and no limit_price. A limit "
+            "order needs the price it trades at or better.")
+    return action_type(symbol.strip(), side, quantity,
+                       None if limit_price is None else float(limit_price))
 
 
 def orders_from(decision: Decision, obs: Any, *,
                 max_participation: float = MAX_PARTICIPATION,
-                ) -> tuple[dict[str, float], list[str]]:
-    """Validated share deltas, plus a note for anything that was adjusted.
+                refused: list[dict[str, Any]] | None = None,
+                ) -> tuple[dict[str, Any], list[str]]:
+    """The orders to send, plus a note for anything that was adjusted.
 
     The second half of validation, and the only thing that ever reaches
-    execution. An unknown symbol raises: the model is trading an instrument
-    this market does not list, and executing the remaining actions would
-    execute half a plan the agent never made.
+    execution. Each value in the returned mapping is what a Python agent's
+    ``act()`` returns: a signed share count for a market order, a
+    :class:`tradefloor.Limit` for a limit order, a :class:`tradefloor.Cancel`
+    for CANCEL.
+
+    A symbol the market does not list is refused. Given a ``refused`` list,
+    the refusal is appended to it as ``{"action": ..., "reason": ...}`` and
+    the other actions still produce orders, which is what the adapters do.
+    Without one, it raises :class:`MarketRefusalError`, as it did before
+    decision schema 2.
 
     A size above the participation cap does not raise. It is clipped to the
-    cap and the clip comes back as a note. An oversized request is something
-    the agent did, so the trace says so. See ``MAX_PARTICIPATION``. Below one
-    share is dust: it generates a trade every step and turns turnover, which
-    the comparison reports, into noise.
+    cap and the clip comes back as a note, for a limit order as for a market
+    one. An oversized request is something the agent did, so the trace says
+    so. See ``MAX_PARTICIPATION``. Below one share is dust: it generates a
+    trade every step and turns turnover, which the comparison reports, into
+    noise.
     """
+    return _orders_from(decision, obs, max_participation=max_participation,
+                        refused=refused, unlisted=MarketRefusalError)
+
+
+def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
+                 refused: list[dict[str, Any]] | None, unlisted: type,
+                 ) -> tuple[dict[str, Any], list[str]]:
+    """:func:`orders_from`, with the class an unlisted symbol raises as a
+    parameter, so the FinRobot adapter raises its own."""
+    from ..portfolio import Cancel, Limit
+
     listed = list(obs.tickers)
-    orders: dict[str, float] = {}
+    orders: dict[str, Any] = {}
     notes: list[str] = []
 
     for action in decision.actions:
         if action.symbol not in listed:
-            raise MarketRefusalError(
-                f"{action.symbol!r} is not listed in this market. The "
-                f"universe is {', '.join(listed)}.")
+            message = (f"{action.symbol!r} is not listed in this market. The "
+                       f"universe is {', '.join(listed)}.")
+            if refused is None:
+                raise unlisted(message)
+            refused.append({"action": action.as_dict(), "reason": message})
+            continue
+        if action.side == "CANCEL":
+            orders[action.symbol] = Cancel()
+            continue
         delta = action.signed()
         if not delta:
             continue
@@ -845,8 +1145,36 @@ def orders_from(decision: Decision, obs: Any, *,
                 "daily volume)")
             delta = cap if delta > 0 else -cap
         if abs(delta) >= 1.0:
-            orders[action.symbol] = delta
+            orders[action.symbol] = (delta if action.limit_price is None
+                                     else Limit(delta, action.limit_price))
     return orders, notes
+
+
+def recorded_orders(orders: dict[str, Any]) -> dict[str, Any]:
+    """``orders`` as JSON-able values, for an adapter's :attr:`record`.
+
+    A market order stays a signed share count, as every record before
+    decision schema 2 holds it. A limit order becomes
+    ``{"quantity": <signed shares>, "limit_price": <price>}`` and a cancel
+    becomes ``{"cancel": True}``.
+    """
+    from ..portfolio import Cancel, Limit
+
+    out: dict[str, Any] = {}
+    for symbol, order in orders.items():
+        if isinstance(order, Limit):
+            out[symbol] = {"quantity": order.quantity,
+                           "limit_price": order.price}
+        elif isinstance(order, Cancel):
+            out[symbol] = {"cancel": True}
+        else:
+            out[symbol] = order
+    return out
+
+
+def refusal_lines(refused: Sequence[dict[str, Any]]) -> list[str]:
+    """One line per refused action, for an error list or a log."""
+    return [f"refused action: {entry['reason']}" for entry in refused]
 
 
 # -- observation -> framework -------------------------------------------------
@@ -901,6 +1229,25 @@ def serialize_observation(obs: Any, *,
     hold. The binding one is usually the funding cap, and it used to be the
     one the payload hid -- see the comment at the portfolio block for what
     that cost.
+
+    The portfolio block mixes units. ``cash``, ``net_worth`` and
+    ``buying_power`` are dollars. ``leverage`` is gross exposure as a
+    multiple of net worth, the value :meth:`Portfolio.leverage` returns, so
+    ``1.39`` means gross positions worth 1.39 times equity, and
+    ``max_leverage`` is the cap on that same multiple. Until 0.8.5 the
+    multiple was called ``gross_exposure``, which is the name of the
+    :class:`Portfolio` method that returns dollars.
+
+    ``portfolio.open_orders`` lists the agent's limit orders still waiting
+    in the book, oldest first, each as ``symbol``, ``side`` (BUY or SELL),
+    ``limit_price`` and ``remaining`` shares. An agent that sends limit
+    orders needs to see which of them are still working before it sends
+    another or a CANCEL.
+
+    The payload is version ``OBSERVATION_SCHEMA_VERSION`` and is frozen for
+    the 0.8.x line: no key is added, removed or renamed, and no value
+    changes meaning, in a 0.8.x patch release (``docs/SUPPORT.md``).
+    ``tests/test_integrations.py`` pins every key.
     """
     macro_state = obs.engine.macro_state
     macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
@@ -951,11 +1298,30 @@ def serialize_observation(obs: Any, *,
         "portfolio": {
             "cash": portfolio.cash,
             "net_worth": equity,
-            "gross_exposure": portfolio.leverage(obs.engine),
+            "leverage": portfolio.leverage(obs.engine),
             "max_leverage": limit,
             "buying_power": headroom,
+            "open_orders": open_orders_of(obs),
         },
     }
+
+
+def open_orders_of(obs: Any) -> list[dict[str, Any]]:
+    """The agent's waiting limit orders, as the payload shows them.
+
+    Read through the observation's portfolio, which knows only its own
+    orders, so no other agent's order can appear. A portfolio with no
+    ``open_orders`` method (a test double, an older custom view) has none
+    to show and gets an empty list.
+    """
+    reader = getattr(type(obs.portfolio), "open_orders", None)
+    if reader is None:
+        return []
+    return [{"symbol": order["ticker"],
+             "side": str(order["side"]).upper(),
+             "limit_price": order["limit_price"],
+             "remaining": order["remaining"]}
+            for order in obs.portfolio.open_orders(obs.engine)]
 
 
 def _window_return(rows: Sequence[Sequence[float]], i: int,
@@ -966,27 +1332,19 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
     the price did not move, and on day one that describes the record and not
     the market. From the number alone the agent cannot tell the two apart.
 
-    The longest window is one step short of its label, KNOWINGLY. A
-    five-day return needs ``steps + 1`` rows -- 31 at six steps a day --
-    and ``HISTORY_STEPS`` keeps 30, so once the buffer is full "return_5d"
-    spans 29 intervals: 4.83 days, permanently, labelled five. The honest
-    fix is ``HISTORY_STEPS = steps_per_day * 5 + 1``, and it is
-    deliberately not made: this value is rendered into every adapter's
-    recorded input, so correcting the arithmetic moves every committed
-    replay digest across all five fixture sets, replacing recorded
-    evidence to relabel a diagnostic. The number is the same for every
-    agent and both arms of any comparison; only its name overstates it by
-    a sixth of a day. Fix the arithmetic in the pass that next re-records
-    the fixtures for cause, and not before.
+    ``HISTORY_STEPS`` keeps 31 rows, so at six steps a day the five-day
+    return spans the 30 intervals its label says. It kept 30 until 0.8.5,
+    which made ``return_5d`` a 4.83-day return; the fix waited for the
+    payload freeze, which re-records every fixture anyway.
 
     The window is load-bearing beyond this file. The value it produces is
     rendered into FinRobot's prompt, and FinRobot's recorded replay keys
     are digests of that prompt -- so tuning the window moves every key in
     the committed transcript at ``tests/fixtures/finrobot/``, with no key
     change anywhere here to make that visible, and the shipped example and
-    notebook stop replaying. Adding a FIELD to the payload is safe (the
-    render names its fields one at a time); changing a rendered VALUE is
-    what invalidates a recording. FinRobot keeps its own byte-identical
+    notebook stop replaying. The payload is frozen for the 0.8.x line, so
+    neither the window nor any rendered value changes in a patch release.
+    FinRobot keeps its own byte-identical
     copy deliberately, and, in ``tests/test_finrobot.py``,
     ``test_the_serializer_agrees_with_the_shared_one`` compares the values
     -- which is what fails first if either side is tuned.
@@ -1039,7 +1397,10 @@ def jsonable(value: Any) -> Any:
     ``config_digest``, which the fork agreement compares.
     """
     if isinstance(value, Decision):
-        return value.as_dict()
+        # What the model wrote, when the decision was parsed from it, so a
+        # recording replays to the same refusals. See `Decision.source`.
+        return (copy.deepcopy(value.source) if value.source is not None
+                else value.as_dict())
     if isinstance(value, dict):
         return {str(k): jsonable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
@@ -1107,6 +1468,23 @@ class Transcript:
     preset does the same thing one step earlier -- every key misses, because
     every price the digest covers moved -- and the refusal a reader then
     meets names a step number rather than the cause.
+
+    An entry does not carry the market's seed, on purpose. The adapter is
+    never told the seed, so it has none to write, and passing it to agent
+    code so that it could be recorded would hand the agent what it needs to
+    rebuild the market and read the answers ahead of time. To audit a
+    multi-seed recording by seed, record each seed into its own transcript,
+    or put a seed-to-arm table in ``meta`` yourself.
+
+    :meth:`save` writes the entries sorted by arm, day, step and digest, so
+    recording the same run twice gives the same file even when
+    ``tf.rank(..., workers=4)`` appended the entries from four threads in
+    whatever order they finished. The order in memory, and in
+    :meth:`to_json`, stays the order the entries were recorded in. Replay
+    looks entries up by digest, so the sort cannot change what a replay
+    returns. The one case where order matters is a digest recorded twice,
+    where the later answer wins, and the sort keeps those entries in their
+    recorded order so the same answer still wins after a save and a load.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -1168,12 +1546,68 @@ class Transcript:
         floor, which market -- is :func:`stamp_artefact`'s, shared with
         ``finrobot.Transcript.save`` so the two cannot say different things
         about the same kind of file.
+
+        The bytes do not depend on thread timing either. Entries are
+        written in :func:`saved_order`, sorted by arm, day, step and
+        digest, so two recordings of one run through ``rank(workers=4)``
+        are the same file. Before 0.8.5 they were written in the order the
+        threads finished, and three recordings of one run gave three
+        different sha256s. The transcript in memory keeps its recorded
+        order.
         """
         import pathlib
         stamp_artefact(self.meta)
         target = pathlib.Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(self.to_json().encode("utf-8"))
+        text = json.dumps({"meta": self.meta,
+                           "entries": saved_order(self.entries)},
+                          indent=2) + "\n"
+        target.write_bytes(text.encode("utf-8"))
+
+
+def _position(value: Any) -> tuple[int, Any]:
+    """A sort key for a day or a step that tolerates a hand-built entry.
+
+    Numbers sort as numbers, a missing field sorts first, and anything else
+    sorts after every number by its text. A fixture written by hand can
+    hold any of these, and sorting it must not raise.
+    """
+    if value is None:
+        return (0, -1)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return (1, value)
+    return (2, str(value))
+
+
+def saved_order(entries: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """``entries`` in the order :meth:`Transcript.save` writes them.
+
+    Sorted by arm, day, step and digest, so the file does not depend on
+    the order threads appended to a shared recorder.
+
+    Lookup is by digest, so for a digest recorded once the order changes
+    nothing a replay can see. A digest recorded more than once is the
+    exception. :class:`Transcript` keeps the LAST of them, so a plain sort
+    could move a different answer into last place and change what the
+    replay returns. That happens when two forked arms, or two agents
+    sharing one recorder, are shown the same payload and answer it
+    differently. Entries that share a digest are therefore kept together
+    in the order they were recorded, placed where the first of them sorts,
+    and the answer that won before the save still wins after the load.
+    """
+    def key(entry: dict[str, Any]) -> tuple:
+        return (str(entry.get("arm", "")), _position(entry.get("day")),
+                _position(entry.get("step")), str(entry.get("digest", "")))
+
+    first: dict[Any, tuple] = {}
+    for entry in entries:
+        slot = key(entry)
+        name = entry.get("digest")
+        if name not in first or slot < first[name]:
+            first[name] = slot
+    ranked = sorted(range(len(entries)),
+                    key=lambda i: (first[entries[i].get("digest")], i))
+    return [entries[i] for i in ranked]
 
 
 def stamp_artefact(meta: dict[str, Any]) -> None:
@@ -1394,9 +1828,28 @@ def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
     so the value is the market of the FIRST recorded exchange. Both arms of
     a forked experiment share one recorder and one engine, so there is no
     second market to disagree with.
+
+    It also writes ``observation_schema_version`` and
+    ``decision_schema_version``, the payload and decision contracts the
+    recording was made under, which :func:`refuse_a_changed_payload` reads
+    back on replay, and ``tradefloor_version``, the library version that
+    made the recording, under the key :class:`~tradefloor.Checkpoint` uses. A
+    preset name means a particular model only within one build, so a
+    reader placing a recording needs the build as well as the name. It is
+    stamped here, while the recording is made, and not at save time,
+    because a save can happen later, under another version.
     """
     if recorder is None:
         return
+    from .. import __version__
+    recorder.meta.setdefault("tradefloor_version", __version__)
+    # The two contracts the recording was made under: the payload the model
+    # was shown and the decision shape it answered in. Stamped while the
+    # recording is made, for the reason given above for the version.
+    recorder.meta.setdefault("observation_schema_version",
+                             OBSERVATION_SCHEMA_VERSION)
+    recorder.meta.setdefault("decision_schema_version",
+                             DECISION_SCHEMA_VERSION)
     preset = preset_of(obs)
     if preset:
         recorder.meta.setdefault("model_preset", preset)
@@ -1408,6 +1861,34 @@ def stamp_preset(recorder: "Transcript | None", obs: Any) -> None:
     vector = vector_of(obs)
     if vector:
         recorder.meta.setdefault(PRESET_VECTOR_KEY, vector)
+
+
+def refuse_a_changed_payload(transcript: "Transcript | None") -> None:
+    """Refuse a replay of a recording made under another observation payload.
+
+    Every replay key is a digest of the payload the model was shown, so a
+    recording made under another payload version misses at step 0 whatever
+    else matches. This says so before the lookup, naming the two versions,
+    so the reader meets the cause and not a missing digest.
+
+    A recording with no ``observation_schema_version`` predates the stamp
+    (0.8.5) and is let through to the lookup, which refuses it on its own if
+    the payload moved. Raises :class:`ReplayMiss`, for the reason
+    :func:`refuse_a_changed_preset` gives.
+    """
+    if transcript is None:
+        return
+    recorded = (transcript.meta or {}).get("observation_schema_version")
+    if recorded is None or str(recorded) == OBSERVATION_SCHEMA_VERSION:
+        return
+    raise ReplayMiss(
+        f"this transcript was recorded under observation payload version "
+        f"{recorded}, and this tradefloor builds version "
+        f"{OBSERVATION_SCHEMA_VERSION}. Every replay key is a digest of the "
+        "payload the model was shown, so no recorded answer can match. "
+        "Replay it on the tradefloor release that recorded it "
+        f"({(transcript.meta or {}).get('tradefloor_version') or 'unknown'}), "
+        "or re-record the run live.")
 
 
 def refuse_a_changed_preset(transcript: "Transcript | None",
@@ -1593,6 +2074,7 @@ def replay_response(transcript: Transcript, key: str, *, step: int,
     written against the old signature keeps working; that adapter loses the
     diagnosis, not the refusal.
     """
+    refuse_a_changed_payload(transcript)
     refuse_a_changed_preset(transcript, preset)
     entry = transcript.entry_for(key)
     if entry is None:
@@ -1749,8 +2231,9 @@ def stamp_resume_counts(recorder: "Transcript | None",
 
 
 def refuse_changed_instructions(prior: "Transcript | None",
-                                current: str) -> None:
-    """Refuse a resume whose instructions are not the recorded ones.
+                                current: str, *,
+                                replaying: bool = False) -> None:
+    """Refuse a resume or a replay whose instructions are not the recorded ones.
 
     The transcript key is a digest of the INPUT, and an adapter's
     instructions do not travel in that input -- they reach the framework as
@@ -1769,12 +2252,31 @@ def refuse_changed_instructions(prior: "Transcript | None",
     worse off than they were. An adapter that leaves
     ``instructions_digest`` empty is in the same position, and the fix
     there is to stamp one.
+
+    ``replaying=True`` applies the same rule to a replay transcript, with
+    the remedy a replay needs. :class:`ReplayMixin` calls it that way at
+    construction. Until 0.8.5 only ``prior=`` was checked, so a
+    :class:`~tradefloor.integrations.callable.CallableAgentAdapter` whose
+    ``AdapterInfo`` named a new prompt replayed a recording made under the
+    old one and produced the recorded scorecard exactly, with no error and
+    no warning.
     """
     if prior is None:
         return
     recorded = (prior.meta or {}).get("instructions_digest")
     if not recorded or not current or recorded == current:
         return
+    if replaying:
+        raise ValidationError(
+            f"this transcript was recorded under different instructions "
+            f"(recorded {recorded}, current {current}). The instructions "
+            "do not travel in the input the replay is keyed on, so every "
+            "recorded key would still match and the run would complete, "
+            "answering the instructions you have now with decisions taken "
+            "under the ones you had then. Restore the instructions the "
+            "recording was made with, or re-record the run live. To replay "
+            "the file as a plain recording, build the adapter with no "
+            "instructions_digest in its AdapterInfo.")
     raise ValidationError(
         f"this prior transcript was recorded under different instructions "
         f"(recorded {recorded}, current {current}). The instructions do not "
@@ -1931,6 +2433,18 @@ class AdapterInfo:
                 else value
         return out
 
+    def _with(self, **changes: Any) -> "AdapterInfo":
+        """A copy with ``changes`` applied. ``self`` is left as it was.
+
+        A copy because one ``AdapterInfo`` is often handed to two adapters,
+        say a live one and a replaying one, and setting the mode on the
+        shared object would make the first report the second's mode.
+        """
+        fields = self.as_dict()
+        fields.pop("decision_schema_version")
+        fields.update(changes)
+        return AdapterInfo(**fields)
+
     def reference(self) -> str:
         """A one-line citation, for ``RunManifest.of(strategy=...)``."""
         parts = [" ".join(p for p in (self.framework, self.framework_version)
@@ -2012,6 +2526,9 @@ class FrameworkAdapter:
         #: :meth:`state` publishes the parts a fork has to agree on.
         self.record: list[dict[str, Any]] = []
         self._decision: dict[str, Any] | None = None
+        #: The actions refused at the last call to :meth:`act`, as
+        #: :meth:`refusals` returns them. Emptied at every call.
+        self._refusals: list[str] = []
         #: Staged by :meth:`record_exchange` during one ask(), consumed by
         #: :meth:`act` into the record entry, cleared before the next.
         self._exchange: dict[str, Any] | None = None
@@ -2110,8 +2627,12 @@ class FrameworkAdapter:
 
     # -- the agent protocol -----------------------------------------------
 
-    def act(self, obs: Any) -> dict[str, float]:
-        """Share deltas for this step. Empty on the steps between decisions.
+    def act(self, obs: Any) -> dict[str, Any]:
+        """The orders for this step. Empty on the steps between decisions.
+
+        Each value is what a Python agent's ``act()`` returns: a signed
+        share count for a market order, a :class:`tradefloor.Limit` for a
+        limit order, a :class:`tradefloor.Cancel` for CANCEL.
 
         The market advances every step; the framework is asked every
         ``every`` steps. On the steps in between, this records the prices it
@@ -2120,10 +2641,30 @@ class FrameworkAdapter:
 
         The Observation is read, never written: the same object is what the
         harness executes against after this returns.
+
+        One adapter instance is one run. Its price memory is never cleared,
+        so an instance handed to a second ``evaluate`` or ``World`` shows
+        its agent up to five days of the first market's prices in the
+        second run's returns and volatility. The first step of a run (day
+        0, step 0) arriving while that memory is not empty is the sign of
+        it, and this warns when it sees one. It warns and does not clear
+        the memory, because the payload the agent is shown must not change.
+        Build a fresh adapter for each run, as :func:`tradefloor.rank` does
+        with the factory it is given.
         """
+        if self.history and obs.step == 0 and getattr(obs, "day", 0) == 0:
+            warnings.warn(
+                f"{type(self).__name__} is starting a new run (day 0, step "
+                f"0) but still holds {len(self.history)} steps of prices "
+                "from an earlier one. This run's returns and volatility "
+                "will be computed partly from the other market's prices. "
+                "A replay shows that as missed digests, and a live run "
+                "shows nothing at all. Build a fresh adapter for each "
+                "evaluate() or World, as rank() does.", stacklevel=2)
         self.history.append(list(obs.prices))
         if len(self.history) > HISTORY_STEPS:
             self.history.pop(0)
+        self._refusals = []
 
         if obs.step % self.every:
             return {}
@@ -2145,8 +2686,13 @@ class FrameworkAdapter:
                 f"{exc}") from exc
 
         decision = parse_decision(raw)
+        # One list for both stages' refusals, so the decision records every
+        # action that did not reach the market and why.
+        refused = decision.refused
         orders, notes = orders_from(
-            decision, obs, max_participation=self.max_participation)
+            decision, obs, max_participation=self.max_participation,
+            refused=refused)
+        self._refusals = refusal_lines(refused)
 
         self._decision = {"step": obs.step, **decision.as_dict()}
         entry: dict[str, Any] = {"arm": self.arm, "step": obs.step,
@@ -2162,15 +2708,36 @@ class FrameworkAdapter:
         # FinRobot record and the Transcript use, so the three join without
         # translation. The response is always in hand -- it is what ask()
         # returned -- normalised to the JSON-able form the record needs.
+        #
+        # The response is what the framework said. An adapter whose ask()
+        # turns that into a decision on the way out (ReplayMixin with an
+        # `interpret` hook) stages the raw response in the exchange, so the
+        # record joins to the transcript, which holds the raw response too.
+        # With nothing staged, what ask() returned is the response.
+        response = raw
         if self._exchange is not None:
             entry["digest"] = self._exchange["digest"]
             entry["prompt"] = self._exchange["prompt"]
-        entry["response"] = raw.as_dict() if isinstance(raw, Decision) else raw
+            response = self._exchange.get("response", raw)
+        entry["response"] = (response.as_dict()
+                             if isinstance(response, Decision) else response)
         entry["decision"] = decision.as_dict()
-        entry["orders"] = dict(orders)
+        entry["orders"] = recorded_orders(orders)
         entry["clipped"] = notes
         self.record.append(entry)
         return orders
+
+    def refusals(self) -> list[str]:
+        """The actions refused at the last call to :meth:`act`, one line each.
+
+        A bad action is refused on its own and the rest of the decision
+        trades, so the refusal never reaches the harness as an exception.
+        :func:`tradefloor.evaluate` calls this after every ``act()`` and
+        writes each line to the scorecard's ``errors``, so a refused action
+        is in the score as well as in :attr:`record`. Empty on a step with
+        no decision.
+        """
+        return list(self._refusals)
 
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
@@ -2220,8 +2787,13 @@ class FrameworkAdapter:
         :class:`AdapterInfo` because they are this adapter's settings, not
         the framework's identity -- but a recording needs both halves, so
         this is the one dictionary a recorder should write.
+
+        It also carries ``observation_schema_version``, the payload version
+        the agent was shown, beside the ``decision_schema_version`` the
+        info stamps.
         """
         out = self.info.as_dict()
+        out["observation_schema_version"] = OBSERVATION_SCHEMA_VERSION
         out["decision_every_steps"] = self.every
         out["max_participation"] = self.max_participation
         return out
@@ -2309,6 +2881,22 @@ class ReplayMixin:
     - :meth:`call` performs one live framework interaction and returns the
       raw response. Replay mode never reaches it, which is what makes a
       replayed run need no framework, no network and no API key.
+
+    One optional hook, for code that runs after the model answers:
+
+    - :meth:`interpret` turns the raw response into what ``ask`` returns.
+      The default returns it unchanged. The transcript always holds the raw
+      response, and ``interpret`` runs on it in both modes, so parsing a
+      tool call, a risk check or position sizing written here is exercised
+      by every replay. Code of that kind placed inside :meth:`call` is
+      recorded as its output and never runs again on replay.
+
+    The mixin also keeps the adapter's ``AdapterInfo.mode`` equal to the
+    mode it runs in, refuses a replay transcript whose recorded
+    ``instructions_digest`` differs from the adapter's own (see
+    :func:`refuse_changed_instructions`), and writes the adapter's
+    :meth:`~FrameworkAdapter.provenance` into a recorder whose ``meta`` does
+    not yet name its instructions, as the framework adapters do.
     """
 
     def __init__(self, *, mode: str = "replay",
@@ -2325,8 +2913,18 @@ class ReplayMixin:
                 "framework.")
         super().__init__(**kwargs)
         self.mode = mode
+        # The mode the adapter RUNS in, which is what AdapterInfo.mode is
+        # for. It was left as given, so a callable adapter's provenance
+        # said "" in both modes. Neither the replay key nor any prompt
+        # reads the info, so this changes what a recording says about
+        # itself and nothing it replays.
+        if self.info.mode != mode:
+            self.info = self.info._with(mode=mode)
         self.transcript = transcript
         self.recorder = recorder
+        if mode == "replay":
+            refuse_changed_instructions(
+                transcript, self.info.instructions_digest, replaying=True)
         self.prior = check_prior(
             prior, mode=mode, recorder=recorder,
             instructions_digest=self.info.instructions_digest)
@@ -2359,23 +2957,42 @@ class ReplayMixin:
             "return the raw response; replay mode never reaches this "
             "method.")
 
+    def interpret(self, response: Any, payload: dict[str, Any]) -> Any:
+        """What ``ask`` returns for ``response``. Optional; identity here.
+
+        ``response`` is the raw response, recorded or live, and ``payload``
+        is the serialized observation it answers. Return anything
+        :func:`parse_decision` accepts. Raise :class:`DecisionError` to
+        refuse the response, which charges the agent the step as any other
+        refusal does.
+
+        It runs in both modes, after the transcript has been read or
+        written, so the transcript and :attr:`~FrameworkAdapter.record`
+        both hold the raw response and a replay re-runs this code on it.
+        """
+        return response
+
     # -- the shared skeleton ----------------------------------------------
 
     def ask(self, obs: Any, payload: dict[str, Any]) -> Any:
         """One decision, replayed or live, recorded either way.
 
         The key is a digest of the INPUT, never of a position: change the
-        observation mapping or the instructions and the key goes missing
-        and the replay REFUSES, naming the step, instead of answering the
-        new question with a response given to the old one.
+        observation mapping, or anything else :meth:`prepare` puts in the
+        key material, and the key goes missing and the replay REFUSES,
+        naming the step, instead of answering the new question with a
+        response given to the old one. Instructions that do not travel in
+        the key material are checked separately, by ``instructions_digest``
+        at construction.
         """
         key_material, prompt = self.prepare(obs, payload)
         key = digest(key_material)
         self.record_exchange(prompt, key=key)
         if self.mode == "replay":
-            return replay_response(self.transcript, key,
-                                   step=obs.step, day=obs.day,
-                                   preset=preset_of(obs))
+            response = replay_response(self.transcript, key,
+                                       step=obs.step, day=obs.day,
+                                       preset=preset_of(obs))
+            return self._interpreted(response, payload)
         # A `prior` recording is consulted first. The market is
         # deterministic, so a resumed run reaches the same prompts and the
         # same digests, and a recorded answer is still an answer to the
@@ -2390,13 +3007,28 @@ class ReplayMixin:
             # replay must return the same shape -- a JSON string
             # json.dumps'd here would replay one parse level short, against
             # a recording that looked fine when it was written.
+            #
+            # The recorder describes itself on its first write, as every
+            # framework adapter's does: a replay can only refuse changed
+            # instructions if the recording says what it ran under, and a
+            # guard that needs somebody to remember `meta` is off in the
+            # runs nobody was careful about. Keys already in `meta` win.
+            if "instructions_digest" not in self.recorder.meta:
+                for field, value in self.provenance().items():
+                    self.recorder.meta.setdefault(field, value)
             stamp_preset(self.recorder, obs)
             self.recorder.record({
                 "arm": self.arm, "step": obs.step, "day": obs.day,
                 "digest": key, "prompt": prompt, "response": response,
             })
             stamp_resume_counts(self.recorder, self.prior)
-        return response
+        return self._interpreted(response, payload)
+
+    def _interpreted(self, response: Any, payload: dict[str, Any]) -> Any:
+        """Stage the raw response for the record, then :meth:`interpret` it."""
+        if self._exchange is not None:
+            self._exchange["response"] = response
+        return self.interpret(response, payload)
 
     def reask(self, entry: Any) -> Any:
         """One more answer, straight through :meth:`call`.
@@ -2407,7 +3039,11 @@ class ReplayMixin:
         the same answer N times and report a noise floor of zero.
         """
         refuse_replay_reask(self.mode, type(self).__name__)
-        return self.call(moment_of(entry), entry.get("prompt"))
+        # Through `interpret`, because `resample` parses what this returns,
+        # and a raw response ask() would have interpreted first is not
+        # always a decision.
+        return self.interpret(self.call(moment_of(entry), entry.get("prompt")),
+                              entry.get("payload"))
 
     def fork_kwargs(self) -> dict[str, Any]:
         kwargs = super().fork_kwargs()

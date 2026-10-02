@@ -199,6 +199,28 @@ def _mutations(label, value):
         # only empty list this walk met before draw addressing added a
         # second one, and it is not this field's shape.
         yield label, [(0, 0, 0, 0.5)]
+    elif isinstance(value, dict) and "ticker" not in value:
+        # A nested block, walked field by field: the economy's
+        # `gdp_publication` (the published figure, the quarter, its count
+        # and sum, the pending releases), which pt-v20 carries since its
+        # graded arm (2026-09-26) set `gdp_publication_lag`. Before that no
+        # snapshot the walk met nested a dict below the economy.
+        for key, inner in value.items():
+            if key in ("pending_days", "pending_values") and not inner:
+                continue
+            for sub, moved in _mutations(f"{label}.{key}", inner):
+                yield sub, {**value, key: moved}
+        if not value.get("pending_days") and "pending_days" in value:
+            # No release pending: the two lists move together, as one
+            # release, since a day without a figure is not a state.
+            yield (f"{label}.pending_days[]",
+                   {**value, "pending_days": [1], "pending_values": [1.0]})
+    elif isinstance(value, list) and value and all(
+            isinstance(v, (int, float)) and not isinstance(v, bool)
+            for v in value) and label.startswith("economy.gdp_publication."):
+        for i, element in enumerate(value):
+            yield (f"{label}[{i}]",
+                   value[:i] + [_moved(element)] + value[i + 1:])
     elif isinstance(value, list) and value:
         for i, element in enumerate(value):
             yield (f"{label}[{i}]",
@@ -234,7 +256,20 @@ def _walk(snapshot):
 #: `vix_anchor_memory` off zero (`manifest.state_hash`). pt-v19 carries it
 #: since its fifth composition (2026-09-23) and pt-v18 does not, so the walk
 #: below runs on both and each must cover exactly what it carries.
-CONDITIONAL_KEYS = {"pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
+#: pt-v20 carries two more, together: the fair-value levels and the
+#: unapplied opening draws, because it can move a level; and its economy
+#: carries `earnings_cycle`, because the cycle is on.
+CONDITIONAL_KEYS = {"pt-v20": {"vix_anchor_slow", "fair_value_offset",
+                               "opening_z"},
+                    "pt-v19": {"vix_anchor_slow"}, "pt-v18": set()}
+#: Since its graded arm (2026-09-26) pt-v20's economy also carries the
+#: state its publication dials and the volatility feedback add: the phase
+#: history, the published GDP figure, the unemployment impulse and the
+#: smoothed VIX exposure. Was {"earnings_cycle"}.
+CONDITIONAL_ECONOMY_KEYS = {"pt-v20": {"earnings_cycle", "cycle_history",
+                                       "gdp_publication",
+                                       "unemployment_impulse",
+                                       "vix_feedback"}}
 
 
 @pytest.mark.parametrize("preset", sorted(CONDITIONAL_KEYS))
@@ -267,15 +302,26 @@ def test_the_hash_moves_when_any_snapshot_field_moves(preset):
     snapshot = engine.state_snapshot()
     base = state_hash(snapshot)
 
-    fields = list(_walk(snapshot))
+    # `session_tick` is carried and deliberately not hashed
+    # (`manifest._UNHASHED_KEYS` says why), so it is walked apart: moving it
+    # must leave the leaf where it was.
+    unhashed = set(mf._UNHASHED_KEYS)
+    assert unhashed <= set(snapshot)
+    for label, mutated in _walk({k: snapshot[k] for k in unhashed}):
+        assert state_hash(dict(snapshot, **mutated)) == base, label
+    fields = [(label, mutated) for label, mutated in _walk(snapshot)
+              if label.split("[")[0].split(".")[0] not in unhashed]
     labels = [label for label, _ in fields]
     named = {label.split("[")[0] for label in labels}
     assert {name.split(".")[0] for name in named} == (
         set(mf._SNAPSHOT_KEYS) | CONDITIONAL_KEYS[preset])
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("columns.")} == set(mf._STATE_HASH_COLUMNS)
-    assert {name.split(".", 1)[1] for name in named
-            if name.startswith("economy.")} == set(mf._ECONOMY_KEYS)
+    # The economy key, not a nested block's field under it.
+    assert {name.split(".")[1] for name in named
+            if name.startswith("economy.")} == (
+                set(mf._ECONOMY_KEYS)
+                | CONDITIONAL_ECONOMY_KEYS.get(preset, set()))
     assert {name.split(".", 1)[1] for name in named
             if name.startswith("central_bank.")} == set(
                 mf._CENTRAL_BANK_FIELDS)
@@ -989,10 +1035,12 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     at all, so the boundary test is the one that matters here: the run
     ledgers, and replaying its log rebuilds the same leaves.
 
-    The two leaves themselves differ, in one field that is not the market.
-    `close_market` clears the binding's session flag and the `close_at_end`
-    path leaves it set, so a snapshot taken at the two boundaries carries
-    `market_open` False and True. Every other field the hash covers -- the
+    The two leaves themselves differ, in one field that is not the market
+    and in what that field leaves the snapshot to carry. `close_market`
+    clears the binding's session flag and the `close_at_end` path leaves it
+    set, so a snapshot taken at the two boundaries carries `market_open`
+    False and True, and since 0.8.5 the session-closed one carries the day
+    just closed as well. Every other field the hash covers -- the
     columns, the generators, the macro chain, the central bank -- is
     identical, and the pinned equality below is what would fail if that
     stopped being true. The flag itself is the binding's to change, and
@@ -1028,6 +1076,16 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
     assert left["market_open"] is False and right["market_open"] is True
     aligned = dict(right)
     aligned["market_open"] = False
+    # The flag also decides which day a snapshot takes for granted: the
+    # counter's while it is set, the day just closed once it is clear. With
+    # it set after a close the day just closed is not the one taken for
+    # granted, so the session-closed snapshot carries it (and its hash covers
+    # it), which is what lets a restore at that boundary number the next
+    # fill and price the next open as the original does. With the flag
+    # cleared it is the day taken for granted again, and is not carried.
+    assert right["current_day"] == right["elapsed_days"] == 2
+    assert "current_day" not in left and "elapsed_days" not in left
+    del aligned["current_day"], aligned["elapsed_days"]
     assert state_hash(left) == state_hash(aligned), (
         "the two spellings of a close differ in the session flag alone; "
         "something else in the state has moved"
@@ -1037,7 +1095,7 @@ def test_a_session_closed_day_ledgers_like_an_explicit_close():
 #: Every per-slot array a snapshot carries, and the f64 slots each holds per
 #: instrument. The columns are added at runtime, since the snapshot names
 #: them itself.
-_PER_SLOT = {"attribution": len(tf.Engine.FACTORS), "tick_components": 8, "tick_fundamental": 1,
+_PER_SLOT = {"attribution": len(tf.Engine.FACTORS), "tick_components": 9, "tick_fundamental": 1,
              "tick_anchor": 1, "volume_idio": 1}
 
 
@@ -1235,3 +1293,29 @@ def test_the_hash_reads_every_field_of_an_overlay_entry():
 
     # the prices are untouched, so this is the overlay and nothing else
     assert list(one.prices()) == list(plain.prices())
+
+
+def test_a_pre_open_pt_v20_snapshot_restores_its_opening_draws():
+    """The unapplied opening draws are state, and the snapshot carries them.
+
+    pt-v20 opens each name's mispricing, and the market's common level, at
+    draws taken when the engine is built and applied at the first open. The
+    state hash covered them and the snapshot did not, so a snapshot taken
+    before the open and restored into an engine of another seed opened at
+    that engine's draws: it hashed apart at once and traded other prices a
+    day later. pt-v19 takes no opening draws and carries none.
+    """
+    source = tf.Engine(seed=SEED, universe=UNIVERSE, model="pt-v20")
+    snapshot = source.state_snapshot()
+    assert len(snapshot["opening_z"]) == 8 * (len(UNIVERSE) + 1)
+    other = tf.Engine(seed=SEED + 1, universe=UNIVERSE, model="pt-v20")
+    other.restore_state(snapshot)
+    assert other.state_hash() == source.state_hash() == state_hash(snapshot)
+    for engine in (source, other):
+        engine.run_days(1, record=False, ticks_per_day=TICKS)
+    assert other.state_snapshot()["opening_z"] == b""
+    assert other.state_hash() == source.state_hash()
+    assert list(other.prices()) == list(source.prices())
+    assert "opening_z" not in tf.Engine(
+        seed=SEED, universe=UNIVERSE, model="pt-v19").state_snapshot()
+
