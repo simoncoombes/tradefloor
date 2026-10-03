@@ -26,6 +26,12 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "release"))
+sys.path.insert(0, str(ROOT / "tools" / "ci"))
+
+import kat_history  # noqa: E402
+import metadata as md  # noqa: E402
+
 MARKER = "<!-- release-note-ends -->"
 BUDGET = 250
 
@@ -54,28 +60,10 @@ def read(name: str) -> str:
 
 
 def declared_versions() -> dict[str, str]:
-    """The version as each file that carries it states it."""
-    out: dict[str, str] = {}
-    m = re.search(r'(?m)^version = "([^"]+)"', read("pyproject.toml"))
-    if m:
-        out["pyproject.toml"] = m.group(1)
-    m = re.search(r'(?m)^version = "([^"]+)"', read("rust/Cargo.toml"))
-    if m:
-        out["rust/Cargo.toml"] = m.group(1)
-    m = re.search(r"(?m)^version: (.+)$", read("CITATION.cff"))
-    if m:
-        out["CITATION.cff"] = m.group(1).strip()
-    # The MCP Registry entry names the version three times: the server's,
-    # the PyPI package's, and the extra that `uvx --with` installs.
-    server = json.loads(read("server.json"))
-    out["server.json"] = server["version"]
-    for i, pkg in enumerate(server["packages"]):
-        out[f"server.json package {i}"] = pkg["version"]
-        for arg in pkg.get("runtimeArguments", []):
-            pin = re.search(r"==(.+)$", arg.get("value", ""))
-            if pin:
-                out[f"server.json package {i} --with"] = pin.group(1)
-    return out
+    """The version as each file that carries it states it. The list of
+    files is `metadata.VERSION`, which `bump.py` rewrites and
+    `tests/test_metadata_consistency.py` checks."""
+    return md.declared_versions()
 
 
 def check_versions(r: Report, intended: str | None) -> None:
@@ -92,11 +80,17 @@ def check_versions(r: Report, intended: str | None) -> None:
         return
     r.add("version locations agree", OK, found)
 
-    # The date a citation carries. It went stale at 0.3.0, under a version
-    # that had moved, and nothing tests it.
+    # The date a citation carries. It went stale at 0.3.0 and at 0.8.5,
+    # under a version that had moved. The release workflow fails a tag more
+    # than a day from it; this shows it so it can be set before the tag.
     m = re.search(r'(?m)^date-released: "?([0-9-]+)"?', read("CITATION.cff"))
     r.add("CITATION.cff date-released", OK if m else BAD,
           m.group(1) if m else "missing")
+
+    drift = md.drift()
+    r.add("every copy agrees with its source", OK if not drift else BAD,
+          "version, year, preset" if not drift
+          else f"{drift[0]}; fix with tools/release/bump.py")
 
 
 def check_changelog(r: Report, intended: str | None) -> None:
@@ -142,7 +136,7 @@ def check_build(r: Report, tf) -> str | None:
     if tf is None:
         r.add("tradefloor importable", BAD, "run `maturin develop --release`")
         return None
-    declared = declared_versions().get("pyproject.toml")
+    declared = md.package_version()
     same = tf.version() == declared
     r.add("installed build matches the tree", OK if same else BAD,
           f"installed {tf.version()}, tree {declared}"
@@ -151,15 +145,13 @@ def check_build(r: Report, tf) -> str | None:
 
 
 def check_readme(r: Report, default_preset: str | None) -> None:
-    """The README names the default preset in prose, twice."""
+    """The READMEs name the default preset in prose, in the sentences
+    `metadata.PRESET_PROSE` matches."""
     if default_preset is None:
         r.add("README names the shipped default", SKIP, "no build")
         return
-    text = read("README.md")
-    stale = sorted({p for p in re.findall(r"pt-v\d+", text)
-                    if p != default_preset
-                    and re.search(rf"default preset, `{p}`|`{p}` became the default",
-                                  text)})
+    stale = sorted({f"{path} {p}" for path, p in md.preset_prose()
+                    if p != default_preset})
     r.add("README names the shipped default", OK if not stale else BAD,
           default_preset if not stale else f"still says {', '.join(stale)}")
 
@@ -221,6 +213,21 @@ def check_determinism(r: Report) -> None:
               "the trajectory moved; bump KAT_VERSION and regenerate")
 
 
+def check_kat_history(r: Report) -> None:
+    """A digest that moved since the last tag moved with a bump and a note."""
+    try:
+        ref = kat_history.newest_tag()
+    except SystemExit as exc:
+        r.add("known answers moved with a bump", BAD, str(exc).splitlines()[0])
+        return
+    found = [line for name in kat_history.RULES
+             for line in kat_history.problems(
+                 name, kat_history.at(ref, name),
+                 json.loads(read(name)))]
+    r.add("known answers moved with a bump", OK if not found else BAD,
+          f"against {ref}" if not found else found[0])
+
+
 def check_prose(r: Report) -> None:
     out = subprocess.run([sys.executable, "tools/prose/prose.py"], cwd=ROOT,
                          capture_output=True, text=True, encoding="utf-8")
@@ -253,6 +260,7 @@ def main() -> int:
     check_preset_record(r, tf, default_preset)
     check_envelope(r, tf)
     check_determinism(r)
+    check_kat_history(r)
     check_prose(r)
     code = r.render()
 

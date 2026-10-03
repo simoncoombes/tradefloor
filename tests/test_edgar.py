@@ -136,19 +136,17 @@ def test_prices_start_at_fair_value():
     harvests mispricing sees nothing until shocks accumulate.
     """
     instruments = to_instruments(snapshot(), **MACRO)
-    # Under the SAME model the loader priced with. The loader takes the
-    # shipped default's `neutral_discount_rate`, and an expectation computed
-    # at `fair_value`'s own default would be checking that the loader used
-    # the constant rather than that it used the model -- which is the defect
-    # this argument exists to prevent, not the property under test.
-    neutral = tradefloor.ModelParams.from_preset().to_dict()[
-        "neutral_discount_rate"]
+    # Under the SAME model the loader priced with, the shipped default. An
+    # expectation from `fair_value` with no model would be checking that the
+    # loader used the reference constants rather than the model, which is
+    # the defect the `model` argument exists to prevent.
+    default = tradefloor.ModelParams.from_preset()
     for inst, row in zip(instruments, ROWS):
         expected = tradefloor.fair_value(
             eps=row["eps"], sector=row["sector"],
             revenue_growth=row["revenue_growth"],
             book_value_per_share=row["book_value_per_share"],
-            neutral_discount_rate=neutral, **MACRO)
+            model=default, **MACRO)
         assert inst.initial_price == expected.fair_value
 
 
@@ -163,15 +161,13 @@ def test_the_loader_prices_under_the_model_it_is_given():
     0.0005, and the gap to a MISMATCHED rate regime fell from 201x to 4.9x.
     """
     for preset in ("pt-v16", "pt-v18"):
-        neutral = tradefloor.ModelParams.from_preset(preset).to_dict()[
-            "neutral_discount_rate"]
         instruments = to_instruments(snapshot(), model=preset, **MACRO)
         for inst, row in zip(instruments, ROWS):
             expected = tradefloor.fair_value(
                 eps=row["eps"], sector=row["sector"],
                 revenue_growth=row["revenue_growth"],
                 book_value_per_share=row["book_value_per_share"],
-                neutral_discount_rate=neutral, **MACRO)
+                model=preset, **MACRO)
             assert inst.initial_price == expected.fair_value, (preset, inst.ticker)
     # And the two really do differ, so the loop above is not comparing a
     # constant with itself.
@@ -673,8 +669,8 @@ def test_the_stationary_width_is_the_model_s_own_not_a_chosen_number():
     kind of thing that looks right and is off by a factor.
     """
     for sector in tradefloor.sectors():
-        daily = tradefloor.sector_daily_sigma(sector)
-        width = tradefloor.stationary_sigma(daily)
+        daily = tradefloor._core.sector_daily_sigma(sector)
+        width = tradefloor._core.stationary_sigma(daily)
         assert width is not None
         # The process amplifies its innovations about 7.6x at rest.
         assert width / daily == pytest.approx(7.636, rel=1e-3)
@@ -768,10 +764,10 @@ def test_an_unknown_mode_is_refused():
 
 def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
     with pytest.raises(tradefloor.ValidationError, match="finite"):
-        tradefloor.stationary_sigma(float("nan"))
+        tradefloor._core.stationary_sigma(float("nan"))
     # A unit root has infinite variance. None rather than a large finite
     # number, which would be worse: it would get used.
-    assert tradefloor.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
+    assert tradefloor._core.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
 
 
 # --------------------------------------------------------------------------

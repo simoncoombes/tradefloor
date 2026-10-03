@@ -183,7 +183,7 @@ def g_consts(ctx: Ctx) -> dict:
         "idio_sigma_scale": const(fvol_rs, "IDIO_SIGMA_SCALE"),
         "crisis_vix_threshold": const(econ_rs, "CRISIS_VIX_THRESHOLD"),
         "spread_formula_present": spread_formula,
-        "impulse_day2": pt.impulse_response(3)[2],
+        "impulse_day2": pt._core.impulse_response(3)[2],
         "truth_cols": truth_cols,
         "book_rows_per_tick_per_name": rows_per_snapshot,
     }

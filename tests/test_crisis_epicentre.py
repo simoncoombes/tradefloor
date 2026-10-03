@@ -360,7 +360,7 @@ def test_the_epicentre_moves_up_the_others_move_down_and_the_mean_is_held():
     """
     sectors = _by_sector(engine(live()))
     target = next(s for s, idx in sectors.items() if idx)
-    solve = tf.crisis_epicentre_solve(EXTRA)
+    solve = tf._core.crisis_epicentre_solve(EXTRA)
     up, down = solve["gain_up"], solve["gain_down"]
     assert up > 1.0 > down
 
@@ -453,7 +453,7 @@ def test_the_solved_pair_satisfies_both_equations():
     numbers and puts them back into the two equations they came from.
     """
     for extra in (0.61, 1.0, 1.41, EXTRA, 2.43, 3.0, 4.0):
-        s = tf.crisis_epicentre_solve(extra)
+        s = tf._core.crisis_epicentre_solve(extra)
         m, w = s["market_share"], s["sector_share"]
         up2 = s["gain_up"] ** 2
         down2 = s["gain_down"] ** 2
@@ -470,9 +470,9 @@ def test_the_solved_pair_satisfies_both_equations():
     # refused one, and a name silenced to 1e-8 is not a value anyone wants
     # either way: the interval is open, and the invariant refuses everything
     # past it.
-    ends = tf.crisis_epicentre_solve(EXTRA)
-    assert tf.crisis_epicentre_solve(ends["extra_min"])["gain_up"] < 1e-7
-    assert tf.crisis_epicentre_solve(ends["extra_max"])["gain_down"] < 1e-7
+    ends = tf._core.crisis_epicentre_solve(EXTRA)
+    assert tf._core.crisis_epicentre_solve(ends["extra_min"])["gain_up"] < 1e-7
+    assert tf._core.crisis_epicentre_solve(ends["extra_max"])["gain_down"] < 1e-7
 
 
 def test_the_multiples_are_the_solve_and_not_the_dial():
@@ -506,7 +506,7 @@ def test_an_extra_outside_the_solve_s_interval_is_refused():
     ways. Under 0.6052 the epicentre's own non-market variance would have to
     be negative; over 4.0307 everyone else's would, since the roster's mean
     is held. Refused where it is set, not at the tick."""
-    ends = tf.crisis_epicentre_solve(EXTRA)
+    ends = tf._core.crisis_epicentre_solve(EXTRA)
     assert ends["extra_min"] == pytest.approx(0.6052, abs=1e-4)
     assert ends["extra_max"] == pytest.approx(4.0307, abs=1e-4)
     for bad in (0.5, 5.0):

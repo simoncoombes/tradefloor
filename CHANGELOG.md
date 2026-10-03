@@ -1,3 +1,96 @@
+## Unreleased
+
+A correctness pass. No coefficient, default or trajectory changes: every
+known-answer digest is 0.8.8's, and `pt-v20` stays the default. It adds API
+and refuses input 0.8.8 accepted, which the 0.8 LTS rules do not allow in a
+patch, so it is meant for 0.9.0.
+
+`Engine.restore_state` now refuses a snapshot that lacks a field, carries an
+unknown one or holds a malformed value, and names the field. It used to keep
+the engine's own value for a missing field (#184). Snapshots carry
+`state_schema`; those written by 0.8.5 to 0.8.8 restore unchanged, and
+earlier ones are refused.
+
+`tradefloor.fair_value(..., model=)` equals the engine's valuation to the
+bit, and without a model it returns what it always has (#176). The new
+`Engine.fair_values()` returns each name's fair value as the next tick
+starts from it.
+
+`order_flow_depth_law`, a new switch that is 0 on every preset, divides
+order-flow impact by a name's depth once instead of twice (#182).
+
+`Scenario.starting_at(day)` and `World.apply(scenario, at=day)` start a
+packaged scenario on a chosen day (#132).
+
+Ten engine internals warn when read from the top level, so import them from
+`tradefloor._core`. They stay until 0.10.0 at the earliest, and a star
+import still binds them without a warning.
+
+<!-- release-note-ends -->
+
+### Restored state
+
+A refused restore now leaves the engine as it was; before, the fields read
+before the bad one stayed written. `economy.qe_assets_ratio` is carried under
+`qe_pe_stock_gain`, which a restored engine used to price off 1.0.
+`DayLedger.to_json` no longer raises on a snapshot with `garch_cascade` or
+`fundamentals`, and `World.checkpoint()` records the version and era it was
+written under. No state hash moves: `state_schema` is outside both hashes.
+
+### Fair value
+
+`fair_value` takes each value in which an engine's valuation can differ from
+the reference (`qe_pe_gain`, `qe_pe_stock_gain`, `rate_pe_sensitivity`,
+`fair_value_book_floor`, `qe_assets_ratio`), or all of them through `model=`;
+passing both is refused. `edgar.to_instruments` now prices under the whole
+model. On pt-v19 under a QE boost it priced names 6% above the engine.
+
+### Order-flow impact
+
+Order-flow impact divided by a name's depth twice, so at equal participation
+a thin name paid far more than a liquid one: 1,500 times across minute
+volumes of 154 and 230,769 shares. At 1 the new switch divides once,
+restated so a name trading a million shares a day pays the same under either
+setting. The switch is left out of `ModelParams.digest()` and the preset
+records while it is 0, so adding it renames no model and moves no record. `order_flow_impact_law` no longer returns NaN for
+flow too large to sum. Untraded runs on any preset, and traded runs on
+pt-v20, are bit-identical with the switch on; traded runs on pt-v19 and
+earlier are not, because agents' fills reach this channel there.
+
+### Scenarios
+
+`Scenario.origins` records the packaged file's fingerprint, the shift and the
+effective days, and the run manifest carries it without counting it in any
+fingerprint. A `World` advanced over several `run()` calls now keeps a hold
+or ramp running across them and releases quoted depth when a window ends on a
+call boundary; before, the first raised and the second left depth at 40%.
+`World.apply` refuses a scenario with pins, which it used to drop.
+
+### The smaller issues
+
+After a delisting, the recorded `jump`, `overnight` and `fair_value_shift`
+columns put each waiting move on the next name's row, and `delist` now drops
+the delisted name's entry (#154). `FinRobotAdapter.fork()` builds the twin
+from `fork_kwargs()`, so a subclass's added argument reaches both arms (#151). The known-answer scripts print `tradefloor`, not
+`pretium` (#160). Two tests that could not fail now can (#134, #159), and two
+that failed on Python 3.12 and 3.13 compare against the left-to-right sum.
+
+### Release metadata and CI
+
+`tools/release/bump.py` writes the version, release date and cited preset
+into every file that carries them, and a test fails when any copy disagrees.
+Documentation links point at docs.tradefloor.dev. CI now runs the test
+batches on 3.13 as well as 3.11, executes every example notebook, installs
+the wheel into an empty environment, and fails a known-answer digest that
+moved without a version bump and a note. `tradefloor._api` lists every
+top-level name with its tier, and a test fails on an unclassified one.
+
+### README
+
+The README is now an entry point. The realism tables, the agent sandbox's
+measurements, the framework adapters and the citation machinery moved to
+`docs/REALISM.md`, `docs/AGENTS.md` and `docs/REPRODUCIBILITY.md`.
+
 ## 0.8.8
 
 A patch release on the 0.8 long-term support line. No coefficient, default

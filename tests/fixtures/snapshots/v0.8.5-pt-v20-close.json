@@ -1,0 +1,597 @@
+{
+ "continued": {
+  "price_sha256": "03636bbc86cdcc4c45c00d99b5bfab18f0a7eb12fc560dcc5b329f45d062fbeb",
+  "state_hash": "f2d0ebeca49c250f02e8d2959abe8b84053cd1f2df0afe62691efaf24aaaded8"
+ },
+ "preset": "pt-v20",
+ "seed": 11,
+ "snapshot": {
+  "attribution": {
+   "bytes": "zxj5cFpsyb7NSYcqhDiAvhj/j1UumLy+3nfxKqqsjr8AAAAAAAAAAAAAAAAAAAAACQRtZzVwdz8AAAAAAAAAAGi6PDhgMS0/AAAAAAAAAAB10bmijluBPy8c8M6VxOS+JkJRI34MiL6t2CmZC2LWvgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALeRULXn2Xy/AAAAAAAAAABgujw4YDEtPwAAAAAAAAAAdzbyzE86eT+OE0OLp27yvn8PcfpMPpC+gu3kV5+x474AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABIaIYGYINtPwAAAAAAAAAAYLo8OGAxLT8AAAAAAAAAAPah/SreznK/FiFHU0ec+D7mvXyZxmxfvqKuiAaDf+k+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5GzXvgfLeb8AAAAAAAAAAIC6PDhgMS0/AAAAAAAAAACK7MBXQ1B1Pw=="
+  },
+  "central_bank": {
+   "forward_guidance": "ongoing_increases",
+   "hawkish_dovish_score": 0.6000000000000001,
+   "last_meeting_date": -14400,
+   "next_meeting_date": 36000,
+   "qe_active": false,
+   "qe_monthly_purchases": 0.0,
+   "target_inflation": 2.0,
+   "target_unemployment": 4.0
+  },
+  "columns": {
+   "avg_volume": {
+    "bytes": "AAAAAIBPEkEAAAAAAGoYQQAAAACAhB5BAAAAAIBPIkE="
+   },
+   "beta": {
+    "bytes": "mpmZmZmZ6T9nZmZmZmbuP5qZmZmZmfE/AAAAAAAA9D8="
+   },
+   "float_shares": {
+    "bytes": "AAAAAKPhoUEAAAAA/UOkQQAAAABXpqZBAAAAALEIqUE="
+   },
+   "garch_variance": {
+    "bytes": "Oj8baXq9ND/zl+QRfsggP6kX6kt+Sx8/C8JBzzEuJz8="
+   },
+   "high": {
+    "bytes": "aV6XTO/4M0CamZmZmRk7QOxRuB6FS0FApHA9CtfDREA="
+   },
+   "last_daily_return": {
+    "bytes": "bK0AuENBf7/mEqvzGgt8v7sBAjgO8XE/FgTFOfoseL8="
+   },
+   "low": {
+    "bytes": "XI/C9SicM0DXo3A9Ctc6QD0K16NwHUFACtejcD2KREA="
+   },
+   "maker_inventory": {
+    "bytes": "AAAAAABJwEAAAAAAAJy1QAAAAAAAXLBAAAAAAAA8x0A="
+   },
+   "market_cap": {
+    "bytes": "aV6596gr5kGZa4cqMw3xQQrwnoVNcfhBHU1je54WAEI="
+   },
+   "mispricing_momentum": {
+    "bytes": "6oDhM3FsQr/g8zNrvjFGvyg6HbNcAUq/EK19vSlfS78="
+   },
+   "mispricing_s": {
+    "bytes": "GP7wnE+LUD+xe9SMORFwPx+uStOAa30/wR6eK8m5hb8="
+   },
+   "mispricing_s_prev_close": {
+    "bytes": "GP7wnE+LUD+xe9SMORFwPx+uStOAa30/wR6eK8m5hb8="
+   },
+   "open": {
+    "bytes": "aV6XTO/4M0CI1SV63xU7QDGqQrW9LEFAZcp+Vr+qREA="
+   },
+   "previous_close": {
+    "bytes": "aV6XTO/4M0CI1SV63xU7QDGqQrW9LEFAZcp+Vr+qREA="
+   },
+   "previous_tick_price": {
+    "bytes": "zczMzMzMM0Bcj8L1KNw6QOF6FK5HQUFAMzMzMzOTREA="
+   },
+   "price": {
+    "bytes": "gy3on37WM0Dvw4xqyuw6QIqS6jI3REFAWBYMzK6QREA="
+   },
+   "short_interest": {
+    "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+   },
+   "volume": {
+    "bytes": "AAAAAGzbEkEAAAAAGOcPQQAAAABIUhJBAAAAAFTHFEE="
+   }
+  },
+  "crisis_epicentre": -1,
+  "crisis_epicentre_pin": -2,
+  "crisis_in_episode": false,
+  "crisis_sessions_under": 0,
+  "day_count": 3,
+  "draw_counts": [
+   3120.0,
+   2652.0,
+   1579.0,
+   7871.0,
+   0.0,
+   0.0,
+   15.0,
+   15.0,
+   0.0,
+   3.0,
+   12.0,
+   12.0,
+   0.0,
+   12.0,
+   0.0,
+   51.0,
+   0.0,
+   3.0,
+   0.0,
+   0.0
+  ],
+  "draw_overlay": [],
+  "economy": {
+   "business_confidence": 109.66031253627077,
+   "consumer_confidence": 114.85583495291438,
+   "copper_price": 8.0,
+   "core_inflation": 2.7658063629964142,
+   "corporate_bond_yield": 5.574269403926419,
+   "cpi": 108.75504326532393,
+   "cycle_history": [
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion"
+   ],
+   "cycle_phase": "expansion",
+   "earnings_cycle": 0.018,
+   "fear_greed_index": 64.64900217609521,
+   "federal_funds_rate": 3.25,
+   "fiscal_stimulus": 0.0,
+   "gdp": 27263.931349538485,
+   "gdp_growth": 3.194859796869552,
+   "gdp_publication": {
+    "count": 4,
+    "pending_days": [],
+    "pending_values": [],
+    "published": 3.194859796869552,
+    "quarter": 0,
+    "sum": 12.779439187478207
+   },
+   "gdp_trend": [
+    2.3,
+    2.4,
+    2.5,
+    2.6
+   ],
+   "gold_price": 2332.1822203946485,
+   "government_debt_to_gdp": 98.2500000000001,
+   "home_starts_monthly": 500000.0,
+   "housing_index": 98.97565194995916,
+   "housing_transaction_volume": 73.75048315639681,
+   "inflation_rate": 2.82999542601757,
+   "jobs_created": 193971.97613966267,
+   "labor_force_participation": 62.814171099929574,
+   "long_term_unemployment_rate": 0.5165376214563322,
+   "market_pe": 18.05566762286049,
+   "months_in_current_phase": 71.19047619047875,
+   "mortgage_rate_30y": 6.75,
+   "oil_inventory_level": 45.304995757306706,
+   "oil_last_opec_day": 1,
+   "oil_price": 74.24837120676895,
+   "phase_gdp_target": 3.0,
+   "previous_day_market_return": -0.020536477235653695,
+   "prime_rate": 6.25,
+   "qe_pe_boost": 0.0,
+   "recession_probability": 0.1,
+   "rolling_market_return_30d": -0.005113567120996968,
+   "structural_unemployment": 4.154961286436899,
+   "tariff_rate": 5.0,
+   "trade_balance": -44.34503595661199,
+   "treasury_yield_10y": 4.421327970193693,
+   "treasury_yield_2y": 3.542871829178204,
+   "unemployment_impulse": -0.4206609414232831,
+   "unemployment_rate": 2.5,
+   "usd_index": 104.10534982095268,
+   "vix": 19.64707168663624,
+   "vix_feedback": 0.0,
+   "wage_growth": 2.771369928771396
+  },
+  "fair_value_offset": {
+   "bytes": "B0XM8wUa4r8M5jCjbCTaP/jYeZQ8OOM/ZLSmnYBT0b8="
+  },
+  "forced_flow_spent": 0.0,
+  "jump_excitation": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "jump_move": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "market_open": false,
+  "market_variance": [
+   3.322985923078489e-05,
+   0.0,
+   3.187363542316015e-05,
+   3.574856058780225e-05,
+   -0.0014567468569488355,
+   -1.0
+  ],
+  "market_vol_log_level": 0.0,
+  "model_fingerprint": "pt-v20",
+  "noise_own_scale2": {
+   "bytes": "lzSIY3Q8uz+XNIhjdDy7P5c0iGN0PLs/lzSIY3Q8uz8="
+  },
+  "noise_parts": {
+   "bytes": "Vi3Y5dI6Xr9LjCz3Iq1UvzYZV28ZFYI/7Vp4OO3yYb//x7yHB0ZUv4RkSm7enW2/LZ8E/nDIZL8VddS6i55hPy1J26SiVnA/auOQw/SdZ7+CRoDsx1dsv8IKlJhM6wc/"
+  },
+  "nominal_output_base": 2962964.22845698,
+  "opening_z": {
+   "bytes": ""
+  },
+  "pending_fair_value": {
+   "bytes": "aLo8OGAxLb9gujw4YDEtv2C6PDhgMS2/gLo8OGAxLb8="
+  },
+  "pending_jump": {
+   "bytes": "aLo8OGAxLT9gujw4YDEtP2C6PDhgMS0/gLo8OGAxLT8="
+  },
+  "pending_overnight": {
+   "bytes": ""
+  },
+  "rng": [
+   4.2999070649013597e+71,
+   2.535e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   2.3875003121031687e-185,
+   2.544e-321,
+   -0.2696239768799665,
+   7.0945321946926564e+224,
+   2.554e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -1.8725562261908297e+48,
+   2.564e-321,
+   -0.44104450583850346,
+   1.225931046216996e-125,
+   2.574e-321,
+   1.4168692461534276,
+   -4.341851845025457e+70,
+   2.584e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -5.3124691448037495e+184,
+   2.594e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -3.662729405799314e-236,
+   2.604e-321,
+   -0.15532686640438584,
+   -4.850174401665827e+115,
+   2.614e-321,
+   -1.337539820710951,
+   -3.288391008572063e-83,
+   2.623e-321,
+   {
+    "f64": "000000000000f87f"
+   }
+  ],
+  "sector_day_factor": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  "sector_target_day": 5.232703804109371e-05,
+  "sector_variance": {
+   "bytes": "q8AZjma+6j9O95MlZZTrPy/m19OY+us/b7ZDf/EN6z88LMXLjUXrP4sGyfP1tuo/CMrirMCX6j+nQprIJt/rPzw4DpOS5uo/yPdjGXyJ7D/y1dfvTbnrP+jKMmNOEus/"
+  },
+  "session_news": [
+   {
+    "price_impact": -0.01548863507913735,
+    "sector": "technology",
+    "ticker": "FX0-0"
+   }
+  ],
+  "session_tick": 78,
+  "tick_anchor": {
+   "bytes": "cPdS1HLOM0D0NEZw3eM6QMe+DN1nPUFAnCJugjOPREA="
+  },
+  "tick_components": {
+   "bytes": "TRmWCXpAYL4jtPG7Yp4avn+QwgDfrFK+g4RoY5ru4b4AAAAAAAAAAAAAAAAAAAAAJ3lBXXlVQb8AAAAAAAAAANFD75F9N0E/INo2w4FOf776sqswe7sjvpw3i9u97HC+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABqG6KUbNQj8AAAAAAAAAANBwhIgORkO/iSZR75ifjL5TDO7I4Kcqvh3k0eV6oX6+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAngXaSQBvOr8AAAAAAAAAAEB1cjhLVzk/7po9ngcNlT7LyV9318j5vQz6fbX8z4U+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4236tcIcLr8AAAAAAAAAAIBrg+sPoSs/"
+  },
+  "tick_fundamental": {
+   "bytes": "DEL0w1TJM0B0n2oq6sg6QC4TV87RHUFAx+5S81THREA="
+  },
+  "tickers": [
+   "FX0-0",
+   "FX1-1",
+   "FX2-2",
+   "FX3-3"
+  ],
+  "universe_stress": 0.0,
+  "vix_anchor_slow": 0.11275643975846107,
+  "vix_log_level": -0.07181249934916209,
+  "volume_idio": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "volume_state": 0.3643298286278331
+ },
+ "stop": "close",
+ "universe": {
+  "instruments": [
+   {
+    "avg_volume": 300000.0,
+    "beta": 0.8,
+    "book_value_per_share": 8.0,
+    "eps": 1.1,
+    "initial_price": 20.0,
+    "revenue_growth": 0.01,
+    "sector": "technology",
+    "shares_outstanding": 150000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX0"
+   },
+   {
+    "avg_volume": 400000.0,
+    "beta": 0.9500000000000001,
+    "book_value_per_share": 9.0,
+    "eps": 1.5,
+    "initial_price": 27.0,
+    "revenue_growth": 0.03,
+    "sector": "financial_services",
+    "shares_outstanding": 170000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX1"
+   },
+   {
+    "avg_volume": 500000.0,
+    "beta": 1.1,
+    "book_value_per_share": 10.0,
+    "eps": 1.9000000000000001,
+    "initial_price": 34.0,
+    "revenue_growth": 0.05,
+    "sector": "energy",
+    "shares_outstanding": 190000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX2"
+   },
+   {
+    "avg_volume": 600000.0,
+    "beta": 1.25,
+    "book_value_per_share": 11.0,
+    "eps": 2.3000000000000003,
+    "initial_price": 41.0,
+    "revenue_growth": 0.06999999999999999,
+    "sector": "healthcare",
+    "shares_outstanding": 210000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX3"
+   }
+  ],
+  "schema": 1
+ },
+ "written_by": "0.8.5"
+}

@@ -137,10 +137,13 @@ def test_the_finrobot_extra_is_introduced_with_the_python_it_needs() -> None:
     the install line comes after a sentence that names 3.11, where a
     reader on 3.12 is told before they run it.
     """
-    lines = README.read_text(encoding="utf-8").splitlines()
-    start = lines.index("## FinRobot integration")
-    end = next(i for i in range(start + 1, len(lines))
-               if lines[i].startswith("## "))
+    # The section moved from the README to docs/AGENTS.md, which the README
+    # links for the framework adapters.
+    lines = (REPO / "docs" / "AGENTS.md").read_text(
+        encoding="utf-8").splitlines()
+    start = lines.index("### FinRobot")
+    end = next((i for i in range(start + 1, len(lines))
+                if lines[i].startswith("#")), len(lines))
     section = lines[start:end]
     install = next(i for i, line in enumerate(section)
                    if line.startswith('pip install "tradefloor[finrobot]"'))

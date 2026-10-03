@@ -147,7 +147,7 @@ def combined_digest(digests: dict) -> str:
 
 if __name__ == "__main__":
     digests = preset_digests()
-    print(f"pretium preset known-answer test v{PRESET_KAT_VERSION}")
+    print(f"tradefloor preset known-answer test v{PRESET_KAT_VERSION}")
     print(f"  package  {tradefloor.version()}")
     for name, digest in digests.items():
         print(f"  {name:<8} {digest}")

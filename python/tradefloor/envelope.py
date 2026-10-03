@@ -1,7 +1,7 @@
 """The realism envelope, as data: what tradefloor certifies, and what it does not.
 
-The realism envelope page at docs.tradefloor.dev states the envelope in
-prose. This module states it in a form a program can read, so a user does not
+The How it is measured page, https://docs.tradefloor.dev/how-its-measured.html, states the
+envelope in prose. This module states it in a form a program can read, so a user does not
 have to remember a page to find out whether their question is one this
 simulator can answer.
 

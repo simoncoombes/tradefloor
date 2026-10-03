@@ -60,7 +60,8 @@ def test_a_record_describes_the_preset_it_names(path):
     catches a record that was generated before an era boundary and kept its
     filename, which is exactly how a stale published figure survives.
     """
-    from tools.presets.record import coefficient_digest  # noqa: PLC0415
+    from tools.presets.record import (  # noqa: PLC0415
+        coefficient_digest, recorded_values)
 
     rec = load(path)
     assert rec["schema"] == SCHEMA
@@ -70,7 +71,7 @@ def test_a_record_describes_the_preset_it_names(path):
         f"{path.name} was measured on a different {rec['preset']} than this "
         "build ships. Re-measure it or restore the preset."
     )
-    assert rec["coefficients"] == pytest.approx(shipped)
+    assert rec["coefficients"] == pytest.approx(recorded_values(shipped))
 
 
 def test_the_envelope_agrees_with_the_record_for_the_preset_it_certifies():
@@ -446,3 +447,73 @@ def test_the_panel_measures_every_shipped_preset():
     if walked != shipped:
         assert preset_panel.presets() != walked, (
             "the numbering has a gap and the tool still stops at it")
+
+
+@pytest.mark.parametrize("path", records(), ids=lambda p: p.stem)
+def test_a_silent_switch_at_zero_moves_no_record(path):
+    """Adding a switch that is inert at 0.0 leaves every record as it was.
+
+    `to_dict()` carries the switch, and the record's digest and vector are
+    taken with it left out while it is zero, so the committed record still
+    describes the preset. Turned on, the vector is a different model and the
+    digest says so.
+    """
+    from tools.presets.record import (  # noqa: PLC0415
+        coefficient_digest, recorded_values)
+
+    rec = load(path)
+    silent = tradefloor.ModelParams.digest_silent_at_zero()
+    assert silent, "the rule has nothing to test"
+    shipped = tradefloor.ModelParams.from_preset(rec["preset"]).to_dict()
+    for name in silent:
+        assert shipped[name] == 0.0, (rec["preset"], name)
+        assert name not in rec["coefficients"], (rec["preset"], name)
+        without = {k: v for k, v in shipped.items() if k != name}
+        assert coefficient_digest(without) == rec["coefficient_digest"]
+        assert coefficient_digest(dict(shipped, **{name: -0.0})) == rec["coefficient_digest"]
+        on = tradefloor.ModelParams.from_preset(rec["preset"], **{name: 1.0}).to_dict()
+        assert coefficient_digest(on) != rec["coefficient_digest"]
+        assert name in recorded_values(on)
+    assert set(rec["coefficients"]) == set(recorded_values(shipped))
+
+
+def test_the_rust_and_python_digests_agree_on_which_keys_are_silent():
+    """One rule on both sides, checked by behaviour rather than by list.
+
+    For every dial, setting it to 0.0 on a preset where it is not zero
+    must move the Rust fingerprint and the record digest together, and
+    for a silent switch, dropping it at zero must move neither.
+    """
+    from tools.presets.record import coefficient_digest  # noqa: PLC0415
+
+    silent = set(tradefloor.ModelParams.digest_silent_at_zero())
+    base = tradefloor.ModelParams.from_preset("pt-v20")
+
+    def vector(params):
+        # Without `name`, which is the Rust fingerprint itself and would
+        # make the two sides agree for a reason that is not the rule.
+        return {k: v for k, v in params.to_dict().items() if k != "name"}
+
+    shipped = vector(base)
+    for name in tradefloor.ModelParams.settable():
+        if shipped[name] == 0.0:
+            # At zero already: adding or dropping it is the question, and
+            # only a silent switch may be dropped without either side moving.
+            dropped = {k: v for k, v in shipped.items() if k != name}
+            python_same = coefficient_digest(dropped) == coefficient_digest(shipped)
+            assert python_same == (name in silent), name
+            continue
+        try:
+            zeroed = tradefloor.ModelParams.from_preset("pt-v20", **{name: 0.0})
+        except tradefloor.ValidationError:
+            continue
+        rust_moved = zeroed.fingerprint != base.fingerprint
+        python_moved = (coefficient_digest(vector(zeroed))
+                        != coefficient_digest(shipped))
+        assert rust_moved == python_moved, name
+    for name in silent:
+        on = tradefloor.ModelParams.from_preset("pt-v20", **{name: 1.0})
+        assert on.fingerprint != base.fingerprint, name
+        assert coefficient_digest(vector(on)) != coefficient_digest(shipped), name
+        at_zero = tradefloor.ModelParams.from_preset("pt-v20", **{name: 0.0})
+        assert at_zero.fingerprint == base.fingerprint, name

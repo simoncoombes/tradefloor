@@ -153,14 +153,14 @@ def test_a_snapshot_carries_the_overnight_stream_and_restores_the_same_night():
     e.run_session(9, 30, 3, 60)
     twin.run_session(9, 30, 3, 60)
     assert arr(e.column("price")) == arr(twin.column("price"))
-    # A checkpoint from before the stream existed restores too, with this
-    # engine's own seed-derived position standing in for the missing one.
+    # A snapshot from before the stream existed is refused. It used to take
+    # this engine's own seed-derived position for the missing stream, which
+    # is the position of whatever engine it was restored into.
     short = dict(snapshot)
     short["rng"] = list(snapshot["rng"])[:21]
     old = tf.Engine(seed=7, universe=UNIVERSE, model=model)
-    old.restore_state(short)
-    old.open_market()
-    assert len(arr(old.column("open"))) == len(UNIVERSE)
+    with pytest.raises(tf.ValidationError, match="rng carries 21 numbers"):
+        old.restore_state(short)
 
 
 def test_the_night_leaves_the_momentum_roll_alone():

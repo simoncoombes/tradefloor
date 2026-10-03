@@ -105,7 +105,7 @@ def high_seed_digest() -> str:
 
 if __name__ == "__main__":
     data = high_seed_buffer()
-    print(f"pretium 64-bit seed known-answer test v{SEED64_KAT_VERSION}")
+    print(f"tradefloor 64-bit seed known-answer test v{SEED64_KAT_VERSION}")
     print(f"  package  {tradefloor.version()}")
     print(f"  seed     {HIGH_SEED}")
     print(f"  bytes    {len(data)}")

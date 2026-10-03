@@ -2318,8 +2318,8 @@ def explain_price_move(
             "This is the simulator's own bookkeeping, not an inference. It "
             "is exact for this model and says nothing about why a real "
             "stock moved.",
-            "No agent traded in this run, so `order_flow_impact` reflects "
-            "background flow only. Use `evaluate_strategies` to see a "
+            "No agent traded in this run and no order flow was injected, so "
+            "`order_flow_impact` is zero. Use `evaluate_strategies` to see a "
             "strategy's own footprint.",
             "`fair_value_shift` is the part of the day's news and noise that "
             "changed the stock's fair value for good, entered as a negative "

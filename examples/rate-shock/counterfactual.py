@@ -203,24 +203,22 @@ def _show_market(roster: tf.Universe) -> None:
     print(f"  model preset          {tf.ModelParams.from_preset().fingerprint}"
           f"   (tradefloor {tf.__version__})")
     print()
-    # The fair value the engine runs, which uses the preset's own neutral
-    # rate. `fair_value` assumes 0.04 when it is not told, which every
-    # preset through pt-v16 ships and pt-v18 and pt-v19 do not (0.0482), so
-    # the column printed here was a valuation this market does not use.
-    neutral = tf.ModelParams.from_preset().to_dict()["neutral_discount_rate"]
+    # The fair value the engine runs: `model=` reads the preset's own neutral
+    # rate, rate sensitivity and QE gain. Without it `fair_value` values at
+    # the reference constants, which the default preset does not use.
+    model = tf.ModelParams.from_preset()
     print(f"  {'':6}{'sector':<22}{'growth':>8}{'price':>9}"
           f"{'fair value':>12}   what it is")
     for (ticker, sector, label, price, _shares, eps, book, growth,
          *_rest) in BY_DURATION:
         value = tf.fair_value(eps=eps, sector=sector, revenue_growth=growth,
                               corporate_bond_yield=DISCOUNT_RATE,
-                              book_value_per_share=book,
-                              neutral_discount_rate=neutral)
+                              book_value_per_share=book, model=model)
         print(f"  {ticker:<6}{sector:<22}{growth:>8.2f}{price:>9.2f}"
               f"{value.fair_value:>12.2f}   {label}")
     # The preset's own coefficient: 1.5 through pt-v19 and 3 on pt-v20, and
     # this line said 1.5 after the default moved.
-    sensitivity = tf.ModelParams.from_preset().to_dict()["rate_pe_sensitivity"]
+    sensitivity = model.to_dict()["rate_pe_sensitivity"]
     print()
     print(f"  Rate sensitivity here is 1 - (discount - neutral) x "
           f"{sensitivity:g} x")

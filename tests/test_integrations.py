@@ -679,6 +679,10 @@ FIXTURE_KINDS = {
     #: the bar-logic tests in `tests/test_mechanism_gate.py` and
     #: `tests/test_structure_gate.py`. Record blocks, not a transcript.
     "records": "frozen-certificates",
+    #: State snapshots written by the released wheels of 0.8.1, 0.8.5 and
+    #: 0.8.8, read by `tests/test_state_schema.py`. Engine state, not a
+    #: transcript.
+    "snapshots": "state-snapshots",
 }
 
 _RECORDING_DIRS = {name for name, kind in FIXTURE_KINDS.items()

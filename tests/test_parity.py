@@ -294,8 +294,8 @@ def test_daily_step_matches_the_reference_bit_for_bit():
         )
         if not all(math.isfinite(v) for v in (s, s_prev, innovation, shock)):
             continue
-        got = tradefloor.step_mispricing_daily(
-            tradefloor.MispricingState(s, s_prev), innovation=innovation, shock=shock
+        got = tradefloor._core.step_mispricing_daily(
+            tradefloor._core.MispricingState(s, s_prev), innovation=innovation, shock=shock
         )
         assert bits(got.s) == row[ix["outS"]].lower(), row
         assert bits(got.s_prev) == row[ix["outSPrev"]].lower(), row
@@ -323,9 +323,9 @@ def test_hundred_thousand_step_trajectories_do_not_drift(name):
     innovations = _series(golden["innovations"], n)
     shocks = _series(golden["shocks"], n)
 
-    state = tradefloor.MispricingState(f64(golden["trajectory"]["initialSInput"]["bits"]))
+    state = tradefloor._core.MispricingState(f64(golden["trajectory"]["initialSInput"]["bits"]))
     for i in range(n):
-        state = tradefloor.step_mispricing_daily(
+        state = tradefloor._core.step_mispricing_daily(
             state, innovation=innovations[i], shock=shocks[i]
         )
         if bits(state.s) != expected[i].lower():
@@ -371,15 +371,15 @@ def test_the_preset_is_named_and_carries_only_live_coefficients():
 def test_the_daily_process_is_provably_stationary():
     # The reason the daily step is the public model rather than the tick
     # variant: this is provable in closed form, not merely observed.
-    moduli = tradefloor.characteristic_root_moduli()
+    moduli = tradefloor._core.characteristic_root_moduli()
     assert len(moduli) == 2
     assert all(m < 1.0 for m in moduli), moduli
     # Crowd feedback must not push it outside the unit circle either.
-    assert all(m < 1.0 for m in tradefloor.crowd_adjusted_root_moduli())
+    assert all(m < 1.0 for m in tradefloor._core.crowd_adjusted_root_moduli())
 
 
 def test_impulse_response_decays():
-    ir = tradefloor.impulse_response(400)
+    ir = tradefloor._core.impulse_response(400)
     assert ir[0] == 1.0
     # Momentum makes it rise before it falls, so the assertion is about the
     # tail, not monotonicity.
@@ -388,25 +388,25 @@ def test_impulse_response_decays():
 
 
 def test_apply_mispricing_never_returns_a_negative_price():
-    assert tradefloor.apply_mispricing(-50.0, 0.1) > 0
-    assert tradefloor.apply_mispricing(0.0, 0.0) > 0
+    assert tradefloor._core.apply_mispricing(-50.0, 0.1) > 0
+    assert tradefloor._core.apply_mispricing(0.0, 0.0) > 0
 
 
 def test_resuming_a_trajectory_preserves_momentum():
     # The reason `s_prev` is constructible. Rebuilding a mid-trajectory state
     # through the single-argument constructor zeroes the momentum term and
     # produces a different path -- silently.
-    state = tradefloor.MispricingState(0.0)
+    state = tradefloor._core.MispricingState(0.0)
     for _ in range(5):
-        state = tradefloor.step_mispricing_daily(state, innovation=0.01)
+        state = tradefloor._core.step_mispricing_daily(state, innovation=0.01)
 
-    resumed_correctly = tradefloor.step_mispricing_daily(
-        tradefloor.MispricingState(state.s, state.s_prev), innovation=0.01
+    resumed_correctly = tradefloor._core.step_mispricing_daily(
+        tradefloor._core.MispricingState(state.s, state.s_prev), innovation=0.01
     )
-    resumed_wrongly = tradefloor.step_mispricing_daily(
-        tradefloor.MispricingState(state.s), innovation=0.01
+    resumed_wrongly = tradefloor._core.step_mispricing_daily(
+        tradefloor._core.MispricingState(state.s), innovation=0.01
     )
-    continued = tradefloor.step_mispricing_daily(state, innovation=0.01)
+    continued = tradefloor._core.step_mispricing_daily(state, innovation=0.01)
 
     assert resumed_correctly.s == continued.s
     assert resumed_wrongly.s != continued.s

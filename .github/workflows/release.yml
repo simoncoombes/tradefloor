@@ -49,6 +49,23 @@ jobs:
       count: ${{ steps.pick.outputs.count }}
       publish: ${{ steps.pick.outputs.publish }}
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # Before anything is built, so a mismatch stops the release while it
+      # can still be fixed and re-tagged. v0.5.0 and v0.7.1 shipped a
+      # CITATION.cff naming the previous version, and v0.8.5 a
+      # date-released a week before its tag; the wheels themselves were
+      # right each time, because the version they read is the one this
+      # checks the others against. Every job below needs this one.
+      - name: The tag is the version every file states
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/release/bump.py --check "${GITHUB_REF_NAME#v}" \
+            --tagged-on "$(git log -1 --format=%cs)"
       - id: pick
         shell: bash
         run: |

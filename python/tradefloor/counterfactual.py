@@ -190,7 +190,7 @@ from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
 from .interventions import Intervention
 from . import noise as _noise
 from .render import Renderer, check_renderer
-from .scenario import Scenario
+from .scenario import Scenario, _start_day
 from .universe_util import fingerprint_of
 
 #: Macro fields reported in a trace row and in the fork agreement. Not every
@@ -358,7 +358,7 @@ class World:
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
                  "trusted_agents", "tampered", "history_days", "_history",
-                 "margin_interest")
+                 "margin_interest", "_origins")
 
     def __init__(
         self,
@@ -426,6 +426,10 @@ class World:
         # onto this world's own day numbering. Separate from `interventions`
         # above, which is this module's own one-field-at-a-time record.
         self.applied: list[Intervention] = []
+        # One record per `apply`: the scenario as written, by its own
+        # fingerprint, and the days its interventions moved to here. See
+        # `Scenario.origins`.
+        self._origins: list[dict[str, Any]] = []
         self._ran: Scenario | None = None
         #: Every draw surgery made on this world, in order: the kind, the
         #: day it aims at, the stream and what was installed. Beside
@@ -670,8 +674,15 @@ class World:
         if days < 0:
             raise ValidationError(f"days cannot be negative, got {days}")
         scenario = self.scenario()
-        # Kept, so `firings` can report what the interventions actually saw.
-        # A fresh object per call, so the trail is this call's.
+        # Built fresh, because an `apply` or an `intervene` since the last
+        # call changes it, and then handed the run the last call left: its
+        # trail, so `firings` covers the world's whole history, and its
+        # anchors, so a hold, a ramp or a release that spans two calls
+        # behaves as it does inside one. Built fresh with nothing carried,
+        # a window that began in one call raised in the next, and one that
+        # ended on a call boundary was never released.
+        if self._ran is not None:
+            scenario._continue(self._ran)
         self._ran = scenario
         hour, minute, day_of_week = self.start
         tickers = self.engine.tickers
@@ -1111,13 +1122,15 @@ class World:
         # disagreeing about what the experiment was.
         for item in self.applied:
             scenario.intervene(item)
+        scenario._origins = tuple(self._origins)
         return scenario
 
-    def apply(self, scenario: Scenario) -> "World":
+    def apply(self, scenario: Scenario, *, at: int | None = None) -> "World":
         """Drive this world from a scenario document, from today on.
 
         ```python
         stress.apply(tf.Scenario.load("liquidity_crisis"))
+        stress.apply(tf.Scenario.load("liquidity_crisis"), at=0)
         ```
 
         The complement of :meth:`intervene`, and worth having beside it
@@ -1139,14 +1152,34 @@ class World:
         mean two different experiments.
 
         So each intervention is rebased by the day it is applied on: a file
-        that says `at: 50` fires on this world's day 20 + 50. What the
-        manifest records is the rebased form, which is the one that says
-        which days things actually fired.
+        that says `at: 50` fires on this world's day 20 + 50. "Today" is
+        :attr:`day`, the next day :meth:`run` will run, and the scenario is
+        applied at the top of that day before the market opens. A world is
+        never stopped part-way through a day, so there is no later point in
+        the day to apply it at.
+
+        `at` moves the scenario's first firing instead: `at=0` fires it on
+        :attr:`day` itself, which on a fresh fork is the first day after the
+        fork, and every other intervention keeps its distance from the
+        first. It is :meth:`Scenario.starting_at` and then the same rebase.
+        Left at None, the file's own days are rebased as above.
+
+        What the manifest records is the rebased form, which is the one that
+        says which days things actually fired, and beside it, in
+        :meth:`scenario`'s `origins`, the scenario as written: its name, its
+        own fingerprint, how far every day moved and the day it was applied
+        on. A packaged scenario applied with `at=0` is therefore cited by
+        the packaged file's fingerprint, not by a copy's.
 
         The scenario is not stored by reference. Rebasing produces new
         :class:`~tradefloor.Intervention` objects, so applying one document
         to two arms on different days gives each the timing it asked for and
         neither can perturb the other.
+
+        Refused: a scenario with no interventions, and one that carries
+        pins. A pin is a whole path from day zero and belongs in `pins` when
+        the world is built. Applying the interventions and dropping the pins
+        would run a different experiment from the one handed in.
         """
         if not isinstance(scenario, Scenario):
             raise ValidationError(
@@ -1162,18 +1195,27 @@ class World:
                 f"that carries only a macro path belongs in `pins` at "
                 f"construction, which drives the whole run rather than "
                 f"starting here.")
+        if scenario.fields:
+            raise ValidationError(
+                f"{scenario.name or 'this scenario'} pins "
+                f"{', '.join(scenario.fields)}, and apply() takes "
+                f"interventions only. A pin is a whole path from day zero, "
+                f"so it cannot start part-way through this world's history. "
+                f"Pin it when the world is built (World(pins=...)), or "
+                f"express it as an intervention.")
         self._refuse_open_market("apply")
-        for item in scenario.interventions:
-            self.applied.append(Intervention(
-                item.target, operation=item.operation, value=item.value,
-                at=item.at + self._day, duration=item.duration,
-                shape=item.shape, role=item.role))
+        if at is not None:
+            scenario = scenario.starting_at(_start_day(at, "apply(at=...)"))
+        moved = scenario._moved_by(self._day, applied_on_day=self._day)
+        self.applied.extend(moved.interventions)
+        self._origins.extend(moved.origins)
         return self
 
     @property
     def firings(self) -> tuple:
-        """Every intervention that fired in the last :meth:`run`, with the
-        values it saw. Empty until something has run."""
+        """Every intervention that fired in this world's history, with the
+        values it saw and the day it fired on. Empty until something has
+        run. A fork carries its parent's, as it carries its trace."""
         return self._ran.log if self._ran is not None else ()
 
     def intervene(self, **fields: Any) -> "World":
@@ -1215,13 +1257,21 @@ class World:
         a few kilobytes of JSON somebody else can resume, rather than a memory
         image of this interpreter.
         """
+        from . import __version__
+        from .manifest import era_fingerprint
+
         self._refuse_open_market("checkpoint")
         default = ModelParams.from_preset().fingerprint
+        # Stamped with the build and its era, as `Checkpoint.of` stamps them.
+        # Without them `resume` cannot tell a build whose arithmetic differs,
+        # and a run under the default preset resumes under whatever default
+        # the resuming build has.
         return Checkpoint(
             seed=self.seed, universe=self.universe, log=self.order_log,
             macro=self.macro, label=label or self.label,
             model=(dict(self.engine.model_params)
-                   if self.engine.model_fingerprint != default else None))
+                   if self.engine.model_fingerprint != default else None),
+            written_by=__version__, era=era_fingerprint())
 
     def fork(self, *labels: str) -> list["World"]:
         """Independent continuations of this world, one per label.
@@ -1296,6 +1346,13 @@ class World:
             # copied and its contents shared safely. Each arm may then
             # `apply` a scenario of its own on top.
             child.applied = list(self.applied)
+            child._origins = [dict(record) for record in self._origins]
+            # The scenario's run so far, so a window open at the fork
+            # carries on in the arm. A copy, so neither arm's next day can
+            # reach the other's anchors.
+            if self._ran is not None:
+                child._ran = self._ran.copy()
+                child._ran._continue(self._ran)
             # The engine copy carries the overlay; the record and the
             # checks still owed travel with it.
             child.surgeries = copy.deepcopy(self.surgeries)

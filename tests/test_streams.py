@@ -251,10 +251,10 @@ def test_a_snapshot_carries_every_stream():
     assert restored.macro_state.vix == e.macro_state.vix
 
 
-def test_a_pre_split_snapshot_is_refused_with_its_era_named():
+def test_a_pre_split_snapshot_is_refused_with_the_count_named():
     e = tradefloor.Engine(seed=1, universe=UNIVERSE)
     snapshot = e.state_snapshot()
     snapshot["rng"] = snapshot["rng"][0:3]  # the old single-stream format
     fresh = tradefloor.Engine(seed=1, universe=UNIVERSE)
-    with pytest.raises(tradefloor.ValidationError, match="stream split"):
+    with pytest.raises(tradefloor.ValidationError, match="rng carries 3 numbers"):
         fresh.restore_state(snapshot)

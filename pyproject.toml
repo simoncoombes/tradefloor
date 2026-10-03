@@ -47,7 +47,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://tradefloor.dev"
 Repository = "https://github.com/simoncoombes/tradefloor"
-Documentation = "https://tradefloor.dev"
+Documentation = "https://docs.tradefloor.dev"
 # PyPI has no changelog field, so a project page can only point at one.
 # Without this a visitor has no route from the package to its release notes.
 Changelog = "https://github.com/simoncoombes/tradefloor/releases"
@@ -179,7 +179,7 @@ finrobot = [
 # `python -m tradefloor ...` is the same command tree without the script.
 tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
-# arguments; see tradefloor-docs: docs/mcp.md for a client configuration block.
+# arguments; https://docs.tradefloor.dev/mcp-local.html has a client configuration block.
 # Through a shim rather than `tradefloor.mcp:main`, so that without the `mcp`
 # extra the script prints one line naming the extra instead of two chained
 # tracebacks.

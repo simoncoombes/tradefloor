@@ -10,7 +10,11 @@ commands parse, validate, resolve and fingerprint a file in milliseconds:
     tradefloor scenario targets
 
 A name from `tradefloor scenario list` reads the file that ships with the
-library, and anything else is a path.
+library, and anything else is a path. `show --start DAY` prints the scenario
+moved so its first firing is on DAY, with the file's own fingerprint beside
+the moved one:
+
+    tradefloor scenario show liquidity_crisis --start 0
 
 `python -m tradefloor ...` is the same thing without the console script, for
 a checkout or an environment where scripts are not on PATH.
@@ -52,6 +56,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     show = sub.add_parser(
         "show", help="print the resolved scenario, shocks above assumptions")
     show.add_argument("file")
+    show.add_argument(
+        "--start", type=int, default=None, metavar="DAY",
+        help="show it moved so its first firing is on DAY, as "
+             "Scenario.starting_at(DAY) and World.apply(..., at=DAY) move it")
 
     diff = sub.add_parser(
         "diff", help="what two scenarios say differently about each target")
@@ -77,7 +85,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "validate":
         return _validate(args.files)
     if args.command == "show":
-        return _show(args.file)
+        return _show(args.file, args.start)
     if args.command == "diff":
         return _diff(args.left, args.right)
     if args.command == "list":
@@ -134,9 +142,12 @@ def _validate(paths: Sequence[str]) -> int:
     return 1 if failed else 0
 
 
-def _show(path: str) -> int:
+def _show(path: str, start: int | None = None) -> int:
     try:
-        print(_load(path).describe())
+        scenario = _load(path)
+        if start is not None:
+            scenario = scenario.starting_at(start)
+        print(scenario.describe())
     except _UNREADABLE as exc:
         print(f"Scenario invalid.\n\n{exc}")
         return 1

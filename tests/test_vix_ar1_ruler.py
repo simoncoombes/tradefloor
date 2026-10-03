@@ -39,6 +39,7 @@ import tradefloor as pt  # noqa: E402
 import tradefloor.facts as facts  # noqa: E402
 import vix_ar1_ruler as ruler  # noqa: E402
 from tradefloor import ValidationError  # noqa: E402
+from tradefloor._arith import ordered_sum  # noqa: E402
 
 #: The number on the record, and what it is: the WHOLE-SPAN reading. Carried
 #: here as the defect's own value so the tests can show it is a different
@@ -118,12 +119,14 @@ def test_a_numerically_identical_twin_is_rejected(monkeypatch):
     still the wrong ruler. The property is that one object runs, and both
     twins are invisible to the check the shipped path passes.
     """
+    # `ordered_sum` rather than the builtin, which compensates on 3.12+ and
+    # would make this twin differ from the shipped path by an ulp there.
     def exact(series):
         values = [float(v) for v in series]
         mean = statistics.mean(values)
-        den = sum((v - mean) ** 2 for v in values)
-        return sum((values[i] - mean) * (values[i + 1] - mean)
-                   for i in range(len(values) - 1)) / den
+        den = ordered_sum((v - mean) ** 2 for v in values)
+        return ordered_sum((values[i] - mean) * (values[i + 1] - mean)
+                           for i in range(len(values) - 1)) / den
 
     def as_shipped_in_the_design_scripts(series):
         values = [float(v) for v in series]

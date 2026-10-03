@@ -437,17 +437,17 @@ def simulation_buffer() -> bytes:
     # 250 days x 12 instruments. Long enough that a single-ULP disagreement
     # compounds into something visible rather than being lost in rounding.
     for instrument in instruments:
-        state = tradefloor.MispricingState(0.0)
+        state = tradefloor._core.MispricingState(0.0)
         for day in range(DAYS):
             innovation = rng.next_normal() * 0.012
             shock = 0.02 if day % 61 == 60 else 0.0
-            state = tradefloor.step_mispricing_daily(
+            state = tradefloor._core.step_mispricing_daily(
                 state, innovation=innovation, shock=shock
             )
             if day % 25 == 0:
                 _f64(buf, state.s)
                 _f64(buf, state.s_prev)
-                _f64(buf, tradefloor.apply_mispricing(instrument["fair_value"], state.s))
+                _f64(buf, tradefloor._core.apply_mispricing(instrument["fair_value"], state.s))
 
     # --- 4. The order book ------------------------------------------------
     book = tradefloor.OrderBook("KAT", 100.0)
@@ -687,7 +687,7 @@ def known_answer_digest() -> str:
 
 if __name__ == "__main__":
     data = known_answer_buffer()
-    print(f"pretium known-answer test v{KAT_VERSION}")
+    print(f"tradefloor known-answer test v{KAT_VERSION}")
     print(f"  package  {tradefloor.version()}")
     print(f"  bytes    {len(data)}")
     print(f"  sha256   {known_answer_digest()}")

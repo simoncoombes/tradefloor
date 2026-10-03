@@ -1,0 +1,317 @@
+{
+ "continued": {
+  "price_sha256": "5c76d459d536bc724312b6338d464cfcb9ac0ebd05f7affdda7a2c2e5782ba1a",
+  "state_hash": "f2150831531414e699d4e968c4ac47fa9154dc1dda98025f06329f571af7dc2e"
+ },
+ "preset": "pt-v3",
+ "seed": 11,
+ "snapshot": {
+  "attribution": {
+   "bytes": "8ivvGS0sRT++ok2CA8gXP1reU89ymDc/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMEQR0GxEZ78AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcmijKHkD+/pxdyedvVEb8EUW6DfpgxvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADArk27ru2+/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABs2068DSNHv0v/mjDQaOg+2tVK2fnTN78AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACafyx0TJ2AvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAusgPsvsLNj+733T9kKDzvtg9UXtxPSY/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJjz38Gsqer8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "central_bank": {
+   "forward_guidance": "as_appropriate",
+   "hawkish_dovish_score": 0.0,
+   "last_meeting_date": 0,
+   "next_meeting_date": 64800,
+   "qe_active": false,
+   "qe_monthly_purchases": 0.0,
+   "target_inflation": 2.0,
+   "target_unemployment": 4.0
+  },
+  "columns": {
+   "avg_volume": {
+    "bytes": "AAAAAIBPEkEAAAAAAGoYQQAAAACAhB5BAAAAAIBPIkE="
+   },
+   "beta": {
+    "bytes": "mpmZmZmZ6T9nZmZmZmbuP5qZmZmZmfE/AAAAAAAA9D8="
+   },
+   "float_shares": {
+    "bytes": "AAAAAKPhoUEAAAAA/UOkQQAAAABXpqZBAAAAALEIqUE="
+   },
+   "garch_variance": {
+    "bytes": "HNM51lMKLD/eyfgM4f8XP5XZO/7FNBU/vk+HY6unHT8="
+   },
+   "high": {
+    "bytes": "16NwPQpXNECF61G4HsU6QFK4HoXrMUFAKVyPwvWoREA="
+   },
+   "last_daily_return": {
+    "bytes": "lLtLtZIdlj9uBc6DYYqTv8KOJ2QPy2e/g8hA17K0X78="
+   },
+   "low": {
+    "bytes": "9ihcj8I1NEAzMzMzM7M6QNejcD0K90BAFK5H4Xp0REA="
+   },
+   "maker_inventory": {
+    "bytes": "AAAAAAD0oMAAAAAAAMB8wAAAAACANddAAAAAAABY2EA="
+   },
+   "market_cap": {
+    "bytes": "AAAAnCCW5kEAAABql+3wQQAAAF4NBPhBAAAAQ44AAEI="
+   },
+   "mispricing_momentum": {
+    "bytes": "QJBH8EZpiD+g4WUCzU6CvwDsZQRWDlk/AM+xE6klZL8="
+   },
+   "mispricing_s": {
+    "bytes": "UY1RINeM4b/1Bqe83d3ZP9JDwIWb5uI/5PS7REyC0r8="
+   },
+   "mispricing_s_prev_close": {
+    "bytes": "yPQ9DY9+4b+WQqkyvSraP10Ca5G7MeM/RBDQv54h0r8="
+   },
+   "open": {
+    "bytes": "16NwPQpXNEB7FK5H4bo6QArXo3A9KkFA4XoUrkehREA="
+   },
+   "previous_close": {
+    "bytes": "16NwPQpXNEB7FK5H4bo6QArXo3A9KkFA4XoUrkehREA="
+   },
+   "previous_tick_price": {
+    "bytes": "uB6F61E4NEA9CtejcL06QHsUrkfh+kBAuB6F61F4REA="
+   },
+   "price": {
+    "bytes": "9ihcj8I1NEB7FK5H4bo6QNejcD0K90BAFK5H4Xp0REA="
+   },
+   "short_interest": {
+    "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+   },
+   "volume": {
+    "bytes": "AAAAAAC780AAAAAAAA71QAAAAAAwc/9AAAAAADjBAEE="
+   }
+  },
+  "crisis_epicentre": -1,
+  "crisis_epicentre_pin": -2,
+  "crisis_in_episode": false,
+  "crisis_sessions_under": 0,
+  "day_count": 3,
+  "draw_counts": [
+   3920.0,
+   3332.0,
+   2.0,
+   27.0,
+   0.0,
+   0.0,
+   15.0,
+   15.0,
+   0.0,
+   3.0,
+   0.0,
+   0.0,
+   0.0,
+   12.0,
+   0.0,
+   68.0,
+   0.0,
+   3.0,
+   0.0,
+   0.0
+  ],
+  "draw_overlay": [],
+  "economy": {
+   "business_confidence": 100.5,
+   "consumer_confidence": 100.5,
+   "copper_price": 4.238179439843072,
+   "core_inflation": 2.0,
+   "corporate_bond_yield": 4.5600000000000005,
+   "cpi": 100.0164392569127,
+   "cycle_phase": "expansion",
+   "fear_greed_index": 63.61222336944246,
+   "federal_funds_rate": 2.5,
+   "fiscal_stimulus": 0.0,
+   "gdp": 25006.849939031847,
+   "gdp_growth": 3.5,
+   "gdp_trend": [
+    2.3,
+    2.4,
+    2.5,
+    2.6
+   ],
+   "gold_price": 1901.3596033205517,
+   "government_debt_to_gdp": 100.0,
+   "home_starts_monthly": 1500000.0,
+   "housing_index": 100.0,
+   "housing_transaction_volume": 100.0,
+   "inflation_rate": 2.0,
+   "jobs_created": 200000.0,
+   "labor_force_participation": 62.5,
+   "long_term_unemployment_rate": 1.5,
+   "market_pe": 18.026279285833844,
+   "months_in_current_phase": 0.1,
+   "mortgage_rate_30y": 6.0,
+   "oil_inventory_level": 49.609119655118754,
+   "oil_last_opec_day": 0,
+   "oil_price": 68.23285778302744,
+   "phase_gdp_target": 3.0,
+   "previous_day_market_return": 0.01890862668028528,
+   "prime_rate": 5.5,
+   "qe_pe_boost": 0.0,
+   "recession_probability": 0.1,
+   "rolling_market_return_30d": -0.00025786370500534826,
+   "structural_unemployment": 4.5,
+   "tariff_rate": 5.0,
+   "trade_balance": -49.824710108085675,
+   "treasury_yield_10y": 3.5185483852037684,
+   "treasury_yield_2y": 2.652782257780565,
+   "unemployment_rate": 4.0,
+   "usd_index": 99.97315597514752,
+   "vix": 15.125172719227434,
+   "wage_growth": 3.0
+  },
+  "forced_flow_spent": 0.0,
+  "jump_excitation": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "jump_move": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "market_open": true,
+  "market_variance": [
+   4.407547526769633e-05,
+   -0.005225304395025383,
+   4.407547526769633e-05,
+   0.000256,
+   -0.002113595537119498,
+   -1.0
+  ],
+  "market_vol_log_level": 0.0,
+  "model_fingerprint": "pt-v3",
+  "noise_own_scale2": {
+   "bytes": "KDyU9bT4wj8oPJT1tPjCPyg8lPW0+MI/KDyU9bT4wj8="
+  },
+  "noise_parts": {
+   "bytes": "KhGz+JIsc7+I+j1Hgv9Fv8VcJLOZlGQ/YqRUh+7Edr/IKT1V5q00P7Lw3KppcFY/mjf2FUpder9QdTxfq+Iiv76Po93lGFm/0sqXpKX1fb9xry/EiYQqP4CJ+CuruEc/"
+  },
+  "nominal_output_base": 2500000.0,
+  "pending_jump": {
+   "bytes": ""
+  },
+  "pending_overnight": {
+   "bytes": ""
+  },
+  "rng": [
+   4.837659417059438e+101,
+   2.535e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   7.571706986787242e-279,
+   2.544e-321,
+   1.1874309486240566,
+   7.0945321946926564e+224,
+   2.554e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -1.8725562261908297e+48,
+   2.564e-321,
+   -0.44104450583850346,
+   1.225931046216996e-125,
+   2.574e-321,
+   1.4168692461534276,
+   -1.5978229121212853e-27,
+   2.584e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -5.3124691448037495e+184,
+   2.594e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -2.1158805751173174e+103,
+   2.604e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -4.850174401665827e+115,
+   2.614e-321,
+   -1.337539820710951,
+   -3.288391008572063e-83,
+   2.623e-321,
+   {
+    "f64": "000000000000f87f"
+   }
+  ],
+  "sector_day_factor": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  "sector_target_day": 0.0,
+  "sector_variance": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  "session_news": [],
+  "session_tick": 40,
+  "tick_anchor": {
+   "bytes": "8jru7n8qNEBOl03ykLk6QHtG+MOW/UBA7AZszXp4REA="
+  },
+  "tick_components": {
+   "bytes": "KcHgZEr/8D6W6Ao1aQbDPjaK1HcY8OI+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALfEMsXs1VL8AAAAAAAAAAAAAAAAAAAAAL1NPAgMl6b4+jLYoX4m8vuAfm7e3Cty+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5sMRl3AxQ78AAAAAAAAAAAAAAAAAAAAAAEnS/ydZ8r6nMq/zDIeTPphmiRAY5eK+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWCgZ4SQdDr8AAAAAAAAAAAAAAAAAAAAAGXG2nYfu4T4qmVRiTmefvncGy48EGdI+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgrjb3V0fQr8AAAAAAAAAAAAAAAAAAAAA"
+  },
+  "tick_fundamental": {
+   "bytes": "MEId+/5yQUAWiQlq+NYxQKaD9X8O0zJAUDCtl/BVS0A="
+  },
+  "tickers": [
+   "FX0-0",
+   "FX1-1",
+   "FX2-2",
+   "FX3-3"
+  ],
+  "universe_stress": 0.0,
+  "vix_log_level": 0.0,
+  "volume_idio": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "volume_state": 0.0
+ },
+ "stop": "midday",
+ "universe": {
+  "instruments": [
+   {
+    "avg_volume": 300000.0,
+    "beta": 0.8,
+    "book_value_per_share": 8.0,
+    "eps": 1.1,
+    "initial_price": 20.0,
+    "revenue_growth": 0.01,
+    "sector": "technology",
+    "shares_outstanding": 150000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX0"
+   },
+   {
+    "avg_volume": 400000.0,
+    "beta": 0.9500000000000001,
+    "book_value_per_share": 9.0,
+    "eps": 1.5,
+    "initial_price": 27.0,
+    "revenue_growth": 0.03,
+    "sector": "financial_services",
+    "shares_outstanding": 170000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX1"
+   },
+   {
+    "avg_volume": 500000.0,
+    "beta": 1.1,
+    "book_value_per_share": 10.0,
+    "eps": 1.9000000000000001,
+    "initial_price": 34.0,
+    "revenue_growth": 0.05,
+    "sector": "energy",
+    "shares_outstanding": 190000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX2"
+   },
+   {
+    "avg_volume": 600000.0,
+    "beta": 1.25,
+    "book_value_per_share": 11.0,
+    "eps": 2.3000000000000003,
+    "initial_price": 41.0,
+    "revenue_growth": 0.06999999999999999,
+    "sector": "healthcare",
+    "shares_outstanding": 210000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX3"
+   }
+  ],
+  "schema": 1
+ },
+ "written_by": "0.8.8"
+}
