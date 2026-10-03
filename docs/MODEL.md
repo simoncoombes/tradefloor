@@ -665,9 +665,9 @@ $L_c > 0$ the economy block also carries `cycle_history`, the $L_c + 1$ phase
 names oldest first, and the state hash takes the history after the phase, as
 a `u32` length then each name (`engine.rs:6612-6617`,
 `manifest.state_hash`). A restore refuses a history of the wrong length, or
-any history on an engine whose lag is 0. A snapshot without one, restored
-under the dial, refills the history with the restored phase, so that phase is
-published at once.
+any history on an engine whose lag is 0. It refuses a snapshot without one
+under the dial too, naming the dial, because a history refilled from the
+restored phase would publish a path the original run did not.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
@@ -715,8 +715,8 @@ unemployment impulse below: the published figure, the quarter, the count, the
 sum, then a `u32` count of pending releases and each one's day and figure
 (`engine.rs:6626-6637`). A restore refuses the block on an engine whose lag
 is 0, a quarter with no close in it, a non-finite figure and releases out of
-order. A snapshot without it, restored under the dial, publishes the
-restored growth and averages its quarter from the restore day on.
+order. It refuses a snapshot without the block under the dial too, naming
+the dial.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|
@@ -763,8 +763,8 @@ so moves everything that reads the rate: inflation, confidence, the central
 bank and the phase hazards. While $H_u > 0$ the snapshot's economy block
 carries `unemployment_impulse`, and the state hash takes it after the phase
 history and before the GDP figure (`engine.rs:6620-6622`). A restore refuses
-it on an engine whose half-life is 0, and re-seeds it from the restored
-economy when a snapshot has none.
+it on an engine whose half-life is 0, and refuses a snapshot without it on
+an engine whose half-life is set.
 
 | Dial | Value | Kind | Source |
 |---|---|---|---|

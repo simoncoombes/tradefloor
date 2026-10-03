@@ -2516,13 +2516,13 @@ def test_a_state_snapshot_refuses_to_restore_across_models():
     with pytest.raises(tradefloor.ValidationError, match="across models"):
         imposter.restore_state(snapshot)
 
-    # A snapshot from before the fingerprint was recorded has no key and
-    # restores as it always did -- the caller vouches for the context,
-    # exactly as they do for the universe.
+    # A snapshot without the fingerprint is refused by name rather than
+    # trusted: every snapshot since 0.5 carries one, so a dict without it
+    # was edited, and the check it exists for cannot be made.
     del snapshot["model_fingerprint"]
     twin = tradefloor.Engine(seed=11, universe=SMALL, model=CUSTOM)
-    twin.restore_state(snapshot)
-    assert twin.prices() == parent.prices()
+    with pytest.raises(tradefloor.ValidationError, match="model_fingerprint"):
+        twin.restore_state(snapshot)
 
 
 def test_an_engine_batch_member_is_the_standalone_custom_engine():

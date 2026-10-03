@@ -257,13 +257,16 @@ _SNAPSHOT_KEYS = (
     "pending_jump", "pending_overnight",
 )
 
-#: Snapshot keys the state hash accepts and does not cover. One:
+#: Snapshot keys the state hash accepts and does not cover. Two:
 #: ``session_tick``, the ticks the day has run, which is the tick the book
 #: stamps a fill with. It moves no price, and every snapshot of an open or a
 #: closed day carries a count, so covering it would have moved every leaf
 #: written before it was carried. A restore puts it back, which is what it
 #: is carried for: a fill after a restore is stamped as the original's was.
-_UNHASHED_KEYS = ("session_tick",)
+#: And ``state_schema``, the snapshot's layout version, which describes the
+#: dict rather than the market; snapshots written before it carried none and
+#: hash as they did.
+_UNHASHED_KEYS = ("session_tick", "state_schema")
 
 
 def _default_day(day_count: int, market_open: bool) -> int:
@@ -424,8 +427,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     ``set_fundamentals`` has changed them, and the variance cascade on a
     model that runs it.
 
-    The one key it accepts and does not cover is ``session_tick``, the
-    ticks the day has run (:data:`_UNHASHED_KEYS` says why).
+    It accepts two keys and does not cover them: ``session_tick``, the
+    ticks the day has run, and ``state_schema``, the snapshot's layout
+    version (:data:`_UNHASHED_KEYS` says why). It accepts the economy's
+    ``qe_assets_ratio``, carried on a model with ``qe_pe_stock_gain`` set,
+    and does not cover it either, as the engine's own hash does not.
 
     ``market_digest`` covers nine columns and the draw count, which is what a
     published result is checked against. This covers the macro chain and the
@@ -500,6 +506,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `_UNHASHED_KEYS`.
          *_UNHASHED_KEYS}
         & carried)
+    layout = snapshot.get("state_schema", Engine.STATE_SCHEMA)
+    if (isinstance(layout, bool) or not isinstance(layout, int)
+            or not 1 <= layout <= Engine.STATE_SCHEMA):
+        raise ValidationError(
+            f"this snapshot's state_schema is {layout!r}, and this build "
+            f"hashes versions 1 to {Engine.STATE_SCHEMA}.")
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
             "this snapshot carries one of fair_value_offset and opening_z "
@@ -550,7 +562,6 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _text(buf, ticker)
     _text(buf, snapshot["model_fingerprint"])
 
-    from ._core import Engine  # the attribution width, one slot per factor
     # The fair-value shift is the last slot of an attribution row and of a
     # tick row. It is hashed after both, and only for an engine carrying
     # fair-value offsets (whose snapshot has the "fair_value_offset" key), as
@@ -701,9 +712,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `unemployment_adjustment_half_life` set; hashed before it.
     # `vix_feedback` only with the volatility feedback smoothed; hashed
     # after `earnings_cycle`.
+    # `qe_assets_ratio` only with `qe_pe_stock_gain` set, and not hashed:
+    # the engine's state hash has never covered it, and covering it now would
+    # move every leaf of such a run.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
-         "unemployment_impulse", "vix_feedback"} & set(economy))
+         "unemployment_impulse", "vix_feedback", "qe_assets_ratio"}
+        & set(economy))
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -1082,10 +1097,16 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
                    "pending_jump", "pending_overnight")
 
 #: Byte buffers only some snapshots carry: the fair-value levels and the
-#: unapplied opening draws on a model that can move a level (pt-v20 on), and
-#: the agent-facing book's consumed depth once an agent has used it. Encoded
-#: where present and left out where not.
-_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value")
+#: unapplied opening draws on a model that can move a level (pt-v20 on), a
+#: jump's fair-value shift waiting for its tape row, and the variance
+#: cascade on a model that runs it. Encoded where present and left out where
+#: not. The ``fundamentals`` block's three buffers and the book's consumed
+#: depth are encoded beside them.
+_LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
+                            "garch_cascade")
+
+#: The ``fundamentals`` block's buffers, one per company each.
+_LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
 
 
 #: The characters a leaf may be built from. A state hash is lowercase hex,
@@ -1354,8 +1375,16 @@ class DayLedger:
 
 
 def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """One state snapshot in a form JSON can carry losslessly."""
+    """One state snapshot in a form JSON can carry losslessly.
+
+    Without its ``state_schema``, so a ledger written here reads, and
+    verifies, on a release that predates the key. Ledger schema 1 holds
+    version-1 snapshots, which ``Engine.restore_state`` reads without the key
+    as it reads one written by 0.8.5 to 0.8.8. A new snapshot layout needs a
+    new ledger schema.
+    """
     out = dict(snapshot)
+    out.pop("state_schema", None)
     out["columns"] = {name: base64.b64encode(buf).decode("ascii")
                       for name, buf in snapshot["columns"].items()}
     for name in _LEDGER_BUFFERS:
@@ -1367,6 +1396,10 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
         book = dict(snapshot["book"])
         book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
         out["book"] = book
+    if "fundamentals" in snapshot:
+        out["fundamentals"] = {
+            name: base64.b64encode(snapshot["fundamentals"][name]).decode("ascii")
+            for name in _LEDGER_FUNDAMENTALS}
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
@@ -1387,6 +1420,10 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
         book = dict(payload["book"])
         book["taken"] = base64.b64decode(book["taken"])
         out["book"] = book
+    if "fundamentals" in payload:
+        out["fundamentals"] = {
+            name: base64.b64decode(payload["fundamentals"][name])
+            for name in _LEDGER_FUNDAMENTALS}
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out

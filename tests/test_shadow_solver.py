@@ -246,6 +246,19 @@ def test_a_resumed_engine_continues_bit_for_bit(short_days):
     assert np.array_equal(shadow.prices(other), shadow.prices(engine))
 
 
+def test_the_checkpoint_json_keeps_every_generator_bit():
+    """A generator word rides the snapshot as an f64 bit pattern, and about
+    one word in two thousand is a NaN with a payload. JSON's own float
+    syntax writes every NaN as `NaN`, so the resumed generator started from
+    a different state with nothing to say so."""
+    word = struct.unpack("<d", struct.pack("<Q", 0x7FF8_0000_DEAD_BEEF))[0]
+    snapshot = {"rng": [1.5, word, float("inf")], "columns": {"x": b"\x00" * 8}}
+    back = shadow.decode(json.loads(json.dumps(shadow.encode(snapshot))))
+    assert [struct.pack("<d", v) for v in back["rng"]] == [
+        struct.pack("<d", v) for v in snapshot["rng"]]
+    assert back["columns"] == snapshot["columns"]
+
+
 # -- what a resumed run carries ----------------------------------------------
 
 def test_a_resumed_run_carries_its_whole_record(short_days):

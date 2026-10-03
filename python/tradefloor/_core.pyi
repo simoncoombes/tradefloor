@@ -249,6 +249,8 @@ class ModelParams:
 
 class Engine:
     FACTORS: list[str]
+    # The layout version `state_snapshot` writes as "state_schema".
+    STATE_SCHEMA: int
     tickers: list[str]
     draws_consumed: int
     len: int

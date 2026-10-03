@@ -304,10 +304,13 @@ def test_the_hash_moves_when_any_snapshot_field_moves(preset):
 
     # `session_tick` is carried and deliberately not hashed
     # (`manifest._UNHASHED_KEYS` says why), so it is walked apart: moving it
-    # must leave the leaf where it was.
+    # must leave the leaf where it was. `state_schema` is not hashed either,
+    # and it does not move: another version is refused, which
+    # `test_state_schema.py` holds.
     unhashed = set(mf._UNHASHED_KEYS)
     assert unhashed <= set(snapshot)
-    for label, mutated in _walk({k: snapshot[k] for k in unhashed}):
+    for label, mutated in _walk({k: snapshot[k] for k in unhashed
+                                 if k != "state_schema"}):
         assert state_hash(dict(snapshot, **mutated)) == base, label
     fields = [(label, mutated) for label, mutated in _walk(snapshot)
               if label.split("[")[0].split(".")[0] not in unhashed]

@@ -204,17 +204,19 @@ def test_a_restore_refuses_a_history_that_does_not_fit():
         tf.Engine(seed=10, universe=UNIVERSE, model=lagged()).restore_state(snap)
 
 
-def test_a_snapshot_without_a_history_reseeds_from_its_phase():
-    """A snapshot written without the history, under the dial, publishes
-    the phase it restores until the lag has elapsed again."""
+def test_a_snapshot_without_a_history_is_refused():
+    """A snapshot without the history, under the dial, used to publish the
+    phase it restored until the lag had elapsed again: a different published
+    path from the run it continued. Every snapshot under the dial carries
+    the history, so one without it is refused, naming the dial."""
     on = tf.Engine(seed=11, universe=UNIVERSE, model=lagged())
     on.pin_macro(cycle="contraction")
     on.run_days(1)
     snap = on.state_snapshot()
     del snap["economy"]["cycle_history"]
     fresh = tf.Engine(seed=11, universe=UNIVERSE, model=lagged())
-    fresh.restore_state(snap)
-    assert fresh.macro_fields["cycle"] == snap["economy"]["cycle_phase"]
+    with pytest.raises(tf.ValidationError, match="cycle_publication_lag"):
+        fresh.restore_state(snap)
 
 
 @pytest.mark.parametrize("value", [-1.0, 2.5, 2521.0, float("nan")])

@@ -1,0 +1,590 @@
+{
+ "continued": {
+  "price_sha256": "bd9f0d2e2f33fc2b049f41c984edfcf7522e7f3ef2a2aabb796098adef8b8864",
+  "state_hash": "5e56bc51e279a2cd0b6e34e437dffe3379c9afd0dd62c7f2f2efc49e17fc46e2"
+ },
+ "preset": "pt-v20",
+ "seed": 11,
+ "snapshot": {
+  "attribution": {
+   "bytes": "n3popJXuhr4xs3fau/KxvnReg+qa1rS+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFHSywkshe78AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACddIBUZD9yPy4XAhiMv8y+AYeULSCftb7c89C5B5bKvgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMB08DfSP3W/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAyioqyh5nZT9Kxgd9McHdvg0jHGqRVbm+Jy6srC9I1r4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/nPj1YPuEvwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADl5bLQjwH0/OoWCCYCx7T5PA2yhV6q6vlWY++JFqNc+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPkD4fd7IgL8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABOYcJfw7BzPw=="
+  },
+  "central_bank": {
+   "forward_guidance": "ongoing_increases",
+   "hawkish_dovish_score": 0.6000000000000001,
+   "last_meeting_date": -14400,
+   "next_meeting_date": 36000,
+   "qe_active": false,
+   "qe_monthly_purchases": 0.0,
+   "target_inflation": 2.0,
+   "target_unemployment": 4.0
+  },
+  "columns": {
+   "avg_volume": {
+    "bytes": "AAAAAIBPEkEAAAAAAGoYQQAAAACAhB5BAAAAAIBPIkE="
+   },
+   "beta": {
+    "bytes": "mpmZmZmZ6T9nZmZmZmbuP5qZmZmZmfE/AAAAAAAA9D8="
+   },
+   "float_shares": {
+    "bytes": "AAAAAKPhoUEAAAAA/UOkQQAAAABXpqZBAAAAALEIqUE="
+   },
+   "garch_variance": {
+    "bytes": "Oj8baXq9ND/zl+QRfsggP6kX6kt+Sx8/C8JBzzEuJz8="
+   },
+   "high": {
+    "bytes": "ZmZmZmbmM0C4HoXrUfg6QM3MzMzMTEFAcT0K16OwREA="
+   },
+   "last_daily_return": {
+    "bytes": "bK0AuENBf7/mEqvzGgt8v7sBAjgO8XE/FgTFOfoseL8="
+   },
+   "low": {
+    "bytes": "7FG4HoWrM0DD9Shcj8I6QHE9CtejEEFAhetRuB5lREA="
+   },
+   "maker_inventory": {
+    "bytes": "AAAAAABwzUAAAAAAgM3VQAAAAAAAbLRAAAAAAAD62kA="
+   },
+   "market_cap": {
+    "bytes": "AQAA1KH75UEAAACIdPLwQQAAAHLqK/hBAAAALhTp/0E="
+   },
+   "mispricing_momentum": {
+    "bytes": "6oDhM3FsQr/g8zNrvjFGvyg6HbNcAUq/EK19vSlfS78="
+   },
+   "mispricing_s": {
+    "bytes": "0mE15rcGU7++IvBVyPJVPw7gZOpKJnE/kHmz47mgjL8="
+   },
+   "mispricing_s_prev_close": {
+    "bytes": "GP7wnE+LUD+xe9SMORFwPx+uStOAa30/wR6eK8m5hb8="
+   },
+   "open": {
+    "bytes": "gy3on37WM0Dvw4xqyuw6QIqS6jI3REFAWBYMzK6QREA="
+   },
+   "previous_close": {
+    "bytes": "gy3on37WM0Dvw4xqyuw6QIqS6jI3REFAWBYMzK6QREA="
+   },
+   "previous_tick_price": {
+    "bytes": "9ihcj8K1M0BI4XoUrsc6QHE9CtejEEFA7FG4HoVrREA="
+   },
+   "price": {
+    "bytes": "7FG4HoWrM0DD9Shcj8I6QDMzMzMzE0FAhetRuB5lREA="
+   },
+   "short_interest": {
+    "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+   },
+   "volume": {
+    "bytes": "AAAAAIAd9EAAAAAAQPb7QAAAAAAoxQRBAAAAABjTBUE="
+   }
+  },
+  "crisis_epicentre": -1,
+  "crisis_epicentre_pin": -2,
+  "crisis_in_episode": false,
+  "crisis_sessions_under": 0,
+  "day_count": 3,
+  "draw_counts": [
+   3920.0,
+   3332.0,
+   1579.0,
+   7871.0,
+   0.0,
+   0.0,
+   15.0,
+   15.0,
+   0.0,
+   3.0,
+   16.0,
+   16.0,
+   0.0,
+   12.0,
+   0.0,
+   68.0,
+   0.0,
+   3.0,
+   0.0,
+   0.0
+  ],
+  "draw_overlay": [],
+  "economy": {
+   "business_confidence": 109.66031253627077,
+   "consumer_confidence": 114.85583495291438,
+   "copper_price": 8.0,
+   "core_inflation": 2.7658063629964142,
+   "corporate_bond_yield": 5.574269403926419,
+   "cpi": 108.75504326532393,
+   "cycle_history": [
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion",
+    "expansion"
+   ],
+   "cycle_phase": "expansion",
+   "earnings_cycle": 0.018,
+   "fear_greed_index": 64.64900217609521,
+   "federal_funds_rate": 3.25,
+   "fiscal_stimulus": 0.0,
+   "gdp": 27263.931349538485,
+   "gdp_growth": 3.194859796869552,
+   "gdp_publication": {
+    "count": 4,
+    "pending_days": [],
+    "pending_values": [],
+    "published": 3.194859796869552,
+    "quarter": 0,
+    "sum": 12.779439187478207
+   },
+   "gdp_trend": [
+    2.3,
+    2.4,
+    2.5,
+    2.6
+   ],
+   "gold_price": 2332.1822203946485,
+   "government_debt_to_gdp": 98.2500000000001,
+   "home_starts_monthly": 500000.0,
+   "housing_index": 98.97565194995916,
+   "housing_transaction_volume": 73.75048315639681,
+   "inflation_rate": 2.82999542601757,
+   "jobs_created": 193971.97613966267,
+   "labor_force_participation": 62.814171099929574,
+   "long_term_unemployment_rate": 0.5165376214563322,
+   "market_pe": 18.05566762286049,
+   "months_in_current_phase": 71.19047619047875,
+   "mortgage_rate_30y": 6.75,
+   "oil_inventory_level": 45.304995757306706,
+   "oil_last_opec_day": 1,
+   "oil_price": 74.24837120676895,
+   "phase_gdp_target": 3.0,
+   "previous_day_market_return": -0.020536477235653695,
+   "prime_rate": 6.25,
+   "qe_pe_boost": 0.0,
+   "recession_probability": 0.1,
+   "rolling_market_return_30d": -0.005113567120996968,
+   "structural_unemployment": 4.154961286436899,
+   "tariff_rate": 5.0,
+   "trade_balance": -44.34503595661199,
+   "treasury_yield_10y": 4.421327970193693,
+   "treasury_yield_2y": 3.542871829178204,
+   "unemployment_impulse": -0.4206609414232831,
+   "unemployment_rate": 2.5,
+   "usd_index": 104.10534982095268,
+   "vix": 19.64707168663624,
+   "vix_feedback": 0.0,
+   "wage_growth": 2.771369928771396
+  },
+  "fair_value_offset": {
+   "bytes": "uMf336I+4r9daGalgvnZPwJtH1+p/OI/z57sFGii0b8="
+  },
+  "forced_flow_spent": 0.0,
+  "jump_excitation": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "jump_move": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "market_open": true,
+  "market_variance": [
+   3.322985923078489e-05,
+   -0.00453708947177309,
+   3.187363542316015e-05,
+   3.574856058780225e-05,
+   -0.0014567468569488355,
+   -1.0
+  ],
+  "market_vol_log_level": 0.0,
+  "model_fingerprint": "pt-v20",
+  "noise_own_scale2": {
+   "bytes": "puXhFnsMrj+m5eEWewyuP6bl4RZ7DK4/puXhFnsMrj8="
+  },
+  "noise_parts": {
+   "bytes": "nbvaqfqHeb+UHTFy+PJiv09ZA4GsgF8/yr6zqXlRfr8oKgpXRUxUPwT8BeCw9E8//GDGVHyNgb++HhW7hFtEv7JKB6xiQVG/kuKy1Dvyg79ad3FG6etPP/6tOCXsqUI/"
+  },
+  "nominal_output_base": 2962964.22845698,
+  "opening_z": {
+   "bytes": ""
+  },
+  "pending_jump": {
+   "bytes": ""
+  },
+  "pending_overnight": {
+   "bytes": ""
+  },
+  "rng": [
+   4.837659417059438e+101,
+   2.535e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   2.3875003121031687e-185,
+   2.544e-321,
+   -0.2696239768799665,
+   7.0945321946926564e+224,
+   2.554e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -1.8725562261908297e+48,
+   2.564e-321,
+   -0.44104450583850346,
+   1.225931046216996e-125,
+   2.574e-321,
+   1.4168692461534276,
+   4.3837270862378355e-20,
+   2.584e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -5.3124691448037495e+184,
+   2.594e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -2.1158805751173174e+103,
+   2.604e-321,
+   {
+    "f64": "000000000000f87f"
+   },
+   -4.850174401665827e+115,
+   2.614e-321,
+   -1.337539820710951,
+   -3.288391008572063e-83,
+   2.623e-321,
+   {
+    "f64": "000000000000f87f"
+   }
+  ],
+  "sector_day_factor": {
+   "bytes": "WypRUoqtcL+5bPr6g5xeP49EQj3Bb1I/YE6Mi7nGR7//MKLU7M1Fv/y/WrkFwFO/3RrwKHhGSb8TE/OQBdxRP+R4F2sLjVG/VMq3SlAoIb8meRQE/JEGv6vK0LHvt1s/"
+  },
+  "sector_target_day": 5.3352642165903745e-05,
+  "sector_variance": {
+   "bytes": "q8AZjma+6j9O95MlZZTrPy/m19OY+us/b7ZDf/EN6z88LMXLjUXrP4sGyfP1tuo/CMrirMCX6j+nQprIJt/rPzw4DpOS5uo/yPdjGXyJ7D/y1dfvTbnrP+jKMmNOEus/"
+  },
+  "session_news": [],
+  "session_tick": 40,
+  "tick_anchor": {
+   "bytes": "f1D7agmzM0D6b4rTxsk6QBE9QH7OFkFAAFV7sEJrREA="
+  },
+  "tick_components": {
+   "bytes": "bsov4vwdXz6D6yX3krdcvkIFs0ZmmE2+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgmfbSLdNVL8AAAAAAAAAAPrq9NuQTlE/8V4H+4rCaL4BbBC+GUxhvhpyt+/tgW++AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADJOQQqiQRb8AAAAAAAAAAJRW2v9Z5Tw/V9ES4Zalgb46T+NUdERkvkMHTXZyQX2+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6g3WC5GzKL8AAAAAAAAAAMCXIkQrhhC/jk4+Wk84mz48nInnElVlvkZ/QkiChoY+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0IxO1p6qSL8AAAAAAAAAAECP/IONmj4/"
+  },
+  "tick_fundamental": {
+   "bytes": "c94ZguW4M0CmM5KSmMA6QJz9LyqHBEFAux/xrte0REA="
+  },
+  "tickers": [
+   "FX0-0",
+   "FX1-1",
+   "FX2-2",
+   "FX3-3"
+  ],
+  "universe_stress": 0.0,
+  "vix_anchor_slow": 0.11275643975846107,
+  "vix_log_level": -0.07181249934916209,
+  "volume_idio": {
+   "bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "volume_state": 0.3643298286278331
+ },
+ "stop": "midday",
+ "universe": {
+  "instruments": [
+   {
+    "avg_volume": 300000.0,
+    "beta": 0.8,
+    "book_value_per_share": 8.0,
+    "eps": 1.1,
+    "initial_price": 20.0,
+    "revenue_growth": 0.01,
+    "sector": "technology",
+    "shares_outstanding": 150000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX0"
+   },
+   {
+    "avg_volume": 400000.0,
+    "beta": 0.9500000000000001,
+    "book_value_per_share": 9.0,
+    "eps": 1.5,
+    "initial_price": 27.0,
+    "revenue_growth": 0.03,
+    "sector": "financial_services",
+    "shares_outstanding": 170000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX1"
+   },
+   {
+    "avg_volume": 500000.0,
+    "beta": 1.1,
+    "book_value_per_share": 10.0,
+    "eps": 1.9000000000000001,
+    "initial_price": 34.0,
+    "revenue_growth": 0.05,
+    "sector": "energy",
+    "shares_outstanding": 190000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX2"
+   },
+   {
+    "avg_volume": 600000.0,
+    "beta": 1.25,
+    "book_value_per_share": 11.0,
+    "eps": 2.3000000000000003,
+    "initial_price": 41.0,
+    "revenue_growth": 0.06999999999999999,
+    "sector": "healthcare",
+    "shares_outstanding": 210000000.0,
+    "short_interest": 0.0,
+    "ticker": "FX3"
+   }
+  ],
+  "schema": 1
+ },
+ "written_by": "0.8.8"
+}

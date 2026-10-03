@@ -1215,13 +1215,21 @@ class World:
         a few kilobytes of JSON somebody else can resume, rather than a memory
         image of this interpreter.
         """
+        from . import __version__
+        from .manifest import era_fingerprint
+
         self._refuse_open_market("checkpoint")
         default = ModelParams.from_preset().fingerprint
+        # Stamped with the build and its era, as `Checkpoint.of` stamps them.
+        # Without them `resume` cannot tell a build whose arithmetic differs,
+        # and a run under the default preset resumes under whatever default
+        # the resuming build has.
         return Checkpoint(
             seed=self.seed, universe=self.universe, log=self.order_log,
             macro=self.macro, label=label or self.label,
             model=(dict(self.engine.model_params)
-                   if self.engine.model_fingerprint != default else None))
+                   if self.engine.model_fingerprint != default else None),
+            written_by=__version__, era=era_fingerprint())
 
     def fork(self, *labels: str) -> list["World"]:
         """Independent continuations of this world, one per label.
