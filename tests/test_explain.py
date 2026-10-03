@@ -1561,7 +1561,8 @@ EXPECTED = {
                       "endogenous_news_sigma"), ()),
     "order_flow_impact": (("order_flow_coefficient",
                            "informed_flow_fraction",
-                           "order_flow_impact_law"), ("avg_volume",)),
+                           "order_flow_impact_law",
+                           "order_flow_depth_law"), ("avg_volume",)),
     "short_squeeze_effect": ((), ("short_interest", "last_daily_return")),
     "random_noise": (("idio_sigma_scale", "idio_sigma_beta_exponent",
                       "sector_loading", "sector_loading_beta_slope",
@@ -1631,7 +1632,9 @@ def test_every_declared_dial_is_a_model_param_that_its_rust_reads():
     # 45 and eleven since the fair-value shift's two joined.
     # 48 and twelve since the close's re-mark joined with its three: the
     # switch, and the buyback share and hard cap its fixed point reads.
-    assert declared == 48
+    # 49 since `order_flow_depth_law` joined the existing order_flow_impact
+    # mechanism, adding no mechanism.
+    assert declared == 49
     assert sum(1 for m in ex.MECHANISMS if m.dials) == 12
 
 

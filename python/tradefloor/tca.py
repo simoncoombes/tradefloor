@@ -42,6 +42,15 @@ replaces both clamps with the measured law -- linear in participation
 below the knee, square root above it -- so the term never goes flat. The
 band between the clamps is identical either way.
 
+Compare names with care. Under the shipped default the term divides by the
+instrument's depth twice, once in the participation and once after it, so
+the same participation costs a thin name far more than a liquid one: on a
+hand-built roster with average minute volumes of 154 and 230,769 shares the
+ratio is 1,500. Setting ``order_flow_depth_law`` to 1.0 divides once, so
+equal participation is an equal move in ``s`` on every name above the
+100-share minute floor. A name trading a million shares a day is charged
+the same under either setting.
+
 There is a second bound past it and it is not in the cost law. The session
 breaker holds a name inside ``price_breaker_fraction`` of its previous
 close, 25 per cent by default, and it clamps the PRICE, so a railed run

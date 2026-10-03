@@ -29,7 +29,7 @@ libm.
   graded against real-market bands, and a long-run check of 17 criteria (40
   rows registered for `pt-v20`, all met), with the misses named as gaps
   rather than omitted.
-  See <https://tradefloor.dev/realism-envelope.html>.
+  See <https://docs.tradefloor.dev/how-its-measured.html>.
 
 ## Using it
 
@@ -86,7 +86,7 @@ pip install tradefloor
 ```
 
 Documentation, including the realism envelope and what the simulator is not
-suitable for, is at <https://tradefloor.dev/>.
+suitable for, is at <https://docs.tradefloor.dev/>.
 
 ## Upgrading from 0.8.1
 

@@ -1231,9 +1231,9 @@ def test_a_restored_snapshot_continues_like_a_copy(lively):
     )
 
 
-#: The keys `restore_state` requires outright, refusing rather than silently
-#: restoring half a market. Each has its own test; dropping one here would
-#: measure the refusal, not the field.
+#: Keys left out of the walk below. The roster, because a fresh engine's
+#: is the same; the columns, the generators and the tick components, because
+#: each obviously drives the market and has its own test.
 REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 
 #: Snapshot fields this scenario cannot reach, each with the condition its
@@ -1300,8 +1300,12 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "pinned episode takes no draw.",
     "model_fingerprint":
         "not state. It is the guard that refuses a snapshot restored onto an "
-        "engine running other coefficients, which has its own test; dropping "
-        "it removes a check rather than a value.",
+        "engine running other coefficients, which has its own test, and a "
+        "fresh engine of the same model carries the same one.",
+    "state_schema":
+        "not state. It is the snapshot's layout version, the same on every "
+        "snapshot this build writes; test_state_schema.py holds what a "
+        "restore does with another one.",
     "tick_fundamental":
         "per-tick scratch. The valuation is recomputed every tick before "
         "anything reads it, so a continuation never depends on the value "
@@ -1350,9 +1354,13 @@ def test_the_drift_guard_notices_every_field_the_snapshot_carries():
     would have passed a snapshot that had lost the day's news, which is the
     defect the whole forking pass was about.
 
-    So each field is dropped from the snapshot in turn and the divergence must
-    be caught, or the field must appear in `UNREACHED_SNAPSHOT_FIELDS` with
-    the condition its effect waits on. Asserted as an equality in both
+    So each field in turn is given the value a freshly built engine holds,
+    and the divergence must be caught, or the field must appear in
+    `UNREACHED_SNAPSHOT_FIELDS` with the condition its effect waits on. The
+    fresh value is what a restore kept for a field the snapshot lacked,
+    until it began refusing such a snapshot by name, so this measures what
+    losing the field would cost. A field the fresh engine does not carry,
+    because its absence is a value, is dropped instead. Asserted as an equality in both
     directions: a NEW field that nothing reaches fails here, and a field that
     becomes reachable fails here too, which is the prompt to delete its note
     rather than let a stale excuse accumulate.
@@ -1367,9 +1375,13 @@ def test_the_drift_guard_notices_every_field_the_snapshot_carries():
         parent = _mid_day_parent(model, CRISIS)
         reference, = tf.branch(parent, 1)
         damaged = parent.state_snapshot()
-        damaged.pop(key)
         restored = tf.Engine(seed=SEED, universe=UNIVERSE, macro_state=CRISIS,
                              model=model)
+        blank = restored.state_snapshot()
+        if key in blank:
+            damaged[key] = blank[key]
+        else:
+            damaged.pop(key)
         restored.restore_state(damaged)
         _continue(reference)
         _continue(restored)

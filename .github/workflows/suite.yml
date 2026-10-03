@@ -26,6 +26,11 @@ on:
   # can move a market and correctly says nothing about either.
   pull_request:
     branches: [main, dev]
+  # And on the merge itself. A pull request is tested against the base it
+  # was opened on, so two that each pass can still break the branch when
+  # both land; this run is the one that sees the result.
+  push:
+    branches: [main, dev]
   schedule:
     # 04:17 UTC. Off the hour on purpose: GitHub's scheduler queues the top of
     # every hour heavily and a job asking for 04:00 can wait twenty minutes for
@@ -117,7 +122,7 @@ jobs:
         run: cargo check --all-targets --all-features
 
   batch:
-    name: tests ${{ matrix.batch }}
+    name: tests ${{ matrix.batch }} on ${{ matrix.interpreter }}
     needs: wheel
     runs-on: ubuntu-latest
     strategy:
@@ -126,11 +131,17 @@ jobs:
       fail-fast: false
       matrix:
         batch: [a-e, f-p, q-z, facts]
+        # The floor and the newest supported version. The builtin sum() over
+        # floats compensates from 3.12, and two exact-equality tests failed by
+        # one ulp on 3.13 for releases while every job here ran 3.11. The
+        # batches run in parallel, so the second version costs runner time,
+        # not wall time.
+        interpreter: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.interpreter }}
       - uses: actions/download-artifact@v8
         with:
           name: suite-wheel
@@ -165,11 +176,13 @@ jobs:
           # when the package is absent. Installing it here would cost minutes
           # and turn a test off.
           python -m pip install pyarrow numpy gymnasium mcp anthropic pydantic \
-                                openai-agents pydantic-ai-slim langgraph
+                                openai-agents pydantic-ai-slim langgraph pyyaml
           # `openai` by name as well: two PydanticAI tests build a real
           # OpenAI model and skip without the SDK, which pydantic-ai-slim
           # does not install. openai-agents brings it.
-          python -c "import pyarrow, numpy, gymnasium, mcp, agents, openai, pydantic_ai, langgraph; print('optional surfaces present')"
+          # pyyaml for the tests that read the workflows and for
+          # test_yaml_subset.py's cross-check, which skips without it.
+          python -c "import pyarrow, numpy, gymnasium, mcp, agents, openai, pydantic_ai, langgraph, yaml; print('optional surfaces present')"
       - name: Run
         shell: bash
         run: |
@@ -224,9 +237,123 @@ jobs:
             tests/test_packaging.py \
             tests/test_python_versions.py
 
+  examples:
+    name: the examples execute
+    needs: wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v8
+        with:
+          name: suite-wheel
+          path: dist
+      - name: Install the wheel, a kernel and what the notebooks import
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip pytest
+          python -m pip install --no-index --find-links dist tradefloor
+          # nbformat and nbclient execute the notebooks and ipykernel is the
+          # kernel they run on. matplotlib, pyarrow and numpy are what the
+          # notebooks import, gymnasium is 05-training-an-agent's, and
+          # anthropic and pydantic are what the tests of 08-claude-agent.py
+          # load it with (a stand-in client, no key and no bill).
+          python -m pip install nbformat nbclient ipykernel matplotlib \
+                                pyarrow numpy gymnasium anthropic pydantic
+          python -c "import nbformat, nbclient, ipykernel, matplotlib, pyarrow, numpy, gymnasium, anthropic, pydantic; print('notebook stack present')"
+      - name: Execute every notebook and example, and the README's commands
+        shell: bash
+        env:
+          TRADEFLOOR_SLOW_TESTS: "1"
+        run: |
+          # The batch job runs these files too, but without the flag, so
+          # there every notebook execution skips and the job is green having
+          # executed none. That was the only place they ran in CI.
+          python -m pytest -q -rs tests/test_examples.py \
+            tests/test_readme_snippets.py --junitxml=examples.xml
+      - name: Nothing skipped
+        shell: bash
+        run: |
+          # pytest exits 0 over a skip, and a notebook test skips when
+          # nbclient is missing or the flag is unset. A skip here is a
+          # notebook that did not run, so it fails the job.
+          python tools/ci/no_skips.py examples.xml
+
+  install:
+    name: a clean install runs
+    needs: wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v8
+        with:
+          name: suite-wheel
+          path: dist
+      - name: Install into an empty venv and use it as a reader would
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A venv with nothing in it but the wheel: the package declares no
+          # dependencies, so anything it needs and does not declare fails
+          # here and nowhere else in CI, where every job installs extras.
+          python -m venv "${{ runner.temp }}/clean"
+          PY="${{ runner.temp }}/clean/bin/python"
+          "$PY" -m pip install --no-index --find-links dist tradefloor
+          want="tradefloor $(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          # Outside the checkout, so nothing can import the source tree.
+          cd "${{ runner.temp }}"
+          export PATH="${{ runner.temp }}/clean/bin:$PATH"
+          test "$(tradefloor --version)" = "$want"
+          test "$("$PY" -m tradefloor --version)" = "$want"
+          tradefloor scenario list > /dev/null
+          tradefloor scenario validate recession
+          tradefloor mcp --help > /dev/null
+          "$PY" - <<'PY'
+          import struct
+          import tradefloor as tf
+
+          def run():
+              e = tf.Engine(universe=tf.Universe.random(5, seed=1), seed=2)
+              e.run_days(2)
+              raw = e.prices()
+              return struct.unpack(f"<{len(raw) // 8}d", raw), e.state_hash()
+
+          (prices, digest), again = run(), run()
+          assert len(prices) == 5 and all(p > 0 for p in prices), prices
+          assert again[1] == digest, "the same seed gave two markets"
+          print("two days on", tf.version(), tf.model_preset()["name"], digest[:16])
+          PY
+
+  known-answers:
+    name: a moved known answer carries a bump and a note
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history and its tags: the check compares each
+          # known-answer file with the newest release tag, and a shallow
+          # clone has none, which it reports as a failure.
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Compare with the newest release
+        shell: bash
+        run: |
+          # test_known_answer.py fails when a digest moves and the JSON was
+          # not re-based. This fails when it was re-based and the version
+          # or the note was left as the release had it, which the other
+          # cannot see. tools/ci/kat_history.py gives the rules per file.
+          python tools/ci/kat_history.py
+
   complete:
     name: the suite is green
-    needs: [batch, versions, rust, msrv]
+    needs: [batch, versions, rust, msrv, examples, install, known-answers]
     runs-on: ubuntu-latest
     steps:
       - name: Report
@@ -237,4 +364,5 @@ jobs:
           # gate as of 0.6.x, so making `the suite is green` a required check
           # on main and dev is what actually closes the hole; the trigger
           # above only makes it run.
-          echo "every batch, every python version and the crate passed"
+          echo "every batch, every python version, the crate, the examples, a clean"
+          echo "install and the known-answer history passed"

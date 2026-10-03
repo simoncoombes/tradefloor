@@ -814,20 +814,12 @@ impl Engine {
     /// The caller is told which two numbers disagree and where the mismatch
     /// came from.
     ///
-    /// # The writes that already stand when this refuses
+    /// # Nothing stands when this refuses
     ///
-    /// This write is the boundary. Everything `PyEngine::restore_state`
-    /// writes BEFORE it holds the snapshot's value, and everything it
-    /// writes AFTER holds the engine's own, because the error propagates
-    /// out of here and the later writes are attempted and never reached.
-    /// The rule is positional, so it stays true as writes are added on
-    /// either side, and reading `restore_state` in order is what tells a
-    /// caller which side a given field is on.
-    ///
-    /// An engine that has caught this error therefore holds one run's
-    /// market beside another run's macro state, and it should be dropped
-    /// rather than run on. `tests/test_volume_idio_roster.py` asserts one
-    /// field on each side of the boundary.
+    /// `PyEngine::restore_state` writes into a copy of the engine and keeps
+    /// it only once every field has been read, so an engine that has caught
+    /// this error holds the state it held before the call.
+    /// `tests/test_volume_idio_roster.py` asserts that.
     pub fn set_volume_idio(&mut self, values: &[f64]) -> Result<(), String> {
         if values.len() != self.volume_idio.len() {
             return Err(format!(
@@ -5746,6 +5738,25 @@ impl Engine {
         )
     }
 
+    /// Every company's fair value as the next tick starts from it, in roster
+    /// order: [`crate::market::tick::tick_fair_value`] on the state now
+    /// standing, at the name's current price and the current day. NaN for a
+    /// bankrupt or private name, which the tick does not value.
+    pub fn fair_values(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| {
+                if c.is_bankrupt || !c.is_public {
+                    f64::NAN
+                } else {
+                    crate::market::tick::tick_fair_value(
+                        &self.params, &self.economy, self.nominal_output_base,
+                        self.elapsed_days, c, c.stock.price)
+                }
+            })
+            .collect()
+    }
+
     /// THE PRICE TAKES A MACRO DECISION WHEN IT IS PUBLISHED
     /// (`macro_publication_repricing`).
     ///
@@ -6768,8 +6779,9 @@ impl Engine {
         }
 
         // The economy, in the order `state_snapshot` declares its fields.
-        // `qe_assets_ratio` is absent from both, which is a gap in the
-        // snapshot rather than a decision taken here.
+        // `qe_assets_ratio` is not hashed. The snapshot carries it only
+        // under `qe_pe_stock_gain`, the one dial that reads it, and covering
+        // it would move every leaf a run under that dial has written.
         let e = &self.economy;
         for value in [
             e.federal_funds_rate, e.prime_rate, e.corporate_bond_yield,

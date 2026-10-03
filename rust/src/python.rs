@@ -348,19 +348,46 @@ impl PyFairValue {
 
 /// Fair value per share from fundamentals and the macro state.
 ///
+/// # Which valuation
+///
+/// With no `model` and none of the five valuation keywords, this is the
+/// reference valuation at fixed constants: a neutral discount rate of 0.04,
+/// a rate sensitivity of 1.5, a QE adjustment of `1 + qe_pe_boost` (a QE
+/// gain of 1.0), no QE stock channel and no book floor on profitable names.
+/// That form does not follow any preset, the default included, so its
+/// numbers stay fixed across releases. The manifest's era fingerprint and
+/// the known-answer scripts are built on it.
+///
+/// An engine runs its own values for those five, and the default preset
+/// differs from the reference in three of them (a neutral rate of 0.0482, a
+/// rate sensitivity of 3.0 and a QE gain of 0.0). To get the valuation a
+/// given engine applies, pass `model` (a preset name or a `ModelParams`) and
+/// every value is read from it, or pass the values one at a time. Passing
+/// `model` together with any of them is refused, because the call would
+/// have two sources for one number.
+///
+/// With `model`, the result is the engine's valuation of these fundamentals
+/// under this macro, to the bit. The engine's per-tick fair value can carry
+/// more than the valuation: on presets that set them, the nominal and
+/// earnings-cycle restatement, buybacks, a name's fair-value level and the
+/// VIX discount, all read from the engine's state. `Engine.fair_values()`
+/// returns that number for a running engine.
+///
 /// # Units
 ///
 /// **Rates are fractional**: `corporate_bond_yield=0.052` means 5.2%. Two of
-/// these five numbers are rates and are converted to the core's percent
-/// denomination here, at the boundary; the other three are already fractional
+/// these numbers are rates and are converted to the core's percent
+/// denomination here, at the boundary; the others are already fractional
 /// in both and must NOT be scaled:
 ///
 /// | argument | kind | converted? |
 /// |---|---|---|
 /// | `corporate_bond_yield` | rate | yes, x100 |
 /// | `federal_funds_rate` | rate | yes, x100 |
+/// | `neutral_discount_rate` | rate | no, compared with the yield over 100 |
 /// | `revenue_growth` | growth fraction | no |
 /// | `qe_pe_boost` | multiplier delta | no |
+/// | `qe_assets_ratio` | ratio to a neutral 1.0 | no |
 /// | `eps`, `book_value_per_share` | currency | no |
 ///
 /// Getting that split wrong is silent: scaling `revenue_growth` by 100 turns
@@ -390,6 +417,12 @@ impl PyFairValue {
     qe_pe_boost = None,
     book_value_per_share = None,
     neutral_discount_rate = None,
+    qe_assets_ratio = None,
+    qe_pe_gain = None,
+    qe_pe_stock_gain = None,
+    rate_pe_sensitivity = None,
+    fair_value_book_floor = None,
+    model = None,
 ))]
 #[allow(clippy::too_many_arguments)]
 fn fair_value(
@@ -407,14 +440,19 @@ fn fair_value(
     corporate_bond_yield: Option<f64>,
     qe_pe_boost: Option<f64>,
     book_value_per_share: Option<f64>,
-    // The rate at which the multiple sits on its anchor. Absent means
-    // `NEUTRAL_DISCOUNT_RATE`, which is what every caller before pt-v18
-    // wanted and what the reference implementation does. A caller
-    // recomputing a run's fair value passes that run's own
-    // `neutral_discount_rate`, because a helper holding the old constant
-    // while the engine moved would disagree with the market it is
-    // describing and the disagreement would read as a print residual.
+    // The five values below are the `ModelParams` fields the valuation
+    // reads. Absent means the reference constant, so a call that names none
+    // of them returns what it always has; that is what keeps the manifest's
+    // probe and the known-answer digests off the default preset.
     neutral_discount_rate: Option<f64>,
+    // Economy state, not a model value: the Fed's holdings over a neutral
+    // baseline, read only by the QE stock channel. Absent is neutral.
+    qe_assets_ratio: Option<f64>,
+    qe_pe_gain: Option<f64>,
+    qe_pe_stock_gain: Option<f64>,
+    rate_pe_sensitivity: Option<f64>,
+    fair_value_book_floor: Option<f64>,
+    model: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyFairValue> {
     // Boundary rejections carry the specific type; PyO3's own argument-type
     // errors remain plain TypeError/ValueError, which is correct -- those are
@@ -444,6 +482,11 @@ fn fair_value(
         ("book_value_per_share", book_value_per_share),
         ("revenue_growth", revenue_growth),
         ("qe_pe_boost", qe_pe_boost),
+        ("qe_assets_ratio", qe_assets_ratio),
+        ("qe_pe_gain", qe_pe_gain),
+        ("qe_pe_stock_gain", qe_pe_stock_gain),
+        ("rate_pe_sensitivity", rate_pe_sensitivity),
+        ("fair_value_book_floor", fair_value_book_floor),
     ] {
         if let Some(v) = value {
             if !v.is_finite() {
@@ -465,14 +508,59 @@ fn fair_value(
         crate::units::check_rate("neutral_discount_rate", r).map_err(Rejected::new_err)?;
     }
 
+    // One source per number. A model and an explicit value for a field it
+    // carries would leave the caller to guess which one won.
+    let explicit = [
+        ("neutral_discount_rate", neutral_discount_rate),
+        ("qe_pe_gain", qe_pe_gain),
+        ("qe_pe_stock_gain", qe_pe_stock_gain),
+        ("rate_pe_sensitivity", rate_pe_sensitivity),
+        ("fair_value_book_floor", fair_value_book_floor),
+    ];
+    let (neutral, qe_gain, qe_stock_gain, sensitivity, book_floor) = match model {
+        Some(m) => {
+            let both: Vec<&str> = explicit
+                .iter()
+                .filter(|(_, v)| v.is_some())
+                .map(|(name, _)| *name)
+                .collect();
+            if !both.is_empty() {
+                return Err(Rejected::new_err(format!(
+                    "model and {} were both given, and the model carries {}. Pass \
+                     the model alone, or a ModelParams built with the value you want \
+                     (ModelParams.from_preset(name, {}=...)).",
+                    both.join(", "),
+                    if both.len() == 1 { "it" } else { "them" },
+                    both[0]
+                )));
+            }
+            let p = crate::python_engine::model_params_from(Some(m))?;
+            (p.neutral_discount_rate, p.qe_pe_gain, p.qe_pe_stock_gain,
+             p.rate_pe_sensitivity, p.fair_value_book_floor)
+        }
+        // The reference constants, which are also what every preset through
+        // pt-v15 ships.
+        None => (
+            // NOT converted. `discount_rate` divides the economy's percent by
+            // 100 and compares the result against this, so the neutral point
+            // is a FRACTION like the constant it defaults to, and a round trip
+            // through percent would not return the caller's own bits.
+            neutral_discount_rate.unwrap_or(crate::fair_value::NEUTRAL_DISCOUNT_RATE),
+            qe_pe_gain.unwrap_or(1.0),
+            qe_pe_stock_gain.unwrap_or(0.0),
+            rate_pe_sensitivity.unwrap_or(crate::fair_value::RATE_PE_SENSITIVITY),
+            fair_value_book_floor.unwrap_or(0.0),
+        ),
+    };
+
     let economy = crate::fair_value::EconomyValuationInputs {
         corporate_bond_yield: corporate_bond_yield.map(crate::units::fraction_to_percent),
         federal_funds_rate: crate::units::fraction_to_percent(federal_funds_rate),
         // NOT converted: a multiplier delta, fractional in both denominations.
         qe_pe_boost,
-        // The standalone helper mirrors the reference implementation, which has no
-        // stock channel; the engine paths carry it.
-        qe_assets_ratio: None,
+        // NOT converted: a ratio. Read only when the stock gain is non-zero,
+        // so absent and 1.0 both contribute nothing.
+        qe_assets_ratio,
     };
     let company = crate::fair_value::CompanyValuationInputs {
         sector_avg_pe: Some(s.avg_pe),
@@ -482,17 +570,11 @@ fn fair_value(
         revenue_growth,
     };
 
-    let b = crate::fair_value::compute_fair_value_with(
-        &company,
-        &economy,
-        0.0,
-        1.0,
-        0.0,
-        // NOT converted. `discount_rate` divides the economy's percent by
-        // 100 and compares the result against this, so the neutral point is
-        // a FRACTION like the constant it defaults to, and a round trip
-        // through percent would not return the caller's own bits.
-        neutral_discount_rate.unwrap_or(crate::fair_value::NEUTRAL_DISCOUNT_RATE),
+    // The function every engine path calls (`market::tick`, the overnight
+    // open). At the reference values it is the two-argument
+    // `compute_fair_value` to the bit, which `fair_value_parity` pins.
+    let b = crate::fair_value::compute_fair_value_at(
+        &company, &economy, book_floor, qe_gain, qe_stock_gain, neutral, sensitivity,
     );
     Ok(PyFairValue {
         fair_value: b.fair_value,

@@ -2054,6 +2054,32 @@ def test_a_fork_keeps_the_subclass():
     assert isinstance(control.agent, Scripted)
 
 
+def test_a_fork_carries_what_a_subclass_adds_to_fork_kwargs():
+    """Issue #151. A subclass with its own constructor argument extends
+    `fork_kwargs()`, as it does on the other three adapters, and the twin is
+    built from it, so the twin carries the argument rather than its default."""
+
+    class Configured(Scripted):
+        def __init__(self, threshold=None, **kwargs):
+            super().__init__(**kwargs)
+            self.threshold = threshold
+
+        def fork_kwargs(self):
+            kwargs = super().fork_kwargs()
+            kwargs["threshold"] = self.threshold
+            return kwargs
+
+    agent = Configured(threshold=0.25, script=answer(), every=3,
+                       objective="hold the index")
+    world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0)
+    world.run(days=1)
+    control, shock = world.fork("control", "shock")
+    for arm in (control.agent, shock.agent):
+        assert type(arm) is Configured
+        assert arm.threshold == 0.25
+        assert arm.fork_kwargs() == agent.fork_kwargs()
+
+
 def test_the_intervention_reaches_one_arm_only():
     agent = Scripted(answer(act("TECH_A", "BUY", 5_000)))
     world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0,

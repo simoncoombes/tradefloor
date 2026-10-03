@@ -24,33 +24,42 @@ implied.
 
 ### 1. Version locations
 
-`pt.version()` is a published fact and these must agree:
+```
+python tools/release/bump.py X.Y.Z --date YYYY-MM-DD
+```
+
+`--date` is the day you intend to tag. The command sets the version in
+`pyproject.toml` and `date-released` in `CITATION.cff`, then rewrites every
+copy of both, and of the default preset where a citation names it, from those
+sources. `tools/release/metadata.py` is the list of copies, and running it
+prints each one beside the value its source gives it:
 
 | file | what reads it |
 |---|---|
-| `pyproject.toml` | the wheel, the sdist, PyPI |
-| `rust/Cargo.toml` | the crate, crates.io |
-| `CITATION.cff` | anyone citing a result |
+| `pyproject.toml` | the wheel, the sdist, PyPI. The source |
+| `rust/Cargo.toml` | the crate, crates.io, and `pt.version()`, which the extension reads from the crate |
+| `CITATION.cff` | anyone citing a result: `version:`, and `date-released:`, the source of the year |
+| `README.md` | the BibTeX entry (version, year, preset) and the example of citing a run in the text |
+| `.zenodo.json` | the preset the description names |
 | `mcpb/manifest.json`, `mcpb/pyproject.toml` | the MCP bundle for Claude Desktop and Smithery: its version and its `tradefloor[mcp]==` pin. Publish it to Smithery after the tag (`mcpb/README.md`) |
 | `server.json` | the MCP Registry listing: its version, the PyPI package's, and the `tradefloor[mcp]==` pin `uvx --with` installs; `release.yml` publishes it after PyPI |
 | `tradefloor-docs: docs/reproducing-a-run.md` | the worked example that prints it |
 
-The fourth location moved with the docs at 0.5.0: it lives in the
-PRIVATE `simoncoombes/tradefloor-docs` repo now, along with every
-rendered page that prints the version. Bump it there, rebuild, and
-push that repo as part of the same release pass.
+The last row is the one `bump.py` cannot reach. It lives in the PRIVATE
+`simoncoombes/tradefloor-docs` repo, along with every rendered page that
+prints the version. Bump it there, rebuild, and push that repo as part of
+the same release pass.
 
-The BibTeX entry in the README's "Citing tradefloor" section carries the
-version too, with the preset beside it, so bump the version in both places.
-
-`CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
-the day the version was tagged. A version without the date it shipped is half
-a citation.
-
-`date-released` is the field that goes stale silently. At 0.3.0 it still read
-`2026-08-26`, which is when v0.2.0 was tagged, sitting under `version: 0.3.0`.
-Nothing tests it, so it reaches a citation field pointing at the previous
-release. Set it to the day you intend to tag, and check it again at the tag.
+A copy that disagrees with its source fails `tests/test_metadata_consistency.py`,
+which runs in the suite on every pull request. Dev may carry a version ahead
+of the newest tag: nothing compares the tree against git until the tag is
+pushed. Then the release workflow's first job runs
+`bump.py --check X.Y.Z --tagged-on <the tagged commit's date>`, which stops
+the release before anything is built when a copy disagrees with its source,
+when the version differs from the tag's, or when `date-released` is more than
+a day from the tag. Before this, v0.5.0 and
+v0.7.1 shipped a `CITATION.cff` naming the previous version, and v0.8.5
+shipped a `date-released` a week before its tag.
 
 Then `cargo update -p tradefloor` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
@@ -418,11 +427,20 @@ new row.
 `evaluate` on pt-v20 by name, so a new preset leaves it where it was. It
 moves when pt-v20 changes before it ships, when a reference agent changes,
 or when `evaluate` scores differently, and `test_known_answer.py` names the
-agent and the part (orders, fills or scorecard). Re-base it with `python
-tests/known_answer_traded.py --write` and add a sentence to its note saying
-what moved. Its `presetRow` must equal pt-v20's row in
-`known_answer_presets.json`, so re-basing that row fails this test until
-the traded run is re-based too.
+agent and the part (orders, fills or scorecard). Re-base it by bumping
+`TRADED_KAT_VERSION`, running `python tests/known_answer_traded.py --write`
+and adding a sentence to its note saying what moved. Its `presetRow` must
+equal pt-v20's row in `known_answer_presets.json`, so re-basing that row
+fails this test until the traded run is re-based too.
+
+Every pull request compares the five baselines with the newest release tag
+(`tools/ci/kat_history.py`, the `known-answers` job in `suite.yml`). A
+digest that differs from the release's needs a higher version and a note
+that says why; a released preset's row may not move at all without both,
+and may never be removed. Between releases a baseline can be re-based more
+than once under one bump. 0.4.0 is the case this exists for: it bumped
+`KAT_VERSION` from 11 to 12 and shipped a note that still described 0.3.0's
+era boundary.
 
 **4. Test expectations pinned to the old default.** NEW, and the largest
 unplanned piece of 0.6.0, where six broke in three shapes:
@@ -717,7 +735,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   `build_site.py` left this repository at 0.5.0. There is no Pages workflow
   here and no committed `docs/` tree; `.github/workflows/` holds
   `determinism.yml`, `release.yml` and `suite.yml`. Step 5 is the whole of
-  what the site needs. Check it serves: `curl -sI https://tradefloor.dev/`.
+  what the site needs. Check it serves: `curl -sI https://docs.tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 
@@ -765,7 +783,7 @@ to Zenodo by hand.
 | two gate rows measured a different pair, and a different agent, from the ones the page names | the rows disagreeing with prose that was right | the measurement follows the call the page prints |
 | the docs quoted the previous default preset's figures | reading a published number after a preset change | step 5b re-measures the grid and names the preset beside the figure |
 | the docs inventory was generated from a development build | two builds reporting one version | `params.py --check` digests the settable list; step 5.2 requires `--python` |
-| `CITATION.cff` shipped the previous release's date | reading the field at the tag | it is named in step 1 as the field that goes stale |
+| `CITATION.cff` shipped the previous release's date, and twice the previous version | reading the field at the tag | `bump.py` writes both, and `release.yml` runs `bump.py --check` against the tag |
 | a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
 The pattern in all five: **correct everywhere the author looks, wrong only in

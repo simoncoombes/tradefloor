@@ -198,6 +198,7 @@ def to_instruments(
     federal_funds_rate: float = 0.025,
     corporate_bond_yield: float | None = None,
     qe_pe_boost: float = 0.0,
+    qe_assets_ratio: float | None = None,
     initial_s: str = "zero",
     s_seed: int = 0,
     model: Any = None,
@@ -210,10 +211,20 @@ def to_instruments(
     company starts at its own computed fair value, so initial mispricing is
     exactly zero.
 
-    Fair value under WHICH model: `model` names it, defaulting to the shipped
-    default, and it must be the model the engine then runs for the same reason
-    the macro must be -- otherwise every company starts mispriced by the
-    difference between two valuations.
+    Fair value under WHICH model: `model` names it (a preset name or a
+    `ModelParams`), defaulting to the shipped default that `Engine` also
+    defaults to. It must be the model the engine then runs, for the same
+    reason the macro must be: otherwise every company starts mispriced by the
+    difference between two valuations. Every value the valuation reads comes
+    from it (the neutral rate, the rate sensitivity, the QE gains and the
+    book floor), through `fair_value(..., model=model)`.
+
+    On a preset with `earnings_cycle_depth` set (pt-v20), the engine's
+    fair value on day zero also carries its opening earnings cycle, a
+    restatement of every name by one common factor that this function cannot
+    see because it has no engine. On pt-v20 that is about 1.3% and the
+    opening books it into each name's fair-value level, so it does not open
+    as mispricing. `Engine.fair_values()` reads the engine's own number.
 
     That is well-defined, needs no second data source, and is consistent with
     a fundamentals-anchored model. The honest cost, stated rather than hidden:
@@ -262,26 +273,18 @@ def to_instruments(
     rng = GameRng(check_seed(s_seed, "s_seed"), MISPRICING_STREAM)
     # THE MODEL, for the same reason the macro is taken: a price computed
     # under one valuation and run under another starts mispriced by the
-    # difference. `neutral_discount_rate` is the rate at which the multiple
-    # sits on its sector anchor, it became settable before pt-v18 and pt-v18
-    # is the first preset to move it -- 0.0482 against the 0.04 every
-    # earlier preset ships and `fair_value` still assumes when nobody says
-    # otherwise. Measured on the EDGAR path at the 0.7.0 boundary: matching
-    # the macro left a day-zero |s| of 0.0169 where pt-v16 left 0.0005, and
-    # the separation from a MISMATCHED rate regime collapsed from 201x to
-    # 4.9x -- so the check that matching the macro matters was most of the
-    # way to not mattering.
-    #
-    # `fair_value`'s own signature was built for this: its
-    # `neutral_discount_rate` argument documents that a caller recomputing a
-    # run's fair value passes that run's own rate. This is that caller.
+    # difference. `fair_value` with no model values at the reference
+    # constants, which no preset since pt-v15 ships: pt-v16 onward set the
+    # QE gain to 0.0, pt-v18 onward the neutral rate to 0.0482, pt-v20 the
+    # rate sensitivity to 3.0. Valuing the neutral rate alone from the model
+    # still priced a roster under a QE boost 6% above the pt-v19 engine it
+    # ran in (`tests/test_fair_value_contract.py`), so every value comes
+    # from the model.
     from . import ModelParams              # noqa: PLC0415 -- circular at import
     params = (model if isinstance(model, ModelParams)
               else ModelParams.from_preset() if model is None
               else ModelParams.from_preset(model))
-    values = params.to_dict()
-    cap = values["mispricing_cap"]
-    neutral = values["neutral_discount_rate"]
+    cap = params.to_dict()["mispricing_cap"]
     out: list[Instrument] = []
     for i, row in enumerate(snapshot.rows):
         missing = {"ticker", "sector", "eps", "shares_outstanding"} - set(row)
@@ -296,7 +299,8 @@ def to_instruments(
             corporate_bond_yield=corporate_bond_yield,
             qe_pe_boost=qe_pe_boost,
             book_value_per_share=row.get("book_value_per_share"),
-            neutral_discount_rate=neutral,
+            qe_assets_ratio=qe_assets_ratio,
+            model=params,
         )
         shares = row["shares_outstanding"]
 

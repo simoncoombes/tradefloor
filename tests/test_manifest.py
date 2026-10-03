@@ -397,14 +397,32 @@ def test_a_divergence_on_one_platform_does_not_blame_the_platform():
     assert "until=n" in message
 
 
-def test_a_divergence_across_platforms_still_names_the_pair():
+@pytest.mark.parametrize("host", [None, ("Linux", "aarch64"),
+                                  ("Windows", "AMD64")])
+def test_a_divergence_across_platforms_still_names_the_pair(host,
+                                                           monkeypatch):
     """The case the old message was written for, kept: same operations, same
-    draw counts, different machines. That IS the leading suspect there."""
+    draw counts, different machines. That IS the leading suspect there.
+
+    The recorded platform is chosen to differ from the host, so the test
+    holds on every host. It named Linux aarch64 outright and failed by
+    construction on a Graviton box (#134); the parametrized hosts stand in
+    for the machines CI does not run it on.
+    """
+    import platform as _p
+
+    if host is not None:
+        monkeypatch.setattr(_p, "system", lambda: host[0])
+        monkeypatch.setattr(_p, "machine", lambda: host[1])
+    here = (_p.system(), _p.machine())
+    os_, machine = next(pair for pair in (("Linux", "aarch64"),
+                                          ("Windows", "AMD64"))
+                        if pair != here)
     with pytest.raises(tradefloor.ValidationError) as raised:
-        _diverging_manifest(os="Linux", machine="aarch64").reproduce()
+        _diverging_manifest(os=os_, machine=machine).reproduce()
     message = str(raised.value)
     assert "different platforms" in message
-    assert "Linux-aarch64 wrote it" in message
+    assert f"{os_}-{machine} wrote it" in message
 
 
 def test_a_short_history_is_named_as_an_input_difference():

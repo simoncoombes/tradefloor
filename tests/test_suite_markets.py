@@ -48,8 +48,8 @@ def test_every_suite_market_runs(preset, seed, universe_seed, scenario):
 def test_growth_alone_may_fall_below_the_rates_floor():
     """The floor is growth's alone: a rate under -5 per cent is still refused,
     and growth under -10 per cent is too."""
-    assert tf.check_rate("gdp_growth", -0.08) == -0.08
+    assert tf._core.check_rate("gdp_growth", -0.08) == -0.08
     with pytest.raises(ValueError):
-        tf.check_rate("gdp_growth", -0.11)
+        tf._core.check_rate("gdp_growth", -0.11)
     with pytest.raises(ValueError):
-        tf.check_rate("federal_funds_rate", -0.08)
+        tf._core.check_rate("federal_funds_rate", -0.08)

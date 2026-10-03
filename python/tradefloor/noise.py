@@ -31,8 +31,8 @@ the uniform index.
 The index runs from engine construction, so the same address names the
 same draw in every fork of the same run and in any restore of a snapshot
 that carries the counts. A snapshot written before draw addressing
-restores with counts of zero: its addresses restart at the restore, and a
-patch written against the original run does not land where it did.
+carries no counts, and ``Engine.restore_state`` refuses it rather than
+restart its addresses at zero.
 
 ## Sites
 
