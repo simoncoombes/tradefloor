@@ -4,6 +4,70 @@ How an agent sees the market, how it is scored, and what the sandbox does
 and does not stop. The README has the short version; this page has the
 detail behind each warning there.
 
+## The agent's view
+
+A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
+read-only market view: prices, the public columns, each book, the bars of days
+already recorded (a World run with `record=True`; `tf.evaluate` records none),
+the published macro fields, the curve and which names have news today.
+`obs.history` holds a daily bar per name and the published macro for every day
+the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`, and
+needs no extra package. A bar's close is the day's last print. On pt-v20 the
+market's close then re-marks every name, so the next day starts from a
+different price: 15 bp away at the median on a 20-name roster. A broker's
+daily bar closes at the official close. `obs.portfolio` reads the agent's own
+positions and cannot trade. Forking the engine, writing to it and reading the
+hidden state all raise `tf.SandboxError`. The hidden state includes the true
+business-cycle phase; the macro fields carry the phase as published. The gym
+environment's `env.engine` and `env.portfolio` are the same views.
+
+In the mapping `act` returns, a plain number is a market order for that many
+shares, negative to sell. A native Python agent can also return
+`tf.Limit(quantity, price)`, which waits in the book for what does not fill,
+and `tf.Cancel()`. The framework adapters can send all three: an LLM's action
+with a `limit_price` becomes a `tf.Limit`, and `side: "CANCEL"` becomes a
+`tf.Cancel()`. There are no stop, stop-limit or bracket orders, so a stop has
+to be checked at each step: at six steps a day an emulated stop filled a
+median 26.5 bp past its level, 9 bp at 5-minute steps, and 540 bp at the 90th
+percentile in the packaged recession. A trade costs the spread and its impact
+on the book. There are no commissions and no borrow fee on a short. Uninvested
+cash earns nothing by default. A negative cash balance pays the policy rate
+before each close in `tf.evaluate`, `tf.rank` and `World`, which is below a
+broker's margin rate, so leverage up to the default `max_leverage=2.0` costs
+at least that. `margin_interest=False` makes borrowing free, as it was before
+0.8.5, and `cash_interest=True` pays the policy rate on idle cash.
+
+Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
+Python process, on the same seed, so the first agent can leave the price path
+in a class variable for a later one, and nothing detects it. The read-only
+view guards against accidents, and an agent written to cheat can get round
+it. One way round it is unflagged: `tf.evaluate`'s own frames hold the
+`seed` and the `universe`, an agent can read them through `sys._getframe`,
+build a second `tf.Engine` from them and run it ahead. The copy count does
+not see a newly built engine, so the card says `tampered=False`. To compare
+agents you did not write, or two that might share state, run each in its own
+process.
+
+In a `World` with several agents, orders placed at the same step execute in
+label order, alphabetical, for the whole run. Two identical buyers of 10% of
+a day's volume paid 19.5 to 30.7 bp apart on seeds 1 to 10, the later label
+paying more. Rotate the labels across runs when you compare different agents
+in one market.
+
+The Oracle reads hidden state by declaring `privileged = True`, which gives
+it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for
+research that needs the live engine, and every scorecard says so. Either way
+the harness compares the engine's state hash around each call, and an agent
+that changed the market is scored `tampered` and left out of `tf.rank`. So
+is a sandboxed agent that forked or snapshotted the engine, however it
+reached it.
+[`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
+lists what the view serves and what the check cannot catch. The view and the
+check guard against accident. Agent code runs in the harness's own process, so
+it can reach the engine by walking the interpreter, and a read made that way
+leaves no trace. Run code you do not trust in a separate process, through the
+MCP server.
+
 ## Scoring
 
 Every `evaluate` and `rank` run starts at day 0, so a rule that needs 20
@@ -44,71 +108,6 @@ never that answer. On pt-v20 a constant answer scores near the top, because
 scores on the same days, and `explanation_edge`, the accuracy minus the
 baseline, and its repr prints the three together. Only the edge means
 anything. Quote it, or all three, and never the accuracy alone.
-
-## The agent's view
-
-A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
-read-only market view: prices, the public columns, each book, the bars of
-days already recorded (a World run with `record=True`; `tf.evaluate` records
-none), the published macro fields, the curve and which names have news today.
-`obs.history` holds a daily bar per name and the published macro for every
-day the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`,
-and needs no extra package. A bar's close is the day's last print. On
-pt-v20 the market's close then re-marks every name, so the next day starts
-from a different price: 15 bp away at the median on a 20-name roster. A
-broker's daily bar closes at the official close.
-`obs.portfolio` reads the agent's own positions and cannot trade. Forking the
-engine, writing to it and reading the hidden state all raise
-`tf.SandboxError`. The hidden state includes the true business-cycle phase;
-the macro fields carry the phase as published. The gym environment's `env.engine` and
-`env.portfolio` are the same views.
-
-In the mapping `act` returns, a plain number is a market order for that many
-shares, negative to sell. A native Python agent can also return
-`tf.Limit(quantity, price)`, which waits in the book for what does not fill,
-and `tf.Cancel()`. The framework adapters can send all three: an LLM's action
-with a `limit_price` becomes a `tf.Limit`, and `side: "CANCEL"` becomes a
-`tf.Cancel()`. There are no stop, stop-limit or bracket orders, so a stop has to be checked at each
-step: at six steps a day an emulated stop filled a median 26.5 bp past its
-level, 9 bp at 5-minute steps, and 540 bp at the 90th percentile in the
-packaged recession. A trade costs the spread and its impact on the book.
-There are no commissions and no borrow fee on a short. Uninvested cash earns
-nothing by default. A negative cash balance pays the policy rate before each
-close in `tf.evaluate`, `tf.rank` and `World`, which is below a broker's
-margin rate, so leverage up to the default `max_leverage=2.0` costs at least
-that. `margin_interest=False` makes borrowing free, as it was before 0.8.5,
-and `cash_interest=True` pays the policy rate on idle cash.
-
-Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
-Python process, on the same seed, so the first agent can leave the price path
-in a class variable for a later one, and nothing detects it. The read-only
-view guards against accidents, and an agent written to cheat can get round
-it. One way round it is unflagged: `tf.evaluate`'s own frames hold the
-`seed` and the `universe`, an agent can read them through `sys._getframe`,
-build a second `tf.Engine` from them and run it ahead. The copy count does
-not see a newly built engine, so the card says `tampered=False`. To compare
-agents you did not write, or two that might share state, run each in its own
-process.
-
-In a `World` with several agents, orders placed at the same step execute in
-label order, alphabetical, for the whole run. Two identical buyers of 10% of
-a day's volume paid 19.5 to 30.7 bp apart on seeds 1 to 10, the later label
-paying more. Rotate the labels across runs when you compare different agents
-in one market.
-
-The Oracle reads hidden state by declaring `privileged = True`, which gives
-it `obs.hidden` and marks its scorecard. Pass `trusted_agents=True` for
-research that needs the live engine, and every scorecard says so. Either way
-the harness compares the engine's state hash around each call, and an agent
-that changed the market is scored `tampered` and left out of `tf.rank`. So
-is a sandboxed agent that forked or snapshotted the engine, however it
-reached it.
-[`tradefloor/sandbox.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/sandbox.py)
-lists what the view serves and what the check cannot catch. The view and the
-check guard against accident. Agent code runs in the harness's own process, so
-it can reach the engine by walking the interpreter, and a read made that way
-leaves no trace. Run code you do not trust in a separate process, through the
-MCP server.
 
 ## Agent frameworks
 
@@ -167,9 +166,9 @@ effect size, and `externalities` does not aggregate across seeds.
 
 This runs a [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 agent in a controlled tradefloor market. It runs a shared history, checkpoints
-the world, forks it, raises rates by 200bps in one branch, and compares how the
-same agent responds. It is the README's rate-shock demo with the agent swapped and
-nothing else changed.
+the world, forks it, raises rates by 200bps in one branch, and compares how
+the same agent responds. It is the README's rate-shock demo with the agent
+swapped and nothing else changed.
 
 ```bash
 git clone https://github.com/simoncoombes/tradefloor

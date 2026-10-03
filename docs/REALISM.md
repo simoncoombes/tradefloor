@@ -13,14 +13,14 @@ lists every member of each, and the counts below refer to them.
 ### The one-year table
 
 The one-year table has 19 statistics of a simulated market, such as
-volatility, fat tails, how much stocks move together and how far the VIX
-jumps after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
-`tf.facts.crisis_statistics()` the nineteenth, which needs a run with a
-crisis in it. `tf.envelope.score()` compares each with the range real
-markets show over a year. On the default preset, `pt-v20`, all 19 are inside
-their ranges. The check runs 30 random seeds. Fifteen of the statistics are read on one fixed
-set of companies, and that fixed-roster panel is repeated on held-out seeds
-and on a held-out set of companies.
+volatility, fat tails, how much stocks move together and how far the VIX jumps
+after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
+`tf.facts.crisis_statistics()` the nineteenth, which needs a run with a crisis
+in it. `tf.envelope.score()` compares each with the range real markets show
+over a year. On the default preset, `pt-v20`, all 19 are inside their ranges.
+The check runs 30 random seeds. Fifteen of the statistics are read on one
+fixed set of companies, and that fixed-roster panel is repeated on held-out
+seeds and on a held-out set of companies.
 
 The 19 of 19 is a verdict on figures pooled over the 30 seeds, the median
 for each shape statistic. One seed's year often misses one or more of the 14

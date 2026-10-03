@@ -55,10 +55,10 @@ know what a missing field held, write it into the dict and restore that.
 ## Publishing a result
 
 To let a reader rerun a result, publish its `RunManifest`: it records the
-version, preset, seed, universe, macro state and scenario, and `reproduce()` stops on a mismatch.
-It checks the market and carries no score: its `result` block holds the
-market's `digest`, the number of `days` and `draws_consumed`, and
-`tf.evaluate` and `tf.rank` write no manifest. A published score has to be
+version, preset, seed, universe, macro state and scenario, and `reproduce()`
+stops on a mismatch. It checks the market and carries no score: its `result`
+block holds the market's `digest`, the number of `days` and `draws_consumed`,
+and `tf.evaluate` and `tf.rank` write no manifest. A published score has to be
 rerun to be checked.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 says which release to pin for a long study.

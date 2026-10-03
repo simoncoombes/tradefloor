@@ -17,8 +17,10 @@ Real market data can't tell you what would have happened if you had traded
 differently, or what caused a move. tradefloor can, because it computed every
 price. You can fork a running market, change one thing in one branch (a rate
 rise, a liquidity crisis, a different agent), and measure where the two
-branches came apart. `engine.truth()` splits every price move into the
-factors that made it, which no historical dataset records.
+branches came apart. `engine.truth()` splits each move in the gap between a
+price and the model's fair value into eleven factors, and
+`engine.explain(ticker, day)` breaks down the move in the traded price, two
+records no historical dataset carries.
 
 Documentation is at https://docs.tradefloor.dev.
 
@@ -36,8 +38,8 @@ extra per agent framework.
 
 The API may change before 1.0. Model changes ship as new presets, so a market
 with no agent orders in it replays exactly on its named preset in later
-releases. tradefloor was called **pretium** until 0.5.0, and results recorded
-under that name still replay.
+releases. tradefloor was called pretium until 0.5.0. Versions up to 0.4.3
+still install under that name, and results recorded with them still replay.
 
 ## A first run
 
@@ -67,8 +69,8 @@ A Python agent is any object with `act(obs)` that returns orders: a number
 of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
 It sees a read-only view of the market and its own portfolio, and
 `obs.history` holds a daily bar per name. A bar's close is the day's last
-print; on pt-v20 the close then re-marks every name, so the next day starts
-from a different price.
+print. On pt-v20 the close then re-marks every name, so the next day starts
+15 bp away at the median on a 20-name roster.
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 covers what the view holds, how trades are charged, the framework adapters
 (OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
@@ -85,8 +87,10 @@ python examples/rate-shock/counterfactual.py
 ```
 
 It runs an agent in a controlled market, checkpoints the world and forks it,
-raises rates by 200bps in one branch, and compares what the same agent does
-next. The run takes under five seconds of CPU and needs no keys and no network.
+raises rates by 200 bp in one branch, and compares what the same agent does
+next. It prints nine checks that the two branches started identical, the
+step at which the agent's behavior changed, and the two branches side by
+side. The run takes under five seconds of CPU and needs no keys and no network.
 The walkthrough is
 [Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
 
@@ -98,7 +102,7 @@ The walkthrough is
 | `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
 | counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
-| `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
+| `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | scenarios | seven packaged shocks, and a file format for your own |
 | MCP server | thirteen read-only tools for a coding agent, scenarios included |
@@ -121,7 +125,9 @@ cannot reach code. Each result carries its own caveats. See
 ## Scenarios
 
 ```python
-scenario = tf.Scenario.load("liquidity_crisis")   # ships with the package
+engine = tf.Engine(seed=42, universe=universe)
+engine.run_days(20)                                # a shared history first
+scenario = tf.Scenario.load("liquidity_crisis")    # ships with the package
 
 control, stress = tf.branch(engine, 2)
 for day in range(80):
@@ -166,13 +172,13 @@ own `exp`, `log`, `pow`, `sin` and `cos`, so the system's math library cannot
 change a result, and each release runs a fixed simulation on five platforms
 and stops if any result differs.
 
-A shipped preset never changes. A market with no agent orders in it replays
-exactly on its named preset in every later release, and each release checks
-that with a digest per preset. A run with agent orders in it replays exactly
-on the same release. Across releases the promise is narrower: 0.8.5 changed
-how an agent's fills reach the market, on every preset, so a traded run
-recorded before 0.8.5 matches up to its first trade and differs after it.
-The default preset is `pt-v20`, and any earlier one can be named:
+A shipped preset never changes, so a market with no agent orders in it replays
+exactly on its named preset in every later release. Each release checks that
+with a digest per preset. A run with agent orders in it replays exactly on the
+same release. Across releases the promise is narrower. 0.8.5 changed how an
+agent's fills reach the market, on every preset, so a traded run recorded
+before 0.8.5 matches up to its first trade and differs after it. The default
+preset is `pt-v20`, and any earlier one can be named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -180,9 +186,9 @@ eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 
 To let a reader rerun a result, publish its `RunManifest`. It records the
 version, preset, seed, universe, macro state and scenario, and `reproduce()`
-stops on a mismatch. It checks the market and carries no score: its `result`
-block holds the market's `digest`, the number of `days` and
-`draws_consumed`, and `tf.evaluate` and `tf.rank` write no manifest, so a
+stops on a mismatch. A manifest checks the market and carries no score. Its
+`result` block holds the market's `digest`, the number of `days` and
+`draws_consumed`. `tf.evaluate` and `tf.rank` write no manifest, so a
 published score has to be rerun to be checked.
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 has the full contract, including what a saved engine state promises when it
@@ -197,30 +203,45 @@ statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
 On the default preset, `pt-v20`, all 19 statistics of the one-year table
 (volatility, fat tails, how much stocks move together, how far the VIX jumps
-after a fall) are inside the range real markets show over a year, and 14 of
-14 on the two-year panel. The long-run criteria are 40 rows over 21 years for pt-v20,
-covering crash depth, how long fear lasts, bear markets per decade, the
-2008 and 2020 replays, the rate indices and the cost of size in the book.
+after a fall) are inside the range real markets show over a year. All 14
+graded statistics of the two-year panel are inside their two-year ranges.
+The long-run criteria are 40 rows over 21 years for pt-v20, covering crash
+depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices and the cost of size in the book.
 pt-v20 meets all 40.
 
 Read those claims narrowly:
 
 - The 19 of 19 is a verdict on figures pooled over 30 seeds. One seed's year
-  often misses some of them: on seeds 101 to 116, all 14 were in range on 5 of
-  the 16. If you run one market per condition, read
-  `tf.envelope.intervals()` for each statistic's spread across seeds.
-- The one-year ranges are wide, so passing one is weak evidence. Volatility
-  clustering shows the gap: `abs_return_acf1` reads 0.028, below every real
-  2015 to 2025 window (the lowest is 0.039), and it passes because its range
-  reaches lower than those windows do.
+  often misses some of its 14 shape statistics. On seeds 101 to 116, all 14
+  were in range on 5 of the 16, and one seed had 8 of 14. If you run one
+  market per condition, read `tf.envelope.intervals()` for each statistic's
+  spread across seeds.
+- A shape statistic's range is the median of 35 real one-year windows plus
+  or minus 2.1 trimmed standard deviations, so passing one is weak evidence.
+  Volatility clustering is one case. `abs_return_acf1` reads 0.028, below
+  every real 2015 to 2025 window (the lowest is 0.039), and it passes
+  because its range reaches lower than those windows do.
+- The one-year table helped choose most of pt-v20's coefficients, so the
+  held-out checks are the fresh seeds and the fresh set of companies the
+  panel is repeated on.
+- One year is the certified horizon. Two years is graded on the two-year
+  panel, and longer runs only by the long-run criteria. Every run on a
+  roster opens at nearly the same VIX (17.66 on the certified roster), so
+  the one-year figures describe years that start calm.
 - A driven scenario moves prices at a quarter to a half of the real size, in
   the right direction. Use a scenario to detect a response, and do not read
   its size as a forecast.
-- Volatility memory is weaker than real at every lag, nothing below the
-  65-minute step is calibrated, and an order sliced over a day costs far less
-  than published studies of such orders find.
-- An agent's own impact barely reaches the tape, and no other trader adapts
-  to it, so no liquidity spiral or predatory trading can arise.
+- Volatility memory is weaker than real at every lag, about a quarter of
+  real at lag 1. Nothing below the 65-minute step is calibrated.
+- An order sliced over a day costs far less than published studies find:
+  0.04 of a daily standard deviation for 10% of a day's volume in 36
+  slices, against 0.15 to 0.3. A schedule optimiser will overstate the value
+  of trading slowly.
+- Your fills pay for the book depth they take, but that temporary impact
+  barely reaches the printed prices. The lasting part is linear and fades,
+  and no other trader adapts to you, so no liquidity spiral or predatory
+  trading can arise.
 
 `tf.envelope.check(horizon_days=...)` refuses a question that falls outside
 a measured limit.
@@ -229,23 +250,28 @@ has every number behind these claims and the full table of limits.
 
 ## Before you publish a result
 
-- An `explanation_accuracy` alone means nothing on pt-v20, because a constant
-  answer scores 0.95 to 1.0. Quote `explanation_edge`.
-- Agents in one `tf.evaluate` or `tf.rank` call share one Python process and
-  one seed. An agent written to cheat can read the seed from the harness's
-  frames through `sys._getframe` and run a copy of the market ahead, and
-  nothing flags it. To compare
-  agents you did not write, run each in its own process, through the MCP
-  server.
-- The read-only market view guards against accidents. Agent code runs in the
-  harness's own process and can reach the engine by walking the interpreter,
-  so run code you do not trust in a separate process.
+- An agent scored on naming the factor behind each day's move gets an
+  `explanation_accuracy`. On pt-v20 a constant answer scores 0.95 to 1.0, so
+  quote `explanation_edge`, the accuracy minus that baseline, and never the
+  accuracy alone.
+- Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
+  Python process, on one seed. An earlier agent can leave the price path in
+  a class variable for a later one. An agent written to cheat can read the
+  seed from the harness's frames through `sys._getframe` and run a copy of
+  the market ahead. Nothing flags either. The read-only market view guards
+  only against accidents, so run each agent you did not write in its own
+  process, through the MCP server.
+- Every `evaluate` and `rank` run starts at day 0, so a rule that needs 20
+  days of prices sits out the first 20 while buy-and-hold is invested. Pass
+  `history_days=20` to run the market 20 days first with nobody trading.
 - In a `World` with several agents, orders placed at the same step execute in
   label order, alphabetical, for the whole run. Rotate the labels across runs
   when you compare different agents in one market.
 - There are no commissions, no borrow fee on a short and no stop orders. A
-  negative cash balance pays the policy rate, which is below a broker's
-  margin rate.
+  stop you check at each step fills a median 26.5 bp past its level at six
+  steps a day. Uninvested cash earns nothing unless you pass
+  `cash_interest=True`, and a negative cash balance pays the policy rate,
+  which is below a broker's margin rate.
 
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 has the measurements behind each of these.
@@ -265,7 +291,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel the repair uses, with the same path on the default, `pt-v20`, at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v20`, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -278,8 +304,8 @@ without an API key.
 ## Documentation
 
 https://docs.tradefloor.dev covers install, the API, the guides and how the
-model is measured. These documents in this repository are for anyone
-publishing with it:
+model is measured. These pages in this repository have the detail behind the
+sections above:
 
 - [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
   the model as equations, with every coefficient's value on the default
@@ -295,7 +321,7 @@ publishing with it:
 - [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
   which release lines get fixes, and for how long
 
-## Contributing and security
+## Contributing and support
 
 [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md)
 explains how to build and test the project. Its main rule is that any change to
@@ -303,10 +329,18 @@ the simulated trajectory is a breaking change, however small, so a model
 change ships as a new preset. [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md)
 is the release checklist.
 
-Report a vulnerability privately as
+Report a vulnerability through GitHub's
+[security advisory form](https://github.com/simoncoombes/tradefloor/security/advisories/new),
+not a public issue.
 [SECURITY.md](https://github.com/simoncoombes/tradefloor/blob/main/SECURITY.md)
-describes. Bugs and questions go to
+says what is in scope. Bugs and questions go to
 [GitHub issues](https://github.com/simoncoombes/tradefloor/issues).
+
+0.8.5 and the 0.8 patches after it are the long-term support line, with bug
+and security fixes for 24 months.
+[docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
+says what a support line promises and which release to pin for a long
+study.
 
 ## Citing tradefloor
 
@@ -320,14 +354,11 @@ several presets, and results depend on the preset.
   version = {0.8.8},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
-  doi     = {10.5281/zenodo.XXXXXXX},
   note    = {Model preset pt-v20}
 }
 ```
 
-The DOI is a placeholder. Zenodo will mint one DOI per release once the
-archive is switched on; until then, cite the version and the URL and leave
-the `doi` line out. [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff)
+[CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff)
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
@@ -344,5 +375,5 @@ tradefloor is licensed under MIT OR Apache-2.0, at your option. See
 and
 [LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).
 GitHub's sidebar reads Apache-2.0 because its license detection picks one
-file and stops; the grant that applies is the dual one, stated in
+file and stops. The grant that applies is the dual one, stated in
 `pyproject.toml`, `rust/Cargo.toml` and this section.
