@@ -1751,8 +1751,8 @@ def moved_dials(recorded: dict[str, Any],
     carrying a value is a model the recording never ran. Measured on those
     seventeen at the ``pt-v19`` of ``38f2c43``: four were inert and THIRTEEN
     live, among them ``market_vol_level_sigma`` 0.085 and
-    ``jump_idio_excitation`` 2.0. pt-v19's fifth composition carries both
-    at 0.0, so the count is that vector's and not the shipped one's.
+    ``jump_idio_excitation`` 2.0. pt-v19 as shipped carries both at 0.0, so
+    the count is that build's vector and not the shipped one's.
 
     A key the RECORD carries and the build does not is returned separately
     and never refused. The build cannot evaluate it -- ``pt-v1`` does not

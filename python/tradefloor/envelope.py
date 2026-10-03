@@ -1,9 +1,9 @@
 """The realism envelope, as data: what tradefloor certifies, and what it does not.
 
-`tradefloor-docs: docs/realism-envelope.md` states the envelope in prose.
-This module states it in a form a program can read, so a user does not have
-to remember a page to find out whether their question is one this simulator
-can answer.
+The realism envelope page at docs.tradefloor.dev states the envelope in
+prose. This module states it in a form a program can read, so a user does not
+have to remember a page to find out whether their question is one this
+simulator can answer.
 
 Two things live here, and neither is a score.
 
@@ -11,21 +11,13 @@ Two things live here, and neither is a score.
 with the spread it actually has across seeds, not as a bare median. A point
 estimate from a stochastic simulator invites a precision it does not have.
 `abs_return_acf20` is the example, and the number is read out of `CERTIFIED`
-below: it reads about +0.0085 at the shipped preset, positive on 21 of the
-30 certification seeds, so a single seed lands either side of zero. The
+below: it reads about +0.0044 at the shipped preset against a seed-to-seed
+sd of about 0.047 (`facts.SEED_SD`), so a single seed lands either side of
+zero. The
 band distance is reported in units of that spread, which
 is the same weighting `tradefloor.loss` uses -- so "how far out" is
 denominated in the model's own noise rather than in the statistic's
 arbitrary units.
-
-This paragraph said +0.0087 until 2026-09-14, which is no preset's reading
-on the current roster generator and was five defaults old while `CERTIFIED`
-a hundred and forty lines below it read 0.0017. The sentence warning against
-quoting a stale point estimate was quoting one, which is the plainest case
-this module contains for why a published number needs a producer rather than
-a careful author. It then read
-+0.0017 until 2026-09-23, when the fifth composition moved `CERTIFIED` to
-0.0085 and the sentence stayed behind again.
 
 **A membership check** (`check`). Given a horizon, the statistics a strategy
 leans on, and the shape of the roster, it answers whether the question falls
@@ -57,9 +49,8 @@ Nothing here re-checks that at call time. `check` reads these constants and
 the question you asked; it never looks at the engine you are about to run.
 So if `tradefloor.model_preset()["name"]` is not `PRESET`, this module is
 describing a different model than the one you are running and will NOT say
-so. This docstring claimed until 2026-08-27 that `check` said so, and it
-never did. The comparison is one line and belongs beside any citation of
-these numbers:
+so. The comparison is one line and belongs beside any citation of these
+numbers:
 
     tradefloor.model_preset()["name"] == tradefloor.envelope.PRESET
 """
@@ -955,12 +946,12 @@ def _sector_reading() -> str:
     `tests/test_preset_records.py` binds to it. The sentence can now only go
     stale if the record does, and that already fails a test.
 
-    The VERDICT is deliberately not stated here, by either name. The band
-    basis is under a ruling: on the 2015-2025 bands these tables carry the
-    row is outside at both horizons, and on the universal 1987-2025 band its
-    floor is 0.04 at 252 and 0.06 at 504 and the same readings are inside at
-    both. Picking one so the sentence resolves is the error the sentence
-    already made in the other direction.
+    The VERDICT is deliberately not stated here, by either name. Which band
+    applies is still open: on the 2015-2025 bands these tables carry the row
+    is outside at both horizons, and on the wider 1987-2025 band, whose floor
+    is 0.04 at 252 and 0.06 at 504, the same readings are inside at both.
+    Picking one so the sentence resolves is the error the sentence already
+    made in the other direction.
     """
     v252 = CERTIFIED["sector_excess_corr"]
     v504 = MEASURED_504["sector_excess_corr"]
@@ -1034,7 +1025,7 @@ GAPS: tuple[Gap, ...] = (
             "easing by about a fifth.\n\n"
             "For the shipped preset's own long run, "
             "`preset_record()[\"long_run\"]` carries thirty 21-year "
-            "histories scored against the adopted long-run criteria. So a "
+            "histories scored against 40 long-run criteria. So a "
             "five-year study is reading numbers that exist and are "
             "published. What it does not have is a band derived at its own "
             "horizon, and no committed tool derives one. That keeps the "
@@ -1111,10 +1102,8 @@ GAPS: tuple[Gap, ...] = (
             f"arms of six, because a smoother variance has thinner tails.\n\n"
             f"The claim is about this model's parameters: no setting of them "
             f"turns its memory into a power law's, because a sum of "
-            f"exponentials is not a power law. The volume-change gap once "
-            f"said its row was structurally unreachable, and a new mechanism "
-            f"reached it. Closing this gap needs a new mechanism too, and "
-            f"tuning the existing dials will not do it."
+            f"exponentials is not a power law. Closing this gap needs a new "
+            f"mechanism, and tuning the existing dials will not do it."
         ),
         forbids=(
             f"strategies whose edge depends on volatility clustering at any "
@@ -1214,12 +1203,11 @@ GAPS: tuple[Gap, ...] = (
             "way, and whether it is closed turns on the BAND BASIS "
             "rather than on the model. In calm markets the shipped preset "
             f"reads {_sector_reading()} against the 2015-2025 bands these "
-            "tables carry. Against the universal 1987-2025 band of the "
-            "design record, whose floor is 0.04 at 252 days and 0.06 at "
-            "504, the same two readings are inside at both horizons. This "
-            "gap does not pick one. The ruler is under a ruling and the "
-            "verdict moves with it, and a reader who needs this row should "
-            "read both numbers and the band they are grading against.\n\n"
+            "tables carry. Against the wider 1987-2025 band, whose floor is "
+            "0.04 at 252 days and 0.06 at 504, the same two readings are "
+            "inside at both horizons. Which band applies is still open, so "
+            "a reader who needs this row should read both numbers and the "
+            "band they're graded against.\n\n"
             "The crisis shape is right from pt-v11 on. Under a held VIX 45 "
             "pt-v12 reads a sector excess correlation of +0.109 against a "
             "real +0.103, and crisis co-movement reads 0.696 against a real "
@@ -2999,8 +2987,7 @@ def mechanism_bar(fresh: Mapping[str, Any] | None,
     ONE definition and the two things that enforce it -- `record.py`, which
     refuses to overwrite a certificate that shows less, and the `ship_bar`
     test, which refuses the release -- read the same object. The failure to
-    avoid is the `vixlaw-ruling` shape: rows that justified a decision and
-    then existed in no scorer.
+    avoid is rows that justified a decision and then existed in no scorer.
 
     THE RULE, in one sentence. A preset's `not_shown` must be a SUBSET of
     the `not_shown` its own committed record carries: it may show more
@@ -3191,33 +3178,29 @@ def structure_bar(fresh: Mapping[str, Any] | None,
                   horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
     """The structural certificate against the one a preset committed.
 
-    THE SAME RULE AS `mechanism_bar`, IN THE SAME FORM, on Simon's ruling:
-    subset, both panels. A preset must not read REFUSED on a structural row
+    THE SAME RULE AS `mechanism_bar`, IN THE SAME FORM: subset, both
+    panels. A preset must not read REFUSED on a structural row
     its own committed record reads PASS. It may pass MORE rows than its
     record, never fewer, and a row that leaves the certificate is a loss and
     not a shorter list.
 
     WHAT THIS DOES AND DOES NOT DO, said here because the block was laid
     down RED and a reader will otherwise expect it to have been blocking.
-    Every pt-v19 vector before the fifth composition read REFUSED on
-    `vix_ar1_debiased` on at least one panel, and none was stopped by it,
-    because there was no earlier record to regress from and the bar is a
-    non-regression rule rather than a fidelity threshold. The block buys
-    visibility -- the row is on every record, by name, with its `k`, its
-    cut and its side -- and the ratchet: the first model that repairs the
-    row lays down a PASS, and from that record on no model may lose it
-    again. pt-v19's fifth composition, which ships at 0.8.0, is that model:
-    it PASSES on both panels, at k = 18 and 17 of 30 against a cut of 21.
+    The bar is a non-regression rule rather than a fidelity threshold, so a
+    preset with no earlier PASS to regress from is not stopped by a REFUSED
+    row. The block buys visibility -- the row is on every record, by name,
+    with its `k`, its cut and its side -- and the ratchet: the first model
+    that repairs the row lays down a PASS, and from that record on no model
+    may lose it again. pt-v19 as shipped PASSES `vix_ar1_debiased` on both
+    panels, at k = 18 and 17 of 30 against a cut of 21.
 
     WHY NOT A HARD FAIL ON REFUSED, which is the obvious alternative and the
-    one the row's own evidence argues for. Two reasons, and the first is
-    Simon's ruling and settles it. The second is the form's: the sign test
-    has no width, its separation is bought by treating the tape's centre as
-    exact, and at thirty seeds the tape's standard error is 1.29 times the
-    test's own resolution (`facts.STRUCTURE`).
-    A gate that REFUSED a release on that would be ruling a 0.03 offset a
-    ship-stopper on a ruler known to be softer than the offset it is
-    measuring. Non-regression asks a question the form can answer: it
+    one the row's own evidence argues for. The sign test has no width, its
+    separation is bought by treating the tape's centre as exact, and at
+    thirty seeds the tape's standard error is 1.29 times the test's own
+    resolution (`facts.STRUCTURE`). A gate that REFUSED a release on that
+    would make a 0.03 offset a ship-stopper on a ruler known to be softer
+    than the offset it is measuring. Non-regression asks a question the form can answer: it
     compares two models on one ruler, and an exact ruler is not needed to
     say that one model moved off a point the other sat on.
 
@@ -3603,15 +3586,11 @@ def certified(basis: str = DEFAULT_BAND_BASIS) -> dict[str, Any]:
     or crisis row whose certified value has not been measured yet is listed
     under ``unmeasured`` rather than given a number.
 
-    THE BASIS IS AN ARGUMENT, since 2026-09-15. This read `REAL_MARKETS`
-    directly, which is the shipped decade table and the one ruler a caller
-    could not ask it for anything else. That made this function the third
-    band path in the library, after `loss._band_of` and `tail_block`, and
-    the one a manifest is serialised from -- so a record could carry a
-    verdict on a ruler the ruling had superseded and say nothing about it.
-    A row the basis has no adopted band for now reports `band` and
-    `in_band` as None and is named in ``unreadable``, which is what `score`
-    does, rather than raising or borrowing another basis's band.
+    THE BASIS IS AN ARGUMENT, `DEFAULT_BAND_BASIS` unless named, so a
+    manifest records its verdict on the same ruler `score` grades with. A
+    row the basis has no band for reports `band` and `in_band` as None and
+    is named in ``unreadable``, which is what `score` does, rather than
+    raising or borrowing another basis's band.
     """
     from .facts import SHAPE, LEVEL, CRISIS, DISPERSION
     from . import facts as _facts
