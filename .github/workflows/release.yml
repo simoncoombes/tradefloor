@@ -32,10 +32,6 @@ on:
         description: "Build and verify one Linux target, publish nothing"
         type: boolean
         default: true
-      publish_pretium_shim:
-        description: "Publish the pretium PyPI shim (shims/pypi-pretium)"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -412,24 +408,3 @@ jobs:
             --notes-file NOTES.md \
             --verify-tag \
             dist/*
-
-  publish_shim:
-    name: publish the pretium shim to PyPI
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_pretium_shim
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write        # the pretium project's Trusted Publisher, repointed here
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with: { python-version: "3.11" }
-      - name: Build the shim
-        run: |
-          python -m pip install --upgrade pip build
-          python -m build --sdist --wheel shims/pypi-pretium -o shim-dist
-          ls -la shim-dist
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: shim-dist
-          skip-existing: true
