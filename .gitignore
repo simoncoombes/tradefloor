@@ -15,7 +15,7 @@ __pycache__/
 
 # Internal design material is kept outside this repository. The exception is validation/: the grade the default
 # preset shipped on, published by the owner's decision of 2026-09-26. The public documentation lives in the private
-# tradefloor-docs repo, which Vercel serves as tradefloor.dev.
+# tradefloor-docs repo, which Vercel serves as docs.tradefloor.dev.
 
 # Spike artifacts
 dist-spike/

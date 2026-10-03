@@ -24,7 +24,7 @@
       "scheme": "url"
     },
     {
-      "identifier": "https://tradefloor.dev/",
+      "identifier": "https://docs.tradefloor.dev/",
       "relation": "isDocumentedBy",
       "scheme": "url"
     }

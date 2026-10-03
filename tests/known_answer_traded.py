@@ -34,13 +34,15 @@ Re-basing. The run uses pt-v20 by name, as it stands on the branch, so the
 row moves when pt-v20 moves. The baseline records pt-v20's row from
 `known_answer_presets.json` as `presetRow`, and the test fails with that
 reason when the two disagree. A change to pt-v20, to a reference agent or
-to what `evaluate` scores moves this digest on purpose. Then run
-``python tests/known_answer_traded.py --write`` on the changed tree, which
-rewrites the digests and `presetRow`, and add a sentence to `note` saying
-what moved and why. The per-agent digests show which agent and which part
-moved, so a scoring change that leaves the orders and fills where they were
-can say so. A change in this file's own harness bumps
-`TRADED_KAT_VERSION`. A digest that moves on one platform and not on
+to what `evaluate` scores moves this digest on purpose. Then bump
+`TRADED_KAT_VERSION`, run ``python tests/known_answer_traded.py --write`` on
+the changed tree, which rewrites the digests and `presetRow`, and add a
+sentence to `note` saying what moved and why. The per-agent digests show
+which agent and which part moved, so a scoring change that leaves the orders
+and fills where they were can say so. A change in this file's own harness
+bumps `TRADED_KAT_VERSION` too. `tools/ci/kat_history.py` fails a pull
+request whose digests differ from the last release's without a higher
+version and a new note. A digest that moves on one platform and not on
 another is never re-based: it is the failure the workflow exists to catch.
 
 Canonical form as in `known_answer.py`: big-endian f64, one NaN pattern,

@@ -218,9 +218,9 @@ def test_a_traded_run_matches_its_baseline():
              if measured[name][part] != baseline["agents"][name][part]]
     assert not moved, (
         f"the traded run moved: {', '.join(moved)}. If pt-v20, a reference "
-        "agent or the scoring changed on purpose, re-base with `python "
-        "tests/known_answer_traded.py --write` and say what moved in the "
-        "note. If only this platform disagrees, that is the failure the "
+        "agent or the scoring changed on purpose, bump TRADED_KAT_VERSION, "
+        "re-base with `python tests/known_answer_traded.py --write` and say "
+        "what moved in the note. If only this platform disagrees, that is the failure the "
         "determinism workflow exists to catch.")
     data = k.combined_buffer(buffers)
     assert len(data) == baseline["bytes"]
