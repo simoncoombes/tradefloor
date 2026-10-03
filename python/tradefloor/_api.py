@@ -29,7 +29,10 @@ INTERNAL
 from __future__ import annotations
 
 #: The first release that may drop a ``DEPRECATED`` name from the top level.
-REMOVAL = "0.9.0"
+#: The warnings cannot ship in an 0.8 patch, because the LTS line adds no
+#: features and keeps ``__all__``, so they arrive with 0.9.0 at the earliest
+#: and the names stay through that whole minor line.
+REMOVAL = "0.10.0"
 
 STABLE: tuple[str, ...] = (
     # markets
