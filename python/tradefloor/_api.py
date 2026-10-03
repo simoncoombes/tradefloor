@@ -17,9 +17,10 @@ ADVANCED
 DEPRECATED
     Engine internals that were exported by accident. Each still resolves at
     the top level, through ``tradefloor.__getattr__``, and warns with a
-    ``DeprecationWarning`` that names its home module. None is in
-    ``__all__``, so ``from tradefloor import *`` neither binds nor warns
-    about them. They leave the top level no earlier than ``REMOVAL``.
+    ``DeprecationWarning`` that names its home module. They stay in
+    ``__all__`` until they leave, so ``from tradefloor import *`` still binds
+    them, without a warning; reading one through the package warns. They
+    leave the top level no earlier than ``REMOVAL``.
 INTERNAL
     Reachable, but not API: the standard-library names ``__init__`` imports,
     and submodules that exist to serve the rest of the package. A submodule
@@ -30,7 +31,7 @@ from __future__ import annotations
 
 #: The first release that may drop a ``DEPRECATED`` name from the top level.
 #: The warnings cannot ship in an 0.8 patch, because the LTS line adds no
-#: features and keeps ``__all__``, so they arrive with 0.9.0 at the earliest
+#: features, so they arrive with 0.9.0 at the earliest
 #: and the names stay through that whole minor line.
 REMOVAL = "0.10.0"
 

@@ -132,10 +132,32 @@ def __getattr__(name: str) -> Any:
 
     from ._api import deprecation_message
 
-    if not sys._getframe(1).f_code.co_filename.startswith("<frozen importlib"):
+    caller = sys._getframe(1)
+    if not (caller.f_code.co_filename.startswith("<frozen importlib")
+            or _is_star_import(caller)):
         warnings.warn(deprecation_message(name), DeprecationWarning,
                       stacklevel=2)
     return getattr(importlib.import_module(home), name)
+
+
+def _is_star_import(frame: Any) -> bool:
+    """Whether `frame` is executing ``from tradefloor import *``.
+
+    A star import reads every name in ``__all__``, the deprecated ones
+    included, so it would warn ten times about names the caller may never
+    use. It binds them silently instead, and the warning comes when the
+    caller reads one through the package. 3.11 runs the import as
+    IMPORT_STAR; 3.12 and later as CALL_INTRINSIC_1 with oparg 2
+    (INTRINSIC_IMPORT_STAR). An opcode this does not know is read as "not a
+    star import", which warns, the safe direction.
+    """
+    import dis
+
+    code, at = frame.f_code.co_code, frame.f_lasti
+    if not 0 <= at < len(code) - 1:
+        return False
+    op = dis.opname[code[at]]
+    return op == "IMPORT_STAR" or (op == "CALL_INTRINSIC_1" and code[at + 1] == 2)
 
 
 __version__ = _core.__version__
@@ -166,7 +188,7 @@ __all__ = [
     "JSONRenderer",
     "explain", "Explanation", "Node",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
-    "TARGETS", "UNSUPPORTED_TARGETS",
+    "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest", "DayLedger", "Verification",
     "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
     "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
@@ -175,6 +197,13 @@ __all__ = [
     "bonds", "rate_specs", "RATE_TICKERS", "RATE_SECTOR",
     "sectors", "version",
     "__version__",
+    # Deprecated engine internals (`_api.DEPRECATED`). Kept here so
+    # `from tradefloor import *` binds them as it always has; `__getattr__`
+    # serves them, silently to a star import and with a warning otherwise.
+    "MispricingState", "apply_mispricing", "characteristic_root_moduli",
+    "check_rate", "crisis_epicentre_solve", "crowd_adjusted_root_moduli",
+    "impulse_response", "sector_daily_sigma", "stationary_sigma",
+    "step_mispricing_daily",
 ]
 
 # The fields an Instrument round-trips through JSON. Declared once, in one

@@ -22,9 +22,9 @@ order-flow impact by a name's depth once instead of twice (#182).
 `Scenario.starting_at(day)` and `World.apply(scenario, at=day)` start a
 packaged scenario on a chosen day (#132).
 
-Ten engine internals leave `tradefloor.__all__` and warn when read from the
-top level, so import them from `tradefloor._core`; they stay until 0.10.0 at
-the earliest.
+Ten engine internals warn when read from the top level, so import them from
+`tradefloor._core`. They stay until 0.10.0 at the earliest, and a star
+import still binds them without a warning.
 
 <!-- release-note-ends -->
 

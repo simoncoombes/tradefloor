@@ -111,25 +111,44 @@ def test_the_tier_tuples_read_without_importing_the_package():
 # ---------------------------------------------------------------------------
 
 def test_every_all_entry_resolves_without_a_warning():
+    """Every entry resolves; only the deprecated ones warn when read."""
+    current = [n for n in tf.__all__ if n not in _api.DEPRECATED]
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        missing = [n for n in tf.__all__ if not hasattr(tf, n)]
+        missing = [n for n in current if not hasattr(tf, n)]
     assert missing == []
     assert len(tf.__all__) == len(set(tf.__all__))
 
 
-def test_all_holds_only_stable_and_advanced_names():
+def test_all_holds_the_api_and_what_is_on_its_way_out():
+    """Stable and advanced names, plus the deprecated ones until they leave,
+    so a star import keeps binding every name it bound in 0.8. `yaml_subset`
+    is internal but was in `__all__` in 0.8, so it stays for the same
+    reason."""
     wrong = sorted(n for n in tf.__all__
-                   if _api.TIERS.get(n) not in {"stable", "advanced"})
+                   if _api.TIERS.get(n) not in {"stable", "advanced", "deprecated"}
+                   and n != "yaml_subset")
     assert wrong == []
+    assert set(_api.DEPRECATED) <= set(tf.__all__)
 
 
-def test_star_import_binds_no_deprecated_name_and_does_not_warn():
+def test_star_import_binds_every_deprecated_name_without_a_warning():
+    """A star import bound these in 0.8, and code that then calls one
+    unqualified must not meet a NameError in the release that only starts
+    warning. It must not warn ten times either, for names it may not use."""
     namespace: dict = {}
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         exec("from tradefloor import *", namespace)
-    assert not set(_api.DEPRECATED) & set(namespace)
+    for name, home in _api.DEPRECATED.items():
+        assert namespace[name] is getattr(importlib.import_module(home), name)
+
+
+def test_a_star_import_does_not_silence_a_later_read():
+    namespace: dict = {}
+    exec("from tradefloor import *", namespace)
+    with pytest.warns(DeprecationWarning):
+        tf.check_rate
 
 
 # ---------------------------------------------------------------------------
@@ -186,8 +205,9 @@ def test_every_compiled_top_level_name_is_declared_in_the_stub():
     for node in ast.parse(STUB.read_text("utf-8")).body:
         if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
             declared.add(node.name)
+    current = [n for n in tf.__all__ if n not in _api.DEPRECATED]
     compiled = sorted(
-        n for n in tf.__all__
+        n for n in current
         if getattr(getattr(tf, n), "__module__", None) in {"tradefloor._core", "_core"}
         or type(getattr(tf, n)).__name__ == "builtin_function_or_method")
     assert compiled, "found no compiled re-exports; check the probe"
