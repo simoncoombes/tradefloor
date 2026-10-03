@@ -1014,7 +1014,9 @@ class Intervention:
     from YAML or from Python, so a fingerprint compares across the two.
 
     ``at`` counts days from the start of the run the scenario is applied to.
-    See :meth:`tradefloor.Scenario.apply` for what that means after a fork.
+    See :meth:`tradefloor.Scenario.apply` for what that means after a fork,
+    and :meth:`tradefloor.Scenario.starting_at` to move a whole scenario's
+    days without editing its file.
     """
 
     __slots__ = ("target", "operation", "value", "at", "duration", "shape",

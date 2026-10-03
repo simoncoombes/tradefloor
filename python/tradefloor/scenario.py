@@ -283,6 +283,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import numbers
 import warnings
 from typing import Any, Callable, Sequence
 
@@ -581,6 +582,54 @@ def _rerole(item: Intervention, role: str) -> Intervention:
     )
 
 
+def _moved(item: Intervention, days: int) -> Intervention:
+    """The same intervention, ``days`` later (or earlier, when negative)."""
+    return Intervention(
+        item.target, operation=item.operation, value=item.value,
+        at=item.at + days, duration=item.duration, shape=item.shape,
+        role=item.role,
+    )
+
+
+def _start_day(day: Any, where: str) -> int:
+    """A start day: a whole number, zero or more.
+
+    Counted as ``at`` counts, from the first day a run loop applies the
+    scenario, so a negative one names a day that has already run.
+    """
+    if isinstance(day, bool) or not isinstance(day, numbers.Integral):
+        raise ScenarioValidationError(
+            f"{where} takes a whole number of days, got {day!r}. It counts "
+            f"days from the first day the scenario is applied, as `at` does."
+        )
+    day = int(day)
+    if day < 0:
+        raise ScenarioValidationError(
+            f"{where} cannot be negative, got {day}. It counts days forward "
+            f"from the first day the scenario is applied, and a day before "
+            f"that has already run."
+        )
+    return day
+
+
+#: The keys every entry in `Scenario.origins` carries.
+_ORIGIN_KEYS = ("applied_on_day", "days", "fingerprint", "first_day", "name",
+                "shift", "source")
+
+
+def _read_origins(raw: Any) -> tuple[dict[str, Any], ...]:
+    """`origins` from a serialised scenario, refused if it is malformed."""
+    if not isinstance(raw, list) or not all(
+            isinstance(entry, dict) and sorted(entry) == list(_ORIGIN_KEYS)
+            and isinstance(entry["days"], list) for entry in raw):
+        raise ValidationError(
+            f"this scenario document's `origins` is not a list of records "
+            f"with exactly {', '.join(_ORIGIN_KEYS)}, so it does not say "
+            f"where the scenario's days came from."
+        )
+    return tuple(dict(entry, days=list(entry["days"])) for entry in raw)
+
+
 class Scenario:
     """A macro path and a set of explicit interventions, applied a day at a time.
 
@@ -612,7 +661,7 @@ class Scenario:
 
     __slots__ = ("_drivers", "_label", "_description", "_shocks",
                  "_transmission", "_source", "_log", "_anchors", "_baselines",
-                 "_day", "_vix_sets_variance")
+                 "_day", "_vix_sets_variance", "_origins")
 
     def __init__(self, label: str = "", *, name: str | None = None,
                  description: str = "",
@@ -646,6 +695,9 @@ class Scenario:
         # written before the switch runs, serialises and fingerprints as it
         # did.
         self._vix_sets_variance = _check_switch(vix_sets_variance)
+        # Where this scenario's timing came from, when it was moved from a
+        # file's own days. See `origins`.
+        self._origins: tuple[dict[str, Any], ...] = ()
 
         for given, role in ((interventions, None), (shocks, "shock"),
                             (transmission, "transmission")):
@@ -985,6 +1037,13 @@ class Scenario:
         out.append(f"Fingerprint {self.fingerprint}")
         if self._source:
             out.append(f"Source      {self._source}")
+        for origin in self._origins:
+            applied = ("" if origin["applied_on_day"] is None
+                       else f", applied on day {origin['applied_on_day']}")
+            out.append(f"Moved from  {origin['name'] or '(unnamed)'} "
+                       f"{origin['fingerprint']}")
+            out.append(f"            days moved by {origin['shift']:+d}, first "
+                       f"firing on day {origin['first_day']}{applied}")
 
         if self._drivers:
             out.append("")
@@ -1051,7 +1110,145 @@ class Scenario:
         twin._transmission = list(self._transmission)
         twin._source = self._source
         twin._vix_sets_variance = self._vix_sets_variance
+        twin._origins = self._origins
         return twin
+
+    # -- when it starts ----------------------------------------------------
+
+    def starting_at(self, day: int) -> "Scenario":
+        """This scenario with its first firing moved to ``day``.
+
+        ```python
+        crisis = tf.Scenario.load("liquidity_crisis").starting_at(0)
+        ```
+
+        The packaged scenarios first fire on day 50 (``policy_regime_shift``
+        on day 30), which leaves a warm-up for the single-market run they
+        were written for. ``starting_at(0)`` fires the same file on the
+        first day a run loop applies it, and moves every other day by the
+        same amount, so ``liquidity_crisis`` still begins its earnings
+        recovery 42 days after the onset.
+
+        ``day`` counts as ``at`` does, from the first day the loop applies
+        the scenario. In a loop that drives a branched engine from its own
+        day zero, ``starting_at(0)`` fires on the first day after the branch.
+        :meth:`tradefloor.World.apply` takes the same number as ``at=``.
+
+        The result is a new scenario, and this one is unchanged. Its
+        :attr:`fingerprint` is over the moved days, because it is a
+        different experiment from the file: it is the fingerprint an edited
+        copy with the same days would have. Its :attr:`origins` name the
+        file it came from by that file's own fingerprint and say how far
+        every day moved, so "the packaged scenario, started on day 0" is a
+        claim a reader can check. Moving a moved scenario again is measured
+        from the file.
+
+        Refused for a scenario that carries pins. A pin is a whole path from
+        day zero, so a start day means nothing for it.
+        """
+        day = _start_day(day, "starting_at(day)")
+        if self._drivers:
+            raise ScenarioValidationError(
+                f"{self._label or 'this scenario'} pins "
+                f"{', '.join(self.fields)}, and starting_at() moves "
+                f"interventions only. A pin is a whole path from day zero, "
+                f"so it has no start to move. Put the path in its own "
+                f"scenario, or use ramp(..., begin=N) for a path that starts "
+                f"later."
+            )
+        if not self.interventions:
+            raise ScenarioValidationError(
+                f"{self._label or 'this scenario'} declares no "
+                f"interventions, so it has no first firing to move."
+            )
+        first = min(item.at for item in self.interventions)
+        return self._moved_by(day - first, applied_on_day=None)
+
+    def _moved_by(self, days: int,
+                  applied_on_day: int | None) -> "Scenario":
+        """A copy with every intervention ``days`` later, and the record.
+
+        The one place an ``at`` is moved, so :meth:`starting_at` and
+        :meth:`tradefloor.World.apply` cannot disagree about what a move
+        means. ``days`` may be negative; the caller has checked that no day
+        lands before zero, and :class:`Intervention` refuses one that does.
+        """
+        twin = self.copy()
+        twin._shocks = [_moved(item, days) for item in self._shocks]
+        twin._transmission = [_moved(item, days)
+                              for item in self._transmission]
+        if self._origins:
+            # Already moved, or several scenarios a World merged: each record
+            # keeps its own file and adds this move to the one it carries.
+            records = [dict(record) for record in self._origins]
+            for record in records:
+                record["shift"] += days
+                record["first_day"] += days
+                record["days"] = [d + days for d in record["days"]]
+        else:
+            records = [{
+                "name": self._label,
+                "fingerprint": self.fingerprint,
+                "source": self._source_name(),
+                "shift": days,
+                "first_day": min(item.at for item in self.interventions)
+                + days,
+                "days": [item.at + days for item in self.interventions],
+            }]
+        for record in records:
+            record["applied_on_day"] = applied_on_day
+        twin._origins = tuple(records)
+        return twin
+
+    @property
+    def origins(self) -> tuple[dict[str, Any], ...]:
+        """Where this scenario's days came from, when they were moved.
+
+        Empty for a scenario read from a file or built in Python: it is its
+        own origin. :meth:`starting_at` and :meth:`tradefloor.World.apply`
+        each record one entry per scenario they moved:
+
+        - ``name``, ``fingerprint`` and ``source``: the scenario as written,
+          before any move. For a packaged scenario this is the fingerprint
+          ``Scenario.load(name).fingerprint`` returns, which is what makes
+          "we ran the scenario that ships with tradefloor" checkable.
+        - ``shift``: the days added to every ``at`` the file declares.
+        - ``first_day`` and ``days``: the day of the first firing, and the
+          start day of every intervention in declared order, shocks first,
+          counted as this scenario's run loop counts.
+        - ``applied_on_day``: the World day it was applied on, or None.
+
+        Provenance, outside :attr:`fingerprint`: two scenarios that fire the
+        same interventions on the same days are the same experiment
+        whatever they were moved from. :meth:`to_json` carries the records,
+        so a :class:`tradefloor.RunManifest` does too, under its own
+        fingerprint.
+        """
+        return tuple(dict(record, days=list(record["days"]))
+                     for record in self._origins)
+
+    def _continue(self, previous: "Scenario") -> None:
+        """Take over the run ``previous`` was driving.
+
+        Its audit trail, its anchors, its baselines and the last day it
+        applied, so a hold, a ramp or a release that spans two calls to
+        :meth:`tradefloor.World.run` behaves as it does inside one. A World
+        builds a fresh scenario on every call, because an ``apply`` or an
+        ``intervene`` between calls changes it, and it only ever appends: so
+        ``previous`` declares a prefix of each of this scenario's two lists,
+        and the anchors, keyed by role and position within the role, still
+        name the same interventions.
+        """
+        for mine, theirs in ((self._shocks, previous._shocks),
+                             (self._transmission, previous._transmission)):
+            if mine[:len(theirs)] != theirs:
+                raise ValidationError(
+                    "a scenario can only continue a run whose interventions "
+                    "it extends, and this one drops or reorders them.")
+        self._log = list(previous._log)
+        self._anchors = dict(previous._anchors)
+        self._baselines = dict(previous._baselines)
+        self._day = previous._day
 
     # -- the audit trail ---------------------------------------------------
 
@@ -1133,6 +1330,12 @@ class Scenario:
         interpretation, `at: {relative: N}` spells it out, and `absolute` is
         refused by name rather than silently treated as relative.
 
+        A file's own days suit a fresh run. A fork that wants the event at
+        once moves them with :meth:`starting_at`: ``starting_at(0)`` fires
+        the first intervention on the loop's day 0, keeps the gaps between
+        firings, and records the file's own fingerprint in :attr:`origins`.
+        :meth:`tradefloor.World.apply` takes the same number as ``at=``.
+
         # Order within a day
 
         Pins, then any window that ENDED yesterday is released, then shocks
@@ -1195,10 +1398,10 @@ class Scenario:
             released = self._release(item, engine, day)
             if released is not None:
                 fired.append(released)
-        for index, item in enumerate(self.interventions):
+        for key, item in self._keyed():
             if not item.active_on(day):
                 continue
-            fired.append(self._fire(index, item, engine, day))
+            fired.append(self._fire(key, item, engine, day))
         # An intervention that wrote the VIX forced it as much as a pin
         # does. Marked after every write, so the close reads the value the
         # last of them left.
@@ -1264,8 +1467,21 @@ class Scenario:
             previous=summarise(previous), new=summarise(baseline),
         )
 
-    def _fire(self, index: int, item: Intervention, engine: Engine,
-              day: int) -> Firing:
+    def _keyed(self) -> list[tuple[tuple[str, int], Intervention]]:
+        """Every intervention in firing order, with its anchor key.
+
+        The key is the role and the position within it rather than the
+        position in :attr:`interventions`, so a World that applies a second
+        scenario between two runs, which can put a shock ahead of an earlier
+        assumption, does not hand one intervention another's anchor. See
+        :meth:`_continue`.
+        """
+        return ([(("shock", i), item) for i, item in enumerate(self._shocks)]
+                + [(("transmission", i), item)
+                   for i, item in enumerate(self._transmission)])
+
+    def _fire(self, index: tuple[str, int], item: Intervention,
+              engine: Engine, day: int) -> Firing:
         """Read the live value, apply the operation, write it back.
 
         The anchor is what stops a `hold` compounding. `multiply` by 2.0 held
@@ -1406,6 +1622,10 @@ class Scenario:
             payload["path"] = self.table(days)
         if self._vix_sets_variance:
             payload["vix_sets_variance"] = True
+        # Present only when the days were moved, so every document written
+        # for an unmoved scenario is byte for byte the one it was.
+        if self._origins:
+            payload["origins"] = list(self.origins)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
     def _source_name(self) -> str | None:
@@ -1534,6 +1754,8 @@ class Scenario:
         source = payload.get("source")
         if source is not None:
             scenario._source = str(source)
+        if payload.get("origins") is not None:
+            scenario._origins = _read_origins(payload["origins"])
         for role, key in (("shock", "shocks"),
                           ("transmission", "transmission")):
             for index, item in enumerate(payload.get(key) or ()):
@@ -1925,6 +2147,11 @@ def run_scenario(
     ``model`` selects the coefficient set, either a preset name or a
     :class:`tradefloor.ModelParams`, defaulting to the shipped preset. The
     returned engine reports it as ``model_fingerprint``, like any other.
+
+    ``at`` in the scenario counts this loop's days, so a packaged file that
+    fires on day 50 needs a run longer than 50 days. A scenario moved with
+    :meth:`Scenario.starting_at` fires where it was moved to, and one moved
+    past the end of the run is refused, because nothing in it would fire.
     """
     from . import _checks
     _checks.scenario(scenario)
@@ -1934,6 +2161,14 @@ def run_scenario(
             "tf.Scenario.load('liquidity_crisis').")
     days = _checks.whole_number("days", days)
     hour, minute, day_of_week = _checks.start_clock(start)
+    if scenario.origins:
+        first = min(origin["first_day"] for origin in scenario.origins)
+        if first >= days:
+            raise ValidationError(
+                f"{scenario.name or 'this scenario'} was moved to fire first "
+                f"on day {first}, and this run is {days} days long (days 0 "
+                f"to {days - 1}), so nothing in it would fire. Run longer, "
+                f"or start it earlier with starting_at().")
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
                     model=model)
     for day in range(days):
