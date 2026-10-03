@@ -1,6 +1,6 @@
 [package]
 name = "tradefloor"
-version = "0.8.7"
+version = "0.8.8"
 edition = "2021"
 rust-version = "1.83"
 description = "A reproducible evaluation environment for financial AI agents."
