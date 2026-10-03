@@ -31,6 +31,7 @@ implied.
 | `pyproject.toml` | the wheel, the sdist, PyPI |
 | `rust/Cargo.toml` | the crate, crates.io |
 | `CITATION.cff` | anyone citing a result |
+| `mcpb/manifest.json`, `mcpb/pyproject.toml` | the MCP bundle for Claude Desktop and Smithery: its version and its `tradefloor[mcp]==` pin. Publish it to Smithery after the tag (`mcpb/README.md`) |
 | `server.json` | the MCP Registry listing: its version, the PyPI package's, and the `tradefloor[mcp]==` pin `uvx --with` installs; `release.yml` publishes it after PyPI |
 | `tradefloor-docs: docs/reproducing-a-run.md` | the worked example that prints it |
 
