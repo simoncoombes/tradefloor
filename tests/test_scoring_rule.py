@@ -658,7 +658,7 @@ def test_the_two_horizons_are_never_combined():
     assert "S" not in at_centre, (
         "a combined score is exactly what R6 refuses")
     assert at_centre["combined"] is None
-    assert "R6" in at_centre["why_no_combined"]
+    assert "never combined" in at_centre["why_no_combined"]
     assert set(at_centre["scored_horizons"]) == set(loss.SCORED_HORIZONS)
     for horizon in loss.SCORED_HORIZONS:
         assert at_centre[f"S_{horizon}"] == pytest.approx(0.0, abs=1e-12)

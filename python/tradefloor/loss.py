@@ -818,8 +818,8 @@ def scoring_rule_from_medians(medians: Mapping[str, float], *,
     `se_model` and `df_model` are REQUIRED keyword arguments with NO
     DEFAULT, and that is the guard. What it refuses is a call that lets the
     frozen `facts.SEED_SD` tables become the model term by omission -- the
-    one substitution the design note measures as wrong by a factor of 0.46
-    to 6.04 against the vectors a search actually visits.
+    one substitution measured as wrong by a factor of 0.46 to 6.04 against
+    the vectors a search actually visits.
 
     Passing a frozen table EXPLICITLY is allowed and warns, because there
     are readers of the old records for whom pt-v1's scale is the only number
@@ -950,15 +950,15 @@ def _dual(results: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
     The shape is deliberately awkward for a caller that wants a scalar: the
     per-horizon results sit under `horizons`, `S_252` and `S_504` are
     conveniences for reading, and there is no `S`. `combined` records why,
-    in the output, so a reader of a serialised score does not have to know
-    the ruling to understand the shape.
+    in the output, so a reader of a serialised score does not have to look
+    anything up to understand the shape.
     """
     out: dict[str, Any] = {
         "horizons": dict(results),
         "scored_horizons": tuple(sorted(results)),
         "combined": None,
         "why_no_combined":
-            "R6 (Simon, 2026-09-06): the two horizons are scored, reported "
+            "The two horizons are scored, reported "
             "and never combined. volume_abs_return_corr sits 0.96 se below "
             "its tape centre at 252 and at z +4.38 at 504; a single number "
             "hides that whichever way it is formed. Rank on the pair -- "
