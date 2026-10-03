@@ -1,9 +1,10 @@
-## Unreleased
+## 0.9.0
 
-A correctness pass. No coefficient, default or trajectory changes: every
-known-answer digest is 0.8.8's, and `pt-v20` stays the default. It adds API
-and refuses input 0.8.8 accepted, which the 0.8 LTS rules do not allow in a
-patch, so it is meant for 0.9.0.
+A library release, not a model change. No coefficient, default or
+trajectory changes: every known-answer digest is 0.8.8's, and `pt-v20`
+stays the default. It adds API and refuses input 0.8.8 accepted, which the
+0.8 LTS rules do not allow in a patch, so it is a minor release, and the 0.8
+LTS line carries on beside it.
 
 `Engine.restore_state` now refuses a snapshot that lacks a field, carries an
 unknown one or holds a malformed value, and names the field. It used to keep

@@ -2,6 +2,7 @@
 
 [![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
 [![PyPI](https://img.shields.io/pypi/v/tradefloor.svg)](https://pypi.org/project/tradefloor/)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/tradefloor?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/tradefloor)
 [![crates.io](https://img.shields.io/crates/v/tradefloor.svg)](https://crates.io/crates/tradefloor)
 [![license: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -351,7 +352,7 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.8.8},
+  version = {0.9.0},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   note    = {Model preset pt-v20}
@@ -362,7 +363,7 @@ several presets, and results depend on the preset.
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.8.8,
+In the text, say which model you used, for example: "tradefloor 0.9.0,
 preset pt-v20, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
