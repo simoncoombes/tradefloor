@@ -921,8 +921,8 @@ pub struct ModelParams {
     pub crash_amplifier_slope: f64,
     /// Switch for the sigma the crash amplifier measures a shock in: 0.0
     /// uses the baseline constant, any nonzero value the tick's own
-    /// conditional sigma. Presets before pt-v19 carry 0.0, and pt-v19 and
-    /// pt-v20 carry 1.0.
+    /// conditional sigma. pt-v1 through pt-v18 carry 0.0. pt-v19 and pt-v20
+    /// carry 1.0.
     ///
     /// # A switch
     ///
@@ -1078,8 +1078,8 @@ pub struct ModelParams {
     /// multiplier on the crisis spike. 0.0 turns the extra loading off,
     /// which is what pt-v19 and pt-v20 ship.
     ///
-    /// pt-v1 to pt-v10 carry 0.5, pt-v11 and pt-v12 0.8, and pt-v13 to
-    /// pt-v18 0.8275881. The crisis blend adds `crisis_blend_source * gain *
+    /// pt-v1 to pt-v10 carry 0.5. pt-v11 and pt-v12 carry 0.8. pt-v13 to
+    /// pt-v18 carry 0.8275881. The crisis blend adds `crisis_blend_source * gain *
     /// crisis_spike * market_factor` to a name's market component. The
     /// spike is capped at `crisis_blend_cap`, 0.98, so the extra market
     /// loading a crisis can produce is the gain times 0.98 of beta (0.49 at
@@ -1179,8 +1179,8 @@ pub struct ModelParams {
     /// factor's own target shape. 0.0 turns it off and is bit-identical by
     /// branch.
     ///
-    /// pt-v1 to pt-v9 carry 0.0, pt-v10 to pt-v12 0.3, pt-v13 0.0269 and
-    /// pt-v14 onward 0.14219611. At 0.0 the per-name GJR-GARCH reads no
+    /// pt-v1 to pt-v9 carry 0.0. pt-v10 to pt-v12 carry 0.3. pt-v13 carries
+    /// 0.0269. pt-v14 onward carry 0.14219611. At 0.0 the per-name GJR-GARCH reads no
     /// macro state at all: its clamps are multiples of a static per-sector
     /// variance, and its own unconditional level sits below the floor those
     /// clamps impose (5.6% annualized against a floor of 19.8% for
@@ -1937,7 +1937,7 @@ pub struct ModelParams {
 
     /// Per-session rate at which the anchor's memory of the read-back
     /// updates. 0.0, which pt-v1 through pt-v18 carry, is the instantaneous
-    /// form; pt-v19 and pt-v20 ship 1/18.
+    /// form; pt-v19 and pt-v20 ship 0.0556 (one eighteenth).
     ///
     /// At 0.0 the target is `implied^(1 - a) (L anchor)^a`, today's
     /// read-back against the anchor. Nonzero, the anchor pulls against a
@@ -2204,7 +2204,7 @@ pub struct ModelParams {
     pub market_burn_in_sessions: f64,
 
     /// Cap on the market factor's variance, as a multiple of its calm level.
-    /// pt-v1 to pt-v6 ship 8, pt-v7 to pt-v9 ship 16 and pt-v10 onward ship
+    /// pt-v1 to pt-v6 ship 8. pt-v7 to pt-v9 ship 16. pt-v10 onward ship
     /// 32.
     ///
     /// It does nothing until the variance reaches it, so raising it above
@@ -2819,8 +2819,8 @@ pub struct ModelParams {
     /// that wants the wider spread has to measure the dials together.
     pub phase_target_range_draw: f64,
     /// The corporate bond yield at which the target multiple sits exactly on
-    /// its sector anchor, as a fraction (0.04 is 4 per cent). Presets before
-    /// pt-v18 carry 0.04; pt-v18 onward carry 0.0482.
+    /// its sector anchor, as a fraction (0.04 is 4 per cent). pt-v1 through
+    /// pt-v16 carry 0.04; pt-v18 onward carry 0.0482.
     ///
     /// # A neutral point the economy never visits
     ///
@@ -3045,7 +3045,7 @@ pub struct ModelParams {
     pub buyback_payout_share: f64,
     /// How much of the drift the market jump's mean carries is given back,
     /// from 0.0 (none) to 1.0, which subtracts the compensator and makes the
-    /// jump a martingale. Presets before pt-v18 carry 0.0; pt-v18 onward
+    /// jump a martingale. pt-v1 through pt-v16 carry 0.0; pt-v18 onward
     /// carry 1.0.
     ///
     /// # The mean is there for skew, and it also buys a drift
@@ -3081,7 +3081,7 @@ pub struct ModelParams {
     pub jump_mean_compensated: f64,
     /// How much of the direction in the stop-cascade ladders is removed,
     /// from 0.0 (the original asymmetric ladders) to 1.0 (mirror images).
-    /// Presets before pt-v18 carry 0.0; pt-v18 onward carry 1.0.
+    /// pt-v1 through pt-v16 carry 0.0; pt-v18 onward carry 1.0.
     ///
     /// # The asymmetry at 0.0
     ///
@@ -3162,7 +3162,7 @@ pub struct ModelParams {
     pub fair_value_book_floor: f64,
     /// How much of nominal output growth the valuation's earnings carry,
     /// from 0.0 (earnings fixed at construction) to 1.0 (the earnings share
-    /// of nominal output held constant). Presets before pt-v18 carry 0.0;
+    /// of nominal output held constant). pt-v1 through pt-v16 carry 0.0;
     /// pt-v18 onward carry 1.0.
     ///
     /// # Why the model has no expected return without this
@@ -4354,8 +4354,8 @@ pub struct ModelParams {
     /// weeks.
     ///
     /// 1.0 uses the five constants as they are (pt-v1 through pt-v8).
-    /// pt-v9 ships 0.6, pt-v10 to pt-v15 0.0, and pt-v16 on 0.85. At `a`
-    /// each constant is pulled toward their mean of 19.0:
+    /// pt-v9 ships 0.6. pt-v10 to pt-v15 carry 0.0. pt-v16 onward carry
+    /// 0.85. At `a` each constant is pulled toward their mean of 19.0:
     /// `19.0 + a * (phase - 19.0)`, so 0.0 makes the cycle contribute
     /// nothing to the VIX and any episodes have to come from the market.
     /// It works with `vix_return_source`, which supplies those episodes.
