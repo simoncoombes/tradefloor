@@ -108,7 +108,9 @@ def test_the_examples_table_says_what_the_factors_sum_to():
 # ---------------------------------------------------------------------------
 
 def limits_table() -> dict[str, str]:
-    text = read("README.md")
+    # The full table moved from the README to docs/REALISM.md, which the
+    # README links for every limit.
+    text = read("docs/REALISM.md")
     start = text.index("| limit | what it means |")
     rows = {}
     for line in text[start:].splitlines()[2:]:
@@ -133,7 +135,7 @@ def test_the_scenario_limit_states_the_envelope_s_bias():
 ])
 def test_every_limit_the_reviewers_measured_has_a_row(name):
     rows = limits_table()
-    assert name in rows, f"no {name!r} row in the README limits table"
+    assert name in rows, f"no {name!r} row in the docs/REALISM.md limits table"
     assert rows[name].endswith("the next preset"), rows[name]
 
 
