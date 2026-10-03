@@ -687,7 +687,7 @@ def known_answer_digest() -> str:
 
 if __name__ == "__main__":
     data = known_answer_buffer()
-    print(f"pretium known-answer test v{KAT_VERSION}")
+    print(f"tradefloor known-answer test v{KAT_VERSION}")
     print(f"  package  {tradefloor.version()}")
     print(f"  bytes    {len(data)}")
     print(f"  sha256   {known_answer_digest()}")
