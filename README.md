@@ -17,13 +17,6 @@ Real market data can't tell you what would have happened if you had traded
 differently, or what caused a move. tradefloor can, because it computed every
 price.
 
-Use it to test how a strategy or an agent handles risk, execution and events.
-It can't tell you whether a price signal has an edge. Good results here do not
-predict real returns: the prices come from a known model, and the model holds
-rules that read only prices to no edge (criteria C4a and C4b in
-[docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)).
-12-1 momentum has a rank IC of -0.003 here against 0.027 in real markets.
-
 ## Documentation
 
 Documentation is at https://tradefloor.dev. It covers install, core
@@ -557,7 +550,7 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.8.6},
+  version = {0.8.7},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   doi     = {10.5281/zenodo.XXXXXXX},
@@ -571,7 +564,7 @@ the `doi` line out. [CITATION.cff](https://github.com/simoncoombes/tradefloor/bl
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.8.6,
+In the text, say which model you used, for example: "tradefloor 0.8.7,
 preset pt-v20, specified in its docs/MODEL.md". To let a reader rerun a
 result, publish its `RunManifest`: it records the version, preset, seed,
 universe, macro state and scenario, and `reproduce()` stops on a mismatch.

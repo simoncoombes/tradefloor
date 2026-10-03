@@ -1,3 +1,20 @@
+## 0.8.7
+
+A patch release on the 0.8 long-term support line that changes text only.
+No coefficient, default or trajectory changes, every known-answer digest is
+0.8.6's, and `pt-v20` stays the default.
+
+The doc comments on `ModelParams` now say what each coefficient does, its
+units, and which presets carry which value, in place of the notes on how each
+value was chosen. The same goes for the envelope's gap descriptions, the
+reasons `score` returns for an unreadable row, and the docstrings in
+`facts`, `fingerprint`, `loss` and `render`. Several stale claims were
+corrected on the way: for example, the comments said pt-v19 ships
+`market_vol_level_sigma` at 0.085, where every preset ships 0.0. A test
+checks every value a doc comment claims against the preset table.
+
+<!-- release-note-ends -->
+
 ## 0.8.6
 
 A patch release on the 0.8 long-term support line. No coefficient, default
