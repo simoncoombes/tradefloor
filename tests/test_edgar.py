@@ -673,8 +673,8 @@ def test_the_stationary_width_is_the_model_s_own_not_a_chosen_number():
     kind of thing that looks right and is off by a factor.
     """
     for sector in tradefloor.sectors():
-        daily = tradefloor.sector_daily_sigma(sector)
-        width = tradefloor.stationary_sigma(daily)
+        daily = tradefloor._core.sector_daily_sigma(sector)
+        width = tradefloor._core.stationary_sigma(daily)
         assert width is not None
         # The process amplifies its innovations about 7.6x at rest.
         assert width / daily == pytest.approx(7.636, rel=1e-3)
@@ -768,10 +768,10 @@ def test_an_unknown_mode_is_refused():
 
 def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
     with pytest.raises(tradefloor.ValidationError, match="finite"):
-        tradefloor.stationary_sigma(float("nan"))
+        tradefloor._core.stationary_sigma(float("nan"))
     # A unit root has infinite variance. None rather than a large finite
     # number, which would be worse: it would get used.
-    assert tradefloor.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
+    assert tradefloor._core.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
 
 
 # --------------------------------------------------------------------------

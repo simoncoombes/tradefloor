@@ -131,13 +131,13 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     same mechanism, which makes it an explanation instead of an
     observation.
     """
-    response = tradefloor.impulse_response(12)
+    response = tradefloor._core.impulse_response(12)
     assert response[0] == pytest.approx(1.0)
     assert response[1] > response[0]
     assert max(response) > 1.2
     # And it is still stationary, so the amplification reverts rather than
     # running away.
-    assert all(modulus < 1.0 for modulus in tradefloor.characteristic_root_moduli())
+    assert all(modulus < 1.0 for modulus in tradefloor._core.characteristic_root_moduli())
 
 
 def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():

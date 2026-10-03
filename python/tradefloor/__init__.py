@@ -14,7 +14,7 @@ ships its own transcendental maths rather than calling the platform's libm.
 from __future__ import annotations
 
 import json
-from typing import Any, Iterable, Sequence
+from typing import TYPE_CHECKING as _TYPE_CHECKING, Any, Iterable, Sequence
 
 from . import _core
 from .portfolio import Cancel, Limit, Portfolio, Position
@@ -79,7 +79,6 @@ from ._core import (  # noqa: F401
     Instrument,
     Macro,
     MatchResult,
-    MispricingState,
     ModelParams,
     News,
     NewsImpact,
@@ -89,23 +88,55 @@ from ._core import (  # noqa: F401
     SweepCost,
     TickResult,
     ValidationError,
-    apply_mispricing,
-    characteristic_root_moduli,
-    check_rate,
     check_seed as _check_seed,
-    crisis_epicentre_solve,
-    crowd_adjusted_root_moduli,
     fair_value,
-    impulse_response,
     market_status,
     model_preset,
     preset_names,
-    sector_daily_sigma,
     sectors,
-    stationary_sigma,
-    step_mispricing_daily,
     version,
 )
+from ._api import DEPRECATED as _DEPRECATED
+
+if _TYPE_CHECKING:
+    # The deprecated names below still resolve at run time, through
+    # __getattr__, so a type checker is told where they come from.
+    from ._core import (  # noqa: F401
+        MispricingState as MispricingState,
+        apply_mispricing as apply_mispricing,
+        characteristic_root_moduli as characteristic_root_moduli,
+        check_rate as check_rate,
+        crisis_epicentre_solve as crisis_epicentre_solve,
+        crowd_adjusted_root_moduli as crowd_adjusted_root_moduli,
+        impulse_response as impulse_response,
+        sector_daily_sigma as sector_daily_sigma,
+        stationary_sigma as stationary_sigma,
+        step_mispricing_daily as step_mispricing_daily,
+    )
+
+
+def __getattr__(name: str) -> Any:
+    """Serve an engine internal that used to be exported here, with a warning.
+
+    The names are listed in ``tradefloor._api.DEPRECATED``. ``from tradefloor
+    import X`` reads the attribute twice, once from inside importlib to see
+    whether X is a submodule and once for the import itself, so the first
+    read is answered without a warning and the caller sees one.
+    """
+    home = _DEPRECATED.get(name)
+    if home is None:
+        raise AttributeError(f"module 'tradefloor' has no attribute {name!r}")
+    import importlib
+    import sys
+    import warnings
+
+    from ._api import deprecation_message
+
+    if not sys._getframe(1).f_code.co_filename.startswith("<frozen importlib"):
+        warnings.warn(deprecation_message(name), DeprecationWarning,
+                      stacklevel=2)
+    return getattr(importlib.import_module(home), name)
+
 
 __version__ = _core.__version__
 __all__ = [
@@ -114,7 +145,7 @@ __all__ = [
     "preset_record",
     "preset_records",
     "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
-    "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
+    "MatchResult", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
     "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "History", "Observation",
@@ -135,17 +166,14 @@ __all__ = [
     "JSONRenderer",
     "explain", "Explanation", "Node",
     "Intervention", "Firing", "ScenarioValidationError", "interventions",
-    "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
+    "TARGETS", "UNSUPPORTED_TARGETS",
     "manifest", "RunManifest", "DayLedger", "Verification",
     "fingerprint", "BATTERY_VERSION", "Battery", "Cell", "Fingerprint",
     "FingerprintComparison", "battery", "commit", "reveal", "sealed_battery",
-    "apply_mispricing", "characteristic_root_moduli", "check_rate",
-    "crisis_epicentre_solve", "crowd_adjusted_root_moduli", "fair_value",
-    "impulse_response",
+    "fair_value",
     "market_status", "model_preset", "preset_names", "run_many",
     "bonds", "rate_specs", "RATE_TICKERS", "RATE_SECTOR",
-    "sector_daily_sigma", "sectors",
-    "stationary_sigma", "step_mispricing_daily", "version",
+    "sectors", "version",
     "__version__",
 ]
 
