@@ -4258,6 +4258,24 @@ impl PyEngine {
         self.inner.fundamentals()
     }
 
+    /// Every equity's fair value as this engine computes it now, in roster
+    /// order, NaN for a bankrupt or private name.
+    ///
+    /// This is the valuation `tradefloor.fair_value(..., model=...)` returns
+    /// for the same fundamentals and macro, with what the engine adds from
+    /// its own state on presets that set it: the nominal and
+    /// earnings-cycle restatement, buybacks, each name's fair-value level
+    /// and the VIX discount. It is the fair value the next tick starts from.
+    /// That tick's `fundamental_value` in `truth()` also carries its own
+    /// share of the tick's shocks (`fair_value_news_share`,
+    /// `fair_value_market_share`), so the two are equal only where those
+    /// shares are 0.0. On a preset whose opening draws the mispricing
+    /// (`opening_market_sigma`), a name's fair-value level is written on its
+    /// first tick, so before that tick this is its published valuation.
+    fn fair_values(&self) -> Vec<f64> {
+        self.inner.fair_values()
+    }
+
     /// Replace every company's fair-value inputs, in roster order, NaN to
     /// clear one. The equities only, one value each.
     ///

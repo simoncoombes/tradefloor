@@ -911,6 +911,17 @@ V_{i,t} = \begin{cases}
 (`fair_value.rs:213`, `fair_value.rs:299-329`). A loss-making company is
 valued at 1.2 times book, with no rate term.
 
+Two public calls return this number. `tradefloor.fair_value(...,
+model=...)` returns $V$ for the fundamentals and macro it is given, with
+$\hat E = E$ and $\hat K = K$, under every valuation value of that model:
+$r^{\ast}$, $\lambda$, the QE gains and the book floor. `Engine.fair_values()`
+returns $V$ for each name as the engine's next tick starts from it, with the
+restatement above and the VIX discount below. Called with no `model` and
+none of those values, `fair_value` uses the reference values ($r^{\ast}$ =
+0.04, $\lambda$ = 1.5, a QE adjustment of $1 + \text{boost}$), which no preset
+after pt-v15 ships. That form stays fixed across releases, and the
+manifest's era fingerprint is computed on it.
+
 What follows from this:
 
 - **Rates.** $\partial \ln V / \partial r = -\lambda D_i / R$, with $\lambda$ = `rate_pe_sensitivity`. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 3% to 5.4% on pt-v20 ($\lambda$ = 3), depending on its growth, and by 1.5% to 2.7% on pt-v19 ($\lambda$ = 1.5). On the driven 2022 path the market P/E falls 4.26% per 100 bp against the S&P 500's 5.2% (row R6, box ptv20g6). Loss-makers do not move.
