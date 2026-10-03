@@ -271,13 +271,16 @@ def test_the_schedule_and_the_layout_follow_a_changed_roster():
                               shares_outstanding=5e7, eps=1.5),
                 tf.Instrument("IPOB", "energy", initial_price=21.0,
                               shares_outstanding=4e7, eps=1.1)]
+    rosters, drawn = [], []
     for day in range(4):
         engine.run_days(1, hour=9, minute=30, day_of_week=3,
                         ticks_per_day=ticks, volatility=1.0, record=True)
         mark = engine.day_marks()[day]
         active = len(mark["active"])
         assert active == len(engine)
+        rosters.append(list(engine.tickers))
         entries = noise.draw_log(engine, "market", day, day)
+        drawn.append(len(entries))
         sites = [e.site for e in entries]
         per_tick = (["market_factor_z"] + ["sector_z"] * mark["sectors"]
                     + ["factor_idio_z", "stash_u"] * active
@@ -303,6 +306,15 @@ def test_the_schedule_and_the_layout_follow_a_changed_roster():
         elif day == 2:
             engine.list_instrument(listings[1])
             engine.delist(0)
+
+    # The scenario is what gives the checks above their reach: four days on
+    # one roster pass every one of them. So the roster has to have changed
+    # as described, and the stream has to have followed it (#159).
+    assert [len(r) for r in rosters] == [10, 9, 10, 10]
+    assert rosters[1] == rosters[0][1:]
+    assert rosters[2] == rosters[1] + ["IPO"]
+    assert rosters[3] == rosters[2][1:] + ["IPOB"]
+    assert drawn == [584, 536, 584, 584]
 
 
 def test_addresses_and_kinds_are_checked():
