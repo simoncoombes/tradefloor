@@ -163,7 +163,7 @@ def book_digest() -> str:
 
 if __name__ == "__main__":
     data = book_buffer()
-    print(f"pretium book known-answer test v{BOOK_KAT_VERSION}")
+    print(f"tradefloor book known-answer test v{BOOK_KAT_VERSION}")
     print(f"  package  {tradefloor.version()}")
     print(f"  bytes    {len(data)}")
     print(f"  sha256   {hashlib.sha256(data).hexdigest()}")

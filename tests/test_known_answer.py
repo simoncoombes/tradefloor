@@ -24,6 +24,7 @@ import known_answer_book  # noqa: E402
 import known_answer_presets  # noqa: E402
 import known_answer_seed64  # noqa: E402
 import known_answer_traded  # noqa: E402
+import pytest  # noqa: E402
 import tradefloor  # noqa: E402
 
 
@@ -307,6 +308,24 @@ def test_known_answer_actually_covers_something():
     assert len(set(buf[i:i + 8] for i in range(0, len(buf), 8))) > 100
 
 
+@pytest.mark.parametrize("script", ["known_answer_book.py",
+                                    "known_answer_presets.py",
+                                    "known_answer_seed64.py",
+                                    "known_answer_traded.py"])
+def test_each_known_answer_script_names_the_package(script, tmp_path):
+    """The header each script prints is the line a developer reads when the
+    gate runs. It named the crate by its name before the rename (#160)."""
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).parent / script)],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    first = result.stdout.splitlines()[0]
+    assert first.startswith("tradefloor "), first
+
+
 def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     """Execute known_answer.py the way CI does: as a script, from elsewhere.
 
@@ -330,6 +349,9 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
         cwd=tmp_path, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
+    # The first line a developer reads names the package by its name.
+    assert result.stdout.startswith("tradefloor known-answer test v"), (
+        result.stdout.splitlines()[0])
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
     # SEVEN digests, in a fixed order: combined, simulation, metadata, the
     # session with the simulated rate indices, every shipped preset's
