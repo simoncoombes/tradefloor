@@ -122,7 +122,7 @@ jobs:
         run: cargo check --all-targets --all-features
 
   batch:
-    name: tests ${{ matrix.batch }}
+    name: tests ${{ matrix.batch }} on ${{ matrix.interpreter }}
     needs: wheel
     runs-on: ubuntu-latest
     strategy:
@@ -131,11 +131,17 @@ jobs:
       fail-fast: false
       matrix:
         batch: [a-e, f-p, q-z, facts]
+        # The floor and the newest supported version. The builtin sum() over
+        # floats compensates from 3.12, and two exact-equality tests failed by
+        # one ulp on 3.13 for releases while every job here ran 3.11. The
+        # batches run in parallel, so the second version costs runner time,
+        # not wall time.
+        interpreter: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.interpreter }}
       - uses: actions/download-artifact@v8
         with:
           name: suite-wheel
