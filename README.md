@@ -19,7 +19,7 @@ price.
 
 ## Documentation
 
-Documentation is at https://tradefloor.dev. It covers install, core
+Documentation is at https://docs.tradefloor.dev. It covers install, core
 concepts, the realism envelope, presets, the API and the notebooks.
 
 Three documents in this repository are for anyone publishing with it:
@@ -226,7 +226,7 @@ claude mcp add tradefloor -- tradefloor-mcp
 
 Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
-[the MCP page](https://tradefloor.dev/mcp.html).
+[the MCP page](https://docs.tradefloor.dev/mcp-local.html).
 
 ## Controlled scenarios
 
@@ -393,7 +393,7 @@ a shipped preset never changes, so those wait for a new one.
 | agent interaction | an agent's temporary impact barely reaches the tape, its permanent impact is linear and fades on the mispricing's half-life, and volume, depth and the background flow ignore it. No liquidity spiral or predatory trading can arise | the next preset |
 
 `tf.envelope.check(horizon_days=...)` refuses a question that falls outside
-a limit, and [the realism envelope](https://tradefloor.dev/realism-envelope.html)
+a limit, and [the realism envelope](https://docs.tradefloor.dev/how-its-measured.html)
 says what each one forbids.
 
 The model has no factor structure beyond each company's beta and sector.
