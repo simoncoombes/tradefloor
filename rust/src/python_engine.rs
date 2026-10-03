@@ -655,8 +655,12 @@ impl PyEngine {
         self.day_buffer.components[fv]
             .extend_from_slice(&self.buffer.components[crate::market::factors::TICK_FAIR_VALUE][..n]);
         self.day_buffer.components[fv].resize(self.day_buffer.components[0].len(), 0.0);
+        // Each pending vector is one entry per name, and the first row is
+        // `width` names wide. An entry past it would land on the second
+        // tick's first name, so it is dropped rather than misfiled.
+        let width = self.buffer.companies;
         if !self.pending_fair_value.is_empty() {
-            for (i, v) in self.pending_fair_value.iter().enumerate() {
+            for (i, v) in self.pending_fair_value.iter().enumerate().take(width) {
                 if let Some(slot) = self.day_buffer.components[fv].get_mut(first + i) {
                     *slot += v;
                 }
@@ -671,7 +675,7 @@ impl PyEngine {
         let before = self.day_buffer.components[crate::market::factors::JUMP_SLOT].len();
         self.day_buffer.components[crate::market::factors::JUMP_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_jump.is_empty() {
-            for (i, v) in self.pending_jump.iter().enumerate() {
+            for (i, v) in self.pending_jump.iter().enumerate().take(width) {
                 if let Some(slot) = self.day_buffer.components[crate::market::factors::JUMP_SLOT].get_mut(before + i) {
                     *slot += v;
                 }
@@ -686,7 +690,7 @@ impl PyEngine {
         let before = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].len();
         self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_overnight.is_empty() {
-            for (i, v) in self.pending_overnight.iter().enumerate() {
+            for (i, v) in self.pending_overnight.iter().enumerate().take(width) {
                 if let Some(slot) = self.day_buffer.components[crate::market::factors::OVERNIGHT_SLOT].get_mut(before + i) {
                     *slot += v;
                 }
@@ -2792,6 +2796,17 @@ impl PyEngine {
         match self.inner.remove_company(index) {
             Some(c) => {
                 self.tickers.remove(index);
+                // The close's jump, its fair-value shift and the open's
+                // overnight move wait per name for the row that observes
+                // them. The delisted name's entry goes with it, so every
+                // later name's entry stays on that name's row (#154). Its
+                // own value is dropped: it has no row on the next tape.
+                for pending in [&mut self.pending_jump, &mut self.pending_overnight,
+                                &mut self.pending_fair_value] {
+                    if index < pending.len() {
+                        pending.remove(index);
+                    }
+                }
                 self.log.push(crate::python_log::LogEntry::Delist { index });
                 Ok(c.ticker)
             }

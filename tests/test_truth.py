@@ -457,3 +457,120 @@ def test_a_single_session_day_is_unaffected():
     implicit.close_market()
 
     assert explicit.prices() == implicit.prices()
+
+
+# -- the day-boundary moves follow the name across a roster edit -------------
+#
+# The close's jump, its fair-value shift and the open's overnight move are
+# held per name until the tape row that observes them, which is the first row
+# of the next session. A roster edit can fall in that gap. Whatever it does,
+# the row each value lands on has to be the row of the name that took it,
+# or the columns stop summing to the change in `s` for two names at once.
+
+_BOUNDARY_ROSTER = tradefloor.Universe.random(8, seed=99)
+_IPO = tradefloor.Instrument("IPO", "energy", initial_price=33.0,
+                             shares_outstanding=5e7, eps=1.5)
+
+
+def _rows_by_name(engine, day):
+    """`truth(day=day)` as ``{(ticker, tick): row}`` under today's roster."""
+    names = list(engine.tickers)
+    return {(names[r["instrument_id"]], r["tick"]): r
+            for r in pa.table(engine.truth(day=day)).to_pylist()}
+
+
+def _last_s(rows):
+    """Each name's `s` on the last row it has."""
+    last = {}
+    for (name, tick), row in sorted(rows.items(), key=lambda kv: kv[0][1]):
+        last[name] = row["mispricing_s"]
+    return last
+
+
+def _worst_residual(rows, start):
+    """The largest gap, over every row, between the components' sum and the
+    change in `s` since the name's previous row (`start` before the first)."""
+    previous = dict(start)
+    worst = 0.0
+    for (name, tick), row in sorted(rows.items(), key=lambda kv: kv[0][1]):
+        moved = row["mispricing_s"] - previous[name]
+        total = math.fsum(row[c] or 0.0 for c in COMPONENTS)
+        worst = max(worst, abs(total - moved))
+        previous[name] = row["mispricing_s"]
+    return worst
+
+
+@pytest.mark.parametrize("model, seed, edit", [
+    # One name jumps (AAB); delisting AAA moves it to position 0.
+    ("pt-v16", 34, "delist_first"),
+    # A market jump on all eight; seven names remain to carry it.
+    ("pt-v16", 7, "delist_first"),
+    ("pt-v16", 7, "delist_last"),
+    # One name jumps under pt-v20's permanent share, so the fair-value shift
+    # waits beside the jump.
+    ("pt-v20", 97, "delist_first"),
+    ("pt-v16", 7, "list"),
+])
+def test_the_closes_jump_lands_on_its_own_name_after_a_roster_edit(
+        model, seed, edit):
+    """Issue #154: a delisting between the close and the next session used
+    to shift every waiting jump one name to the left, and the last one onto
+    the second tick. Total jump mass was conserved, so a column sum could not
+    see it."""
+    engine = tradefloor.Engine(seed=seed, universe=_BOUNDARY_ROSTER,
+                               model=model)
+    engine.run_days(1, record=True, ticks_per_day=30)
+    jumped = dict(zip(engine.tickers, _f64(engine.attribution("jump"))))
+    start = _last_s(_rows_by_name(engine, 0))
+
+    if edit == "delist_first":
+        engine.delist(0)
+    elif edit == "delist_last":
+        engine.delist(len(engine) - 1)
+    else:
+        engine.list_instrument(_IPO)
+        jumped["IPO"] = 0.0
+        start["IPO"] = None
+    survivors = list(engine.tickers)
+    assert any(jumped[name] != 0.0 for name in survivors), (
+        "no surviving name jumped, so this compared zeros")
+
+    engine.run_days(1, record=True, ticks_per_day=30)
+    rows = _rows_by_name(engine, 1)
+    for name in survivors:
+        assert rows[(name, 0)]["jump"] == jumped[name], name
+    late = {key: row["jump"] for key, row in rows.items()
+            if key[1] > 0 and row["jump"]}
+    assert late == {}, "a jump landed after the first row"
+    if edit == "list":
+        # A new name has no previous row; take its first row as the base.
+        start["IPO"] = (rows[("IPO", 0)]["mispricing_s"]
+                        - math.fsum(rows[("IPO", 0)][c] or 0.0
+                                    for c in COMPONENTS))
+    assert _worst_residual(rows, start) < 1e-12
+
+
+def test_the_opens_overnight_move_lands_on_its_own_name_after_a_delisting():
+    """The overnight move waits from the open to the session's first row, so
+    a delisting between `open_market` and `run_session` falls in its gap."""
+    model = tradefloor.ModelParams.from_preset(
+        "pt-v20", overnight_variance_ratio=0.3)
+    engine = tradefloor.Engine(seed=34, universe=_BOUNDARY_ROSTER,
+                               model=model)
+    engine.run_days(1, record=True, ticks_per_day=30)
+    start = _last_s(_rows_by_name(engine, 0))
+    engine.open_market()
+    waiting = engine.state_snapshot()["pending_overnight"]
+    moved = dict(zip(engine.tickers, _f64(waiting)))
+    engine.delist(0)
+    survivors = list(engine.tickers)
+    assert any(moved[name] != 0.0 for name in survivors)
+
+    engine.run_session(9, 30, 3, 30)
+    engine.close_market()
+    engine.record(1)
+    rows = _rows_by_name(engine, 1)
+    for name in survivors:
+        assert rows[(name, 0)]["overnight"] == moved[name], name
+    assert not any(row["overnight"] for key, row in rows.items() if key[1] > 0)
+    assert _worst_residual(rows, start) < 1e-12
