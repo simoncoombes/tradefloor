@@ -35,7 +35,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "python" / "tradefloor" / "presets"
 
 sys.path.insert(0, str(ROOT))
-from tools.presets.record import coefficient_digest, mechanism_set  # noqa: E402
+from tools.presets.record import (  # noqa: E402
+    coefficient_digest, mechanism_set, recorded_values)
 
 import tradefloor  # noqa: E402
 
@@ -51,7 +52,8 @@ def main() -> int:
     for path in paths:
         rec = json.loads(path.read_text(encoding="utf-8"))
         name = rec["preset"]
-        values = tradefloor.ModelParams.from_preset(name).to_dict()
+        values = recorded_values(
+            tradefloor.ModelParams.from_preset(name).to_dict())
         digest = coefficient_digest(values)
         if digest == rec["coefficient_digest"]:
             continue

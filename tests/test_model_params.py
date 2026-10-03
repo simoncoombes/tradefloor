@@ -110,10 +110,14 @@ PERTURBATIONS = [
     ("order_flow_coefficient", 80.0, False),   # needs order flow; none sent
     # Same reason, and it is the whole reason the known-answer digests do
     # not move: this dial is reachable only through `TickInputs`
-    # `.order_volumes`, which is the empty slice at every construction
-    # site but the two `order_flow=` paths. At zero volume the raw
+    # `.order_volumes`, which an untraded run leaves empty. Flow reaches it
+    # from `flow_per_tick`, `tick(order_flow=...)`, and agents' fills on
+    # presets with `fill_impact_coefficient` at 0.0. At zero volume the raw
     # imbalance is the literal 0.0 under both laws.
     ("order_flow_impact_law", 1.0, False),     # needs order flow; none sent
+    # The same channel, scaled after the imbalance: zero times the
+    # reference depth is still +0.0.
+    ("order_flow_depth_law", 1.0, False),      # needs order flow; none sent
     ("informed_flow_fraction", 0.5, False),    # needs order flow; none sent
     ("news_sector_weight", 0.6, False),        # needs news; none sent
     ("news_market_weight", 0.4, False),        # needs news; none sent

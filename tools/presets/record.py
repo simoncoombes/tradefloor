@@ -93,6 +93,20 @@ def moved_values(was: dict[str, float], now: dict[str, float]) -> list[str]:
     return sorted(k for k in set(was) & set(now) if was[k] != now[k])
 
 
+def recorded_values(values: dict[str, float]) -> dict[str, float]:
+    """The vector a record carries: `to_dict()` less the silent switches.
+
+    A switch in `ModelParams.digest_silent_at_zero()` is left out while it
+    is 0.0, the rule the Rust digest follows, because at zero it is the
+    model that existed before it was added. So adding one moves no
+    record's `coefficients` or `coefficient_digest`. Off zero it is kept.
+    """
+    import tradefloor  # noqa: PLC0415
+
+    silent = set(tradefloor.ModelParams.digest_silent_at_zero())
+    return {k: v for k, v in values.items() if not (k in silent and v == 0.0)}
+
+
 def coefficient_digest(values: dict[str, float]) -> str:
     """A citable identity for the coefficient vector itself.
 
@@ -100,8 +114,10 @@ def coefficient_digest(values: dict[str, float]) -> str:
     under it, which is the failure `the_three_presets_are_three_different_
     models` exists to catch on the Rust side. This is the same guard for a
     record: two files claiming one name and disagreeing here is a defect,
-    not a matter of interpretation.
+    not a matter of interpretation. Taken over `recorded_values`, so a
+    silent switch at zero does not enter it.
     """
+    values = recorded_values(values)
     body = "\n".join(f"{k}={values[k]!r}" for k in sorted(values))
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -252,7 +268,7 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         "preset": name,
         "fingerprint": name,
         "coefficient_digest": coefficient_digest(values),
-        "coefficients": {k: values[k] for k in sorted(values)},
+        "coefficients": dict(sorted(recorded_values(values).items())),
         "mechanisms": mechanism_set(values),
         "default_since": DEFAULT_SINCE.get(name),
         "measured": measured,
@@ -974,7 +990,7 @@ def write_coefficients() -> int:
             refused.append(path.name)
             continue
         record["coefficient_digest"] = coefficient_digest(values)
-        record["coefficients"] = {k: values[k] for k in sorted(values)}
+        record["coefficients"] = dict(sorted(recorded_values(values).items()))
         text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
         path.write_text(text, encoding="utf-8", newline=chr(10))
         added = sorted(set(values) - set(before))

@@ -667,6 +667,11 @@ class FlowImpact:
        between them changes nothing, so this is the wrong tool for asking how
        cost scales with size.
 
+       Under the shipped default it also divides by each name's depth
+       twice, so at equal participation a thin name is charged far more
+       than a liquid one. Pass a model with ``order_flow_depth_law=1.0`` to
+       compare names; it divides once.
+
     
     Two runs of the SAME seed, one with the trader's order flow and one without,
     and the difference between them.

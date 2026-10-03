@@ -242,7 +242,7 @@ MECHANISMS: tuple[Mechanism, ...] = (
         function="market::factors::calculate_live_factors",
         state=("avg_volume",),
         dials=("order_flow_coefficient", "informed_flow_fraction",
-               "order_flow_impact_law"),
+               "order_flow_impact_law", "order_flow_depth_law"),
         # `order_flow_impact_law` is read where the imbalance is COMPUTED and
         # not where it is consumed: the tick calls `order_imbalance_with` and
         # hands `calculate_live_factors` the product. That is the mirror of

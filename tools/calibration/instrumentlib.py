@@ -191,6 +191,9 @@ PARAM_SPECS: dict[str, dict] = {
     # measurements, not fitted, and a tunable exponent is the defect
     # this dial exists to remove.
     "order_flow_impact_law": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # A switch too: how many times the order-flow impact divides by depth.
+    # The exponent it sets is dimensional, not fitted.
+    "order_flow_depth_law": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # Also a SWITCH, and the same box for the same reason. 0.0 denominates
     # the crash amplifier's shock in the BASELINE factor sigma and every
     # nonzero value denominates it in the tick's own CONDITIONAL sigma;
