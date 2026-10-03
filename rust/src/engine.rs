@@ -5746,6 +5746,25 @@ impl Engine {
         )
     }
 
+    /// Every company's fair value as the next tick starts from it, in roster
+    /// order: [`crate::market::tick::tick_fair_value`] on the state now
+    /// standing, at the name's current price and the current day. NaN for a
+    /// bankrupt or private name, which the tick does not value.
+    pub fn fair_values(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| {
+                if c.is_bankrupt || !c.is_public {
+                    f64::NAN
+                } else {
+                    crate::market::tick::tick_fair_value(
+                        &self.params, &self.economy, self.nominal_output_base,
+                        self.elapsed_days, c, c.stock.price)
+                }
+            })
+            .collect()
+    }
+
     /// THE PRICE TAKES A MACRO DECISION WHEN IT IS PUBLISHED
     /// (`macro_publication_repricing`).
     ///
