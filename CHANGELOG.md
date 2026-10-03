@@ -51,8 +51,8 @@ Order-flow impact divided by a name's depth twice, so at equal participation
 a thin name paid far more than a liquid one: 1,500 times across minute
 volumes of 154 and 230,769 shares. At 1 the new switch divides once,
 restated so a name trading a million shares a day pays the same under either
-setting. A dial that is 0 is left out of `ModelParams.digest()`, so adding
-this one renames no model. `order_flow_impact_law` no longer returns NaN for
+setting. The switch is left out of `ModelParams.digest()` and the preset
+records while it is 0, so adding it renames no model and moves no record. `order_flow_impact_law` no longer returns NaN for
 flow too large to sum. Untraded runs on any preset, and traded runs on
 pt-v20, are bit-identical with the switch on; traded runs on pt-v19 and
 earlier are not, because agents' fills reach this channel there.
