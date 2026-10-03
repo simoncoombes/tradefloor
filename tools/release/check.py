@@ -75,6 +75,16 @@ def declared_versions() -> dict[str, str]:
             pin = re.search(r"==(.+)$", arg.get("value", ""))
             if pin:
                 out[f"server.json package {i} --with"] = pin.group(1)
+    # The MCP bundle (Claude Desktop, Smithery): its manifest, its project,
+    # and the tradefloor[mcp] pin that project installs.
+    out["mcpb/manifest.json"] = json.loads(read("mcpb/manifest.json"))["version"]
+    bundle = read("mcpb/pyproject.toml")
+    m = re.search(r'(?m)^version = "([^"]+)"', bundle)
+    if m:
+        out["mcpb/pyproject.toml"] = m.group(1)
+    m = re.search(r'tradefloor\[mcp\]==([0-9][^"]*)', bundle)
+    if m:
+        out["mcpb/pyproject.toml pin"] = m.group(1)
     return out
 
 

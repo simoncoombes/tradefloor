@@ -1,0 +1,105 @@
+{
+  "manifest_version": "0.3",
+  "name": "tradefloor",
+  "display_name": "tradefloor",
+  "version": "0.8.8",
+  "description": "Simulated stock markets that react to your orders: run, fork and score trading agents.",
+  "long_description": "tradefloor generates simulated stock markets with a limit order book and an economy, for testing trading algorithms and AI agents. Markets react to your orders, a year runs in seconds, and any market can be recreated exactly or forked on any day to compare scenarios. The server lets an AI assistant evaluate and rank strategies across many markets, run stress scenarios such as a recession or a liquidity crisis, and check a question against the model's validated limits. It runs on your machine and places no real orders.",
+  "author": {
+    "name": "Simon Coombes",
+    "url": "https://github.com/simoncoombes"
+  },
+  "homepage": "https://tradefloor.dev",
+  "documentation": "https://docs.tradefloor.dev/mcp-local.html",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simoncoombes/tradefloor"
+  },
+  "license": "MIT OR Apache-2.0",
+  "keywords": [
+    "trading",
+    "market simulation",
+    "backtesting",
+    "order book",
+    "finance",
+    "agents"
+  ],
+  "icon": "icon.png",
+  "server": {
+    "type": "python",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "server.py"
+      ]
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "tools": [
+    {
+      "name": "describe_simulator",
+      "description": "What this simulator is, what it is certified to reproduce, and what it cannot do."
+    },
+    {
+      "name": "check_envelope",
+      "description": "Ask whether a question falls inside the realism envelope BEFORE running it."
+    },
+    {
+      "name": "validate_strategy",
+      "description": "Parse and fingerprint a strategy spec WITHOUT running it."
+    },
+    {
+      "name": "evaluate_strategies",
+      "description": "Run strategies against one identical market, beside the baseline agents, and score them."
+    },
+    {
+      "name": "rank_strategies",
+      "description": "Score strategies across MANY seeds, beside the baseline agents, and rank them with a paired sign test."
+    },
+    {
+      "name": "list_scenarios",
+      "description": "What scenarios exist and what each intervention target actually reaches, read this before authoring one, because four of the targets are honest mechanisms with effects too small to see over a hundred days."
+    },
+    {
+      "name": "build_scenario",
+      "description": "Author a custom scenario, a macro PATH from hold/ramp/step instructions, or explicit INTERVENTIONS as shocks and assumed transmission, and see what it resolves to before running it."
+    },
+    {
+      "name": "run_stress_scenario",
+      "description": "Run strategies through a macro stress scenario, always beside the same market unshocked."
+    },
+    {
+      "name": "explain_price_move",
+      "description": "Why did a price move?"
+    },
+    {
+      "name": "explain",
+      "description": "Which draws seeded one name's day?"
+    },
+    {
+      "name": "build_universe",
+      "description": "Build a roster and preview it: generated from (size, seed) with optional sector concentration, or from explicit instruments."
+    },
+    {
+      "name": "start_job",
+      "description": "Start a long simulation in the background and get a job id back immediately."
+    },
+    {
+      "name": "check_job",
+      "description": "Check a background job."
+    }
+  ]
+}
