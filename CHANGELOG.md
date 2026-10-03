@@ -1,3 +1,18 @@
+## 0.8.8
+
+A patch release on the 0.8 long-term support line. No coefficient, default
+or trajectory changes, every known-answer digest is 0.8.7's, and `pt-v20`
+stays the default.
+
+tradefloor is listed in the MCP Registry as
+`io.github.simoncoombes/tradefloor`, so an MCP client can find it and start
+it with `uvx --with "tradefloor[mcp]==0.8.8" tradefloor mcp`. The new
+`tradefloor mcp` command runs the same server as `tradefloor-mcp`. The
+release workflow now publishes `server.json` to the registry after each
+PyPI upload.
+
+<!-- release-note-ends -->
+
 ## 0.8.7
 
 A patch release on the 0.8 long-term support line that changes text only.

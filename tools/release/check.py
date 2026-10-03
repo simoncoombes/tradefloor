@@ -65,6 +65,16 @@ def declared_versions() -> dict[str, str]:
     m = re.search(r"(?m)^version: (.+)$", read("CITATION.cff"))
     if m:
         out["CITATION.cff"] = m.group(1).strip()
+    # The MCP Registry entry names the version three times: the server's,
+    # the PyPI package's, and the extra that `uvx --with` installs.
+    server = json.loads(read("server.json"))
+    out["server.json"] = server["version"]
+    for i, pkg in enumerate(server["packages"]):
+        out[f"server.json package {i}"] = pkg["version"]
+        for arg in pkg.get("runtimeArguments", []):
+            pin = re.search(r"==(.+)$", arg.get("value", ""))
+            if pin:
+                out[f"server.json package {i} --with"] = pin.group(1)
     return out
 
 
