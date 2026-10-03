@@ -34,7 +34,7 @@ from .scenario import Scenario, _wrap
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="tradefloor",
-        description="Inspect tradefloor scenario files.",
+        description="Inspect tradefloor scenario files, or run the MCP server.",
     )
     parser.add_argument("--version", action="version",
                         version=f"tradefloor {__version__}")
@@ -64,7 +64,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser(
         "targets", help="every intervention target, and what it actually reaches")
 
+    # The same server as `tradefloor-mcp`. The registry launches it as
+    # `uvx --with "tradefloor[mcp]==X" tradefloor mcp`, because uvx runs a
+    # package's own command, and this is the one that carries the extra.
+    top.add_parser(
+        "mcp", help="run the MCP server over stdio (needs tradefloor[mcp])")
+
     args = parser.parse_args(argv)
+    if args.group == "mcp":
+        mcp_main()
+        return 0
     if args.command == "validate":
         return _validate(args.files)
     if args.command == "show":

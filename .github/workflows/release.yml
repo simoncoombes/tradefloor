@@ -276,6 +276,39 @@ jobs:
         # publish; it went with the transition.)
         run: cargo publish --no-verify
 
+  mcp_registry:
+    name: publish to the MCP Registry
+    # The registry lists the PyPI package, and it checks ownership by finding
+    # `mcp-name: io.github.simoncoombes/tradefloor` in the README PyPI shows
+    # for that version, so this waits for the version to be on PyPI first.
+    # It authenticates with this workflow's GitHub identity: no token exists.
+    needs: [setup, publish]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for this version on PyPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(python3 -c "import json;print(json.load(open('server.json'))['version'])")"
+          for i in $(seq 1 30); do
+            curl -fsS "https://pypi.org/pypi/tradefloor/$v/json" >/dev/null && exit 0
+            sleep 10
+          done
+          echo "tradefloor $v is not on PyPI after five minutes" >&2
+          exit 1
+      - name: Publish server.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
   github_release:
     name: GitHub release
     needs: [setup, verify, publish, publish_crate]
