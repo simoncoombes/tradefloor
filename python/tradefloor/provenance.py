@@ -582,8 +582,12 @@ OUT_OF_SCOPE = {
         "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
         "reads the raw print",
     "order_flow_impact_law":
-        "inert at 0.0: market/factors.rs:773 branches on `== 0.0` and "
-        "takes the shipped law",
+        "inert at 0.0: `order_imbalance_with` in market/factors.rs "
+        "branches on `== 0.0` and takes the shipped law",
+    "order_flow_depth_law":
+        "inert at 0.0: `calculate_live_factors` in market/factors.rs "
+        "branches on `== 0.0` and divides by depth twice, as the shipped "
+        "law does; at 0.0 it is also left out of the model's digest",
     "overnight_variance_ratio":
         "inert at 0.0: the overnight move is this ratio of a session's "
         "variance (engine.rs:1856), and nothing moved a price between "

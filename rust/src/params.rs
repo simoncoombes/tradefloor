@@ -309,18 +309,61 @@ pub struct ModelParams {
     /// Only the two clamped tails differ, and neither carries a coefficient
     /// anyone could tune.
     ///
-    /// It does not restate the depth exponent. `calculate_live_factors`
-    /// multiplies this by `liquidity_factor`, which divides by the same
-    /// per-minute volume a second time, so impact still falls as depth
-    /// squared where the cited law gives depth. That is a separate defect,
-    /// issue #182, and this dial does not touch it.
+    /// It does not restate the depth exponent. At
+    /// `order_flow_depth_law` 0.0, `calculate_live_factors` multiplies this
+    /// by `liquidity_factor`, which divides by the same per-minute volume a
+    /// second time, so impact falls as depth squared at a fixed share
+    /// count where the cited law gives depth. That is issue #182, and
+    /// `order_flow_depth_law` is its switch.
     ///
-    /// It also changes nothing in a run that injects no order flow.
-    /// `TickInputs.order_volumes` is the empty slice at every construction
-    /// site but the two `order_flow=` paths, and at zero volume the raw
-    /// imbalance is the literal `0.0`, whose product with either multiplier
-    /// is `+0.0`.
+    /// It also changes nothing in a run with no flow in the order-flow
+    /// channel: at zero volume the raw imbalance is the literal `0.0`, whose
+    /// product with either multiplier is `+0.0`. An untraded run has none.
+    /// Flow reaches the channel from `flow_per_tick` and
+    /// `tick(order_flow=...)`, and from an agent's fills on presets where
+    /// `fill_impact_coefficient` is 0.0, which is every preset before
+    /// pt-v20, so there this dial does change what agents pay.
     pub order_flow_impact_law: f64,
+    /// How many times the order-flow impact divides by the name's depth, a
+    /// switch. 0.0, on every shipped preset, divides twice; 1.0 divides
+    /// once.
+    ///
+    /// `order_imbalance` already returns participation, the tick's flow
+    /// over the name's average minute volume. At 0.0 the factor then
+    /// multiplies by `1 / max(max(avg_volume, 0.005 * shares) / 390, 100)`,
+    /// a minute volume a second time. So at equal participation the impact
+    /// falls as depth, and at a fixed share count as depth squared: five
+    /// times its own minute volume moves a name trading 154 shares a minute
+    /// 1,500 times as far as one trading 230,769. Cont, Kukanov and Stoikov
+    /// (Journal of Financial Econometrics 12(1) 47-88, 2014) find price
+    /// change linear in order-flow imbalance over depth, which is
+    /// participation, so at equal participation the move in return terms
+    /// does not depend on depth.
+    ///
+    /// At 1.0 the second division is by a fixed minute volume instead:
+    /// 1,000,000 / 390 shares, the daily volume `order_imbalance` already
+    /// assumes for a name that reports none. That restates
+    /// `order_flow_coefficient` rather than retuning it. A name trading a
+    /// million shares a day is charged exactly what 0.0 charges it, and
+    /// every other name moves by its own depth over that one. Equal
+    /// participation is then equal impact on every name above the 100-share
+    /// minute floor, and the `0.005 * shares` depth, which only the second
+    /// division read, is no longer used.
+    ///
+    /// It adds no price term. The cited law is stated in ticks, so in
+    /// return terms it carries the tick over the price, while the
+    /// square-root and Almgren et al. laws scale a return by the name's
+    /// volatility. The two sources disagree there, and this switch takes
+    /// neither.
+    ///
+    /// The zero case is a branch, so presets at 0.0 reproduce bit for bit,
+    /// and a value of 0.0 is left out of the model's digest, so it moves no
+    /// fingerprint either. With no flow in the order-flow channel the
+    /// imbalance is `+0.0` and the result is `+0.0` at either value. Flow
+    /// reaches the channel from `flow_per_tick` and `tick(order_flow=...)`,
+    /// and from an agent's fills on presets where `fill_impact_coefficient`
+    /// is 0.0, which is every preset before pt-v20.
+    pub order_flow_depth_law: f64,
     /// Share of order-flow impact that is permanent (information), from 0 to
     /// 1. 0.35 on every shipped preset.
     pub informed_flow_fraction: f64,
@@ -4935,6 +4978,7 @@ impl ModelParams {
             idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             order_flow_impact_law: 0.0,
+            order_flow_depth_law: 0.0,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
             inflation_ceiling: crate::economy::INFLATION_CEILING,
@@ -7276,6 +7320,7 @@ impl ModelParams {
             "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
             "order_flow_impact_law" => self.order_flow_impact_law,
+            "order_flow_depth_law" => self.order_flow_depth_law,
             "inflation_ceiling" => self.inflation_ceiling,
             "inflation_floor" => self.inflation_floor,
             "inflation_reversion" => self.inflation_reversion,
@@ -7527,6 +7572,7 @@ impl ModelParams {
             "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
             "order_flow_impact_law" => out.order_flow_impact_law = value,
+            "order_flow_depth_law" => out.order_flow_depth_law = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
             "inflation_floor" => out.inflation_floor = value,
             "inflation_reversion" => out.inflation_reversion = value,
@@ -7790,11 +7836,20 @@ impl ModelParams {
     /// values as big-endian IEEE-754 bit patterns — the known-answer
     /// convention, so decimal formatting can never differ for reasons that
     /// are not the model.
+    ///
+    /// A switch in [`DIGEST_SILENT_AT_ZERO`] is left out while it is 0.0
+    /// (either sign), because at zero its branch is the model that existed
+    /// before the switch did. So adding one moves no preset's digest, no
+    /// custom model's fingerprint, and no state hash or manifest that
+    /// carries one. Off zero it is hashed like any other dial.
     pub fn digest(&self) -> String {
         #[cfg(test)]
         DIGESTS_TAKEN.with(|n| n.set(n.get() + 1));
         let mut hasher = Sha256::new();
         for (name, value) in self.to_pairs() {
+            if value == 0.0 && DIGEST_SILENT_AT_ZERO.contains(&name.as_str()) {
+                continue;
+            }
             hasher.update(name.as_bytes());
             hasher.update(b"=");
             hasher.update(value.to_bits().to_be_bytes());
@@ -8516,6 +8571,17 @@ fn shipped_digests() -> &'static [(&'static str, String)] {
     })
 }
 
+/// Switches whose value 0.0 is left out of [`ModelParams::digest`].
+///
+/// Each one branches on `== 0.0` and takes, at zero, exactly the arithmetic
+/// that stood before it was added, so a model with it at zero is the model
+/// without it and should hash the same. Without this, adding a switch
+/// renames every custom model: a manifest recorded under `custom-XXXXXXXX`
+/// rebuilds to a different digest and its replay is refused, and every
+/// recorded state hash of a custom model moves. Only a switch whose zero is
+/// a branch belongs here; a dial whose zero is arithmetic does not.
+pub const DIGEST_SILENT_AT_ZERO: &[&str] = &["order_flow_depth_law"];
+
 #[cfg(test)]
 thread_local! {
     /// How many times [`ModelParams::digest`] has run on this thread. Tests
@@ -8686,6 +8752,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_sector_weight",
         "order_flow_coefficient",
         "order_flow_impact_law",
+        "order_flow_depth_law",
         "overnight_variance_ratio",
         "price_breaker_fraction",
         "price_hard_cap",
@@ -9182,6 +9249,43 @@ mod tests {
         let by_format: String = every.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(lower_hex(&every), by_format);
         assert_eq!(lower_hex(&[]), "");
+    }
+
+    #[test]
+    fn a_switch_silent_at_zero_is_left_out_of_the_digest_only_at_zero() {
+        // The digest a build without the switch computed: every pair but
+        // the silent ones, in the same canonical form.
+        fn without_silent(p: &ModelParams) -> String {
+            let mut hasher = Sha256::new();
+            for (name, value) in p.to_pairs() {
+                if DIGEST_SILENT_AT_ZERO.contains(&name.as_str()) {
+                    continue;
+                }
+                hasher.update(name.as_bytes());
+                hasher.update(b"=");
+                hasher.update(value.to_bits().to_be_bytes());
+                hasher.update(b"\n");
+            }
+            lower_hex(&hasher.finalize())
+        }
+        let custom = PT_V19.with_override("book_resting", 1.0).unwrap();
+        for p in [PT_V1, PT_V19, PT_V20, custom] {
+            assert_eq!(p.digest(), without_silent(&p));
+            for name in DIGEST_SILENT_AT_ZERO {
+                // The surface still carries the name; only the hash skips it.
+                assert!(p.to_pairs().iter().any(|(n, _)| n == name), "{name}");
+                assert_eq!(p.get(name), Some(0.0), "{name}");
+                let negative = p.with_override(name, -0.0).unwrap();
+                assert_eq!(negative.digest(), p.digest(), "{name} at -0.0");
+                let on = p.with_override(name, 1.0).unwrap();
+                assert_ne!(on.digest(), p.digest(), "{name} at 1.0");
+                assert!(on.fingerprint().starts_with("custom-"), "{name}");
+            }
+        }
+        // And every name listed is a settable dial.
+        for name in DIGEST_SILENT_AT_ZERO {
+            assert!(settable_names().contains(name), "{name}");
+        }
     }
 
     #[test]

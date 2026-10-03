@@ -427,6 +427,15 @@ pub const fn attribution_slot_for_tick(k: usize) -> usize {
 /// Total impact coefficient for order flow, before the informed fraction.
 pub const ORDER_FLOW_COEFFICIENT: f64 = 50.0;
 
+/// The daily volume `order_flow_depth_law` restates the coefficient at.
+///
+/// It is the volume `order_imbalance` already assumes for a name that
+/// reports none (its `truthy_or` fallback), and
+/// `the_reference_liquidity_is_the_fallback_the_participation_term_uses`
+/// reads it back out of that function so the two cannot drift apart. A name
+/// trading this much is charged the same under either depth law.
+pub const REFERENCE_DAILY_VOLUME: f64 = 1_000_000.0;
+
 /// Weight of a sector-scoped news event on a name in that sector.
 ///
 /// A §5.4 promotion: previously the inline `* 0.5` below. Named so the
@@ -821,12 +830,25 @@ pub fn calculate_live_factors(
     }
 
     // ── Order flow ────────────────────────────────────────────────────────
-    // NOTE this is `Math.max`, not the `||` fallback chain
-    // `microstructure::base_quote_size` uses on the same field. A zero
-    // `avg_volume` is KEPT here and compared, rather than falling through.
-    let avg_daily_volume = mathx::max(company.avg_volume, company.shares_outstanding * 0.005);
-    // Per-minute volume, floored so a thin name cannot produce unbounded impact.
-    let liquidity_factor = 1.0 / mathx::max(avg_daily_volume / 390.0, 100.0);
+    // `order_imbalance` is already participation: flow over this name's
+    // minute volume. Under `order_flow_depth_law` at 0.0 the depth is
+    // divided out a second time here, so impact falls as depth at equal
+    // participation; at 1.0 it is divided by the reference name's minute
+    // volume instead, which restates the coefficient without retuning it.
+    // A branch, so 0.0 is the arithmetic that stood, bit for bit.
+    let liquidity_factor = if params.order_flow_depth_law == 0.0 {
+        // NOTE this is `Math.max`, not the `||` fallback chain
+        // `microstructure::base_quote_size` uses on the same field. A zero
+        // `avg_volume` is KEPT here and compared, rather than falling
+        // through.
+        let avg_daily_volume =
+            mathx::max(company.avg_volume, company.shares_outstanding * 0.005);
+        // Per-minute volume, floored so a thin name cannot produce
+        // unbounded impact.
+        1.0 / mathx::max(avg_daily_volume / 390.0, 100.0)
+    } else {
+        1.0 / (REFERENCE_DAILY_VOLUME / 390.0)
+    };
     let order_flow_impact = order_imbalance
         * liquidity_factor
         * params.order_flow_coefficient
@@ -1319,7 +1341,8 @@ fn participation_multiplier(participation: f64) -> f64 {
 /// participation multiplier follows the measured law instead of the clamped
 /// one. `ModelParams::order_flow_impact_law` carries the sources, the
 /// clock, and what the change does not claim. It does NOT restate the
-/// depth exponent; that is issue #182.
+/// depth exponent; `ModelParams::order_flow_depth_law` does, in
+/// `calculate_live_factors`.
 ///
 /// `order_imbalance` keeps its signature and its behaviour because it is
 /// public API, re-exported through `market::mod`. This is the
@@ -1354,8 +1377,21 @@ pub fn order_imbalance_with(
         return 0.0;
     }
     let avg_minute_vol = mathx::max(truthy_or(avg_volume, 1_000_000.0) / 390.0, 100.0);
-    let raw_imbalance = (buy_vol - sell_vol) / total_vol;
-    raw_imbalance * participation_multiplier(total_vol / avg_minute_vol)
+    // Two finite sides can sum past the largest double. Then `(b - s) / inf`
+    // reads zero whatever the direction, the participation is infinite, and
+    // the unbounded multiplier made the product `0 * inf`, a NaN price.
+    // Halving both sides is exact and keeps the ratio, and the participation
+    // is held at the largest finite value, where the multiplier is still
+    // finite. Both are branches on overflow alone, so every finite total
+    // takes the arithmetic that stood.
+    let raw_imbalance = if total_vol.is_finite() {
+        (buy_vol - sell_vol) / total_vol
+    } else {
+        (0.5 * buy_vol - 0.5 * sell_vol) / (0.5 * buy_vol + 0.5 * sell_vol)
+    };
+    let participation = total_vol / avg_minute_vol;
+    let participation = if participation.is_finite() { participation } else { f64::MAX };
+    raw_imbalance * participation_multiplier(participation)
 }
 
 #[cfg(test)]
@@ -2319,6 +2355,357 @@ mod tests {
                 -order_imbalance_with(&on, phi * 1000.0, 0.0, 390_000.0),
                 "phi {phi}"
             );
+        }
+    }
+
+    // -- The depth law -----------------------------------------------------
+    //
+    // `order_imbalance` is already participation, flow over the name's own
+    // minute volume. The shipped `calculate_live_factors` then divides by a
+    // minute volume a second time, so at equal participation the impact
+    // falls as depth and at a fixed share count as depth squared.
+    // `order_flow_depth_law` at 1.0 divides once. The tests below read the
+    // exponents off the function's own output rather than off the source.
+
+    fn depth_on(p: &crate::params::ModelParams) -> crate::params::ModelParams {
+        p.with_override("order_flow_depth_law", 1.0).unwrap()
+    }
+
+    /// The four combinations of the two switches, labelled.
+    fn four_laws() -> Vec<(&'static str, crate::params::ModelParams)> {
+        let shipped = crate::params::PT_V16;
+        let sqrt = law_on();
+        let (shipped_once, sqrt_once) = (depth_on(&shipped), depth_on(&sqrt));
+        vec![
+            ("shipped", shipped),
+            ("depth once", shipped_once),
+            ("square root", sqrt),
+            ("square root, depth once", sqrt_once),
+        ]
+    }
+
+    /// A name whose two depth definitions agree. Half a per cent of its
+    /// shares is half its average volume, so the shipped
+    /// `liquidity_factor` divides by the same minute volume the
+    /// participation term does, and any exponent read off it is the law's.
+    fn named(avg_volume: f64) -> FactorCompany {
+        let mut c = company();
+        c.avg_volume = avg_volume;
+        c.shares_outstanding = avg_volume * 100.0;
+        c
+    }
+
+    /// The minute volume the participation term divides by.
+    fn minute_of(c: &FactorCompany) -> f64 {
+        (c.avg_volume / 390.0).max(100.0)
+    }
+
+    /// One tick's order flow carried through both functions the tick calls:
+    /// the participation term, then the factor that scales it.
+    fn flow_impact(p: &crate::params::ModelParams, c: &FactorCompany, buy: f64, sell: f64) -> f64 {
+        let imbalance = order_imbalance_with(p, buy, sell, c.avg_volume);
+        factors_with(p, c, &[], imbalance, &shared()).order_flow_impact
+    }
+
+    /// Least-squares slope of `ln y` on `ln x`.
+    fn log_slope(xs: &[f64], ys: &[f64]) -> f64 {
+        let lx: Vec<f64> = xs.iter().map(|x| x.ln()).collect();
+        let ly: Vec<f64> = ys.iter().map(|y| y.ln()).collect();
+        let mx = lx.iter().sum::<f64>() / lx.len() as f64;
+        let my = ly.iter().sum::<f64>() / ly.len() as f64;
+        let num: f64 = lx.iter().zip(&ly).map(|(x, y)| (x - mx) * (y - my)).sum();
+        let den: f64 = lx.iter().map(|x| (x - mx) * (x - mx)).sum();
+        num / den
+    }
+
+    /// Thin, medium and mega-cap: minute volumes of 154, 6,154 and 230,769
+    /// shares, three and a half orders of magnitude, all above the
+    /// 100-share floor.
+    const DEPTHS: [f64; 3] = [60_000.0, 2_400_000.0, 90_000_000.0];
+
+    #[test]
+    fn at_equal_participation_the_corrected_law_does_not_depend_on_depth() {
+        // Participation is the dimensionless quantity, so once depth is
+        // divided out once the same participation is the same impact on
+        // every name: exponent 0. The shipped law divides twice and keeps
+        // exponent -1. Read at a participation under the floor, one in the
+        // band and one past the knee, under both participation laws.
+        //
+        // The tolerance is rounding only. This is `order_flow_impact`
+        // itself, before the cent grid, the breaker or any price, and the
+        // three values differ by at most an ulp of `phi * v / v`.
+        for (label, p) in four_laws() {
+            let depth_once = p.order_flow_depth_law != 0.0;
+            for phi in [0.5, 5.0, 50.0] {
+                let names: Vec<FactorCompany> = DEPTHS.iter().map(|&v| named(v)).collect();
+                let minutes: Vec<f64> = names.iter().map(minute_of).collect();
+                let out: Vec<f64> = names
+                    .iter()
+                    .map(|c| flow_impact(&p, c, phi * minute_of(c), 0.0))
+                    .collect();
+                let k = log_slope(&minutes, &out);
+                let expected = if depth_once { 0.0 } else { -1.0 };
+                assert!((k - expected).abs() < 1e-12, "{label}, phi {phi}: exponent {k}");
+            }
+        }
+    }
+
+    #[test]
+    fn at_a_fixed_share_count_the_corrected_law_falls_as_depth_and_the_shipped_one_as_its_square() {
+        // The same order in shares, which is a different participation on
+        // each name. Under the square-root participation law every name
+        // here is below the knee, where the law is linear, so the exponent
+        // is the depth law's alone: -1 dividing once, -2 dividing twice.
+        // (Under the shipped participation law the clamps bind on two of
+        // the three names and no single exponent exists.)
+        let sqrt = law_on();
+        let names: Vec<FactorCompany> = DEPTHS.iter().map(|&v| named(v)).collect();
+        let minutes: Vec<f64> = names.iter().map(minute_of).collect();
+        for (p, expected) in [(depth_on(&sqrt), -1.0), (sqrt, -2.0)] {
+            let out: Vec<f64> = names.iter().map(|c| flow_impact(&p, c, 1_000.0, 0.0)).collect();
+            let k = log_slope(&minutes, &out);
+            assert!((k - expected).abs() < 1e-12, "expected {expected}, got {k}");
+        }
+    }
+
+    #[test]
+    fn the_corrected_law_is_the_shipped_one_at_the_reference_liquidity() {
+        // The restatement of `order_flow_coefficient`: removing one power
+        // of depth needs a depth to remove it at, and the corrected law
+        // takes the one `order_imbalance` already assumes for a name that
+        // reports no volume. A name AT that volume is charged the same, to
+        // the bit, under every participation law.
+        let c = named(REFERENCE_DAILY_VOLUME);
+        for (label, p) in four_laws() {
+            let q = if p.order_flow_impact_law != 0.0 { law_on() } else { crate::params::PT_V16 };
+            for (b, s) in [(10.0, 0.0), (5_000.0, 1_000.0), (0.0, 25_641.0), (1e9, 3.0)] {
+                assert_eq!(
+                    flow_impact(&p, &c, b, s).to_bits(),
+                    flow_impact(&q, &c, b, s).to_bits(),
+                    "{label} at {b}/{s}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_reference_liquidity_is_the_fallback_the_participation_term_uses() {
+        // Recovered from `order_imbalance`, so the constant cannot drift
+        // from the literal it names.
+        assert_eq!(
+            order_imbalance(5_000.0, 0.0, 0.0),
+            order_imbalance(5_000.0, 0.0, REFERENCE_DAILY_VOLUME)
+        );
+        assert_ne!(
+            order_imbalance(5_000.0, 0.0, 0.0),
+            order_imbalance(5_000.0, 0.0, REFERENCE_DAILY_VOLUME * 1.01)
+        );
+    }
+
+    #[test]
+    fn the_depth_switch_rescales_and_never_reshapes_the_participation_law() {
+        // The two switches are independent. At a given name the depth law
+        // multiplies the participation term by a constant, so the clamps of
+        // the shipped participation law sit exactly where they did (just
+        // below and above 4/3 and 10) and the square-root law's knee too.
+        for avg in DEPTHS {
+            let c = named(avg);
+            let v = minute_of(&c);
+            let scale = v / (REFERENCE_DAILY_VOLUME / 390.0);
+            for base in [crate::params::PT_V16, law_on()] {
+                let on = depth_on(&base);
+                for phi in [
+                    1e-6,
+                    4.0 / 3.0 * (1.0 - 1e-9),
+                    4.0 / 3.0 * (1.0 + 1e-9),
+                    1.0,
+                    9.999,
+                    10.0,
+                    10.0 * (1.0 + 1e-9),
+                    1e6,
+                ] {
+                    let off_val = flow_impact(&base, &c, phi * v, 0.0);
+                    let on_val = flow_impact(&on, &c, phi * v, 0.0);
+                    let ratio = on_val / off_val;
+                    assert!(
+                        (ratio / scale - 1.0).abs() < 1e-14,
+                        "avg {avg} phi {phi}: ratio {ratio} against {scale}"
+                    );
+                }
+                // The shipped clamps survive the switch.
+                if base.order_flow_impact_law == 0.0 {
+                    assert_eq!(
+                        flow_impact(&on, &c, 1e-6 * v, 0.0),
+                        flow_impact(&on, &c, 4.0 / 3.0 * (1.0 - 1e-9) * v, 0.0)
+                    );
+                    assert!(
+                        flow_impact(&on, &c, 4.0 / 3.0 * (1.0 + 1e-9) * v, 0.0)
+                            > flow_impact(&on, &c, 4.0 / 3.0 * (1.0 - 1e-9) * v, 0.0)
+                    );
+                    assert_eq!(
+                        flow_impact(&on, &c, 10.0 * v, 0.0),
+                        flow_impact(&on, &c, 1e6 * v, 0.0)
+                    );
+                    assert!(flow_impact(&on, &c, 9.999 * v, 0.0) < flow_impact(&on, &c, 10.0 * v, 0.0));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn no_flow_is_positive_zero_under_every_combination() {
+        // What keeps an untraded run bit-identical with either switch on:
+        // the participation term returns `+0.0` and the depth law
+        // multiplies it by a positive finite number.
+        for (label, p) in four_laws() {
+            for avg in [0.0, 30_000.0, 1e6, 9e7] {
+                let out = flow_impact(&p, &named(avg), 0.0, 0.0);
+                assert_eq!(out.to_bits(), 0.0f64.to_bits(), "{label} at {avg}: {out}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_zero_average_volume_reads_the_reference_name_under_the_corrected_law() {
+        // The shipped law reads TWO depths and they disagree here: the
+        // participation term falls through to a million shares a day, and
+        // `liquidity_factor` takes half a per cent of the shares
+        // outstanding. The corrected law reads only the first, so a name
+        // that reports no volume is the reference name, whatever its share
+        // count.
+        let mut zero = company();
+        zero.avg_volume = 0.0;
+        for shares in [1e6, 1e8, 1e10] {
+            zero.shares_outstanding = shares;
+            for (b, s) in [(2_000.0, 0.0), (0.0, 40_000.0)] {
+                let shipped = flow_impact(&crate::params::PT_V16, &zero, b, s);
+                let corrected = flow_impact(&depth_on(&crate::params::PT_V16), &zero, b, s);
+                let reference = flow_impact(&crate::params::PT_V16, &named(REFERENCE_DAILY_VOLUME), b, s);
+                assert_eq!(corrected, reference, "{shares}");
+                let liquid = mathx::max((shares * 0.005) / 390.0, 100.0);
+                let expected = order_imbalance(b, s, 0.0)
+                    * (1.0 / liquid)
+                    * ORDER_FLOW_COEFFICIENT
+                    * INFORMED_FLOW_FRACTION;
+                assert_eq!(shipped, expected, "{shares}");
+            }
+        }
+    }
+
+    #[test]
+    fn below_the_minute_floor_every_name_is_the_floor_name() {
+        // `order_imbalance` floors the minute volume at 100 shares, which
+        // is a daily volume of 39,000. Under both depth laws a thinner name
+        // is charged as if it traded that much, so the same shares cost the
+        // same on every name below the floor.
+        for (label, p) in four_laws() {
+            let at_floor = flow_impact(&p, &named(39_000.0), 500.0, 0.0);
+            for avg in [1.0, 2_000.0, 20_000.0, 38_999.0] {
+                assert_eq!(flow_impact(&p, &named(avg), 500.0, 0.0), at_floor, "{label} at {avg}");
+            }
+        }
+        // So the corrected law's independence from depth stops at the
+        // floor: at the same TRUE participation a sub-floor name is charged
+        // less than a liquid one, because its participation is understated.
+        let on = depth_on(&crate::params::PT_V16);
+        let thin = named(10_000.0);
+        let true_minute = thin.avg_volume / 390.0;
+        let liquid = named(2_400_000.0);
+        assert!(
+            flow_impact(&on, &thin, 5.0 * true_minute, 0.0)
+                < flow_impact(&on, &liquid, 5.0 * minute_of(&liquid), 0.0)
+        );
+    }
+
+    #[test]
+    fn a_nan_average_volume_reaches_only_the_shipped_depth_law() {
+        // Refused at the Python boundary; a Rust caller can still build
+        // one. The participation term falls through a NaN to the fallback,
+        // and `liquidity_factor` propagates it. The corrected law reads
+        // only the first.
+        let mut c = company();
+        c.avg_volume = f64::NAN;
+        assert!(flow_impact(&crate::params::PT_V16, &c, 1_000.0, 0.0).is_nan());
+        let corrected = flow_impact(&depth_on(&crate::params::PT_V16), &c, 1_000.0, 0.0);
+        assert_eq!(corrected, flow_impact(&crate::params::PT_V16, &named(REFERENCE_DAILY_VOLUME), 1_000.0, 0.0));
+    }
+
+    #[test]
+    fn nan_flow_is_what_each_participation_law_already_made_of_it() {
+        // The depth law adds no NaN of its own and removes none: under the
+        // shipped participation law a NaN volume reaches the impact, under
+        // the square-root law the early return makes it zero, and the depth
+        // switch leaves both as they were. The boundary refuses NaN flow
+        // before it gets here.
+        for (label, p) in four_laws() {
+            let out = flow_impact(&p, &named(1e6), f64::NAN, 0.0);
+            if p.order_flow_impact_law == 0.0 {
+                assert!(out.is_nan(), "{label}: {out}");
+            } else {
+                assert_eq!(out, 0.0, "{label}: {out}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_flow_too_large_to_sum_stays_finite_under_every_law() {
+        // Each side finite, so the boundary accepts it, and their sum past
+        // the largest double. The square-root law used to return NaN here:
+        // the total overflowed, the raw imbalance read 0/inf, and the
+        // unbounded multiplier made that 0 * inf. A NaN reaching `s` is a
+        // NaN price.
+        let c = named(1e6);
+        for (label, p) in four_laws() {
+            for (b, s) in [(1e308, 1e308), (1.5e308, 0.5e308), (1e308, 0.0), (0.0, 1.7e308)] {
+                let out = flow_impact(&p, &c, b, s);
+                assert!(out.is_finite(), "{label} at {b}/{s}: {out}");
+            }
+            // Balanced flow is neutral at any size.
+            assert_eq!(flow_impact(&p, &c, 1e308, 1e308), 0.0, "{label}");
+        }
+        // Under the square-root law the direction survives the overflow.
+        let sqrt = law_on();
+        assert!(flow_impact(&sqrt, &c, 1.5e308, 0.5e308) > 0.0);
+        assert!(flow_impact(&sqrt, &c, 0.5e308, 1.5e308) < 0.0);
+    }
+
+    #[test]
+    fn the_corrected_law_is_monotone_in_size_and_symmetric_in_sign() {
+        // Under the square-root participation law, strictly increasing
+        // across nine decades of participation, on a thin and a mega-cap
+        // name; under the shipped one, never decreasing. Selling is the
+        // exact mirror of buying under every combination.
+        for (label, p) in four_laws() {
+            for avg in [60_000.0, 90_000_000.0] {
+                let c = named(avg);
+                let v = minute_of(&c);
+                let mut phi = 1e-4;
+                while phi < 1e5 {
+                    let (a, b) = (flow_impact(&p, &c, phi * v, 0.0), flow_impact(&p, &c, 2.0 * phi * v, 0.0));
+                    if p.order_flow_impact_law != 0.0 {
+                        assert!(b > a, "{label} at {avg}: flat between {phi} and {}", 2.0 * phi);
+                    } else {
+                        assert!(b >= a, "{label} at {avg}: falls between {phi} and {}", 2.0 * phi);
+                    }
+                    assert_eq!(
+                        flow_impact(&p, &c, 0.0, phi * v).to_bits(),
+                        (-a).to_bits(),
+                        "{label} at {avg}, phi {phi}"
+                    );
+                    phi *= 2.0;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_shipped_preset_divides_by_depth_twice() {
+        // The switch ships at 0.0 everywhere. This fails the day a preset
+        // turns it on, which is the day order-flow costs change for every
+        // caller who injects flow.
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).expect("named");
+            assert_eq!(p.order_flow_depth_law, 0.0, "{name}");
         }
     }
 

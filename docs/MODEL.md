@@ -1997,7 +1997,16 @@ which now carries only flow a caller supplies directly:
 O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac{x^{+} + x^{-}}{\max(\bar A_i/390,\ 100)},\ 10\Big)\Big)\cdot\frac{c_{OF}\,f_I}{\max\big(\max(\bar A_i,\ 0.005\,S_i)/390,\ 100\big)}
 ```
 
-(`market/factors.rs:827-833`, `market/factors.rs:1263-1276`).
+(`calculate_live_factors` and `order_imbalance` in `market/factors.rs`).
+
+The first factor is already participation, flow over the name's minute
+volume, and the last divides by a minute volume again. So at equal
+participation $O$ falls as depth, and at a fixed share count as depth
+squared. With `order_flow_depth_law` at 1 the last denominator is the fixed
+$10^6/390$ instead, the minute volume the first factor assumes for a name
+that reports no volume. Equal participation is then an equal move on every
+name above the 100-share minute floor, and a name trading a million shares a
+day is charged what it is charged at 0.
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
@@ -2009,6 +2018,7 @@ O_{i,t} = \frac{x^{+} - x^{-}}{x^{+} + x^{-}}\,\max\Big(0.2,\ 0.15\min\Big(\frac
 | | `book_resting` | 1 (0) | derived | a switch: limit orders rest with queue priority |
 | $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
+| | `order_flow_depth_law` | 0 | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
 | $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 
 ### Cash and borrowing
@@ -2362,6 +2372,7 @@ pt-v20. Each dial is 0 unless stated. Earlier presets use some of them.
 - **Self-exciting jumps** (`jump_idio_excitation`), and jumps in the market-variance shock (`jump_market_variance_share`).
 - **Smooth size and spread curves** (`size_effect_smoothness`, `spread_size_smoothness`): the step functions above are used.
 - **Square-root impact** (`order_flow_impact_law`): the clamped participation law above is used.
+- **Depth divided once** (`order_flow_depth_law`): order-flow impact divides by a name's depth twice, as in the formula above.
 - **Company volume state** (`volume_idio_persistence`, `volume_idio_sigma`).
 - **Down-market idiosyncratic suppression** (`market_idio_down_suppress`) and a beta-dependent idiosyncratic scale (`idio_sigma_beta_exponent`).
 - **VIX extras** (`vix_anchor_reversion`, `vix_innovation_sigma`, `vix_jump_intensity`, `vix_target_offset`). With `vix_level_identity` = 1, the VIX target no longer reads the business-cycle table, `vix_cycle_amplitude`, `vix_realised_vol_weight` or `market_vol_vix_anchor`, although those dials still carry values.

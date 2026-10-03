@@ -392,6 +392,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # unit interval is the registry's shape, not a claim that 0.5 means
     # half a law.
     "order_flow_impact_law": (0.0, 1.0),
+    # Two levels for the same reason: 0.0 divides by depth twice and 1.0
+    # once, and nothing between them is a law anybody measured.
+    "order_flow_depth_law": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
