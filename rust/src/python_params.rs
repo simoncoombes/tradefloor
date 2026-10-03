@@ -277,6 +277,15 @@ impl PyModelParams {
         settable_names().iter().map(|s| s.to_string()).collect()
     }
 
+    /// The switches left out of the model's digest while they are 0.0,
+    /// because at zero each one is the model that existed before it. The
+    /// preset records' `coefficient_digest` follows the same rule, so
+    /// adding one moves no fingerprint and no record.
+    #[staticmethod]
+    fn digest_silent_at_zero() -> Vec<String> {
+        crate::params::DIGEST_SILENT_AT_ZERO.iter().map(|s| s.to_string()).collect()
+    }
+
     /// Read any parameter as an attribute: `params.garch_alpha`.
     fn __getattr__(&self, name: &str) -> PyResult<f64> {
         self.inner.get(name).ok_or_else(|| {

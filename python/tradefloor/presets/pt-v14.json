@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "38f2fe898921cabe4ee335658bc76bd4d9d1ab5458860da0cef23b6fa6f7c7f6",
+  "coefficient_digest": "f101d55ca006b5bfaebf3c2ea6f671cd0013e76faeaa11f6b3f1251873e38de3",
   "coefficients": {
     "book_depth_coefficient": 0.0,
     "book_depth_exponent": 0.0,
@@ -159,7 +159,6 @@
     "opening_market_sigma": 0.0,
     "opening_mispricing_sigma": 0.0,
     "order_flow_coefficient": 50.0,
-    "order_flow_depth_law": 0.0,
     "order_flow_impact_law": 0.0,
     "overnight_variance_ratio": 0.0,
     "phase_target_range_draw": 0.0,
