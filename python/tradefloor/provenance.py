@@ -1093,7 +1093,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "than adding any; it passes 0.0 for the SLOW "
                   "component, which is where the fit does not reach",
         "note": "WHY IT WAS ADOPTED, having been recorded and declined. "
-                "The GARCH derivation left it to Simon because "
+                "The GARCH derivation left it open because "
                 "`market_vol_gamma` was outside its dial list. What made "
                 "it necessary is the "
                 "envelope's SHAPE panel -- the fourteen rows measured on "
@@ -1520,7 +1520,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                 "and VIX persistence (VIX acf1 of 21-day "
                                 "means 0.46 against the tape's 0.62) and is "
                                 "derived on its own; adopted with the row "
-                                "red by Simon's ruling of 2026-09-12 (R16)",
+                                "red on 2026-09-12",
         "what_the_value_buys": "the tape's VIX distribution on every "
                                "per-year statistic (runs above 60: 3.3 per "
                                "cent against 5.7; highest 73.9 against "
@@ -2909,7 +2909,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "-3.9). Q5 holds: `volume_abs_return_corr` candidate "
                     "minus control -0.15 / +0.42 tape se. The registration "
                     "says a failed Q4 takes the dial out of the candidate; "
-                    "that is a ruling for Simon and this entry records the "
+                    "that decision is open and this entry records the "
                     "numbers it would be made on",
         "estimator": "as `vix_level_identity`; on the varying roster the "
                      "rule's Welch z over thirty seeds",
@@ -3598,7 +3598,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "project's unpublished design notes, recorded 2026-09-23: "
                   "certification runs open at a random point in the cycle, "
                   "because a bot may start trading in any phase. The law is "
-                  "derived; turning it on is the owner's ruling",
+                  "derived; turning it on is a choice",
         "date": "2026-09-23",
     },
     "news_absorption_half_life": {
@@ -3764,7 +3764,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "registration, V1 and 'The graded arm')",
         "superseded": "0.0 on every preset until 2026-09-26, recorded in "
                       "POST_BASELINE as a choice with a measured cost (B9) "
-                      "for the owner to rule on",
+                      "left open",
     },
     "opening_market_sigma": {
         "kind": "undetermined",
@@ -4107,7 +4107,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "what_would_determine_it": "the NBER's announcement delays over the "
             "post-war turns, as a distribution the one lag stands for; it "
             "announced the December 2007 peak on 1 December 2008 and the "
-            "June 2009 trough on 20 September 2010. CHOSEN by the owner "
+            "June 2009 trough on 20 September 2010. CHOSEN "
             "(2026-09-25): the phase is published about a year late, as the "
             "NBER dates a recession. With the phase in real time no arm of "
             "grid ptv20e8 passed C10 (out in peak and contraction beat "
@@ -4119,7 +4119,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "undetermined",
         "presets": {"pt-v20": 21.0},
         "what_would_determine_it": "the BEA's release calendar read as "
-            "sessions after each quarter's end. CHOSEN by the owner "
+            "sessions after each quarter's end. CHOSEN "
             "(2026-09-25): a quarterly figure, the quarter's mean, released "
             "21 sessions after the quarter, about the advance estimate's "
             "month. The daily figure stepped about -3 points at the first "

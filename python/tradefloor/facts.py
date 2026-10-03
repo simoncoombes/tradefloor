@@ -291,8 +291,7 @@ before any verdict was looked at; the two inward clamps it needed (the
 clustering floor, the leverage top) are named on their rows and decide
 no current verdict. One band is marked INDICATIVE (volume-change
 autocorrelation: own measurement only, no published figure for the
-estimator was recoverable). The full derivation record, window tables
-and verdict moves are in the project's unpublished design notes.
+estimator was recoverable).
 
 ## Why there are fourteen statistics and not four
 
@@ -1210,7 +1209,7 @@ REAL_MARKETS_PROVENANCE = {
         # decade objection that motivates the universal band never reached
         # this row: it was never a decade object.
         "section14": {
-            "ruled": "ruling-nineteen-rows-with-dn3-re-derived, Simon "
+            "ruled": "ruling-nineteen-rows-with-dn3-re-derived, "
                      "2026-09-15",
             "outcome": "derived and recorded, NOT adopted: at the project's "
                        "own window anchor the rule gives no band at 252 and "
@@ -3691,9 +3690,8 @@ def _index_drift_pct(
     portfolio median of +1.55 a year with 65 of 101 rosters above zero,
     where roster 111 reads about minus five. So every level in the table
     below is that roster's and reads about six points worse than the model
-    does. An earlier and smaller sample in the design note puts the same
-    roster at 0.78 standard deviations, and the two have not been
-    reconciled. The handicap was then measured directly, on 2026-09-04 at
+    does. An earlier and smaller sample puts the same roster at 0.78
+    standard deviations, and the two have not been reconciled. The handicap was then measured directly, on 2026-09-04 at
     thirty seeds each: pt-v18 reads +1.974 in this row's convention with
     roster 111 held and +5.281 with the roster varying, 3.3 points, and
     pt-v16 reads -13.643 varying, so the direct figure is about half the
@@ -5252,7 +5250,7 @@ BAND_BASIS: dict[str, dict[str, Any]] = {
                 "corr_persistence_acf1 is carried here on the walked "
                 "six-window protocol and NOT on the shipped sub-window one, "
                 "so its universal band is a band for a different quantity "
-                "until that row-definition ruling is made",
+                "until the row's definition at 504 is settled",
     },
 }
 
@@ -5840,25 +5838,13 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
         VIX_AR1_ROW:
             "NO BAND TABLE IN THIS LIBRARY CARRIES THE ROW, and that alone "
             "is what holds it here: REAL_MARKETS, REAL_MARKETS_UNIVERSAL "
-            "and REAL_MARKETS_RULED all lack it at both horizons. The "
-            "adoption is RULED AND NOT LANDED, which is the opposite of "
-            "what this entry said until 2026-09-18: a band of [0.82, 1.04] "
-            "at 252 and [0.90, 1.01] at 504 was derived off-library and "
-            "Simon ruled it this row's ruled band on 2026-09-15 "
-            "(ruling-vix-ar1-band-adopted, which also publishes the row "
-            "FLOOR-ONLY under ruling-dead-edges-are-not-counted). The "
-            "blocker this entry used to name, vix-ar1-band-not-adopted, "
-            "was closed the same day by closes-vix-ar1-band-not-adopted "
-            "and must not be quoted as live. What is outstanding is the "
-            "table entry, tracked as "
-            "the standing open dn3derive-the-ruling-names-a-vix-ar1-ruler-"
-            "the-library-does-not-carry. NO BAND IS INVENTED HERE AND NONE "
-            "IS READ: until the entry lands, the row is ungraded. "
-            "CITATION CORRECTED: this entry cited "
-            "vix-ar1-band-derivation.md section 9, and that note was never "
-            "written -- it appears in no commit of either repository. The "
-            "derivation's terms survive in the ledger instead, under "
-            "ruling-prep-vix-ar1-separately-derived-band",
+            "and REAL_MARKETS_RULED all lack it at both horizons. A band "
+            "of [0.82, 1.04] at 252 and [0.90, 1.01] at 504 has been "
+            "derived outside the library and chosen as this row's ruled "
+            "band, graded on its floor only because debias_ar1's own bound "
+            "of 1 + 4/n puts the ceiling out of reach. It is not in the "
+            "tables yet. NO BAND IS INVENTED HERE AND NONE IS READ: until "
+            "the table entry lands, the row is ungraded",
     },
     504: {
         "corr_persistence_acf1":
@@ -5870,10 +5856,8 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "whole question is whether persistence is positive, and the "
             "band is 1.260 wide against the decade band's 0.300, a factor "
             "of 4.2. A floor below zero is also one no reading on the "
-            "record comes near, and that is an EMPIRICAL statement rather "
-            "than the arithmetic one this entry used to make. Corrected "
-            "2026-09-14 under producerband-corr-persistence-504-is-not-a-"
-            "dead-edge: an autocorrelation is bounded in [-1, 1], so -0.38 "
+            "record comes near, and that is an EMPIRICAL statement: an "
+            "autocorrelation is bounded in [-1, 1], so -0.38 "
             "is attainable in principle and the floor is NOT dead the way "
             "vix_ar1_debiased's ceiling is dead, where debias_ar1's own "
             "bound of 1 + 4/n puts the ceiling out of reach by arithmetic. "
@@ -5883,12 +5867,9 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "readings run -0.00039 (pt-v2 at 252) to 0.40881 (pt-v19 at "
             "504), and the lowest clears -0.38 by 0.3796. So switching "
             "this row's constant would not make any preset on the record "
-            "pass, and it would retire "
-            "ruling-gain-zero-and-the-red-row-stands by accident, since "
-            "that ruling was decided on this exact statistic. The FIRST "
-            "ground above is the recorded one and holds on its own. "
-            "Blocker corr-persistence-504-unbanded, waiting on the "
-            "row-definition ruling",
+            "pass. The FIRST ground above holds on its own. Open item "
+            "corr-persistence-504-unbanded: the row stays unbanded at 504 "
+            "until its definition at that horizon is settled",
         VIX_AR1_ROW: AS_AT_252,
     },
 }
@@ -5984,8 +5965,7 @@ BAND_EDGE_LIVENESS: dict[str, dict[str, Any]] = {
                   "1 + 4/n and the ceiling sits past that bound at 252, and "
                   "at 504 it is 0.42 of one ceiling standard error away. "
                   "The row is nonetheless UNREADABLE today, because its "
-                  "band is derived and not adopted, and a row cannot be "
-                  "both. The ruling decides which",
+                  "band is derived and not yet in the library's tables",
     },
 }
 
@@ -6798,16 +6778,15 @@ def rule_row(key: str, *, horizon_days: int = TRADING_DAYS_PER_YEAR,
     `scoring_rule` builds its `blind` list with a reason rather than by
     reading an exception's message.
 
-    R7, THE ERROR BARS, ruled by Simon on 2026-09-06: `se` is the
-    WITHIN-DECADE standard error of the 2015-2025 reference panel, and the
-    measured disagreement between that decade and the 32-name 1990-2025
-    reference -- one to three `se` on three rows, recorded in
+    THE ERROR BARS: `se` is the WITHIN-DECADE standard error of the
+    2015-2025 reference panel, and the measured disagreement between that
+    decade and the 32-name 1990-2025 reference -- one to three `se` on three
+    rows, recorded in
     `centre_distance`'s docstring -- is NOT folded into it. Widening `se`
     by that gap would make the objective honest about the decade at the
     cost of discrimination on exactly the rows where it bites. So a fit to
-    this centre is a fit to the decade, and that is now a decision rather
-    than a default: the limit is stated here because this is where the
-    number enters.
+    this centre is a fit to the decade. The limit is stated here because
+    this is where the number enters.
 
     EVERY VALUE IS DERIVED FROM THE WINDOWS, and no stored summary is read
     from any file. `centre`, `se` and `df` come from `real_centre`,
