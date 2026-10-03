@@ -156,8 +156,9 @@ DOCS_PAGES = {
     "mcp-local.html", "hosted.html", "api.html", "core-types.html",
     "evaluate.html", "api-counterfactual.html", "api-scenario.html",
     "api-integrations.html", "rl-environment.html", "parameters.html",
-    "how-prices-are-made.html", "why-pt-v20.html", "how-its-measured.html",
-    "release-notes.html", "support.html", "cite.html",
+    "how-prices-are-made.html", "default-model.html", "how-its-measured.html",
+    "release-notes.html", "support.html", "cite.html", "quickstart.html",
+    "guide-scenario.html", "guide-rl.html",
 }
 
 #: What the marketing site may be linked for besides its home page: files,
