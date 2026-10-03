@@ -280,10 +280,19 @@ class Forward:
 
 def encode(value):
     """A snapshot as JSON can carry it: byte buffers as base64 under one
-    key, tuples as lists, everything else as it is."""
+    key, a float that is not finite as its bit pattern under another, tuples
+    as lists, everything else as it is.
+
+    The bit pattern because a generator word rides the snapshot as an f64,
+    and some words are NaNs whose payload is the state. JSON writes every
+    NaN the same way."""
     import base64
+    import math
+    import struct
     if isinstance(value, bytes):
         return {"__bytes__": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, float) and not math.isfinite(value):
+        return {"__f64__": struct.pack("<d", value).hex()}
     if isinstance(value, dict):
         return {k: encode(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
@@ -294,9 +303,12 @@ def encode(value):
 def decode(value):
     """The inverse of ``encode``."""
     import base64
+    import struct
     if isinstance(value, dict):
         if set(value) == {"__bytes__"}:
             return base64.b64decode(value["__bytes__"])
+        if set(value) == {"__f64__"}:
+            return struct.unpack("<d", bytes.fromhex(value["__f64__"]))[0]
         return {k: decode(v) for k, v in value.items()}
     if isinstance(value, list):
         return [decode(v) for v in value]

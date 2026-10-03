@@ -132,23 +132,29 @@ def test_a_restored_engine_a_fork_and_a_checkpoint_continue_as_the_parent():
         assert engine.macro_fields == parent.macro_fields
 
 
-def test_a_snapshot_without_the_impulse_reseeds_it():
+def test_a_snapshot_without_the_impulse_is_refused():
+    """Every snapshot under the dial carries the impulse. One without it was
+    re-seeded from the economy it restored, which is not the impulse the
+    run it continued held, so it is refused, naming the dial."""
     on = tf.Engine(seed=6, universe=UNIVERSE, model=adjusted())
     on.run_days(MONTH + 1)
     snap = on.state_snapshot()
     del snap["economy"]["unemployment_impulse"]
     fresh = tf.Engine(seed=6, universe=UNIVERSE, model=adjusted())
-    fresh.restore_state(snap)
-    assert "unemployment_impulse" in economy(fresh)
+    with pytest.raises(tf.ValidationError, match="unemployment_adjustment_half_life"):
+        fresh.restore_state(snap)
 
 
 def test_a_restore_refuses_an_impulse_where_the_dial_is_off():
     on = tf.Engine(seed=7, universe=UNIVERSE, model=adjusted())
     snap = on.state_snapshot()
-    del snap["model_fingerprint"]
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm
+    # (2026-09-26). The fingerprint is forged to the target's to get past the
+    # model check, to the state itself.
+    target = tf.Engine(seed=7, universe=UNIVERSE, model=adjusted(0.0))
+    snap["model_fingerprint"] = target.model_fingerprint
     with pytest.raises(tf.ValidationError, match="unemployment_adjustment_half_life is 0"):
-        # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
-        tf.Engine(seed=7, universe=UNIVERSE, model=adjusted(0.0)).restore_state(snap)
+        target.restore_state(snap)
 
 
 def test_a_restore_refuses_a_non_finite_impulse():

@@ -271,26 +271,28 @@ def test_a_restore_refuses_a_state_that_does_not_fit(changes):
 
 def test_a_restore_refuses_the_state_where_the_dial_is_off():
     snap = _snap_with()
-    # Past the model check, to the state itself.
-    del snap["model_fingerprint"]
+    # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm
+    # (2026-09-26). The fingerprint is forged to the target's to get past the
+    # model check, to the state itself.
+    target = tf.Engine(seed=11, universe=UNIVERSE, model=lagged(0))
+    snap["model_fingerprint"] = target.model_fingerprint
     with pytest.raises(tf.ValidationError, match="gdp_publication_lag is 0"):
-        # pt-v20 with the dial off: pt-v20 itself sets it since its graded arm (2026-09-26); was model="pt-v20"
-        tf.Engine(seed=11, universe=UNIVERSE, model=lagged(0)).restore_state(snap)
+        target.restore_state(snap)
 
 
-def test_a_snapshot_without_the_state_reseeds_from_its_growth():
-    """A snapshot written without the state, under the dial, publishes the
-    growth it restores until the next release."""
+def test_a_snapshot_without_the_state_is_refused():
+    """A snapshot without the state, under the dial, used to publish the
+    growth it restored until the next release, which is not what the run it
+    continued published. Every snapshot under the dial carries the state, so
+    one without it is refused, naming the dial."""
     on = tf.Engine(seed=12, universe=UNIVERSE, model=lagged())
     on.pin_macro(gdp_growth=-0.02)
     on.run_days(1)
     snap = on.state_snapshot()
     del snap["economy"]["gdp_publication"]
     fresh = tf.Engine(seed=12, universe=UNIVERSE, model=lagged())
-    fresh.restore_state(snap)
-    assert fresh.macro_fields["gdp_growth"] == snap["economy"]["gdp_growth"] / 100.0
-    gdp = fresh.state_snapshot()["economy"]["gdp_publication"]
-    assert gdp["quarter"] == 0 and gdp["count"] == 1 and gdp["pending_days"] == []
+    with pytest.raises(tf.ValidationError, match="gdp_publication_lag"):
+        fresh.restore_state(snap)
 
 
 @pytest.mark.parametrize("value", [-1.0, 2.5, 2521.0, float("nan")])

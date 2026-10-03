@@ -371,10 +371,11 @@ def test_a_mid_day_fork_closes_the_day_the_same_way():
     assert fork.column("garch_variance") != fresh.column("garch_variance")
 
 
-def test_a_snapshot_without_the_day_state_still_restores():
-    # Written before the per-day accumulators were carried. Such a snapshot
-    # described a day that had not started, so that is what it restores to --
-    # refusing it would break every archived state for no gain.
+def test_a_snapshot_without_the_day_state_is_refused_by_name():
+    # A snapshot written before the per-day accumulators were carried was
+    # restored as a day that had not started, whatever day it froze. Every
+    # snapshot since 0.8.5 carries them, and a restore that fills them in
+    # cannot know what the day held, so it names them instead.
     universe = tradefloor.Universe.random(6, seed=5)
     engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
@@ -385,8 +386,8 @@ def test_a_snapshot_without_the_day_state_still_restores():
         snapshot.pop(key)
 
     restored = tradefloor.Engine(seed=1, universe=universe)
-    restored.restore_state(snapshot)
-    assert restored.prices() == engine.prices()
+    with pytest.raises(tradefloor.ValidationError, match="tick_anchor"):
+        restored.restore_state(snapshot)
 
 
 def test_the_snapshot_carries_the_open_flag():

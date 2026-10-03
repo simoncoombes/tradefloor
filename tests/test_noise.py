@@ -176,20 +176,19 @@ def test_a_snapshot_taken_with_an_overlay_restores_with_the_overlay():
     assert restored.stream_positions() == source.stream_positions()
 
 
-def test_a_snapshot_without_the_new_keys_still_restores():
-    """A snapshot written before draw addressing carries neither key; it
-    restores with counts of zero and no overlay, and says nothing else."""
+def test_a_snapshot_without_the_draw_keys_is_refused():
+    """A snapshot written before draw addressing carries neither key. It
+    used to restore with counts of zero, and with whatever overlay the
+    engine it went into held, which is a different addressed state from the
+    one it froze. Every snapshot since 0.7.0 carries both, so it is refused
+    by name."""
     source = run(fresh(), 2)
     snapshot = source.state_snapshot()
     snapshot.pop("draw_overlay")
     snapshot.pop("draw_counts")
     restored = fresh()
-    restored.restore_state(snapshot)
-    assert restored.draw_patches() == []
-    assert all(pos == (0, 0) for pos in restored.stream_positions().values())
-    run(source, 1, first=2)
-    run(restored, 1, first=2)
-    assert prices(restored) == prices(source)
+    with pytest.raises(tf.ValidationError, match="draw_counts"):
+        restored.restore_state(snapshot)
 
 
 # -- the schedule ------------------------------------------------------------
