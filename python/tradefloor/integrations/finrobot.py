@@ -1208,6 +1208,26 @@ class FinRobotAdapter:
             "mandate_version": MANDATE_VERSION,
         }
 
+    def fork_kwargs(self) -> dict[str, Any]:
+        """The constructor arguments a fork is rebuilt with.
+
+        A subclass that adds constructor arguments extends this rather than
+        overriding :meth:`fork`, as it would on the other adapters, so what
+        is shared and what is copied stays in :meth:`fork`.
+        """
+        return dict(
+            mode=self.mode, transcript=self.transcript,
+            recorder=self.recorder, prior=self.prior,
+            llm_config=self.llm_config,
+            fundamentals=self.fundamentals, objective=self.objective,
+            mandate=self.mandate, agent_config=self.agent_config,
+            every=self.every, max_participation=self.max_participation,
+            panel=self.panel, renderer=self.renderer, arm=self.arm,
+            # Passed rather than left to rebuild. It rebuilds identically
+            # from the arguments above, but a caller who supplied their own
+            # `info` would silently lose it in both arms.
+            info=self.info)
+
     def fork(self) -> "FinRobotAdapter":
         """An independent copy, for :meth:`World.fork`.
 
@@ -1224,19 +1244,11 @@ class FinRobotAdapter:
         obtained kept the override through the shared history and lost it in
         both arms. The run then completes, and the comparison it prints is
         between two agents neither of which was the one under test.
+
+        Built from :meth:`fork_kwargs`, so a subclass's own constructor
+        arguments reach the twin when it extends that method.
         """
-        twin = type(self)(
-            mode=self.mode, transcript=self.transcript,
-            recorder=self.recorder, prior=self.prior,
-            llm_config=self.llm_config,
-            fundamentals=self.fundamentals, objective=self.objective,
-            mandate=self.mandate, agent_config=self.agent_config,
-            every=self.every, max_participation=self.max_participation,
-            panel=self.panel, renderer=self.renderer, arm=self.arm,
-            # Passed rather than left to rebuild. It rebuilds identically
-            # from the arguments above, but a caller who supplied their own
-            # `info` would silently lose it in both arms.
-            info=self.info)
+        twin = type(self)(**self.fork_kwargs())
         twin.history = [list(row) for row in self.history]
         twin.record = copy.deepcopy(self.record)
         twin._decision = copy.deepcopy(self._decision)

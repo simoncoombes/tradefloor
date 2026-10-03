@@ -900,18 +900,10 @@ class _FlakyFinRobot(fr.FinRobotAdapter):
                 "scripted failure after good_for decisions")
         return json.dumps({"actions": [], "rationale": "hold"})
 
-    def fork(self):
-        # `FinRobotAdapter.fork` is hand-written, not `fork_kwargs()`-based
-        # (it does not subclass `common.FrameworkAdapter`), and its
-        # constructor call knows nothing about this subclass's extra
-        # arguments -- overriding `fork_kwargs()` here is silently never
-        # called. `super().fork()` still does the real work (a fresh
-        # `type(self)(...)`, with `history`/`record`/`_decision` copied
-        # over), so this only has to reattach what it drops.
-        twin = super().fork()
-        twin.fail_key = self.fail_key
-        twin.good_for = self.good_for
-        return twin
+    def fork_kwargs(self):
+        kwargs = super().fork_kwargs()
+        kwargs.update(fail_key=self.fail_key, good_for=self.good_for)
+        return kwargs
 
 
 def test_invariance_reports_the_actual_span_when_one_arm_stops_early():
