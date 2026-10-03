@@ -294,6 +294,22 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _scenario_fingerprint(payload: dict[str, Any]) -> str:
+    """The manifest's scenario fingerprint: the payload without `origins`.
+
+    `origins` says where a scenario's days came from (the file as written,
+    its own fingerprint and how far its days moved). That is provenance,
+    not part of the experiment, so it travels in the scenario block and
+    stays out of every fingerprint here. A run that applied a scenario
+    therefore keeps the scenario and inputs fingerprints it had before the
+    record was written, and a reader who strips the record changes neither.
+    The days the interventions actually fired on are in the shocks and
+    transmission, and those are fingerprinted.
+    """
+    return _sha(_canonical({key: value for key, value in payload.items()
+                            if key != "origins"}))
+
+
 def _f64(buf: bytearray, value: float) -> None:
     """One f64 in canonical big-endian form, NaN normalised.
 
@@ -1529,7 +1545,7 @@ class RunManifest:
             "macro": None if macro_payload is None
             else _sha(_canonical(macro_payload)),
             "scenario": None if scenario_payload is None
-            else _sha(_canonical(scenario_payload)),
+            else _scenario_fingerprint(scenario_payload),
             "strategy": strategy_fp,
             # The model rides beside the strategy: the same honesty
             # mechanism, where a shipped preset is cited by name and a
@@ -1705,7 +1721,12 @@ class RunManifest:
                     f"{name}, or the reverse. One of them was removed in "
                     "transit."
                 )
-            if part is not None and _sha(_canonical(part)) != expected:
+            if part is None:
+                continue
+            digest = (_scenario_fingerprint(part)
+                      if name == "scenario" and isinstance(part, dict)
+                      else _sha(_canonical(part)))
+            if digest != expected:
                 raise ValidationError(
                     f"the {name} in this manifest does not match its "
                     "recorded fingerprint. It was edited in transit, and "

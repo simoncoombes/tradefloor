@@ -239,6 +239,13 @@ for day in range(80):
     ...                                  # run both branches
 ```
 
+`at` in a scenario counts days from the first day it is applied, so on a
+branch it counts from the branch. Most packaged files first fire on day 50,
+which suits a fresh run. To fire one on the first day after a fork, use
+`scenario.starting_at(0)`, or `world.apply(scenario, at=0)` on a `World`.
+The gaps between its events stay the same, and the run's record keeps the
+packaged file's fingerprint and the days each event actually fired.
+
 A scenario is a file of changes to the market and the assumptions behind
 them, for controlled experiments. Each change targets a field the engine
 reads. The file keeps the shock apart from the knock-on effects you assume

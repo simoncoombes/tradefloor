@@ -131,7 +131,10 @@ ways.
 
 So `at: 0`, and nothing else. Both fingerprints are recorded, and the
 notebook checks that every shock, value and window matches the packaged
-file rather than asking you to believe it. 0.8.5 recalibrated the packaged
+file rather than asking you to believe it. A new study does not need the
+copy: `World.apply(tf.Scenario.load("liquidity_crisis"), at=0)` fires the
+packaged file on the first day after the fork and records the packaged
+fingerprint with the days it was moved by. 0.8.5 recalibrated the packaged
 file (the VIX goes three and a half times rather than two, and earnings fall
 15% and recover), so against the 0.8.5 package the check reads False, which
 is what the committed output shows. The study keeps the file it was
