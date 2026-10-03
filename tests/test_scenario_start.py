@@ -169,8 +169,7 @@ def test_the_world_records_the_packaged_fingerprint_and_the_effective_days():
     }
     assert stress.scenario().origins == (expected,)
 
-    # The manifest carries it, under the manifest's own scenario
-    # fingerprint, and reads it back.
+    # The manifest carries it and reads it back.
     manifest = stress.manifest(strategy="tests")
     doc = json.loads(manifest.to_json())
     assert doc["scenario"]["origins"] == [expected]
@@ -369,3 +368,73 @@ def test_scenario_show_takes_a_start(capsys):
 
     assert main(["scenario", "show", PACKAGED, "--start", "-1"]) == 1
     assert "negative" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# The record is provenance, and moves no fingerprint
+# ---------------------------------------------------------------------------
+
+#: The manifest fingerprints of `applied_run()` below, computed by running the
+#: same script against the tree before `origins` existed (0.8.8 plus the MCP
+#: bundle, commit 7410aec0, `World.manifest(strategy="tests").fingerprints`).
+#: The record of where a scenario's days came from must not change the
+#: identity of a run that applied it with no start given.
+FINGERPRINTS_BEFORE_ORIGINS = {
+    "inputs": "4e7b31245dcd29cb82c29cdea857b1d01ccdff8577bfbc60ec548a00f07b8e69",
+    "macro": None,
+    "model": "pt-v20",
+    "order_log":
+        "2b18dc6a1de91ad40db53f2ece40f174debf1254135af8bb2667af134d5f5fa3",
+    "scenario":
+        "cc2c4051f0569f4d5edad07f21ca5c4cd9fbb7ef92ac6f3f4848fc6325db4bc5",
+    "strategy": None,
+    "universe":
+        "1c2fb3fda17a46bb9437915758d1f9375cf6731b2946bacc38d5edca3219ec71",
+}
+
+
+def applied_run(at=None) -> World:
+    """Three shared days, a fork, a hand-built window that fires inside the
+    run and the packaged file, then five days in one call."""
+    _control, stress = forked()
+    stress.apply(tf.Scenario(name="thin").shock(
+        "market.liquidity", operation="multiply", value=0.4, at=1,
+        duration=2))
+    stress.apply(tf.Scenario.load(PACKAGED), at=at)
+    stress.run(days=5)
+    return stress
+
+
+def test_a_run_applied_with_no_start_keeps_its_manifest_fingerprints():
+    manifest = applied_run().manifest(strategy="tests")
+    assert json.loads(manifest.to_json())["scenario"]["origins"]
+    assert manifest.fingerprints == FINGERPRINTS_BEFORE_ORIGINS
+
+
+def test_stripping_the_record_leaves_every_fingerprint_where_it_was():
+    """A reader who removes `origins`, or a tool that never knew it, holds a
+    manifest that still verifies and fingerprints the same. Editing what
+    fired is still caught."""
+    text = applied_run(at=0).manifest(strategy="tests").to_json()
+    doc = json.loads(text)
+    stripped = json.loads(text)
+    del stripped["scenario"]["origins"]
+    loaded = RunManifest.from_json(json.dumps(stripped))
+    assert loaded.fingerprints == doc["fingerprints"]
+    assert loaded.scenario.origins == ()
+
+    edited = json.loads(text)
+    edited["scenario"]["shocks"][0]["at"] += 1
+    with pytest.raises(tf.ValidationError, match="scenario"):
+        RunManifest.from_json(json.dumps(edited))
+
+
+def test_a_moved_scenario_is_a_different_experiment():
+    """Its days differ, so its fingerprint does, in the scenario and in the
+    manifest; only the record of where it came from is left out."""
+    unmoved = applied_run().manifest(strategy="tests").fingerprints
+    moved = applied_run(at=0).manifest(strategy="tests").fingerprints
+    assert moved["scenario"] != unmoved["scenario"]
+    assert moved["inputs"] != unmoved["inputs"]
+    assert tf.Scenario.load(PACKAGED).starting_at(0).fingerprint != \
+        tf.Scenario.load(PACKAGED).fingerprint

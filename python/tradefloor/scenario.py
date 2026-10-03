@@ -1221,8 +1221,9 @@ class Scenario:
         Provenance, outside :attr:`fingerprint`: two scenarios that fire the
         same interventions on the same days are the same experiment
         whatever they were moved from. :meth:`to_json` carries the records,
-        so a :class:`tradefloor.RunManifest` does too, under its own
-        fingerprint.
+        so a :class:`tradefloor.RunManifest` carries them in its scenario
+        block, and leaves them out of its scenario and inputs fingerprints
+        for the same reason.
         """
         return tuple(dict(record, days=list(record["days"]))
                      for record in self._origins)
