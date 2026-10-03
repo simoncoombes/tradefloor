@@ -552,7 +552,7 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.8.7},
+  version = {0.8.8},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   doi     = {10.5281/zenodo.XXXXXXX},
@@ -566,7 +566,7 @@ the `doi` line out. [CITATION.cff](https://github.com/simoncoombes/tradefloor/bl
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.8.7,
+In the text, say which model you used, for example: "tradefloor 0.8.8,
 preset pt-v20, specified in its docs/MODEL.md". To let a reader rerun a
 result, publish its `RunManifest`: it records the version, preset, seed,
 universe, macro state and scenario, and `reproduce()` stops on a mismatch.
