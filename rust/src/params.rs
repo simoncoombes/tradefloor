@@ -18,7 +18,7 @@
 //! arithmetic: same values, same operations, same order. Rust neither
 //! reassociates nor contracts floating point under any default profile, and
 //! this crate additionally bans `mul_add` and non-`mathx` transcendentals.
-//! The one hazard §5.3 names — a `const` deriving another — is handled by
+//! The one hazard, a `const` deriving another, is handled by
 //! deriving once, in the constructor: the circuit-breaker band multipliers
 //! ([`breaker_up`](crate::params::ModelParams::breaker_up) and
 //! [`breaker_down`](crate::params::ModelParams::breaker_down)) are computed
@@ -27,7 +27,7 @@
 //! const build's known-answer digest bit for bit, and does — see
 //! `tests/test_model_params.py`.
 //!
-//! # Membership (§5.2), drawn here
+//! # Membership
 //!
 //! Four classes, and the draw-schedule rule above all: **nothing settable
 //! may change how many draws are taken or in what order.** A preset changes
@@ -45,13 +45,13 @@
 //!    may not change the model" was never the rule. "A changed model has a
 //!    different name" is.
 //! 2. **Derived bits** — `mispricing_phi` and `s_phi_tick` are carried as
-//!    V8's recorded bits and are never set directly. Overriding
+//!    recorded bits and are never set directly. Overriding
 //!    `mispricing_half_life_days` recomputes both via `mathx::pow`,
 //!    documented as deterministic-but-not-bit-identical to any recorded
-//!    constant (API §3's verbatim policy). An override equal to the shipped
+//!    constant. An override equal to the shipped
 //!    half-life keeps the recorded bits — sameness of value must mean
 //!    sameness of bits.
-//! 3. **Carried, read-only** — the rest of Appendix A's preset surface:
+//! 3. **Carried, read-only**: the rest of the preset surface:
 //!    fair-value coefficients, the economy's daily-chain constants, the
 //!    book geometry, the sector sigma table, `daily_shock_cap` and
 //!    `crisis_vix_threshold`. Visible in the dict and covered by the
@@ -59,7 +59,7 @@
 //!    threaded through their call sites, and accepting an override the
 //!    engine would ignore is exactly the fingerprint lie this type exists
 //!    to make impossible. They become settable when their chains are
-//!    threaded (the "+2–3 days" half of §5.3's estimate).
+//!    threaded.
 //! 4. **Excluded outright** — the draw-schedule surface: market hours, the
 //!    390 tick base, the calendar constants (`DAYS_PER_MONTH`,
 //!    `OIL_OPEC_INTERVAL`), the sector key set and order, the
@@ -116,58 +116,57 @@ use crate::mispricing;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelParams {
     // ── Factor structure (market/tick.rs, market/factors.rs) ────────────
-    /// Baseline daily sigma of the shared market factor. It is the anchor of
-    /// the factor's variance process and the crash amplifier's denomination.
+    /// Baseline daily sigma of the shared market factor. It anchors the
+    /// factor's variance process and is the unit the crash amplifier's
+    /// threshold is measured in.
     pub market_factor_sigma: f64,
     /// How much the sector draw's variance follows VIX, on the same
     /// `(VIX / anchor)^2` target the market factor's variance uses
     /// (`factor_vol.rs`). At 0.0 the sector sigma is static, bit-identical by
     /// branch. At 1.0 it scales fully.
     ///
-    /// MEASURED 2026-08-25 (§59, §60): a static sector sigma is the one
-    /// variance term on the tick path that does not scale with stress, so any
-    /// positive `sector_factor_sigma` raises calm volatility and leaves crisis
-    /// volatility alone, and the crisis lever falls by a tenth on pt-v3 and
-    /// pt-v6 alike (3.07x to 2.78x, 2.68x to 2.49x). This is the term that
-    /// lets sector structure exist without paying that.
+    /// A static sector sigma is the one variance term on the tick path that
+    /// does not scale with stress, so any positive `sector_factor_sigma`
+    /// raises calm volatility and leaves crisis volatility alone. Measured
+    /// with this coupling at 0.0, raising the sector sigma cuts the crisis
+    /// lever by a tenth on pt-v3 and pt-v6 alike (3.07x to 2.78x, 2.68x to
+    /// 2.49x). This coupling lets
+    /// the model carry sector structure without that cost. 0.0 on presets
+    /// before pt-v7, 0.25 on pt-v7 to pt-v10, and 1.0 from pt-v11 on.
     pub sector_vix_coupling: f64,
-    /// Daily sigma of each shared sector factor, loaded at 0.5 by every
-    /// member of the sector (`market/factors.rs`).
+    /// Daily sigma of each shared sector factor, loaded at `sector_loading`
+    /// by every member of the sector (`market/factors.rs`).
     ///
-    /// 0.002 -- pt-v1 through pt-v6, which this paragraph called "every
-    /// preset" until 2026-09-17 -- is about a quarter of one percent of a
-    /// name's daily variance: at that value the model had a market factor
-    /// and nothing else, and residual correlation after it was diagonal.
-    /// pt-v7 onward carry the larger sigma this entry argues for, and
-    /// pt-v16 to pt-v19 ship 0.008583053614. Nothing measured that until
-    /// 2026-08-25, when
-    /// `sector_excess_corr` (same-sector minus cross-sector mean pairwise
-    /// correlation) joined the panel and read 0.004 on the shipped preset
-    /// against a real band of 0.11 to 0.23, fifteen seed-sd out. The pt-v1
-    /// search had reported this parameter as a null direction, which is what
-    /// a lever looks like when the objective cannot see what it moves.
+    /// pt-v1 to pt-v6 carry 0.002, about a quarter of one percent of a
+    /// name's daily variance: at that value the model has a market factor
+    /// and nothing else, and residual correlation after it is diagonal.
+    /// pt-v7 onward carry a larger sigma, and pt-v16 to pt-v20 ship
+    /// 0.008583053614. On the 0.002 setting `sector_excess_corr`
+    /// (same-sector minus cross-sector mean pairwise correlation) reads
+    /// 0.004 against a real band of 0.11 to 0.23, fifteen seed-sd out.
     ///
-    /// MEASURED, thirty seeds, pt-v3 base, 252 days: monotone and roughly
-    /// quadratic in sigma; 0.012 puts `sector_excess_corr` at 0.155, inside
-    /// its band, with no other panel statistic leaving its own; 0.020
-    /// overshoots the band and drops kurtosis through its floor. Two costs the
-    /// panel does not show: the crisis volatility lever falls from 3.07x to
-    /// 2.78x because the added variance is not VIX-coupled, and kurtosis
-    /// thins by about 0.3 seed-sd at 504 days. And above the crisis
-    /// threshold the blend in `market/tick.rs` replaces the sector draw with
-    /// the market draw, so whatever this is set to, sector structure reads
-    /// zero at VIX 45. Raising it is an era boundary.
+    /// Measured on thirty seeds, pt-v3 base, 252 days: `sector_excess_corr`
+    /// is monotone and roughly quadratic in sigma. 0.012 puts it at 0.155,
+    /// inside its band, with no other panel statistic leaving its own, and
+    /// 0.020 overshoots the band and drops kurtosis through its floor. The
+    /// panel does not show two costs. The crisis volatility lever falls from
+    /// 3.07x to 2.78x unless `sector_vix_coupling` is on, and kurtosis
+    /// thins by about 0.3 seed-sd at 504 days. Above the crisis threshold
+    /// the blend in `market/tick.rs` replaces the sector draw with the
+    /// market draw, so sector structure reads zero at VIX 45 whatever this
+    /// is set to.
     pub sector_factor_sigma: f64,
-    /// How hard a name loads onto its own sector's factor. 0.5 on every
-    /// preset before this dial and bit-identical (§108).
+    /// How hard a name loads on its own sector's factor, as a multiplier on
+    /// the sector draw. 0.5 on pt-v1 to pt-v12; pt-v19 and pt-v20 ship 0.6.
     ///
-    /// It was the literal 0.5 for every member of every sector. A name's
-    /// exposure to the MARKET varies by its beta; its exposure to its own
-    /// industry did not vary at all, which is the last homogeneous loading
-    /// in the factor structure.
+    /// On its own this is one loading shared by every member of every
+    /// sector. A name's exposure to the market varies with its beta, and
+    /// `sector_loading_beta_slope` gives its exposure to its own industry
+    /// the same kind of spread.
     pub sector_loading: f64,
-    /// How much a name's sector loading follows its market beta. Zero on
-    /// every preset before this dial and bit-identical.
+    /// How much a name's sector loading follows its market beta. 0.0 on
+    /// presets before pt-v15, which gives every member the same loading;
+    /// pt-v16 onward ship 0.7.
     ///
     /// At `s` the loading is `sector_loading * (1 + s * (beta - 1))`, so a
     /// high-beta name loads harder on its industry and a defensive one
@@ -175,80 +174,76 @@ pub struct ModelParams {
     /// reuses a per-name attribute the universe already carries, so it needs
     /// no RNG stream and cannot move the draw schedule.
     ///
-    /// This is cross-sectional DISPERSION in sector exposure, which the
-    /// model has never had. `sector_excess_corr` is a mean over pairs, so a
-    /// fixed loading makes every same-sector pair identically exposed; real
-    /// industries contain pure plays and conglomerates.
+    /// This gives sector exposure a cross-sectional spread. `sector_excess_corr`
+    /// is a mean over pairs, so a fixed loading makes every same-sector pair
+    /// identically exposed, while real industries contain pure plays and
+    /// conglomerates.
     pub sector_loading_beta_slope: f64,
     /// How far the crisis blend's market injection is decoupled from the
-    /// market factor's own magnitude. Zero on every preset before this dial
-    /// and bit-identical.
+    /// market factor's own magnitude, from 0.0 (fully coupled) to 1.0 (fully
+    /// decoupled). 0.0 on every shipped preset.
     ///
     /// The injection is `source * gain * crisis_spike * market_factor`, and
-    /// at a held VIX the spike is pinned at [`crisis_blend_cap`](Self::crisis_blend_cap) (§63), so
-    /// the ONLY thing that varies between seed blocks is `market_factor`'s
-    /// magnitude — which is the market variance level, which is what GARCH
-    /// persistence governs.
+    /// at a held VIX the spike is pinned at
+    /// [`crisis_blend_cap`](Self::crisis_blend_cap), so the only thing that
+    /// varies between seed blocks is `market_factor`'s magnitude. That is
+    /// the market variance level, which GARCH persistence governs.
     ///
-    /// That is the mechanical reason crisis co-movement's across-block RANGE
-    /// tracks persistence at rho +0.85, and why every attempt to tighten the
-    /// range has had to lower persistence and pay for it in the 504-day
-    /// panel. Round 79 measured that trade across a 4x4 grid and found no
-    /// cell escaping it: the range is bought with panel blocks.
+    /// So crisis co-movement's across-block range tracks persistence at rho
+    /// +0.85, and tightening the range by the existing dials means lowering
+    /// persistence and paying for it in the 504-day panel. A 4x4 grid over
+    /// that trade found no cell escaping it.
     ///
     /// At `d` the injection is scaled by `|market_factor / baseline|^-d`, so
     /// at 1.0 its magnitude no longer depends on how large the market factor
     /// happens to be and the crisis correlation it produces stops inheriting
-    /// the variance level. The baseline is [`market_factor_sigma`](Self::market_factor_sigma) at tick
-    /// scale, the same normaliser `crash_amplifier` already uses, so
-    /// "ordinary" means the same thing in both places.
+    /// the variance level. The baseline is
+    /// [`market_factor_sigma`](Self::market_factor_sigma) at tick scale, the
+    /// same normalizer `crash_amplifier` already uses, so "ordinary" means
+    /// the same thing in both places.
     ///
-    /// This is the mechanism round 79 said the next gain on this axis would
-    /// need: one that decouples the co-movement spread from GARCH
-    /// persistence rather than another search over the dials that exist.
-    /// Whether it does so at a price worth paying is a measurement, and it
-    /// ships inert until that measurement exists.
+    /// Whether it narrows the co-movement spread at an acceptable cost has
+    /// not been measured, and no preset turns it on.
     pub crisis_blend_variance_damp: f64,
-    /// Gain on the QE valuation channel. 1.0 on every preset before this
-    /// dial and bit-identical.
+    /// Gain on the QE valuation channel, where the target P/E takes
+    /// `1 + qe_pe_gain * qe_pe_boost`. 1.0 on pt-v1 to pt-v15; pt-v16 onward
+    /// ship 0.0, which turns the channel off.
     ///
-    /// `qe_pe_boost` reaches the target P/E as `1 + qe_pe_boost`, and alone
-    /// among the model's macro channels it has no gain between the input and
-    /// the response — `garch_vix_coupling`, `jump_vix_coupling`,
-    /// `sector_vix_coupling` and `market_vol_vix_coupling` all exist.
+    /// Every other macro channel has a gain between input and response
+    /// (`garch_vix_coupling`, `jump_vix_coupling`, `sector_vix_coupling` and
+    /// `market_vol_vix_coupling`), and at 1.0 this one has none.
     ///
-    /// Round 76 measured why that matters. Freezing each macro channel of
-    /// the driven test in turn, the VIX channel alone produces a ratio of
-    /// 1.136 against real AAPL and the full four produce 1.394; `qe_pe_boost`
-    /// carries about 0.25 of that 0.39 excess, more than VIX's own 0.14, and
-    /// the policy channel contributes nothing. The response is convex, so
-    /// halving the amplitude removes 68% of the contribution: a gain near
-    /// 0.5 would move the driven ratio from 1.394 to 1.222.
+    /// Freezing each macro channel of the driven test in turn shows why it
+    /// matters. The VIX channel alone produces a ratio of 1.136 against real
+    /// AAPL and the full four produce 1.394. `qe_pe_boost` carries about
+    /// 0.25 of that 0.39 excess, more than VIX's own 0.14, and the policy
+    /// channel contributes nothing. The response is convex, so halving the
+    /// amplitude removes 68% of the contribution: a gain near 0.5 would move
+    /// the driven ratio from 1.394 to 1.222.
     ///
-    /// **A caveat that belongs with the dial, not only in the record.** The
-    /// `qe_pe_boost` series the driven test supplies is not measured
+    /// The `qe_pe_boost` series the driven test supplies is not measured
     /// quantitative easing. `gate_pick._covid_inputs` derives it as the S&P
     /// against its own 200-day EMA, clamped to +/-0.35. A gain calibrated
     /// against that proxy encodes the proxy's amplitude as if it were the
-    /// model's physics. The dial is a real gap in the model — every other
-    /// channel has one — but any value fitted to the current driven test
-    /// carries that qualification with it.
+    /// model's physics, so any value fitted to the current driven test
+    /// carries that qualification.
     pub qe_pe_gain: f64,
     /// Gain on the QE stock channel: the target P/E takes
     /// `+ qe_pe_stock_gain * ln(qe_assets_ratio)`, concave in the level of
-    /// holdings, zero at the neutral baseline. 0.0, which every preset
-    /// carried when the dial shipped, is bit-inert. The flow channel above
-    /// it is linear in monthly purchases and overshoots when fed the
-    /// measured series, but this is the formulation that can take real data.
-    /// See `corpus/qe` in the design record for the measured Fed series and
-    /// the -0.485 proxy anticorrelation that motivated it.
+    /// holdings and zero at the neutral baseline. 0.0 on every shipped
+    /// preset, where it has no effect.
+    ///
+    /// The flow channel (`qe_pe_gain`) is linear in
+    /// monthly purchases and overshoots when fed the measured Fed series.
+    /// This form can take real holdings data.
     pub qe_pe_stock_gain: f64,
-    /// Scale on the per-name idiosyncratic GARCH sigma, which is the funding
-    /// side of the factor-variance reallocation. Bit-inert at 1.0.
+    /// Multiplier on every name's idiosyncratic GARCH sigma. 1.0 leaves it
+    /// unscaled; shipped presets run 0.51 to 0.84, and pt-v16 onward ship
+    /// 0.5125981926.
     pub idio_sigma_scale: f64,
     /// How strongly a name's idiosyncratic volatility follows its market
-    /// beta, as an exponent. Zero on every preset before this dial and
-    /// bit-identical.
+    /// beta, as an exponent. 0.0 on every shipped preset, which gives every
+    /// name the same scale.
     ///
     /// At `k` the scale is `idio_sigma_scale * beta^k`, bounded by
     /// [`IDIO_BETA_BOUNDS`](crate::market::factors::IDIO_BETA_BOUNDS). Like
@@ -257,74 +252,68 @@ pub struct ModelParams {
     /// fresh one, so it costs no RNG stream and cannot move the draw
     /// schedule.
     ///
-    /// It exists because `idio_sigma_scale` is the last homogeneous term in
-    /// a name's volatility. Cap size varies it through
-    /// `cap_size_multiplier` and GARCH varies it through each name's own
-    /// conditional variance, but the SCALE itself is one number for every
-    /// name in the roster. Real rosters disperse considerably more: over ten
-    /// non-overlapping 252-day windows of the forty-name reference panel the
-    /// interquartile ratio of annualised name volatility runs 1.273 to
-    /// 1.486, where pt-v12 averages 1.205 across thirty seeds. That is a
-    /// dispersion gap, not a level gap, and no dial that moves every name
-    /// together can close it.
+    /// `idio_sigma_scale` is otherwise the last homogeneous term in a name's
+    /// volatility. Cap size varies volatility through `cap_size_multiplier`
+    /// and GARCH varies it through each name's own conditional variance, but
+    /// the scale itself is one number for every name in the roster. Real
+    /// rosters disperse more: over ten non-overlapping 252-day windows of
+    /// the forty-name reference panel the interquartile ratio of annualized
+    /// name volatility runs 1.273 to 1.486, where pt-v12 averages 1.205
+    /// across thirty seeds. That is a dispersion gap with the level right,
+    /// and no dial that moves every name together can close it.
     ///
-    /// An exponent rather than the linear `1 + s(beta - 1)` this dial was
-    /// first built as. The linear form has a wall: it drives any name with
-    /// beta below `1 - 1/s` to exactly zero volatility, and on the certified
-    /// roster that starts at `s` near 2 -- before the form reaches the
-    /// bottom of the real range, which it never did. `beta^k` is positive
-    /// for every positive beta, so it disperses without deleting names.
+    /// It is an exponent because the linear form `1 + s(beta - 1)` drives
+    /// any name with beta below `1 - 1/s` to exactly zero volatility, and on
+    /// the certified roster that starts at `s` near 2, before the form
+    /// reaches the bottom of the real range. `beta^k` is positive for every
+    /// positive beta, so it disperses without deleting names.
     pub idio_sigma_beta_exponent: f64,
-    /// Order-flow impact coefficient, before the informed fraction.
+    /// Order-flow impact coefficient: the scale of the price move that
+    /// injected order flow causes, before `informed_flow_fraction` splits it.
+    /// 50.0 on every shipped preset.
     pub order_flow_coefficient: f64,
-    /// Which participation law the order-flow impact multiplier follows.
+    /// Which participation law the order-flow impact multiplier follows, a
+    /// switch. 0.0, on every shipped preset, is the clamped linear law; 1.0
+    /// is linear up to a knee and a square root above it.
     ///
-    /// At 0.0, the shipped law unchanged: the multiplier is
-    /// `max(0.2, min(participation, 10) * 0.15)`. At 1.0 it is
-    /// `0.15 * participation` up to the knee at ten and
-    /// `1.5 * sqrt(participation / 10)` above it.
+    /// At 0.0 the multiplier is `max(0.2, min(participation, 10) * 0.15)`.
+    /// At 1.0 it is `0.15 * participation` up to the knee at ten and
+    /// `1.5 * sqrt(participation / 10)` above it. The zero case is a branch,
+    /// so presets at 0.0 reproduce bit for bit.
     ///
-    /// A BRANCH at zero rather than a blend, so every preset that predates
-    /// this dial is bit-identical instead of owing anything to an argument
-    /// about arithmetic on a signed zero.
+    /// Participation is a tick's total order volume over the name's average
+    /// minute volume, which is its average daily volume over 390, the
+    /// minutes in a session. That is the only rate this dial touches, and
+    /// its clock is the trading day. The 365-day economy never enters here.
     ///
-    /// THE CLOCK. Participation is a tick's total order volume over the
-    /// name's average MINUTE volume, which is its average DAILY volume over
-    /// 390, the minutes in a session. That is the only rate this dial
-    /// touches and its clock is the trading day, not the calendar one. The
-    /// 365-day economy never enters here.
+    /// The law at 0.0 has three regimes. The floor and the linear term meet
+    /// at exactly 4/3, because 0.15 times 4/3 is 0.2, so the multiplier is
+    /// the linear law clamped at both ends. Its elasticity in participation
+    /// is 0 below 4/3, 1 between 4/3 and 10, and 0 again above 10.
     ///
-    /// WHAT IS WRONG WITH THE SHIPPED LAW: it has three regimes, not two.
-    /// The floor and the linear term meet at exactly 4/3, because 0.15
-    /// times 4/3 is 0.2, so the shipped multiplier is the linear law
-    /// clamped at BOTH ends. Its elasticity in participation is 0 below
-    /// 4/3, 1 between 4/3 and 10, and 0 again above 10. The reported defect
-    /// was the ceiling; the floor is the same defect at the other end.
-    ///
-    /// WHAT THE MEASURED LAW IS. Below the knee, linear: Cont, Kukanov and
+    /// The measured law is linear below the knee: Cont, Kukanov and
     /// Stoikov (Journal of Financial Econometrics 12(1) 47-88, 2014) find
     /// price change over short intervals linear in order-flow imbalance
     /// with slope inversely proportional to depth, which is this function's
-    /// scale exactly. Above it, one half: Toth, Lemperiere, Deremble, de
-    /// Lataillade, Kockelkoren and Bouchaud (Physical Review X 1, 021006,
-    /// 2011) give the square root for orders large against available
-    /// volume, and Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62, 2005)
-    /// measure 0.6 on the same object. The two regimes are one law rather
-    /// than two findings to reconcile: Cont et al. derive the square root
-    /// from their own linear model by a scaling argument, in their own
-    /// abstract.
+    /// scale exactly. Above it the exponent is one half: Toth, Lemperiere,
+    /// Deremble, de Lataillade, Kockelkoren and Bouchaud (Physical Review X
+    /// 1, 021006, 2011) give the square root for orders large against
+    /// available volume, and Almgren, Thum, Hauptmann and Li (Risk 18(7)
+    /// 58-62, 2005) measure 0.6 on the same object. Cont et al. derive the
+    /// square root from their own linear model by a scaling argument, so
+    /// the two regimes are one law.
     ///
-    /// NO NEW CONSTANT, WHICH IS THE POINT. 0.15 and 10 are the numbers
-    /// already in the source. The knee does not move, the two branches
-    /// agree at 1.5 where they meet, and the band between 4/3 and 10 is
-    /// unchanged to the bit. Only the two clamped tails differ and neither
-    /// carries a coefficient anyone could tune.
+    /// It adds no constant. 0.15 and 10 are the numbers already in the
+    /// source, the knee does not move, the two branches agree at 1.5 where
+    /// they meet, and the band between 4/3 and 10 is unchanged to the bit.
+    /// Only the two clamped tails differ, and neither carries a coefficient
+    /// anyone could tune.
     ///
-    /// WHAT IT DOES NOT CLAIM. It does not restate the DEPTH exponent.
-    /// `calculate_live_factors` multiplies this by `liquidity_factor`,
-    /// which divides by the same per-minute volume a second time, so impact
-    /// still falls as depth squared where the cited law gives depth. That
-    /// is a separate defect, issue #182, and this dial does not touch it.
+    /// It does not restate the depth exponent. `calculate_live_factors`
+    /// multiplies this by `liquidity_factor`, which divides by the same
+    /// per-minute volume a second time, so impact still falls as depth
+    /// squared where the cited law gives depth. That is a separate defect,
+    /// issue #182, and this dial does not touch it.
     ///
     /// It also changes nothing in a run that injects no order flow.
     /// `TickInputs.order_volumes` is the empty slice at every construction
@@ -332,82 +321,76 @@ pub struct ModelParams {
     /// imbalance is the literal `0.0`, whose product with either multiplier
     /// is `+0.0`.
     pub order_flow_impact_law: f64,
-    /// Permanent (information) share of order-flow impact.
+    /// Share of order-flow impact that is permanent (information), from 0 to
+    /// 1. 0.35 on every shipped preset.
     pub informed_flow_fraction: f64,
     /// How fast endogenous inflation reverts toward its 2% target each
-    /// month, as a fraction of the gap.
+    /// month, as a fraction of the gap. 0.55 on every shipped preset, a
+    /// half-life under a month.
     ///
-    /// Shipped 0.55, the hard-coded value every preset ran on: a half-life
-    /// under a month. Promoted to a dial on 2026-08-25 (calibration record
-    /// §65) because the one coefficient sets both how persistent inflation
-    /// is and how far it can wander, and the endogenous economy reaches
-    /// neither the persistence (monthly acf1 0.936 against real CPI's
-    /// 0.978, FRED CPIAUCSL 2015-2025) nor the dispersion (sd 1.23 against
-    /// 2.18; peak 4.1% against 9.0%) of the real series. Lower is more
-    /// persistent and wider. Nothing else in the economy is touched; at
-    /// 0.55 every preset reproduces bit for bit.
+    /// The one coefficient sets both how persistent inflation is and how
+    /// far it can wander. At 0.55 the endogenous economy reaches neither the
+    /// persistence (monthly acf1 0.936 against real CPI's 0.978, FRED
+    /// CPIAUCSL 2015-2025) nor the dispersion (sd 1.23 against 2.18; peak
+    /// 4.1% against 9.0%) of the real series. Lower is more persistent and
+    /// wider. Nothing else in the economy is touched.
     pub inflation_reversion: f64,
-    /// The hard ceiling on endogenous inflation, in percent.
+    /// The hard ceiling on endogenous inflation, in percent. 6.0 on every
+    /// shipped preset.
     ///
-    /// Shipped 6.0, the clamp every preset ran under. Promoted with
-    /// `inflation_reversion` (§65): once the reversion is loosened enough
-    /// to give inflation its real dispersion, the series sits on this clamp
-    /// where the real one reached 9.0% in June 2022 (FRED CPIAUCSL). At 6.0
-    /// every preset reproduces bit for bit. The floor stays at -1.0.
+    /// Once `inflation_reversion` is loosened
+    /// enough to give inflation its real dispersion, the series sits on this
+    /// clamp where the real one reached 9.0% in June 2022 (FRED CPIAUCSL).
+    /// The floor is `inflation_floor`.
     pub inflation_ceiling: f64,
-    /// The hard floor on endogenous inflation, in percent.
+    /// The hard floor on endogenous inflation, in percent. -1.0 on every
+    /// shipped preset.
     ///
-    /// Shipped -1.0, the clamp every preset ran under. Promoted with the
-    /// ceiling (§65): with the reversion loosened to the real dispersion the
-    /// series sits on this floor at every setting, where real CPI
-    /// year-on-year bottomed at -0.2 in 2015-2025 and -2.0 in 2009 (FRED
-    /// CPIAUCSL). At -1.0 every preset reproduces bit for bit.
+    /// With the reversion loosened to the real dispersion the series sits on
+    /// this floor at every setting, where real CPI year-on-year bottomed at
+    /// -0.2 in 2015-2025 and -2.0 in 2009 (FRED CPIAUCSL).
     pub inflation_floor: f64,
-    /// Weight of sector-scoped news on a member name (§5.4 promotion). Daily
-    /// probability that a company generates its own news, and the standard
-    /// deviation of that news's price impact. Both zero on every preset
-    /// before this dial, bit-identically (§101).
+    /// Daily probability that a company generates its own news event. 0.0 on
+    /// presets before pt-v11, which turns endogenous news off; pt-v11 onward
+    /// ship 0.05.
     ///
-    /// The news machinery existed and never fired before this dial, which
-    /// is the state the rest of this paragraph describes; pt-v11 onward
-    /// ship 0.05 here, with a sigma of 0.03 falling to 0.01751004376 at
-    /// pt-v16. News is caller-supplied: `SessionRequest.news` is a slice
-    /// the engine never filled, and the only populated path is
-    /// `tradefloor.replay`, which feeds
-    /// a recorded log's news back in. So `company_news` contributed exactly
-    /// zero in every simulation the panel measures, 0 nonzero day-cells out
-    /// of 30240 at every pinned VIX (§85), and `news_sector_weight`,
-    /// `news_market_weight` and the two peer weights could not move any
-    /// certified statistic.
+    /// At 0.0 the only news in a run is what the caller supplies:
+    /// `SessionRequest.news` is a slice the engine never fills, and the only
+    /// populated path is `tradefloor.replay`, which feeds a recorded log's
+    /// news back in. So in a free simulation `company_news` is exactly zero
+    /// (0 nonzero day-cells out of 30240 at every pinned VIX), and
+    /// `news_sector_weight`, `news_market_weight` and the two peer weights
+    /// move no certified statistic.
     ///
-    /// That left the jump process as this market's only idiosyncratic
-    /// shock, which this file already calls the earnings-surprise channel.
-    /// A jump lands on one name and reaches no other. Real earnings
-    /// surprises transfer: one cloud company's miss moves its peers.
-    /// Switching this on gives sector co-movement an ENDOGENOUS contagion
-    /// route, where before pt-v11 it was entirely exogenous, a per-tick
-    /// sector draw
-    /// plus market beta and nothing that travels between members.
+    /// That leaves the jump process as the market's only idiosyncratic
+    /// shock, which this file calls the earnings-surprise channel. A jump
+    /// lands on one name and reaches no other. Real earnings surprises
+    /// transfer: one cloud company's miss moves its peers. Switching this on
+    /// gives sector co-movement an endogenous contagion route. Without it,
+    /// co-movement is entirely exogenous, a per-tick sector draw plus market
+    /// beta, and nothing travels between members.
     pub endogenous_news_intensity: f64,
     /// Standard deviation of an endogenous news event's price impact, in the
-    /// units `NewsEvent::price_impact` carries.
+    /// units `NewsEvent::price_impact` carries. pt-v11 ships 0.03 and pt-v16
+    /// onward ship 0.01751004376.
     pub endogenous_news_sigma: f64,
     /// Weight on sector-wide news, an event tagged with a sector and no
     /// company. It is distinct from peer transfer, which is one named
     /// company's news reaching another. This is news about the industry
     /// itself.
     pub news_sector_weight: f64,
-    /// Weight of market-wide news on every name (§5.4 promotion).
+    /// Weight of market-wide news on every name. 0.3 on every shipped
+    /// preset.
     pub news_market_weight: f64,
     /// Weight of one company's good news on its sector peers. This is the
     /// information-transfer channel.
     ///
-    /// Before this, a company-tagged event moved only the company it named.
+    /// Without it, a company-tagged event moves only the company it names.
     /// The news dispatch is an if/else-if chain whose sector branch requires
-    /// `company_id.is_none()`, so an earnings beat at one cloud name reached
-    /// no other cloud name, in either direction. Sector co-movement existed
-    /// but arrived entirely as exogenous shared shocks — a per-tick sector
-    /// factor draw and market beta — never as contagion from a member.
+    /// `company_id.is_none()`, so an earnings beat at one cloud name reaches
+    /// no other cloud name, in either direction, and sector co-movement
+    /// arrives only as exogenous shared shocks (a per-tick sector factor
+    /// draw and market beta).
     ///
     /// Real markets transfer: a surprise at one name moves its close
     /// competitors, typically at a fraction of the announcer's move (Foster
@@ -415,9 +398,9 @@ pub struct ModelParams {
     /// because `cross_sectional_corr` is unconditional and dominated by the
     /// market factor, while transfer is a conditional, event-time effect.
     ///
-    /// 0.0 means no transfer, which is every preset before pt-v4, and the
-    /// branch is skipped entirely at zero rather than adding `0.0 * impact`
-    /// — so it is bit-identical when off, not merely numerically close.
+    /// 0.0 means no transfer, as on presets before pt-v11; pt-v11 onward
+    /// ship 0.05. The branch is skipped entirely at zero instead of adding
+    /// `0.0 * impact`, so it is bit-identical when off.
     pub news_peer_weight: f64,
     /// Weight of one company's bad news on its sector peers.
     ///
@@ -429,38 +412,36 @@ pub struct ModelParams {
     ///
     /// Applies when the event's price impact is negative. 0.0 is inert.
     pub news_peer_weight_down: f64,
-    /// How much harder news transfers to a peer in a crisis. Zero on every
-    /// preset before this dial and bit-identical (§104, §105).
+    /// How much harder news transfers to a peer in a crisis. 0.0 on presets
+    /// before pt-v11; pt-v11 onward ship 8.0.
     ///
-    /// The peer weights are constants, so contagion ran as hard in a quiet
-    /// July as in March 2020. Measured, that is what made endogenous news
-    /// unusable: calm-market sector excess is already in band at +0.166
-    /// against a 0.11-to-0.22 ceiling, and constant transfer pushed it to
-    /// +0.256 at both horizons in exchange for the crisis figure that was
-    /// wanted. A mechanism that cannot tell a crisis from a Tuesday cannot
-    /// be aimed at one.
+    /// The peer weights are constants, so without this coupling contagion
+    /// runs as hard in a quiet July as in March 2020. Measured, that makes
+    /// endogenous news unusable: calm-market sector excess is already in
+    /// band at +0.166 against a 0.11-to-0.22 ceiling, and constant transfer
+    /// pushes it to +0.256 at both horizons in exchange for the crisis
+    /// figure that was wanted.
     ///
     /// At `c` the peer weight becomes `base * (1 + c * crisis_spike)`. The
-    /// spike is ZERO below `crisis_vix_threshold`, so a calm market is
-    /// untouched at ANY coupling and only the crisis moves. Real
+    /// spike is zero below `crisis_vix_threshold`, so a calm market is
+    /// untouched at any coupling and only the crisis moves. Real
     /// information contagion works this way: when one bank misses, the
     /// market re-reads every other bank, and it does that harder in a panic.
     pub news_peer_vix_coupling: f64,
     /// How fast the market prices an endogenous news event, as the half-life
-    /// in ticks (minutes) of the fast part of its move. 0.0, which every
-    /// preset through pt-v18 carries, is the straight line that has always
-    /// stood. pt-v19 ships 0.6 since its fifth composition (2026-09-23).
+    /// in ticks (minutes) of the fast part of its move. 0.0, on every preset
+    /// through pt-v18, spreads the move in a straight line over the session;
+    /// pt-v19 and pt-v20 ship 0.6.
     ///
-    /// # The defect
+    /// # Why
     ///
-    /// An event drawn at `open_market` adds `price_impact / 390` on every
-    /// tick of its day, so its move lands in a straight line across the
-    /// session: 5% of it by tick 30, half by lunch, all of it by the close.
-    /// An agent that reads the headline at tick 30 and trades its direction
-    /// earned about +120bp an event on pt-v19, 82% of the time (measured
-    /// for the trading session server's headlines, which now live in their
-    /// own repository). Real prices take in firm news in minutes,
-    /// so that is an edge a bot would learn here and lose with money.
+    /// At 0.0 an event drawn at `open_market` adds `price_impact / 390` on
+    /// every tick of its day, so its move lands in a straight line across
+    /// the session: 5% of it by tick 30, half by lunch, all of it by the
+    /// close. An agent that reads the headline at tick 30 and trades its
+    /// direction earns about +120 bp an event, 82% of the time. Real prices
+    /// take in firm news in minutes, so that is an edge a bot would learn
+    /// here and lose with money.
     ///
     /// # The profile
     ///
@@ -477,7 +458,7 @@ pub struct ModelParams {
     /// Caller-supplied news (`tick(news=...)`, `run_session(news=...)`) is
     /// not reshaped. Off the regular session the profile prices nothing.
     ///
-    /// # The derived values (not adopted by any preset)
+    /// # The shipped values
     ///
     /// Half-life 0.6 ticks, drift share 0.12, drift half-life 42 ticks,
     /// with `news_quote_revision` 1.0. Christensen, Timmermann and Veliyev
@@ -503,280 +484,310 @@ pub struct ModelParams {
     pub news_absorption_half_life: f64,
     /// The share of an endogenous news event's move that arrives as
     /// post-news drift, after the fast part: `d` in
-    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0, which
-    /// every preset through pt-v18 carries, is no drift part. Read only with
-    /// that dial off zero. pt-v19 ships 0.12 since its fifth composition.
+    /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0, on every
+    /// preset through pt-v18, is no drift part; pt-v19 and pt-v20 ship 0.12.
+    /// Read only with that dial off zero.
     pub news_absorption_drift_share: f64,
     /// The half-life in ticks of the post-news drift part, `h_d` in
     /// [`ModelParams::news_absorption_half_life`]'s profile. 0.0 lands the
-    /// drift share in a straight line over the session. Read only with
-    /// `news_absorption_drift_share` off zero.
+    /// drift share in a straight line over the session; pt-v19 and pt-v20
+    /// ship 42.0. Read only with `news_absorption_drift_share` off zero.
     pub news_absorption_drift_half_life: f64,
-    /// Whether the market maker re-quotes on public news. 0.0, which every
-    /// preset through pt-v18 carries, quotes the book around the last print
-    /// (pt-v19 re-quotes, 1.0, since its fifth composition), so a news move
-    /// in the model price reaches the tape only as fast as the tick's flow
-    /// can walk the book. 1.0 quotes it around the last print moved by the
-    /// tick's news term (`company_news / 390` as applied), the way dealers
-    /// revise quotes on a public announcement without waiting for a trade. A
-    /// switch. See `market::tick`, the settlement phase.
+    /// Whether the market maker re-quotes on public news, a switch. 0.0, on
+    /// every preset through pt-v18, quotes the book around the last print;
+    /// pt-v19 and pt-v20 ship 1.0.
+    ///
+    /// At 0.0 a news move in the model price reaches the tape only as fast
+    /// as the tick's flow can walk the book. 1.0 quotes it around the last
+    /// print moved by the tick's news term (`company_news / 390` as
+    /// applied), the way dealers revise quotes on a public announcement
+    /// without waiting for a trade. See `market::tick`, the settlement phase.
     pub news_quote_revision: f64,
-    /// Where the market maker centres its book, as a weight on the model
-    /// price. 0.0, which every preset through pt-v19 carries, quotes around
-    /// the last print (moved by the tick's news term when
-    /// `news_quote_revision` is on), so the print chases the model price at
-    /// about a half-spread a tick and the maker's inventory skew carries it
-    /// past: on pt-v19 the print sits about 37 bp (sd) off the model price
-    /// in every liquidity bucket, and 65-minute returns carry a lag-one
-    /// autocorrelation of -0.135 against a Roll spread 5.8x the quoted one
-    /// (the mean-reversion investigation of 2026-09-24).
-    /// 1.0 quotes around the tick's model price, the way dealers revise
-    /// quotes on every change in the efficient price and not only on a
-    /// headline; in between, the centre is the geometric blend
-    /// `last^(1-w) * model^w`. A weight in [0, 1]. See `market::tick`, the
-    /// settlement phase.
+    /// Where the market maker centers its book, as a weight in [0, 1] on the
+    /// model price. 0.0, on every preset through pt-v19, quotes around the
+    /// last print; pt-v20 ships 1.0, which quotes around the model price.
+    ///
+    /// At 0.0 the center is the last print (moved by the tick's news term
+    /// when `news_quote_revision` is on), so the print chases the model
+    /// price at about a half-spread a tick and the maker's inventory skew
+    /// carries it past. On pt-v19 the print sits about 37 bp (sd) off the
+    /// model price in every liquidity bucket, and 65-minute returns carry a
+    /// lag-one autocorrelation of -0.135 against a Roll spread 5.8x the
+    /// quoted one. 1.0 quotes around the tick's model price, the way dealers
+    /// revise quotes on every change in the efficient price and not only on
+    /// a headline. In between, the center is the geometric blend
+    /// `last^(1-w) * model^w`. See `market::tick`, the settlement phase.
     pub quote_model_weight: f64,
-    /// Whether the session closes with a cross. 0.0, which every preset
-    /// through pt-v19 carries, closes on the last minute's print: whichever
-    /// side of the book the final tick's flow hit, and at the close the
-    /// intraday volume curve is at its peak, so the flow walks deepest. The
-    /// closing print then sits 14 bp (sd) off the model price on a large
-    /// name of the certified roster and 45 bp on a small one, and that noise
-    /// reverts the next day: a daily Lo-MacKinlay contrarian book earns
-    /// +13 bp a day on the large names from it alone, against the certified
-    /// forty's -1.7 +/- 2.3, whose closes are auction prices. 1.0 prints
-    /// the session's
-    /// final regular tick at the model price, as a closing auction clears at
-    /// the efficient price; the tick's settlement still runs, so it costs
-    /// the same draws, and its book fills do not move the maker's
-    /// inventory. A switch. See `market::tick`, the settlement phase.
+    /// Whether the session closes with a cross at the model price, a switch.
+    /// 0.0, on every preset through pt-v19, closes on the last minute's
+    /// print; pt-v20 ships 1.0.
+    ///
+    /// At 0.0 the close is whichever side of the book the final tick's flow
+    /// hit, and at the close the intraday volume curve is at its peak, so
+    /// the flow walks deepest. The closing print then sits 14 bp (sd) off
+    /// the model price on a large name of the certified roster and 45 bp on
+    /// a small one, and that noise reverts the next day: a daily
+    /// Lo-MacKinlay contrarian book earns +13 bp a day on the large names
+    /// from it alone, against the certified forty's -1.7 +/- 2.3, whose
+    /// closes are auction prices. 1.0 prints the session's final regular
+    /// tick at the model price, as a closing auction clears at the efficient
+    /// price. The tick's settlement still runs, so it costs the same draws,
+    /// and its book fills do not move the maker's inventory. See
+    /// `market::tick`, the settlement phase.
     pub closing_auction: f64,
     /// The aggregate earnings cycle's depth: the log level every company's
     /// earnings are pulled toward in a contraction or a trough, beyond what
-    /// nominal output alone gives them. 0.0, which every preset through
-    /// pt-v19 carries, has no cycle: earnings grow with nominal output and a
-    /// recession reaches equities only through rates, credit and fear, so a
-    /// year's index return spread 9 to 12 per cent (sd) against the S&P's
-    /// 17.4, and a replayed crisis left the index a third as far down as the
-    /// real one. S&P reported earnings fell 29, 54, 92 and 33 per cent around
-    /// the 1990, 2001, 2008 and 2020 recessions (Shiller's series; operating
-    /// earnings about 40 in 2008), and their twelve-month log growth has an sd
-    /// of 0.18 over 1950-2023 with the 2008 write-down capped.
+    /// nominal output alone gives them. 0.0, on every preset through pt-v19,
+    /// has no cycle; pt-v20 ships 0.2.
+    ///
+    /// At 0.0 earnings grow with nominal output and a recession reaches
+    /// equities only through rates, credit and fear, so a year's index
+    /// return spreads 9 to 12 percent (sd) against the S&P's 17.4, and a
+    /// replayed crisis leaves the index a third as far down as the real one.
+    /// S&P reported earnings fell 29, 54, 92 and 33 percent around the 1990,
+    /// 2001, 2008 and 2020 recessions (Shiller's series; operating earnings
+    /// about 40 in 2008), and their twelve-month log growth has an sd of
+    /// 0.18 over 1950-2023 with the 2008 write-down capped.
     pub earnings_cycle_depth: f64,
-    /// Every other phase's pull toward `+depth * upside`, the share that
-    /// centres the level over a cycle, so the cycle moves earnings around
-    /// the nominal-output path without shifting it. Read only with
-    /// `earnings_cycle_depth` non-zero.
+    /// The earnings cycle's upside share: every phase other than a
+    /// contraction or a trough pulls earnings toward `+depth * upside`,
+    /// which centers the level over a cycle so the cycle moves earnings
+    /// around the nominal-output path without shifting it. pt-v20 ships
+    /// 0.09. Read only with `earnings_cycle_depth` non-zero.
     pub earnings_cycle_upside: f64,
-    /// Half-life in sessions of the pull toward the phase's level. Read only
-    /// with `earnings_cycle_depth` non-zero.
+    /// Half-life in sessions of the pull toward the phase's level, 60 on
+    /// every shipped preset. Read only with `earnings_cycle_depth` non-zero.
     pub earnings_cycle_half_life: f64,
     /// The daily sd of the earnings level's own noise; 0.0 is the phase path
     /// alone and takes no draw. Read only with `earnings_cycle_depth`
     /// non-zero.
     pub earnings_cycle_sigma: f64,
     /// Half-life, in sessions, of the discount the valuation puts on the
-    /// earnings cycle's expected path. 0.0, which every preset through
-    /// pt-v19 carries, prices today's level alone, so a recession reaches
-    /// prices only as fast as earnings fall and a recovery only as they
-    /// recover: the index cannot fall at the turn and look through the dip,
-    /// as the S&P 500 did in 2020 (trough 23 March, earnings' trough the
-    /// quarter to June). Off zero, fair value reads the level averaged over
-    /// the expected path, `A = c e + g_phase`, from the cycle's own hazards
-    /// and the level's own pull (`Engine::earnings_anticipation_terms`):
-    /// a turn of phase moves it at once, and a trough reads above a
-    /// contraction because a recovery is near. Read only with
-    /// `earnings_cycle_depth` non-zero.
+    /// earnings cycle's expected path. 0.0, on every preset through pt-v19,
+    /// prices today's level alone; pt-v20 ships 126.
+    ///
+    /// At 0.0 a recession reaches prices only as fast as earnings fall and a
+    /// recovery only as they recover, so the index cannot fall at the turn
+    /// and look through the dip, as the S&P 500 did in 2020 (trough 23
+    /// March, earnings' trough the quarter to June). Off zero, fair value
+    /// reads the level averaged over the expected path, `A = c e + g_phase`,
+    /// from the cycle's own hazards and the level's own pull
+    /// (`Engine::earnings_anticipation_terms`): a turn of phase moves it at
+    /// once, and a trough reads above a contraction because a recovery is
+    /// near. Read only with `earnings_cycle_depth` non-zero.
     pub earnings_anticipation_half_life: f64,
     /// P/E compression per unit of discount rate above neutral, times a
     /// name's growth duration: the target multiple's rate adjustment is
-    /// `1 - (yield - neutral) * rate_pe_sensitivity * duration`. 1.5, which
-    /// every preset through pt-v19 carries, is the constant that stood,
-    /// about 2 per cent of fair value per 100 bp of the corporate yield at
-    /// the median duration; the S&P 500's trailing P/E fell 4.9 to 5.5 per
-    /// cent per 100 bp of Baa over 2022.
+    /// `1 - (yield - neutral) * rate_pe_sensitivity * duration`. 1.5 on
+    /// every preset through pt-v19; pt-v20 ships 3.0.
+    ///
+    /// At 1.5 fair value moves about 2 percent per 100 bp of the corporate
+    /// yield at the median duration. The S&P 500's trailing P/E fell 4.9 to
+    /// 5.5 percent per 100 bp of Baa over 2022.
     pub rate_pe_sensitivity: f64,
     /// Sessions between a turn of the business cycle and its publication.
-    /// 0.0, which every preset through pt-v19 carries, publishes the phase
-    /// the economy is in; pt-v20 sets 252.0. Off zero, every route that reports the phase -- `macro_fields`,
+    /// 0.0, on every preset through pt-v19, publishes the phase the economy
+    /// is in; pt-v20 sets 252.0.
+    ///
+    /// Off zero, every route that reports the phase (`macro_fields`,
     /// `macro_state`, and what reads them: a World's trace rows, a hosted
-    /// market log's cycle events -- reports the phase of this many sessions
+    /// market log's cycle events) reports the phase of this many sessions
     /// before, as the NBER dates a recession about a year after it began,
     /// and a turn is announced when it is published. The true phase stays
     /// internal: the earnings cycle, the anticipated earnings path, the
     /// hazards and the stress read it, and a scenario that sets the phase
     /// sets the true one at once. Before this many sessions have closed
     /// the opening phase is published. A whole number of sessions; the
-    /// engine keeps the last `lag + 1` phases (`Engine::published_cycle_phase`),
-    /// and its snapshot and state hash carry them only while this is set.
+    /// engine keeps the last `lag + 1` phases
+    /// (`Engine::published_cycle_phase`), and its snapshot and state hash
+    /// carry them only while this is set.
     pub cycle_publication_lag: f64,
     /// Sessions between the end of a quarter and the publication of its GDP
     /// growth, as the BEA's advance estimate comes about a month after the
-    /// quarter. 0.0, which every preset through pt-v19 carries, is off
-    /// (pt-v20 sets 21.0): `gdp_growth` is reported daily, as the economy runs it. Off zero, every route that
-    /// reports growth -- `macro_fields["gdp_growth"]` and the recorded
-    /// `macro_table()`, and what reads them: a dataset export's
-    /// `macro.arrow`, an explanation's state -- reports a QUARTERLY figure,
-    /// the mean of the true daily growth over the macro calendar's quarter
-    /// (`MacroCalendar::days_per_quarter`, 63 sessions on the 252-session
-    /// calendar, 90 on the shipped one; day 0, the opening, is the first
-    /// day of quarter 0), released on the close this many sessions after
-    /// the quarter's last day. Before the first release the opening growth
-    /// is published. The true daily growth stays internal: output, earnings,
-    /// unemployment, the cycle's hazards and the central bank read it, a pin
-    /// sets it at once, and `state_snapshot()` carries it. A whole number of
-    /// sessions; lag 0 with quarterly averaging is not offered, since no
-    /// agency publishes on the quarter's last day (`Engine::published_gdp_growth`).
-    /// The snapshot and the state hash carry its state only while this is set.
+    /// quarter. 0.0, on every preset through pt-v19, reports `gdp_growth`
+    /// daily as the economy runs it; pt-v20 sets 21.0.
+    ///
+    /// Off zero, every route that reports growth
+    /// (`macro_fields["gdp_growth"]` and the recorded `macro_table()`, and
+    /// what reads them: a dataset export's `macro.arrow`, an explanation's
+    /// state) reports a quarterly figure, the mean of the true daily growth
+    /// over the macro calendar's quarter (`MacroCalendar::days_per_quarter`,
+    /// 63 sessions on the 252-session calendar, 90 on the shipped one; day
+    /// 0, the opening, is the first day of quarter 0), released on the close
+    /// this many sessions after the quarter's last day. Before the first
+    /// release the opening growth is published. The true daily growth stays
+    /// internal: output, earnings, unemployment, the cycle's hazards and the
+    /// central bank read it, a pin sets it at once, and `state_snapshot()`
+    /// carries it. A whole number of sessions; lag 0 with quarterly
+    /// averaging is not offered, since no agency publishes on the quarter's
+    /// last day (`Engine::published_gdp_growth`). The snapshot and the state
+    /// hash carry its state only while this is set.
     pub gdp_publication_lag: f64,
     /// The half-life, in sessions, of unemployment's response to its
-    /// cyclical drivers. 0.0, which every preset through pt-v19 carries, is
-    /// off (pt-v20 sets 84.0): at each
-    /// monthly release the rate moves by the whole of what the phase's trend
-    /// and Okun's law on the day's growth ask for, so the first release
-    /// after a contraction begins carries a rise of about 1.2 pp (desk seeds
-    /// 201-212, 2026-09-25), four times the spread of a release otherwise,
-    /// and announces the turn. At 84 sessions it is 0.16 pp.
-    /// Off zero, the monthly change is an impulse partially adjusted toward
-    /// that drive, closing `1 - 0.5^(month / half_life)` of the gap at each
-    /// release (`EconomyState::unemployment_impulse`), so the rise builds
-    /// over months: UNRATE went from 4.3 to 5.5 over the 2001 recession and
-    /// from 5.0 to 9.5 over December 2007 to June 2009, a first month of
-    /// 0.1 to 0.3 pp each time. The NAIRU pull and the noise act as before.
-    /// It moves the TRUE unemployment rate and so everything that reads it
+    /// cyclical drivers. 0.0, on every preset through pt-v19, moves it in
+    /// one step at each monthly release; pt-v20 sets 84.0.
+    ///
+    /// At 0.0 the rate moves at each monthly release by the whole of what
+    /// the phase's trend and Okun's law on the day's growth ask for, so the
+    /// first release after a contraction begins carries a rise of about
+    /// 1.2 pp (seeds 201-212), four times the spread of a release otherwise,
+    /// and announces the turn. At 84 sessions it is 0.16 pp. Off zero, the
+    /// monthly change is an impulse partially adjusted toward that drive,
+    /// closing `1 - 0.5^(month / half_life)` of the gap at each release
+    /// (`EconomyState::unemployment_impulse`), so the rise builds over
+    /// months: UNRATE went from 4.3 to 5.5 over the 2001 recession and from
+    /// 5.0 to 9.5 over December 2007 to June 2009, a first month of 0.1 to
+    /// 0.3 pp each time. The NAIRU pull and the noise act as before. It
+    /// moves the true unemployment rate and so everything that reads it
     /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
     /// and the state hash carry the impulse only while this is set.
     pub unemployment_adjustment_half_life: f64,
-    /// A switch, 0.0 or 1.0. 0.0, which every preset through pt-v19
-    /// carries, is off (pt-v20 sets 1.0): the
-    /// fear/greed index's target reads the business-cycle phase (a bonus of
-    /// +15 in an expansion to -25 in a contraction) and the GDP growth the
-    /// economy runs at, so it falls about 35 points in the five sessions
-    /// after a contraction begins and announces the turn. On, it reads them
-    /// as published (`cycle_publication_lag`, `gdp_publication_lag`), so it
-    /// steps when the turn is published, which is public already. It moves
-    /// the index itself, and through it consumer confidence, housing,
-    /// copper and gold; nothing a price, the bank, the cycle or a draw
-    /// reads. With both lags at 0 it is the index that stood. No state.
+    /// Switch that makes the fear/greed index read the business cycle and
+    /// GDP growth as published instead of as they are. 0.0, on every preset
+    /// through pt-v19, is off; pt-v20 sets 1.0.
+    ///
+    /// The index's target reads the business-cycle phase (a bonus of +15 in
+    /// an expansion to -25 in a contraction) and GDP growth. Off, it reads
+    /// the values the economy runs at, so it falls about 35 points in the
+    /// five sessions after a contraction begins and announces the turn. On,
+    /// it reads them as published (`cycle_publication_lag`,
+    /// `gdp_publication_lag`), so it steps when the turn is published, which
+    /// is public already. It moves the index itself, and through it consumer
+    /// confidence, housing, copper and gold; nothing a price, the bank, the
+    /// cycle or a draw reads. With both lags at 0 it has no effect. No
+    /// state.
     pub fear_greed_published_inputs: f64,
     /// Whether a name's price takes the change the close's macro step makes
-    /// to its fair value at the moment the step is published, rather than
-    /// at the next session's first tick. 0.0, which every preset through
-    /// pt-v19 carries, leaves it to the tick (pt-v20 sets 1.0): the central bank meets at the
-    /// close, the new policy rate, corporate yield and cycle are readable
-    /// from then on, and the price stays at the day's last print until the
-    /// first tick of the next session re-values the name, so an agent that
-    /// reads the decision fills at the price from before it. On pt-v20 with
-    /// its leading dials (anticipation 126, rate sensitivity 3, buyback
-    /// share 0.75) the index's first 65 minutes after a published hike fell
-    /// 76 bp (se 5) from that price and after a cut rose 171 (se 36), and
-    /// the published corporate yield's overnight change correlated -0.32
-    /// with the next session's return (pt-v20 audit, finding 3). A real
-    /// FOMC statement is priced within minutes: event studies read the
-    /// S&P 500's whole response inside a 30-minute window around it
-    /// (Gurkaynak, Sack and Swanson 2005; Bernanke and Kuttner 2005). 1.0
-    /// re-marks every name that has traded as the step ends, to the price
-    /// its premium over fair value implies on the published state, so its
-    /// mispricing `s` is unchanged and the next tick starts from the model
-    /// price the published state implies. A `pin_macro` re-marks the same
-    /// way. The move sits between the day's last print and the next open,
-    /// where a decision announced after the close lands. No draw. A switch.
-    /// See `Engine::reprice_to_published_macro`.
+    /// to its fair value at the moment the step is published, a switch. 0.0,
+    /// on every preset through pt-v19, leaves it to the next session's first
+    /// tick; pt-v20 sets 1.0.
+    ///
+    /// At 0.0 the central bank meets at the close, the new policy rate,
+    /// corporate yield and cycle are readable from then on, and the price
+    /// stays at the day's last print until the first tick of the next
+    /// session re-values the name, so an agent that reads the decision fills
+    /// at the price from before it. On pt-v20 with this switch off (and
+    /// anticipation 126, rate sensitivity 3, buyback share 0.75) the index's
+    /// first 65 minutes after a published hike fell 76 bp (se 5) from that
+    /// price and after a cut rose 171 (se 36), and the published corporate
+    /// yield's overnight change correlated -0.32 with the next session's
+    /// return. A real FOMC statement is priced within minutes: event studies
+    /// read the S&P 500's whole response inside a 30-minute window around it
+    /// (Gurkaynak, Sack and Swanson 2005; Bernanke and Kuttner 2005).
+    ///
+    /// 1.0 re-marks every name that has traded as the step ends, to the
+    /// price its premium over fair value implies on the published state, so
+    /// its mispricing `s` is unchanged and the next tick starts from the
+    /// model price the published state implies. A `pin_macro` re-marks the
+    /// same way. The move sits between the day's last print and the next
+    /// open, where a decision announced after the close lands. No draw. See
+    /// `Engine::reprice_to_published_macro`.
     pub macro_publication_repricing: f64,
-    /// The 10-year Treasury yield's daily noise, in percentage points. 0.03,
-    /// which every preset through pt-v19 carries, is the literal that stood:
-    /// with the pull toward the policy rate it gives a daily change of about
-    /// 3.1 bp against the tape's 5.4 (FRED DGS10,
-    /// 2015-2025).
+    /// The 10-year Treasury yield's daily noise, in percentage points. 0.03
+    /// on every preset through pt-v19; pt-v20 ships 0.038.
+    ///
+    /// At 0.03, with the pull toward the policy rate, it gives a daily change
+    /// of about 3.1 bp against the tape's 5.4 (FRED DGS10, 2015-2025).
     pub treasury_10y_noise: f64,
     /// The 2-year Treasury yield's own daily noise, in percentage points.
-    /// 0.0, which every preset through pt-v19 carries, keeps the 2-year the
-    /// formula `0.85 policy rate + 0.15 10-year`, which between meetings
-    /// moves by 0.15 of the 10-year's noise: 0.46 bp a session against the
-    /// tape's 5.2 (FRED DGS2, 2015-2025). Off zero the 2-year is its own
-    /// process, pulled toward the formula at the 10-year's rate (0.05 a
-    /// session), with this noise; one more normal on the economy stream,
-    /// taken only under the dial.
+    /// 0.0, on every preset through pt-v19, makes the 2-year a fixed blend
+    /// of the policy rate and the 10-year; pt-v20 ships 0.022.
+    ///
+    /// At 0.0 the 2-year is the formula `0.85 policy rate + 0.15 10-year`,
+    /// which between meetings moves by 0.15 of the 10-year's noise: 0.46 bp
+    /// a session against the tape's 5.2 (FRED DGS2, 2015-2025). Off zero the
+    /// 2-year is its own process, pulled toward the formula at the 10-year's
+    /// rate (0.05 a session), with this noise; one more normal on the
+    /// economy stream, taken only under the dial.
     pub treasury_2y_noise: f64,
     /// The flight to quality's size: percentage points of 10-year yield per
-    /// per cent of index return, down with the market when inflation is
-    /// under 3 per cent and up when it is over 4. 0.02, which every preset
-    /// through pt-v19 carries, is the literal that stood.
+    /// percent of index return, down with the market when inflation is
+    /// under 3 percent and up when it is over 4. 0.02 on every preset
+    /// through pt-v19; pt-v20 ships 0.008.
     pub flight_to_quality_gain: f64,
-    /// Which return the flight to quality reads. 0.0, which every preset
-    /// through pt-v19 carries, reads the PREVIOUS session's closing-minute
-    /// return behind a 0.5 per cent gate, which that return never crosses,
-    /// so the rule never fires and the curve carries no stock-bond
-    /// correlation (tape: -0.16 for Treasuries, +0.27 for IG corporates,
-    /// 2015-2025). 1.0 reads THIS session's index return, with no gate. A
-    /// switch.
-    pub flight_to_quality_day: f64,
-    /// Whether the corporate yield moves between central-bank meetings.
-    /// 0.0, which every preset through pt-v19 carries, writes it only at a
-    /// meeting, so fair value's discount rate and an IG bond priced off it
-    /// sit still for six weeks at a time. 1.0 moves it every session by the
-    /// 10-year's move plus the meeting formula's VIX slope on the session's
-    /// VIX change; the next meeting re-anchors the level. A switch.
-    pub corporate_yield_daily: f64,
-    /// The share of each IDIOSYNCRATIC shock that moves the name's fair
-    /// value for good rather than its mispricing. 0.0, which every preset
-    /// through pt-v19 carries, sends the whole shock to `s`, so every
-    /// stock-specific move reverts on the mispricing half-life: on pt-v19
-    /// 96% of a name's own daily variance is mispricing, its 60-day
-    /// idiosyncratic variance ratio is 0.51 against the certified forty's
-    /// 0.92, and a value screen on published fundamentals predicts the next
-    /// 20 days with rank IC +0.38 at stationarity against a real one near
-    /// +0.01.
+    /// Which return the flight to quality reads, a switch. 0.0, on every
+    /// preset through pt-v19, reads the previous session's closing minute;
+    /// pt-v20 ships 1.0, which reads this session's index return.
     ///
-    /// Off zero, a share `psi` of the name's own shocks -- the idiosyncratic
+    /// At 0.0 the rule reads the previous session's closing-minute return
+    /// behind a 0.5 percent gate, which that return never crosses, so the
+    /// rule never fires and the curve carries no stock-bond correlation
+    /// (tape: -0.16 for Treasuries, +0.27 for IG corporates, 2015-2025). 1.0
+    /// reads this session's index return, with no gate.
+    pub flight_to_quality_day: f64,
+    /// Whether the corporate yield moves between central-bank meetings, a
+    /// switch. 0.0, on every preset through pt-v19, writes it only at a
+    /// meeting; pt-v20 ships 1.0.
+    ///
+    /// At 0.0 fair value's discount rate and an IG bond priced off it sit
+    /// still for six weeks at a time. 1.0 moves the yield every session by
+    /// the 10-year's move plus the meeting formula's VIX slope on the
+    /// session's VIX change; the next meeting re-anchors the level.
+    pub corporate_yield_daily: f64,
+    /// The share of each idiosyncratic shock that moves the name's fair
+    /// value for good instead of its mispricing, in [0, 1]. 0.0, on every
+    /// preset through pt-v19, sends the whole shock to the mispricing;
+    /// pt-v20 ships 1.0.
+    ///
+    /// At 0.0 every stock-specific move reverts on the mispricing half-life:
+    /// on pt-v19 96% of a name's own daily variance is mispricing, its
+    /// 60-day idiosyncratic variance ratio is 0.51 against the certified
+    /// forty's 0.92, and a value screen on published fundamentals predicts
+    /// the next 20 days with rank IC +0.38 at stationarity against a real
+    /// one near +0.01.
+    ///
+    /// Off zero, a share `psi` of the name's own shocks (the idiosyncratic
     /// and sector draws of the tick's noise, the news that names the
     /// company, a peer or its sector, and the company's own jump at the
-    /// close -- lands in a per-name log fair-value level `v`
-    /// (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The
-    /// price moves by the whole shock on impact either way; what changes is
-    /// how much of it later reverts. `v` scales the published fundamentals
+    /// close) lands in a per-name log fair-value level `v`
+    /// (`TickStock::fair_value_offset`) and `1 - psi` in `s`. The price
+    /// moves by the whole shock on impact either way; what changes is how
+    /// much of it later reverts. `v` scales the published fundamentals
     /// (earnings and book) the valuation reads, so the market P/E and the
     /// buyback yield read the same earnings the price does, and it carries
     /// an Ito term so `E[exp(v)]` stays one and the index's expected return
     /// does not move. The market-wide part of each shock stays in `s`
     /// (`fair_value_market_share` moves that); the sector part goes with
-    /// the name's own, as listed above. In [0, 1].
+    /// the name's own, as listed above.
     pub fair_value_news_share: f64,
-    /// The share of each MARKET-WIDE shock that moves fair value for good:
-    /// the name's loading on the market factor's draw, market-wide news and
-    /// the market jump. 0.0, which every preset through pt-v19 carries,
-    /// sends them to `s`, whose pull reverts every market move on the
-    /// mispricing half-life: on pt-v19 the index's calendar-year returns
-    /// spread 11.4 per cent (sd) against the S&P's 17.4 at the same daily
-    /// volatility, a 20 per cent bear market recovers in 158 sessions
-    /// against the tape's 670, and a replayed crisis leaves the index a
-    /// third as far down at the window's end as the real one did.
-    /// Off zero, that share joins the
-    /// name's fair-value level, as the stock-level share does. In [0, 1].
+    /// The share of each market-wide shock that moves fair value for good,
+    /// in [0, 1]: the name's loading on the market factor's draw,
+    /// market-wide news and the market jump. 0.0, on every preset through
+    /// pt-v19, sends them all to the mispricing; pt-v20 ships 1.0.
+    ///
+    /// At 0.0 the mispricing's pull reverts every market move on its
+    /// half-life: on pt-v19 the index's calendar-year returns spread 11.4
+    /// percent (sd) against the S&P's 17.4 at the same daily volatility, a
+    /// 20 percent bear market recovers in 158 sessions against the tape's
+    /// 670, and a replayed crisis leaves the index a third as far down at
+    /// the window's end as the real one did. Off zero, that share joins the
+    /// name's fair-value level, as the stock-level share does.
     pub fair_value_market_share: f64,
     /// Which part of a market shock `fair_value_market_share` makes
-    /// permanent. 0.0, which every preset through pt-v19 carries, is the
-    /// whole of the name's market input; pt-v20 sets 1.0. 1.0 is its plain loading on the
-    /// draw, `beta * F`, which has zero mean in every regime; the down-tick
-    /// tilt, the lagged down-day wire, the crisis injection, the crash
-    /// amplifier and the recentring stay in `s` and revert.
+    /// permanent, a switch. 0.0, on every preset through pt-v19, is the
+    /// whole of the name's market input; pt-v20 sets 1.0, which is its plain
+    /// loading on the draw.
+    ///
+    /// At 1.0 the permanent part is `beta * F`, which has zero mean in every
+    /// regime. The down-tick tilt, the lagged down-day wire, the crisis
+    /// injection, the crash amplifier and the recentering stay in `s` and
+    /// revert.
     ///
     /// Those terms are not zero-mean once the market is volatile: the
-    /// amplifier fires on a threshold in BASELINE sigmas, so at a high VIX it
-    /// multiplies the tilted down side on most ticks, and the recentring
+    /// amplifier fires on a threshold in baseline sigmas, so at a high VIX
+    /// it multiplies the tilted down side on most ticks, and the recentering
     /// gives back only the unamplified, unlagged form. In `s` that is a
     /// discount that grows with the VIX and reverts as it falls, which is
     /// how a replayed crash reaches its depth. Made permanent, it is a drift
-    /// that runs as long as the VIX is high: on the driven 2020 path at a
-    /// share of 1.0 the cap-weighted fair-value level falls about 0.45 in the
-    /// hundred sessions after the VIX peak (desk, seed 101). A switch. Read
-    /// only with `fair_value_market_share` non-zero. In [0, 1].
+    /// that runs as long as the VIX is high: on the driven 2020 path, with
+    /// this switch at 0.0 and a share of 1.0, the cap-weighted fair-value
+    /// level falls about 0.45 in the hundred sessions after the VIX peak
+    /// (seed 101). Read only with `fair_value_market_share` non-zero.
     pub fair_value_market_linear: f64,
     /// A ceiling, in multiples of `market_factor_sigma`, on the market
-    /// volatility whose shocks `fair_value_market_share` makes permanent.
-    /// 0.0, which every preset through pt-v19 carries, is no ceiling: the
-    /// share applies to every market shock whatever the regime. pt-v20
-    /// sets 1.5.
+    /// volatility whose shocks `fair_value_market_share` makes permanent,
+    /// in [0, 32]. 0.0, on every preset through pt-v19, is no ceiling;
+    /// pt-v20 sets 1.5.
     ///
     /// Off zero, a market shock drawn at a daily sigma above `this *
     /// market_factor_sigma` moves fair value by the share times `this *
@@ -787,11 +798,10 @@ pub struct ModelParams {
     /// 1988 on 1926-40; Kim, Nelson and Startz 1991; Spierdijk, Bikker and
     /// van den Hoek 2012). The same ceiling applies to the market jump's
     /// permanent share. Read only with `fair_value_market_share` non-zero.
-    /// In [0, 32].
     pub fair_value_market_vol_cap: f64,
     /// Volatility feedback: a discount on every name's fair value while the
     /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
-    /// knee))`. 0.0, which every preset through pt-v19 carries, is none;
+    /// knee))`, in [0, 1]. 0.0, on every preset through pt-v19, is none;
     /// pt-v20 sets 0.35.
     ///
     /// A function of the VIX alone and no state, so it is transient by
@@ -803,362 +813,338 @@ pub struct ModelParams {
     /// Under `macro_publication_repricing` the close's VIX reaches prices at
     /// the close, with the day's move; without it, at the next tick. Read
     /// wherever fair value is: the tick, the overnight opening print, the
-    /// re-mark and the stationary opening. In [0, 1].
+    /// re-mark and the stationary opening.
     pub fair_value_vix_discount: f64,
-    /// The VIX level above which `fair_value_vix_discount` applies. 30.0,
-    /// which every preset through pt-v19 carries, is unread while the
+    /// The VIX level, in points, above which `fair_value_vix_discount`
+    /// applies. In (0, 200].
+    ///
+    /// Presets through pt-v19 carry 30.0, which is unread while their
     /// discount is 0.0. pt-v20 sets 40.0.
-    /// In (0, 200].
     pub fair_value_vix_knee: f64,
     /// Half-life, in sessions, of the VIX exposure the volatility-feedback
-    /// discount reads. 0.0, which every preset through pt-v19 carries,
-    /// reads the VIX as it stands (pt-v20 sets 5.0), so the discount's whole daily change lands with the VIX's
-    /// move: on a held-out grid (ptv20vr6-7) that doubled the sessions under
-    /// -5 per cent and took the 2008 replay's worst month to 122 per cent
-    /// against 84. Off zero, the close pulls a smoothed exposure
-    /// (`EconomyState::vix_feedback`) toward the VIX's log excess over the
-    /// knee at this half-life, so the discount builds over a fearful month
-    /// and goes as the fear does, without a session of its own. The
-    /// snapshot and the state hash carry the exposure only while this and
-    /// the gain are both set. In [0, 252].
+    /// discount reads. In [0, 252], and 0.0 reads the VIX as it stands.
+    ///
+    /// Presets through pt-v19 carry 0.0 and pt-v20 sets 5.0. At 0.0 the
+    /// discount's whole daily change lands with the VIX's move: on a
+    /// held-out grid that doubled the sessions under -5 per cent and took
+    /// the 2008 replay's worst month to 122 per cent against 84. Off zero,
+    /// the close pulls a smoothed exposure (`EconomyState::vix_feedback`)
+    /// toward the VIX's log excess over the knee at this half-life, so the
+    /// discount builds over a fearful month and goes as the fear does,
+    /// without a session of its own. The snapshot and the state hash carry
+    /// the exposure only while this and the gain are both set.
     pub fair_value_vix_half_life: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
-    /// price` that the buyback term compounds over the elapsed years. 0.0,
-    /// which every preset through pt-v19 carries, is none; pt-v20 sets
-    /// 0.15.
+    /// price` that the buyback term compounds over the elapsed years. In
+    /// [0, 1], and 0.0 means no ceiling.
     ///
-    /// The term reads the yield at today's price and applies it over the
-    /// whole elapsed time, so a name whose price collapses toward the 0.01
-    /// floor reads a yield of hundreds, its fair value runs to exp(hundreds)
-    /// and the close's re-mark (whose fixed point assumes the term's
-    /// elasticity is well under one) diverges: on the leading pt-v20 arm
-    /// with the market permanent share, a name went from 0.10 to 38,220 in
-    /// one close and the index rose 86-fold (seed 821, session 4851), and
-    /// the W100k15d20 control shows the same on 1 of 90 held-out histories.
-    /// Off zero, the yield is capped at this, so the term's elasticity
-    /// stays under one. Read only with `buyback_payout_share` non-zero.
-    /// In [0, 1].
+    /// Presets through pt-v19 carry 0.0 and pt-v20 sets 0.15. The term reads
+    /// the yield at today's price and applies it over the whole elapsed
+    /// time, so a name whose price collapses toward the 0.01 floor reads a
+    /// yield of hundreds, its fair value runs to exp(hundreds) and the
+    /// close's re-mark (whose fixed point assumes the term's elasticity is
+    /// well under one) diverges. Measured without the ceiling on settings
+    /// close to pt-v20, a name went from 0.10 to 38,220 in one close and the
+    /// index rose 86-fold (seed 821, session 4851), and a second setting did
+    /// the same on 1 of 90 held-out histories. Off zero, the yield is capped
+    /// at this value, so the term's elasticity stays under one. Read only
+    /// with `buyback_payout_share` non-zero.
     pub buyback_yield_cap: f64,
-    /// The cross-sectional sd of the opening mispricing. 0.0, which every
-    /// preset through pt-v19 carries, adopts the whole day-zero premium of
-    /// price over fair value as `s`: on a generated roster that premium is
-    /// the P/E scatter, sd about 0.32 against a stationary `s` of about
-    /// 0.06, so every name drifts toward fair value in a known direction
-    /// for months (the value screen's rank IC in a market's first 60 days
-    /// is +0.75 on pt-v19, and a 5-day momentum rule earns +10% there).
+    /// The cross-sectional sd of each name's opening mispricing. 0.0 adopts
+    /// each name's whole day-zero premium of price over fair value as its
+    /// mispricing `s`.
+    ///
+    /// Presets through pt-v19 carry 0.0 and pt-v20 sets 0.016. At 0.0, on a
+    /// generated roster that premium is the P/E scatter, sd about 0.32
+    /// against a stationary `s` of about 0.06, so every name drifts toward
+    /// fair value in a known direction for months (the value screen's rank
+    /// IC in a market's first 60 days is +0.75 on pt-v19, and a 5-day
+    /// momentum rule earns +10% there).
     ///
     /// Off zero, the opening `s` is the roster's cap-weighted premium (so
     /// the index opens with the mispricing it always had) plus a draw of
-    /// this sd per name, re-centred to cap-weighted zero, and the rest of
-    /// each name's premium is its opening fair-value level `v`: the
-    /// published fundamentals are a noisy read of fair value, not a
-    /// statement that the price is wrong. The draw is one normal per name
-    /// on its own stream (`rng::stream::OPENING`), taken when the engine is
-    /// built, so no other stream moves.
+    /// this sd per name, re-centered to cap-weighted zero, and the rest of
+    /// each name's premium is its opening fair-value level `v`. The
+    /// published fundamentals are then a noisy read of fair value, and the
+    /// price is not taken to be wrong by the whole gap. The draw is one
+    /// normal per name on its own stream (`rng::stream::OPENING`), taken
+    /// when the engine is built, so no other stream moves.
     pub opening_mispricing_sigma: f64,
-    /// The sd of the common level of the opening mispricing: the market's
-    /// own opening premium. 0.0, which every preset through pt-v19 carries,
-    /// is the roster's cap-weighted day-zero premium of price over fair
-    /// value (under `opening_mispricing_sigma`; without it every name adopts
-    /// its whole premium, which comes to the same index). A generated roster
-    /// opens its index that far from fair value by construction -- +0.11 on
-    /// the certified roster, -0.33 to +0.30 on the suite's 20-name rosters
-    /// -- and the index then reverts on the mispricing half-life: a drift of
-    /// up to 30 per cent in the first months with nothing happening, and a
-    /// certified year one of +2 per cent against the tape's +10.
+    /// The sd of the market's common opening mispricing, the index's own
+    /// premium over fair value on day zero. 0.0 uses the roster's
+    /// cap-weighted day-zero premium of price over fair value.
+    ///
+    /// Presets through pt-v19 carry 0.0 and pt-v20 sets 0.001. At 0.0 (under
+    /// `opening_mispricing_sigma`, or without it, where every name adopts its
+    /// whole premium and the index comes out the same) a generated roster
+    /// opens its index that far from fair value by construction: +0.11 on
+    /// the certified roster, and -0.33 to +0.30 on the suite's 20-name
+    /// rosters. The index then reverts on the mispricing half-life, which
+    /// gives a drift of up to 30 per cent in the first months with nothing
+    /// happening, and a certified year one of +2 per cent against the
+    /// tape's +10.
     ///
     /// Off zero, the common level is a draw at this sd, the market opening
     /// at a point of its own stationary mispricing; the rest of each name's
     /// premium is its fair-value level. One more normal on
     /// `rng::stream::OPENING`, after the per-name draws.
     pub opening_market_sigma: f64,
-    /// Market-shock magnitude, in baseline sigmas, above which the crash
-    /// amplifier fires (§5.4 promotion).
+    /// Market-shock size, in baseline sigmas, above which the crash
+    /// amplifier fires. Every preset ships 2.0.
     pub crash_amplifier_threshold: f64,
-    /// Extra market loading per baseline sigma beyond the threshold
-    /// (§5.4 promotion).
+    /// Extra market loading the crash amplifier adds per baseline sigma of
+    /// shock beyond `crash_amplifier_threshold`. Every preset ships 0.2.
     ///
-    /// # This is the dial the VIX loop now answers to, and it is unbounded
-    /// in the regime
+    /// # Loop gain through the VIX
     ///
-    /// `shock_magnitude` is normalised by the BASE sigma and not the
-    /// conditional one — deliberately, and `factors.rs` states and costs the
-    /// alternative — so the amplifier's conditional second moment
-    /// (`market::index_var::amplifier_moments`) grows as the square of the
-    /// regime ratio rather than staying flat in it. Under
-    /// `vix_level_identity` that moment is in the VIX's own target, so the
-    /// map from the VIX to the variance it implies is superlinear at the top
-    /// of the VIX's range. Measured on a pin ladder with the crisis blend
-    /// off (`tools/calibration/pin_ladder.py`), `implied(v) / v` falls to
-    /// 0.732 at VIX 40 and then rises: 0.854 at 80, 0.941 at 100. On that
-    /// slope it would cross one somewhere past 110 — an extrapolation, and
-    /// said to be one — and it crosses one INSIDE `vix_ceiling` on a roster
-    /// whose factor block is a larger share of the index's variance.
+    /// With `crash_amplifier_conditional_sigma` at 0.0 (presets before
+    /// pt-v19), `shock_magnitude` is normalized by the base sigma rather
+    /// than the conditional one, and `factors.rs` explains that choice. The
+    /// amplifier's conditional second moment
+    /// (`market::index_var::amplifier_moments`) then grows as the square of
+    /// the regime ratio. Under `vix_level_identity` that moment is in the
+    /// VIX's own target, so the map from the VIX to the variance it implies
+    /// is superlinear at the top of the VIX's range. Measured on a pin
+    /// ladder with the crisis blend off (`tools/calibration/pin_ladder.py`),
+    /// `implied(v) / v` falls to 0.732 at VIX 40 and then rises: 0.854 at
+    /// 80, 0.941 at 100. On that slope it would cross one somewhere past 110
+    /// (an extrapolation), and it crosses one inside `vix_ceiling` on a
+    /// roster whose factor block is a larger share of the index's variance.
     ///
-    /// That is not the amplifier being wrong. It is the amplifier having a
-    /// loop gain, which nothing measured while the read-back was blind to
-    /// it. Against a factor-variance process whose ORDINARY excursions reach
-    /// twenty to fifty times its target — see `market_vol_alpha`, and note
-    /// that the shipped mixture's fourth moment is finite — it takes the
-    /// VIX to `vix_ceiling` and the
-    /// loop holds it there: 81 of 7,560 seed-days on three of the
-    /// certification protocol's thirty rosters, with the crisis blend
-    /// switched entirely off. See `market::index_var`.
+    /// So the amplifier has a loop gain. Against a factor-variance process
+    /// whose ordinary excursions reach twenty to fifty times its target (see
+    /// `market_vol_alpha`, and note that the shipped mixture's fourth moment
+    /// is finite) it takes the VIX to `vix_ceiling` and the loop holds it
+    /// there: 81 of 7,560 seed-days on three of the certification
+    /// protocol's thirty rosters, with the crisis blend switched entirely
+    /// off. See `market::index_var`.
     pub crash_amplifier_slope: f64,
-    /// Which sigma the crash amplifier measures a shock in: the baseline
-    /// constant (0.0, every preset before pt-v19) or the tick's own
-    /// conditional sigma (nonzero).
+    /// Switch for the sigma the crash amplifier measures a shock in: 0.0
+    /// uses the baseline constant, any nonzero value the tick's own
+    /// conditional sigma. Presets before pt-v19 carry 0.0, and pt-v19 and
+    /// pt-v20 carry 1.0.
     ///
-    /// # A switch, and it is one on purpose
+    /// # A switch
     ///
-    /// There is no half-normalised shock. `factors.rs` branches on
+    /// There is no half-normalized shock. `factors.rs` branches on
     /// `== 0.0` and reads the conditional sigma on every other value, so
-    /// the MAGNITUDE is unused and the two admissible values are the two
-    /// ends. It belongs in `atlas.SWITCH_DIALS` for that reason and NOT in
-    /// the survey's zero-shipped ranges: a Latin hypercube over `[0, 1]`
-    /// never draws exactly zero, so an axis would survey the dial
-    /// permanently ON and report the far end as the whole map.
-    /// `cycle_stationary_opening` and `garch_omega_sector_scaled` are the
-    /// same shape and carry the same note.
+    /// the magnitude is unused and the two meaningful values are 0.0 and
+    /// 1.0. A survey axis over `[0, 1]` never draws exactly zero and would
+    /// map only the switched-on side, so `tools/calibration/atlas_survey.py`
+    /// lists it in `SWITCH_DIALS`, with `cycle_stationary_opening` and
+    /// `garch_omega_sector_scaled`, which are the same shape.
     ///
-    /// At 0.0 nothing is computed that was not computed before and no draw
-    /// moves, so every preset from pt-v1 to pt-v18 is BIT-IDENTICAL.
+    /// At 0.0 nothing extra is computed and no draw moves, so pt-v1 to
+    /// pt-v18 reproduce bit for bit.
     ///
     /// # What it changes, in one line
     ///
     /// `shock_magnitude` is `|F| / sigma`. With the baseline sigma the
     /// amplifier's argument is `s|z|` for the regime ratio
     /// `s = sqrt(v_f) / market_factor_sigma`, so a high-variance regime
-    /// pushes more ticks past `crash_amplifier_threshold` AND pushes them
+    /// pushes more ticks past `crash_amplifier_threshold` and pushes them
     /// further past it. With the conditional sigma the argument is `|z|`
     /// and the regime drops out entirely.
     ///
-    /// # Why pt-v19 needs it, which is a stability result and not a taste
+    /// # Why pt-v19 sets it
     ///
     /// In `market::index_var`'s closed form the amplifier's second moment
     /// is `E[z^2 A^2]` at `a = m s`, `c = T / s`, which grows without
     /// bound in `s`. Under `vix_level_identity` that moment is inside the
-    /// VIX's own target, so the map `v -> implied(v)` is SUPERLINEAR at the
+    /// VIX's own target, so the map `v -> implied(v)` is superlinear at the
     /// top of the VIX's range: `implied(v) / v` falls to 0.732 at VIX 40
     /// and then rises, 0.854 at 80 and 0.941 at 100, and it crosses one
     /// inside `vix_ceiling` on a roster whose factor block is a larger
     /// share of the index's variance. The ceiling is then absorbing, and
-    /// measured it is absorbed: 81 of 7,560 seed-days on three of the
-    /// certification protocol's thirty rosters with the crisis blend
-    /// switched entirely OFF, and 11 of 120 rosters over the population
-    /// b4read1 censused, where pt-v19 before charter bar B4 reached it on
-    /// 0 of 7,560.
+    /// measured with the baseline sigma the VIX sits on it on 81 of 7,560
+    /// seed-days on three of the certification protocol's thirty rosters
+    /// with the crisis blend switched off, and on 11 of 120 rosters in a
+    /// wider census.
     ///
-    /// At nonzero this dial sets `a = m` and `c = T`, so `E[z^2 A^2]` is
-    /// CONSTANT in the regime, the amplified factor block is linear in
+    /// At nonzero this switch sets `a = m` and `c = T`, so `E[z^2 A^2]` is
+    /// constant in the regime, the amplified factor block is linear in
     /// `v_f` exactly as the unamplified one is, and the map cannot cross
-    /// the diagonal however far the factor variance excurses. The runaway
-    /// b4read1 decomposed onto the draw stream (14 of 120 runs with the
-    /// roster held, 0 of 120 with the stream held) is removed at its
-    /// mechanism rather than made rarer.
+    /// the diagonal however far the factor variance moves. That removes the
+    /// runaway at its source. Splitting the runs traced it to the draw stream
+    /// (14 of 120 runs with the roster held, 0 of 120 with the stream held).
     ///
-    /// # What it costs, which was priced before it was needed
+    /// # What it costs
     ///
-    /// The alternative was built and measured on 2026-08-22, on a preset
-    /// whose VIX could not see the amplifier: 0.03 of volatility
-    /// clustering, 0.10 of excess kurtosis and 0.006 of correlation, for
-    /// "only the constancy of the firing rate". The magnitudes are
-    /// re-measured on pt-v19 in `CHANGELOG.md`; the APPRAISAL is what has
-    /// changed, because constancy now buys the loop's stability, which was
-    /// not on the ledger when the trade was first priced.
+    /// Measured on a preset whose VIX could not see the amplifier, the
+    /// conditional sigma cost 0.03 of volatility clustering, 0.10 of excess
+    /// kurtosis and 0.006 of correlation. `CHANGELOG.md` has the figures
+    /// re-measured on pt-v19. The cost buys the loop's stability.
     ///
-    /// And the realism the baseline normaliser was keeping is real and is
-    /// given up knowingly: with a constant normaliser the amplifier turns
-    /// a variance regime into a correlation regime, which is what crises
-    /// do. What replaces it is the rest of the crisis apparatus — the
-    /// blend, `sector_vix_coupling`, the jump coupling — none of which has
-    /// an unbounded loop gain through the read-back.
+    /// The realism the baseline normalizer kept is real and is given up:
+    /// with a constant normalizer the amplifier turns a variance regime into
+    /// a correlation regime, which is what crises do. The rest of the crisis
+    /// apparatus takes over that job (the blend, `sector_vix_coupling` and
+    /// the jump coupling), and none of it has an unbounded loop gain through
+    /// the read-back.
     pub crash_amplifier_conditional_sigma: f64,
-    /// Which VIX the market factor's variance target reads: the level
-    /// against a fixed anchor (0.0, every preset before pt-v19) or the
-    /// excursion above the level the index's own conditional variance
-    /// already implies (nonzero).
+    /// Switch for the VIX reading the market factor's variance target uses:
+    /// 0.0 reads the VIX level against a fixed anchor, any nonzero value
+    /// reads only the excursion above the level the index's own conditional
+    /// variance implies. Every shipped preset carries 0.0.
     ///
-    /// # A switch, and it is one on purpose
+    /// # A switch
     ///
     /// There is no half-excursion. `engine.rs` branches on `== 0.0` and
     /// reads the identity's own read-back on every other value, so the
-    /// MAGNITUDE is unused and the two admissible values are the two ends.
-    /// It belongs in `atlas.SWITCH_DIALS` beside
+    /// magnitude is unused and the two meaningful values are 0.0 and 1.0.
+    /// `tools/calibration/atlas_survey.py` lists it in `SWITCH_DIALS` beside
     /// [`ModelParams::crash_amplifier_conditional_sigma`],
-    /// `cycle_stationary_opening` and `garch_omega_sector_scaled`, and NOT
-    /// in the survey's zero-shipped ranges, for the reason all four carry:
-    /// a Latin hypercube over `[0, 1]` never draws exactly zero and would
-    /// survey the dial permanently ON.
+    /// `cycle_stationary_opening` and `garch_omega_sector_scaled`, because
+    /// a survey axis over `[0, 1]` never draws exactly zero and would map
+    /// only the switched-on side.
     ///
-    /// At 0.0 the engine passes `self.vix_anchor` exactly as it did, so
-    /// nothing is computed that was not computed before, no draw moves,
-    /// and every preset from pt-v1 to pt-v18 is BIT-IDENTICAL.
+    /// At 0.0 the engine passes `self.vix_anchor`, so nothing extra is
+    /// computed and no draw moves.
     ///
-    /// # The double count it removes, which is a RECORDED finding
+    /// # The double count it removes
     ///
-    /// A finding of the GARCH derivation. Under
-    /// [`ModelParams::vix_level_identity`] the VIX IS the index's own
+    /// Under [`ModelParams::vix_level_identity`] the VIX is the index's own
     /// conditional variance in points, plus a fear excursion. The factor's
     /// target then reads `(VIX / anchor)^2`, which is mostly the factor's
-    /// OWN variance coming back to it: that derivation shows the target
-    /// reverts the factor toward `c * s_f` of its own level, so
-    /// `market_vol_vix_coupling` — a fear-to-variance channel when the VIX
-    /// came from a phase table — became a LOOP-GAIN dial the moment the
-    /// identity shipped, doing a job its name does not say.
+    /// own variance coming back to it: the target reverts the factor toward
+    /// `c * s_f` of its own level. So under the identity
+    /// `market_vol_vix_coupling`, a fear-to-variance channel when the VIX
+    /// came from a phase table, is a loop-gain dial, which its name does not
+    /// say.
     ///
-    /// The cost is measured, not argued. The loop's static gain is
-    /// `theta = sum_k s_k c_k` and the factor
+    /// The loop's static gain is `theta = sum_k s_k c_k`, and the factor
     /// term carries about 0.45 of it against 0.11 for the instantaneous
     /// sector, jump and per-name couplings together. A standing bias `L`
-    /// in the target moves the level by `1 / (1 - theta)`: **2.7x at the
-    /// shipped theta of about 0.62.** Every excursion in the fear channel
+    /// in the target moves the level by `1 / (1 - theta)`, which is 2.7x at
+    /// the shipped theta of about 0.62. Every excursion in the fear channel
     /// is amplified by that factor before it reaches the variance, and the
     /// variance's own excursions are amplified again on the way back.
     ///
     /// # What it changes, in one line
     ///
     /// The ratio's denominator. At 0.0 it is `market_vol_vix_anchor` (or
-    /// the derived anchor under the identity), a CONSTANT; at nonzero it is
+    /// the derived anchor under the identity), a constant. At nonzero it is
     /// `vix_from_variance(vix_variance_premium, V_t)` evaluated on the
-    /// session's own index variance — the level the identity says this VIX
+    /// session's own index variance, the level the identity says this VIX
     /// ought to be. The ratio is then 1.0 whenever the VIX is exactly what
-    /// the variance implies, the target is exactly `base`, and what lifts
-    /// it is the fear excursion ALONE.
+    /// the variance implies, the target is exactly `base`, and only the
+    /// fear excursion lifts it.
     ///
-    /// # Why that is a stability result and not a taste
+    /// # Stability
     ///
-    /// At a PINNED VIX `v` the target becomes `base (1 - c + c v^2 / I(V)^2)`
-    /// with `I(V)` the read-back, which is DECREASING in the variance where
+    /// At a pinned VIX `v` the target becomes `base (1 - c + c v^2 / I(V)^2)`
+    /// with `I(V)` the read-back, which is decreasing in the variance where
     /// the old form was constant in it. The variance's fixed point solves an
     /// increasing function against a decreasing one, so it is unique and
     /// globally attracting at every pin.
     ///
     /// Free-running, the VIX is `I + E` for a fear excursion `E` that
     /// `vix_return_clamp` bounds. The ratio is `(1 + E / I)`, and `I` grows
-    /// with the variance while `E` does not — so the regime ratio DECAYS as
-    /// the variance excurses and the target falls back to `base`. The
-    /// runaway `b4fix1` left behind (5 of 120 rosters, 25 seed-days, after
-    /// the amplifier's superlinearity was removed) is a day-to-day
-    /// excursion amplified 2.7x around a map that already contracts; this
-    /// takes the amplification to about 1.1x, and it does so by removing
-    /// the term rather than by making the excursions rarer.
+    /// with the variance while `E` does not, so the regime ratio decays as
+    /// the variance moves up and the target falls back to `base`. The
+    /// runaway left once `crash_amplifier_conditional_sigma` removes the
+    /// amplifier's superlinearity (5 of 120 rosters, 25 seed-days) is a
+    /// day-to-day excursion amplified 2.7x around a map that already
+    /// contracts. This switch takes the amplification to about 1.1x by
+    /// removing the term.
     ///
-    /// # What it does NOT touch, deliberately
+    /// # What it leaves alone
     ///
-    /// `theta_i`, the instantaneous couplings — `sector_vix_coupling`,
-    /// `jump_vix_coupling`, `garch_vix_coupling`. Those read the VIX the
-    /// same day it prints and close the loop through the tick rather than
-    /// through the variance target; §3.4's option C names the variance
-    /// arm and only the variance arm. They are about 0.11 of theta and
-    /// they stay.
+    /// `theta_i`, the instantaneous couplings (`sector_vix_coupling`,
+    /// `jump_vix_coupling`, `garch_vix_coupling`). Those read the VIX the
+    /// same day it prints and close the loop through the tick, outside the
+    /// variance target. They are about 0.11 of theta and they stay.
     ///
-    /// Nor does it touch the four dials in the fear channel that
-    /// `flattens_at` reads, so charter bar B4 is a property of
-    /// `vix_return_clamp`, `vix_return_gain`, `vix_return_exponent` and
-    /// `vix_target_shock_cap` alone and is untouched by this.
+    /// It also leaves alone the four fear-channel dials that `flattens_at`
+    /// reads (`vix_return_clamp`, `vix_return_gain`, `vix_return_exponent`
+    /// and `vix_target_shock_cap`), so the bound they put on the VIX does
+    /// not change.
     ///
     /// # It is only meaningful under the identity
     ///
     /// Off `vix_level_identity` there is no read-back to be an excursion
-    /// above, and `vix_implied_from_market` is either zero or the FACTOR's
-    /// sigma on a different scale. `the_excursion_switch_requires_the_
-    /// identity` asserts no shipped preset sets one without the other.
+    /// above, and `vix_implied_from_market` is either zero or the factor's
+    /// sigma on a different scale. The test
+    /// `the_excursion_switch_requires_the_identity` checks that no shipped
+    /// preset sets one without the other.
     pub market_vol_vix_excursion: f64,
-    /// VIX points past `CRISIS_VIX_THRESHOLD` for the sector→market blend
-    /// to reach 1.0 before its cap (§5.4 promotion).
+    /// VIX points past `CRISIS_VIX_THRESHOLD` for the sector-to-market
+    /// crisis blend to reach 1.0 before its cap. Every preset ships 1.4.
     pub crisis_blend_ramp: f64,
-    /// Ceiling of the crisis correlation blend (§5.4 promotion).
+    /// Ceiling of the crisis correlation blend. pt-v1 to pt-v6 carry 0.8 and
+    /// pt-v7 onward 0.98.
     pub crisis_blend_cap: f64,
     /// How hard a crisis loads every name onto the market factor, as a
-    /// multiplier on the crisis spike. 0.5 is every preset before this dial
-    /// and is bit-identical (§96, §97).
+    /// multiplier on the crisis spike. 0.0 turns the extra loading off,
+    /// which is what pt-v19 and pt-v20 ship.
     ///
-    /// The crisis blend adds `crisis_blend_source * gain * crisis_spike *
-    /// market_factor` to a name's market component, and `gain` was the
-    /// literal 0.5. The spike itself is capped at `crisis_blend_cap`, 0.98,
-    /// so the extra market loading a crisis could ever produce was
-    /// 0.5 x 0.98 = 0.49 of beta, fixed in the source and reachable by no
-    /// parameter.
+    /// pt-v1 to pt-v10 carry 0.5, pt-v11 and pt-v12 0.8, and pt-v13 to
+    /// pt-v18 0.8275881. The crisis blend adds `crisis_blend_source * gain *
+    /// crisis_spike * market_factor` to a name's market component. The
+    /// spike is capped at `crisis_blend_cap`, 0.98, so the extra market
+    /// loading a crisis can produce is the gain times 0.98 of beta (0.49 at
+    /// a gain of 0.5).
     ///
-    /// That ceiling is why crisis co-movement could not be raised. Measured
-    /// at thirty seeds, every route to a real-sized crisis lever adds
-    /// variance that is NOT the market factor (jumps are per-name, the
-    /// sector draw is per-sector), and crisis-state cross-sectional
-    /// correlation is precisely the market factor's SHARE of total variance.
-    /// So the lever and co-movement traded against each other, and the one
-    /// channel that should have raised both was already pinned: the spike
-    /// saturates its cap for any crisis, because `effective_stress` is the
-    /// raw point excess over the 25.5 threshold and is about 19.5 at a held
-    /// VIX 45.
+    /// Measured at thirty seeds, every other route to a real-sized crisis
+    /// lever adds variance that is outside the market factor (jumps are
+    /// per-name, the sector draw is per-sector), and crisis-state
+    /// cross-sectional correlation is the market factor's share of total
+    /// variance. So the lever and co-movement trade against each other, and
+    /// this gain is the channel that can raise both, because it multiplies
+    /// the market factor and nothing else. The spike saturates its cap in
+    /// any crisis, because `effective_stress` is the raw point excess over
+    /// the 25.5 threshold and is about 19.5 at a held VIX 45.
     ///
-    /// Raising this gain is the headroom. It multiplies the market factor
-    /// and nothing else, so it buys co-movement in the one currency that
-    /// does not dilute it.
-    ///
-    /// # DERIVED TO ZERO for pt-v19, 2026-09-12
+    /// # Why pt-v19 and pt-v20 set it to zero
     ///
     /// The tape's VIX has no crisis attractor and its correlation is a
-    /// function of realised common volatility, which this model's factor
-    /// share already reproduces with no lift; a lift keyed on the VIX
+    /// function of realized common volatility, which this model's factor
+    /// share already reproduces with no lift. A lift keyed on the VIX
     /// level gives the map a second stable fixed point the tape refutes.
-    /// See `pt_v19`. The account
-    /// below is the value's history and stands for pt-v13 to pt-v18.
+    /// See `pt_v19`. The rest of this entry is about the value pt-v13 to
+    /// pt-v18 ship.
     ///
-    /// # It was UN-DERIVED at 0.8275881 from pt-v13 to pt-v18
+    /// # The pt-v13 to pt-v18 value
     ///
-    /// The value came off pt-v13's search, against a VIX read-back that
-    /// could not see the blend at all. `market::index_var` sees it now, so
-    /// the dial has a loop to answer to and a stability condition to be
-    /// derived from: `implied(v) < v` for every `v` above
+    /// 0.8275881 came from a search against a VIX read-back that could not
+    /// see the blend at all. `market::index_var` sees it now, so the gain
+    /// has a stability condition: `implied(v) < v` for every `v` above
     /// `crisis_vix_threshold`, which binds at `vix_ceiling` and is a
     /// quadratic in this gain with a closed-form root. That root is 0.1496
     /// on seeds 101 to 103.
     ///
-    /// **It is not moved to that root, because the root does not settle
-    /// what it was supposed to settle.** At a gain of exactly 0.0 the VIX
+    /// The root does not stop the runaway. At a gain of exactly 0.0 the VIX
     /// still reaches `vix_ceiling` on 81 of 7,560 seed-days over the
-    /// certification protocol's thirty rosters, where pt-v19 before B4
-    /// reached it on 0 of 7,560. The runaway is the crash amplifier's
-    /// second moment against the factor variance's own ordinary dispersion,
-    /// and not the blend's; this dial can make that worse and cannot make
-    /// it well. See `market::index_var`'s module
-    /// documentation for the measurement and for the three routes that
-    /// would settle it, none of them a dial.
+    /// certification protocol's thirty rosters. The runaway is the crash
+    /// amplifier's second moment against the factor variance's own ordinary
+    /// dispersion, and this gain can make it worse but cannot fix it. See
+    /// `market::index_var`'s module documentation for the measurement and
+    /// for the three routes that would settle it, none of them a dial.
     ///
-    /// A gain near 0.05 DOES pass the certified bands -- 18 of 18 at both
+    /// A gain near 0.05 passes the certified bands (18 of 18 at both
     /// horizons, the down-tail row at 1.9522 of a 1.9600 ceiling at 252 and
-    /// 1.7561 at 504 -- and is still not shipped. It is a grid search on one
-    /// row, which is what bar B3 exists to end; that row is a `pooled_rate`
-    /// with no seed scale, so the value cannot carry the error bar a
-    /// `measured` dial owes; and the loop is no better at it, with the
-    /// ceiling reached on 93 of 7,560 seed-days against 81 at a gain of
-    /// zero. Passing a band by switching off the mechanism the dial exists
-    /// for is not the same thing as being right.
+    /// 1.7561 at 504), and no preset ships it. It comes from a grid search
+    /// on one row, and that row is a `pooled_rate` with no seed scale, so
+    /// the value cannot carry an error bar. The loop is no better at it
+    /// either: the ceiling is reached on 93 of 7,560 seed-days against 81
+    /// at a gain of zero.
     pub crisis_blend_gain: f64,
-    /// Where the crisis correlation injection is taken from. At 0.0 it
-    /// comes out of the sector slot, which consumes the sector draw
-    /// exactly when sector structure matters most. At 1.0 it is added
-    /// to the market component instead, leaving the sector draw
-    /// whole. pt-v7 onward run 1.0.
+    /// Where the crisis correlation injection comes from. At 0.0 it comes
+    /// out of the sector slot, and at 1.0 it is added to the market
+    /// component, leaving the sector draw whole. pt-v1 to pt-v6 carry 0.0
+    /// and pt-v7 onward 1.0.
     ///
     /// At 0.0 the sector draw is attenuated by the spike and the market
-    /// factor is injected through the sector slot, which is the reference
-    /// behaviour and is bit-identical by branch. At 1.0 the sector draw is
-    /// left intact and the same market injection is added to the market
-    /// component directly.
+    /// factor is injected through the sector slot, which consumes the
+    /// sector draw exactly when sector structure matters most. That path is
+    /// bit-identical by branch. At 1.0 the sector draw is left intact and
+    /// the same market injection is added to the market component directly.
     ///
-    /// MEASURED 2026-08-25:
-    /// with the sector draw consumed, `sector_excess_corr` reads -0.007 at a
-    /// held VIX 45 whatever `sector_factor_sigma` is, where the real 2020
-    /// window reads +0.10; and a longer window reads lower sector excess than
-    /// a shorter one on every base, because it contains more crisis days.
-    /// The 0.0 path was written when the sector draw carried nothing worth
-    /// keeping.
-    ///
-    /// This paragraph and the two above it sat on `crisis_blend_gain` until
-    /// 2026-09-24, where the gain's own doc comment began after them, so the
-    /// parameter table described the gain as this dial.
+    /// Measured with the sector draw consumed, `sector_excess_corr` reads
+    /// -0.007 at a held VIX 45 whatever `sector_factor_sigma` is, where the
+    /// real 2020 window reads +0.10, and a longer window reads lower sector
+    /// excess than a shorter one on every base, because it contains more
+    /// crisis days.
     pub crisis_blend_source: f64,
 
     // ── Per-name GJR-GARCH (market/garch.rs) ────────────────────────────
@@ -1177,41 +1163,42 @@ pub struct ModelParams {
     /// level and a long run drifts without bound. The calibration
     /// searches (persistence, alpha share) rather than these two
     /// directly, because independent boxes around them put half
-    /// their mass across that line (atlas_survey TRANSFORMED_AXES).
+    /// their mass across that line (`TRANSFORMED_AXES` in
+    /// `tools/calibration/atlas_survey.py`).
     pub garch_beta: f64,
-    /// GJR leverage-effect asymmetry. Zero recovers symmetric GARCH(1,1)
+    /// GJR leverage-effect asymmetry: the extra weight a negative shock
+    /// gets in a name's next variance. Zero recovers symmetric GARCH(1,1)
     /// bit for bit.
     pub garch_gamma: f64,
-    /// Ceiling as a multiple of the sector's long-run variance. A guard, but
-    /// one searched under bounds. It was measured as binding on clustering.
+    /// Ceiling on a name's GARCH variance, as a multiple of the sector's
+    /// long-run variance. Every preset ships 5.0. It is a guard, but it was
+    /// measured binding on volatility clustering, so calibration searches
+    /// it under bounds.
     pub garch_ceiling_multiple: f64,
     /// How much a name's own variance follows the VIX, on the market
-    /// factor's own target shape.
+    /// factor's own target shape. 0.0 turns it off and is bit-identical by
+    /// branch.
     ///
-    /// 0.0 -- pt-v1 through pt-v9 -- is bit-identical by branch. It is no
-    /// longer the shipped value, where this line said "Shipped 0.0" until
-    /// 2026-09-17: pt-v10 to pt-v12 carry 0.3, pt-v13 0.0269 and pt-v14
-    /// onward 0.14219611. What follows is the variance model at zero, which
-    /// is where it stood when this dial arrived and the last piece of it
-    /// that did not know what regime it was in. The per-name
-    /// GJR-GARCH reads no macro state at all: its clamps are multiples of a
-    /// static per-sector variance, and its own unconditional level sits
-    /// below the floor those clamps impose (5.6% annualised against a floor
-    /// of 19.8% for technology), so a name's variance hovers near that floor
-    /// whatever the market is doing. The 5.6% is the reading at the
-    /// persistence of 0.8364 this line was written at; pt-v19's 0.9416 puts
-    /// the same level at 9.3% annualised, which is still under technology's
-    /// floor and over the 6.4% floor the three lowest-sigma sectors carry. That is why `garch_ceiling_multiple`
-    /// was measured not to bind at any value on this preset (§75): the
-    /// variance never gets within twenty times of it.
+    /// pt-v1 to pt-v9 carry 0.0, pt-v10 to pt-v12 0.3, pt-v13 0.0269 and
+    /// pt-v14 onward 0.14219611. At 0.0 the per-name GJR-GARCH reads no
+    /// macro state at all: its clamps are multiples of a static per-sector
+    /// variance, and its own unconditional level sits below the floor those
+    /// clamps impose (5.6% annualized against a floor of 19.8% for
+    /// technology), so a name's variance hovers near that floor whatever the
+    /// market is doing. That 5.6% is at a persistence of 0.8364. pt-v19's
+    /// 0.9416 puts the same level at 9.3% annualized, which is still under
+    /// technology's floor and over the 6.4% floor the three lowest-sigma
+    /// sectors carry. So `garch_ceiling_multiple` was measured not to bind
+    /// at any value with the coupling at 0.0: the variance never gets
+    /// within twenty times of it.
     ///
     /// The consequence is the crisis lever. Total volatility is the market
     /// factor plus the name's own, the factor scales with the VIX squared
     /// and the name's does not, so a held VIX 65 raises one term and leaves
     /// the other where it was: the lever reads 4.75x against a real 6.16x
-    /// with the factor's own clamp already past what a record VIX implies
-    /// (§77). Real single-stock volatility rises with the market's in a
-    /// crisis; here it cannot.
+    /// with the factor's own clamp already past what a record VIX implies.
+    /// Real single-stock volatility rises with the market's in a crisis;
+    /// at 0.0 here it cannot.
     ///
     /// At `c` the clamp reference becomes `base * (1 - c + c * (vix /
     /// market_vol_vix_anchor)^e)`, with `e` the exponent
@@ -1220,73 +1207,68 @@ pub struct ModelParams {
     /// base at any coupling and the two variance processes read the regime
     /// the same way.
     pub garch_vix_coupling: f64,
-    /// Exponent on the VIX ratio in a name's variance reference.
+    /// Exponent on the VIX ratio in a name's variance reference. Every
+    /// preset ships 2.0, the square.
     ///
-    /// 2.0 -- every preset before this dial -- is the literal square the
-    /// line in `market/daily.rs` has always computed, read BY BRANCH, so
-    /// `mathx::pow` never runs and every preset is bit-identical. Same
-    /// spelling and same discipline as
-    /// [`crate::market::factor_vol`]'s `vix_response` for the market
-    /// factor's own target, which is what makes the two shapes separable:
-    /// the index and the roster can be given different laws instead of
-    /// sharing one because nobody wrote the second one down.
+    /// At 2.0 the code in `market/daily.rs` takes the literal square by
+    /// branch, so `mathx::pow` never runs. Same spelling and same
+    /// discipline as [`crate::market::factor_vol`]'s `vix_response` for the
+    /// market factor's own target, which makes the two shapes separable:
+    /// the index and the roster can be given different laws.
     ///
     /// # What the shipped pair reaches, and what it does not
     ///
-    /// `garch_vix_coupling` is NOT inert on the shipped vector, and the
-    /// reading that says it is stops one line short.
+    /// `garch_vix_coupling` has an effect on the shipped vector, though it
+    /// does not reach the variance's level.
     /// [`crate::market::garch::update_garch_variance_for`] takes the
     /// constant `garch_omega` while `garch_omega_sector_scaled` is 0.0, so
-    /// the coupled reference does not reach the process's LEVEL -- but both
+    /// the coupled reference does not reach the process's level, but both
     /// clamps are multiples of that same reference. The recursion's own
     /// constant level, `garch_omega / (1 - persistence)`, is 3.42e-5 at
     /// pt-v19's persistence of 0.9416: under the floor for eight of the
     /// twelve sectors and at most 2.2x it for the other four, so what
     /// places a name's variance is the reference and the shock rather than
-    /// the constant. Measured on the held roster (`Universe.random(40, seed=111)`,
-    /// the VIX pinned at 5 against 65, medians over 60 graded days after
-    /// 252): the reference moves 2.28x, a name's GARCH variance 5.41x, and
-    /// the variance the tick actually draws with,
-    /// `max(variance, idio_sigma_floor)`, 3.57x. At coupling 0.0 the same
-    /// three read 1.00x, 4.61x and 3.16x. So the coupling buys 1.17x of the
-    /// 5.41x and the rest arrives by another road.
+    /// the constant. Measured on the held roster
+    /// (`Universe.random(40, seed=111)`, the VIX pinned at 5 against 65,
+    /// medians over 60 graded days after 252): the reference moves 2.28x, a
+    /// name's GARCH variance 5.41x, and the variance the tick actually draws
+    /// with, `max(variance, idio_sigma_floor)`, 3.57x. At coupling 0.0 the
+    /// same three read 1.00x, 4.61x and 3.16x. So the coupling buys 1.17x
+    /// of the 5.41x and the rest arrives by another road.
     ///
-    /// That road is the SHOCK, and it is why this dial is the one the
-    /// roster's law can be written on. `close_day_with` feeds the recursion
-    /// the day's `random_noise` attribution, and
+    /// That road is the shock. `close_day_with` feeds the recursion the
+    /// day's `random_noise` attribution, and
     /// [`crate::market::factors::calculate_live_factors`] builds it as
     /// `market_component * crash_amplifier + tilt_recentre +
     /// sector_component + idiosyncratic_noise`. A name's variance is
     /// therefore re-excited by the market factor's own VIX-coupled variance
     /// at a gain of `(alpha + gamma / 2) / (1 - beta)`, which is 0.72 on
-    /// pt-v19. What a name's variance does in a crisis is what the FACTOR
+    /// pt-v19. What a name's variance does in a crisis is what the factor
     /// does, attenuated and floored; nothing in it is a statement about the
     /// roster.
     ///
-    /// # The value the roster's own scaling law derives
+    /// # The value the roster's own scaling law gives
     ///
-    /// The tape's names scale like its index: realised volatility ~
+    /// The tape's names scale like its index: realized volatility ~
     /// `VIX^0.7088` across the roster, which is the 6.16x lever the record
     /// grades against a 13x of VIX. A variance is a volatility squared, so
     /// a name's variance reference must be proportional to `VIX^(2 *
     /// 0.7088)` = `VIX^1.4176`.
     ///
-    /// A blend `1 - c + c r^e` is a power law only at `c = 1`; below it the
+    /// A blend `1 - c + c r^e` is a power law only at `c = 1`. Below it the
     /// `1 - c` term is a floor the low end never leaves, and no exponent
-    /// makes such a map a law. So the law is a PAIR and not a number:
+    /// makes such a map a law. So the law is a pair of values:
     /// `garch_vix_coupling` at 1.0 and this dial at 1.4176, where the
     /// reference moves `13^1.4176` = 37.9x for the 13x of VIX the lever row
     /// reads. Neither figure is fitted to that row; both come off the
-    /// tape's exponent.
-    ///
-    /// The pair is not adopted here, and 2.0 ships. See
-    /// `provenance.py`'s entry for what would register it.
+    /// tape's exponent. No shipped preset uses this pair.
     pub garch_vix_exponent: f64,
-    /// Floor as a multiple of the sector's long-run variance.
+    /// Floor on a name's GARCH variance, as a multiple of the sector's
+    /// long-run variance. Every preset ships 0.25.
     pub garch_floor_multiple: f64,
-    /// Scale `garch_omega` by the sector's base variance instead of using
-    /// one constant for every sector. 0.0 is the shipped constant, read by
-    /// branch, and every preset before this dial is bit-identical.
+    /// Switch that scales `garch_omega` by each sector's base variance in
+    /// place of one constant for every sector. 0.0, which every shipped
+    /// preset carries, keeps the constant and is read by branch.
     ///
     /// The identity, which is the cascade path's arithmetic verbatim
     /// ([`crate::market::garch::update_garch_cascade`]):
@@ -1296,22 +1278,22 @@ pub struct ModelParams {
     /// ```
     ///
     /// which is exactly the omega that makes the recursion's unconditional
-    /// variance `omega / (1 - persistence)` EQUAL the sector's own base
+    /// variance `omega / (1 - persistence)` equal the sector's own base
     /// variance. No number is chosen: every term is already a parameter or
     /// the sector table's own `daily_sigma` squared.
     ///
-    /// Why it is needed. At the shipped constant of 2e-6 the recursion's
-    /// unconditional level is about 1.2e-5 for EVERY sector, against clamp
-    /// floors running 1.6e-5 to 1.56e-4, so the level is global while the
-    /// band around it is per sector. The sector table's 3.1x spread in
-    /// `daily_sigma` then reaches the price as roughly 1.4x, and per-name
-    /// volatility carries no sector ordering at all against a real corpus
-    /// ordered from staples 17.0 per cent to technology 29.4.
+    /// At the shipped constant of 2e-6 the recursion's unconditional level
+    /// is about 1.2e-5 for every sector, against clamp floors running
+    /// 1.6e-5 to 1.56e-4, so the level is global while the band around it
+    /// is per sector. The sector table's 3.1x spread in `daily_sigma` then
+    /// reaches the price as roughly 1.4x, and per-name volatility carries
+    /// no sector ordering at all against a real corpus ordered from staples
+    /// 17.0 per cent to technology 29.4.
     pub garch_omega_sector_scaled: f64,
-    /// Feed the per-name GJR the name's own noise, in the units the
-    /// coefficients were fitted in, instead of the whole `random_noise`
-    /// column. 0.0 is the shipped column read by branch, so every preset
-    /// before this dial is bit-identical. 1.0 is the whole form.
+    /// Feeds the per-name GJR-GARCH the name's own noise, in the units the
+    /// coefficients were fitted in, in place of the whole `random_noise`
+    /// column. 0.0, which every shipped preset carries, keeps the column
+    /// and is read by branch; 1.0 is the whole form.
     ///
     /// # The defect
     ///
@@ -1320,7 +1302,7 @@ pub struct ModelParams {
     /// [`crate::market::factors::calculate_live_factors`] builds that
     /// column as `market_component * crash_amplifier + tilt_recentre +
     /// sector_component + idiosyncratic_noise`. Three of the four terms
-    /// are not the name's variance at all. Measured on the held roster
+    /// are outside the name's own variance. Measured on the held roster
     /// (`Universe.random(40, seed=111)`, 504 days, eight seeds, medians
     /// over 320 names), in multiples of the `h` the recursion carries: the
     /// whole column's mean square is 1.387 h, of which the market's and
@@ -1330,7 +1312,7 @@ pub struct ModelParams {
     /// `kappa^2` is under one because the tick draws the name's own noise
     /// as `sqrt(max(h, idio_sigma_floor)) * idio_sigma_scale * cap_mult *
     /// volatility_multiplier / sqrt(390)` per tick, so the session's sum
-    /// carries that factor squared and not `h`. Two consequences, both
+    /// carries that factor squared in place of `h`. Two consequences, both
     /// measured:
     ///
     /// - the shock coefficient acts on the name's own variance at
@@ -1339,7 +1321,7 @@ pub struct ModelParams {
     ///   the dial vector reads 0.9416 and the tape's names read 0.938. The
     ///   fitted GJR persistence of the model's names is 0.894, between the
     ///   two, because the rest arrives from outside;
-    /// - the name is re-excited by the MARKET's own noise at a gain of
+    /// - the name is re-excited by the market's own noise at a gain of
     ///   0.72, so a name's variance memory is partly the factor's memory
     ///   wearing the name's label.
     ///
@@ -1349,8 +1331,8 @@ pub struct ModelParams {
     /// it with. `kappa^2` is accumulated in the engine the same way the
     /// attribution is, as the day's sum of
     /// `(idio_scale / sqrt(390) * cap_mult * volatility_multiplier *
-    /// suppress * tick_scale)^2`, so it is the scale that ACTUALLY ran and
-    /// not a reconstruction of it, and the innovation is
+    /// suppress * tick_scale)^2`, so it is the scale that actually ran, and
+    /// the innovation is
     ///
     /// ```text
     /// eps = noise_idio_sum / sqrt(kappa2)
@@ -1368,15 +1350,15 @@ pub struct ModelParams {
     /// Taking the common noise out of the innovation takes the level with
     /// it: the constant `garch_omega` gives an unconditional variance of
     /// 3.42e-5, under the clamp floor for eight of the twelve sectors, so
-    /// a name that is no longer re-excited by the market simply rests on
-    /// the floor. The companion is therefore
+    /// a name that is no longer re-excited by the market rests on the
+    /// floor. The companion is therefore
     /// [`ModelParams::garch_omega_sector_scaled`] at 1.0, which makes the
     /// recursion's own level the sector's base variance times the coupled
     /// reference, with [`ModelParams::garch_vix_coupling`] 1.0 and
-    /// [`ModelParams::garch_vix_exponent`] 1.4176 -- the roster's own
-    /// scaling law, `volatility ~ VIX^0.7088`. With the level following the
-    /// reference, the regime reaches a name where it belongs, as a LEVEL,
-    /// and the shock is the name's own.
+    /// [`ModelParams::garch_vix_exponent`] 1.4176 (the roster's own
+    /// scaling law, `volatility ~ VIX^0.7088`). With the level following
+    /// the reference, the regime reaches a name as a level, and the shock
+    /// is the name's own.
     ///
     /// [`ModelParams::idio_sigma_floor`] is the one constant this form
     /// cannot put in the right units. It ships at 1e-4 against a median
@@ -1384,12 +1366,11 @@ pub struct ModelParams {
     /// the innovation is divided by was taken at the floor and not at `h`,
     /// and `eps^2` then reads the floor: on the shipped level the fed
     /// innovation would be 1.28 h rather than the 1.00 h the form is
-    /// after. The companion repairs most of it by lifting the level --
-    /// with the sector-scaled omega the median variance is 1.29e-4, the
-    /// floor binds on 31 per cent of name-days, and the fed innovation
-    /// reads 1.09 h. The floor is left at its shipped value here: moving
-    /// it is a separate box, and the residual 0.09 is part of why the form
-    /// lands short of the dialled 0.9416.
+    /// after. The companion repairs most of it by lifting the level. With
+    /// the sector-scaled omega the median variance is 1.29e-4, the floor
+    /// binds on 31 per cent of name-days, and the fed innovation reads
+    /// 1.09 h. The floor stays at its shipped value here, and the residual
+    /// 0.09 is part of why the form lands short of the dialed 0.9416.
     ///
     /// # Measured
     ///
@@ -1408,115 +1389,102 @@ pub struct ModelParams {
     /// fed innovation over h    1.281   1.091
     /// ```
     ///
-    /// This dial ALONE, without the sector-scaled omega, is the reading
-    /// that says why the two travel together: the median variance falls to
-    /// 8.19e-5, the floor binds on 64 per cent of name-days, and the log
-    /// AR(1) reads 0.8673 -- below the shipped 0.8770. Taking the common
-    /// noise out of the innovation takes the level with it, and the name
-    /// comes to rest on the clamp floor.
+    /// This dial alone, without the sector-scaled omega, shows why the two
+    /// travel together: the median variance falls to 8.19e-5, the floor
+    /// binds on 64 per cent of name-days, and the log AR(1) reads 0.8673,
+    /// below the shipped 0.8770. Taking the common noise out of the
+    /// innovation takes the level with it, and the name comes to rest on
+    /// the clamp floor.
     pub garch_innovation_commensurate: f64,
-    /// The absolute floor under a name's daily sigma in the tick and in the
-    /// overnight path, in daily variance units. Ships at 1e-4, which is the
-    /// constant both sites carried inline, so every existing preset is
-    /// bit-identical. 0.0 removes it.
+    /// The absolute floor under a name's daily variance in the tick and in
+    /// the overnight path, in daily variance units. Every preset ships
+    /// 1e-4, and 0.0 removes it.
     ///
-    /// It was written as a dead-stock guard -- a zero variance would freeze
-    /// a price -- and against a recursion whose own level is about 6.3e-5
-    /// it is instead the binding constraint on 61 to 90 per cent of
-    /// name-days in nine of the twelve sectors. The guard's job is already
-    /// done, and done PER SECTOR rather than absolutely, by the
+    /// It guards against a zero variance, which would freeze a price.
+    /// Against a recursion whose own level is about 6.3e-5 it is also the
+    /// binding constraint on 61 to 90 per cent of name-days in nine of the
+    /// twelve sectors. The guard's job is already done per sector by the
     /// `[0.25, 5.0] x sector_base_variance` clamp in
     /// [`crate::market::garch::update_garch_variance_for`], which cannot
-    /// return zero for a positive base. A preset that sets this to 0.0
-    /// therefore has one fewer constant in it, not one more.
+    /// return zero for a positive base, so a preset that sets this to 0.0
+    /// has one fewer constant in it.
     pub idio_sigma_floor: f64,
 
     // ── Market-factor variance process (market/factor_vol.rs) ───────────
     /// The market factor's own GARCH reaction term: how sharply market-wide
-    /// variance responds to the last market-wide shock. This is the process
-    /// that gives every name a common volatility regime, and a name's own
-    /// GJR-GARCH is idiosyncratic on top of it.
+    /// variance responds to the last market-wide shock. This process gives
+    /// every name a common volatility regime, and a name's own GJR-GARCH is
+    /// idiosyncratic on top of it.
     ///
-    /// # THE DISPERSION IS HEAVY, FINITE, AND TAPE-LIKE — AND IT IS NOW
-    /// LOAD-BEARING
+    /// # Stationarity and the fourth moment
     ///
     /// `alpha + beta + gamma / 2 < 1` makes the process revert to its target
-    /// in expectation; 0.28035 and 0.69245 -- pt-v14 through pt-v18, which
-    /// this line attributed to pt-v13 until 2026-09-17 -- give 0.9728 and
-    /// pass it.
-    /// The fourth-moment condition `3 alpha^2 + 2 alpha beta + beta^2 < 1`
-    /// reads **1.1035** for this FAST COMPONENT ALONE and fails — but the
-    /// shipped process is a 0.65/0.35 mixture with `market_vol_slow_weight`,
-    /// its own condition is the spectral radius of a 4x4 matrix, and that
-    /// reads **0.9870**. The shipped factor variance has a finite fourth
-    /// moment. Both figures come from the GARCH derivation in the project's
-    /// unpublished design notes, which derived them before this note, and
-    /// both are computed on the pt-v16/pt-v18 triple. Until 2026-09-17 this
-    /// entry added that every dial they depend on is identical from pt-v16
-    /// to pt-v19, and it is not: pt-v19 moves all three -- alpha 0.28035004
-    /// to 0.0066, beta 0.69244622 to 0.8946, gamma 0.0 to 0.1556 -- and
-    /// `market_vol_slow_persistence` with them, 0.98 to 0.9913. The GJR
-    /// fourth-moment coefficient at pt-v19's triple reads 0.9908, recorded
-    /// under [`ModelParams::market_vol_alpha_excursion`]; the mixture's 4x4
-    /// spectral radius has not been recomputed at the pt-v19 vector here.
+    /// in expectation. pt-v14 to pt-v18 carry 0.28035 and 0.69245, which
+    /// give 0.9728 and pass it. The fourth-moment condition
+    /// `3 alpha^2 + 2 alpha beta + beta^2 < 1` reads 1.1035 for this fast
+    /// component alone and fails, but the process is a 0.65/0.35 mixture
+    /// with `market_vol_slow_weight`, its own condition is the spectral
+    /// radius of a 4x4 matrix, and on pt-v16 to pt-v18 that reads 0.9870,
+    /// so the factor variance there has a finite fourth moment. pt-v19 and
+    /// pt-v20 move all three (alpha 0.0066, beta 0.8946, gamma 0.1556) and
+    /// `market_vol_slow_persistence` to 0.9913. The GJR fourth-moment
+    /// coefficient at that triple reads 0.9908, recorded under
+    /// [`ModelParams::market_vol_alpha_excursion`]; the mixture's 4x4
+    /// spectral radius has not been recomputed for it.
     ///
     /// What the process has is heavy, finite dispersion: variance-of-variance
     /// 3.4 times its mean squared, implied factor kurtosis 13 against the
     /// tape's own GARCH at 2.8 and 11.3. The per-seed spread is the
-    /// finite-sample dispersion of any GARCH at this persistence — a bare
-    /// recursion with no engine reproduces it — and the tape's own years
+    /// finite-sample dispersion of any GARCH at this persistence (a bare
+    /// recursion with no engine reproduces it), and the tape's own years
     /// spread as widely. Pinned at a VIX whose target is 0.45 of baseline,
     /// the variance is measured sitting at 11.7 times baseline for eighty
     /// consecutive sessions on one of thirty certification rosters, and that
     /// is ordinary rather than pathological.
     ///
-    /// **Which is what makes it load-bearing now.** It was harmless while
-    /// the VIX could not see the crash amplifier. Since `market::index_var`
-    /// prices it, an excursion of that ordinary size implies a VIX above
-    /// `vix_ceiling` and the loop holds it there — so the read-back is
-    /// asking these two coefficients to carry a stability property they were
-    /// never derived for, and the GARCH derivation has tape-derived
-    /// values (0.1059 and 0.8787, with error bars) waiting for the question.
+    /// That dispersion matters for the VIX loop. `market::index_var` prices
+    /// the crash amplifier into the VIX, so an excursion of that ordinary
+    /// size can imply a VIX above `vix_ceiling`, and the loop holds it
+    /// there. These two coefficients were not derived with that stability
+    /// property in view. A GARCH fit to the real index gives 0.1059 and
+    /// 0.8787, with error bars.
     pub market_vol_alpha: f64,
     /// The market factor's variance persistence. `alpha + beta` is this
     /// process's persistence and is subject to the same stationarity limit
     /// as the per-name one, and to the same reparameterization in the
     /// survey.
     pub market_vol_beta: f64,
-    /// GJR leverage on the market factor's variance update. Zero recovers
-    /// the symmetric update bit for bit, and every preset before this dial
-    /// sets it.
+    /// GJR leverage on the market factor's variance update: the extra weight
+    /// a down day's squared shock gets. 0.0 is the symmetric update, carried
+    /// by pt-v1 through pt-v18; pt-v19 and pt-v20 ship 0.1556.
     ///
     /// A down day loads `market_vol_alpha + market_vol_gamma` on the
     /// squared shock where an up day loads `market_vol_alpha` alone, and
     /// omega compensates by `gamma/2` so the unconditional level stays on
-    /// target: the dial redistributes variance between down and up states
-    /// rather than adding any. The per-name asymmetry (`garch_gamma`) has
-    /// existed since pt-v2; the COMMON factor ran symmetric from pt-v1 to
-    /// pt-v18, where this line said "forever" until 2026-09-17, and pt-v19
-    /// ships 0.1556. Through pt-v18 that is why the model could not
-    /// produce correlation asymmetry --
-    /// correlations that rise in falling markets are the common factor's
-    /// leverage effect, and this model's corr_asymmetry sits at -0.016
-    /// against a real +0.015 with nothing measured able to move it
-    /// (rounds 93/95). This is the wire for exactly that statistic.
+    /// target. The dial moves variance between down and up states without
+    /// adding any. The per-name asymmetry (`garch_gamma`) has existed since
+    /// pt-v2, but the common factor ran symmetric through pt-v18, and that
+    /// is why those presets cannot produce correlation asymmetry.
+    /// Correlations that rise in falling markets are the common factor's
+    /// leverage effect, and on those presets `corr_asymmetry` sits at
+    /// -0.016 against a real +0.015 with no other dial able to move it.
     ///
-    /// Applies to the FAST component only: the leverage effect is a
+    /// Applies to the fast component only. The leverage effect is a
     /// same-week phenomenon, and the slow component carries long-horizon
-    /// clustering, not asymmetry.
+    /// clustering with no asymmetry.
     pub market_vol_gamma: f64,
 
     /// How far the common factor's shock share moves with the factor's own
-    /// variance excursion. 0.0 is a constant share, which is every preset
-    /// before 0.8.0 and is bit-identical to the arithmetic that predates
-    /// this dial.
+    /// variance excursion. 0.0, which every shipped preset carries, is a
+    /// constant share, and at 0.0 the arithmetic is bit-identical to the
+    /// form without this dial.
     ///
-    /// # What the tape says, and why a constant share cannot say it
+    /// # What the tape says
     ///
-    /// MEASURED on the index, 19,014 sessions 1950-2025. Regress
-    /// `|r_t|` on `|r_{t-1}|`, the standardised log of trailing realised
+    /// Measured on the index, 19,014 sessions 1950-2025. Regress
+    /// `|r_t|` on `|r_{t-1}|`, the standardized log of trailing realized
     /// volatility over `w` sessions ending at `t-1`, and their product.
-    /// The product's coefficient is how much clustering MOVES with the
+    /// The product's coefficient is how much clustering moves with the
     /// state, and the tape reads:
     ///
     /// ```text
@@ -1526,233 +1494,205 @@ pub struct ModelParams {
     ///   w = 252 sessions   +0.0187 +/- 0.0059
     /// ```
     ///
-    /// Two things follow. The response is REAL and it is FAST: strongest
-    /// at a week and decaying as the window lengthens, so it is a
-    /// days-to-weeks mechanism rather than a regime. And the tape's
-    /// BASELINE clustering at the weekly window is NEGATIVE (-0.058):
-    /// almost all of the real market's volatility clustering is
-    /// conditional on the last week having been rough, and a constant
-    /// shock share has no way to spell that.
+    /// The response is strongest at a week and decays as the window
+    /// lengthens, so it is a days-to-weeks mechanism and not a regime. The
+    /// tape's baseline clustering at the weekly window is negative
+    /// (-0.058): almost all of the real market's volatility clustering is
+    /// conditional on the last week having been rough, and a constant shock
+    /// share cannot express that.
     ///
-    /// The shipped model has about a fifth of the response
-    /// (+0.0158 +/- 0.0064 at w = 5 on the composed vector, +0.0483 on
-    /// pt-v18) and the WRONG SIGN at a quarter and a year. This dial is
-    /// the mechanism that gap asks for.
+    /// The model without this dial has about a fifth of the response
+    /// (+0.0158 +/- 0.0064 at w = 5 on pt-v19's vector, +0.0483 on pt-v18)
+    /// and the wrong sign at a quarter and a year.
     ///
-    /// # The form, and why it is a rotation rather than a lift
+    /// # The form
     ///
     /// `delta = excursion * ln(variance / target)`, then
-    /// `alpha_t = alpha + delta` and `beta_t = beta - delta`. The PAIR
-    /// moves, not the share alone, so `alpha + beta` is invariant and with
-    /// it the persistence, the unconditional level and omega's
-    /// mean-reversion. What changes is the split between yesterday's shock
-    /// and the carried state, which is what clustering is.
+    /// `alpha_t = alpha + delta` and `beta_t = beta - delta`. The pair
+    /// moves together, so `alpha + beta` is invariant and with it the
+    /// persistence, the unconditional level and omega's mean reversion.
+    /// What changes is the split between yesterday's shock and the carried
+    /// state, which is what clustering is.
     ///
-    /// Lifting alpha alone was the obvious form and the fourth moment
-    /// refuses it. The GJR coefficient
-    /// `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` reads 0.9908 at the shipped
-    /// triple, and raising alpha alone crosses one at 0.0120 -- half a
+    /// Raising alpha alone runs into the fourth moment. The GJR coefficient
+    /// `3a^2 + 3ag + 1.5g^2 + 2ab + bg + b^2` reads 0.9908 at the pt-v18
+    /// triple, and raising alpha alone crosses one at 0.0120, half a
     /// thousandth of headroom. Rotating gives six times as much (`delta`
-    /// to 0.020 at 0.9984), because what the fourth moment objects to is
-    /// total persistence and the rotation does not add any. This is the
-    /// same one-parameter-fewer argument that put `g = p - 1` on the VIX
-    /// response and the ratio form on the sector state.
+    /// to 0.020 at 0.9984), because the fourth moment limits total
+    /// persistence and the rotation adds none.
     ///
-    /// `delta` is CLAMPED at the value that holds that coefficient at
-    /// 0.999, computed from `beta` and `gamma` rather than written down,
-    /// so a preset that moves either cannot silently lose the finite
-    /// fourth moment the tape's coefficients bought.
+    /// `delta` is clamped at the value that holds that coefficient at
+    /// 0.999, computed from `beta` and `gamma`, so a preset that moves
+    /// either keeps a finite fourth moment.
     pub market_vol_alpha_excursion: f64,
 
-    /// How much of last session's slow variance level carries into this one.
-    /// Together with `market_vol_level_sigma` this is a lognormal AR(1)
-    /// multiplier on the factor's variance target. It is a level that drifts
-    /// over months, not a component that reverts over days.
+    /// Session-to-session persistence of a slow multiplier on the market
+    /// factor's variance target, in (0, 1). With `market_vol_level_sigma`
+    /// it makes a lognormal AR(1) level that drifts over months; 0.0, which
+    /// every shipped preset carries, turns it off.
     ///
-    /// # Why a level rather than a third component
+    /// # Why a level and not a third component
     ///
-    /// DERIVED from the variance cascade's fourth moment. Every candidate
-    /// that buys fat tails by adding
-    /// variance-of-variance to the recursion -- a heavier `alpha`, a longer
-    /// slow pole, a third component, a random `gamma` -- is a
-    /// random-coefficient recursion, and those are exactly the entries of
-    /// the fourth-moment operator `T` whose spectral radius has to stay
-    /// under one. At the shipped triple `rho(T)` reads 0.9841 and the
-    /// campaign has already spent the margin.
+    /// Every way of buying fat tails by adding variance-of-variance to the
+    /// recursion (a heavier `alpha`, a longer slow pole, a third component,
+    /// a random `gamma`) is a random-coefficient recursion. Those are the
+    /// entries of the fourth-moment operator `T`, whose spectral radius has
+    /// to stay under one, and at the pt-v18 triple `rho(T)` already reads
+    /// 0.9841.
     ///
     /// A term that moves only `omega` does not appear in `T` at all.
     /// Scaling the target scales `omega_i = (1 - pers_i) * target` and
-    /// leaves every `a_i, b_i, g_i` untouched, so the composed condition
+    /// leaves every `a_i, b_i, g_i` untouched, so the combined condition
     /// becomes `rho(T) < 1` AND `E[L^2] < infinity`, and the second holds
     /// for every stationary lognormal at every `phi < 1` and every `sigma`.
-    /// The two conditions SEPARATE. That is the whole argument for this
-    /// form: it is the only one whose tail does not come out of the moment
-    /// condition's budget.
+    /// The two conditions separate, so the level's tail costs nothing
+    /// against the moment condition.
     ///
-    /// # The value
+    /// # The derived value
     ///
-    /// DERIVED from two MEASURED tape statistics, section 4.3: the
-    /// window log-variance dispersion of ^GSPC that the model does not
-    /// account for, and its window-to-window autocorrelation, solved
-    /// through the closed-form autocorrelation of the session means of an
-    /// AR(1). **0.9977 [0.9945, 0.9992]**, a half-life of 295 sessions
-    /// [126, 866]. The two 252-session tape windows (1990-2025 and
-    /// 1950-2026) agree at 0.6 of their own error.
+    /// 0.9977 (0.9945 to 0.9992), a half-life of 295 sessions (126 to
+    /// 866), derived from two measured statistics of ^GSPC: the window
+    /// log-variance dispersion the model does not account for, and its
+    /// window-to-window autocorrelation, solved through the closed-form
+    /// autocorrelation of the session means of an AR(1). The two
+    /// 252-session tape windows (1990-2025 and 1950-2026) agree at 0.6 of
+    /// their own error.
     ///
-    /// NOT derived: the estimator. The 504-window autocorrelation is the
-    /// weakest of the four inputs and it is what drags the 504 solve down
-    /// to 0.995. If this is adopted, `phi` should be re-derived from the
-    /// log realised-variance autocorrelation over a RANGE of lags rather
-    /// than from a single window lag.
+    /// The estimator is the weak part. The 504-session window's
+    /// autocorrelation is the weakest of the four inputs and pulls the
+    /// 504 solve down to 0.995. A better estimate would fit the log
+    /// realized-variance autocorrelation over a range of lags.
     ///
-    /// 0.0 -- pt-v1 through pt-v18 -- is, with `market_vol_level_sigma`
-    /// 0.0, a multiplier of exactly 1.0 and bit-identical. It stopped being
-    /// the shipped value at pt-v19, which carries the 0.9977 derived above
-    /// beside a sigma of 0.085; this paragraph read "Ships at 0.0" until
-    /// 2026-09-17.
+    /// At 0.0, with `market_vol_level_sigma` 0.0, the multiplier is exactly
+    /// 1.0 and the run is bit-identical to one without this term.
     pub market_vol_level_persistence: f64,
 
-    /// The per-session innovation of the slow variance level, in log units.
-    /// 0.0, which pt-v1 through pt-v18 carry, pins the level at exactly 1.0
-    /// and leaves the target arithmetic that predates this dial untouched,
-    /// to the bit. pt-v19 ships 0.0 again since the 2026-09-20
-    /// recomposition, having carried 0.085 from 2026-09-14. This line said
-    /// "every preset through pt-v19" until 2026-09-17.
+    /// Per-session innovation of the slow variance level, in log units.
+    /// 0.0, which every shipped preset carries, pins the level at exactly
+    /// 1.0 and leaves the target arithmetic untouched, to the bit.
     ///
-    /// **0.047 [0.035, 0.064]** DERIVED, section 4.3, equivalently a
-    /// stationary `sd(log L)` of **0.69 [0.56, 0.87]**: the dispersion of
+    /// The value derived from the tape is 0.047 (0.035 to 0.064), a
+    /// stationary `sd(log L)` of 0.69 (0.56 to 0.87): the dispersion of
     /// window log-variance the tape has and the model does not,
-    /// `sqrt(tape^2 - model^2)`, carried through the AR(1) shrinkage
-    /// factor at the persistence above. The bar is the propagated
-    /// jackknife error on the two tape sds. That is not the shipped number
-    /// and `provenance.py` records why: 4.3 set the LEVEL's window-mean
-    /// dispersion equal to the INDEX's deficit, and the level drives the
-    /// factor, which is about half the index, so 0.047 is low by about a
-    /// factor of two. The entry records this dial `measured` at pt-v19's
-    /// 0.085, read off the engine's own output rather than solved,
-    /// and the arm at 0.085 puts sd(log var)
-    /// inside the tape's band at both horizons.
+    /// `sqrt(tape^2 - model^2)`, carried through the AR(1) shrinkage factor
+    /// at the persistence above. The range is the propagated jackknife
+    /// error on the two tape sds. That derivation sets the level's
+    /// window-mean dispersion equal to the index's deficit, but the level
+    /// drives the factor, which is about half the index, so 0.047 is low by
+    /// about a factor of two. Read off the engine's own output, 0.085 puts
+    /// sd(log var) inside the tape's band at both horizons.
     ///
-    /// # Three things it costs
+    /// # What it costs
     ///
-    /// 1. **The level would fall if `E[L]` were normalised.** At the
-    ///    shipped 0.085, with `market_vol_level_persistence` 0.9977, the
-    ///    stationary `sd(log L)` is `0.085 / sqrt(1 - 0.9977^2)` =
-    ///    **1.254**; so with `E[L] = 1` the mean root `E[sqrt(L)]` is
-    ///    `exp(-sd^2/8)` = 0.822 and median annualised volatility would
-    ///    drop EIGHTEEN per cent -- and `annualised_vol_pct` is a graded
-    ///    row. The derived 0.047 gives `sd(log L)` 0.69, `E[sqrt(L)]`
-    ///    0.942 and six per cent instead, and this paragraph quoted only
-    ///    that second triple until 2026-09-18 -- a derived cost standing
-    ///    where the shipped one belongs, and the only self-refuting number
-    ///    in this entry: 0.69 solves back to a sigma of 0.047, not to the
-    ///    0.085 four paragraphs above it. So the normalisation here is
-    ///    `E[sqrt(L)] = 1`, which subtracts `sd^2/4` from the log level. A
-    ///    constant of the construction, not a free dial, and it is applied
-    ///    at whatever sigma the preset carries.
+    /// 1. **The level would fall if `E[L]` were normalized.** At 0.085,
+    ///    with `market_vol_level_persistence` 0.9977, the stationary
+    ///    `sd(log L)` is `0.085 / sqrt(1 - 0.9977^2)` = 1.254, so with
+    ///    `E[L] = 1` the mean root `E[sqrt(L)]` is `exp(-sd^2/8)` = 0.822
+    ///    and median annualized volatility would drop 18 per cent, on a
+    ///    graded row (`annualised_vol_pct`). At the derived 0.047 the same
+    ///    sums give `sd(log L)` 0.69, `E[sqrt(L)]` 0.942 and a 6 per cent
+    ///    drop. So the normalization is `E[sqrt(L)] = 1`, which subtracts
+    ///    `sd^2/4` from the log level. It is a constant of the
+    ///    construction, applied at whatever sigma the preset carries.
     /// 2. **A draw.** One normal per session, on
     ///    [`crate::rng::stream::MARKET_VOL_LEVEL`] and not on `MARKET`, so
     ///    the schedule does not move and nothing else reshuffles. See that
-    ///    constant for why the isolation is what makes the zero arm a
-    ///    control rather than a different random world.
-    /// 3. **The VIX loop will amplify it, by an unmeasured factor.**
-    ///    `market_vol_vix_excursion` is 1.0 on pt-v19, so the target reads
-    ///    the VIX's excursion from the index's own implied level and a
-    ///    slow level moves that level. DERIVED as a bound: the standalone
-    ///    factor's window dispersion is 0.249 and the engine's index reads
-    ///    0.225, so the loop plus the 45 per cent non-factor share
-    ///    currently transmits at about 0.9. If that ratio holds the value
-    ///    above is right to within its own bar; if the loop amplifies, it
-    ///    is high. This is the single largest reason to read 4.3 as the
-    ///    starting point of a box rather than as a finished calibration.
+    ///    constant for why the isolation makes the zero setting a control
+    ///    and not a different random world.
+    /// 3. **The VIX loop can amplify it, by an unmeasured factor.** With
+    ///    `market_vol_vix_excursion` at 1.0 the target reads the VIX's
+    ///    excursion from the index's own implied level, and a slow level
+    ///    moves that level. As a bound: the standalone factor's window
+    ///    dispersion is 0.249 and the engine's index reads 0.225, so the
+    ///    loop plus the 45 per cent non-factor share transmits at about
+    ///    0.9. If that ratio holds, the derived value is right to within its
+    ///    own range; if the loop amplifies, it is high. Treat the derived
+    ///    pair as a starting point for a search and not a finished
+    ///    calibration.
     ///
-    /// # What it is predicted to buy, registered before the box
+    /// # Expected effect
     ///
-    /// `index_tail_dn3_pct` at 252 from 0.608 to **0.86-1.03** against a
-    /// tape centre of 1.213; `excess_kurtosis` UNMOVED, because a
-    /// per-window level shift multiplies every name equally and the pooled
-    /// standardised statistic is invariant to it by construction.
-    /// FALSIFIER: if the tail row does not reach 0.80 at the derived pair,
-    /// the mechanism is wrong rather than under-dialled.
+    /// The derivation predicts `index_tail_dn3_pct` at 252 moving from 0.608
+    /// to 0.86 to 1.03 against a tape center of 1.213, with
+    /// `excess_kurtosis` unmoved, because a per-window level shift
+    /// multiplies every name equally and the pooled standardized statistic
+    /// is invariant to it by construction. If the tail row does not reach
+    /// 0.80 at the derived pair, the mechanism is wrong, and more of the
+    /// same dial will not fix it.
     pub market_vol_level_sigma: f64,
 
-    /// The persistence of the VIX's own slow log-level: a lognormal AR(1)
-    /// multiplier on what the VIX prices under the identity, riding the
-    /// normal `stream::MARKET_VOL_LEVEL` already draws every close.
+    /// Session-to-session persistence of the VIX's own slow log-level, a
+    /// lognormal AR(1) multiplier on the VIX target under
+    /// `vix_level_identity`. 0.0 on pt-v1 through pt-v18; pt-v19 and
+    /// pt-v20 ship 0.9979.
     ///
     /// # Why it exists
     ///
     /// The real VIX's persistence rises from one-year to two-year windows
     /// (`facts.REAL_VIX_AR1_RISE`): two thirds of its variance is a slow
     /// regime level with a half-life near two hundred sessions, and a
-    /// single-pole process cannot show that on the gate's estimator. The
-    /// stochastic level on the FACTOR's variance target was the first
-    /// attempt and was returned to 0.0 on 2026-09-20 because a multiplier
-    /// on the variance process moves every row that reads it. This one
-    /// multiplies the VIX target alone -- `vix_implied_from_market`, at the
-    /// one line the engine wires it -- so the factor's variance and the
-    /// fourteen shape rows it drives are untouched at first order, and the
-    /// VIX loop sees the level only through the coupling every preset
-    /// already carries.
+    /// single-pole process cannot show that on the realism gate's
+    /// estimator. A slow level on the factor's variance target
+    /// (`market_vol_level_sigma`) moves every row that reads the variance
+    /// process. This one multiplies the VIX target alone, the read-back
+    /// `vix_implied_from_market` at the one place the engine wires it, so
+    /// the factor's variance and the fourteen shape rows it drives are
+    /// untouched at first order, and the VIX loop sees the level only
+    /// through the coupling every preset already carries.
     ///
-    /// # Derivation (2026-09-21)
+    /// # Derivation
     ///
     /// A two-pole fit to the ACF of log VIX over 1990-2025 at lags 1 to 504
-    /// reads a fast pole of 0.942 carrying 21 per cent of the variance and
-    /// a SLOW pole of 0.9965 (half-life 198 sessions) carrying 79 per cent:
-    /// stationary sd 0.306 in logs, innovation 0.0256 per session. Those
-    /// are the derived values; they ship at 0.0 until the registered arm
-    /// has measured what they do to every row.
+    /// reads a fast pole of 0.942 carrying 21 per cent of the variance and a
+    /// slow pole of 0.9965 (half-life 198 sessions) carrying 79 per cent:
+    /// stationary sd 0.306 in logs, innovation 0.0256 per session. Those are
+    /// the tape-derived values. The shipped pair is 0.9979 and 0.0181.
     ///
-    /// 0.0 -- every preset through pt-v18 -- is, with `vix_level_sigma` 0.0,
-    /// a multiplier of exactly 1.0 and bit-identical. Read only while
-    /// `vix_level_sigma` is non-zero, which it is on pt-v19 since the
-    /// 2026-09-21 composition.
+    /// At 0.0, with `vix_level_sigma` 0.0, the multiplier is exactly 1.0
+    /// and the run is bit-identical. Read only while `vix_level_sigma` is
+    /// nonzero.
     pub vix_level_persistence: f64,
 
-    /// The per-session innovation of the VIX's own slow log-level. It is 0.0
-    /// on every preset through pt-v18 (pt-v19 ships it since the 2026-09-21
-    /// composition, and `provenance.py` carries the value it ships and its
-    /// derivation). At 0.0 the log-level stays exactly 0.0, the multiplier
-    /// is exactly 1.0 by a branch and not by arithmetic, and no draw is
-    /// added or moved. The normal it would consume is the one the factor
-    /// level already takes unconditionally on its own stream, so a preset
-    /// carrying both levels drives them with one draw and says so. Derived
-    /// 0.0256 at persistence 0.9965 (see `vix_level_persistence`). Read only
-    /// under `vix_level_identity`, where the VIX target is what the index's
-    /// own conditional variance implies. Off the identity the target is the
+    /// Per-session innovation of the VIX's own slow log-level, in log units.
+    /// 0.0 on pt-v1 through pt-v18; pt-v19 and pt-v20 ship 0.0181.
+    ///
+    /// At 0.0 the log-level stays exactly 0.0, the multiplier is exactly 1.0
+    /// by a branch, and no draw is added or moved. The normal it would
+    /// consume is the one the factor level already takes unconditionally on
+    /// its own stream, so a preset carrying both levels drives them with
+    /// one draw. The tape derivation gives 0.0256 at persistence 0.9965
+    /// (see `vix_level_persistence`). Read only under
+    /// `vix_level_identity`, where the VIX target is what the index's own
+    /// conditional variance implies. Off the identity the target is the
     /// phase table and this multiplier is not applied.
     pub vix_level_sigma: f64,
 
-    /// The loop's own transmission of the VIX's slow level into the VIX,
-    /// which the level's innovation is divided by. 0.0, which every preset
-    /// through pt-v18 carries, is the branch not taken: the recursion and
-    /// the multiplier read `vix_level_sigma` itself, the same f64, and those
-    /// presets reproduce bit for bit. pt-v19 ships it since the 2026-09-21
-    /// composition. `provenance.py` carries the value it ships and its
-    /// derivation, which the defect below predates.
+    /// The VIX loop's own gain on the slow VIX level, which the level's
+    /// innovation is divided by. 0.0, which pt-v1 through pt-v18 carry,
+    /// skips the division and those presets reproduce bit for bit; pt-v19
+    /// and pt-v20 ship 1.79.
     ///
-    /// # The defect
+    /// # The problem it corrects
     ///
     /// `vix_level_sigma` is the spread of the tape's yearly medians of log
-    /// VIX written onto the LATENT multiplier, and the two are not the same
-    /// quantity. Under `vix_level_identity` the VIX's target is the
+    /// VIX written onto the latent multiplier, and the two are different
+    /// quantities. Under `vix_level_identity` the VIX's target is the
     /// read-back of the index's own conditional variance times this level,
-    /// and the read-back answers the VIX back: a level a little higher
+    /// and the read-back answers the VIX back: a slightly higher level
     /// raises the factor's variance target, which raises the read-back,
     /// which raises the VIX again. So the spread the model's VIX shows is
-    /// the level's spread times the loop's gain, and the derivation put a
-    /// spread measured on the OUTPUT onto the INPUT. It is why every gain
-    /// in the variance loop lengthens the VIX's memory: at
+    /// the level's spread times the loop's gain, and a spread measured on
+    /// the output is being applied to the input. This is why every gain in
+    /// the variance loop lengthens the VIX's memory: at
     /// `market_vol_vix_exponent` 4.9 the same level arrives at the VIX half
     /// again as large, the slow share of the VIX's variance grows with it,
     /// and `vix_ar1_debiased` rises at both horizons.
     ///
-    /// # The form, and why it is one number
+    /// # The form
     ///
     /// Hold the VIX and the excursion target's fixed point makes the
-    /// read-back a power of it, `I = A * VIX^h`, which is what the held-VIX
-    /// probe measures. Let the loop run and the level multiplies:
+    /// read-back a power of it, `I = A * VIX^h`, which is what a held-VIX
+    /// run measures. Let the loop run and the level multiplies:
     /// `VIX = I(VIX) * L`, so `log VIX = h log VIX + log A + log L` and
     ///
     /// ```text
@@ -1763,21 +1703,18 @@ pub struct ModelParams {
     /// VIX's own log-level spread at the spread the tape's yearly medians
     /// carry, whatever the loop's gain is, so the exponent can be moved for
     /// the crisis lever without the VIX's memory moving with it. It divides
-    /// the STATIONARY opening too, not only the innovation, because the two
-    /// are one dispersion and the opening draw is the level's own
-    /// stationary distribution.
+    /// the stationary opening too, because the two are one dispersion and
+    /// the opening draw is the level's own stationary distribution.
     ///
     /// # Derivation
     ///
-    /// `h` is read off the held-VIX pair the lever probe already runs, VIX
-    /// 5 against VIX 65: the read-back `vix_implied_from_market` rises
-    /// 3.00x at the shipped exponent 2.0 and 4.60x at 4.9, over a VIX that
-    /// rises 13x, so `h` is `ln 3.00 / ln 13` = 0.428 and
-    /// `ln 4.60 / ln 13` = 0.595. The gain is then 1.75 at the shipped
-    /// exponent and 2.47 at 4.9. Both are DERIVED in the sense that matters
-    /// here: nothing was fitted to a graded row, each is a ratio of two
-    /// readings the lever probe takes anyway, and the form above is the
-    /// loop's own algebra.
+    /// `h` is read off a pair of held-VIX runs, VIX 5 against VIX 65: the
+    /// read-back `vix_implied_from_market` rises 3.00x at exponent 2.0 and
+    /// 4.60x at 4.9, over a VIX that rises 13x, so `h` is
+    /// `ln 3.00 / ln 13` = 0.428 and `ln 4.60 / ln 13` = 0.595. The gain is
+    /// then 1.75 at exponent 2.0 and 2.47 at 4.9. Nothing was fitted to a
+    /// graded row: each is a ratio of two readings, and the form above is
+    /// the loop's own algebra.
     ///
     /// A gain must be strictly positive: it divides a dispersion, and the
     /// loop's is `1 / (1 - h)` with `h` in `[0, 1)`, so it is never below
@@ -1785,53 +1722,49 @@ pub struct ModelParams {
     /// refuses the dial while `vix_level_sigma` is 0.0, where there is no
     /// level for it to correct.
     ///
-    /// # What it moves, MEASURED on 16 seeds of the held roster
+    /// # What it moves, measured on 16 seeds of a fixed roster
     ///
-    /// `vix_ar1_debiased` reads 0.9523 at 252 and 0.9637 at 504 on the
-    /// shipped vector. At `market_vol_vix_exponent` 4.9, which is what the
-    /// crisis lever asks for, it reads 0.9581 and 0.9752, and the 504
-    /// reading is refused. With the gain divided out at 4.9 it reads 0.9492
-    /// and 0.9592, under the shipped vector at both horizons, with a rise
-    /// of +0.0100 against the shipped vector's +0.0114, and the lever is
-    /// untouched: the read-back still rises 4.60x and realised index
-    /// volatility 4.85x for a VIX of 5 against 65.
+    /// On a base vector with `market_vol_vix_exponent` 2.0,
+    /// `vix_ar1_debiased` reads 0.9523 at 252 and 0.9637 at 504. At
+    /// exponent 4.9, which is what the crisis lever asks for, it reads
+    /// 0.9581 and 0.9752, and the 504 reading is refused. With the gain
+    /// divided out at 4.9 it reads 0.9492 and 0.9592, under the base at
+    /// both horizons, with a rise of +0.0100 against the base's +0.0114,
+    /// and the lever is untouched: the read-back still rises 4.60x and
+    /// realized index volatility 4.85x for a VIX of 5 against 65.
     ///
-    /// That the LEVEL is where the exponent's whole cost sits is the claim
-    /// the form makes, and it is measurable on its own. With
-    /// `vix_level_sigma` at 0.0 the same exponent change reads 0.9451 and
-    /// 0.9581 at 2.0 against 0.9413 and 0.9569 at 4.9: with no regime level
-    /// in the loop, the loop's own gain does not lengthen the VIX's lag-one
-    /// memory at all.
+    /// The level carries the exponent's whole cost, and that can be
+    /// checked on its own. With `vix_level_sigma` at 0.0 the same exponent
+    /// change reads 0.9451 and 0.9581 at 2.0 against 0.9413 and 0.9569 at
+    /// 4.9: with no regime level in the loop, the loop's own gain does not
+    /// lengthen the VIX's lag-one memory at all.
     pub vix_level_loop_gain: f64,
 
-    /// The VIX's own slow reversion toward the identity's anchor, per
-    /// session. 0.0, which every preset through pt-v19 carries, is the
-    /// branch not taken: the step is the same three-term sum it always was,
-    /// no arithmetic runs on this path and every preset is bit-identical.
+    /// Per-session rate at which the VIX reverts toward the identity's
+    /// anchor, as a share of the distance in `[0, 1)`. 0.0, which every
+    /// shipped preset carries, skips the term and is bit-identical.
     ///
-    /// # The defect
+    /// # The problem it addresses
     ///
     /// Under [`ModelParams::vix_level_identity`] the VIX reverts to the
     /// read-back of the index's own conditional variance, and the variance
     /// reverts to a target that reads the VIX. There is no third thing.
-    /// The VIX reverts to the variance, the variance reverts to the VIX,
-    /// and nothing in the pair reverts to a LEVEL: the loop's only anchor
-    /// is the fact that its static gain is under one, so the closer that
-    /// gain is to one the longer the pair wanders and the larger every
-    /// standing bias becomes at the level. On the tape the VIX does have a
-    /// third thing -- it sits near a regime mean over months -- and the
-    /// model has been supplying that from outside, as a driven regime level
-    /// (`vix_level_sigma`), because the loop itself could not.
+    /// Nothing in the pair reverts to a level: the loop's only anchor is
+    /// that its static gain is under one, so the closer that gain is to one
+    /// the longer the pair wanders and the larger every standing bias
+    /// becomes at the level. On the tape the VIX does sit near a regime
+    /// mean over months, and the model supplies that from outside, as a
+    /// driven regime level (`vix_level_sigma`), because the loop itself
+    /// cannot.
     ///
-    /// That is why the crisis lever and the VIX's memory have been traded
-    /// against one another at every composition. The excursion form
-    /// (`market_vol_vix_excursion` 1.0) buys stability by making the
-    /// factor's target FALL as the read-back rises, which is the same knob
-    /// that caps the held-VIX response: at `market_vol_vix_exponent` e the
-    /// held-VIX fixed point is `v ~ VIX^(e / (1 + e/2))`, so 4.9 gives
-    /// 1.42 where the tape's index variance rises as VIX^1.83, and 1.83
-    /// would need e = 21.5. The valve that damps the free loop is the valve
-    /// that shuts the lever.
+    /// That is why the crisis lever and the VIX's memory trade against one
+    /// another. The excursion form (`market_vol_vix_excursion` 1.0) buys
+    /// stability by making the factor's target fall as the read-back rises,
+    /// and the same mechanism caps the held-VIX response: at
+    /// `market_vol_vix_exponent` e the held-VIX fixed point is
+    /// `v ~ VIX^(e / (1 + e/2))`, so 4.9 gives 1.42 where the tape's index
+    /// variance rises as VIX^1.83, and 1.83 would need e = 21.5. Damping
+    /// the free loop this way also shuts the lever.
     ///
     /// # The form
     ///
@@ -1848,16 +1781,16 @@ pub struct ModelParams {
     /// unconditional point) and `L` is the slow regime level's multiplier
     /// (`Engine::vix_level_multiplier`, exactly 1.0 with
     /// `vix_level_sigma` at 0.0). So the VIX reverts to the read-back at
-    /// `vix_mean_reversion` AND to its regime level at this rate, and the
+    /// `vix_mean_reversion` and to its regime level at this rate, and the
     /// pair has an anchor that is not itself a function of the VIX. With
-    /// the anchor in place the variance target can read the VIX's LEVEL
+    /// the anchor in place the variance target can read the VIX's level
     /// with the tape's own exponent (`market_vol_vix_excursion` 0.0,
     /// `market_vol_vix_exponent` 1.83) without the loop becoming a random
-    /// walk, which is what the pre-excursion form was.
+    /// walk.
     ///
     /// # Derivation
     ///
-    /// Linearise the closed loop in logs about its fixed point, writing
+    /// Linearize the closed loop in logs about its fixed point, writing
     /// `f = log(v / base)` and `y = log(VIX / (L anchor))`. The factor
     /// mixture reverts to a target `p y` at rate `1 - rho`, and the VIX
     /// reverts to `f / 2` at `mr` and to `0` at `kappa`:
@@ -1877,19 +1810,19 @@ pub struct ModelParams {
     /// det = rho (1 - mr - kappa) - (1 - rho) p mr / 2
     /// ```
     ///
-    /// `rho` is the factor mixture's effective persistence, the weight
+    /// `rho` is the factor mixture's effective persistence, the weighted
     /// average of the two components' own poles: the fast component's GJR
     /// triple gives `alpha + beta + gamma / 2` = 0.979 and the slow
     /// component's `market_vol_slow_persistence` is 0.9913 at
     /// `market_vol_slow_weight` 0.35, so
-    /// `0.65 * 0.979 + 0.35 * 0.9913` = 0.98331. The weight average is the
-    /// right combination here because both components are fed by the SAME
+    /// `0.65 * 0.979 + 0.35 * 0.9913` = 0.98331. The weighted average is
+    /// the right combination because both components are fed by the same
     /// innovation and both revert toward the same VIX-coupled target
     /// (`factor_vol.rs`), so the mixture's response to a step in that
     /// target is the weighted sum of two exponentials and 0.98331 is its
     /// one-pole stand-in.
     ///
-    /// The characteristic equation is LINEAR in `kappa`, so a target pole
+    /// The characteristic equation is linear in `kappa`, so a target pole
     /// inverts in closed form:
     ///
     /// ```text
@@ -1897,32 +1830,32 @@ pub struct ModelParams {
     ///         / (l - rho)
     /// ```
     ///
-    /// DERIVED 0.047 at `l` = 0.9965 -- the tape's own slow pole of log VIX
-    /// (the two-pole fit:
-    /// fast 0.942 with 21 per cent of the variance, slow 0.9965 with 79) --
-    /// with `p` = 1.83 and `mr` = 0.27. At `kappa` 0 the same algebra reads
-    /// the loop's slow pole at 0.9987, slower than the tape's; the dial is
-    /// the amount of anchor that brings it back to it. The slow pole then
-    /// comes from the LOOP and not from a driven regime level.
+    /// This gives 0.047 at `l` = 0.9965, the tape's own slow pole of log VIX
+    /// (the two-pole fit: fast 0.942 with 21 per cent of the variance, slow
+    /// 0.9965 with 79), with `p` = 1.83 and `mr` = 0.27. At `kappa` 0 the
+    /// same algebra puts the loop's slow pole at 0.9987, slower than the
+    /// tape's, and the dial is the amount of anchor that brings it back.
+    /// The slow pole then comes from the loop and not from a driven regime
+    /// level.
     ///
     /// # Invariants
     ///
     /// `kappa` lives in `[0, 1)`: it is a share of the distance to the
     /// anchor taken in one session, and at one or above the step
     /// overshoots the anchor every day. `ModelParams::invariants` refuses
-    /// it with `vix_level_identity` at 0.0 the way `vix_level_sigma` is
-    /// refused -- off the identity there is no derived anchor for the VIX
-    /// to revert to, `derive_vix_anchor` returns the dial
+    /// it with `vix_level_identity` at 0.0, the way `vix_level_sigma` is
+    /// refused. Off the identity there is no derived anchor for the VIX to
+    /// revert to: `derive_vix_anchor` returns the dial
     /// `market_vol_vix_anchor` and the VIX's target is the phase table, so
-    /// the reversion would be pulling one scale toward another.
+    /// the reversion would pull one scale toward another.
     ///
-    /// # What it moves, MEASURED on 16 seeds of the held roster
+    /// # What it moves, measured on 16 seeds of a fixed roster
     ///
-    /// On the arm the design note registers -- `market_vol_vix_excursion`
-    /// 0.0, `market_vol_vix_exponent` 1.83, this dial 0.046081 -- against
-    /// the shipped pt-v19, with the regime level on at its shipped values
-    /// (a), on at the gain the same algebra re-derives on this form, 2.3552
-    /// (b), and off (c):
+    /// The arm is `market_vol_vix_excursion` 0.0, `market_vol_vix_exponent`
+    /// 1.83 and this dial at 0.046081, against a base on the excursion form
+    /// at exponent 4.9. The regime level is on at the base's values (a), on
+    /// at the gain the same algebra re-derives on this form, 2.3552 (b),
+    /// and off (c):
     ///
     /// ```text
     ///                          base      (a)      (b)      (c)    tape
@@ -1940,171 +1873,179 @@ pub struct ModelParams {
     ///   S(252) / S(504)   42.4/31.6 51.3/37.6 48.8/39.9 47.7/36.1   --
     /// ```
     ///
-    /// **THE LEVEL LAW DID NOT ARRIVE, AND THE DIAL IS NOT WHY.** The
-    /// design derived p = 1.83 from the tape on the assumption that with
-    /// the excursion damping removed the target's held-VIX exponent passes
-    /// through to the variance's one for one. It does not: the transmission
-    /// measured on this form is about 0.8 from the target's own effective
-    /// exponent to the factor variance's, and about 0.9 again from there to
-    /// the index's, so p = 1.83 buys an index lever of 4.61x where the
-    /// design predicted 8x to 11x and where the shipped excursion form at
-    /// exponent 4.9 already reads 4.90x. The exponent ladder on THIS form,
-    /// with the anchor reversion on, measures the transmission directly:
-    /// p = 1.83 gives 4.61x, p = 3.0 gives 7.89x, p = 4.9 gives 11.27x, so
-    /// the tape's 10.5x sits near p = 4.5 and not near 1.83. The arm is
-    /// registered and refused; the dial ships at 0.0.
+    /// The level law misses the crisis lever, and the cause is upstream of
+    /// this dial. The exponent 1.83 assumed that, with the excursion
+    /// damping removed, the target's held-VIX exponent passes through to
+    /// the variance one for one. It does not: the transmission measured on
+    /// this form is about 0.8 from the target's own effective exponent to
+    /// the factor variance's, and about 0.9 again from there to the
+    /// index's, so p = 1.83 gives an index lever of 4.61x where 8x to 11x
+    /// was expected, and where the excursion form at exponent 4.9 already
+    /// reads 4.90x. The exponent ladder on this form, with the anchor
+    /// reversion on, measures the transmission directly: p = 1.83 gives
+    /// 4.61x, p = 3.0 gives 7.89x and p = 4.9 gives 11.27x, so the tape's
+    /// 10.5x sits near p = 4.5. For that reason the dial is 0.0 on every
+    /// shipped preset.
     ///
-    /// What the dial itself does is what the algebra says. The free VIX's
-    /// log ACF at lags 21 and 63 rises from 0.33 / 0.01 to 0.53 / 0.11
-    /// toward the tape's 0.80 / 0.63, which is the loop's own slow pole
-    /// arriving, and it does so with `vix_ar1_debiased` unmoved: within
-    /// 0.001 of the base at 252 and within 0.003 at 504, on the level arm
-    /// at the re-derived gain and on the level-off arm alike. No seed's VIX
-    /// reaches `vix_ceiling` on any arm. One graded row leaves its band on
-    /// the level law and it is the same row on all three level arms:
+    /// The dial itself does what the algebra says. The free VIX's log ACF
+    /// at lags 21 and 63 rises from 0.33 / 0.01 to 0.53 / 0.11 toward the
+    /// tape's 0.80 / 0.63, which is the loop's own slow pole arriving, and
+    /// it does so with `vix_ar1_debiased` unmoved: within 0.001 of the base
+    /// at 252 and within 0.003 at 504, on the level arm at the re-derived
+    /// gain and on the level-off arm alike. No seed's VIX reaches
+    /// `vix_ceiling` on any arm. One graded row leaves its band on the level
+    /// law, and it is the same row on all three level arms:
     /// `index_tail_dn3_pct` 0.398 against 0.64 to 2.34 at both horizons,
-    /// where the base reads 0.797 and 0.696 -- a three-sigma index day is
-    /// half as likely under a target that reads the VIX's level, because
-    /// the level moves slowly and the excursion form's target did not.
+    /// where the base reads 0.797 and 0.696. A three-sigma index day is half
+    /// as likely under a target that reads the VIX's level, because the
+    /// level moves slowly and the excursion form's target does not.
     pub vix_anchor_reversion: f64,
 
-    /// The share of the VIX's target taken by the identity's anchor, in
-    /// logs. 0.0, which every preset through pt-v18 carries, is the branch
-    /// not taken: the target is the read-back exactly and those presets are
-    /// bit-identical. pt-v19 ships 0.375 since its fifth composition, the
-    /// calm weight the tape's VIX-to-realized-volatility elasticity gives
-    /// through `theta = (1 - a) k` (`provenance.py`), which is a different
-    /// identity from the slow-pole weight derived below.
+    /// Share of the VIX's target taken by the identity's anchor, as a
+    /// geometric weight in `[0, 1)`. 0.0, which pt-v1 through pt-v18 carry,
+    /// makes the target the read-back exactly, bit for bit; pt-v19 and
+    /// pt-v20 ship 0.375.
     ///
-    /// The same job as [`ModelParams::vix_anchor_reversion`] done in the
-    /// other place. That dial adds a second reversion RATE beside
+    /// The shipped 0.375 is the calm weight the tape's
+    /// VIX-to-realized-volatility elasticity gives through
+    /// `theta = (1 - a) k`, which is a different identity from the
+    /// slow-pole weight derived below.
+    ///
+    /// This does the job of [`ModelParams::vix_anchor_reversion`] in a
+    /// different place. That dial adds a second reversion rate beside
     /// `vix_mean_reversion`, so the VIX reverts `mr + kappa` of the way each
     /// session and its lag-one persistence collapses with the loop's fast
-    /// pole. This one leaves the rate at `mr` and moves the TARGET instead:
+    /// pole. This one leaves the rate at `mr` and moves the target instead:
     ///
     /// ```text
     /// target = implied^(1 - a) * (L * anchor)^a
     /// ```
     ///
-    /// Linearised, `y' = (1 - mr) y + mr (1 - a) f / 2`. The static gain is
+    /// Linearized, `y' = (1 - mr) y + mr (1 - a) f / 2`. The static gain is
     /// `p (1 - a) / 2`, the same as the rate form's at `1 - a = w`, and the
     /// trace of the loop matrix is `rho + 1 - mr` whatever `a` is. So pinning
     /// the slow pole pins the fast pole too: at the tape's 0.9965 the fast
     /// pole is 0.717 at every exponent, where the rate form's runs from 0.671
-    /// down to 0.146. DERIVED in closed form from the characteristic equation,
-    /// `1 - a = (rho - l)(1 - mr - l) / ((1 - rho) p mr / 2)`: 0.6099 at
-    /// `market_vol_vix_exponent` 4.0. Geometric rather than arithmetic
+    /// down to 0.146. Solved in closed form from the characteristic
+    /// equation, `1 - a = (rho - l)(1 - mr - l) / ((1 - rho) p mr / 2)`
+    /// gives 0.6099 at `market_vol_vix_exponent` 4.0. The blend is geometric
     /// because on the anchor form the held read-back rises about as
     /// `VIX^(p / 2)`, so an arithmetic blend keeps a tail that grows faster
     /// than the VIX, and the geometric one grows as `VIX^((1 - a) p / 2)`,
     /// under one at the derived weight.
     pub vix_anchor_weight: f64,
 
-    /// How fast the anchor's view of the read-back moves, per session. 0.0,
-    /// which every preset through pt-v18 carries, is the instantaneous form
-    /// (pt-v19 ships a memory of one eighteenth since its fifth
-    /// composition): the target is `implied^(1 - a) (L anchor)^a`, today's
-    /// read-back against the anchor.
+    /// Per-session rate at which the anchor's memory of the read-back
+    /// updates. 0.0, which pt-v1 through pt-v18 carry, is the instantaneous
+    /// form; pt-v19 and pt-v20 ship 1/18.
     ///
-    /// Nonzero, the anchor pulls against a SLOW memory of the read-back's
-    /// log deviation instead, `s' = (1 - h) s + h log(implied / L anchor)`,
-    /// and the target is `implied * exp(-a s)`. Today's move in the
-    /// variance then reaches the VIX in full, which is the same-day fear
-    /// response and the range the instantaneous form damps by `1 - a`,
-    /// while a deviation that persists is pulled back at weight `a`. At
-    /// h = 1 it is the instantaneous form less one session's lag.
+    /// At 0.0 the target is `implied^(1 - a) (L anchor)^a`, today's
+    /// read-back against the anchor. Nonzero, the anchor pulls against a
+    /// slow memory of the read-back's log deviation instead,
+    /// `s' = (1 - h) s + h log(implied / L anchor)`, and the target is
+    /// `implied * exp(-a s)`. Today's move in the variance then reaches the
+    /// VIX in full, which is the same-day fear response and the range the
+    /// instantaneous form damps by `1 - a`, while a deviation that persists
+    /// is pulled back at weight `a`. At h = 1 it is the instantaneous form
+    /// less one session's lag.
     pub vix_anchor_memory: f64,
 
-    /// How many economy steps the macro model compounds a year's GDP and CPI
-    /// growth over. 365.0, which every preset through pt-v18 carries, is the
-    /// arithmetic that has always stood, and the step at 365.0 is the same
-    /// f64 division. pt-v19 ships 252.0 since its fifth composition.
+    /// Economy steps per year used to compound annual GDP and CPI growth.
+    /// 365.0 on pt-v1 through pt-v18; pt-v19 and pt-v20 ship 252.0, one
+    /// step per trading session.
     ///
-    /// # The defect
+    /// # Why 252
     ///
-    /// The economy steps once per trading SESSION, 252 to a year, and
-    /// compounded `rate / 365` each step, so a trading year received
+    /// The economy steps once per trading session, 252 to a year. At 365.0
+    /// it compounds `rate / 365` each step, so a trading year receives
     /// 252/365 of its annual growth: nominal output, and with it every
-    /// name's earnings and book (`earnings_nominal_growth`), grew about 1.1
-    /// points a year too slowly. Measured on 30 seeds x 21 years of pt-v19:
-    /// the index's long-run return 3.83 -> 4.92 per cent with only the two
-    /// divisors changed. 252.0
-    /// puts the compounding on the session clock. The rest of the macro
-    /// calendar (30-session months) is not moved by this dial.
+    /// name's earnings and book (`earnings_nominal_growth`), grows about 1.1
+    /// points a year too slowly. Measured on 30 seeds x 21 years of pt-v19,
+    /// the index's long-run return moves from 3.83 to 4.92 per cent with
+    /// only the two divisors changed. The rest of the macro calendar
+    /// (30-session months) is set by `macro_calendar_days_per_year`.
     pub macro_compound_days_per_year: f64,
 
-    /// How many economy steps make a macro year on the rest of the macro
-    /// calendar. 365.0, which every preset through pt-v18 carries, is the
-    /// calendar that has always stood (pt-v19 ships 252.0 since its fifth
-    /// composition): 30-step months (`DAYS_PER_MONTH`), 90-step quarters, a
-    /// 90-step OPEC interval, a 365-step seasonal year, a 30-step month on
-    /// the cycle's phase clock and its per-day hazard, a 30-step
-    /// market-return memory, and central-bank meetings every 42-55 (crisis
-    /// 21-30) steps.
+    /// Economy steps per macro year for the rest of the macro calendar:
+    /// months, quarters, the seasonal year and central-bank meetings. 365.0
+    /// on pt-v1 through pt-v18; pt-v19 and pt-v20 ship 252.0.
     ///
-    /// # The defect
+    /// At 365.0 the calendar is 30-step months (`DAYS_PER_MONTH`), 90-step
+    /// quarters, a 90-step OPEC interval, a 365-step seasonal year, a
+    /// 30-step month on the cycle's phase clock and its per-day hazard, a
+    /// 30-step market-return memory, and central-bank meetings every 42 to
+    /// 55 steps (21 to 30 in a crisis).
     ///
-    /// The economy steps once per trading session, so a macro year was 365
-    /// sessions, 1.45 trading years: every business-cycle phase, release
-    /// and meeting interval ran 1.45 times slow in market time. At 252.0 --
-    /// the session clock, DERIVED from the session count and not fitted --
-    /// a month is 21 sessions, a quarter 63, the year 252, and calendar-day
-    /// intervals (meetings, the seasonal valley) are scaled by 252/365 and
-    /// rounded. A monthly rate stays a monthly rate; per-step processes are
-    /// not touched. Pair it with `macro_compound_days_per_year` 252.0.
-    /// Measured; the measurement is in the project's unpublished design notes.
+    /// # Why 252
+    ///
+    /// The economy steps once per trading session, so at 365.0 a macro
+    /// year is 365 sessions, 1.45 trading years, and every business-cycle
+    /// phase, release and meeting interval runs 1.45 times slow in market
+    /// time. At 252.0, the session clock (taken from the session count, not
+    /// fitted), a month is 21 sessions, a quarter 63 and the year 252, and
+    /// calendar-day intervals (meetings, the seasonal valley) are scaled by
+    /// 252/365 and rounded. A monthly rate stays a monthly rate, and
+    /// per-step processes are not touched. Pair it with
+    /// `macro_compound_days_per_year` 252.0.
     pub macro_calendar_days_per_year: f64,
 
-    /// Selects the business-cycle phase table derived from NBER and BEA
-    /// (`economy::state::us_phase_characteristics`). 0.0, which every preset
-    /// through pt-v18 carries, reads the shipped table. Any other value
-    /// reads the US table, which pt-v19 does since its fifth composition.
+    /// Switch for the business-cycle phase table derived from NBER and BEA
+    /// data (`economy::state::us_phase_characteristics`). 0.0, which pt-v1
+    /// through pt-v18 carry, reads the original table; any other value
+    /// reads the US table, as pt-v19 and pt-v20 do (1.0).
+    ///
     /// Its durations are months of the macro calendar, so they mean real
     /// months only with `macro_calendar_days_per_year` 252.0. See the
     /// table's own docstring for each number's derivation.
     pub cycle_us_calibration: f64,
 
-    /// Adds a lift-off branch to the central bank's ladder. 0.0, which every
-    /// preset through pt-v18 carries, is the ladder that stood (pt-v19 adds
-    /// the branch, 1.0, since its fifth composition), in which every hike
-    /// needs inflation at least a point above target, so after the first
-    /// recession the rate sits at zero for the rest of a run. At any other
-    /// value the bank also hikes 25bp when its own Taylor rate is 50bp above
-    /// the policy rate, unemployment is not more than a point over target,
-    /// and the cycle is not in contraction or trough: the ladder's own cut
-    /// branch mirrored. See `economy::central_bank`.
+    /// Switch for a lift-off branch in the central bank's rate ladder. 0.0,
+    /// which pt-v1 through pt-v18 carry, leaves it out; pt-v19 and pt-v20
+    /// ship 1.0.
+    ///
+    /// Without the branch every hike needs inflation at least a point above
+    /// target, so after the first recession the rate sits at zero for the
+    /// rest of a run. At any nonzero value the bank also hikes 25bp when its
+    /// own Taylor rate is 50bp above the policy rate, unemployment is not
+    /// more than a point over target, and the cycle is not in contraction
+    /// or trough: the ladder's own cut branch mirrored. See
+    /// `economy::central_bank`.
     pub fed_liftoff_rule: f64,
 
-    /// Reads buybacks into `market_pe`. 0.0, which every preset through
-    /// pt-v18 carries, divides price by `eps * nominal` without the buyback
-    /// term the valuation applies, so the multiple rises by about the
-    /// buyback yield a year (22.6 to 28.0 over 21 years on pt-v19's fourth
-    /// composition, but the fifth reads the buybacks in, 1.0) and slowly
-    /// raises the expansion hazard, which adds above a multiple of 28. At
-    /// any other value the earnings carry `market::tick::buyback_scale`, as
-    /// the valuation's do.
+    /// Switch that includes buybacks in the earnings behind `market_pe`.
+    /// 0.0, which pt-v1 through pt-v18 carry, leaves them out; pt-v19 and
+    /// pt-v20 ship 1.0.
+    ///
+    /// At 0.0 `market_pe` divides price by `eps * nominal` without the
+    /// buyback term the valuation applies, so the multiple rises by about
+    /// the buyback yield a year (22.6 to 28.0 over 21 years, measured on a
+    /// pt-v19 vector with the switch off) and slowly raises the expansion
+    /// hazard, which adds above a multiple of 28. At any nonzero value the
+    /// earnings carry `market::tick::buyback_scale`, as the valuation's do.
     pub market_pe_buybacks: f64,
 
-    /// Where the anchor's weight pulls to, as a log offset below the
-    /// identity's derived anchor: the blend (and the memory's reference) use
-    /// `L * anchor * exp(-c)`. 0.0, which every preset through pt-v18
-    /// carries, is the branch not taken and the reference is `L * anchor`
-    /// exactly (pt-v19 ships 0.1515, ln(1.252 / 1.076), since its fifth
-    /// composition). The forward map's denominator (`vix_ratio_denominator`)
-    /// is not moved, so a held VIX drives the same variance it did.
+    /// Log offset below the identity's derived anchor that the anchor
+    /// weight pulls toward: the blend and the memory's reference use
+    /// `L * anchor * exp(-c)`. 0.0, which pt-v1 through pt-v18 carry, makes
+    /// the reference `L * anchor` exactly; pt-v19 and pt-v20 ship 0.1515,
+    /// ln(1.252 / 1.076).
     ///
-    /// Why a centre and not the anchor: the anchor is the identity at the
-    /// UNCONDITIONAL (mean) variance, a root-mean-square level. The
-    /// geometric blend pulls log VIX toward it, so in calm it LIFTS the VIX
-    /// above its own read-back by `(L anchor / implied)^a`, 1.19 to 1.26 on
-    /// the route-1 cell, where the tape's VIX over realised volatility says
-    /// the read-back alone is already right. A probe
-    /// from the investigation of the VIX law's levels.
+    /// The forward map's denominator (`vix_ratio_denominator`) does not
+    /// move, so a held VIX drives the same variance it did.
+    ///
+    /// The anchor is the identity at the unconditional (mean) variance, a
+    /// root-mean-square level. The geometric blend pulls log VIX toward it,
+    /// so in calm markets it lifts the VIX above its own read-back by
+    /// `(L anchor / implied)^a`, 1.19 to 1.26 on the base it was measured
+    /// on, where the tape's VIX over realized volatility says the read-back
+    /// alone is already right. Pulling to a center below the anchor removes
+    /// that lift.
     pub vix_anchor_centre: f64,
 
-    /// The anchor weight as a function of the VIX's level. 0.0, which every
-    /// preset through pt-v18 carries, is the constant weight
-    /// `vix_anchor_weight` (pt-v19 ships 1.0 since its fifth composition).
+    /// How the anchor weight rises with the VIX's level, as an exponent.
+    /// 0.0, which pt-v1 through pt-v18 carry, keeps the constant weight
+    /// `vix_anchor_weight`; pt-v19 and pt-v20 ship 1.0.
+    ///
     /// Nonzero,
     ///
     /// ```text
@@ -2115,265 +2056,274 @@ pub struct ModelParams {
     /// (`L anchor exp(-k)`, [`ModelParams::vix_anchor_weight_level_knee`])
     /// and `r` [`ModelParams::vix_anchor_weight_level_cap`]. At and below the
     /// knee the weight is the dial. The loop's local gain is
-    /// `(1 - a(x)) g(x)` with `g` the held read-back's elasticity to the VIX;
-    /// measured on the route-1 base `g` crosses one at a held VIX of 18.5 and
-    /// rises about in proportion to the VIX from there to about 36, so
-    /// `eta = 1` holds the local gain at its knee value over that range and
-    /// the fear trap at 30 to 50, where a constant 0.45 leaves the gain at
-    /// one, is removed.
+    /// `(1 - a(x)) g(x)` with `g` the held read-back's elasticity to the VIX.
+    /// Measured on the base the law was built on, `g` crosses one at a held
+    /// VIX of 18.5 and rises about in proportion to the VIX from there to
+    /// about 36, so `eta = 1` holds the local gain at its knee value over
+    /// that range. That removes the fear trap at 30 to 50, where a constant
+    /// weight of 0.45 leaves the gain at one.
     pub vix_anchor_weight_level: f64,
 
-    /// The level, as a multiple of the center, above which
-    /// [`ModelParams::vix_anchor_weight_level`] stops raising the weight:
-    /// where the held read-back's elasticity stops rising. 0.0 is no cap.
+    /// Multiple of the knee above which the level law stops raising the
+    /// anchor weight. 0.0 is no cap; pt-v19 and pt-v20 ship 2.2159.
+    ///
+    /// The cap sits where the held read-back's elasticity stops rising.
+    /// Read only with [`ModelParams::vix_anchor_weight_level`] on.
     pub vix_anchor_weight_level_cap: f64,
 
-    /// Where [`ModelParams::vix_anchor_weight_level`] starts raising the
-    /// weight, as a log offset below `L * anchor`. Read only with the level
-    /// law on. 0.0 puts the knee at `L * anchor`.
+    /// Where the level law starts raising the anchor weight, as a log
+    /// offset below `L * anchor`. 0.0 puts the knee at `L * anchor`; pt-v19
+    /// and pt-v20 ship 0.3888.
+    ///
+    /// Read only with [`ModelParams::vix_anchor_weight_level`] on.
     pub vix_anchor_weight_level_knee: f64,
 
-    /// Nonzero, the level law also runs below the knee, where it lowers the
-    /// weight toward zero. 0.0, the default, holds the dial there. Read only
-    /// with the level law on.
+    /// Switch that also runs the level law below the knee, where it lowers
+    /// the anchor weight toward zero. 0.0, which every shipped preset
+    /// carries, holds the weight at `vix_anchor_weight` there.
+    ///
+    /// Read only with the level law on.
     pub vix_anchor_weight_level_below: f64,
 
-    /// Nonzero, the level law's knee does not read the slow regime level:
-    /// `K = anchor exp(-k)` instead of `K = L anchor exp(-k)`. 0.0, which
-    /// every preset carries, is the knee as it was. A switch, 0.0 or 1.0,
-    /// read only with the level law on.
+    /// Switch that fixes the level law's knee to the anchor alone, without
+    /// the slow regime level: `K = anchor exp(-k)` in place of
+    /// `K = L anchor exp(-k)`. 0.0, which every shipped preset carries,
+    /// keeps `L` in the knee; it is read only with the level law on.
     ///
     /// # Why
     ///
-    /// The knee is DERIVED from the held-VIX map: it is where the read-back's
-    /// elasticity `g(x)` to a held VIX reaches `G* / (1 - a)`, and `g` is a
-    /// property of the VIX's absolute level (the index variance's floor and
-    /// coupling), which the slow regime level `L`
+    /// The knee is derived from the held-VIX map: it is where the
+    /// read-back's elasticity `g(x)` to a held VIX reaches `G* / (1 - a)`,
+    /// and `g` is a property of the VIX's absolute level (the index
+    /// variance's floor and coupling), which the slow regime level `L`
     /// ([`ModelParams::vix_level_sigma`]) does not move. With the knee on
     /// `L anchor`, a turbulent era (`L > 1`) lifts the knee, leaving the band
     /// from `anchor exp(-k)` to `L anchor exp(-k)` at the constant weight,
-    /// where `(1 - a) g(x)` exceeds the gain the law holds -- toward the fear
-    /// trap the law exists to remove -- and a calm era lowers it. The centre
-    /// and the read-back keep `L`: that is the era.
+    /// where `(1 - a) g(x)` exceeds the gain the law holds. That band is
+    /// toward the fear trap the law exists to remove, and a calm era lowers
+    /// the knee. The center and the read-back keep `L`, since `L` is the
+    /// era.
     pub vix_anchor_weight_level_knee_fixed: f64,
 
-    /// How many sessions of market-side warm-up the factor's variance
-    /// components get before session one. 0.0, which every preset through
-    /// pt-v19 carries, runs nothing, touches no state and is bit-identical.
+    /// Sessions of warm-up given to the market factor's variance components
+    /// before session one. 0.0, which every preset through pt-v20 carries,
+    /// runs nothing, touches no state and is bit-identical.
     ///
-    /// # The defect
+    /// # What it fixes
     ///
     /// [`ModelParams::macro_burn_in_days`] runs `Engine::advance_day`, the
-    /// ECONOMY path. `Engine::close_market` -- where the slow variance
-    /// LEVEL is drawn and where the factor's two variance components close
-    /// -- is never called during it. So the LEVEL opens from its own
-    /// stationary distribution (`market_vol_level_sigma`'s third paragraph)
-    /// and every variance state it acts THROUGH opens cold, at the
-    /// unscaled baseline `market_factor_sigma^2`.
+    /// economy path. `Engine::close_market`, where the slow variance level
+    /// is drawn and where the factor's two variance components close, is
+    /// never called during it. So the level opens from its own stationary
+    /// distribution (`market_vol_level_sigma`'s third paragraph) and every
+    /// variance state it acts through opens cold, at the unscaled baseline
+    /// `market_factor_sigma^2`.
     ///
-    /// MEASURED: cut each 504-session recording at session 252
-    /// and the two halves -- both 252-session windows of a level that is
-    /// stationary from session one -- do not read the same.
-    /// `sd(log window variance)` across 120 rosters reads 0.6938 +/- 0.0602
-    /// in the first half and 0.9570 +/- 0.0609 in the second at
-    /// `market_vol_level_sigma` 0.085, and the effect is ABSENT at sigma 0
-    /// (ratio 1.09 [0.90, 1.30]). The transient traces out over 98 to 145
-    /// sessions and is flat from about session 350.
+    /// Measured: cut each 504-session recording at session 252 and the two
+    /// halves, both 252-session windows of a level that is stationary from
+    /// session one, do not read the same. `sd(log window variance)` across
+    /// 120 rosters reads 0.6938 +/- 0.0602 in the first half and
+    /// 0.9570 +/- 0.0609 in the second at `market_vol_level_sigma` 0.085,
+    /// and the effect is absent at sigma 0 (ratio 1.09, interval 0.90 to
+    /// 1.30). The transient lasts 98 to 145 sessions and is flat from
+    /// about session 350.
     ///
-    /// # What it does, and why it takes NO draw
+    /// # What it does, and why it takes no draw
     ///
     /// The level is a lognormal AR(1) and the components are linear in
-    /// their target, so the state a fully-run-in engine would hold has a
-    /// CLOSED conditional mean given the level the run opens on. This
-    /// steps each component's MEAN recursion --
-    /// `v <- (1 - p) * target + p * v` with `p = alpha + beta + gamma/2`,
-    /// which is `E[v_{t+1} | v_t]` exactly, since `E[f^2] = v` and the
-    /// leverage arm fires on half the days -- along
+    /// their target, so the state a fully run-in engine would hold has a
+    /// closed conditional mean given the level the run opens on. This
+    /// steps each component's mean recursion,
+    /// `v <- (1 - p) * target + p * v` with `p = alpha + beta + gamma/2`
+    /// (which is `E[v_{t+1} | v_t]` exactly, since `E[f^2] = v` and the
+    /// leverage arm fires on half the days), along
     /// `E[log L_{1-k} | log L_1] = phi^k * log L_1`, the level's own
     /// expected backward path.
     ///
-    /// So the warm-up is a DETERMINISTIC function of a draw the close
+    /// So the warm-up is a deterministic function of a draw the close
     /// already takes. It consumes nothing, from any stream, at any
-    /// setting: the draw schedule cannot move, no new stream is declared,
-    /// and `rng::stream`'s whole argument about draw-consuming mechanisms
-    /// does not have to be spent here. See
-    /// `MarketVarianceState::warm_to_level`.
+    /// setting: the draw schedule cannot move and no new stream is
+    /// declared. See `MarketVarianceState::warm_to_level`.
     ///
-    /// What that leaves behind. The component's state given the opening
-    /// level still has a conditional SPREAD -- the level's own innovations
-    /// over the component's memory, and the GARCH shocks -- which a
-    /// conditional mean cannot carry. DERIVED for the level's half of it:
-    /// its variance is 0.096 of the component's total for the fast
-    /// component and 0.207 for the slow, and because it decays on the
-    /// component's own memory while the conditional-mean term does not, a
-    /// 252-session window average retains 99.0 per cent of the stationary
-    /// window statistic's variance against the cold start's 59.6 (Monte
-    /// Carlo on the linearised recursion, 40,000 replications,
+    /// The component's state given the opening level still has a
+    /// conditional spread (the level's own innovations over the
+    /// component's memory, and the GARCH shocks), which a conditional mean
+    /// cannot carry. Derived for the level's half of it: its variance is
+    /// 0.096 of the component's total for the fast component and 0.207 for
+    /// the slow, and because it decays on the component's own memory while
+    /// the conditional-mean term does not, a 252-session window average
+    /// retains 99.0 per cent of the stationary window statistic's variance
+    /// against the cold start's 59.6 (Monte Carlo on the linearised
+    /// recursion, 40,000 replications,
     /// `tools/calibration/warmup_probe.py derive`).
     ///
-    /// **MEASURED on the engine, that 99 per cent is optimistic and the
-    /// recovery is partial.** With the warm-up on, the factor's level
+    /// Measured on the engine, that 99 per cent is optimistic and the
+    /// recovery is partial. With the warm-up on, the factor's level
     /// envelope over the first quarter reads 0.770 against 0.846
-    /// equilibrated -- 0.91, against a cold engine's 0.50 -- and the
-    /// per-name GARCH and the VIX inherit it within twenty sessions, at
-    /// 0.98 of their own equilibria against 0.64 and 0.56 cold. But the
-    /// window statistic the calibration is read through recovers 46 per
-    /// cent of its deficit, not 99: the split-half ratio goes 1.2539 to
-    /// 1.1197 +/- 0.1818 on 48 rosters. The three readings are each about
-    /// one standard error apart and were not reconciled; the
-    /// warm-up registration records the gap and the stochastic warm-up that
-    /// would close it.
+    /// equilibrated (0.91, against a cold engine's 0.50), and the per-name
+    /// GARCH and the VIX inherit it within twenty sessions, at 0.98 of
+    /// their own equilibria against 0.64 and 0.56 cold. But the window
+    /// statistic the calibration reads recovers 46 per cent of its deficit:
+    /// the split-half ratio goes from 1.2539 to 1.1197 +/- 0.1818 on 48
+    /// rosters. The three readings are each about one standard error apart
+    /// and have not been reconciled. Closing the rest of the gap would take
+    /// a stochastic warm-up.
     ///
-    /// # 504
+    /// # Why 504
     ///
-    /// DERIVED from the measured envelope: the transient is flat from
+    /// Derived from the measured envelope: the transient is flat from
     /// session 350 and 504 is the next round number past it. The recursion
-    /// converges geometrically at the SLOW component's persistence, so
-    /// 504 sessions leaves `0.9913^504` = 0.012 of the initial condition,
-    /// and anything past about 700 is arithmetically indistinguishable.
-    /// It is a session count rather than a switch so that the length is
-    /// falsifiable rather than assumed.
+    /// converges geometrically at the slow component's persistence, so 504
+    /// sessions leave `0.9913^504` = 0.012 of the initial condition, and
+    /// anything past about 700 is arithmetically indistinguishable. It is a
+    /// session count rather than a switch so that the length can be tested.
     ///
-    /// # Two things it deliberately does not do
+    /// # Two things it does not do
     ///
-    /// It does not run at `market_vol_level_sigma` 0.0, and the reason is
-    /// MEASURED rather than tidy. With no level, the components' target is
-    /// `base` times the VIX's excursion from the index's own implied
-    /// level, and that excursion averages one -- so the constructor's
-    /// `base` is close to the right LOCATION and the block means show no
-    /// travel an error bar can separate from noise (32 seeds, eight
-    /// 63-session blocks: block one sits +0.080 in the log above the
-    /// blocks-3-to-8 mean, about one standard error, and block EIGHT sits
-    /// +0.137 above it in the same direction). What is cold there is the
-    /// cross-seed DISPERSION: 0.087 in the log on day one and 0.594
-    /// by day 300, 0.63 of equilibrium over the first quarter. **A
-    /// deterministic warm-up cannot supply a dispersion** -- every seed
-    /// would get the same number -- so running this at sigma 0 would buy
-    /// exactly zero. Closing that one needs a warm-up that DRAWS, which
-    /// needs a stream, which is a different change; the warm-up
-    /// registration records it and says what it would cost.
+    /// It does not run at `market_vol_level_sigma` 0.0, for a measured
+    /// reason. With no level, the components' target is `base` times the
+    /// VIX's excursion from the index's own implied level, and that
+    /// excursion averages one, so the constructor's `base` is close to the
+    /// right location and the block means show no travel an error bar can
+    /// separate from noise (32 seeds, eight 63-session blocks: block one
+    /// sits +0.080 in the log above the mean of blocks 3 to 8, about one
+    /// standard error, and block eight sits +0.137 above it in the same
+    /// direction). What is cold there is the cross-seed dispersion: 0.087
+    /// in the log on day one and 0.594 by day 300, 0.63 of equilibrium over
+    /// the first quarter. A deterministic warm-up cannot supply a
+    /// dispersion, since every seed would get the same number, so running
+    /// this at sigma 0 would buy nothing. That would need a warm-up that
+    /// draws, which needs its own stream. Keeping the zero-sigma case
+    /// untouched also keeps it usable as the control for both a warmed and
+    /// an unwarmed ladder.
     ///
-    /// Keeping the zero-sigma arm untouched also keeps it usable as the
-    /// control for BOTH a warmed and an unwarmed ladder.
-    ///
-    /// The run's FIRST session still trades at the cold sigma, because the
-    /// level the components must be warmed to is not drawn until that
-    /// session's close. One session in 504, and the alternative is a draw
-    /// at construction -- which is a draw.
+    /// The run's first session still trades at the cold sigma, because the
+    /// level the components are warmed to is not drawn until that session's
+    /// close. That is one session in 504, and the alternative is a draw at
+    /// construction.
     pub market_burn_in_sessions: f64,
 
     /// Cap on the market factor's variance, as a multiple of its calm level.
-    /// A cap, not a lever: it does nothing until the variance reaches it, so
-    /// raising it above where it already binds changes almost nothing.
-    /// Measured from 32 to 50 it moves the crisis lever by under 3% and
-    /// crisis co-movement not at all (§93). The physical anchor is that a
-    /// real record VIX of 82.7 against this model's anchor of 15 is a
-    /// variance ratio of about 30.
+    /// pt-v1 to pt-v6 ship 8, pt-v7 to pt-v9 ship 16 and pt-v10 onward ship
+    /// 32.
+    ///
+    /// It does nothing until the variance reaches it, so raising it above
+    /// where it already binds changes little. Measured from 32 to 50 it
+    /// moves the crisis lever by under 3% and crisis co-movement not at
+    /// all. For scale, a real record VIX of 82.7 against this model's
+    /// anchor of 15 is a variance ratio of about 30.
     pub market_vol_ceiling_multiple: f64,
     /// Floor on the market factor's variance, as a multiple of its
     /// calm level. Stops a quiet stretch from compounding into a
     /// market with no shared movement at all.
     pub market_vol_floor_multiple: f64,
-    /// 0 = autonomous target, 1 = target fully proportional to VIX².
+    /// How far the market factor's variance target follows the VIX, from
+    /// 0.0 (a fixed target) to 1.0 (fully proportional to the VIX response,
+    /// the squared VIX ratio at the default `market_vol_vix_exponent`). The
+    /// target is the baseline times `1 - c + c * response`.
     pub market_vol_vix_coupling: f64,
     /// VIX level at which a coupled target equals the baseline variance.
     pub market_vol_vix_anchor: f64,
-    /// Days of EMA smoothing on the VIX the market variance target reads. 0,
-    /// which every shipped preset carries, reads each day's print raw, bit
-    /// for bit. Round 99: with QE silenced, the entire remaining
-    /// driven-window excess is the fear response transmitting print-to-print
-    /// VIX churn into the variance target. Real volatility follows sustained
-    /// fear. Affects the market factor only. The per-name GARCH VIX coupling
-    /// still reads the print.
+    /// Days of EMA smoothing on the VIX that the market variance target
+    /// reads. 0, which every shipped preset carries, reads each day's print
+    /// raw, bit for bit.
+    ///
+    /// Measured on the driven test with the QE channel switched off, all of
+    /// the remaining excess comes from the fear response passing day-to-day
+    /// VIX churn into the variance target, where real volatility follows
+    /// sustained fear. It affects the market factor only. The per-name
+    /// GARCH VIX coupling still reads the raw print.
     pub market_vol_vix_smooth: f64,
     /// Exponent on the market variance target's VIX ratio. 2.0 is the
-    /// literal square, bit for bit, and is every preset up to the 2026-09-21
-    /// composition of pt-v19. pt-v19 then shipped 4.9 (the tape's lever law
-    /// at the excursion form's fixed point, see the constructor) until its
-    /// fifth composition, which ships 4.0 on the anchor form, above the
-    /// anchor only (see `market_vol_vix_exponent_below`). Round 100 measured
-    /// the square too convex through mid-VIX along real paths. A lower
-    /// exponent with the coupling re-fit to hold T(45)/T(5) flattens the
-    /// middle while preserving the certified crisis lever's backbone. Below
-    /// one the target at very low VIX can go negative and the variance floor
-    /// clamps it, so the vix5 instrument must be checked, not assumed.
+    /// literal square, bit for bit, and is what every preset through pt-v18
+    /// carries. pt-v19 and pt-v20 ship 4.0 on the anchor form, applied above
+    /// the anchor only (see `market_vol_vix_exponent_below`).
+    ///
+    /// Measured along real VIX paths, the square is too convex through
+    /// mid-VIX. A lower exponent, with the coupling re-fit to hold
+    /// T(45)/T(5), flattens the middle and keeps the crisis lever. Below
+    /// one, the target at very low VIX can go negative and the variance
+    /// floor clamps it, so check the reading at VIX 5 when you set it.
     pub market_vol_vix_exponent: f64,
-    /// Exponent on the market variance target's VIX ratio below one, i.e.
-    /// where the VIX sits under the ratio's denominator (the derived anchor
-    /// under the level form, the read-back under the excursion form). 0.0,
-    /// which every preset through pt-v18 carries, reads
-    /// `market_vol_vix_exponent` on both sides and never branches, bit for
-    /// bit. pt-v19 ships 2.5 since its fifth composition.
+    /// Exponent on the market variance target's VIX ratio when that ratio is
+    /// below one, where the VIX sits under the ratio's denominator (the
+    /// derived anchor under the level form, the read-back under the
+    /// excursion form). 0.0, which every preset through pt-v18 carries,
+    /// uses `market_vol_vix_exponent` on both sides and never branches, bit
+    /// for bit. pt-v19 and pt-v20 ship 2.5.
     ///
     /// Nonzero, the response is `r^below` for `r < 1` and
-    /// `r^market_vol_vix_exponent` at and above one: continuous at the
+    /// `r^market_vol_vix_exponent` at and above one. It is continuous at the
     /// anchor, so the held-VIX response from the anchor up (the crisis
     /// side) is untouched and only the calm side is reshaped. The tape's
     /// common variance (mean pairwise correlation times a name's variance,
     /// 40-name roster 1990-2025) scales as about VIX^2.1 below the anchor
-    /// and steeper above it; a single exponent of 4.0 fitted for the crisis
-    /// lever starves calm markets of shared variance.
+    /// and steeper above it, and a single exponent of 4.0 fitted for the
+    /// crisis lever starves calm markets of shared variance.
     pub market_vol_vix_exponent_below: f64,
-    /// Downside transmission asymmetry: on a down tick of the market factor,
-    /// every name receives `beta * factor * (1 + this)`. 0.0, which pt-v1
-    /// through pt-v15 carry, is bit-identical. pt-v16 onward ship 0.025. The
-    /// direct wire for correlation asymmetry: names co-moving harder on the
-    /// way down is the exceedance correlation real markets show and the
-    /// panel's corr_asymmetry statistic measures. Raises down-day
-    /// co-movement and some volatility asymmetry with it. The
-    /// leverage_effect row is the stated side-channel to watch.
+    /// Extra transmission of the market factor on a down tick: every name
+    /// receives `beta * factor * (1 + this)`. 0.0, which pt-v1 through
+    /// pt-v15 carry, is bit-identical. pt-v16 onward ship 0.025.
+    ///
+    /// It wires in correlation asymmetry directly. Names co-moving harder on
+    /// the way down is the exceedance correlation real markets show and the
+    /// panel's `corr_asymmetry` statistic measures. It raises down-day
+    /// co-movement and some volatility asymmetry with it, so watch the
+    /// `leverage_effect` row when you move it.
     pub market_beta_down_asym: f64,
     /// The lagged downside transmission: on the session after a down day,
     /// every name receives `beta * factor * (1 + this)` whatever the tick's
     /// own sign. 0.0, which pt-v1 through pt-v16 carry, is bit-identical.
-    /// pt-v18 ships 0.375, which `provenance.py` records as an S-argmin on a
-    /// seven-point grid rather than as anything derived. pt-v19 shipped it
-    /// too until its fifth composition, which ships 0.46 with the wire
-    /// sampled on the live session. That value is fitted against the lagged
-    /// asymmetry row's held-out count and recorded as fitted. Block 1201's
-    /// deep-trim signature (the wire landing a day late on its structure) is
-    /// the measured motivation: real down-moves continue, and the
-    /// contemporaneous wire alone cannot express that.
+    /// pt-v18 ships 0.375, and pt-v19 and pt-v20 ship 0.46.
+    ///
+    /// pt-v18's 0.375 is the best score on a seven-point grid, with nothing
+    /// derived behind it. The 0.46 on pt-v19 and pt-v20 is fitted against
+    /// the lagged asymmetry row's held-out count, with the condition
+    /// sampled live through the session (`market_beta_down_asym_lag_live`
+    /// 1.0). The reason for the wire is measured: real down-moves continue
+    /// into the next session, and the same-day wire alone cannot express
+    /// that.
     pub market_beta_down_asym_lag: f64,
-    /// Where the lagged wire's condition is sampled. A form dial with no
-    /// number to derive: it does not change what the boost is, only which
-    /// state the boolean is read off. 0.0, which every shipped preset
-    /// through pt-v18 carries, is bit-identical, because the branch below
-    /// returns `inputs.prev_day_down` unchanged. pt-v19 samples on the live
-    /// session, 1.0, since its fifth composition.
+    /// Where the lagged wire's down-day condition is sampled: at the open
+    /// (0.0), live through the session (1.0), or with the sign reversed as a
+    /// diagnostic (2.0). 0.0, which every preset through pt-v18 carries, is
+    /// bit-identical. pt-v19 and pt-v20 ship 1.0.
+    ///
+    /// It has no number to derive. It changes which state the condition is
+    /// read from and leaves the size of the boost alone. At 0.0 the branch
+    /// returns `inputs.prev_day_down` unchanged.
     ///
     /// # The three values
     ///
-    /// - **0.0, as shipped.** The condition is `prev_day_factor < 0`,
-    ///   sampled once at the open and held for the whole session. Exact at
-    ///   the bell and a day stale by the close.
-    /// - **1.0, live.** At tick `k` of 390 the condition is
+    /// - 0.0, at the open. The condition is `prev_day_factor < 0`, sampled
+    ///   once at the open and held for the whole session. Exact at the bell
+    ///   and a day stale by the close.
+    /// - 1.0, live. At tick `k` of 390 the condition is
     ///   `prev_day_factor * (1 - k/390) + day_factor_so_far < 0`, which is
     ///   `E[sum of the last 390 tick factors | prev_day_factor, day_factor]`
     ///   under exchangeable within-day draws: yesterday's remaining tail
     ///   decays linearly across the session while today's own running sum
-    ///   takes over. At `k = 0` it IS `prev_day_down`; at `k = 390` it is
-    ///   today's own sign.
-    /// - **2.0, the sign control.** The same quantity with the comparison
-    ///   REVERSED (`c_k > 0`). A diagnostic arm only, registered as F4 in
-    ///   the asymmetry repair's registration: a live sample that moves
-    ///   `corr_asymmetry` the same way under both signs is adding variance,
-    ///   not re-timing a signed response. Never a shipping value.
+    ///   takes over. At `k = 0` it is `prev_day_down`, and at `k = 390` it
+    ///   is today's own sign.
+    /// - 2.0, the sign control. The same quantity with the comparison
+    ///   reversed (`c_k > 0`). A diagnostic setting only, never one to ship:
+    ///   a live sample that moves `corr_asymmetry` the same way under both
+    ///   signs is adding variance instead of re-timing a signed response.
     ///
     /// # Why this injects no first moment
     ///
     /// The multiplier `m_t = 1 + lag * 1{c_t < 0}` is a function of draws
-    /// strictly BEFORE tick `t` -- `day_factor_so_far` is the accumulator
-    /// as it stands when the tick is called, and `engine.rs` accumulates
-    /// this tick's factor only AFTER `simulate_market_tick` returns. The
-    /// tick's own factor `f_t` is an independent zero-mean draw, so
+    /// strictly before tick `t`. `day_factor_so_far` is the accumulator as
+    /// it stands when the tick is called, and `engine.rs` adds this tick's
+    /// factor only after `simulate_market_tick` returns. The tick's own
+    /// factor `f_t` is an independent zero-mean draw, so
     /// `E[m_t f_t] = E[m_t] E[f_t] = 0` tick by tick and the day's
-    /// delivered factor has mean zero. That is the sharp contrast with
-    /// `market_beta_down_asym`, which scales the draw WHOSE OWN SIGN IT
-    /// BRANCHES ON and therefore needs `market_beta_down_asym_recentre`
-    /// beside it. There is no recentring dial here and no `return_acf1`
-    /// channel: `E[F_d F_{d+1}] = 0` by the same independence. The shipped
-    /// keying has this property too, so it is PRESERVED, not gained.
+    /// delivered factor has mean zero. Compare `market_beta_down_asym`,
+    /// which scales the draw whose own sign it branches on and therefore
+    /// needs `market_beta_down_asym_recentre` beside it. There is no
+    /// recentring dial here and no `return_acf1` channel:
+    /// `E[F_d F_{d+1}] = 0` by the same independence. The 0.0 setting has
+    /// this property too.
     ///
     /// # No draw
     ///
@@ -2383,9 +2333,9 @@ pub struct ModelParams {
     /// sector count and this touches none of them, so no stream is added
     /// and no restore offset moves.
     pub market_beta_down_asym_lag_live: f64,
-    /// How much of the first moment `market_beta_down_asym` injects is given
-    /// back. 0.0, which every preset before pt-v18 carries, is
-    /// bit-identical. 1.0 returns the whole of it.
+    /// How much of the mean that `market_beta_down_asym` injects is given
+    /// back, from 0.0 (none) to 1.0 (all of it). 0.0, which every preset
+    /// before pt-v18 carries, is bit-identical. pt-v18 onward ship 1.0.
     ///
     /// # Why the tilt injects a first moment at all
     ///
@@ -2393,27 +2343,26 @@ pub struct ModelParams {
     /// of a symmetric factor moves its mean, and a mean in the price
     /// process is a drift: `E[f 1{f<0}]` for `f ~ N(0, s^2)` is
     /// `-s / sqrt(2 pi)`, so the tilt adds `a * beta * -s / sqrt(2 pi)` to
-    /// every name every tick. Nobody chose that; it is the by-product of a
+    /// every name every tick. Nobody chose that. It is a by-product of a
     /// correlation mechanism, and it cost the equal-weight index 7.9
     /// percentage points a year at pt-v16.
     ///
     /// # What is given back, exactly
     ///
-    /// `this * a * beta * s / sqrt(2 pi)`, where `s` is the CONDITIONAL
-    /// per-tick sigma the factor was actually drawn with rather than
-    /// `market_factor_sigma`. Every quantity in it is known exactly at the
-    /// point it is applied, so the correction is arithmetic and not an
+    /// `this * a * beta * s / sqrt(2 pi)`, where `s` is the conditional
+    /// per-tick sigma the factor was actually drawn with (and not
+    /// `market_factor_sigma`). Every quantity in it is known exactly at the
+    /// point it is applied, so the correction is arithmetic, not an
     /// estimate, and it cannot be defeated by the factor's variance
     /// process, its VIX coupling or a scenario that pins VIX: a hotter
     /// tick injects more and gives back more, in the same ratio.
     ///
-    /// `beta` is per name because it is not a correction but the algebra of
-    /// the line being corrected -- the injection into name `i` IS `beta_i`
-    /// times the form. Using 1.0 instead would leave a residual
-    /// proportional to `beta_i - 1`, which is a cross-sectional bias as
-    /// well as a mean one.
+    /// `beta` is per name because the injection into name `i` is `beta_i`
+    /// times the form, so the correction has to carry it too. Using 1.0
+    /// instead would leave a residual proportional to `beta_i - 1`, which
+    /// is a cross-sectional bias as well as a mean one.
     ///
-    /// # What is NOT given back, deliberately
+    /// # What is not given back
     ///
     /// The crash amplifier. It multiplies the market channel above a
     /// threshold in baseline sigmas, and it is exactly the tail the tilt
@@ -2421,18 +2370,17 @@ pub struct ModelParams {
     /// `E[f 1{f<0} A] / E[f 1{f<0}]`. That ratio has no closed form. It
     /// was measured at 1.00 to 1.38 across conditional sigmas and sits
     /// near 1.01 at the sigmas that occur, so correcting it would mean
-    /// either a new bit-pinned transcendental or a fitted constant, and a
-    /// fitted constant is the thing this project calls tuning rather than
-    /// fixing. The residual is therefore known, signed and about one per
-    /// cent of the term, and it is left rather than approximated.
+    /// either a new bit-pinned transcendental or a fitted constant. The
+    /// residual is therefore known, signed and about one per cent of the
+    /// term, and it is left as it is.
     ///
-    /// The offset is applied AFTER the amplifier for the same reason. An
+    /// The offset is applied after the amplifier for the same reason. An
     /// offset added before it would itself be amplified, delivering the
-    /// form times `E[A]` rather than the form.
+    /// form times `E[A]`.
     pub market_beta_down_asym_recentre: f64,
-    /// How much of the first moment the down-day wire adds to the tilt is
-    /// given back. 0.0, which every preset through pt-v20 carries, is
-    /// bit-identical. 1.0 returns the whole of it.
+    /// How much of the extra mean that the lagged down-day wire adds to the
+    /// tilt is given back, from 0.0 (none) to 1.0 (all of it). 0.0, which
+    /// every preset through pt-v20 carries, is bit-identical.
     ///
     /// `market_beta_down_asym_recentre` gives back the tilt's mean at a
     /// lag multiplier of one. On a session after a down day
@@ -2441,88 +2389,87 @@ pub struct ModelParams {
     /// `(1 + lag)` times the form and `lag * a * beta * s / sqrt(2 pi)` of
     /// it is left in every name every tick of that session. At pt-v20's
     /// 0.025 and 0.46 that is about -8 per cent a year of the cap-weighted
-    /// market input (desk: -11.3 per cent a year with the wire, -3.5 with
-    /// it off, se 3 to 4, seeds 101-104, 756 sessions). While every market
-    /// shock sits in `s` the pull turns it into a constant discount of
-    /// about 2 per cent and it costs no drift; under
+    /// market input (measured: -11.3 per cent a year with the wire, -3.5
+    /// with it off, se 3 to 4, seeds 101-104, 756 sessions). While every
+    /// market shock sits in `s` the pull turns it into a constant discount
+    /// of about 2 per cent and it costs no drift. Under
     /// `fair_value_market_share` it accumulates in the fair-value level and
-    /// is a drift (grid ptv20g1: the index's long-run return 5.6, 1.3 and
-    /// -3.1 per cent at shares 0, 0.5 and 1).
+    /// is a drift (measured on a grid: the index's long-run return is 5.6,
+    /// 1.3 and -3.1 per cent at shares 0, 0.5 and 1).
     ///
     /// Off zero, on a lagged session the recentring offset is multiplied by
     /// `1 + this * lag`, so at 1.0 it gives back the lagged tilt's mean
     /// exactly as `market_beta_down_asym_recentre` gives back the unlagged
     /// one, after the amplifier and with the same one per cent left. Read
-    /// only with `market_beta_down_asym_recentre`, `market_beta_down_asym`
-    /// and `market_beta_down_asym_lag` all non-zero. In [0, 1].
+    /// only when `market_beta_down_asym_recentre`, `market_beta_down_asym`
+    /// and `market_beta_down_asym_lag` are all non-zero. Range 0 to 1.
     pub market_beta_down_asym_lag_recentre: f64,
 
-    /// Suppression of a name's idiosyncratic shock on a down tick of the
-    /// market factor, with the up tick inflated to hold the unconditional
-    /// variance exactly. 0.0, which every shipped preset carries, is
-    /// bit-identical by branch, the way every wire in `factors.rs` is.
+    /// Shrinks a name's idiosyncratic shock on a down tick of the market
+    /// factor and inflates it on an up tick, so same-day down-market
+    /// co-movement rises while the unconditional variance is held exactly.
+    /// 0.0, which every shipped preset carries, is bit-identical by branch,
+    /// the way every wire in `factors.rs` is.
     ///
     /// # The tape measurement this exists for
     ///
-    /// MEASURED. `corr_asymmetry` at 504 is the largest single
-    /// row on the whole-tape nineteen -- 3.29 of 9.19 on the release
-    /// candidate -- and it is NOT a level deficit. The row and its lagged
-    /// partner SUM to 0.1195..0.1590 across all thirty measured
-    /// arm-horizon cells against a tape of 0.1291 at 252 and 0.1377 at 504.
-    /// The model has as much down-conditioned co-movement as the tape. What
-    /// is wrong is where it lands: the tape puts 47 per cent of it on the
-    /// SAME DAY at 252 and 60 per cent at 504, and every pt-v19 arm puts 8
-    /// to 15 per cent there. It is a routing defect, and it is a routing
-    /// defect no existing dial reaches -- paired over 120 rosters and 22
-    /// arms, the largest move any pt-v19 dial produces at 504 is
-    /// +0.0026 +/- 0.0012, three per cent of a 0.065 gap.
+    /// Measured on pt-v19: `corr_asymmetry` at 504 sessions is the largest
+    /// single row of the nineteen-row whole-tape score (3.29 of 9.19), and
+    /// the miss is in where the co-movement lands, with the level about
+    /// right. The row and its lagged partner sum to 0.1195 to 0.1590 across
+    /// all thirty measured variant-horizon cells, against a tape of 0.1291
+    /// at 252 and 0.1377 at 504, so the model has as much down-conditioned
+    /// co-movement as the tape. The tape puts 47 per cent of it on the same
+    /// day at 252 and 60 per cent at 504, and every pt-v19 variant measured
+    /// puts 8 to 15 per cent there. No existing dial reaches it: paired over
+    /// 120 rosters and 22 variants, the largest move any pt-v19 dial
+    /// produces at 504 is +0.0026 +/- 0.0012, three per cent of a 0.065 gap.
     ///
-    /// # Why not the tilt that is already there
+    /// # Why the existing tilt cannot do it
     ///
-    /// `market_beta_down_asym` is the same-day wire, and its argmin on the
-    /// nineteen -- on slopes re-measured on the pt-v19 base itself -- is
-    /// the shipped 0.025 at BOTH horizons. Not near it: at it. The reason
-    /// is that it MULTIPLIES. Scaling the factor leg by `(1 + a)` on a down
-    /// tick raises the name's conditional variance by
-    /// `beta^2 s_f^2 ((1 + a)^2 - 1)`, so the factor's SHARE -- which is
-    /// what a pairwise correlation is -- rises only as
-    /// `q (1+a)^2 / (1 + q ((1+a)^2 - 1))` rather than as `q (1+a)^2`,
+    /// `market_beta_down_asym` is the same-day wire, and its best value on
+    /// the nineteen-row score, on slopes measured on the pt-v19 base, is
+    /// the shipped 0.025 at both horizons. The reason is that it
+    /// multiplies. Scaling the factor leg by `(1 + a)` on a down tick
+    /// raises the name's conditional variance by
+    /// `beta^2 s_f^2 ((1 + a)^2 - 1)`, so the factor's share (which is what
+    /// a pairwise correlation is) rises only as
+    /// `q (1+a)^2 / (1 + q ((1+a)^2 - 1))` and falls short of `q (1+a)^2`,
     /// while the whole of the excess variance lands on
     /// `annualised_vol_pct`, `excess_kurtosis` and the tails. The measured
-    /// bill on the pt-v19 base is +9.5 points of annualised volatility and
+    /// bill on the pt-v19 base is +9.5 points of annualized volatility and
     /// +0.27 of `return_acf1` per unit against +0.199 of the row, and
     /// `return_acf1` has a tape error of 0.0106.
     ///
-    /// # The form, and why this form
+    /// # The form
     ///
-    /// A REALLOCATION rather than a multiplication. The market leg is left
-    /// exactly alone and the idiosyncratic shock is scaled instead:
+    /// The market leg is left exactly alone and the idiosyncratic shock is
+    /// scaled instead:
     ///
     /// ```text
     /// down tick (market_factor < 0):  e -> e * (1 - c)
     /// up tick   (market_factor >= 0): e -> e * sqrt(2 - (1 - c)^2)
     /// ```
     ///
-    /// Nothing is added anywhere; the factor's share is raised where the
-    /// statistic looks and lowered where it does not. DERIVED, with `q` the
+    /// Nothing is added anywhere. The factor's share is raised where the
+    /// statistic looks and lowered where it does not. Derived, with `q` the
     /// unconditional pairwise correlation (`cross_sectional_corr` reads
-    /// 0.3219 on the release candidate at 504), the tick-level conditional
-    /// correlations are
+    /// 0.3219 on pt-v19 at 504), the tick-level conditional correlations
+    /// are
     ///
     /// ```text
     /// q_down = q / (q + (1 - q) (1 - c)^2)
     /// q_up   = q / (q + (1 - q) (2 - (1 - c)^2))
     /// ```
     ///
-    /// -- 0.394 and 0.269 at `c` = 0.15, a tick-level difference of 0.125.
-    /// At the day-level attenuation of 0.47 read off the existing tilt's
-    /// own contrast, that predicts about +0.059 of day-level
-    /// `corr_asymmetry` at 504 against a gap of 0.0646. FALSIFIER, and the
-    /// one that matters: if `d(corr_asymmetry)/dc` measures at or below the
-    /// tilt's own +0.199 the reallocating form buys nothing the
-    /// multiplying form does not and the mechanism is dead whatever else it
-    /// does. The 0.47 is read off ONE contrast of a DIFFERENT wire and is
-    /// the weakest number in the derivation.
+    /// These are 0.394 and 0.269 at `c` = 0.15, a tick-level difference of
+    /// 0.125. At the day-level attenuation of 0.47 read off the existing
+    /// tilt's own contrast, that predicts about +0.059 of day-level
+    /// `corr_asymmetry` at 504 against a gap of 0.0646. The test that
+    /// decides it: if `d(corr_asymmetry)/dc` measures at or below the
+    /// tilt's own +0.199, the reallocating form buys nothing the
+    /// multiplying form does not. The 0.47 is read off one contrast of a
+    /// different wire and is the weakest number in the derivation.
     ///
     /// # The neutrality, exactly
     ///
@@ -2531,85 +2478,82 @@ pub struct ModelParams {
     /// independently of `f`. The transform is `e' = m(f) e` with
     /// `m = (1 - c)` on `{f < 0}` and `m = sqrt(2 - (1 - c)^2)` elsewhere.
     ///
-    /// **Mean: exactly zero, and not because of the symmetry.**
-    /// `E[e'] = E[m(f)] E[e] = 0` for ANY `m` and any split of the line,
-    /// because `e` is an independent zero-mean draw. That is the sharpest
-    /// contrast with `market_beta_down_asym_recentre`: the tilt injects a
-    /// mean because it scales the draw WHOSE OWN SIGN IT BRANCHES ON, and
-    /// `E[f 1{f<0}]` is not zero. This branches on a different draw, so
-    /// there is no first moment to give back and no recentring dial beside
-    /// it.
+    /// The mean is exactly zero for any `m`:
+    /// `E[e'] = E[m(f)] E[e] = 0` for any split of the line, because `e`
+    /// is an independent zero-mean draw. Compare
+    /// `market_beta_down_asym_recentre`: the tilt injects a mean because it
+    /// scales the draw whose own sign it branches on, and `E[f 1{f<0}]` is
+    /// not zero. This branches on a different draw, so there is no first
+    /// moment to give back and no recentring dial beside it.
     ///
-    /// **Variance: exactly held, and it is the symmetry that buys it.**
+    /// The variance is held exactly, and that is what the symmetry buys.
     /// `E[e'^2] = E[m(f)^2] s^2` with
     /// `E[m(f)^2] = p (1-c)^2 + (1-p) (2 - (1-c)^2)` at `p = P(f < 0)`.
-    /// The inflation is DEFINED as the complement, so at `p = 1/2` the two
-    /// squared scales average to exactly 1 for every `c` -- which is why
-    /// there is no funding dial here either, and why `market::index_var`
-    /// needs no new term: its `idio * idio` is the unconditional variance
-    /// and this leaves it alone.
+    /// The inflation is defined as the complement, so at `p = 1/2` the two
+    /// squared scales average to exactly 1 for every `c`. That is why there
+    /// is no funding dial here either, and why `market::index_var` needs no
+    /// new term: its `idio * idio` is the unconditional variance and this
+    /// leaves it alone.
     ///
-    /// # Where "exactly" stops, stated rather than asserted
+    /// # Where "exactly" stops
     ///
-    /// 1. **Exact in expectation, `O(N^{-1/2})` in a realisation.** Over
-    ///    `N` ticks the realised multiplier on the idiosyncratic variance
-    ///    is `M_N = (k/N)(1-c)^2 + (1 - k/N)(2 - (1-c)^2)` with
-    ///    `k ~ Binomial(N, 1/2)` -- the sign of a symmetric draw is a fair
-    ///    coin independent of every sigma in the recursion. So `E[M_N] = 1`
-    ///    exactly and `sd(M_N) = |1 - (1-c)^2| / sqrt(N)`. MEASURED against
-    ///    that closed form by `the_variance_residual_is_the_binomial_one`.
-    ///    At `c` = 0.15 it is 1.4 per cent of the idiosyncratic variance
-    ///    over one 390-tick session and 0.089 per cent over a 252-session
-    ///    window, which on a name whose idiosyncratic leg is two thirds of
-    ///    its variance is 0.03 per cent of its sigma.
-    /// 2. **One ulp of arithmetic.** `(1-c)^2` and `2 - (1-c)^2` are
-    ///    computed in doubles, so their mean is 1 to a relative `2^-52`
-    ///    rather than to the bit. Pinned by
+    /// 1. Exact in expectation, `O(N^{-1/2})` in a realization. Over `N`
+    ///    ticks the realized multiplier on the idiosyncratic variance is
+    ///    `M_N = (k/N)(1-c)^2 + (1 - k/N)(2 - (1-c)^2)` with
+    ///    `k ~ Binomial(N, 1/2)`, since the sign of a symmetric draw is a
+    ///    fair coin independent of every sigma in the recursion. So
+    ///    `E[M_N] = 1` exactly and `sd(M_N) = |1 - (1-c)^2| / sqrt(N)`. The
+    ///    test `the_variance_residual_is_the_binomial_one` checks it against
+    ///    that closed form. At `c` = 0.15 it is 1.4 per cent of the
+    ///    idiosyncratic variance over one 390-tick session and 0.089 per
+    ///    cent over a 252-session window, which on a name whose
+    ///    idiosyncratic leg is two thirds of its variance is 0.03 per cent
+    ///    of its sigma.
+    /// 2. One ulp of arithmetic. `(1-c)^2` and `2 - (1-c)^2` are computed
+    ///    in doubles, so their mean is 1 to a relative `2^-52` and not to
+    ///    the bit. Pinned by
     ///    `the_two_scales_average_to_one_to_within_an_ulp`.
-    /// 3. **THE ZERO TICK.** The branch is `< 0.0`, the convention
+    /// 3. The zero tick. The branch is `< 0.0`, the convention
     ///    `market_beta_down_asym` already uses, so a factor of exactly
-    ///    `0.0` takes the UP branch. On a live draw that is a
-    ///    probability-zero event; on a degenerate configuration where the
-    ///    factor cannot move -- `market_factor_sigma` 0.0, or a fixture
-    ///    that hands the tick a zero factor -- EVERY tick takes the up
-    ///    branch and the idiosyncratic variance is inflated by
-    ///    `2 - (1-c)^2` rather than held. That is not a defect of the
-    ///    arithmetic; it is what "half the ticks are down" means when none
-    ///    of them is. It is written down because a zero-factor fixture is
-    ///    exactly where somebody would go to measure neutrality and would
-    ///    find it absent.
+    ///    `0.0` takes the up branch. On a live draw that has probability
+    ///    zero. On a degenerate configuration where the factor cannot move
+    ///    (`market_factor_sigma` 0.0, or a fixture that hands the tick a
+    ///    zero factor) every tick takes the up branch and the idiosyncratic
+    ///    variance is inflated by `2 - (1-c)^2`. The neutrality assumes half
+    ///    the ticks are down, which fails when none of them is. A
+    ///    zero-factor fixture is where somebody would go to measure
+    ///    neutrality, and they would find it absent.
     ///
-    /// # Three things it costs
+    /// # Costs and limits
     ///
-    /// 1. **It is not CONDITIONALLY variance-neutral, and cannot be.** A
-    ///    name's per-tick total variance is
-    ///    `beta^2 s_f^2 + m(f)^2 s_i^2`, which is lower on a down tick and
-    ///    higher on an up tick -- that inequality IS the raised factor
-    ///    share. So a down DAY, which holds more down ticks than an up day,
-    ///    carries slightly less name-level variance: at `c` = 0.15 a
-    ///    55/45 day carries 0.972 of its idiosyncratic variance. The
-    ///    per-name GJR GARCH innovation is the day's noise and
-    ///    `garch_gamma` reads exactly that conditional moment, so the
-    ///    leverage channel sees a slightly SMALLER down-day squared return.
-    ///    Signed, small, and registered as a falsifier
-    ///    (F7 of its registration) rather than argued away.
-    /// 2. **The intraday leg only.** The overnight move composes a name
-    ///    through `idio_scale_for` as the tick does, and it is untouched
-    ///    here because there is no tick sign at the open. Nothing is lost
-    ///    on the shipped preset, where `overnight_variance_ratio` is 0.0
-    ///    and no price moves between sessions; on a preset that turned it
-    ///    on, the reallocation would cover the intraday part of the
-    ///    close-to-close return and not the gap.
-    /// 3. **NO DRAW, which is the point.** The transform reshapes a shock
-    ///    the tick has already taken, so the draw count and the draw order
-    ///    are untouched at every value and on every branch. A mechanism
-    ///    that needed a number would have needed a stream of its own.
+    /// 1. It is not conditionally variance-neutral, and cannot be. A name's
+    ///    per-tick total variance is `beta^2 s_f^2 + m(f)^2 s_i^2`, which
+    ///    is lower on a down tick and higher on an up tick, and that
+    ///    inequality is the raised factor share. So a down day, which holds
+    ///    more down ticks than an up day, carries slightly less name-level
+    ///    variance: at `c` = 0.15 a 55/45 day carries 0.972 of its
+    ///    idiosyncratic variance. The per-name GJR GARCH innovation is the
+    ///    day's noise and `garch_gamma` reads exactly that conditional
+    ///    moment, so the leverage channel sees a slightly smaller down-day
+    ///    squared return. The effect is signed and small.
+    /// 2. It covers the intraday leg only. The overnight move composes a
+    ///    name through `idio_scale_for` as the tick does, and it is
+    ///    untouched here because there is no tick sign at the open. Nothing
+    ///    is lost on the shipped presets, where `overnight_variance_ratio`
+    ///    is 0.0 and no price moves between sessions. On a preset that
+    ///    turned it on, the reallocation would cover the intraday part of
+    ///    the close-to-close return and leave the gap alone.
+    ///
+    /// It takes no draw. The transform reshapes a shock the tick has
+    /// already taken, so the draw count and the draw order are untouched
+    /// at every value and on every branch.
     pub market_idio_down_suppress: f64,
-    /// How much of oil demand is answered by supply on the daily step. 0.0,
-    /// which every preset before pt-v18 carries, is bit-identical, and it is
-    /// what the reference implementation does.
+    /// How much of oil demand is answered by supply on the daily step, from
+    /// 0.0 (none) to 1.0 (supply equals demand in expectation). 0.0, which
+    /// every preset before pt-v18 carries, is bit-identical and is what the
+    /// reference implementation does. pt-v18 onward ship 1.0.
     ///
-    /// # The zero nobody chose
+    /// # What happens at 0.0
     ///
     /// `update_economy_daily` draws inventory down by
     /// `gdp_growth * 0.15` every day and replenishes it by a hardcoded
@@ -2624,27 +2568,27 @@ pub struct ModelParams {
     /// the ten-year and the corporate yield, the higher discount rate
     /// compresses every target multiple, and every price falls.
     ///
-    /// That is the whole of the one-way rate path. It is not a rate
-    /// mechanism at all; it is a supply term left at zero.
+    /// That supply term is the whole cause of the one-way rate path seen at
+    /// 0.0. No rate mechanism is involved.
     ///
-    /// # Why 1.0 is derived and not fitted
+    /// # Why 1.0
     ///
     /// At 1.0 supply equals demand in expectation, so `inventory_change`
     /// is the noise term alone and inventory is driftless. That is the
     /// stationarity condition of the inventory process, read off the
     /// process itself, and the `0.15` it uses is the coefficient already
-    /// there. Nothing here is tuned to a target: the value that makes a
-    /// random walk driftless is not a matter of degree.
+    /// there. Nothing here is fitted to a target.
     ///
     /// The pressure term is already two-sided, pushing up below 40 and
     /// down above 60, so a driftless inventory gives a two-sided oil price
     /// and a two-sided rate path without any of them being made two-sided
     /// by hand.
     pub oil_supply_response: f64,
-    /// Removes the direction from the OPEC rule while keeping its size. 0.0,
-    /// which every preset before pt-v18 carries, is bit-identical.
+    /// Removes the direction from the OPEC production rule while keeping its
+    /// size. 0.0, which every preset before pt-v18 carries, is
+    /// bit-identical. pt-v18 onward ship 1.0.
     ///
-    /// # The asymmetry nobody chose
+    /// # The asymmetry at 0.0
     ///
     /// The rule reacts to the oil price against an 80 target. Below it by
     /// more than 10 it cuts production with probability 0.6 and magnitude
@@ -2654,23 +2598,23 @@ pub struct ModelParams {
     /// the oil price up on net. Nothing in the code says that was intended
     /// and the two branches read as a pair that should mirror.
     ///
-    /// # Symmetrised rather than picked
+    /// # At 1.0
     ///
-    /// At 1.0 both branches use one probability and one magnitude range,
-    /// each the mean of the two the rule already carries: probability
-    /// 0.55, magnitude 2.5 to 5.5. That is the unique symmetric rule which
+    /// Both branches use one probability and one magnitude range, each the
+    /// mean of the two the rule already carries: probability 0.55,
+    /// magnitude 2.5 to 5.5. That is the unique symmetric rule which
     /// preserves the total intervention the rule performs, so it removes
-    /// the direction without choosing a side and without inventing a
-    /// number. Expected impact is then equal and opposite either side of
-    /// the target, and zero on net.
+    /// the direction without choosing a side or inventing a number.
+    /// Expected impact is then equal and opposite either side of the
+    /// target, and zero on net.
     ///
     /// It is worth about +0.95 of oil price per firing and the rule fires
-    /// every 90 days, so this is a small term. It is corrected because it
-    /// is wrong rather than because it is large.
+    /// every 90 days, so this is a small term.
     pub oil_opec_symmetry: f64,
-    /// Where oil's seasonal shape acts: on the price the process reverts
-    /// toward, or on the price level itself. 0.0, which every preset before
-    /// pt-v18 carries, is bit-identical.
+    /// Where oil's seasonal shape acts: on the price level itself (0.0) or
+    /// on the price the process reverts toward (1.0). 0.0, which every
+    /// preset before pt-v18 carries, is bit-identical. pt-v18 onward ship
+    /// 1.0.
     ///
     /// # A shape applied to a level compounds
     ///
@@ -2690,24 +2634,27 @@ pub struct ModelParams {
     /// on its 150.0 clamp from day 180 on every seed, and the inflation
     /// term, the meeting rule and the discount rate follow it there.
     ///
-    /// # The target rather than the level, at the same amplitude
+    /// # The target instead of the level, at the same amplitude
     ///
     /// At 1.0 the whole amplitude multiplies the reversion target and none
-    /// of it multiplies the level, so the shape modulates where the price
-    /// is pulled toward by plus or minus 3 per cent and integrates to
-    /// +0.672 per cent of oil over a certified year. The amplitude is the
-    /// 0.03 the term already carries and this dial is a share of it, so
-    /// what changes is where a shape acts rather than how large it is.
-    /// Nothing here is fitted: a seasonal shape has to be neutral over the
-    /// WINDOW as well as over its own period, and moving it off the level
-    /// is what makes that possible without touching its size.
+    /// of it multiplies the level, so the shape moves where the price is
+    /// pulled toward by plus or minus 3 per cent and integrates to +0.672
+    /// per cent of oil over a certified year. The amplitude is the 0.03 the
+    /// term already carries and this dial is a share of it, so it changes
+    /// where the shape acts and leaves its size alone. Nothing here is
+    /// fitted: a seasonal shape has to be neutral over the window as well
+    /// as over its own period, and moving it off the level is what makes
+    /// that possible without touching its size.
     ///
     /// Between the ends the amplitude is split, `1 + g * a` on the target
     /// and `1 + (1 - g) * a` on the level, so the total is conserved and
     /// past 1.0 the level would carry the shape inverted.
     pub oil_seasonality_target: f64,
-    /// The clock the business cycle's hazard is read on. 0.0, which every
-    /// preset before pt-v18 carries, is bit-identical.
+    /// Reads the business cycle's hazard as a rate per month: at 1.0 the
+    /// monthly transition probability is divided by 30 before the daily
+    /// draw. 0.0, which every preset before pt-v18 carries, applies the
+    /// monthly rate once a day, bit-identically, so the cycle runs about
+    /// thirty times too fast. pt-v18 onward ship 1.0.
     ///
     /// # A rate per month drawn once a day
     ///
@@ -2715,11 +2662,10 @@ pub struct ModelParams {
     /// shape - 1)`, and every scale in `cycle_hazard_params` is in months:
     /// 36 for an expansion, 6 for a peak, 12 for a contraction. A hazard
     /// whose scale is in months is a rate per month, and
-    /// `check_cycle_transition` compares it against a uniform once a day,
-    /// so the cycle runs about thirty times too fast. A full cycle takes
-    /// 2.6 trading years where the same constants read per month give 9.7,
-    /// and a 252-day run opening at the start of an expansion leaves it 63
-    /// per cent of the time against 3.
+    /// `check_cycle_transition` compares it against a uniform once a day.
+    /// At 0.0 a full cycle takes 2.6 trading years where the same constants
+    /// read per month give 9.7, and a 252-day run opening at the start of
+    /// an expansion leaves it 63 per cent of the time against 3.
     ///
     /// Both figures are the hazard alone. The condition ladder below adds
     /// to it and never subtracts except through the expansion guard, so
@@ -2728,28 +2674,25 @@ pub struct ModelParams {
     /// ladder is scaled with the base, because the conversion below is
     /// applied after it.
     ///
-    /// # A correction to the arithmetic this comment carried
+    /// # When the ladder's conditions fire
     ///
-    /// An earlier version said the ladder's four contraction conditions
-    /// sum to 0.25 against a base hazard of 0.081, so a deep contraction
-    /// ran 7.7 months where a mild one ran 23. Every contraction condition
-    /// adds to the hazard, so the ladder can only shorten a phase, but the
-    /// arithmetic assumed all four fire from the phase's fourth month.
-    /// Measured on the four-year arms they fire late: growth under -2.0 on
-    /// day 1 from the phase-change shock, the policy rate under 1.0 on day
-    /// 190 at the median and unemployment over 10.0 on day 239.
+    /// Every contraction condition adds to the hazard, so the ladder can
+    /// only shorten a phase. The four contraction conditions do not all
+    /// fire early in a phase. Measured on four-year runs they fire late:
+    /// growth under -2.0 on day 1 from the phase-change shock, the policy
+    /// rate under 1.0 on day 190 at the median, and unemployment over 10.0
+    /// on day 239.
     ///
     /// A spell's count of fired conditions therefore records how long it
     /// has already run. Completed contraction spells read 162 days at one
     /// condition, 226 at two and 335 at three, which sorts them by duration
-    /// rather than by depth and carries no reading of either. A deep
-    /// contraction ended early by its own ladder was looked for and
-    /// measured absent.
+    /// and says nothing about depth. No deep contraction ended early by its
+    /// own ladder was found.
     ///
     /// `months_in_current_phase` advances by exactly `1/30` a day, so the
     /// month this model keeps is 30 days and the divisor is read off the
-    /// engine's own clock rather than chosen. At 1.0 the daily probability
-    /// is the monthly rate divided by 30 to the last bit.
+    /// engine's own clock. At 1.0 the daily probability is the monthly rate
+    /// divided by 30 to the last bit.
     ///
     /// # The whole ladder is in months
     ///
@@ -2771,25 +2714,25 @@ pub struct ModelParams {
     /// contraction's hazard falls with duration. It shapes the mean peak
     /// from 183 days to 171 and the mean trough from 159 to 138.
     ///
-    /// Measured over thirty seeds at 1008 days on the era's roster, at
-    /// commit 6dfe09b. Read per month the clamp binds on 527 of 2082 peak
-    /// rolls and 153 of 203 trough rolls on the hazard alone, and on 0 of
-    /// 18352 expansion and 0 of 1495 contraction rolls. Drawn per day it
-    /// binds on none of them.
+    /// Measured over thirty seeds at 1008 days. Read per month the clamp
+    /// binds on 527 of 2082 peak rolls and 153 of 203 trough rolls on the
+    /// hazard alone, and on 0 of 18352 expansion and 0 of 1495 contraction
+    /// rolls. Drawn per day it binds on none of them.
     ///
-    /// WITH the ladder the trough is different, and it was different
-    /// before this dial existed. A trough adds 0.1 for a policy rate under
-    /// 3.0 and 0.05 for unemployment over 8.0, against a hazard of 0.265
-    /// at its two-month minimum, so the clamp binds on its first eligible
-    /// roll under either reading: 203 of 203 read per month and 97 of 97
-    /// drawn per day, over the same runs. So the clamp was already doing
-    /// work in a trough, and what changed is that phases now last long
-    /// enough to reach one. A certified year reaches no trough at all and
-    /// records 0 of 2121 rolls clamped under either reading.
+    /// With the ladder the trough is different, under either setting. A
+    /// trough adds 0.1 for a policy rate under 3.0 and 0.05 for
+    /// unemployment over 8.0, against a hazard of 0.265 at its two-month
+    /// minimum, so the clamp binds on its first eligible roll under either
+    /// reading: 203 of 203 read per month and 97 of 97 drawn per day, over
+    /// the same runs. The clamp was already doing work in a trough, and at
+    /// 1.0 phases last long enough to reach one. A certified year reaches
+    /// no trough at all and records 0 of 2121 rolls clamped under either
+    /// reading.
     pub cycle_hazard_per_month: f64,
-    /// Where the trough phase's growth range begins. 0.0, which every preset
-    /// before pt-v18 carries, is the shipped `(-1.0, 0.5)` and
-    /// bit-identical.
+    /// Raises the bottom of the trough phase's GDP growth range from -1.0
+    /// (at 0.0) to 0.0 (at 1.0), moving proportionally in between; the top
+    /// stays at 0.5. Every preset ships 0.0, the original `(-1.0, 0.5)`
+    /// range, bit-identically.
     ///
     /// # A second falling phase the engine does not call a recession
     ///
@@ -2800,63 +2743,56 @@ pub struct ModelParams {
     /// falling output at pt-v18 and the share passes 100 at pt-v16.
     ///
     /// That is the whole of the engine's disagreement between its two
-    /// frequency rulers. The share of days in a contraction reads 18.21
+    /// frequency measures. The share of days in a contraction reads 18.21
     /// and the share with output falling reads 27.31, while contraction
     /// or trough reads 27.61: the second and third agree to 0.3 points,
-    /// so the nine-point gap IS this phase. The NBER's two rulers agree
+    /// so the nine-point gap is this phase. The NBER's two measures agree
     /// to 1.2 points, 10.72 per cent of months in a contraction against
     /// 11.93 per cent of quarters with real GDP falling, because a
-    /// contraction there IS the falling-output period.
+    /// contraction there is the falling-output period.
     ///
     /// At 1.0 the lower end moves to 0.0 and the upper end keeps the 0.5
     /// the table already states. Zero is the only non-arbitrary floor,
     /// being the boundary between falling and rising output, so nothing
-    /// here is fitted. Between the ends the floor moves proportionally.
+    /// here is fitted.
     ///
-    /// # It is 0.0 on every preset, including pt-v18, and here is why
+    /// # Why every preset ships 0.0
     ///
-    /// This was built to close that nine-point gap and it closes 1.52 of
-    /// it. Thirty seeds at a hundred years: the output ruler moves from
-    /// 27.309 to 25.791 and the contraction share moves 0.10, so the
-    /// mechanism is the one described and its size is a sixth of what the
-    /// accounting implied.
+    /// It closes 1.52 points of that nine-point gap. Thirty seeds at a
+    /// hundred years: the output measure moves from 27.309 to 25.791 and
+    /// the contraction share moves 0.10, so the mechanism is the one
+    /// described and its size is a sixth of what the accounting implied.
     ///
     /// A target is only reached if the phase lasts long enough to
     /// approach it. Growth enters a trough near -3.0, having left a
-    /// contraction whose realised rate is about -2.5 and then taken this
+    /// contraction whose realized rate is about -2.5 and then taken this
     /// phase's own -0.5 entry shock, and it reverts by `gap * 0.12` a
-    /// month and `gap * 0.25` a quarter. Under the shipped range it
-    /// asymptotes to -0.25 and NEVER crosses zero. At 1.0 it crosses at
-    /// month 11 or 12. A trough runs 2 to 6 months, so output falls
-    /// through the whole phase under either setting and this dial changes
-    /// where growth is heading rather than where it is.
+    /// month and `gap * 0.25` a quarter. Under the original range it
+    /// approaches -0.25 and never crosses zero. At 1.0 it crosses at month
+    /// 11 or 12. A trough runs 2 to 6 months, so output falls through the
+    /// whole phase under either setting and this dial changes where growth
+    /// is heading, with little effect on where it is.
     ///
     /// So the binding constraint is the reversion rate against the phase
-    /// length, not the declared range, and the repair the evidence points
-    /// at is the -0.5 entry shock at `daily.rs:568`, which this line placed
-    /// at `:247` until 2026-09-17: the only phase after
-    /// a contraction that still pushes growth DOWN on entry is the one
-    /// named for the turn.
-    ///
-    /// Kept at 0.0 rather than deleted because the measurement is the
-    /// reason the next change is known, and the dial is the instrument
-    /// that produced it.
+    /// length, and the declared range matters little. The evidence points
+    /// at the -0.5 growth shock a trough takes on entry, in
+    /// `economy/daily.rs`: of the phases after a contraction, only the one
+    /// named for the turn still pushes growth down on entry. The dial stays
+    /// at 0.0 so the measurement can be repeated.
     pub trough_growth_floor: f64,
-    /// Whether a phase's growth target is drawn from its declared range or
-    /// fixed at the range's midpoint. 0.0, which every preset before pt-v18
-    /// carries, takes no draw and is bit-identical.
+    /// Whether a phase's growth target is drawn from its declared range
+    /// (1.0) or fixed at the range's midpoint (0.0). Every shipped preset
+    /// carries 0.0, which takes no draw.
     ///
     /// # A declared range the mechanism reduces to its midpoint
     ///
     /// `gdp_growth_range` is stated for all five phases and read at
-    /// exactly two sites, both of which take `(lo + hi) / 2.0`. The
-    /// declared WIDTH is discarded everywhere, so the table reads as a
-    /// specification and behaves as a list of five midpoints. That is the
-    /// third instance of one habit in this struct rather than three
-    /// accidents: `max_months` is declared for every phase and read by
-    /// nothing, `gdp_growth_range` is declared and halved to a midpoint,
-    /// and the trough's phase-change shock carries a sign that
-    /// contradicts its own phase.
+    /// exactly two sites, both of which take `(lo + hi) / 2.0`. At 0.0 the
+    /// declared width is discarded everywhere, so the table behaves as a
+    /// list of five midpoints. The same struct has two related quirks:
+    /// `max_months` is declared for every phase and read by nothing, and
+    /// the trough's phase-change shock carries a sign that contradicts its
+    /// own phase.
     ///
     /// What that costs is the depth distribution. An episode's fall is its
     /// mean growth times its length, and with the rate pinned to a
@@ -2875,22 +2811,16 @@ pub struct ModelParams {
     /// midpoint. No constant is invented: the numbers are the ones the
     /// table states.
     ///
-    /// # Zero on every preset until the four items are composed
+    /// # Why it ships at 0.0
     ///
-    /// This is the era's one shippable dial for the recession item and it
-    /// is still 0.0 in pt-v18, deliberately. Four items are landing dials
-    /// into one preset and each is measured alone, so a preset assembled
-    /// by turning them on one at a time has no arm that sees the pair
-    /// terms. This item supplies the evidence for that rule rather than an
-    /// exception to it: its two dials each improve the depth spread alone
-    /// and together they are worse than neither, because the pair
-    /// eliminates shallow recessions. Two dials from ONE item already did
-    /// it. Composition is one step, measured together, and it belongs to
-    /// whoever runs it.
+    /// Measured alone this dial widens the depth spread, and so does its
+    /// companion recession dial. Turned on together they are worse than
+    /// either, because the pair eliminates shallow recessions. A preset
+    /// that wants the wider spread has to measure the dials together.
     pub phase_target_range_draw: f64,
     /// The corporate bond yield at which the target multiple sits exactly on
-    /// its sector anchor. 0.04, which every preset before pt-v18 carries, is
-    /// the constant this was, to the bit.
+    /// its sector anchor, as a fraction (0.04 is 4 per cent). Presets before
+    /// pt-v18 carry 0.04; pt-v18 onward carry 0.0482.
     ///
     /// # A neutral point the economy never visits
     ///
@@ -2898,20 +2828,20 @@ pub struct ModelParams {
     /// `(discount - neutral) * RATE_PE_SENSITIVITY * duration`, so a name
     /// is valued on its anchor exactly when the discount rate equals this.
     /// The economy opens at a corporate yield of 4.56 per cent and settles
-    /// at 4.82, and it never visits 4.00. So every profitable name opens
-    /// about one per cent below the price the generator drew for it, which
-    /// is +0.0107 of day-zero mispricing at the opening and +0.014 at the
-    /// corner, and the market spends the year unwinding it on a 60-day
-    /// half-life. At the second sweep's measured -94.872 index points per
-    /// unit of opening level that is 1.0 to 1.3 points of the first year,
-    /// on every seed, and nothing in a stationary year.
+    /// at 4.82, and it never visits 4.00. So at 0.04 every profitable name
+    /// opens about one per cent below the price the generator drew for it,
+    /// which is +0.0107 of day-zero mispricing at the opening and +0.014 at
+    /// the settled state, and the market spends the year unwinding it on a
+    /// 60-day half-life. At a measured -94.872 index points per unit of
+    /// opening level that is 1.0 to 1.3 points of the first year, on every
+    /// seed, and nothing in a stationary year.
     ///
-    /// # Read off the economy rather than chosen
+    /// # Read off the economy
     ///
     /// The value that zeroes the day-zero term is the yield the economy
-    /// opens at, which is 0.0456 as it opens today and 0.0482 at the corner
-    /// the dynamics reach. Both are read off the process, the second from
-    /// the burn-in table, so neither is a matter of degree.
+    /// opens at: 0.0456 at a cold start and 0.0482 at the settled state the
+    /// dynamics reach. Both are read off the process, the second from the
+    /// burn-in table, so neither is a matter of degree.
     ///
     /// # Why the generator is untouched
     ///
@@ -2922,26 +2852,23 @@ pub struct ModelParams {
     /// by no line of the generator's code; the only other reference is its
     /// own test.
     ///
-    /// # Promoted rather than renamed
+    /// # One name for one quantity
     ///
-    /// This name was on the carried read-only surface. `to_pairs` merges
-    /// that surface with the settable one and sorts, so moving the name
-    /// between them leaves every preset's pairs, fingerprint and
-    /// coefficient digest untouched wherever the value has not moved. A new
-    /// name would have added a second entry for one quantity, with this one
-    /// still reading 0.04 about an engine using 0.0456.
+    /// This name was on the carried read-only surface before it became
+    /// settable. `to_pairs` merges that surface with the settable one and
+    /// sorts, so moving the name between them leaves every preset's pairs,
+    /// fingerprint and coefficient digest untouched wherever the value has
+    /// not moved.
     pub neutral_discount_rate: f64,
-    /// Days the economy is advanced alone, before day zero. 0.0, which every
-    /// preset before pt-v18 carries, draws nothing and leaves construction
-    /// as it was.
+    /// Days the economy is advanced alone, before day zero, so a run opens
+    /// on settled macro fields. 0.0 draws nothing; pt-v18 onward carry 755.
     ///
-    /// # A year spent travelling
+    /// # Why the economy needs settling
     ///
     /// The economy opens at unemployment 4.00, inflation 2.00 and a
     /// corporate yield of 4.56, and its own dynamics reach 2.50, 2.74 and
-    /// 4.82. Everything this project certifies is certified on a window in
-    /// which nothing has settled, and the travel is one-way on the
-    /// multiple.
+    /// 4.82. Without a burn-in, every certified window is one in which
+    /// nothing has settled, and the travel is one-way on the multiple.
     ///
     /// # The length is measured
     ///
@@ -2955,31 +2882,29 @@ pub struct ModelParams {
     /// # What it costs to run
     ///
     /// The draws come from the economy's own substream, so the market's
-    /// day-0 draws are where they were. It consumes economy draws, which is
-    /// the only settable field besides the volatility jump that moves a
-    /// draw count, and it does so by running the economy rather than as a
-    /// side effect.
+    /// day-0 draws are where they were. It consumes economy draws, which
+    /// makes it the only settable field besides the volatility jump that
+    /// moves a draw count, and it does so by running the economy.
     pub macro_burn_in_days: f64,
-    /// Draw the day-zero cycle phase and its age from the cycle's own
-    /// stationary law, instead of opening every run at the same point. 0.0,
-    /// which every preset through pt-v18 carries, draws nothing and leaves
-    /// construction as it was, to the bit. pt-v19 carries 1.0 since its
-    /// fifth composition, by the owner's ruling of 2026-09-23 that
-    /// certification runs open at a random point in the business cycle.
+    /// Switch (0.0 or 1.0) that draws the day-zero cycle phase and its age
+    /// from the cycle's own stationary law, instead of opening every run at
+    /// the start of an expansion. Presets through pt-v18 carry 0.0, which
+    /// draws nothing; pt-v19 and pt-v20 carry 1.0, so certification runs open
+    /// at a random point in the business cycle.
     ///
     /// # A cohort, not a transient
     ///
-    /// Every run opens in EXPANSION at phase age ZERO. A phase has a
+    /// At 0.0 every run opens in EXPANSION at phase age ZERO. A phase has a
     /// minimum duration before a transition can roll (`economy/state.rs`,
     /// `phase_characteristics`: 6, 2, 4, 2, 4 months) and then a Weibull
-    /// hazard (`economy/cycle.rs`), and at this era's clock the exit after
-    /// the minimum is steep, so thirty seeds leave their first expansion
-    /// at nearly the same age and move through the first cycle in step.
-    /// Year two is a synchronised recession -- contraction share 0.51 on
-    /// pt-v1, pt-v16 and a pinned-VIX arm alike, so it is a property of
-    /// the construction and not of a preset -- and the macro fields travel
-    /// with it: unemployment 2.8, 5.8, 7.0, 4.9 by year on pt-v16, the
-    /// recession probability 0.13, 0.54, 0.14, 0.37.
+    /// hazard (`economy/cycle.rs`), and at this clock the exit after the
+    /// minimum is steep, so thirty seeds leave their first expansion at
+    /// nearly the same age and move through the first cycle in step. Year
+    /// two is a synchronized recession (contraction share 0.51 on pt-v1,
+    /// pt-v16 and a pinned-VIX arm alike, so it is a property of the
+    /// construction and not of a preset), and the macro fields travel with
+    /// it: unemployment 2.8, 5.8, 7.0, 4.9 by year on pt-v16, the recession
+    /// probability 0.13, 0.54, 0.14, 0.37.
     ///
     /// It does not damp on a horizon anyone runs. The fixed minimums make
     /// the cycle's length nearly deterministic, so the yearly mix is still
@@ -3003,26 +2928,26 @@ pub struct ModelParams {
     ///
     /// with `p_i` the probability `check_cycle_transition` compares against
     /// its uniform, read on the hazard alone. Nothing is chosen: every term
-    /// is the engine's own -- `cycle_hazard_params`, `min_months`, the
+    /// is the engine's own (`cycle_hazard_params`, `min_months`, the
     /// hazard's cap of 0.8, the clamp at 0.3 and
-    /// [`ModelParams::cycle_hazard_per_month`] -- and the walk stops where
+    /// [`ModelParams::cycle_hazard_per_month`]), and the walk stops where
     /// the remaining tail cannot move an f64 sum of it.
     ///
-    /// **The AGE is not optional.** `f_i` is the renewal identity for the
-    /// backward recurrence time, and it is the part a build would skip.
-    /// Drawing the phase and setting the age to zero would start a smaller
-    /// cohort at the same point: at this clock 73 per cent of stationary
-    /// expansions are younger than the 180-day minimum a fresh one has to
-    /// clear, with a median age of 123 days against a mean sojourn of 246.
+    /// The age matters as much as the phase. `f_i` is the renewal identity
+    /// for the backward recurrence time. Drawing the phase and setting the
+    /// age to zero would start a smaller cohort at the same point: at this
+    /// clock 73 per cent of stationary expansions are younger than the
+    /// 180-day minimum a fresh one has to clear, with a median age of 123
+    /// days against a mean sojourn of 246.
     ///
     /// # The fields, and the ladder
     ///
     /// `adjust_transition_probability` adds to the hazard from the macro
     /// state, so the TRUE stationary law depends on the fields, which
     /// depend on the phase path. There is no closed form. The draw above
-    /// is the hazard-only law; the fields are then relaxed by
+    /// is the hazard-only law. The fields are then relaxed by
     /// `macro_burn_in_days` days of the ordinary daily step with the phase
-    /// NOT held and its clock NOT reset -- the chain is already in its
+    /// NOT held and its clock NOT reset. The chain is already in its
     /// stationary law, which a free run preserves by definition, while
     /// unemployment, inflation and the yields relax to the values
     /// consistent with the phase path they have just lived through, and the
@@ -3033,32 +2958,31 @@ pub struct ModelParams {
     /// opening, and a preset that sets this without the other opens a
     /// drawn contraction on an expansion's fields.
     ///
-    /// # Why it is a SWITCH and the interior has no reading
+    /// # Why it is a switch
     ///
     /// A day-zero state is either drawn from the stationary law or it is
     /// not; there is no half-drawn phase. Every non-zero value therefore
-    /// gives the same opening, which is asserted rather than left for a
-    /// search to find as a flat direction:
+    /// gives the same opening, which
     /// `test_every_non_zero_value_gives_the_same_opening` in
-    /// `tests/test_stationary_opening.py`. The two admissible values are
-    /// 0.0 and 1.0.
+    /// `tests/test_stationary_opening.py` asserts. The two admissible
+    /// values are 0.0 and 1.0.
     ///
     /// # What it costs
     ///
     /// Two uniforms from the economy substream at construction, so the
     /// market's day-zero draws sit where they sat, plus about 2,500 to
-    /// 67,000 multiplies once -- the identity's walk, whose length is the
-    /// clock's, not the run's. Nothing per session.
+    /// 67,000 multiplies once for the identity's walk, whose length is set
+    /// by the clock and not by the run. Nothing per session.
     ///
-    /// # It moves the draw schedule in TWO places, not one
+    /// # It moves the economy's draw schedule in two places
     ///
-    /// The two construction uniforms, as `macro_burn_in_days` already
-    /// moves it and declares. And then, for the WHOLE RUN:
+    /// The first is the two construction uniforms, as `macro_burn_in_days`
+    /// also moves it. The second lasts the whole run:
     /// `check_cycle_transition` returns before drawing while a phase is
     /// younger than its minimum duration, so a run opening at age zero
     /// rolls no exit for its first 180 days while one opening past the
-    /// minimum rolls one every day. The count there is the mechanism -- a
-    /// phase past its minimum is a phase whose exit is being rolled -- and
+    /// minimum rolls one every day. That count is the mechanism itself (a
+    /// phase past its minimum is a phase whose exit is being rolled), and
     /// it is not a construction cost.
     ///
     /// The three-day perturbation probe cannot see either, and reads the
@@ -3068,150 +2992,136 @@ pub struct ModelParams {
     /// construction draws exactly. Measured over six seeds at 1, 2, 3, 5,
     /// 10 and 30 days the difference runs 0, +1, +2, +4 and +30, which is
     /// why `ECONOMY_STREAM_MOVERS` in `tests/test_model_params.py` carries
-    /// this dial for the mechanism rather than on the probe's evidence.
-    /// That set was called `DRAW_SCHEDULE_MOVERS`, as this line did until
-    /// 2026-09-17, and was renamed when the sweep found no dial that moves
-    /// the market stream.
+    /// this dial for the mechanism rather than on the probe's evidence. No
+    /// dial moves the market stream.
     pub cycle_stationary_opening: f64,
-    /// The share of earnings a company returns as net buybacks. 0.0, which
-    /// every preset before pt-v18 carries, is bit-identical.
+    /// The share of earnings a company returns as net buybacks, paid as a
+    /// yield on the price. 0.0 turns it off; pt-v18 and pt-v19 carry one
+    /// third, and pt-v20 carries 0.75.
     ///
-    /// # A CHOSEN constant, and the only one in this era
+    /// # A chosen constant
     ///
-    /// Every other dial here is derived: a stationarity condition, a
+    /// Most dials in this group are derived: a stationarity condition, a
     /// symmetric mean, a unit, a measured transient, the yield the economy
-    /// opens at. This one is not. It is a statement about how US large-cap
-    /// companies behave, taken from company filings, where total
-    /// shareholder return runs near half of earnings split between
-    /// dividends and net buybacks. A third in net buybacks sits inside that
-    /// record and a reader can check it against the same source.
+    /// opens at. This one is a statement about how US large-cap companies
+    /// behave, taken from company filings, where total shareholder return
+    /// runs near half of earnings split between dividends and net
+    /// buybacks. A third in net buybacks sits inside that record and a
+    /// reader can check it against the same source.
     ///
-    /// The era's record marks it CHOSEN for that reason. It is not fitted
-    /// to anything this engine produces, which is the property that makes
-    /// it checkable: a value fitted to our own distribution would be
-    /// unfalsifiable outside it.
+    /// It is not fitted to anything this engine produces, which is the
+    /// property that makes it checkable: a value fitted to the model's own
+    /// distribution would be unfalsifiable outside it.
     ///
-    /// # What it buys, and the check that is not its source
+    /// # What a third buys, and the check on it
     ///
     /// The model's own median annual earnings yield is 0.0555 at pt-v18 on
-    /// the era's roster, so a third of it is a buyback yield of 1.85 per
-    /// cent. US large-cap net buybacks over 2000 to 2025 run near 1.5 to
-    /// 2.0 per cent of market value. That agreement is a check on the
+    /// its certified roster, so a third of it is a buyback yield of 1.85
+    /// per cent. US large-cap net buybacks over 2000 to 2025 run near 1.5
+    /// to 2.0 per cent of market value. That agreement is a check on the
     /// share, in that order: the share comes from the earnings record and
     /// the yield it implies is then compared against the value record.
     ///
-    /// # Why it is a yield and not a premium
+    /// # Why it is a yield
     ///
     /// Earnings over price, so it pays more when the multiple is low and
     /// less when it is high. A flat premium would pay the same in a market
     /// priced at forty times earnings as at ten, which is the opposite of
-    /// what a buyback programme does with a fixed budget. See
+    /// what a buyback program does with a fixed budget. See
     /// [`crate::market::tick::buyback_scale`] for the arithmetic, its
     /// residual against the exact path integral, and the clamp on a
     /// loss-maker.
     ///
-    /// # pt-v20's 0.75 is not this record
+    /// # pt-v20's 0.75 is a calibration
     ///
-    /// pt-v20 ships 0.75, and none of the above is its source. It is a
-    /// CALIBRATION: the earnings anticipation and the rate sensitivity cost
-    /// the index its one-year drift, no arm at a third held the level
-    /// band's floor, and 0.75 restores it (the tenth and eleventh
-    /// registrations in `validation/pt-v20/programme/ptv20-registration.md`).
-    /// At the 0.0555 earnings
-    /// yield above it is a buyback yield of about 4.2 per cent, over twice
-    /// the 1.5 to 2.0 per cent the value record shows. The model pays no
-    /// dividends, so the term carries the whole of the drift that payouts
-    /// would; that is a reading of the gap, not a measurement behind the
-    /// value.
+    /// None of the filings argument above is the source of pt-v20's 0.75.
+    /// The earnings anticipation and the rate sensitivity cost the index
+    /// its one-year drift, no setting at a third held the floor of the
+    /// level band, and 0.75 restores it. At the 0.0555 earnings yield above
+    /// it is a buyback yield of about 4.2 per cent, over twice the 1.5 to
+    /// 2.0 per cent the value record shows. The model pays no dividends, so
+    /// the term carries the whole of the drift that payouts would; that is
+    /// a reading of the gap, not a measurement behind the value.
     pub buyback_payout_share: f64,
-    /// How much of the drift the market jump's mean carries is given back.
-    /// 0.0, which every preset before pt-v18 carries, is bit-identical. 1.0
-    /// subtracts the compensator and makes the jump a martingale.
+    /// How much of the drift the market jump's mean carries is given back,
+    /// from 0.0 (none) to 1.0, which subtracts the compensator and makes the
+    /// jump a martingale. Presets before pt-v18 carry 0.0; pt-v18 onward
+    /// carry 1.0.
     ///
     /// # The mean is there for skew, and it also buys a drift
     ///
     /// `jump_mean_market` is negative so that crashes are larger than
-    /// rallies, which is a real property of index returns and a legitimate
-    /// thing to want. But a jump that arrives with probability `lambda`
-    /// and mean `m` contributes `lambda * m` to the expected return every
-    /// day whether it fires or not, so the skew comes with a drift nobody
-    /// asked for. At pt-v16 that is -0.11769 per name per year at the
-    /// day-zero intensity, and 2.6 percentage points of annual index
-    /// level.
-    ///
-    /// The value was set once in the pt-v4 era by a search whose objective
-    /// could not read a first moment, and inherited unchanged through
-    /// eleven presets. So the drift was never chosen; it was never
-    /// visible.
+    /// rallies, which is a real property of index returns. But a jump that
+    /// arrives with probability `lambda` and mean `m` contributes
+    /// `lambda * m` to the expected return every day whether it fires or
+    /// not, so the skew comes with an unintended drift. At pt-v16 that is
+    /// -0.11769 per name per year at the day-zero intensity, and 2.6
+    /// percentage points of annual index level. The mean was set in the
+    /// pt-v4 era by a search whose objective could not read a first
+    /// moment, and was inherited unchanged through eleven presets.
     ///
     /// # Compensated rather than re-derived
     ///
-    /// The obvious repair is to solve for a smaller mean that buys skew
-    /// without the drift. There is no such value: for a compound Poisson
-    /// jump the drift and the skew are both linear in the mean, so trading
-    /// one against the other is a matter of degree and any answer would be
-    /// a fitted constant.
+    /// Solving for a smaller mean that buys skew without the drift does not
+    /// work: for a compound Poisson jump the drift and the skew are both
+    /// linear in the mean, so trading one against the other is a matter of
+    /// degree and any answer would be a fitted constant.
     ///
     /// Subtracting `lambda * m` instead is the standard compensated-Poisson
     /// construction. It makes the jump term a martingale, and because the
-    /// compensator is a DETERMINISTIC offset it moves the first moment and
+    /// compensator is a deterministic offset it moves the first moment and
     /// leaves every central moment untouched. The skew and the fat tail
-    /// survive exactly, at the mean the calibration chose, and the drift
-    /// goes to zero. The mean therefore does not move at all: what was
-    /// wrong was the missing compensator and not the value.
+    /// survive exactly, at the calibrated mean, and the drift goes to zero.
     ///
     /// `lambda` is the CONDITIONAL intensity, already scaled by the VIX
-    /// coupling, so the compensator tracks the arrival rate. The
-    /// investigation measured the realised drift at 1.084 times the
-    /// day-zero closed form for exactly that reason, and a compensator on
-    /// the day-zero rate would have left that 8 per cent behind.
+    /// coupling, so the compensator tracks the arrival rate. The realized
+    /// drift measured 1.084 times the day-zero closed form for exactly that
+    /// reason, and a compensator on the day-zero rate would have left that
+    /// 8 per cent behind.
     pub jump_mean_compensated: f64,
-    /// How much of the stop-cascade ladder's direction is removed. 0.0,
-    /// which every preset before pt-v18 carries, is bit-identical. 1.0 makes
-    /// the two ladders mirror images.
+    /// How much of the direction in the stop-cascade ladders is removed,
+    /// from 0.0 (the original asymmetric ladders) to 1.0 (mirror images).
+    /// Presets before pt-v18 carry 0.0; pt-v18 onward carry 1.0.
     ///
-    /// # The asymmetry nobody chose
+    /// # The asymmetry at 0.0
     ///
     /// Forced flow from resting stop orders runs both ways: stop-losses
     /// under longs on the way down, buy-stops over shorts on the way up.
-    /// The two ladders that express it do not match. The downside fires at
-    /// a 2 per cent move and the upside at 3; the downside has four tiers
-    /// and the upside three; and at every matched size the downside is
-    /// larger, 0.008 against 0.006, 0.005 against 0.004, 0.003 against
-    /// 0.002, with a fourth downside tier of 0.001 that has no partner.
-    /// Every one of those is a bare literal with no parameter, so nothing
-    /// could reach them and nothing recorded a reason for the difference.
+    /// At 0.0 the two ladders that express it do not match. The downside
+    /// fires at a 2 per cent move and the upside at 3; the downside has
+    /// four tiers and the upside three; and at every matched size the
+    /// downside is larger, 0.008 against 0.006, 0.005 against 0.004, 0.003
+    /// against 0.002, with a fourth downside tier of 0.001 that has no
+    /// partner. Every one of those is a bare literal with no parameter and
+    /// no recorded reason for the difference.
     ///
     /// Over a symmetric distribution of daily returns a ladder that
-    /// subtracts more than it adds is a drift, which is this era's shape
-    /// again.
+    /// subtracts more than it adds is a drift.
     ///
-    /// # What is matched, and what is deliberately left alone
+    /// # What is matched, and what is left alone
     ///
-    /// The GATES stay. A stop-loss sits under every long, so the downside
+    /// The gates stay. A stop-loss sits under every long, so the downside
     /// needs no condition; a buy-stop needs shorts to exist, so the upside
-    /// keeps `short_interest_ratio > 0.1`. That is defensible finance and
-    /// not an asymmetry anybody left by accident.
+    /// keeps `short_interest_ratio > 0.1`.
     ///
-    /// The THRESHOLD and the TIER MAGNITUDES are matched, at the mean of
+    /// The threshold and the tier magnitudes are matched, at the mean of
     /// the two ladders: threshold 0.025, tiers 0.007, 0.0045, 0.0025 and
     /// 0.0005. That is the same construction the OPEC rule uses. It
     /// chooses neither side and it preserves the total intervention the
     /// pair performs exactly, 0.029 across both ladders before and after.
     ///
-    /// # What is NOT derived here, and is worth saying
+    /// # What is not derived
     ///
     /// Unlike the tilt, the jump and the oil supply term, this one has no
     /// stationarity condition or closed form behind it. Odd symmetry in
     /// the return is the structural claim; the mean is a rule for picking
-    /// the numbers under it rather than a value read off the process.
-    /// Whether these literals should become parameters at all is an open
-    /// question for the era's owner rather than something settled here.
+    /// the numbers under it rather than a value read off the process. The
+    /// tier literals themselves are not parameters.
     pub cascade_symmetry: f64,
     /// A scale on the whole forced-flow term: the short squeeze and both
     /// stop ladders ([`ModelParams::cascade_symmetry`]). 1.0, which every
     /// preset through pt-v19 carries, is the ladder as it stands; 0.0
-    /// switches it off.
+    /// switches it off, and pt-v20 carries 0.1.
     ///
     /// The term reacts to the name's own previous day (a stop cascade after
     /// any fall of 2.5 per cent, a buy cascade on a heavily shorted rally),
@@ -3219,25 +3129,23 @@ pub struct ModelParams {
     /// following the model price (`quote_model_weight`) it is the largest
     /// daily momentum left in it: on pt-v19's certified roster it carries
     /// about -18 bp a day of a Lo-MacKinlay one-day contrarian book's -23,
-    /// against the certified
-    /// forty's -1.7 +/- 2.3.
+    /// against the certified forty's -1.7 +/- 2.3.
     pub cascade_gain: f64,
-    /// Persistence of the slow variance component (Engle-Lee style). The
-    /// market factor's variance carries two timescales from the pt-v4 era:
-    /// the fast one above tracks the VIX-scaled target, this one carries
-    /// long-horizon clustering. 0.0 disables it and recovers the
-    /// single-component update bit for bit.
+    /// Daily persistence of the slow component of the market factor's
+    /// variance (Engle-Lee style). The fast component tracks the
+    /// VIX-scaled target and this one carries long-horizon clustering; 0.0
+    /// disables it and recovers the single-component update bit for bit.
     pub market_vol_slow_persistence: f64,
     /// How much of each day's variance surprise the slow component takes
     /// up. 0.0 disables it.
     pub market_vol_slow_gain: f64,
-    /// How much of the slow component's deviation from baseline reaches the
-    /// realized variance. 0.0 disables it. Applies the loss-maker book floor
-    /// to profitable companies too.
+    /// Switch that applies the loss-maker book floor to profitable
+    /// companies too, making fair value continuous at zero earnings. 0.0,
+    /// which every shipped preset carries, is off.
     ///
-    /// At 0.0 this is off and the valuation is bit-identical to the reference implementation
-    /// reference, which switches hard at `eps > 0`: a company earning 0.01 is
-    /// valued on earnings and one earning exactly 0 is valued at
+    /// At 0.0 the valuation switches hard at `eps > 0`, as the reference
+    /// implementation does: a company earning 0.01 is valued on earnings
+    /// and one earning exactly 0 is valued at
     /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Fair value therefore JUMPS UP as
     /// earnings fall through zero, and a barely profitable company is worth
     /// less than a loss-making one with the same book.
@@ -3245,16 +3153,17 @@ pub struct ModelParams {
     /// At 1.0 the floor applies on both sides, `max(eps * pe, book * 1.2)`, so
     /// fair value is continuous at zero and non-decreasing in earnings.
     ///
-    /// Inert by default because it is NOT a small correction: 42.8% of
+    /// It is off by default because it is a large change: 42.8% of
     /// instruments from `Universe.random` sit below the floor, some at a fifth
     /// of it, so switching it on re-values a large part of any universe and
     /// re-bases every calibrated statistic. It exists so that a time-varying
-    /// earnings path has somewhere monotonic to run; adopting it is an era
-    /// boundary and a recalibration, not a bug fix.
+    /// earnings path has somewhere monotonic to run; adopting it needs a new
+    /// preset and a recalibration.
     pub fair_value_book_floor: f64,
-    /// How much of nominal output growth the valuation's earnings carry.
-    /// 0.0, which every preset before pt-v18 carries, is bit-identical. 1.0
-    /// holds the earnings share of nominal output constant.
+    /// How much of nominal output growth the valuation's earnings carry,
+    /// from 0.0 (earnings fixed at construction) to 1.0 (the earnings share
+    /// of nominal output held constant). Presets before pt-v18 carry 0.0;
+    /// pt-v18 onward carry 1.0.
     ///
     /// # Why the model has no expected return without this
     ///
@@ -3290,12 +3199,12 @@ pub struct ModelParams {
     /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Scaling only earnings would
     /// make a loss-maker's fair value fall in real terms every year.
     ///
-    /// # The clock, which is the part that is easy to get wrong
+    /// # The clock
     ///
     /// `N` is integrated by the economy, which compounds `gdp` by
     /// `gdp_growth / 100 / 365` and `cpi` by `inflation_rate / 100 / 365`
     /// on every day it advances, while the market trades 252 days to a
-    /// year and annualises by 252. The economy advances once per market
+    /// year and annualizes by 252. The economy advances once per market
     /// day, so a certified year of 252 sessions takes 252 of those steps
     /// and delivers `252 / 365` of every annual rate: growth of 2.50 and
     /// inflation of 2.00 at the opening state give 4.50 per economy-year
@@ -3317,8 +3226,7 @@ pub struct ModelParams {
     /// ratio of 1.0685, which is 1.67 per cent a year. The term goes below
     /// 1.0 whenever `gdp * cpi` falls under its opening value, which is
     /// growth plus inflation turning negative together. A flat premium
-    /// would have paid the same rate through all of that, which is the
-    /// reason this is a mechanism.
+    /// would have paid the same rate through all of that.
     ///
     /// # A company listed mid-run
     ///
@@ -3330,13 +3238,13 @@ pub struct ModelParams {
     /// `nominal_output_base`. Every preset before pt-v18 holds that ratio
     /// at 1.0, where the two readings are the same number.
     ///
-    /// # What it does NOT claim
+    /// # What it does not claim
     ///
     /// Earnings are a share of nominal output, and the share is a quantity
     /// this model does not carry. At 1.0 the share is held constant, which
     /// is the only value that is read off the process rather than chosen;
-    /// below 1.0 the share falls every year and above 1.0 it rises for
-    /// ever, both of which are assertions about an unmodelled quantity.
+    /// below 1.0 the share falls every year and above 1.0 it rises
+    /// forever, both of which are assertions about an unmodeled quantity.
     ///
     /// A real price index also earns a return above nominal output growth,
     /// through buybacks and the drift of the earnings share, worth 3 to 4
@@ -3345,70 +3253,74 @@ pub struct ModelParams {
     /// closed.
     pub earnings_nominal_growth: f64,
     /// Weight of the slow variance component in the market factor's
-    /// two-component mixture. The mixture exists because real volatility
-    /// memory decays hyperbolically and a single exponential cannot imitate
-    /// that past about a year. Two exponentials fake it better and still
-    /// come apart, which is gap 3.
+    /// two-component mixture, from 0.0 (single component) to 1.0. pt-v15
+    /// onward carry 0.35.
+    ///
+    /// The mixture exists because real volatility memory decays
+    /// hyperbolically and a single exponential cannot imitate that past
+    /// about a year. Two exponentials imitate it better and still come
+    /// apart at long lags, which is a known gap in the model.
     pub market_vol_slow_weight: f64,
     /// How strongly realized volume tracks the market factor's variance.
+    /// 0.0 disables it and leaves volume exactly as it was; pt-v4 onward
+    /// carry about 0.0284.
     ///
     /// Volume in this engine is a pure function of `avg_volume`, which the
     /// close holds fixed ([`crate::market::daily::AvgVolumePolicy::Hold`]),
-    /// so daily volume changes are very nearly independent noise and
-    /// difference to an autocorrelation near -0.5 -- measured -0.46 against
-    /// a real -0.32..-0.20. Real volume is a persistent level plus large
-    /// day-to-day noise, and the persistence is what this supplies.
+    /// so without this term daily volume changes are very nearly
+    /// independent noise and difference to an autocorrelation near -0.5
+    /// (measured -0.46 against a real -0.32 to -0.20). Real volume is a
+    /// persistent level plus large day-to-day noise, and the persistence is
+    /// what this supplies.
     ///
     /// The driver is the market factor's variance, which is already
-    /// persistent and is genuinely EXOGENOUS to volume -- the property the
-    /// `Hold` docstring names as the precondition for reintroducing any
-    /// feedback. Feeding realised volume back was tried and removed: it is
-    /// a pure function of `avg_volume`, so the loop carried no information
-    /// and compounded at ~1.7%/day. This carries information, because
-    /// volume and volatility genuinely co-move.
-    ///
-    /// 0.0 disables it and volume is exactly what it was.
+    /// persistent and is EXOGENOUS to volume, the property the `Hold`
+    /// docstring names as the precondition for reintroducing any feedback.
+    /// Feeding realized volume back was tried and removed: it is a pure
+    /// function of `avg_volume`, so the loop carried no information and
+    /// compounded at about 1.7% a day. This carries information, because
+    /// volume and volatility co-move.
     pub volume_variance_gain: f64,
-    /// Per-name volume persistence and its innovation. Both zero on every
-    /// preset before this dial and bit-identical (§107).
+    /// Daily persistence of a per-name volume state, so each name has busy
+    /// and quiet spells of its own. 0.0, which every shipped preset
+    /// carries, turns it off.
     ///
     /// `volume_persistence` carries a COMMON multiplier: every name shares
     /// it, so the whole market is busy or quiet together. That function's
-    /// own docstring has said since it was written that "real volume
-    /// persistence is partly idiosyncratic, and that half is not modelled".
+    /// own docstring says "real volume persistence is partly
+    /// idiosyncratic, and that half is not modelled". This is that half.
     ///
-    /// It is the half the last panel miss needs. `volume_change_acf1` at 504
-    /// days reads about -0.316 against a band of -0.29 to -0.21 on every
-    /// preset, and the model is too NEGATIVE, which is what independent
-    /// per-tick noise does to the change in a series. Reaching the band
-    /// through the common component needs a bigger innovation, and that
-    /// takes `volume_abs_return_corr` out with it (§21 to §23, §73): a
-    /// market-wide volume multiplier adds volume variance unrelated to any
-    /// name's own moves. A PER-NAME state raises each name's own volume
-    /// autocorrelation without touching the common component the
-    /// volume-and-volatility row depends on, which is the trade those
-    /// searches could not find a way around.
+    /// `volume_change_acf1` at 504 days reads about -0.316 against a band
+    /// of -0.29 to -0.21 on presets without it, and the model is too
+    /// NEGATIVE, which is what independent per-tick noise does to the
+    /// change in a series. Reaching the band through the common component
+    /// needs a bigger innovation, and that takes `volume_abs_return_corr`
+    /// out with it: a market-wide volume multiplier adds volume variance
+    /// unrelated to any name's own moves. A per-name state raises each
+    /// name's own volume autocorrelation without touching the common
+    /// component. Measured, it lowers `volume_abs_return_corr` as well;
+    /// see [`ModelParams::volume_idio_variance_gain`].
     pub volume_idio_persistence: f64,
-    /// Volume that follows the name's own conditional variance. Zero on
-    /// every preset before this dial and bit-identical (§112).
+    /// Gain that makes a name's volume follow its own conditional variance,
+    /// so a name trades more when its own volatility is high. 0.0 turns it
+    /// off; pt-v19 onward carry 0.2.
     ///
     /// `volume_variance_gain` couples volume to the MARKET factor's
-    /// variance and nothing else, so a name whose OWN volatility is
-    /// elevated trades no more than a quiet one in the same market.
+    /// variance and nothing else, so without this a name whose OWN
+    /// volatility is elevated trades no more than a quiet one in the same
+    /// market.
     ///
-    /// This exists because §111 refuted §107. Adding per-name volume
-    /// PERSISTENCE fixes `volume_change_acf1` and takes
-    /// `volume_abs_return_corr` down with it, exactly as the common
-    /// component does, and the reason is not that the old state was common.
-    /// `volume_abs_return_corr` measures how well volume tracks the size of
-    /// a name's own move, so any volume variance UNRELATED to that name's
-    /// returns dilutes it, and per-name noise is as unrelated as
-    /// market-wide noise. This is the return-related version: at `g` the
-    /// multiplier is `1 + g * (garch_variance / sector base - 1)`, clamped,
-    /// so a name trades more precisely when its own volatility is high.
+    /// Per-name volume PERSISTENCE alone fixes `volume_change_acf1` and
+    /// takes `volume_abs_return_corr` down with it, exactly as the common
+    /// component does. `volume_abs_return_corr` measures how well volume
+    /// tracks the size of a name's own move, so any volume variance
+    /// UNRELATED to that name's returns dilutes it, and per-name noise is
+    /// as unrelated as market-wide noise. This is the return-related
+    /// version: at `g` the multiplier is
+    /// `1 + g * (garch_variance / sector base - 1)`, clamped.
     pub volume_idio_variance_gain: f64,
-    /// Innovation of the per-name volume state. See
-    /// [`ModelParams::volume_idio_persistence`].
+    /// Innovation size of the per-name volume state. 0.0 on every shipped
+    /// preset. See [`ModelParams::volume_idio_persistence`].
     pub volume_idio_sigma: f64,
 
     /// How many components a name's variance cascade carries. 0 is off and
@@ -3421,73 +3333,78 @@ pub struct ModelParams {
     /// about `log(range)/log(ratio)`. Six at ratio 3 covers lags 1 to 60.
     /// Capped at [`crate::market::garch::CASCADE_MAX`].
     pub garch_cascade_components: f64,
-    /// Half-life spacing between cascade components. Component `k` has a
-    /// half-life `ratio^k` times component 0's, and component 0 keeps the
-    /// name's own `garch_beta`, so per-name persistence dispersion survives.
+    /// Half-life spacing between cascade components: component `k` has a
+    /// half-life `ratio^k` times component 0's. Every shipped preset
+    /// carries 3.0.
     ///
-    /// Measured (§122): at ratio 3 with six components the latent decay slope
-    /// reads -0.536 against a one-component -1.273 and a real -0.436.
+    /// Component 0 keeps the name's own `garch_beta`, so per-name
+    /// persistence dispersion survives. Measured at ratio 3 with six
+    /// components, the latent decay slope reads -0.536 against a
+    /// one-component -1.273 and a real -0.436.
     pub garch_cascade_ratio: f64,
     /// How much of the variance comes from the cascade rather than from the
-    /// single-component process. 0.0 is the legacy process exactly, and 1.0
-    /// is the cascade alone.
+    /// single-component process. 0.0 is the single-component process
+    /// exactly, and 1.0 is the cascade alone.
     ///
     /// A dial rather than a switch so a preset can take part of the
     /// cascade's shape without paying all of its cost, and so the two can be
-    /// separated in a search: `components` sets the SHAPE, this sets how much
-    /// of it reaches the price.
+    /// separated in a search: `components` sets the shape, this sets how
+    /// much of it reaches the price.
     pub garch_cascade_weight: f64,
 
-    /// Base volume a name trades on a day it does not move at all.
+    /// Base volume multiplier for a name on a day it does not move at all.
+    /// Every shipped preset carries 0.6.
     ///
     /// Volume per tick is `base * (floor + response * min(move, cap) +
     /// noise * u)`, where `move` is the day's move from the open in units
     /// of one percent and `u` is a uniform draw. These four numbers were
-    /// literals `0.6`, `0.6`, `4.0` and `0.2` in the tick engine from the
-    /// first version until 0.3.0, and they ship at exactly those values,
-    /// so every preset before pt-v12 prints the volume it always did.
+    /// literals `0.6`, `0.6`, `4.0` and `0.2` in the tick engine until
+    /// 0.3.0. Presets before pt-v12 carry exactly those values, so they
+    /// print the volume they always did.
     ///
-    /// They became dials because §113 measured what the cap costs. See
-    /// [`ModelParams::volume_move_cap`], which is the interesting one.
+    /// See [`ModelParams::volume_move_cap`] for what the cap costs.
     pub volume_move_floor: f64,
     /// How much more a name trades per one percent it has moved today.
+    /// 0.6 on most presets; pt-v16 to pt-v19 carry 1.0.
     ///
-    /// The contemporaneous channel `volume_abs_return_corr` measures: that
-    /// statistic asks how well a name's volume tracks the size of its own
-    /// move, and this is the only term in the volume expression that ties
-    /// the two together on the SAME day. `volume_variance_gain` and
+    /// This is the contemporaneous channel `volume_abs_return_corr`
+    /// measures: that statistic asks how well a name's volume tracks the
+    /// size of its own move, and this is the only term in the volume
+    /// expression that ties the two together on the SAME day.
+    /// `volume_variance_gain` and
     /// [`ModelParams::volume_idio_variance_gain`] both couple volume to a
     /// conditional variance, which is a forecast made from yesterday's
-    /// information, and §113 measured that a forecast tracks today's
-    /// realised move far more loosely than today's move does.
+    /// information, and a forecast measurably tracks today's realized move
+    /// far more loosely than today's move does.
     pub volume_move_response: f64,
     /// Where the volume response to a move saturates, in units of one
-    /// percent.
+    /// percent. pt-v1 through pt-v11 carry 4.0; pt-v12 onward carry 12.0.
     ///
-    /// At 4.0 -- pt-v1 through pt-v11, and what this line called the
-    /// shipped value until 2026-09-17; pt-v12 onward ship 12.0 -- a name
-    /// that falls twelve percent trades exactly as much as one that falls
-    /// four. Real markets do not do that: volume
-    /// on a limit-down day is a multiple of a bad-Tuesday day, and the
-    /// relationship keeps rising well past four percent. The cap is the
-    /// reason `volume_abs_return_corr` sits where it does and the reason it
-    /// is so easily diluted, because every crisis day is pinned to one
-    /// value and contributes no covariance at all.
+    /// At 4.0 a name that falls twelve percent trades exactly as much as
+    /// one that falls four. Real markets do not do that: volume on a
+    /// limit-down day is a multiple of a bad-Tuesday day, and the
+    /// relationship keeps rising well past four percent. A low cap holds
+    /// `volume_abs_return_corr` down and makes it easy to dilute, because
+    /// every crisis day is pinned to one value and contributes no
+    /// covariance at all.
     ///
-    /// Raising it also raises volume in crises, which is a returns change
-    /// and not only a volume one: volume feeds the book depth that prices
-    /// settle through, so a volume dial is a price dial (§113).
+    /// Raising it also raises volume in crises, which changes returns as
+    /// well: volume feeds the book depth that prices settle through, so a
+    /// volume dial is a price dial.
     pub volume_move_cap: f64,
     /// Amplitude of the return-unrelated noise in a name's daily volume.
+    /// Every shipped preset carries 0.2.
     ///
-    /// Multiplies a uniform draw, so it widens volume without any relation
-    /// to what the name did, which is exactly the dilution §111 identified.
-    /// Lowering it should raise `volume_abs_return_corr` and cost realism
-    /// in whatever a real market's unexplained volume variation represents,
-    /// so it is a dial rather than a thing to minimise.
+    /// It multiplies a uniform draw, so it widens volume without any
+    /// relation to what the name did, which dilutes
+    /// `volume_abs_return_corr`. Lowering it should raise that statistic
+    /// and cost realism in whatever a real market's unexplained volume
+    /// variation represents, so it is a dial rather than a thing to
+    /// minimize.
     pub volume_move_noise: f64,
     /// How much of a jump's share of the day's move the volume scale
-    /// counts. Ships at 1.0, where the arithmetic is the shipped one.
+    /// counts, from 0.0 (none) to 1.0. Every shipped preset carries 1.0,
+    /// where the arithmetic is the original one.
     ///
     /// `price_magnitude` in market/tick.rs phase 3 is the day's move from
     /// the open, `|new_price - open| / open`, and a jump is in it whole. A
@@ -3499,93 +3416,89 @@ pub struct ModelParams {
     /// nothing reprices the open, so there is no session in which a jump
     /// is anything but an intraday move.
     ///
-    /// That is the coupling §0.4 of the 2026-09-21 design note names: the
-    /// model's idiosyncratic jump is five times the tape's size at a
-    /// fortieth of its rate, and the rare huge private jumps are what hold
-    /// `volume_change_acf1` inside its band. Take them out and the band is
-    /// left; leave them in and the names' excess kurtosis is made by jumps
-    /// the tape does not have. This dial separates the two: it decides
-    /// whether the volume process is allowed to see a jump at all.
+    /// That couples two things. The model's idiosyncratic jump is five
+    /// times the tape's size at a fortieth of its rate, and the rare huge
+    /// private jumps are what hold `volume_change_acf1` inside its band.
+    /// Take them out and the band is left; leave them in and the names'
+    /// excess kurtosis is made by jumps the tape does not have. This dial
+    /// separates the two: it decides whether the volume process is allowed
+    /// to see a jump at all.
     ///
     /// At share `q` the day's move is measured from the open the name
     /// would have had if `(1 - q)` of the jump had gapped overnight:
     /// `open_eff = open * exp((1 - q) * j)`, with `j` the log jump the
-    /// close booked into `s` -- read back from the jump slot of the
+    /// close booked into `s`, read back from the jump slot of the
     /// attribution accumulator, which `apply_jumps` is the only writer of.
-    /// At 0.0 the volume scale reads the DIFFUSION move alone, which is
+    /// At 0.0 the volume scale reads the diffusion move alone, which is
     /// what a gap is: volume on a gap day is made at the open, not by the
-    /// name travelling that distance through the book.
+    /// name traveling that distance through the book.
     ///
-    /// UNDETERMINED. What would determine it is volume on jump days read
-    /// off the tape -- the share of a gap day's volume that the gap itself
-    /// explains -- and nobody has read it. 1.0 ships because it is the
-    /// arithmetic that was there, not because it was chosen.
+    /// The right value is undetermined. What would determine it is volume
+    /// on jump days read off the tape (the share of a gap day's volume
+    /// that the gap itself explains), and that has not been measured. 1.0
+    /// ships because it is the original arithmetic.
     pub volume_move_jump_share: f64,
 
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
-    /// How slowly the universe's remembered stress decays, per day.
+    /// Daily decay factor of the universe's remembered stress level, which
+    /// keeps crisis correlation elevated after the VIX falls back. 0.0,
+    /// which every shipped preset carries, means the level never survives
+    /// a day.
     ///
-    /// The crisis correlation blend is otherwise a LOOKUP ON TODAY'S VIX:
+    /// Without it the crisis correlation blend is a LOOKUP ON TODAY'S VIX:
     /// `spike = min(cap, (vix - threshold) / ramp)` with no state at all,
     /// so the tick VIX falls back under the threshold and the whole
     /// cross-section decouples in the same tick. A crisis leaves the
     /// universe exactly as it found it.
     ///
-    /// Real correlation does not work that way -- it spikes with the shock
-    /// and decays over weeks, which is the most-observed crisis fact there
-    /// is and the one this model could not produce. This carries a stress
+    /// Real correlation spikes with the shock and decays over weeks, which
+    /// is the most-observed crisis fact there is. This carries a stress
     /// level that ratchets up instantly and decays geometrically, so an
-    /// event has an effect that OUTLIVES it.
-    ///
-    /// 0.0 means the level never survives a day and the blend is exactly
+    /// event has an effect that outlives it. At 0.0 the blend is exactly
     /// what it always was.
     pub universe_stress_decay: f64,
     /// How much of the remembered stress reaches the correlation blend.
     ///
     /// 0.0 disables the memory entirely; the blend then reads today's VIX
-    /// and nothing else, bit for bit.
+    /// and nothing else, bit for bit. Every shipped preset carries 0.0.
     pub universe_stress_weight: f64,
-    /// Stress the business cycle contributes, in VIX-equivalent points at
-    /// full intensity (contraction).
+    /// Stress the business cycle adds to the correlation blend, in
+    /// VIX-equivalent points at full intensity (a contraction).
     ///
-    /// The engine runs a five-phase cycle -- expansion, peak, contraction,
-    /// trough, recovery -- that the MARKET has never read. The central
-    /// bank changes its whole policy by phase; the price process behaves
-    /// as though the economy were always expanding. This is the wire.
+    /// The engine runs a five-phase cycle (expansion, peak, contraction,
+    /// trough, recovery). The central bank changes its policy by phase, but
+    /// without this dial the price process behaves as though the economy
+    /// were always expanding.
     ///
     /// It feeds the same remembered stress VIX does, so a contraction
     /// raises correlation across the whole cross-section and keeps it
     /// raised while the phase lasts and for weeks after it ends. Regime
     /// switching is also, per Diebold and Inoue, indistinguishable from
-    /// long memory in the data -- so this may reproduce the decay curve a
+    /// long memory in the data, so this may reproduce the decay curve a
     /// second variance timescale was added to chase.
     ///
-    /// 0.0 means the market ignores the cycle, which is every preset
-    /// before pt-v4.
+    /// 0.0, which every shipped preset carries, means the market ignores
+    /// the cycle.
     pub regime_stress_points: f64,
     /// How far the slow variance component's target is decoupled from VIX,
     /// in [0, 1].
     ///
-    /// With a shared target the two components chase VIX together, so adding
-    /// a slow one makes the mixture track a spike MORE sluggishly than the
-    /// fast component alone -- the opposite of what a scenario transient
-    /// needs. The measurement says that is the live defect: pt-v3 retains
-    /// 95.2% of pt-v1's steady-state VIX lever and only 27.6% of its
-    /// transient, because one timescale is doing two jobs. Within-year
-    /// clustering wants long memory; tracking a twenty-day spike wants short.
+    /// With a shared target the two components chase VIX together. At 0.0
+    /// the slow component tracks VIX exactly as the fast one does and the
+    /// branch is skipped, so pt-v1 to pt-v3 reproduce bit for bit. At 1.0
+    /// it ignores VIX entirely and reverts to the autonomous baseline,
+    /// leaving the fast component to carry the whole response. pt-v1 to
+    /// pt-v14 carry 0.0 and pt-v15 onward ship 0.374.
     ///
-    /// At 0.0 the slow component tracks VIX exactly as the fast one does and
-    /// the branch is skipped, so every preset before pt-v4 is bit-identical.
-    /// At 1.0 it ignores VIX entirely and reverts to the autonomous baseline,
-    /// leaving the fast component to carry the whole response.
+    /// # Measured effect
     ///
-    /// # Measured, and the motivation above is REFUTED
-    ///
-    /// This was built on the reasoning that a VIX-coupled slow component
-    /// blunts the transient, so decoupling it should sharpen the response.
-    /// Swept at thirty seeds against eighteen configurations, damping makes
-    /// both the shock ratio AND the steady-state lever monotonically WORSE,
-    /// at every fast persistence and every weight:
+    /// The dial was built on the reasoning that a VIX-coupled slow
+    /// component blunts the response to a VIX spike, so decoupling it
+    /// should sharpen that response: pt-v3 retains 95.2% of pt-v1's
+    /// steady-state VIX lever and only 27.6% of its transient. Swept at
+    /// thirty seeds over eighteen configurations, damping makes both the
+    /// shock ratio and the steady-state lever monotonically worse, at every
+    /// fast persistence and every weight:
     ///
     /// | damp | shock | lever |
     /// |---|---|---|
@@ -3593,26 +3506,20 @@ pub struct ModelParams {
     /// | 0.5 | 1.208 | 4.116 |
     /// | 1.0 | 1.194 | 3.821 |
     ///
-    /// The reasoning was wrong in a nameable way: response SPEED is set by
-    /// the fast component's persistence, while the slow component's VIX
-    /// coupling contributes GAIN, not lag. Removing it removes gain.
+    /// Response speed is set by the fast component's persistence, and the
+    /// slow component's VIX coupling contributes gain rather than lag, so
+    /// removing the coupling removes gain. A value above zero needs its own
+    /// measurement to justify it.
     ///
-    /// Kept, because a measured negative is worth keeping and a search may
-    /// still find a use for it in a region this grid did not cover. But
-    /// nothing should set it above zero on the strength of the argument
-    /// that produced it. It did not stay inert, which this paragraph said
-    /// until 2026-09-17: 0.0 is pt-v1 through pt-v14 and pt-v15 onward ship
-    /// 0.374.
-    ///
-    /// What DID restore the transient was the fast component's persistence:
+    /// The fast component's persistence is what restores the transient:
     /// 0.95 gives shock 1.228 and lever 4.446 where 0.97 gives 1.170 and
-    /// 3.944. pt-v3 raised it to 0.989 to buy clustering, and that single
-    /// choice is what cost the scenario response.
+    /// 3.944. pt-v3's 0.989 buys volatility clustering and costs the
+    /// scenario response.
     ///
-    /// Neither lever is near real markets regardless: measured on the 40-name
-    /// reference roster, real is x6.16 (17.2% annualised below VIX 12 against
-    /// 106.1% above VIX 45) against roughly x3.1 here. "Restore pt-v1's
-    /// lever" was never the right target.
+    /// Neither lever is near real markets: measured on the 40-name
+    /// reference roster, real is x6.16 (17.2% annualized below VIX 12
+    /// against 106.1% above VIX 45) against roughly x3.1 in the
+    /// configurations swept here.
     pub market_vol_slow_vix_damp: f64,
 
     // ── Endogenous jumps (engine.rs, applied at the day close) ──────────
@@ -3621,7 +3528,7 @@ pub struct ModelParams {
     /// The model has no discontinuities without this. Prices diffuse; real
     /// markets gap. Nothing surprises this market unless a caller injects
     /// news by hand, and that is why excess kurtosis reads 5.2 over 504-day
-    /// windows against real markets' 7.1 to 22 — fat tails at that scale are
+    /// windows against real markets' 7.1 to 22. Fat tails at that scale are
     /// not reachable from a diffusion plus GARCH at any coefficients.
     ///
     /// Jumps are drawn from their OWN RNG stream ([`crate::rng::stream::JUMPS`]),
@@ -3643,8 +3550,8 @@ pub struct ModelParams {
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
     /// How much of the market jump's log return joins the day's factor
-    /// innovation, so the GJR variance update sees a crash day. Ships at
-    /// 0.0, where nothing is added and the update is the shipped one.
+    /// innovation, so the GJR variance update sees a crash day. Every
+    /// shipped preset carries 0.0, where nothing is added.
     ///
     /// The market factor's variance steps on `day_factor`, the sum of the
     /// day's per-tick market factors (market/factor_vol.rs). A jump is not
@@ -3657,41 +3564,37 @@ pub struct ModelParams {
     /// on a series it was not fitted to.
     ///
     /// At share `s` the day's shock gains `s * market`, `market` being the
-    /// jump's log return -- the same number every name's `s` took. The
-    /// compensator is deliberately NOT in it: `jump_mean_compensated`
-    /// gives back a deterministic drift, the first moment, and a variance
-    /// shock is a second moment. On a day no jump fires `market` is
-    /// exactly 0.0 and nothing is added at all.
+    /// jump's log return, the same number every name's `s` took. The
+    /// compensator is left out on purpose: `jump_mean_compensated` gives
+    /// back a deterministic drift, the first moment, and a variance shock
+    /// is a second moment. On a day no jump fires `market` is exactly 0.0
+    /// and nothing is added at all.
     ///
-    /// DERIVED 1.0 by that argument, and shipped 0.0. The whole of the
-    /// jump's return belongs in the shock because the whole of it was in
-    /// the returns the coefficients were fitted to; a share between the
-    /// two would be claiming the fit saw part of a crash day.
+    /// By that argument the derived value is 1.0: the whole of the jump's
+    /// return belongs in the shock because the whole of it was in the
+    /// returns the coefficients were fitted to. A share between the two
+    /// would be claiming the fit saw part of a crash day.
     ///
-    /// # It has to land in the day the jump moved
+    /// # It lands in the day the jump moved
     ///
-    /// `apply_jumps` runs at the close, and `close_market` used to run it
-    /// after the factor's own close had already consumed `day_factor` and
-    /// zeroed it. Adding there would have put the jump in the NEXT day's
-    /// shock, and `open_market` clears the accumulator in between, so it
-    /// would have been thrown away instead. The call therefore sits
-    /// immediately after the per-name closes and before the factor's, so
-    /// the addition lands in the shock the same close computes. Nothing
-    /// between the two reads or writes what `apply_jumps` touches, which
-    /// is why the move costs no preset a bit.
+    /// `apply_jumps` runs at the close, immediately after the per-name
+    /// closes and before the factor's own close, so the addition lands in
+    /// the shock that close computes. Nothing between the two reads or
+    /// writes what `apply_jumps` touches.
     pub jump_market_variance_share: f64,
-    /// How much a jump's arrival rate follows the VIX. Zero is every preset
-    /// before this dial and is bit-identical (§84).
+    /// How much a jump's arrival rate follows the VIX. 0.0 on pt-v1 to
+    /// pt-v12, which reproduce bit for bit; pt-v13 onward ship 0.2626.
     ///
-    /// Both intensities are per-day probabilities that ignore the regime,
-    /// so the number of jump days in a dead-calm market and in a panic is
-    /// the same. Decomposing the nine attribution components under a pinned
-    /// VIX measured what that costs: jumps carry 40.5% of the variance of a
-    /// market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on 3003 and
-    /// 2998 jump day-cells respectively. Real markets are the other way
-    /// round, and jump clustering in crises is the documented fact this
-    /// misses. It is also the floor under the calm end of the crisis lever:
-    /// a market that cannot stop jumping cannot get quiet.
+    /// Without it both intensities are per-day probabilities that ignore
+    /// the regime, so the number of jump days in a dead-calm market and in
+    /// a panic is the same. Decomposing the nine attribution components
+    /// under a pinned VIX measured what that costs: jumps carry 40.5% of
+    /// the variance of a market pinned at VIX 5 and 1.1% of one pinned at
+    /// VIX 65, on 3003 and 2998 jump day-cells respectively. Real markets
+    /// are the other way round, and jump clustering in crises is the
+    /// documented fact this misses. It is also the floor under the calm end
+    /// of the crisis lever: a market that cannot stop jumping cannot get
+    /// quiet.
     ///
     /// At `c` both intensities are scaled by `1 - c + c * (vix /
     /// market_vol_vix_anchor)^2`, the same map `garch_vix_coupling` and the
@@ -3701,20 +3604,20 @@ pub struct ModelParams {
     /// unconditionally whatever the rate is, so this moves a THRESHOLD and
     /// never a stream position.
     ///
-    /// # It is not variance-neutral, and must be funded
+    /// # It adds variance, which must be funded
     ///
     /// The scale averages ABOVE one over this model's own VIX distribution,
     /// so raising the coupling adds jump variance rather than only moving it
-    /// between regimes. Measured on an undriven 504-day run (§88): VIX mean
+    /// between regimes. Measured on an undriven 504-day run: VIX mean
     /// 20.24, `E[(vix / 15)^2]` = 2.035, so the mean scale is
-    /// `1 - c + 2.035c` — 1.725 at `c` = 0.7, meaning jumps fire 72% more
-    /// often on average.
+    /// `1 - c + 2.035c`, which is 1.725 at `c` = 0.7, meaning jumps fire 72%
+    /// more often on average.
     ///
     /// Left unfunded that shows up as total volatility. At `c` = 0.7 on the
     /// pt-v10 base it takes the 252-day panel to 14 of 14 and the 504-day
     /// panel from 13 of 14 to 11, losing `annualised_vol_pct` at 34.9
     /// against a ceiling of 34.0 and `sector_excess_corr` at 0.1058 against
-    /// a floor of 0.11 (§87).
+    /// a floor of 0.11.
     ///
     /// Fund it by scaling `jump_intensity_market` and `jump_intensity_idio`
     /// by the reciprocal of the mean scale, which is derivable rather than
@@ -3722,39 +3625,39 @@ pub struct ModelParams {
     /// bookkeeping `idio_sigma_scale` does for the market factor's variance.
     pub jump_vix_coupling: f64,
     /// The variance of the overnight move as a fraction of a session's,
-    /// per name. Zero is every preset before this dial and is bit-identical.
+    /// per name. Every shipped preset carries 0.0, where prices do not move
+    /// between sessions.
     ///
-    /// Nothing moved a price between sessions before it: the price after
-    /// `open_market` was the price after the previous `close_market` on
-    /// every name-night, so the engine's true overnight variance share was
-    /// identically zero against a real 0.23 to 0.43 (the forty-name
-    /// reference panel over nine non-crisis windows, median 0.33, by
-    /// `tools/calibration/overnight_band.py`).
+    /// At 0.0 the price after `open_market` is the price after the
+    /// previous `close_market` on every name-night, so the engine's
+    /// overnight variance share is identically zero against a real 0.23
+    /// to 0.43 (the forty-name reference panel over nine non-crisis
+    /// windows, median 0.33, by `tools/calibration/overnight_band.py`).
     ///
     /// Above zero `Engine::apply_overnight` does two things at each open,
-    /// before the day's marks are set. It realises in the opening print
+    /// before the day's marks are set. It realizes in the opening print
     /// the state that changed between the sessions, the close's jump on
-    /// `s` and the macro step in fair value, rather than leaving them for
+    /// `s` and the macro step in fair value, instead of leaving them for
     /// the first ticks to settle toward; that is what gives the night its
     /// shape, since the reference panel's nights put 0.50 to 0.68 of their
     /// variance in the largest five percent against 0.36 to 0.49 for the
-    /// sessions. And it adds a draw on `s` composed exactly as a session's
+    /// sessions. And it adds a draw on `s` built exactly as a session's
     /// factor structure is, beta on the market factor at its conditional
     /// daily sigma, the sector loading on the sector factor, the name's own
     /// GARCH sigma at its idiosyncratic scale, scaled by the square root of
-    /// this dial; the composition is the session's because the panel's
+    /// this dial. It is built like the session's because the panel's
     /// nights and sessions read the same cross-sectional correlation. The
     /// move reverts on the mispricing's own half-life and is kept out of
     /// the momentum roll, as the jump's carried share is.
     ///
     /// The session band anchors on the post-gap open, so the gap sits
-    /// outside it, which is the intent market/mod.rs has stated since D6.
+    /// outside it, as market/mod.rs defines the circuit breaker's band.
     /// A value is a ratio of variances, so 0.5 is a night carrying half a
-    /// session's variance; with the jump realised at the open the share
+    /// session's variance; with the jump realized at the open the share
     /// the row reads is more than the ratio alone would give.
     pub overnight_variance_ratio: f64,
     /// Cross-sectional spread in volatility persistence, in raw `beta`
-    /// units. Zero is every preset before pt-v7 and is bit-identical.
+    /// units. Every shipped preset carries 0.0, where it has no effect.
     ///
     /// Every instrument reads the same `garch_alpha`, `garch_beta` and
     /// `garch_gamma` off this struct, so volatility memory is homogeneous
@@ -3767,58 +3670,54 @@ pub struct ModelParams {
     /// producing long memory from short-memory components.
     ///
     /// Above zero, a name's persistence moves with its size: `beta` plus
-    /// `dispersion * clamp(log(cap / reference) / scale, -1, 1)`, so the reference
-    /// cap gets exactly `garch_beta` and the spread is bounded by
+    /// `dispersion * clamp(log(cap / reference) / scale, -1, 1)`, so the
+    /// reference cap gets exactly `garch_beta` and the spread is bounded by
     /// `dispersion` in both directions. Derived from the roster rather than
     /// from a draw, so the RNG stream schedule is untouched and no earlier
     /// preset's trajectory moves.
     ///
     /// Clamped so GJR persistence `alpha + beta + gamma/2` stays below
-    /// [`GARCH_PERSISTENCE_CEILING`](crate::market::garch::GARCH_PERSISTENCE_CEILING). A name whose variance process is not
-    /// stationary does not produce fat tails, it produces a number that
-    /// grows until a guard catches it.
+    /// [`GARCH_PERSISTENCE_CEILING`](crate::market::garch::GARCH_PERSISTENCE_CEILING).
+    /// A name whose variance process is not stationary does not produce
+    /// fat tails, it produces a number that grows until a guard catches it.
     ///
-    /// # It does NOT close the decay-shape gap, which is what it was for
+    /// # It does not close the decay-shape gap
     ///
-    /// Measured, thirty seeds at 504 days (CALIBRATION-FOLLOWUPS §54). The
-    /// log-log slope of the `|r|` autocorrelation over lags 1 to 20 reads
-    /// −0.436 in real markets and −0.933 on pt-v6. At dispersion 0.15 it
-    /// reads −0.944, which is further from real, not closer. The spread
-    /// shaves a little off the short lags and more off the long ones: lag 30
-    /// goes from 0.0026 to 0.0001 against a real 0.0179.
+    /// Measured, thirty seeds at 504 days: the log-log slope of the `|r|`
+    /// autocorrelation over lags 1 to 20 reads -0.436 in real markets and
+    /// -0.933 on pt-v6. At dispersion 0.15 it reads -0.944, slightly
+    /// further from real. The spread shaves a little off the short lags and
+    /// more off the long ones: lag 30 goes from 0.0026 to 0.0001 against a
+    /// real 0.0179. A toy AR/GARCH simulation had it roughly doubling the
+    /// `acf20/acf1` ratio; the engine carries a GJR term, a factor variance
+    /// process and VIX coupling on top, and the result did not transfer.
     ///
-    /// A toy AR/GARCH simulation had it roughly doubling the `acf20/acf1`
-    /// ratio (§52). The engine carries a GJR term, a factor variance process
-    /// and VIX coupling on top, and the result did not transfer.
-    ///
-    /// What it DOES do, measured on the same run, is improve room at 504 on
+    /// What it does do, measured on the same run, is improve room at 504 on
     /// `excess_kurtosis`, +0.58 to +0.74 seed-sd, and on
-    /// `annualised_vol_pct`, +0.17 to +0.34. That is the honest claim for it.
-    /// It also moves `abs_return_acf5` across its 504 band edge, but by 0.09
-    /// seed-sd, which §36's flip margin exists to say is not a real crossing.
+    /// `annualised_vol_pct`, +0.17 to +0.34. It also moves
+    /// `abs_return_acf5` across its 504 band edge, but by 0.09 seed-sd,
+    /// which is inside the flip margin and not a real crossing.
     pub garch_beta_dispersion: f64,
 
-    /// How much of a jump the herding term is allowed to continue.
+    /// How much of a jump the herding term is allowed to continue, in
+    /// [0, 1]. pt-v1 to pt-v4 carry 1.0 and pt-v5 onward ship 0.0.
     ///
     /// A jump lands on `mispricing_s`, and the momentum term reads the
-    /// change in `s` across closes. So by default a jump is a re-rating like
+    /// change in `s` across closes. So at 1.0 a jump is a re-rating like
     /// any other and `momentum_theta` carries a share of it into the next
-    /// day. That is the coupling behind the trade recorded in §34 and
-    /// reinstated in §37: the only mechanism that reaches the 504-day tail
-    /// also pushes 252-day return autocorrelation out of its band, because
-    /// fattening the tail and adding continuation are the same act.
+    /// day. That couples two things: the only mechanism that reaches the
+    /// 504-day tail also pushes 252-day return autocorrelation out of its
+    /// band, because fattening the tail and adding continuation are the
+    /// same act.
     ///
-    /// This splits them. At `1.0` the jump feeds herding exactly as before,
-    /// which is what pt-v1 through pt-v4 do and why they reproduce bit for
-    /// bit; pt-v5 onward ship 0.0, where this sentence said "every shipped
-    /// preset" until 2026-09-17. Below `1.0` the jump moves the momentum
-    /// reference point with
-    /// it, so herding sees the post-jump level as the new baseline rather
-    /// than as a change to continue. At `0.0` the jump is invisible to
-    /// momentum: it decays on `s_phi` alone, giving a fat tail with no
-    /// continuation attached to it.
+    /// This dial splits them. At `1.0` the jump feeds herding in full,
+    /// which is why pt-v1 to pt-v4 reproduce bit for bit. Below `1.0` the
+    /// jump moves the momentum reference point with it, so herding sees the
+    /// post-jump level as the new baseline rather than as a change to
+    /// continue. At `0.0` the jump is invisible to momentum: it decays on
+    /// `s_phi` alone, giving a fat tail with no continuation attached to it.
     ///
-    /// The jump's own mean reversion is unchanged either way -- it always
+    /// The jump's own mean reversion is unchanged either way; it always
     /// decays back through the existing mispricing process. What moves is
     /// only whether the herding term amplifies it on the way.
     pub jump_momentum_share: f64,
@@ -3826,26 +3725,24 @@ pub struct ModelParams {
     // ── Persistent volume (engine.rs close, market/tick.rs phase 3) ─────
     /// Day-to-day persistence of the shared volume component, in [0, 1).
     ///
-    /// Volume is otherwise a LEVEL -- `avg_volume` scaled by multipliers,
-    /// with an independent uniform each tick. Consecutive volumes are then
+    /// At 0.0 volume is a LEVEL, `avg_volume` scaled by multipliers, with
+    /// an independent uniform each tick. Consecutive volumes are then
     /// near-independent draws around a fixed level, and differencing that
     /// gives a change autocorrelation near -0.5 at ANY coefficients. That is
     /// why `volume_change_acf1` sits 13.7 seed-sd outside a real band of
-    /// -0.32 to -0.20 and is excluded from the calibration objective as
-    /// structurally unreachable: no parameter reaches a row whose defect is
-    /// the absence of a process.
+    /// -0.32 to -0.20 without it, and no other parameter can reach that row.
     ///
     /// This supplies the process: a log-scale AR(1) multiplier, so a busy
-    /// day is followed by a busy day. It models the COMMON component only --
+    /// day is followed by a busy day. It models the COMMON component only,
     /// market-wide volume persistence shared by every name. Real volume
     /// persistence is partly idiosyncratic too (a name in play stays in
-    /// play), and that part is NOT modelled here, because per-name state
+    /// play), and that part is not modeled here, because per-name state
     /// would touch the column and checkpoint surface for a second-order
-    /// effect. Stated so the limitation is on the record rather than
-    /// discovered later.
+    /// effect.
     ///
     /// 0.0 with a zero innovation leaves the multiplier at exactly 1.0 and
-    /// the branch is skipped, so every preset before pt-v4 is bit-identical.
+    /// the branch is skipped, which is pt-v1 to pt-v3. pt-v10 onward ship
+    /// 0.7.
     pub volume_persistence: f64,
     /// Standard deviation of the daily log-volume innovation.
     pub volume_innovation_sigma: f64,
@@ -3854,31 +3751,30 @@ pub struct ModelParams {
     /// Blend from the four-tier size step toward a continuous power law,
     /// in [0, 1].
     ///
-    /// The step function gives a $49B company 1.0 and a $51B company 0.8 --
+    /// The step function gives a $49B company 1.0 and a $51B company 0.8,
     /// a 25% jump in idiosyncratic volatility from a $2B difference. Every
     /// name lands on one of four levels, which puts cliffs in the
     /// cross-section that no real market has and compresses the dispersion
     /// of volatility across names into four spikes.
     ///
-    /// 0.0 returns the step value by branch, so every preset before pt-v4 is
-    /// bit-identical. 1.0 is the pure power law.
+    /// 0.0 returns the step value by branch, and every shipped preset
+    /// carries 0.0. 1.0 is the pure power law.
     pub size_effect_smoothness: f64,
     /// Exponent of the continuous size effect: `(cap / 25B) ^ -exponent`.
     ///
     /// Ships at 0.15, fitted to the step function's own tiers where those
-    /// tiers are informative -- 5B reads 1.273 against a step of 1.3, 25B
+    /// tiers are informative: 5B reads 1.273 against a step of 1.3, 25B
     /// reads 1.000 against 1.0, 100B reads 0.812 against 0.8. It departs
     /// below $1B, where the step stops being a size effect and becomes a
-    /// floor, and that departure is the mechanism's purpose rather than an
-    /// error in the fit.
+    /// floor, and that departure is the mechanism's purpose.
     pub size_effect_exponent: f64,
     /// Blend from the four-tier spread step toward a continuous power law,
     /// in [0, 1].
     ///
-    /// The step charges 10 bps at $1B and 30 bps at $0.9B -- a three times
-    /// jump in transaction cost from a rounding error in capitalisation. Any
+    /// The step charges 10 bps at $1B and 30 bps at $0.9B, a three times
+    /// jump in transaction cost from a rounding error in capitalization. Any
     /// execution study spanning that edge measures the tier rather than the
-    /// size effect. 0.0 is the step and is bit-identical.
+    /// size effect. 0.0 is the step, and every shipped preset carries it.
     pub spread_size_smoothness: f64,
     /// Exponent of the continuous spread curve. Ships at 0.455, least-squares
     /// fitted to the step's own four tiers: 29.65 bps against 30 at $0.5B,
@@ -3896,18 +3792,21 @@ pub struct ModelParams {
     // market nobody traded. `agent_book.rs` carries the model and its
     // sources; the notes here say what each dial moves.
 
-    /// Latent depth behind the maker's ladder: `Y` in the square-root law.
+    /// Coefficient `Y` of the square-root law that sets the latent depth
+    /// behind the maker's ladder. pt-v20 ships 0.75; 0.0 turns the latent
+    /// depth off.
     ///
-    /// 0.0, which every preset through pt-v19 carries, is no depth past the maker's ten levels,
-    /// so an order larger than the ladder fills what the ladder holds and
-    /// drops the rest (whole-book depth is 2.6 to 5% of daily volume per
-    /// side). Off zero, levels are appended behind the ladder out to
-    /// `book_depth_reach` times daily volume, with the cumulative depth to
-    /// a price distance `d` from the touch set so that the MARGINAL price
-    /// of the `Q`-th share is never below `touch * (1 + Y sigma (Q/V)^delta)`:
-    /// `sigma` the name's conditional daily volatility, `V` its average
-    /// daily volume and `delta` [`ModelParams::book_depth_exponent`]. An
-    /// order walks those levels at worse prices instead of being cut off.
+    /// At 0.0, which pt-v1 to pt-v19 carry, there is no depth past the
+    /// maker's ten levels, so an order larger than the ladder fills what
+    /// the ladder holds and drops the rest (whole-book depth is 2.6 to 5%
+    /// of daily volume per side). Off zero, levels are appended behind the
+    /// ladder out to `book_depth_reach` times daily volume, with the
+    /// cumulative depth to a price distance `d` from the touch set so that
+    /// the MARGINAL price of the `Q`-th share is never below
+    /// `touch * (1 + Y sigma (Q/V)^delta)`: `sigma` the name's conditional
+    /// daily volatility, `V` its average daily volume and `delta`
+    /// [`ModelParams::book_depth_exponent`]. An order walks those levels at
+    /// worse prices instead of being cut off.
     ///
     /// That is the latent order book of Toth, Lemperiere, Deremble, de
     /// Lataillade, Kockelkoren and Bouchaud (Physical Review X 1, 021006,
@@ -3920,25 +3819,26 @@ pub struct ModelParams {
     /// only with [`ModelParams::book_depth_coefficient`] off zero, and
     /// refused off zero without it. 0.0 reads as 0.5, the square root of
     /// Toth et al. (2011), so the coefficient alone turns the law on.
-    /// Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62, 2005) measure 0.6
-    /// on the temporary cost of US equity executions.
+    /// pt-v20 ships 0.5. Almgren, Thum, Hauptmann and Li (Risk 18(7) 58-62,
+    /// 2005) measure 0.6 on the temporary cost of US equity executions.
     pub book_depth_exponent: f64,
     /// How far the latent depth reaches, in multiples of the name's average
     /// daily volume per side. Read only with
     /// [`ModelParams::book_depth_coefficient`] off zero, and refused off
-    /// zero without it. 0.0 reads as one day's volume. An order past the
-    /// reach is cut off there, as an order past the ladder is without the
-    /// tail.
+    /// zero without it. 0.0 reads as one day's volume, and pt-v20 ships
+    /// 1.0. An order past the reach is cut off there, as an order past the
+    /// ladder is without the tail.
     pub book_depth_reach: f64,
-    /// Whether agents consume the book they share. A switch.
+    /// Switch for whether agents' orders consume the book they share: 1.0
+    /// on, 0.0 off. pt-v20 ships 1.0.
     ///
-    /// 0.0, which every preset through pt-v19 carries: an agent's order is priced against the
-    /// book and removes nothing from it (`Portfolio.execute` reads
-    /// `sweep_cost`), so two agents buying the same name in one step fill
-    /// at the same price against the same levels, and the maker's
+    /// At 0.0, which pt-v1 to pt-v19 carry, an agent's order is priced
+    /// against the book and removes nothing from it (`Portfolio.execute`
+    /// reads `sweep_cost`), so two agents buying the same name in one step
+    /// fill at the same price against the same levels, and the maker's
     /// inventory never hears about an agent.
     ///
-    /// 1.0: an agent's order executes in the engine. The levels it takes
+    /// At 1.0 an agent's order executes in the engine. The levels it takes
     /// are gone for every agent after it until they refill: the maker's
     /// ladder at the next tick, when the maker re-quotes, and the latent
     /// depth at `book_refill_half_life`. Its fills against the maker are
@@ -3949,6 +3849,7 @@ pub struct ModelParams {
     /// Half-life in ticks at which consumed LATENT depth refills. Read only
     /// with `book_shared` on and the depth tail on, and refused off zero
     /// otherwise. 0.0 refills it at the next tick, with the maker's ladder.
+    /// pt-v20 ships 27.
     ///
     /// Obizhaeva and Wang (Journal of Financial Markets 16(1) 1-32, 2013)
     /// model a book whose consumed depth recovers exponentially;
@@ -3957,15 +3858,16 @@ pub struct ModelParams {
     /// a book of any shape admits no profitable round trip. The half-life
     /// is the one free number; see `agent_book.rs` for the value derived.
     pub book_refill_half_life: f64,
-    /// Whether an agent's limit order rests IN the book. A switch.
+    /// Switch for whether an agent's unfilled limit order rests in the
+    /// book: 1.0 on, 0.0 off. pt-v20 ships 1.0.
     ///
-    /// 0.0, which every preset through pt-v19 carries: an unfilled limit waits outside the book
-    /// and fills in full at its limit when a later print reaches it, the
-    /// traded-range convention the hosted service has always used. It takes
-    /// no queue, meets no flow, and no other agent can trade against it.
+    /// At 0.0, which pt-v1 to pt-v19 carry, an unfilled limit waits outside
+    /// the book and fills in full at its limit when a later print reaches
+    /// it (the traded-range convention). It takes no queue, meets no flow,
+    /// and no other agent can trade against it.
     ///
-    /// 1.0: the remainder rests at its price with time priority behind the
-    /// depth already there, including the maker's, which re-quotes every
+    /// At 1.0 the remainder rests at its price with time priority behind
+    /// the depth already there, including the maker's, which re-quotes every
     /// tick and is therefore always ahead at an equal price. It fills when
     /// the model's own flow or another agent's order trades through it,
     /// partially when that flow is smaller than the queue ahead of it plus
@@ -3973,48 +3875,52 @@ pub struct ModelParams {
     pub book_resting: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
-    /// mispricing `s` once, on the first tick after the fills.
+    /// mispricing `s` once, on the first tick after the fills. pt-v20
+    /// ships 0.314.
     ///
-    /// 0.0, which every preset through pt-v19 carries, sends fills through the order-imbalance
-    /// law the model's standing flow uses (`order_flow_impact`), which is
-    /// concave and floored: a one-share order carries the imbalance floor
-    /// of 0.2, worth up to 0.9 bp of `s` in the thinnest names, so a
-    /// trader holding a position can lift its mark with a stream of
-    /// one-share buys at almost no cost. Off zero the law is linear, which
-    /// is the condition Huberman and Stanzl (Econometrica 72(4) 1247-1275,
-    /// 2004) prove necessary for permanent impact to admit no
-    /// price-manipulation round trip, and it is additive across agents, so
-    /// each agent's share of a name's impact is exact. Almgren, Thum,
-    /// Hauptmann and Li (2005) measure `gamma` = 0.314 on the same form.
+    /// At 0.0, which pt-v1 to pt-v19 carry, fills go through the
+    /// order-imbalance law the model's standing flow uses
+    /// (`order_flow_impact`), which is concave and floored: a one-share
+    /// order carries the imbalance floor of 0.2, worth up to 0.9 bp of `s`
+    /// in the thinnest names, so a trader holding a position can lift its
+    /// mark with a stream of one-share buys at almost no cost. Off zero the
+    /// law is linear, which is the condition Huberman and Stanzl
+    /// (Econometrica 72(4) 1247-1275, 2004) prove necessary for permanent
+    /// impact to admit no price-manipulation round trip, and it is additive
+    /// across agents, so each agent's share of a name's impact is exact.
+    /// Almgren, Thum, Hauptmann and Li (2005) measure `gamma` = 0.314 on the
+    /// same form.
     pub fill_impact_coefficient: f64,
 
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
-    /// How fast VIX reverts toward its target each day.
+    /// How fast VIX reverts toward its target, as the fraction of the gap
+    /// closed each day. pt-v19 and pt-v20 ship 0.27.
     ///
-    /// Promoted from carried-read-only, because a const answers a
-    /// calibration question before anyone asks it. This is the OTHER side of
-    /// the scenario transient: the defect is that a 63-day variance
-    /// half-life cannot track a twenty-day VIX spike, and where a faster
-    /// variance process was measured to cost long-horizon realism, a longer
-    /// SPIKE touches variance persistence not at all.
+    /// This sets how long a VIX spike lasts. The variance process has a
+    /// 63-day half-life and cannot track a twenty-day VIX spike, and a
+    /// faster variance process was measured to cost long-horizon realism.
+    /// A longer or shorter spike set here does not touch variance
+    /// persistence. Earlier presets carry 0.12 (pt-v1 to pt-v15), 0.06
+    /// (pt-v16 and pt-v17) and 0.1 (pt-v18).
     pub vix_mean_reversion: f64,
-    /// Fear decays slower than it arrives. Multiplies the mean reversion on
-    /// days the target sits below the current VIX (fear decaying). Rising
-    /// days keep the full rate. 1.0, which every preset before the fear-gap
-    /// era carries, is the symmetric shipped arithmetic, bit for bit. In
-    /// real markets, up-moves average 1.20x the size of down-moves
-    /// (2004-2025).
+    /// Multiplier on the VIX mean reversion on days the target sits below
+    /// the current VIX, so fear can decay more slowly than it arrives.
+    /// Rising days keep the full rate. 1.0 is symmetric reversion; pt-v16
+    /// to pt-v18 ship 0.6 and every other preset carries 1.0. In real
+    /// markets, up-moves average 1.20x the size of down-moves (2004-2025).
     pub vix_decay_ratio: f64,
-    /// Exogenous fear events, per year. Real VIX spikes often arrive from
-    /// news rather than accumulated market moves, and the target's small
-    /// Gaussian noise cannot make that tail: P(VIX>30) reads ~0.007
-    /// endogenous against a real 0.082 (round 133). At intensity != 0 a rare
-    /// jump lands directly on the VIX level (a target jump would be eaten by
-    /// the mean reversion, which is the measured death of the return wire)
-    /// and decays through the slow side of [`ModelParams::vix_decay_ratio`],
-    /// up fast and down slow, like fear. 0.0, which every preset before the
-    /// fear era carries, takes no random draws, so the schedule and every
-    /// recorded run reproduce bit for bit.
+    /// Rate of exogenous fear events, per year, each a jump in the VIX
+    /// level. Every shipped preset carries 0.0, which turns them off.
+    ///
+    /// Real VIX spikes often arrive from news rather than accumulated
+    /// market moves, and the target's small Gaussian noise cannot make that
+    /// tail: P(VIX>30) reads about 0.007 endogenous against a real 0.082.
+    /// Above zero a rare jump lands directly on the VIX level (a jump in
+    /// the target would be absorbed by the mean reversion before it showed)
+    /// and decays through the slow side of
+    /// [`ModelParams::vix_decay_ratio`], up fast and down slow, like fear.
+    /// At 0.0 no random draws are taken, so the schedule and every recorded
+    /// run reproduce bit for bit.
     pub vix_jump_intensity: f64,
     /// Mean size of a fear event, in VIX points (exponential draw).
     pub vix_jump_scale: f64,
@@ -4038,19 +3944,18 @@ pub struct ModelParams {
     /// ```
     ///
     /// (calendar-year block bootstrap, 300 draws). The level-blind form
-    /// pt-v1 through pt-v18 run -- `g = 0` on both sides, which this line
-    /// called "every preset" until 2026-09-17 -- is refused at F(2,
-    /// 8951) = 118, and the multiplicative "ratio" form `dVIX/VIX ~ r` is
-    /// refused harder still (F = 588): on the down side the response in
+    /// (`g = 0` on both sides, which pt-v1 to pt-v18 run) is rejected at
+    /// F(2, 8951) = 118, and the multiplicative "ratio" form `dVIX/VIX ~ r`
+    /// is rejected harder still (F = 588): on the down side the response in
     /// points FALLS with the level, as `VIX^(-0.49)`, and the level
     /// exponent is the same in every decade (0.47, 0.50, 0.47, 0.47 for the
-    /// 1990s to the 2020s) while the scale `b` moves by +/- 20 per cent.
+    /// 1990s to the 2020s) while the scale `b` moves by +/- 20 percent.
     ///
     /// # The form the tape supports, and what this dial's value is
     ///
     /// `g_d = p_d - 1` is inside the error bar (0.44 against 0.49 +/-
-    /// 0.12; the restriction costs 0.15 per cent of the weighted SSR), and
-    /// it is the STANDARDISED-RETURN form: `dVIX = gain VIX (|r| / VIX)^p`,
+    /// 0.12; the restriction costs 0.15 percent of the weighted SSR), and
+    /// it is the standardized-return form: `dVIX = gain VIX (|r| / VIX)^p`,
     /// the VIX responding in proportion to itself to the return measured in
     /// units of itself. It carries no reference level, so the gain has a
     /// meaning without one. The derived value is therefore
@@ -4058,9 +3963,9 @@ pub struct ModelParams {
     /// and the gain that reproduces the tape's same-day response is
     /// `3.754 / vix_mean_reversion` (the update transmits `mr` of the
     /// target spike on the day), less the part the identity's read-back
-    /// already contributes -- both measured in the design note.
+    /// already contributes. pt-v19 and pt-v20 ship 0.4483.
     ///
-    /// 0.0 -- every preset up to pt-v19 -- is a branch, not arithmetic:
+    /// 0.0, which pt-v1 to pt-v18 carry, is a branch:
     /// `economy::daily::return_spike_at_level` returns `return_spike_for`
     /// there and the level is never read.
     pub vix_return_level_exponent: f64,
@@ -4069,11 +3974,11 @@ pub struct ModelParams {
     ///
     /// Measured with the down side above: **0.596 +/- 0.037** whole span
     /// (0.49 to 0.66 by decade), and 0.543 in the restricted form this
-    /// dial and its partner implement. The up side is CONCAVE -- a +2 per
-    /// cent session lowers the VIX by less than twice what a +1 per cent
-    /// one does -- where the earlier bucket-median fit that read 1.04 had
-    /// no level in it, and big up sessions come at high levels. 1.0 is the
-    /// linear form the arithmetic stood in and is bit-identical with the
+    /// dial and its partner implement; pt-v19 and pt-v20 ship 0.5433. The
+    /// up side is CONCAVE: a +2 percent session lowers the VIX by less than
+    /// twice what a +1 percent one does. A fit with no level term reads
+    /// 1.04, because big up sessions come at high levels. 1.0, which pt-v1
+    /// to pt-v18 carry, is the linear form, and is bit-identical with the
     /// two level exponents at 0.0.
     pub vix_return_exponent_up: f64,
     /// How the up-side response scales with the level. Measured
@@ -4084,21 +3989,23 @@ pub struct ModelParams {
     /// on an up session. The two sides are different laws (surprise in units
     /// of priced volatility on the way up, proportional relief on the way
     /// down), and the tape distinguishes them at F(2, 8951) = 43. 0.0 is the
-    /// level-blind branch.
+    /// level-blind branch, which pt-v1 to pt-v18 carry; pt-v19 and pt-v20
+    /// ship -1.0.
     pub vix_return_level_exponent_up: f64,
-    /// The VIX's own innovation, as a fraction of its level per session.
+    /// Base scale of the VIX's own daily innovation, as a fraction of its
+    /// level. Every shipped preset carries 0.0.
     ///
     /// # Why it exists
     ///
-    /// The shipped noise is `N(0, 0.15)` POINTS -- under one per cent of the
-    /// level -- and `vix_jump_intensity` is 0.0 on every preset, so the
-    /// model's VIX is an image of its own index return: corr(dVIX, r)
-    /// -0.977 against the tape's -0.804, R^2 0.954 against 0.646, the sd of
-    /// the daily log change 0.105 against 0.064 and its excess kurtosis
-    /// 0.16 against 2.66. Once the response
-    /// form above is removed from the tape's dVIX, what is left is
-    /// proportional to the level (`log|e| ~ 1.08 log VIX`, bootstrap sd
-    /// 0.06) and its scale grows with the session's own size:
+    /// With both innovation dials at 0.0 the noise is `N(0, 0.15)` POINTS,
+    /// under one percent of the level, and `vix_jump_intensity` is 0.0 on
+    /// every preset, so the model's VIX is an image of its own index
+    /// return: corr(dVIX, r) -0.977 against the tape's -0.804, R^2 0.954
+    /// against 0.646, the sd of the daily log change 0.105 against 0.064
+    /// and its excess kurtosis 0.16 against 2.66. Once the response form
+    /// above is removed from the tape's dVIX, what is left is proportional
+    /// to the level (`log|e| ~ 1.08 log VIX`, bootstrap sd 0.06) and its
+    /// scale grows with the session's own size:
     ///
     /// ```text
     /// sd(e / VIX | r) = sqrt(s0^2 + (c r)^2)
@@ -4114,27 +4021,29 @@ pub struct ModelParams {
     /// model given it lands below the tape's median window on R^2.
     ///
     /// At (0.0, 0.0) the draw's scale is `0.15 * volatility` by the same
-    /// expression, and the draw is the same draw, so every preset up to
-    /// pt-v19 reproduces to the bit.
+    /// expression, and the draw is the same draw, so pt-v1 to pt-v18, which
+    /// carry both at 0.0, reproduce to the bit. pt-v19 and pt-v20 carry
+    /// 0.0 here and 0.0175 on the partner.
     pub vix_innovation_sigma: f64,
     /// The part of the innovation scale that rises with the session return,
     /// per percent: see `vix_innovation_sigma`. Measured 0.0179 [0.0135,
-    /// 0.0232]. What it buys, on the tape's own returns: the per-window
-    /// excess kurtosis of the daily log VIX change reads 1.48 with `s0`
-    /// alone and 2.09 with both, against 2.66 measured. It is also the
-    /// component the whole-span kurtosis of 6.9 mostly comes from.
+    /// 0.0232]; pt-v19 and pt-v20 ship 0.0175. What it buys, on the tape's
+    /// own returns: the per-window excess kurtosis of the daily log VIX
+    /// change reads 1.48 with `s0` alone and 2.09 with both, against 2.66
+    /// measured. It is also the component the whole-span kurtosis of 6.9
+    /// mostly comes from.
     pub vix_innovation_return_sigma: f64,
     /// A fear event's mean size in units of the day's innovation scale
     /// (`VIX * sqrt(s0^2 + (c r)^2)`, or `VIX` when the innovation dials
     /// are off), exponential draw. Non-zero selects that unit over
-    /// `vix_jump_scale`'s points.
+    /// `vix_jump_scale`'s points. pt-v19 and pt-v20 ship 1.7.
     ///
-    /// Derived by cumulant inversion on the scale-standardised within-
+    /// Derived by cumulant inversion on the scale-standardized within-
     /// window residual `z`: with `kappa_3 = 6 lam mu^3` and `kappa_4 = 24
     /// lam mu^4` for a Poisson(lam) count of Exp(mu) jumps on a Gaussian,
     /// `mu = kappa_4 / (4 kappa_3)` = **1.70** and `lam = kappa_3 / (6
-    /// mu^3)` = 0.0089 a day (2.24 a year), leaving the Gaussian 94.9 per
-    /// cent of the variance. The closed form is checked against 2-D
+    /// mu^3)` = 0.0089 a day (2.24 a year), leaving the Gaussian 94.9
+    /// percent of the variance. The closed form is checked against 2-D
     /// quadrature of the density to 2e-13 with a negative control that
     /// fails at 2e-2. The skew of `z` is 0.26 +/- 0.04 and its excess
     /// kurtosis 1.77 +/- 0.21 (window bootstrap), so the innovation is not
@@ -4144,19 +4053,26 @@ pub struct ModelParams {
     pub vix_jump_level_scale: f64,
     /// The part of the fear-event arrival rate, per year per percent of down
     /// session, that rises with the session: the daily probability is
-    /// `(vix_jump_intensity + this * max(0, -r)) / 252`. The tape's residual
-    /// skew on down sessions rises with the size of the session (0.38, 0.46,
-    /// 0.59, 1.76 for |r| under 0.5, 0.5-1, 1-2, 2-3 percent within windows)
-    /// and is flat on up sessions, so the events cluster with the crashes
-    /// rather than arriving on their own clock. At the derived mean rate of
-    /// 2.24 a year spread this way the value is **6.2** (0.0246 a day per
-    /// percent). Non-zero takes the arrival draw. With both intensities at
-    /// 0.0 no draw is taken and the schedule is the shipped one.
+    /// `(vix_jump_intensity + this * max(0, -r)) / 252`. pt-v19 and pt-v20
+    /// ship 6.199.
+    ///
+    /// The tape's residual skew on down sessions rises with the size of the
+    /// session (0.38, 0.46, 0.59, 1.76 for |r| under 0.5, 0.5-1, 1-2, 2-3
+    /// percent within windows) and is flat on up sessions, so the events
+    /// cluster with the crashes rather than arriving on their own clock. At
+    /// the derived mean rate of 2.24 a year spread this way the value is
+    /// **6.2** (0.0246 a day per percent). Non-zero takes the arrival draw.
+    /// With both intensities at 0.0 no draw is taken and the schedule is
+    /// the shipped one.
     pub vix_jump_return_intensity: f64,
-    /// The per-sector variance state's shock share: the sector factor's
-    /// daily variance is `T * s`, with `T` the VIX-coupled sigma squared the
-    /// stateless draw uses (`tick::sector_sigma_at`) and `s` a symmetric
-    /// GARCH(1,1) of unconditional mean 1 on the factor standardized by `T`:
+    /// Shock weight (alpha) of the per-sector GARCH(1,1) variance state.
+    /// pt-v19 and pt-v20 ship 0.067; with this and `sector_vol_beta` both
+    /// at 0.0 the state is off.
+    ///
+    /// The sector factor's daily variance is `T * s`, with `T` the
+    /// VIX-coupled sigma squared the stateless draw uses
+    /// (`tick::sector_sigma_at`) and `s` a symmetric GARCH(1,1) of
+    /// unconditional mean 1 on the factor standardized by `T`:
     /// `s' = (1 - a - b) + a d^2 / T + b s`, `d` the day's accumulated
     /// sector factor, `s` clamped to the per-name multiples. The ratio form
     /// keeps the coupling's own state whole (at `sector_vix_coupling` 1.0
@@ -4165,29 +4081,29 @@ pub struct ModelParams {
     /// tick draws at `sector_sigma_at` exactly as before and the read-back
     /// prices the same scalar.
     ///
-    /// MEASURED: a GARCH(1,1)
-    /// QMLE on each of seven sectors' market residuals of the 40-name
-    /// reference panel, 2015-2025, divided by the VIX close the session
-    /// opened from over its median, reads alpha **0.067 +/- 0.043**, beta
-    /// 0.837 +/- 0.111, persistence 0.904 +/- 0.069 (half-life about
-    /// seven sessions). The plain fit (19.1: 0.063 / 0.908, persistence
-    /// 0.971) absorbs the VIX's own level into beta; composed additively
-    /// on the coupled target it smoothed that channel away and the
-    /// clustering rows FELL (`vixdyn8`).
+    /// Measured: a GARCH(1,1) QMLE on each of seven sectors' market
+    /// residuals of the 40-name reference panel, 2015-2025, divided by the
+    /// VIX close the session opened from over its median, reads alpha
+    /// **0.067 +/- 0.043**, beta 0.837 +/- 0.111, persistence 0.904 +/-
+    /// 0.069 (half-life about seven sessions). The plain fit without the
+    /// VIX division (alpha 0.063, beta 0.908, persistence 0.971) absorbs
+    /// the VIX's own level into beta; added on top of the coupled target it
+    /// smoothed that channel away and the clustering rows fell.
     pub sector_vol_alpha: f64,
     /// The per-sector variance state's persistence term, **0.837** by the
-    /// same measurement. See [`ModelParams::sector_vol_alpha`].
+    /// same measurement, which pt-v19 and pt-v20 ship. See
+    /// [`ModelParams::sector_vol_alpha`].
     pub sector_vol_beta: f64,
     /// Self-excitation of a name's idiosyncratic jumps: after a jump the
     /// name's arrival rate is `lambda (1 + h)` with `h' = decay h + this`.
-    /// 0.0, which every preset up to pt-v19 carries, is a branch: the rate
-    /// is `lambda` and the state is never read or written. The arrival test
-    /// takes the same uniform per name per session at every rate, so no draw
-    /// moves either way.
+    /// 0.0, which every shipped preset carries, is a branch: the rate is
+    /// `lambda` and the state is never read or written. The arrival test
+    /// takes the same uniform per name per session at every rate, so no
+    /// draw moves either way.
     ///
-    /// MEASURED: on the reference panel the rate of
-    /// a 3-sd idiosyncratic move at lag k after one reads 3.29, 1.84, 2.13,
-    /// 1.68, 1.58 times the base at k = 1..5 and 1.0 by k = 12, fitted as
+    /// Measured: on the reference panel the rate of a 3-sd idiosyncratic
+    /// move at lag k after one reads 3.29, 1.84, 2.13, 1.68, 1.58 times the
+    /// base at k = 1..5 and 1.0 by k = 12, fitted as
     /// `1 + 2.0 x 0.72^(k-1)`: amplitude **2.0** [1.5, 2.8], branching ratio
     /// 0.13 (stationary by a wide margin). The model's independent arrivals
     /// read a lag-one ratio of 1.7 with no memory past a day.
@@ -4196,83 +4112,88 @@ pub struct ModelParams {
     /// sessions) by the same measurement. Unread while
     /// [`ModelParams::jump_idio_excitation`] is 0.0.
     pub jump_idio_excitation_decay: f64,
-    /// Takes the VIX-squared scaling (`jump_vix_coupling`) off the
-    /// idiosyncratic arrival rate, leaving it on the market jump. 0.0, which
-    /// pt-v1 through pt-v18 carry, keeps the arithmetic that predates the
-    /// dial. This line called those presets "every preset" until 2026-09-17.
-    /// pt-v19 ships 0.0 again since the 2026-09-20 recomposition, having
-    /// carried 1.0 from 2026-09-14. Non-zero is a switch.
+    /// Switch that takes the VIX-squared scaling (`jump_vix_coupling`) off
+    /// the idiosyncratic arrival rate, leaving it on the market jump.
+    /// Every shipped preset carries 0.0, which keeps the scaling on both.
     ///
-    /// MEASURED: the panel's idiosyncratic jump rate,
-    /// in units of the name's own trailing sd, reads `var^-0.20` against the
-    /// name's own variance and `var^0.05` against the market's -- flat, not
-    /// squared. The coupling was an unprovenanced constant on this rate, in
-    /// the family the crisis blend's gain belonged to.
+    /// Measured: the panel's idiosyncratic jump rate, in units of the
+    /// name's own trailing sd, reads `var^-0.20` against the name's own
+    /// variance and `var^0.05` against the market's. That is close to flat,
+    /// so the data do not support scaling this rate with VIX squared.
     pub jump_idio_vix_decoupled: f64,
-    /// Flow composition (the design record's FLOW-COMPOSITION campaign): a
-    /// stress-activated common flow lean in the price path. It is forced,
-    /// correlated selling above a fear threshold, which is the real-market
-    /// mechanism hypothesized to pin a crash's cohesion (real 2020 crash
-    /// co-movement 0.781 tightly, this model 0.22-0.73 across seeds).
-    /// Log-shock per VIX point above the threshold, per day, applied
-    /// identically to every name alongside the crowd lean. The term varies
-    /// only as the VIX varies, so a replayed crash (VIX moving 30->80)
-    /// receives strong common motion while the held-VIX crisis instrument
-    /// (constant 45) receives a constant drift and near-zero added
-    /// correlation. 0.0 is a branch, not arithmetic, and is bit-inert.
-    pub forced_flow_gain: f64,
-    /// Where forced flow wakes, in VIX points. Below it the segment does
-    /// not exist, so by construction flow composition has no effect in
-    /// calm markets.
-    pub forced_flow_threshold: f64,
-    /// How unevenly forced flow lands, as beta^k. Screen one measured the
-    /// uniform lean pinning crash cohesion (0.52 -> 0.69, IQR halved) at the
-    /// cost of crash dispersion (0.48 -> 0.34 of real). Identical pressure
-    /// crowds out cross-sectional spread. Real forced selling is
-    /// heterogeneous: leveraged and high-beta names get sold hardest. At k
-    /// the per-name lean is the common term times beta^k. 0.0 is the uniform
-    /// screen-one behavior bit for bit (beta^0 multiplies by 1.0 through a
-    /// branch, not a pow call).
-    pub forced_flow_beta_exponent: f64,
-    /// Forced sellers are finite. In round 143, sixty held days of constant
-    /// sell drift ground prices into their clamps and the crisis lever broke
-    /// downward. Only a sustained-stress instrument could catch infinite
-    /// sellers. The reservoir is the segment's total budget in
-    /// VIX-point-days: each day above the threshold spends its excess, and
-    /// the effective lean scales by the fraction remaining. 0.0 is the
-    /// infinite-sellers screen behavior bit for bit.
-    pub forced_flow_reservoir: f64,
-    /// Fraction of spent budget recovered per below-threshold day
-    /// (deleveraging capacity rebuilds in calm). 0.0: never.
-    pub forced_flow_replenish: f64,
-    /// How much of the VIX's target is the market's own volatility.
+    /// Common forced-selling flow in stress: a log-shock per VIX point
+    /// above `forced_flow_threshold`, per day, applied identically to every
+    /// name. Every shipped preset carries 0.0, which turns it off.
     ///
-    /// 0.0 -- pt-v1 through pt-v15 -- is bit-identical by branch, and this
-    /// line said "Shipped 0.0" until 2026-09-17; pt-v16 onward ship 0.3.
-    /// At zero the VIX is a
-    /// function of the business cycle phase, a one-day return spike that
-    /// decays with a 5.4-day half-life, and noise: the market's own realised
-    /// volatility is not an input to it. MEASURED consequence (§68): real
-    /// implied volatility tracks trailing 21-day realised volatility at
+    /// It models forced, correlated selling above a fear threshold, the
+    /// real-market mechanism proposed to explain why a crash's co-movement
+    /// is so tight (real 2020 crash co-movement 0.781, this model 0.22 to
+    /// 0.73 across seeds). It is applied alongside the crowd lean. The term
+    /// varies only as the VIX varies, so a replayed crash (VIX moving from
+    /// 30 to 80) receives strong common motion while the held-VIX crisis
+    /// instrument (constant 45) receives a constant drift and near-zero
+    /// added correlation. 0.0 is a branch and changes nothing.
+    pub forced_flow_gain: f64,
+    /// VIX level, in points, above which forced flow applies. Every shipped
+    /// preset carries 40. Below it the term is absent, so forced flow has
+    /// no effect in calm markets.
+    pub forced_flow_threshold: f64,
+    /// How unevenly forced selling lands across names, as an exponent on
+    /// beta. 0.0 on every shipped preset, which is the uniform lean.
+    ///
+    /// At `k` the per-name lean is the common forced-flow term times
+    /// `beta^k`, with beta floored at 0.1. At 0.0 the factor is 1.0 through
+    /// a branch, with no pow call, so the uniform behavior reproduces bit
+    /// for bit.
+    ///
+    /// A uniform lean pushes every name the same way at the same time. In a
+    /// measured run it raised crash cohesion from 0.52 to 0.69 and halved
+    /// its IQR, and cut crash dispersion from 0.48 to 0.34 of real. Real
+    /// forced selling is uneven: leveraged and high-beta names get sold
+    /// hardest. Read only while `forced_flow_gain` is non-zero, and every
+    /// shipped preset sets that to 0.0.
+    pub forced_flow_beta_exponent: f64,
+    /// Total forced-selling budget, in VIX-point-days. 0.0, on every shipped
+    /// preset, means the forced sellers never run out.
+    ///
+    /// Each day the VIX is above `forced_flow_threshold` spends its excess
+    /// over the threshold, and the lean is scaled by the fraction of the
+    /// budget left. Real forced sellers are finite: with no budget, sixty
+    /// held days of constant sell pressure in a measured run ground prices
+    /// into their clamps and broke the crisis lever downward. At 0.0 the
+    /// unlimited behavior reproduces bit for bit. Read only while
+    /// `forced_flow_gain` is non-zero.
+    pub forced_flow_reservoir: f64,
+    /// Fraction of the spent forced-selling budget recovered on each day the
+    /// VIX is at or below `forced_flow_threshold` (deleveraging capacity
+    /// rebuilds in calm). 0.0 means it never refills.
+    pub forced_flow_replenish: f64,
+    /// Weight of the market's own volatility in the VIX target, from 0.0 to
+    /// 1.0. 0.0 on pt-v1 through pt-v15 (bit-identical by branch) and 0.3
+    /// from pt-v16 on; pt-v19 and pt-v20 don't read it, because
+    /// `vix_level_identity` replaces the target it blends into.
+    ///
+    /// At zero the VIX is a function of the business cycle phase, a one-day
+    /// return spike that decays with a 5.4-day half-life, and noise. The
+    /// market's own realized volatility is not an input. Measured: real
+    /// implied volatility tracks trailing 21-day realized volatility at
     /// +0.818 (FRED VIXCLS against SP500, 2,491 days), the model at +0.275
     /// on pt-v3 and +0.337 on pt-v8, and the endogenous VIX crosses its own
-    /// crisis threshold on 0.0% of days in a year against a real 12.5%.
-    /// This market cannot frighten itself.
+    /// crisis threshold on 0.0% of days in a year against a real 12.5%. At
+    /// 0.0 the market's own moves can't push the VIX into a crisis.
     ///
     /// At `w` the target becomes `(1 - w) * target + w * implied`, where
     /// `implied` is the market factor's current sigma read back through the
     /// same anchor the forward coupling uses: `market_vol_vix_anchor *
     /// sigma_today / market_factor_sigma`. Using the forward map's own
     /// inverse means the loop is consistent at equilibrium and introduces no
-    /// second calibration constant. The VIX clamp -- 10 to `vix_ceiling`,
-    /// which is 80 through pt-v18 and 181.3295 on pt-v19, where this line
-    /// said "10 to 80" until 2026-09-17 -- and the factor's ceiling
-    /// multiple bound the feedback.
+    /// second calibration constant. The VIX clamp (10 to `vix_ceiling`,
+    /// which is 80 through pt-v18 and 181.3295 on pt-v19 and pt-v20) and the
+    /// factor's ceiling multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
-    /// The VIX's level comes from the index's own conditional variance, not
-    /// from a table of constants. 0.0, which pt-v1 through pt-v18 carry, is
-    /// the table, bit for bit. pt-v19 ships 1.0. This line read "0.0 ships
-    /// and is every shipped preset" until 2026-09-17.
+    /// Switch that sets the VIX level from the index's own conditional
+    /// variance instead of a table of per-phase constants. 0.0, on pt-v1
+    /// through pt-v18, is the table bit for bit; pt-v19 and pt-v20 ship 1.0.
     ///
     /// # What the level was made of
     ///
@@ -4286,20 +4207,20 @@ pub struct ModelParams {
     ///        + 0.3 *   anchor * sigma_f / market_factor_sigma
     /// ```
     ///
-    /// so ABOUT TWO THIRDS OF THE LEVEL WAS CONSTANTS and their
-    /// cancellations — a phase table shrunk toward 19, an offset cancelling
-    /// the standing excursion an asymmetric gain injects, an earnings bump
-    /// — and the remaining third was the market factor's sigma read through
-    /// a conversion of 2105.1 VIX points per unit of daily sigma where the
-    /// identity is `100 * sqrt(252)` = 1587.5. Measured, at the arm nearest
-    /// the candidate: mean VIX 13.76 on an index realising 15.60 per cent
-    /// annualised, a ratio of 0.882 where the tape's is 1.252.
+    /// so about two thirds of the level was constants and their
+    /// cancellations (a phase table shrunk toward 19, an offset cancelling
+    /// the standing excursion an asymmetric gain injects, an earnings bump).
+    /// The remaining third was the market factor's sigma read through a
+    /// conversion of 2105.1 VIX points per unit of daily sigma, where the
+    /// identity is `100 * sqrt(252)` = 1587.5. Measured at that setting:
+    /// mean VIX 13.76 on an index realizing 15.60 per cent annualized, a
+    /// ratio of 0.882 where the tape's is 1.252.
     ///
-    /// And the referent was wrong twice over. The index is not the factor:
-    /// on the certified roster it carries 2.05x the factor's variance —
-    /// factor 55 per cent, jumps 23, sector and idiosyncratic 11, the
-    /// intraday curve 4.6, news 3 — and none of the rest reached the VIX at
-    /// any value of any dial.
+    /// The 0.0 form also reads the wrong quantity, because the index is not
+    /// the factor. On the certified roster the index carries 2.05x the
+    /// factor's variance (factor 55 per cent, jumps 23, sector and
+    /// idiosyncratic 11, the intraday curve 4.6, news 3), and none of the
+    /// rest reached the VIX at any value of any dial.
     ///
     /// # What it is at 1.0
     ///
@@ -4313,15 +4234,13 @@ pub struct ModelParams {
     /// zero-mean by its own closed form rather than by a fitted offset.
     /// `pi` is [`ModelParams::vix_variance_premium`].
     ///
-    /// Three things follow, and they are the point of the change rather
-    /// than side effects:
+    /// Three things follow:
     ///
     /// - `market_vol_vix_anchor` is DERIVED, from the same identity at the
     ///   unconditional point, and the dial is not read at all. The forward
     ///   map `base * (1 - c + c (VIX/anchor)^2)` and the read-back then
-    ///   agree at that point by construction — the property the old
-    ///   comment claimed ("so the loop is consistent") and the two
-    ///   constants never delivered.
+    ///   agree at that point by construction, which the two constants of
+    ///   the 0.0 form never achieved.
     /// - The phase table, `vix_cycle_amplitude`, `vix_target_offset`, the
     ///   earnings bump and `vix_realised_vol_weight` are not read. The
     ///   business cycle reaches the VIX through the variance processes or
@@ -4345,21 +4264,22 @@ pub struct ModelParams {
     /// `base (1 - c + c V_t / V_uncond)`; substituting
     /// `V_t = s_f V_uncond v_f / base + (1 - s_f) V_uncond` gives a fixed
     /// point at `v_f = base` EXACTLY, independent of `s_f`, and an
-    /// effective persistence of `(alpha + beta) + (1 - alpha - beta) c s_f`
-    /// — about 0.99 at the shipped coefficients. The level is held by the
+    /// effective persistence of `(alpha + beta) + (1 - alpha - beta) c s_f`,
+    /// about 0.99 at the shipped coefficients. The level is held by the
     /// variance processes' own reversion, weakened but not removed, which
     /// is where a real index's long-run variance lives.
     pub vix_level_identity: f64,
     /// The variance risk premium `pi`: how far a real VIX sits above the
-    /// realized volatility of its own index. Read only while
-    /// [`ModelParams::vix_level_identity`] is non-zero.
+    /// realized volatility of its own index, as a fraction. 0.252 on every
+    /// shipped preset, read only while [`ModelParams::vix_level_identity`]
+    /// is non-zero.
     ///
-    /// # Equality was the wrong identity, and this is the size of it
+    /// # Measurement
     ///
-    /// MEASURED on ^GSPC and ^VIX adjusted closes, 1990-01-03 to
-    /// 2025-07-30, 8,959 aligned sessions with a return.
-    /// Five estimators, because the answer depends on which one the model's
-    /// own statistic corresponds to:
+    /// Measured on ^GSPC and ^VIX adjusted closes, 1990-01-03 to
+    /// 2025-07-30, 8,959 aligned sessions with a return. Five estimators,
+    /// because the answer depends on which one the model's own statistic
+    /// corresponds to:
     ///
     /// | estimator | VIX / RV |
     /// |---|---|
@@ -4373,47 +4293,45 @@ pub struct ModelParams {
     /// 0.85, 2018 at 0.98); the other 32 sit above it, and 92.5 per cent of
     /// rolling windows do.
     ///
-    /// **The value is 0.252 and the residual is the per-year IQR, 1.128 to
-    /// 1.398, so +/- 0.13 on `pi`.** The window estimator is the
-    /// like-for-like one: the certified panel's statistic is a per-window
-    /// relationship on a 252-session window, which is what estimators B and
-    /// C measure. The pooled 1.076 is recorded so the choice is visible; it
-    /// does not change any conclusion, because the model reads 0.88.
+    /// The value is 0.252 and the residual is the per-year IQR, 1.128 to
+    /// 1.398, so +/- 0.13 on `pi`. The per-year and rolling-window rows are
+    /// the like-for-like estimators, because the certified panel's
+    /// statistic is a relationship on a 252-session window. The pooled
+    /// 1.076 is listed so the choice is visible; it changes no conclusion,
+    /// because the model reads 0.88.
     ///
-    /// # Why the default is the measured value and not zero
+    /// # Why the default is the measured value
     ///
-    /// Every other dial in this era ships at the value that makes it inert.
-    /// This one is not read at all while `vix_level_identity` is 0.0, so
-    /// both defaults are equally inert and the choice is about what a
-    /// preset that turns the identity on gets without saying anything.
-    /// Zero would be the EQUALITY ruler, which the measurement above puts
-    /// at 1.42x wrong. A default that is a refuted identity is a chosen
-    /// constant; the measured one is not.
+    /// The dial is not read while `vix_level_identity` is 0.0, so on pt-v1
+    /// through pt-v18 any default is inert. The default decides what a
+    /// preset that turns the identity on gets without setting this. Zero
+    /// would make the VIX equal realized volatility, which the measurement
+    /// above rejects.
     ///
     /// # What could not be determined
     ///
-    /// The premium's FORM. By VIX level the difference grows from +3.3
+    /// The premium's form. By VIX level the difference grows from +3.3
     /// points below VIX 12 to +8.9 above 30 while the ratio holds at 1.44,
     /// 1.42, 1.44, 1.37, 1.35, 1.35 from 0 to 40 and falls to 1.23 only
-    /// above 40; by realised-vol tercile of years the ratio reads 1.40,
+    /// above 40; by realized-vol tercile of years the ratio reads 1.40,
     /// 1.24, 1.16 from calm to violent while the difference reads +4.1,
     /// +3.0, +4.2. Neither form is exact. The ratio is the more stable one
-    /// over the range this model lives in and is the one used; a
-    /// state-dependent premium is not supported by this measurement and is
-    /// not fitted here.
+    /// over the range this model lives in and is the one used. This
+    /// measurement doesn't support a state-dependent premium, and none is
+    /// fitted.
     pub vix_variance_premium: f64,
-    /// Which return the VIX reacts to: the last tick's (0.0, pt-v1 through
-    /// pt-v8) or the day's (1.0, pt-v9 onward), blended in between. This
-    /// line called 0.0 the shipped value until 2026-09-17.
+    /// Which index return the VIX reacts to: the session's final minute
+    /// (0.0, pt-v1 through pt-v8) or the whole day's (1.0, pt-v9 onward),
+    /// blended in between.
     ///
-    /// The VIX's return channel reads `market_return_pct`, which the engine
-    /// builds from `previous_tick_price`: the cap-weighted move over the
-    /// final minute of the session, not the session. MEASURED (§70): an
-    /// index day of -7.87% moves the VIX +0.15 points, half the worst days
-    /// move it DOWN, and with the gain raised to 5000 and the clamp opened
-    /// the day's index return still correlates -0.065 with the next day's
-    /// VIX change. Raising the gain amplifies the closing minute, which is
-    /// noise, which is why every gain sweep in §68 and §69 did nothing.
+    /// At 0.0 the VIX's return channel reads `market_return_pct`, which the
+    /// engine builds from `previous_tick_price`: the cap-weighted move over
+    /// the final minute of the session. Measured at 0.0: an index day of
+    /// -7.87% moves the VIX +0.15 points, half the worst days move it DOWN,
+    /// and with the gain raised to 5000 and the clamp opened the day's index
+    /// return still correlates -0.065 with the next day's VIX change.
+    /// Raising the gain amplifies the closing minute, which is noise, so
+    /// gain changes alone do nothing.
     ///
     /// At 1.0 the channel reads the day's cap-weighted open-to-close return
     /// instead, in the same percent units, which includes the jumps that
@@ -4422,7 +4340,8 @@ pub struct ModelParams {
     /// is source 1.0 with `vix_return_gain` near 2.0 and
     /// `vix_return_clamp` in percentage points rather than fractions.
     pub vix_return_source: f64,
-    /// How much of the VIX's level comes from the business cycle.
+    /// How much of the VIX's level comes from the business cycle, from 0.0
+    /// (none) to 1.0 (the full per-phase constants).
     ///
     /// The VIX target starts at a constant per cycle phase: 14 in expansion,
     /// 18 at a peak, 25 in contraction, 22 in a trough, 16 in recovery. Those
@@ -4431,52 +4350,44 @@ pub struct ModelParams {
     /// clustering reads 0.0136 over 252 days, below its 0.02 floor, and
     /// 0.0828 over 504, because only the longer window contains a phase
     /// change. Real markets read inside 0.02 to 0.09 at ONE year and 0.02 to
-    /// 0.10 at two: their clustering comes from episodes lasting weeks, not
-    /// from the cycle.
+    /// 0.10 at two, because their clustering comes from episodes lasting
+    /// weeks.
     ///
-    /// At 1.0 the five constants are used as they are -- pt-v1 through
-    /// pt-v8, which this line called "shipped" until 2026-09-17. The shipped
-    /// value since is 0.6 at pt-v9, 0.0 from pt-v10 to pt-v15 and 0.85 from
-    /// pt-v16 on. At `a` each
-    /// is pulled toward their mean of 19.0: `19.0 + a * (phase - 19.0)`, so
-    /// 0.0 makes the cycle contribute nothing to the VIX and any episodes
-    /// have to come from the market. Combines with `vix_return_source`, which
-    /// is what supplies episodes in the first place (§70, §71).
+    /// 1.0 uses the five constants as they are (pt-v1 through pt-v8).
+    /// pt-v9 ships 0.6, pt-v10 to pt-v15 0.0, and pt-v16 on 0.85. At `a`
+    /// each constant is pulled toward their mean of 19.0:
+    /// `19.0 + a * (phase - 19.0)`, so 0.0 makes the cycle contribute
+    /// nothing to the VIX and any episodes have to come from the market.
+    /// It works with `vix_return_source`, which supplies those episodes.
+    /// pt-v19 and pt-v20 don't read it, because `vix_level_identity`
+    /// replaces the phase table.
     pub vix_cycle_amplitude: f64,
     /// VIX points added to its target per unit of a down day's index return,
-    /// before the clamp and cap below.
+    /// before the clamp and cap below. Under a `vix_return_exponent` other
+    /// than 1.0 it is the scale of a power law instead.
     ///
-    /// 25.0, a literal in the VIX update, is pt-v1 through pt-v8 and what
-    /// this paragraph called "shipped" until 2026-09-17; pt-v9 to pt-v18
-    /// carry 17.0 and pt-v19 8.83, the scale of the power law
-    /// `vix_return_exponent` makes of it. MEASURED against real
-    /// markets (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a
-    /// session at -3% or worse moves the VIX a median of +6.03 points, and
-    /// -2% to -1% moves it +1.95. The 25.0 gain with the 0.03 clamp beside
-    /// it added at most 0.75 points to the TARGET, of which the day traverses
-    /// `vix_mean_reversion`, about 0.09 points. Raising it to the real slope
-    /// is NOT the lever, measured: it moves the within-year VIX sd from 1.54
-    /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
-    /// (§68). What was missing is the feedback above, not the gain.
+    /// 25.0 on pt-v1 through pt-v8, 17.0 on pt-v9 to pt-v18, and 8.83 on
+    /// pt-v19 and pt-v20, where it is the scale of the power law
+    /// `vix_return_exponent` makes of it. Measured against real markets
+    /// (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a session at
+    /// -3% or worse moves the VIX a median of +6.03 points, and -2% to -1%
+    /// moves it +1.95. The 25.0 gain with the 0.03 clamp beside it added at
+    /// most 0.75 points to the TARGET, of which the day traverses
+    /// `vix_mean_reversion`, about 0.09 points. Raising the gain to the real
+    /// slope doesn't fix that: measured, it moves the within-year VIX sd
+    /// from 1.54 to 1.79 against a real 4.0 and leaves lag-5 clustering
+    /// where it was. The missing piece was the realized-volatility feedback
+    /// in `vix_realised_vol_weight`.
     pub vix_return_gain: f64,
-    /// The same for an up day. pt-v1 through pt-v8 carry 10.0, which is what
-    /// this line called shipped until 2026-09-17. pt-v9 to pt-v18 ship 17.0
-    /// and pt-v19 0.049 under the ratio form
-    /// ([`ModelParams::vix_return_level_exponent_up`] -1.0).
+    /// The up-day counterpart of `vix_return_gain`: how far an up day's index
+    /// return moves the VIX target. 10.0 on pt-v1 through pt-v8, 17.0 on
+    /// pt-v9 to pt-v18, and 0.049 on pt-v19 and pt-v20, which use the ratio
+    /// form ([`ModelParams::vix_return_level_exponent_up`] -1.0).
     ///
-    /// # The "about half" this used to claim has no provenance, and is wrong
+    /// # The real up-to-down ratio
     ///
-    /// This docstring read: "the real response to a +2% day is about half
-    /// the size of the response to -2%, which the shipped 2.5:1 ratio is
-    /// already close to." That sentence names no series, no window, no
-    /// sample size and no estimator, and it sits directly beneath
-    /// `vix_return_gain`'s claim, which names all four -- so it read as
-    /// though it inherited that provenance when it had none of its own.
-    /// It was the only statement of a real up-to-down ratio anywhere in
-    /// the tree, and a derivation was built on it.
-    ///
-    /// MEASURED, on ^GSPC and ^VIX over 8,960 aligned sessions, by
-    /// fitting each side separately and evaluating the two curves:
+    /// Measured on ^GSPC and ^VIX over 8,960 aligned sessions, by fitting
+    /// each side separately and evaluating the two curves:
     ///
     /// | move | down response | up response | up / down |
     /// |---|---|---|---|
@@ -4484,23 +4395,24 @@ pub struct ModelParams {
     /// | 3% | 3.73 | 2.80 | 0.75 |
     /// | 6% | 8.58 | 5.75 | 0.67 |
     ///
-    /// So the real ratio is 0.67 to 0.89, not 0.5, and the model's fear
-    /// asymmetry is about TWICE the real one rather than close to it.
+    /// So the real up-to-down ratio is 0.67 to 0.89. The 25:10 gains of
+    /// pt-v1 through pt-v8 give a ratio of 0.4, about twice the real
+    /// asymmetry.
     ///
-    /// And the ratio is NOT CONSTANT, because the two sides have
-    /// different exponents -- 1.1996 down against 1.0410 up. **No single
-    /// value of this dial can express a ratio that varies with the size
-    /// of the move.** That is the same class of defect as the linear
+    /// The ratio also varies with the size of the move, because the two
+    /// sides have different exponents (1.1996 down against 1.0410 up). No
+    /// single value of this dial can express a ratio that varies with the
+    /// size of the move. That is the same class of defect as the linear
     /// response the exponent fixes: the parameter's form cannot represent
     /// the quantity it names. Expressing it properly needs an up-side
     /// scale set against the down-side scale at the fit level, 0.894, and
     /// the residual variation left over is the up side's own exponent,
     /// which this data cannot resolve.
     pub vix_return_gain_up: f64,
-    /// The exponent of the return-to-fear response. 1.0, which pt-v1 through
-    /// pt-v18 carry, is the linear form, bit-identical to the arithmetic
-    /// that stood here. pt-v19 ships 1.4483, and this line read "1.0 ships"
-    /// until 2026-09-17.
+    /// Exponent of the VIX's response to a down day's return: 1.0 is
+    /// linear, above 1.0 is convex. pt-v1 through pt-v18 carry 1.0, which
+    /// is bit-identical to the linear arithmetic; pt-v19 and pt-v20 ship
+    /// 1.4483.
     ///
     /// # Why a linear gain cannot be calibrated
     ///
@@ -4528,22 +4440,22 @@ pub struct ModelParams {
     /// squared of 0.9947. A linear gain is the `p = 1` special case and
     /// the tape rejects it.
     ///
-    /// # The exponent's error bar, which it must not ship without
+    /// # The exponent's error bar
     ///
     /// Refitting those medians: residual sd 0.0671 in logs, which is 6.9
     /// per cent in `dVIX`, worst bucket -9.8 per cent; standard error of
-    /// the exponent 0.0357, so a 95 per cent interval of **1.112 to
-    /// 1.287** on six degrees of freedom.
+    /// the exponent 0.0357, so a 95 per cent interval of 1.112 to 1.287 on
+    /// six degrees of freedom.
     ///
-    /// A SECOND and larger uncertainty is the weighting. The fit above is
-    /// unweighted over buckets holding 22 to 994 sessions -- the shallow
-    /// buckets carry forty-five times the sessions of the deep ones -- and
-    /// weighting by count gives **1.132** instead. Neither is wrong:
-    /// unweighted asks what shape the curve has, count-weighted asks what
-    /// shape a typical session sees. The first is the right question for a
-    /// tail, so 1.200 is the value here, but the choice is a choice and
-    /// the range it spans is worth 8 per cent of the response at -3% and
-    /// 13 per cent at -6.4%.
+    /// A second, larger uncertainty is the weighting. The fit above is
+    /// unweighted over buckets holding 22 to 994 sessions (the shallow
+    /// buckets carry forty-five times the sessions of the deep ones), and
+    /// weighting by count gives 1.132 instead. Unweighted asks what shape
+    /// the curve has, and count-weighted asks what shape a typical session
+    /// sees. The first is the right question for a tail, so 1.200 is the
+    /// measured value, but the weighting is a choice and the range it
+    /// spans is worth 8 per cent of the response at -3% and 13 per cent at
+    /// -6.4%.
     ///
     /// # What changes when this is not 1.0
     ///
@@ -4558,47 +4470,39 @@ pub struct ModelParams {
     /// becomes `scale * vix_return_clamp^p` rather than
     /// `gain * vix_return_clamp`.
     ///
-    /// # The up side was assumed, then measured, and the assumption lost
+    /// # The up side
     ///
-    /// The first version of this dial applied one exponent to BOTH sides
-    /// and said so as an assumption. The up side has since been fitted on
-    /// the same 8,960 sessions with the same alignment, the same
-    /// estimator and the same buckets, taking `-dVIX` on up sessions
-    /// (the same fit on down sessions reproduces the figures above exactly,
-    /// which is what makes
-    /// the instrument trustworthy before it is used on new data):
+    /// The exponent applies to down sessions only. The up side was fitted
+    /// on the same 8,960 sessions with the same alignment, estimator and
+    /// buckets, taking `-dVIX` on up sessions (the same fit on down
+    /// sessions reproduces the figures above exactly):
     ///
     /// | side | scale | exponent | R squared | worst bucket |
     /// |---|---|---|---|---|
     /// | down | 1.0033 | 1.1996 | 0.9947 | 9.8% |
     /// | up | 0.8965 | 1.0410 | 0.9655 | 35.0% |
     ///
-    /// **The down side is convex and the up side is very nearly linear**,
-    /// so ONE exponent across both would have been wrong on the up side
-    /// to buy nothing. The exponent is therefore the down side's alone;
-    /// `return_spike_for` never reaches an up session with it and a test
-    /// pins that at every exponent.
+    /// The down side is convex and the up side is very nearly linear, so
+    /// one exponent across both would be wrong on the up side and gain
+    /// nothing. `return_spike_for` never applies this exponent to an up
+    /// session, and a test pins that at every exponent.
     ///
-    /// The up side keeps the LINEAR form rather than shipping 1.0410,
-    /// because at an R squared of 0.9655 with a worst bucket missing by
-    /// 35 per cent on 23 sessions this data cannot tell 1.0410 from 1.0.
-    /// The DIRECTION is robust across every bucket; the fourth decimal is
-    /// not, and shipping it would be a chosen constant wearing a
-    /// measurement's clothes.
+    /// The up side keeps the linear form, because at an R squared of
+    /// 0.9655 with a worst bucket missing by 35 per cent on 23 sessions
+    /// this data cannot tell 1.0410 from 1.0. The direction is robust
+    /// across every bucket and the fourth decimal is not.
     ///
-    /// **0.8965 IS NOT `vix_return_gain_up`'s TARGET**, and the table
-    /// above is the easiest place in this file to think it is. It is the
-    /// scale of a `p = 1.041` power fit, and no dial in this tree
-    /// implements that form. The quantity the up side's dial reproduces
-    /// is the scale of a fit with the exponent PINNED AT 1, which is what
-    /// the code runs. Refitting the same eight up buckets that way gives
-    /// **0.9278** -- residual sd 0.1425 in logs, 14.2 per cent in `dVIX`;
-    /// standard error of the mean 0.0504, so a 95 per cent interval of
-    /// 0.824 to 1.045 on seven degrees of freedom; worst bucket 38.5 per
-    /// cent; count-weighted 0.8904. The same refit on the DOWN buckets
-    /// gives 1.1872 with a worst residual of 29.6 per cent against the
-    /// power form's 9.8, which is the convexity stated in the units a
-    /// linear dial would have to work in.
+    /// 0.8965 is not the target for `vix_return_gain_up`. It is the scale
+    /// of a `p = 1.041` power fit, and no dial implements that form. The
+    /// quantity the up side's dial reproduces is the scale of a fit with
+    /// the exponent pinned at 1, which is what the code runs. Refitting the
+    /// same eight up buckets that way gives 0.9278 (residual sd 0.1425 in
+    /// logs, 14.2 per cent in `dVIX`; standard error of the mean 0.0504,
+    /// so a 95 per cent interval of 0.824 to 1.045 on seven degrees of
+    /// freedom; worst bucket 38.5 per cent; count-weighted 0.8904). The
+    /// same refit on the DOWN buckets gives 1.1872 with a worst residual
+    /// of 29.6 per cent against the power form's 9.8, which is the
+    /// convexity stated in the units a linear dial would have to work in.
     ///
     /// # The zero-mean correction moves with this dial
     ///
@@ -4608,86 +4512,75 @@ pub struct ModelParams {
     /// response's FIRST MOMENT. A power form changes it: see
     /// [`crate::economy::daily::expected_return_spike`], which carries
     /// this exponent for that reason. The two dials are independent of
-    /// each other -- either ships alone -- but a tree that has one
-    /// reaching the spike and not the correction cancels the wrong
-    /// quantity, by a factor that scales as `sigma^(p - 1)` and is
-    /// therefore right at exactly one volatility.
+    /// each other (either works alone), but a setup that has one reaching
+    /// the spike and not the correction cancels the wrong quantity, by a
+    /// factor that scales as `sigma^(p - 1)` and is therefore right at
+    /// exactly one volatility.
     pub vix_return_exponent: f64,
-    /// The index return is clamped to +/- this before it drives the VIX.
+    /// The index return is clamped to +/- this before it drives the VIX, in
+    /// the units of the return source. 0.03 on pt-v1 through pt-v8 and 15.0
+    /// from pt-v9 on.
     ///
-    /// 0.03 -- pt-v1 through pt-v8 -- makes a -10% day and a -3% day
-    /// produce identical fear, and a crash is exactly where that assumption
-    /// is worst. It is not the shipped value, where this line said "Shipped
-    /// 0.03" until 2026-09-17: pt-v9 onward ship 15.0, in the percentage
-    /// points the day-return source (`vix_return_source` 1.0) works in.
+    /// On pt-v1 through pt-v8 the return is a fraction, and 0.03 makes a
+    /// -10% day and a -3% day produce identical fear, which is worst in a
+    /// crash. From pt-v9 the value is in the percentage points the
+    /// day-return source (`vix_return_source` 1.0) works in.
     pub vix_return_clamp: f64,
     /// Ceiling on the VIX target's whole excursion, in points: the return
-    /// spike plus the inflation and shock adjustments. 12.0, which pt-v1
-    /// through pt-v8 carry and which this line called shipped until
-    /// 2026-09-17, binds long before a real crisis does. pt-v9 to pt-v18
-    /// ship 45.0 and pt-v19 158.8524, both of which the section below
-    /// accounts for.
+    /// spike plus the inflation and shock adjustments. 12.0 on pt-v1
+    /// through pt-v8, 45.0 on pt-v9 to pt-v18, and 158.8524 on pt-v19 and
+    /// pt-v20, where it is derived from the return clamp and does not bind
+    /// on its own.
     ///
-    /// # It was a shape parameter, and pt-v19 retires it
+    /// # Before pt-v19 it shaped the response
     ///
-    /// At 45.0 against a `vix_return_gain` of 17.0 it BOUND at 2.647 per
-    /// cent of session return — deep inside the 6.39 per cent the tape
-    /// supplies a conditional median for — so a -2.7 per cent session and a
-    /// -6.4 per cent one produced identical fear. That is a shape, not a
-    /// boundary, and `economy::daily::fear_response_shape` is the guard
-    /// that made every preset declare it.
+    /// At 45.0 against a `vix_return_gain` of 17.0 it bound at 2.647 per
+    /// cent of session return, deep inside the 6.39 per cent the tape
+    /// supplies a conditional median for, so a -2.7 per cent session and a
+    /// -6.4 per cent one produced identical fear. That makes it a shape
+    /// parameter, and `economy::daily::fear_response_shape` is the guard
+    /// that makes every preset declare it.
     ///
-    /// **The loop-gain run says what the cap was actually doing**:
-    /// it was "compensating for a read-back
-    /// that omits the crisis blend". The index realised 4.0 to 4.9 times the
-    /// variance `V_t` priced above `crisis_vix_threshold` and 1.2 to 1.4
-    /// below it, so the fear arm had nothing to balance it above the
-    /// threshold and the cap was the brake on the divergence. With
-    /// `market::index_var` pricing its own regime that brake has a
-    /// mechanism to hold it instead, and the dial goes back to being the
-    /// boundary condition it is documented as.
+    /// A loop-gain measurement showed the cap was compensating for a VIX
+    /// read-back that left out the crisis blend. The index realized 4.0 to
+    /// 4.9 times the variance `V_t` priced above `crisis_vix_threshold` and
+    /// 1.2 to 1.4 below it, so the fear arm had nothing to balance it above
+    /// the threshold and the cap was the brake on the divergence. With
+    /// `market::index_var` pricing its own regime, that brake has a
+    /// mechanism, and the cap goes back to being a boundary condition.
     ///
     /// pt-v19 therefore sets it to the SUPREMUM of the spike over the domain
-    /// the update admits — `vix_return_gain * clamp^vix_return_exponent *
+    /// the update admits: `vix_return_gain * clamp^vix_return_exponent *
     /// floor^-vix_return_level_exponent`, where the floor is the 10.0 of the
-    /// state clamp. **That is a derived value and not a tuned one**: the
-    /// return is already bounded one step earlier and the spike FALLS with
-    /// the level, so at this value the cap cannot bind anywhere the clamp
-    /// does not and the pair has one binding constraint between them instead
-    /// of two. Under the level-blind law (`vix_return_level_exponent` 0) the
-    /// same expression is the product `gain * clamp`, which is the 255.0 at
-    /// 17.0 and 15.0 the earlier text quoted; under pt-v19's composed law it
-    /// is `8.83 * 15^1.4483 * 10^-0.4483` = 158.8524.
+    /// state clamp. The return is already bounded one step earlier and the
+    /// spike falls with the level, so at this value the cap cannot bind
+    /// anywhere the clamp does not, and the pair has one binding constraint
+    /// between them instead of two. Under the level-blind law
+    /// (`vix_return_level_exponent` 0) the same expression is the product
+    /// `gain * clamp`, which is 255.0 at a gain of 17.0 and a clamp of 15.0.
+    /// Under pt-v19's law it is `8.83 * 15^1.4483 * 10^-0.4483` = 158.8524.
     ///
-    /// **What the cap is NOT ordered against is `vix_ceiling`.** That
-    /// invariant was withdrawn on 2026-09-14: the cap truncates an additive
-    /// term of the TARGET and the ceiling truncates the STATE, so neither
-    /// binds "first" at any pair of values, and a cap under the ceiling
-    /// makes the ceiling less sticky rather than more. See
-    /// `ModelParams::pt_v19` at the cap's own assignment.
+    /// The cap has no required order against `vix_ceiling`. The cap
+    /// truncates an additive term of the TARGET and the ceiling truncates
+    /// the STATE, so neither binds first at any pair of values, and a cap
+    /// under the ceiling makes the ceiling less sticky rather than more.
+    /// See `ModelParams::pt_v19` at the cap's own assignment.
     ///
-    /// The value is asserted against its own derivation by
-    /// `the_default_cap_is_the_clamps_own_image`. That test computed the
-    /// LEVEL-BLIND spelling `gain * clamp^p` = 445.9577 and was red on
-    /// pt-v19 until 2026-09-14; it now computes the image WITH the level
-    /// in it, `gain * clamp^p * floor^(-g)` = 158.85236 at the VIX floor
-    /// of 10, which is the spike's supremum over the domain the update
-    /// admits.
+    /// The test `the_default_cap_is_the_clamps_own_image` checks the value
+    /// against its derivation, `gain * clamp^p * floor^(-g)` = 158.85236 at
+    /// the VIX floor of 10, which is the spike's supremum over the domain
+    /// the update admits.
     pub vix_target_shock_cap: f64,
-    /// Upper bound on the VIX state itself, in points.
+    /// Upper bound on the VIX state itself, in points. 80.0 on pt-v1 through
+    /// pt-v18; pt-v19 and pt-v20 ship 181.3295.
     ///
-    /// NOT a chosen constant on pt-v19, and this entry said otherwise until
-    /// 2026-09-17. `provenance.py` records it `derived`: a LOWER BOUND solved
-    /// on a simulated pin ladder at tolerance 8.64, not a closed form over the
-    /// vector -- so it cannot be recomputed from the other dials the way
-    /// `vix_target_shock_cap` above can. pt-v19 ships 181.3295; the 80.0 this
-    /// paragraph used to call "the shipped value" is pt-v18's, and it
-    /// reproduced the literal the dial replaced.
+    /// The pt-v19 value is derived: a lower bound solved on a simulated pin
+    /// ladder at tolerance 8.64. It has no closed form over the other
+    /// dials, so unlike `vix_target_shock_cap` it cannot be recomputed from
+    /// them. The 80.0 of earlier presets reproduced the literal the dial
+    /// replaced.
     ///
-    /// Declared here so a reader can disagree with it, which is still the
-    /// point -- but disagreeing now means disputing the ladder, not a taste.
-    ///
-    /// Two facts decide what it may be set to. The real index closed at 82.69
+    /// Two facts bound what it may be set to. The real index closed at 82.69
     /// on 2020-03-16, so any bound below that makes a peak target derived
     /// from that day unreachable by construction. And the derived response
     /// peaks at 93.0 when driven over the 2020 tape with the ceiling off, so
@@ -4695,7 +4588,8 @@ pub struct ModelParams {
     /// truncates. That 93 is a statement about one year rather than a bound
     /// on the process, and a different tape would move it.
     pub vix_ceiling: f64,
-    /// A constant added to the VIX target, in points. Zero ships and is inert.
+    /// A constant added to the VIX target, in points. 0.0 on every shipped
+    /// preset, where it is inert, and pt-v19 and pt-v20 don't read it.
     ///
     /// It exists because an ASYMMETRIC return gain puts a standing positive
     /// excursion on the target: the down side is worth more per unit than the
@@ -4705,29 +4599,26 @@ pub struct ModelParams {
     /// the 2020 tape that is 10.5 points of excursion and 7.34 of level,
     /// against a measured overshoot of 6.38.
     ///
-    /// THE LIMITATION, because whoever next changes this market's volatility
-    /// will change the bias this cancels and will not otherwise know. The
-    /// bias is proportional to the mean ABSOLUTE session return, which is a
-    /// property of the run rather than of the model, so one constant cancels
-    /// it exactly at one value of `mean|r|` and approximately elsewhere. A
-    /// calm year carries a smaller bias than a crisis year and the same
-    /// offset over-corrects it.
+    /// Anyone who changes this market's volatility changes the bias this
+    /// cancels. The bias is proportional to the mean ABSOLUTE session
+    /// return, which is a property of the run rather than of the model, so
+    /// one constant cancels it exactly at one value of `mean|r|` and
+    /// approximately elsewhere. A calm year carries a smaller bias than a
+    /// crisis year and the same offset over-corrects it.
     pub vix_target_offset: f64,
-    /// VIX level at which crisis behavior begins.
+    /// VIX level at which crisis behavior begins. 25.5 on pt-v1 through
+    /// pt-v12 and 30.88325108 from pt-v13 on.
     ///
-    /// Gates the sector-to-market correlation blend, the universe stress
-    /// memory and the economy's crisis premium -- three mechanisms whose
-    /// trigger point nobody has ever been able to search. 25.5 is the P94 of
-    /// the long-run endogenous VIX distribution, chosen so the trigger is
-    /// reachable at all; whether it is the RIGHT point is a different
-    /// question and now an answerable one.
+    /// It gates the sector-to-market correlation blend, the universe stress
+    /// memory, the economy's crisis premium and the crisis epicentre's
+    /// episodes. 25.5 is the P94 of the long-run endogenous VIX
+    /// distribution, chosen so the trigger is reachable at all.
     pub crisis_vix_threshold: f64,
-    /// How much more volatile the crisis epicentre's names are than the
-    /// other sectors' at the same VIX. 0.0, which every preset before
-    /// pt-v19's fourth composition of 2026-09-22 carries (that composition
-    /// ships 1.93), takes the branch not taken: no episode is tracked, no
-    /// epicentre is drawn, no draw is taken on any stream and every preset
-    /// is bit-identical. Derived 1.93.
+    /// How much more volatile the crisis epicentre sector's names are than
+    /// the other sectors' at the same VIX, as a ratio of total volatility.
+    /// pt-v19 and pt-v20 ship 1.93, derived below. 0.0, on pt-v1 through
+    /// pt-v18, tracks no episode, draws no epicentre and takes no draw on
+    /// any stream, so those presets are bit-identical.
     ///
     /// # What it is
     ///
@@ -4739,33 +4630,30 @@ pub struct ModelParams {
     /// remainder and a draw in its own right, on
     /// [`crate::rng::stream::CRISIS_EPICENTRE`]. While the episode runs,
     /// the names in that sector carry an extra multiple on the parts of
-    /// their return that are NOT the market factor -- the sector leg and
+    /// their return that are NOT the market factor (the sector leg and
     /// their own idiosyncratic noise, both in
-    /// `market::factors::calculate_live_factors` -- and every OTHER name
+    /// `market::factors::calculate_live_factors`), and every OTHER name
     /// carries a multiple below one on the same two parts. The market
     /// component is untouched, so the index, the VIX and the fear rows do
-    /// not move -- only who carries the crisis moves.
+    /// not move. Only who carries the crisis moves.
     ///
-    /// # It redistributes rather than adds
+    /// # It redistributes variance
     ///
-    /// The second multiple is what makes this dial a statement about WHO
-    /// carries a crisis and not a statement about how large crises are. At a
-    /// given VIX the roster's total crisis variance is the VIX's to set:
-    /// `crisis_blend_*`, the GARCH and the market factor set it, and this
-    /// dial has no business moving it. So the pair of multiples is solved
-    /// under a conservation condition -- the roster's MEAN non-market
-    /// variance is unchanged -- alongside the tape's ratio.
+    /// The second multiple makes this dial a statement about WHO carries a
+    /// crisis, and leaves how large crises are alone. At a given VIX the
+    /// roster's total crisis variance is set by `crisis_blend_*`, the GARCH
+    /// and the market factor, and this dial does not move it. So the pair
+    /// of multiples is solved under a conservation condition (the roster's
+    /// MEAN non-market variance is unchanged) alongside the tape's ratio.
     ///
-    /// It was built the other way first, on 2026-09-22: the epicentre's
-    /// names were lifted and no one was lowered. That arm moved the row it
-    /// was built for (`crisis_sector_dispersion` 1.15 to 1.39 against the
-    /// tape's 1.34 at two years) and moved three rows away with it --
-    /// `annualised_vol_pct` 24.3 to 25.5 against 23.7,
-    /// `cross_sectional_corr` 0.330 to 0.314 against 0.353,
-    /// `volume_abs_return_corr` 0.535 to 0.545 -- and the three were one
-    /// cause: a roster whose total crisis variance had risen. It was
-    /// refused. The additive arm is kept as
-    /// the `w = 0` edge of this solve rather than as a second form; see
+    /// An additive form, which lifted the epicentre's names and lowered no
+    /// one, was measured and rejected. It moved the row it was built for
+    /// (`crisis_sector_dispersion` 1.15 to 1.39 against the tape's 1.34 at
+    /// two years) and moved three rows away with it: `annualised_vol_pct`
+    /// 24.3 to 25.5 against 23.7, `cross_sectional_corr` 0.330 to 0.314
+    /// against 0.353, and `volume_abs_return_corr` 0.535 to 0.545. The
+    /// three had one cause, a roster whose total crisis variance had risen.
+    /// The additive form is the `w = 0` edge of this solve; see
     /// [`crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE`].
     ///
     /// # Derivation
@@ -4774,7 +4662,7 @@ pub struct ModelParams {
     /// to the engine's sector keys, each sector's median episode volatility
     /// over each name's own calm-day volatility (VIX under 12), then each
     /// sector relative to the median sector of that episode.
-    /// The rule was stated before the numbers were read: the epicentre is
+    /// The rule was fixed before the numbers were read: the epicentre is
     /// the sector furthest above the episode's median if it is 1.3x or more
     /// above it. 2008-09 gives financial services at 2.43, 2011 financial
     /// services at 1.93, 2020 financial services at 1.41; 2000-02 and 2022
@@ -4799,33 +4687,32 @@ pub struct ModelParams {
     ///
     /// `m` is [`CRISIS_EPICENTRE_MARKET_SHARE`](crate::market::factors::CRISIS_EPICENTRE_MARKET_SHARE)
     /// and `w` is
-    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`](crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE), both MEASURED on the composed
+    /// [`CRISIS_EPICENTRE_SECTOR_SHARE`](crate::market::factors::CRISIS_EPICENTRE_SECTOR_SHARE), both measured on
     /// pt-v19 and recorded there with their recipes. At `m = 0.3916`,
     /// `w = 0.1019` and `e = 1.93` that is `g_down^2 = 0.4996655 /
     /// 0.7773328 = 0.642795`, `g_down = 0.801745`, and `g_up^2 = 1.753897 +
     /// 2.394346 = 4.148243`, `g_up = 2.036724`. See
     /// [`crate::market::factors::crisis_epicentre_gains`], which is where
     /// the solve lives, and
-    /// [`crate::market::factors::crisis_epicentre_extra_bounds`], which is
-    /// where the two extras that would ask a name for a negative variance
-    /// sit -- 0.6052 below and 4.0307 above.
+    /// [`crate::market::factors::crisis_epicentre_extra_bounds`], which
+    /// holds the two extras that would ask a name for a negative variance:
+    /// 0.6052 below and 4.0307 above.
     ///
-    /// # What it is NOT
+    /// # What it does not do
     ///
-    /// It is not a correlation dial and not a second crisis blend. The
-    /// sector leg it multiplies is the one every member of the sector
+    /// It doesn't set correlation directly and isn't a second crisis blend.
+    /// The sector leg it multiplies is the one every member of the sector
     /// shares, so lifting it lifts both the epicentre's volatility and its
-    /// internal correlation -- which is what an epicentre is -- and the
+    /// internal correlation (which is what an epicentre is), and the
     /// idiosyncratic leg is lifted beside it so the split between the two
     /// is the one the name already had.
     ///
-    /// It is not meant to be a volatility dial either, and that is what the
-    /// conservation condition buys: the roster's mean non-market INNOVATION
-    /// variance is the same at any extra, to the bit. What a long run
-    /// realises is not, because the per-name GARCH is convex in what it is
-    /// fed and gives some of it back;
-    /// [`crate::market::factors::crisis_epicentre_gains`] measures how much
-    /// and says why moving `w` to chase it would be fitting.
+    /// The conservation condition also keeps it from being a volatility
+    /// dial: the roster's mean non-market INNOVATION variance is the same
+    /// at any extra, to the bit. What a long run realizes is not, because
+    /// the per-name GARCH is convex in what it is fed and gives some of it
+    /// back; [`crate::market::factors::crisis_epicentre_gains`] measures
+    /// how much and says why moving `w` to chase it would be fitting.
     ///
     /// An epicentre no name in the roster is in does nothing at all, and
     /// `Engine::crisis_epicentre_key` is where that is decided: the draw
@@ -4833,47 +4720,44 @@ pub struct ModelParams {
     /// move the variance TO there is nothing for the tick to do with it.
     pub crisis_epicentre_extra: f64,
     /// How many consecutive sessions under `crisis_vix_threshold` end a
-    /// crisis episode. 21 ships, which is a month of sessions.
+    /// crisis episode. 21, a month of sessions, on every shipped preset.
     ///
-    /// The hysteresis, and it is what makes an episode an episode rather
-    /// than a run of scattered days: the tape's five episodes are months
-    /// long (the shortest, 2011, is four months) and the VIX crosses back
-    /// under the threshold repeatedly inside each of them. Without the
-    /// counter an epicentre would be redrawn on every re-crossing, which
-    /// would average three sectors across one crisis and show none of them.
+    /// This hysteresis keeps an episode together. The tape's five episodes
+    /// are months long (the shortest, 2011, is four months) and the VIX
+    /// crosses back under the threshold repeatedly inside each of them.
+    /// Without the counter an epicentre would be redrawn on every
+    /// re-crossing, which would average three sectors across one crisis and
+    /// show none of them.
     ///
-    /// Read only while `crisis_epicentre_extra` is non-zero, which pt-v19
-    /// is (1.93) and every preset before it is not, so it is inert on pt-v1
-    /// through pt-v18 whatever it reads. This line said "inert on every
-    /// shipped preset" until 2026-09-24. A value at or below zero
-    /// ends an episode on the first session back under the threshold, which
-    /// `ModelParams::invariants` allows: it is a degenerate hysteresis, not
-    /// an incoherent one.
+    /// Read only while `crisis_epicentre_extra` is non-zero, which is true
+    /// on pt-v19 and pt-v20 (1.93) and on no earlier preset, so it is inert
+    /// on pt-v1 through pt-v18. A value at or below zero ends an episode on
+    /// the first session back under the threshold, which
+    /// `ModelParams::invariants` allows as a degenerate hysteresis.
     pub crisis_epicentre_end_sessions: f64,
-    /// The VIX above which the dollar catches a safe-haven bid.
+    /// The VIX above which the dollar catches a safe-haven bid. 25.5 on
+    /// every shipped preset.
     ///
-    /// Defaults to the same constant as `crisis_vix_threshold` and is a
-    /// SEPARATE dial. 0.4.2 pointed the dollar gate at `crisis_vix_threshold`
-    /// to close issue #50, which moved it from 25.5 to 30.88 for `pt-v13` and
-    /// `pt-v14`, the two presets that override that parameter, and changed
-    /// their trajectories in a patch release. A preset that wants the two
-    /// gates to move together sets them together.
+    /// It starts at the same 25.5 as `crisis_vix_threshold` and is a
+    /// separate dial, so moving the crisis threshold does not move the
+    /// dollar: pt-v13 onward set `crisis_vix_threshold` to 30.88325108 and
+    /// leave this at 25.5. A preset that wants the two gates to move
+    /// together sets both.
     pub usd_crisis_vix_threshold: f64,
-    /// Re-assert the credit spread floors on every daily step, scaled.
+    /// How strongly the credit spread floors are re-applied on every daily
+    /// step, from 0.0 (off) to 1.0 (both floors in full). 0.0 on pt-v1
+    /// through pt-v14; pt-v15 onward ship 1.0.
     ///
-    /// INERT at 0.0, which pt-v1 through pt-v14 set; pt-v15 onward ship
-    /// 1.0, and this line said "every shipped preset" until 2026-09-17.
-    /// `update_economy_daily`
-    /// moves the 10y treasury daily and never writes the credit yields, so
-    /// between periodic meetings the corporate spread drifts below its 0.8
-    /// floor -- measured to 0.4216, first breaching on day 121, which is an
-    /// investment-grade yield under the risk-free curve.
+    /// `update_economy_daily` moves the 10y treasury daily and never writes
+    /// the credit yields, so between periodic meetings the corporate spread
+    /// drifts below its 0.8 floor. Measured at 0.0, it falls to 0.4216,
+    /// first breaching on day 121, which is an investment-grade yield under
+    /// the risk-free curve.
     ///
-    /// A dial rather than a straight fix because that function is
-    /// preset-independent: flooring unconditionally would move the economy
-    /// trajectory of every preset including `pt-v1`, and the version policy
-    /// requires a trajectory change to arrive as a new preset. 1.0 enforces
-    /// both floors in full.
+    /// It is a dial because that function runs for every preset: flooring
+    /// unconditionally would move the economy trajectory of every preset
+    /// including `pt-v1`, and a trajectory change has to arrive as a new
+    /// preset.
     pub daily_credit_floor_gain: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
@@ -4881,10 +4765,11 @@ pub struct ModelParams {
     /// for the decay: overriding it recomputes `mispricing_phi` and
     /// `s_phi_tick` via `mathx::pow`.
     pub mispricing_half_life_days: f64,
-    /// Daily AR(1) coefficient. It holds V8's recorded bits at the shipped
-    /// half-life and is recomputed, deterministically but not
-    /// bit-identically to any recorded constant, when the half-life is
-    /// overridden.
+    /// Daily AR(1) coefficient of the mispricing, derived from
+    /// `mispricing_half_life_days`. At the shipped half-life it holds the
+    /// recorded reference bits; when the half-life is overridden it is
+    /// recomputed deterministically, though not bit-identical to any
+    /// recorded constant.
     pub mispricing_phi: f64,
     /// Per-tick decay, `mispricing_phi^(1/390)`. Same bits policy.
     pub s_phi_tick: f64,
@@ -4894,19 +4779,19 @@ pub struct ModelParams {
     pub mispricing_cap: f64,
     /// Crowd valuation gain per day on `s`.
     pub crowd_valuation_gain: f64,
-    /// Crowd herding gain per day on yesterday's Δs.
+    /// Crowd herding gain per day on yesterday's change in `s`.
     pub crowd_momentum_gain: f64,
     /// Bound on the crowd's daily log-price shock. A guard.
     pub crowd_lean_cap: f64,
 
     // ── Session guards (market/tick.rs) ─────────────────────────────────
-    /// Circuit-breaker band as a fraction of the session open (±25%
+    /// Circuit-breaker band as a fraction of the session open (+/-25%
     /// shipped). A guard: settable, never searched.
     pub price_breaker_fraction: f64,
     /// Absolute cap on any model price (50,000 shipped). A guard.
     pub price_hard_cap: f64,
 
-    // ── Derived, computed once at construction (§5.3) ───────────────────
+    // ── Derived, computed once at construction ──────────────────────────
     /// `1 + price_breaker_fraction`. Not in the dict: derived, never set.
     pub breaker_up: f64,
     /// `1 - price_breaker_fraction`. Not in the dict: derived, never set.
