@@ -13,6 +13,7 @@ import pytest
 
 import tradefloor as tf
 from tradefloor import facts, noise
+from tradefloor._arith import ordered_sum
 from tradefloor.counterfactual import World, compare
 
 SEED = 42
@@ -292,7 +293,9 @@ def test_a_column_target_is_read_at_its_own_day():
         probe.run(day + 1)
         values = struct.unpack("<%dd" % len(probe.engine.tickers),
                                probe.engine.column("price"))
-        assert attribution.control == sum(values) / len(values)
+        # `ordered_sum`, because the builtin `sum` compensates on 3.12+ and
+        # the engine's mean is the plain left-to-right sum.
+        assert attribution.control == ordered_sum(values) / len(values)
     # the label names the day the value came from
     assert "at day 1" in early.target.label()
     assert "at day 3" in late.target.label()
