@@ -105,8 +105,8 @@ INTERNAL: tuple[str, ...] = (
 )
 
 
-#: Every top-level name and its tier, sorted by name.
-#: The surface test refuses a name listed in two tiers.
+#: Each top-level name and its tier.
+#: Sorted by name. The surface test refuses a name listed in two tiers.
 TIERS: dict[str, str] = dict(sorted(
     [(name, "stable") for name in STABLE]
     + [(name, "advanced") for name in ADVANCED]
