@@ -5,9 +5,11 @@ the local MCP server, for Claude Desktop and Smithery. It vendors nothing:
 `pyproject.toml` depends on `tradefloor[mcp]` at this release, and the host
 runs `server.py` with uv, which installs it.
 
-Pack and check it:
+Pack and check it. The icon is the site's, fetched at pack time, because
+the repository tracks no binary files:
 
 ```
+curl -fsSL -o mcpb/icon.png https://tradefloor.dev/icon-512.png
 npx -y @anthropic-ai/mcpb validate mcpb/manifest.json
 npx -y @anthropic-ai/mcpb pack mcpb tradefloor.mcpb
 ```
