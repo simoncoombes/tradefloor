@@ -258,7 +258,7 @@ def _callable_notebook_prose() -> str:
                          if cell["cell_type"] == "markdown"))
 
 
-@pytest.mark.parametrize("name", ["README.md",
+@pytest.mark.parametrize("name", ["docs/AGENTS.md",
                                   "examples/integrations/README.md",
                                   "callable notebook"])
 def test_the_callable_docs_name_postprocess_and_the_prompt_guard(name):

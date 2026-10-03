@@ -65,7 +65,10 @@ the same market.
 
 A Python agent is any object with `act(obs)` that returns orders: a number
 of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
-It sees a read-only view of the market and its own portfolio.
+It sees a read-only view of the market and its own portfolio, and
+`obs.history` holds a daily bar per name. A bar's close is the day's last
+print; on pt-v20 the close then re-marks every name, so the next day starts
+from a different price.
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 covers what the view holds, how trades are charged, the framework adapters
 (OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
@@ -83,11 +86,11 @@ python examples/rate-shock/counterfactual.py
 
 It runs an agent in a controlled market, checkpoints the world and forks it,
 raises rates by 200bps in one branch, and compares what the same agent does
-next. It takes under five seconds of CPU and needs no keys and no network.
+next. The run takes under five seconds of CPU and needs no keys and no network.
 The walkthrough is
 [Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
 
-## What's in it
+## Contents
 
 | | |
 |---|---|
@@ -166,8 +169,10 @@ and stops if any result differs.
 A shipped preset never changes. A market with no agent orders in it replays
 exactly on its named preset in every later release, and each release checks
 that with a digest per preset. A run with agent orders in it replays exactly
-on the same release; across releases the promise is narrower.
-`pt-v20` is the default preset.
+on the same release. Across releases the promise is narrower: 0.8.5 changed
+how an agent's fills reach the market, on every preset, so a traded run
+recorded before 0.8.5 matches up to its first trade and differs after it.
+The default preset is `pt-v20`, and any earlier one can be named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -175,14 +180,17 @@ eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 
 To let a reader rerun a result, publish its `RunManifest`. It records the
 version, preset, seed, universe, macro state and scenario, and `reproduce()`
-stops on a mismatch.
+stops on a mismatch. It checks the market and carries no score: its `result`
+block holds the market's `digest`, the number of `days` and
+`draws_consumed`, and `tf.evaluate` and `tf.rank` write no manifest, so a
+published score has to be rerun to be checked.
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 has the full contract, including what a saved engine state promises when it
 is restored, and
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 says which release to pin for a long study.
 
-## What the realism claims mean
+## Realism
 
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
@@ -198,9 +206,13 @@ pt-v20 meets all 40.
 Read those claims narrowly:
 
 - The 19 of 19 is a verdict on figures pooled over 30 seeds. One seed's year
-  often misses some of them, so if you run one market per condition, read
+  often misses some of them: on seeds 101 to 116, all 14 were in range on 5 of
+  the 16. If you run one market per condition, read
   `tf.envelope.intervals()` for each statistic's spread across seeds.
-- The one-year ranges are wide, so passing one is weak evidence.
+- The one-year ranges are wide, so passing one is weak evidence. Volatility
+  clustering shows the gap: `abs_return_acf1` reads 0.028, below every real
+  2015 to 2025 window (the lowest is 0.039), and it passes because its range
+  reaches lower than those windows do.
 - A driven scenario moves prices at a quarter to a half of the real size, in
   the right direction. Use a scenario to detect a response, and do not read
   its size as a forecast.
@@ -221,11 +233,13 @@ has every number behind these claims and the full table of limits.
   answer scores 0.95 to 1.0. Quote `explanation_edge`.
 - Agents in one `tf.evaluate` or `tf.rank` call share one Python process and
   one seed. An agent written to cheat can read the seed from the harness's
-  frames and run a copy of the market ahead, and nothing flags it. To compare
+  frames through `sys._getframe` and run a copy of the market ahead, and
+  nothing flags it. To compare
   agents you did not write, run each in its own process, through the MCP
   server.
-- The read-only market view guards against accidents. It is not a security
-  boundary, so run code you do not trust in a separate process.
+- The read-only market view guards against accidents. Agent code runs in the
+  harness's own process and can reach the engine by walking the interpreter,
+  so run code you do not trust in a separate process.
 - In a `World` with several agents, orders placed at the same step execute in
   label order, alphabetical, for the whole run. Rotate the labels across runs
   when you compare different agents in one market.
@@ -281,7 +295,7 @@ publishing with it:
 - [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
   which release lines get fixes, and for how long
 
-## Contributing, security and support
+## Contributing and security
 
 [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md)
 explains how to build and test the project. Its main rule is that any change to

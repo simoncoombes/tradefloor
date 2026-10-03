@@ -27,7 +27,7 @@ returns `{}` and warns why: market moves there mostly stick, so even perfect
 knowledge of fair value leaves little edge, and buy-and-hold is the
 comparison to quote.
 
-### Explaining moves
+### Explanation scores
 
 The eleven factors `engine.truth()` reports sum to the change in mispricing,
 the log gap between the price and the model's fair value. On pt-v20 a shock
@@ -45,7 +45,7 @@ scores on the same days, and `explanation_edge`, the accuracy minus the
 baseline, and its repr prints the three together. Only the edge means
 anything. Quote it, or all three, and never the accuracy alone.
 
-## What an agent sees
+## The agent's view
 
 A Python agent implements `act(obs)` and returns orders. `obs.engine` is a
 read-only market view: prices, the public columns, each book, the bars of

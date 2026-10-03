@@ -28,6 +28,30 @@ lists what each digest covers.
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 ```
 
+## Saved state
+
+`engine.state_snapshot()` returns everything the engine needs to continue a
+run, and `engine.restore_state(snapshot)` puts it back. A run snapshotted,
+saved as JSON, restored in a new process and continued gives the same market,
+bit for bit, as the run that never stopped. The test suite checks this on
+the default preset and on `pt-v3`, at a close and in the middle of a
+session, with a scenario in flight, and through `tf.Checkpoint` and
+`tf.branch`.
+
+A snapshot carries `state_schema`, which is `Engine.STATE_SCHEMA`, now 1.
+`restore_state` refuses, and names the field, when a snapshot lacks a field
+this engine needs, carries one it does not know, or holds a value of the
+wrong type, length or range. It never keeps the engine's own value for a
+missing field. A field that only some models carry is required exactly when
+the engine's model sets the dial behind it, and the refusal names that dial.
+A refused restore leaves the engine as it was.
+
+Snapshots written by 0.8.5 to 0.8.8 carry no version and restore as version
+1, because the snapshot layout did not change between those releases.
+Earlier ones lack the day state and are refused, because the day they were
+taken on cannot be recovered from them. A newer schema is refused. If you
+know what a missing field held, write it into the dict and restore that.
+
 ## Publishing a result
 
 To let a reader rerun a result, publish its `RunManifest`: it records the
@@ -39,7 +63,7 @@ rerun to be checked.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 says which release to pin for a long study.
 
-## Showing a score was not tuned to its seeds
+## Commitments to seeds
 
 To show a score was not tuned to its seeds, publish `tf.commit(seeds, salt)`
 before the run and the seeds and salt after it. Draw the seeds with
