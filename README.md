@@ -222,6 +222,8 @@ pip install "tradefloor[mcp]"
 claude mcp add tradefloor -- tradefloor-mcp
 ```
 
+<!-- mcp-name: io.github.simoncoombes/tradefloor -->
+
 Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
 [the MCP page](https://tradefloor.dev/mcp.html).
