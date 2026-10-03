@@ -558,7 +558,7 @@ class Fingerprint:
     def from_json(cls, text: str) -> "Fingerprint":
         """The inverse of :meth:`to_json`.
 
-        Not part of the frozen design note's own grammar; added because a
+        Not part of the fingerprint's original grammar. It exists because a
         digest published without a way to read it back is not a citable
         one.
         """

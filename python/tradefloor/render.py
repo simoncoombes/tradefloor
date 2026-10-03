@@ -1,9 +1,7 @@
 """Turn an allowlisted observation payload into the text an agent reads.
 
-The P6 observation-invariance design note (the programme design
-repository, outside this checkout) names the question this module exists
-to ask: how much of what an agent decides is the market, and how much is
-how the market was described to it.
+This module exists to ask one question: how much of what an agent decides
+is the market, and how much is how the market was described to it.
 Four adapters already turn `integrations.common.serialize_observation` (or
 FinRobot's own copy of it, `integrations.finrobot.observe`) into text, each
 its own way -- FinRobot writes prose, LangGraph and PydanticAI dump sorted
