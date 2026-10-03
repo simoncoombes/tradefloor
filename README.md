@@ -351,7 +351,7 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.8.8},
+  version = {0.9.0},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   note    = {Model preset pt-v20}
@@ -362,7 +362,7 @@ several presets, and results depend on the preset.
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.8.8,
+In the text, say which model you used, for example: "tradefloor 0.9.0,
 preset pt-v20, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
