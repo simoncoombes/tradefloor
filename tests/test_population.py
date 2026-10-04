@@ -470,7 +470,7 @@ def test_the_crowded_population_adds_both_crowds_to_the_standard_one():
     reversal = [p for p in crowds if p.signal == "reversal"]
     momentum = [p for p in crowds if p.signal == "momentum"]
     assert len(reversal) == 1 and len(momentum) == 3
-    assert reversal[0].size == pytest.approx(0.002) and reversal[0].interval == 15
+    assert reversal[0].size == pytest.approx(0.006) and reversal[0].interval == 15
     assert sum(p.size for p in momentum) == pytest.approx(0.01)
     # Loss limits spread around `stop`; none at all with stop 0.
     assert sorted(p.stop for p in momentum) == pytest.approx([0.015, 0.03, 0.045])

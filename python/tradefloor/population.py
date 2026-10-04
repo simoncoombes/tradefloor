@@ -385,7 +385,7 @@ class Population:
                    name="standard")
 
     @classmethod
-    def crowded(cls, *, reversal: float = 0.002, momentum: float = 0.01,
+    def crowded(cls, *, reversal: float = 0.006, momentum: float = 0.01,
                 members: int = 3, stop: float = 0.03,
                 recover: float = 0.2) -> "Population":
         """The standard population plus two crowds trading the ranked rules'

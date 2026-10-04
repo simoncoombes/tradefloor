@@ -33,7 +33,11 @@ rows: (a) the predictable programme's populated cost over its isolated cost,
 (b) that excess against the randomised programme's, (c) the detector's P&L
 on the predictable programme (traded fork less the twin, in dollars and in
 units of the name's daily dollar volume times its daily sigma), and the
-populated predictable cost against the populated randomised cost.
+populated predictable cost against the populated randomised cost. Each
+mode's cost is in its own warm-up sigma, as registered;
+`a_excess_predictable_iso_sigma` also reads the populated cost in the isolated
+market's sigma, because a population that moves a name's volatility moves the
+first reading by that share without any change in what the programme paid.
 
 **ac3, an edge as more capital trades it.** Per seed, `Universe.random(20,
 seed=93000 + i)` at seed `92000 + i`, 60 days of 6 steps of 65 ticks, $1M
@@ -253,6 +257,11 @@ def ac4_seed(args):
                     if mode == "pop":
                         pnl += _pnl(e, None) - _pnl(twin, None)
                 row[f"{sched}_{mode}"] = st.fmean(costs)
+                # The same cost in the isolated market's sigma, so the two
+                # modes are read in one unit: a population that moves the
+                # name's own volatility otherwise moves the reading too.
+                row[f"{sched}_{mode}_iso_sigma"] = st.fmean(costs) * sigma[i] / bases["iso"][2][i]
+                row[f"sigma_{mode}"] = sigma[i]
                 if mode == "pop":
                     price = f64(base.prices())[i]
                     row[f"{sched}_detector_pnl"] = pnl
@@ -292,6 +301,11 @@ def ac4(a):
         "populated_predictable_over_randomised": one_sided(
             [r["pred_pop"] - r["rand_pop"] for r in rows]),
         "excess_share_of_isolated": st.fmean(ex_pred) / st.fmean(r["pred_iso"] for r in rows),
+        "a_excess_predictable_iso_sigma": one_sided(
+            [r["pred_pop_iso_sigma"] - r["pred_iso"] for r in rows]),
+        "excess_randomised_iso_sigma": one_sided(
+            [r["rand_pop_iso_sigma"] - r["rand_iso"] for r in rows]),
+        "sigma_populated_over_isolated": st.fmean(r["sigma_pop"] / r["sigma_iso"] for r in rows),
         "rows": rows,
     }
     return out
