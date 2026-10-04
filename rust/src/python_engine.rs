@@ -355,6 +355,80 @@ macro_rules! field_names {
 /// The economy's scalar keys, from [`economy_scalars`].
 const ECONOMY_SCALARS: &[&str] = economy_scalars!(field_names);
 
+/// A population's engine spec, read from the object `population=` was
+/// given: anything with `_engine_spec()` returning `{"fingerprint": str,
+/// "participants": [dict, ...]}`, which is what `tradefloor.Population`
+/// writes. Each participant dict carries `name`, `kind`, `size`, `rate`,
+/// `interval`, `band` and its kind's own numbers.
+fn population_from(
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<(String, Vec<crate::population::Participant>)> {
+    use crate::population::{Participant, Policy};
+    let spec = obj.call_method0("_engine_spec").map_err(|_| {
+        ValidationError::new_err(
+            "population= takes a tradefloor.Population (for example \
+             tf.Population.standard()), or None for an isolated engine.",
+        )
+    })?;
+    let spec = spec
+        .downcast_into::<PyDict>()
+        .map_err(|_| ValidationError::new_err("Population._engine_spec() must return a dict"))?;
+    fn get<'py>(d: &Bound<'py, PyDict>, k: &str) -> PyResult<Bound<'py, PyAny>> {
+        d.get_item(k)?
+            .ok_or_else(|| ValidationError::new_err(format!("population spec has no {k}")))
+    }
+    let fingerprint: String = get(&spec, "fingerprint")?.extract()?;
+    let items = get(&spec, "participants")?;
+    let mut out = Vec::new();
+    for item in items.iter()? {
+        let d = item?
+            .downcast_into::<PyDict>()
+            .map_err(|_| ValidationError::new_err("each population participant must be a dict"))?;
+        let num = |k: &str| -> PyResult<f64> { get(&d, k)?.extract::<f64>() };
+        let whole = |k: &str| -> PyResult<u32> {
+            let v = num(k)?;
+            if !(v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0) {
+                return Err(ValidationError::new_err(format!(
+                    "population participant field {k} must be a whole number, got {v}"
+                )));
+            }
+            Ok(v as u32)
+        };
+        let kind: String = get(&d, "kind")?.extract()?;
+        let policy = match kind.as_str() {
+            "trend" => Policy::Trend { lookback: whole("lookback")?, scale: num("scale")? },
+            "reversion" => Policy::Reversion { lookback: whole("lookback")?, scale: num("scale")? },
+            "liquidity" => Policy::Liquidity {
+                half_life: num("half_life")?,
+                scale: num("scale")?,
+                vix_calm: num("vix_calm")?,
+                vix_stress: num("vix_stress")?,
+            },
+            "detector" => Policy::Detector {
+                memory: num("memory")?,
+                bucket: whole("bucket")?,
+                lead: whole("lead")?,
+                hold: whole("hold")?,
+            },
+            other => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown population participant kind {other:?}: trend, reversion, \
+                     liquidity or detector"
+                )))
+            }
+        };
+        out.push(Participant {
+            name: get(&d, "name")?.extract()?,
+            size: num("size")?,
+            rate: num("rate")?,
+            interval: whole("interval")?,
+            band: num("band")?,
+            policy,
+        });
+    }
+    Ok((fingerprint, out))
+}
+
 /// The top-level keys every version-1 snapshot carries. `manifest.py`'s
 /// `_SNAPSHOT_KEYS` is the same list less `session_tick`, which the state
 /// hash leaves out, and a test holds the two together.
@@ -1953,6 +2027,11 @@ impl PyEngine {
             Gated::when("idio_variance", idio, idio_why.clone()),
             Gated::when("idio_jump_pending", idio, idio_why.clone()),
             Gated::when("idio_jump_var_pending", idio, idio_why),
+            Gated::when(
+                "population",
+                self.inner.population().is_some(),
+                "the engine was built with a population".to_string(),
+            ),
             Gated {
                 key: "rates",
                 wanted: !held.is_empty(),
@@ -2563,9 +2642,10 @@ impl PyEngine {
             seed = crate::python::Given::Missing,
             universe = crate::python::Given::Missing,
             macro_state = None,
-            model = None
+            model = None,
+            population = None
         ),
-        text_signature = "(*, seed, universe, macro_state=None, model=None)"
+        text_signature = "(*, seed, universe, macro_state=None, model=None, population=None)"
     )]
     fn new(
         args: &Bound<'_, pyo3::types::PyTuple>,
@@ -2573,6 +2653,7 @@ impl PyEngine {
         universe: crate::python::Given<'_>,
         macro_state: Option<PyMacro>,
         model: Option<&Bound<'_, PyAny>>,
+        population: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         if !args.is_empty() {
             return Err(pyo3::exceptions::PyTypeError::new_err(format!(
@@ -2664,7 +2745,116 @@ impl PyEngine {
                 .inner
                 .set_rate_instruments(rates.iter().map(|i| i.to_rate()).collect());
         }
+        // Last, so it starts from the market the run actually opens on.
+        if let Some(population) = population {
+            if !population.is_none() {
+                let (fingerprint, participants) = population_from(population)?;
+                engine
+                    .inner
+                    .set_population(fingerprint, participants)
+                    .map_err(ValidationError::new_err)?;
+            }
+        }
         Ok(engine)
+    }
+
+    /// The population this engine was built with, as the data
+    /// `tradefloor.Population` was built from: `{"fingerprint": ...,
+    /// "participants": [dict, ...]}`, or None for an isolated engine. A
+    /// manifest carries it so a replay rebuilds the same population.
+    fn population_spec(&self, py: Python<'_>) -> PyResult<Option<Py<PyDict>>> {
+        use crate::population::Policy;
+        let Some(pop) = self.inner.population() else {
+            return Ok(None);
+        };
+        let out = PyDict::new_bound(py);
+        out.set_item("fingerprint", pop.fingerprint.clone())?;
+        let items = pyo3::types::PyList::empty_bound(py);
+        for p in &pop.participants {
+            let d = PyDict::new_bound(py);
+            d.set_item("kind", p.policy.kind())?;
+            d.set_item("name", p.name.clone())?;
+            d.set_item("size", p.size)?;
+            d.set_item("rate", p.rate)?;
+            d.set_item("interval", p.interval)?;
+            d.set_item("band", p.band)?;
+            match &p.policy {
+                Policy::Trend { lookback, scale } | Policy::Reversion { lookback, scale } => {
+                    d.set_item("lookback", *lookback)?;
+                    d.set_item("scale", *scale)?;
+                }
+                Policy::Liquidity { half_life, scale, vix_calm, vix_stress } => {
+                    d.set_item("half_life", *half_life)?;
+                    d.set_item("scale", *scale)?;
+                    d.set_item("vix_calm", *vix_calm)?;
+                    d.set_item("vix_stress", *vix_stress)?;
+                }
+                Policy::Detector { memory, bucket, lead, hold } => {
+                    d.set_item("memory", *memory)?;
+                    d.set_item("bucket", *bucket)?;
+                    d.set_item("lead", *lead)?;
+                    d.set_item("hold", *hold)?;
+                }
+            }
+            items.append(d)?;
+        }
+        out.set_item("participants", items)?;
+        Ok(Some(out.into()))
+    }
+
+    /// The fingerprint of the population this engine was built with, or
+    /// None for an isolated engine.
+    #[getter]
+    fn population_fingerprint(&self) -> Option<String> {
+        self.inner.population().map(|p| p.fingerprint.clone())
+    }
+
+    /// The population's ledger, one dict per participant: its `name`,
+    /// `kind` and `label`, and per name (keyed by ticker) its `position` in
+    /// shares, `cash`, `volume` (shares traded), `notional` (dollars
+    /// traded) and `pnl` (cash plus the position at the last print); then
+    /// the totals `pnl`, `volume`, `notional` and `orders`. An empty list
+    /// on an engine without a population.
+    fn population_report(&self, py: Python<'_>) -> PyResult<Py<pyo3::types::PyList>> {
+        let out = pyo3::types::PyList::empty_bound(py);
+        let Some(pop) = self.inner.population() else {
+            return Ok(out.into());
+        };
+        let companies = self.inner.companies();
+        for (k, p) in pop.participants.iter().enumerate() {
+            let s = &pop.states[k];
+            let row = PyDict::new_bound(py);
+            row.set_item("name", p.name.clone())?;
+            row.set_item("kind", p.policy.kind())?;
+            row.set_item("label", p.label())?;
+            let names = PyDict::new_bound(py);
+            let (mut pnl, mut volume, mut notional) = (0.0, 0.0, 0.0);
+            for (i, t) in pop.tickers.iter().enumerate() {
+                let price = companies
+                    .iter()
+                    .find(|c| &c.ticker == t)
+                    .map(|c| c.stock.price)
+                    .unwrap_or(f64::NAN);
+                let mark = s.cash[i] + if s.position[i] == 0.0 { 0.0 } else { s.position[i] * price };
+                let cell = PyDict::new_bound(py);
+                cell.set_item("position", s.position[i])?;
+                cell.set_item("cash", s.cash[i])?;
+                cell.set_item("volume", s.volume[i])?;
+                cell.set_item("notional", s.notional[i])?;
+                cell.set_item("pnl", mark)?;
+                names.set_item(t, cell)?;
+                pnl += mark;
+                volume += s.volume[i];
+                notional += s.notional[i];
+            }
+            row.set_item("names", names)?;
+            row.set_item("pnl", pnl)?;
+            row.set_item("volume", volume)?;
+            row.set_item("notional", notional)?;
+            row.set_item("orders", s.orders)?;
+            out.append(row)?;
+        }
+        Ok(out.into())
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
@@ -5734,6 +5924,16 @@ impl PyEngine {
         if self.inner.carries_garch_cascade() {
             out.set_item("garch_cascade", f64_bytes(py, &self.inner.garch_cascade()))?;
         }
+        // The population's ledger and memories, only on an engine built with
+        // one (`crate::population`), so every other snapshot is the dict it
+        // was.
+        if let Some(pop) = self.inner.population() {
+            let block = PyDict::new_bound(py);
+            block.set_item("fingerprint", pop.fingerprint.clone())?;
+            block.set_item("tickers", pop.tickers.clone())?;
+            block.set_item("state", f64_bytes(py, &pop.to_flat()))?;
+            out.set_item("population", block)?;
+        }
         Ok(out.into())
     }
 
@@ -6435,6 +6635,24 @@ impl PyEngine {
             None => crate::agent_book::BookState::default(),
         };
         inner.set_book_state(book).map_err(ValidationError::new_err)?;
+        // The population, on an engine built with one: the snapshot must
+        // come from the same population (the key check above has already
+        // required the block exactly when this engine holds one).
+        if let Some(fingerprint) = inner.population().map(|p| p.fingerprint.clone()) {
+            let block = snap_dict(snapshot, "", "population")?;
+            check_keys("this snapshot's population", &block, &["fingerprint", "tickers", "state"], &[], &[])?;
+            let carried: String = snap_value(&block, "population.", "fingerprint", "a string")?;
+            if carried != fingerprint {
+                return Err(ValidationError::new_err(format!(
+                    "this snapshot was taken with population {carried}, and this engine \
+                     holds population {fingerprint}. Build the engine with the population \
+                     the snapshot came from."
+                )));
+            }
+            let tickers: Vec<String> = snap_value(&block, "population.", "tickers", "a list of tickers")?;
+            let state = snap_buffer(&block, "population.", "state")?;
+            inner.set_population_state(tickers, &state).map_err(ValidationError::new_err)?;
+        }
         // What was written to each price since its last print is tape, not
         // state: the snapshot does not carry it, and the engine restored
         // into must not keep its own. So the next print's `repriced` reads

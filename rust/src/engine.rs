@@ -927,6 +927,12 @@ pub struct Engine {
     /// and unhashed while the switch is 0.0, which every preset carries;
     /// only its key is set at construction.
     cycle_publication: CyclePublication,
+
+    /// The background traders sharing the agent-facing book, when the
+    /// engine was built with them (`crate::population`). `None` on every
+    /// engine built without one, which then never calls into that module,
+    /// so its market is the market it was before populations existed.
+    population: Option<Box<crate::population::PopulationRun>>,
 }
 
 /// The state behind the published cycle phase under
@@ -1807,6 +1813,7 @@ impl Engine {
                 key: crate::rng::publication_key(seed),
                 ..CyclePublication::default()
             },
+            population: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
@@ -3758,6 +3765,13 @@ impl Engine {
     /// inside [`simulate_market_tick`] and precedes every draw site, which
     /// matters because most of the clock is closed.
     pub fn tick(&mut self, request: &TickRequest) -> TickOutcome {
+        // The population acts first, on an open tick, and only on an engine
+        // that holds one (`crate::population`).
+        let population_open = self.population.is_some()
+            && get_market_status(request.time) == MarketStatus::Open;
+        if population_open {
+            self.population_before_tick();
+        }
         // The market generator is moved out, used, and moved back.
         // `tick_inner` takes `&mut self`, so it cannot also borrow
         // `self.market_rng` — and swapping is clearer than duplicating the
@@ -3802,7 +3816,82 @@ impl Engine {
             };
             self.rates.tick_live(request.time, &self.economy, live, request.order_volumes);
         }
+        if population_open {
+            if let Some(pop) = self.population.as_mut() {
+                pop.after_tick(&self.companies);
+            }
+        }
         outcome
+    }
+
+    // ── The population (`crate::population`) ──────────────────────────────
+
+    /// Attach a population, built for this engine's roster. Called once,
+    /// right after construction.
+    pub fn set_population(
+        &mut self,
+        fingerprint: String,
+        participants: Vec<crate::population::Participant>,
+    ) -> Result<(), String> {
+        let run = crate::population::PopulationRun::new(fingerprint, participants, &self.companies)?;
+        self.population = Some(Box::new(run));
+        Ok(())
+    }
+
+    /// The population this engine holds, if any.
+    pub fn population(&self) -> Option<&crate::population::PopulationRun> {
+        self.population.as_deref()
+    }
+
+    /// Install a population state from a snapshot; the engine must hold the
+    /// population it was taken from.
+    pub fn set_population_state(&mut self, tickers: Vec<String>, flat: &[f64]) -> Result<(), String> {
+        match self.population.as_mut() {
+            Some(pop) => pop.set_flat(tickers, flat),
+            None => Err("this engine holds no population".to_string()),
+        }
+    }
+
+    /// The population's turn at the start of an open tick: it rolls the
+    /// day, books the agents' flow that reaches this tick, and sends its
+    /// orders through the agent-facing book.
+    fn population_before_tick(&mut self) {
+        let Some(mut pop) = self.population.take() else {
+            return;
+        };
+        pop.align(&self.companies);
+        if pop.day != Some(self.current_day) {
+            pop.roll_day(self.current_day);
+        }
+        let tick = self.ticks_today();
+        for (agent, ticker, bought, sold) in &self.book.flow {
+            if crate::population::is_population_label(agent) {
+                continue;
+            }
+            if let Some(i) = self.companies.iter().position(|c| &c.ticker == ticker) {
+                let volume = crate::agent_book::daily_volume(&self.companies[i]);
+                pop.observe_flow(i, tick, bought - sold, volume);
+            }
+        }
+        let orders = pop.decide(tick, &self.companies, self.market_vol.sigma_daily(), self.economy.vix);
+        for (k, i, signed) in orders {
+            let label = pop.participants[k].label();
+            let side = if signed > 0.0 {
+                crate::order_book::Side::Buy
+            } else {
+                crate::order_book::Side::Sell
+            };
+            let (fills, _) = self.meet_book(i, &label, &label, side, signed.abs(), None, true, false, false);
+            pop.book_order(k);
+            for f in &fills {
+                pop.book_fill(k, i, side, f.quantity, f.price);
+            }
+        }
+        // Its fills live on its own ledger, not in what `take_fills` returns.
+        if self.book.fills.iter().any(|f| crate::population::is_population_label(&f.agent)) {
+            self.book.fills.retain(|f| !crate::population::is_population_label(&f.agent));
+        }
+        self.population = Some(pop);
     }
 
     /// Run one simulated minute against an EXTERNAL draw source.
@@ -4462,6 +4551,9 @@ impl Engine {
         // Permanent impact, per agent and name.
         let linear = self.params.fill_impact_coefficient != 0.0;
         for (agent, t, b, s) in applied {
+            if crate::population::is_population_label(agent) {
+                continue;
+            }
             let Some(i) = self.companies.iter().position(|c| &c.ticker == t) else {
                 continue;
             };
@@ -4944,6 +5036,13 @@ impl Engine {
             return Err(format!(
                 "{agent:?} cannot place orders: agent labels are non-empty and \
                  not one of the book's own owners (mm, depth, flow, range)"
+            ));
+        }
+        if self.population.is_some() && crate::population::is_population_label(agent) {
+            return Err(format!(
+                "{agent:?} cannot place orders: labels starting {:?} belong to \
+                 this engine's population",
+                crate::population::LABEL_PREFIX
             ));
         }
         if !(quantity > 0.0) || !quantity.is_finite() {
@@ -11299,6 +11398,21 @@ impl Engine {
             hash_str(&mut buf, "garch_cascade");
             hash_u32(&mut buf, values.len() as u32);
             for value in values {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The population, last and only on an engine that holds one: its
+        // fingerprint, its roster and every number of its state.
+        if let Some(pop) = self.population.as_deref() {
+            hash_str(&mut buf, "population");
+            hash_str(&mut buf, &pop.fingerprint);
+            hash_u32(&mut buf, pop.tickers.len() as u32);
+            for t in &pop.tickers {
+                hash_str(&mut buf, t);
+            }
+            let flat = pop.to_flat();
+            hash_u32(&mut buf, flat.len() as u32);
+            for value in flat {
                 hash_f64(&mut buf, value);
             }
         }
