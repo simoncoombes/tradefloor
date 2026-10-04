@@ -7,6 +7,8 @@
 [![license: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
+<a href="https://tradefloor.dev"><img src="https://tradefloor.dev/multiverse.gif" width="900" alt="One simulated market, forked on six days into seven futures: a rate cut, a stimulus, an oil spike, a rate shock, a liquidity crisis and a recession, each run on from the same past."></a>
+
 tradefloor is a market simulator you can run a strategy against. It has a
 Rust core and a Python API.
 
