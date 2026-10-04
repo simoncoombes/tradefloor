@@ -168,6 +168,21 @@ process in the market reads it back.
 
 The next session reads the new VIX, rates and output.
 
+**The previous close is the open.** At the open each company's
+`previous_close` is set to its opening price $P^{o}$, after the close's
+re-mark to newly published macro data and after any overnight move, not to
+the previous session's last print. It is the anchor of the session's ±25%
+circuit-breaker band and of the daily return the GARCH update reads, so the
+band is a session band and the move between the last print and the open
+sits outside it (`market/daily.rs`, `reset_daily_prices`). A day change
+taken against `previous_close` is therefore open to close. On pt-v20 the
+open differs from the last print on every name every day, by a median of
+0.12% and at most 0.55% (119 days of a 20-name roster). For a
+close-to-close change, the Rust engine keeps each name's last print:
+`Engine::prior_closes()` is the close the current day is measured from and
+`Engine::last_closes()` the most recent session's. In Python, the previous
+day's bar close is the same number.
+
 **Randomness.** Each process draws from its own stream, derived from the
 run's seed (`rng.rs:397-514`): market, economy, news, jumps, overnight,
 volume, crisis epicentre and others. The market stream's schedule depends
@@ -203,6 +218,12 @@ that depends on the roster and hardly on the seed: on
 `Universe.random(40, seed=111)` it opens at 17.66 on 27 of seeds 101 to 130,
 and at 17.68 to 17.85 on the other three. The opening corporate yield
 depends on where the cycle opens, 2.5% to 6.7% across the same seeds.
+This opening runs only when the engine builds its own default economy. A
+caller that supplies a macro state keeps it exactly: Python's
+`macro_state=`, and in Rust `Engine::with_params_keeping_opening`.
+`Engine::new` and `Engine::with_params` always run it, over whatever
+economy they are given, and `Engine::opening_settled()` says whether it
+ran.
 
 ## The macro economy
 
@@ -1778,7 +1799,18 @@ epicentre's non-market volatility is $e$ times the rest's, and the roster's
 mean non-market variance is unchanged. A scenario can pick the epicentre.
 
 **Macro gates.** Above a VIX of 25.5 the dollar takes a safe-haven bid
-(above).
+(above). Its threshold is `usd_crisis_vix_threshold`, which does not
+follow $X_c$.
+
+$X_c$ is a coefficient like the others, readable and settable from both
+languages. In Python it is `engine.model.crisis_vix_threshold`, and a model
+with another value is `ModelParams.from_dict` of a `to_dict()` with the key
+changed. In Rust it is `engine.crisis_vix_threshold()` (or
+`params().crisis_vix_threshold`), set before construction with
+`ModelParams::with_override("crisis_vix_threshold", x)`, and
+`engine.vix_above_crisis_threshold()` applies the gates' own strict test. A
+host with crisis gates of its own should read it from the engine, because
+it is 30.88325108 from pt-v13 on and 25.5 before.
 
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
