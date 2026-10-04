@@ -12,7 +12,7 @@
 //! the same agent-facing book as the agents, see the same prices and pay the
 //! same costs.
 //!
-//! # The four archetypes
+//! # The five archetypes
 //!
 //! Every participant is a policy over observable state: prices, each name's
 //! daily volume and daily sigma as the book reads them, the published VIX,
@@ -49,6 +49,25 @@
 //!   quoted spread is at most `max_spread` of the name's daily sigma: on a
 //!   name whose spread is a large part of its daily move, a round trip costs
 //!   more than riding the flow can earn.
+//! - **Crowd** trades a ranked signal, the one an agent's ranked trend rule
+//!   trades: the simple return over `lookback` open ticks, momentum (long
+//!   the risers) or reversal (long the fallers), long the first `top_k`
+//!   names and short the last `top_k`, each at `size V`. A held name stays
+//!   until it slips `buffer` ranks past the edge, so a name on the boundary
+//!   does not churn. It decides where the session's tick count, modulo
+//!   `interval`, equals `offset`, and keeps its price at each decision, so
+//!   a crowd that looks every five ticks reaches a new loser before an agent
+//!   that decides every sixty-five, and one that decides near the close is
+//!   in before a rule that rebalances at the next open. That is signal
+//!   competition: the crowd takes the mispricing first and the agent meets
+//!   the price it left. With `stop` above zero it carries a loss limit:
+//!   it books what its positions made between its decisions (its price
+//!   P&L, before what it paid to trade), and when that has fallen `stop`
+//!   of its full book's gross from its best it sells out, then takes back
+//!   `recover` of its book each session. Several crowd participants on one
+//!   signal with different limits unwind one after another: the first
+//!   one's selling moves prices against the rest. That is a crowded exit,
+//!   the mechanism behind the quant unwind of August 2007.
 //!
 //! # How it trades
 //!
@@ -74,7 +93,8 @@
 //!
 //! It takes no random draw. Every decision is arithmetic on engine state
 //! that the snapshot carries (`population` in `state_snapshot`, its ledger
-//! and memories, required exactly when the engine holds a population) and
+//! and memories, a crowd's prices and loss-limit state, required exactly
+//! when the engine holds a population) and
 //! that both state hashes cover. The same seed, universe, model and
 //! population give the same market, bit for bit, and a restored engine
 //! continues as the original does. An engine built without a population
@@ -142,6 +162,27 @@ pub enum Policy {
         hold: u32,
         max_spread: f64,
     },
+    Crowd {
+        /// True for momentum (long the winners), false for the reversal
+        /// (long the losers).
+        momentum: bool,
+        /// Open ticks between the two prices the signal compares.
+        lookback: u32,
+        /// The tick of each interval at which it decides: it decides where
+        /// the session's tick count, modulo the interval, equals this.
+        offset: u32,
+        /// Names held long and short.
+        top_k: u32,
+        /// Extra ranks a held name may slip before it leaves the book: it
+        /// enters within the first `top_k` and leaves past `top_k + buffer`.
+        buffer: u32,
+        /// Loss limit: the fall of its book's price P&L from its best, as a
+        /// share of its full book's gross, at which it sells out. 0 is no
+        /// limit.
+        stop: f64,
+        /// Share of its full book it takes back each session after a stop.
+        recover: f64,
+    },
 }
 
 impl Policy {
@@ -151,6 +192,7 @@ impl Policy {
             Policy::Reversion { .. } => "reversion",
             Policy::Liquidity { .. } => "liquidity",
             Policy::Detector { .. } => "detector",
+            Policy::Crowd { .. } => "crowd",
         }
     }
 }
@@ -263,6 +305,43 @@ impl Participant {
                     ));
                 }
             }
+            Policy::Crowd {
+                lookback,
+                top_k,
+                offset,
+                stop,
+                recover,
+                ..
+            } => {
+                if SESSION_TICKS % self.interval != 0 {
+                    return Err(format!(
+                        "{}: a crowd's interval must divide the session's {SESSION_TICKS} ticks",
+                        self.name
+                    ));
+                }
+                if *lookback == 0
+                    || lookback % self.interval != 0
+                    || *lookback > MAX_LOOKBACK * SESSION_TICKS
+                {
+                    return Err(format!(
+                        "{}: a crowd's lookback is a whole number of intervals, at most \
+                         {MAX_LOOKBACK} sessions of {SESSION_TICKS} ticks",
+                        self.name
+                    ));
+                }
+                if *top_k == 0 {
+                    return Err(format!("{}: top_k must be at least 1", self.name));
+                }
+                if *offset >= self.interval {
+                    return Err(format!("{}: offset must be below the interval", self.name));
+                }
+                if !(stop.is_finite() && *stop >= 0.0) {
+                    return Err(format!("{}: stop must be finite and not negative", self.name));
+                }
+                if !(recover.is_finite() && *recover > 0.0 && *recover <= 1.0) {
+                    return Err(format!("{}: recover must be above 0 and at most 1", self.name));
+                }
+            }
         }
         Ok(())
     }
@@ -273,7 +352,22 @@ impl Participant {
             _ => 0,
         }
     }
+
+    /// A crowd's samples per name: its price at each of its decisions,
+    /// enough to reach `lookback` ticks back. 0 for the other kinds.
+    fn samples(&self) -> usize {
+        match self.policy {
+            Policy::Crowd { lookback, .. } => (lookback / self.interval) as usize + 1,
+            _ => 0,
+        }
+    }
 }
+
+/// The scalars a crowd carries: the share of its full book it holds, its
+/// best price P&L since its last stop, how many times it has stopped out,
+/// and its price P&L (what its positions made between its decisions, before
+/// what it paid to trade).
+const CROWD_SCALARS: usize = 4;
 
 /// One participant's ledger and memory, per name in roster order.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -297,6 +391,12 @@ pub struct ParticipantState {
     /// per name so a run in which agents trade a few names carries a few
     /// profiles, not one per name.
     pub profile: Vec<Vec<f64>>,
+    /// Crowd: per name, its price at each of its last decisions, oldest
+    /// first, NaN where not yet seen. Empty for the other kinds.
+    pub samples: Vec<f64>,
+    /// Crowd: `[exposure, peak, stops]` (see `CROWD_SCALARS`). Empty for
+    /// the other kinds.
+    pub crowd: Vec<f64>,
 }
 
 /// A population running inside one engine: the spec and its state.
@@ -360,6 +460,11 @@ impl PopulationRun {
             states: Vec::new(),
         };
         run.states = vec![ParticipantState::default(); run.participants.len()];
+        for (k, p) in run.participants.iter().enumerate() {
+            if matches!(p.policy, Policy::Crowd { .. }) {
+                run.states[k].crowd = vec![1.0, 0.0, 0.0, 0.0];
+            }
+        }
         run.align(companies);
         Ok(run)
     }
@@ -416,6 +521,11 @@ impl PopulationRun {
                     let avg = pick(&s.average, 1, f64::NAN);
                     s.average = avg;
                 }
+                Policy::Crowd { .. } => {
+                    let width = p.samples();
+                    let samples = pick(&s.samples, width, f64::NAN);
+                    s.samples = samples;
+                }
                 Policy::Detector { .. } => {
                     s.profile = from
                         .iter()
@@ -451,6 +561,12 @@ impl PopulationRun {
             }
         }
         for (k, p) in self.participants.iter().enumerate() {
+            if let Policy::Crowd { recover, .. } = p.policy {
+                let g = &mut self.states[k].crowd[0];
+                if *g < 1.0 {
+                    *g = mathx::min(1.0, *g + recover);
+                }
+            }
             if let Policy::Detector { memory, .. } = p.policy {
                 let alpha = 1.0 - mathx::pow(0.5, 1.0 / memory);
                 let b = p.buckets();
@@ -518,6 +634,132 @@ impl PopulationRun {
         }
     }
 
+    /// Whether participant `k` decides at this tick of the session.
+    fn turn(&self, k: usize, tick: u32) -> bool {
+        let p = &self.participants[k];
+        match p.policy {
+            Policy::Crowd { offset, .. } => tick % p.interval == offset,
+            _ => tick % p.interval == (k as u32) % p.interval,
+        }
+    }
+
+    /// A crowd's book: +1 for a name it holds long, -1 short, 0 otherwise,
+    /// ranked exactly as a ranked trend rule ranks (the simple return over
+    /// the lookback, ties broken on the ticker). A name enters a side within
+    /// its first `top_k` ranks and, once held there, stays until it slips
+    /// past `top_k + buffer`. `None` until some name has a price that far
+    /// back.
+    fn crowd_book(&self, k: usize, companies: &[TickCompany]) -> Option<Vec<f64>> {
+        let p = &self.participants[k];
+        let Policy::Crowd {
+            momentum,
+            top_k,
+            buffer,
+            ..
+        } = p.policy
+        else {
+            return None;
+        };
+        let width = p.samples();
+        let rows = &self.states[k].samples;
+        let held = &self.states[k].position;
+        let mut ranked: Vec<(f64, usize)> = Vec::new();
+        for (i, c) in companies.iter().enumerate() {
+            if c.is_bankrupt || !c.is_public || !(c.stock.price > 0.0) {
+                continue;
+            }
+            let Some(row) = rows.get(i * width..(i + 1) * width) else {
+                continue;
+            };
+            let (past, now) = (row[0], row[width - 1]);
+            if !(past > 0.0) || !(now > 0.0) {
+                continue;
+            }
+            let r = now / past - 1.0;
+            ranked.push((if momentum { -r } else { r }, i));
+        }
+        let n = ranked.len();
+        let kk = (top_k as usize).min(n / 2);
+        if kk == 0 {
+            return None;
+        }
+        let keep = (kk + buffer as usize).min(n / 2);
+        ranked.sort_by(|a, b| {
+            a.0.partial_cmp(&b.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| companies[a.1].ticker.cmp(&companies[b.1].ticker))
+        });
+        let mut book = vec![0.0; companies.len()];
+        for (rank, (_, i)) in ranked.iter().enumerate() {
+            let q = held.get(*i).copied().unwrap_or(0.0);
+            if rank < kk || (rank < keep && q > 0.0) {
+                book[*i] = 1.0;
+            } else if rank >= n - kk || (rank >= n - keep && q < 0.0) {
+                book[*i] = -1.0;
+            }
+        }
+        Some(book)
+    }
+
+    /// Before the participants decide at this tick: each crowd whose turn it
+    /// is records its prices, and one with a loss limit marks its book to
+    /// the market and sells out when it has lost `stop` of its full book's
+    /// gross from its best.
+    pub fn prepare(&mut self, tick: u32, companies: &[TickCompany]) {
+        for k in 0..self.participants.len() {
+            let Policy::Crowd { stop, .. } = self.participants[k].policy else {
+                continue;
+            };
+            if !self.turn(k, tick) {
+                continue;
+            }
+            let width = self.participants[k].samples();
+            {
+                let s = &mut self.states[k];
+                let mut made = 0.0;
+                for (i, c) in companies.iter().enumerate() {
+                    if let Some(row) = s.samples.get_mut(i * width..(i + 1) * width) {
+                        row.rotate_left(1);
+                        let price = c.stock.price;
+                        row[width - 1] = if price > 0.0 { price } else { f64::NAN };
+                        let q = s.position.get(i).copied().unwrap_or(0.0);
+                        let (was, now) = (row[width - 2], row[width - 1]);
+                        if q != 0.0 && was > 0.0 && now > 0.0 {
+                            made += q * (now - was);
+                        }
+                    }
+                }
+                s.crowd[3] += made;
+            }
+            if stop <= 0.0 {
+                continue;
+            }
+            let Some(book) = self.crowd_book(k, companies) else {
+                continue;
+            };
+            let size = self.participants[k].size;
+            let mut gross = 0.0;
+            for (i, c) in companies.iter().enumerate() {
+                if book[i] != 0.0 {
+                    gross += size * daily_volume(c) * c.stock.price;
+                }
+            }
+            if !(gross > 0.0) {
+                continue;
+            }
+            let s = &mut self.states[k];
+            let pnl = s.crowd[3];
+            if pnl > s.crowd[1] {
+                s.crowd[1] = pnl;
+            }
+            if s.crowd[0] > 0.0 && s.crowd[1] - pnl > stop * gross {
+                s.crowd[0] = 0.0;
+                s.crowd[1] = pnl;
+                s.crowd[2] += 1.0;
+            }
+        }
+    }
+
     /// The detector's predicted flow over its window, as a share of
     /// volume, at this tick.
     fn predicted(&self, k: usize, index: usize, tick: u32) -> f64 {
@@ -563,10 +805,15 @@ impl PopulationRun {
     ) -> Vec<Order> {
         let mut orders = Vec::new();
         for (k, p) in self.participants.iter().enumerate() {
-            if tick % p.interval != (k as u32) % p.interval {
+            if !self.turn(k, tick) {
                 continue;
             }
             let s = &self.states[k];
+            let book = if matches!(p.policy, Policy::Crowd { .. }) {
+                self.crowd_book(k, companies)
+            } else {
+                None
+            };
             for (i, c) in companies.iter().enumerate() {
                 if c.is_bankrupt || !c.is_public {
                     continue;
@@ -607,6 +854,13 @@ impl PopulationRun {
                         let z = (mathx::log(price) - avg)
                             / (sigma * mathx::sqrt(half_life / SESSION_TICKS as f64));
                         -cap * w * mathx::clamp(z / scale, -1.0, 1.0)
+                    }
+                    Policy::Crowd { .. } => {
+                        let side = book.as_ref().map(|b| b[i]).unwrap_or(0.0);
+                        if side == 0.0 && s.position[i] == 0.0 {
+                            continue;
+                        }
+                        side * s.crowd[0] * cap
                     }
                     Policy::Detector { .. } => {
                         let pred = self.predicted(k, i, tick);
@@ -676,7 +930,7 @@ impl PopulationRun {
         ];
         out.extend_from_slice(&self.last);
         out.extend_from_slice(&self.closes);
-        for s in &self.states {
+        for (k, s) in self.states.iter().enumerate() {
             out.push(s.orders);
             for v in [&s.position, &s.cash, &s.volume, &s.notional, &s.average] {
                 out.push(v.len() as f64);
@@ -686,6 +940,13 @@ impl PopulationRun {
             for row in &s.profile {
                 out.push(row.len() as f64);
                 out.extend_from_slice(row);
+            }
+            // A crowd's prices and scalars; nothing for the other kinds, so
+            // a population without a crowd keeps the layout it had.
+            if matches!(self.participants[k].policy, Policy::Crowd { .. }) {
+                out.push(s.samples.len() as f64);
+                out.extend_from_slice(&s.samples);
+                out.extend_from_slice(&s.crowd);
             }
         }
         out
@@ -769,6 +1030,14 @@ impl PopulationRun {
                     return Err(bad("a detector profile has the wrong length"));
                 }
                 s.profile.push(take(len as usize)?.to_vec());
+            }
+            if matches!(p.policy, Policy::Crowd { .. }) {
+                let len = take(1)?[0];
+                if len != (n * p.samples()) as f64 {
+                    return Err(bad("a crowd's prices do not match this population and roster"));
+                }
+                s.samples = take(len as usize)?.to_vec();
+                s.crowd = take(CROWD_SCALARS)?.to_vec();
             }
             states.push(s);
         }

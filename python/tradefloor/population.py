@@ -39,7 +39,7 @@ population share one market.
 
 Each participant sets a target position per name, in shares, from what the
 market shows, and trades toward it with market orders. Sizes are shares of
-the name's daily volume. Four kinds:
+the name's daily volume. Five kinds:
 
 - ``trend`` piles into moves: long a name that has risen over ``lookback``
   sessions (five: the five-day momentum signal), in proportion to the move
@@ -62,8 +62,25 @@ the name's daily volume. Four kinds:
   the same minutes every day is what it learns best; flow at random minutes
   stays an unreliable, small prediction. It sees the agents' flow per name,
   not per label.
+- ``crowd`` trades a ranked signal, the one
+  :class:`tradefloor.baselines.Momentum` and
+  :class:`tradefloor.baselines.MeanReversion` trade: the simple return over
+  ``lookback`` open ticks (390 is one session), ``"momentum"`` or
+  ``"reversal"``, long the first ``top_k`` names and short the last
+  ``top_k``, each at ``size``. A held name stays until it slips ``buffer``
+  ranks past the edge. It decides where the session's tick count, modulo
+  ``interval``, equals ``offset``: a crowd that looks every five ticks
+  reaches a new loser before a rule that decides every sixty-five, and one
+  that decides near the close is in before a rule that rebalances at the
+  next open. So it takes the mispricing first and your rule trades at the
+  price it left (signal competition, the decay of a published anomaly).
+  With ``stop`` above zero it sells out when its positions' price P&L has
+  fallen ``stop`` of its full book's gross from its best, then takes back
+  ``recover`` of its book each session; several crowd participants with
+  different limits unwind one after another (a crowded exit).
 
-Every participant decides every ``interval`` ticks (staggered), leaves gaps
+Every participant decides every ``interval`` ticks (staggered, or at a
+crowd's ``offset``), leaves gaps
 smaller than ``band`` of its size alone, and trades at most ``rate`` of daily
 volume per decision. It acts at the start of a tick, before the market moves:
 an order an agent sends between ticks is ahead of the population on that
@@ -109,7 +126,12 @@ _KIND_PARAMS: dict[str, tuple[tuple[str, bool], ...]] = {
                   ("vix_calm", False), ("vix_stress", False)),
     "detector": (("memory", False), ("bucket", True), ("lead", True),
                  ("hold", True), ("max_spread", False)),
+    "crowd": (("lookback", True), ("offset", True), ("top_k", True), ("buffer", True),
+              ("stop", False), ("recover", False)),
 }
+
+#: The signals a crowd can trade, as the ranked trend rules name them.
+CROWD_SIGNALS = ("momentum", "reversal")
 
 _COMMON = ("size", "rate", "interval", "band")
 
@@ -138,11 +160,18 @@ class Participant:
                 f"a participant's name is a non-empty string with no spaces, "
                 f"got {name!r}")
         wanted = dict(_KIND_PARAMS[kind])
+        signal = params.pop("signal", None) if kind == "crowd" else None
+        if kind == "crowd" and signal not in CROWD_SIGNALS:
+            raise ValidationError(
+                f"{name}: a crowd's signal is one of {', '.join(CROWD_SIGNALS)}, "
+                f"got {signal!r}")
         if set(params) != set(wanted):
             raise ValidationError(
                 f"a {kind} participant takes {', '.join(wanted)}; got "
                 f"{', '.join(sorted(params)) or 'none'}")
         fields: dict[str, Any] = {"kind": kind, "name": name}
+        if signal is not None:
+            fields["signal"] = signal
         for key, value, whole in (("size", size, False), ("rate", rate, False),
                                   ("interval", interval, True),
                                   ("band", band, False),
@@ -173,6 +202,21 @@ class Participant:
             raise ValidationError(
                 f"{name}: memory must be above zero, bucket 1 to 390 ticks, and "
                 "lead and hold together shorter than a session less one bucket")
+        if kind == "crowd":
+            if 390 % fields["interval"]:
+                raise ValidationError(
+                    f"{name}: a crowd's interval must divide the session's 390 ticks")
+            if (fields["lookback"] < 1 or fields["lookback"] % fields["interval"]
+                    or fields["lookback"] > 60 * 390):
+                raise ValidationError(
+                    f"{name}: a crowd's lookback is a whole number of intervals, "
+                    "at most 60 sessions of 390 ticks")
+            if fields["top_k"] < 1:
+                raise ValidationError(f"{name}: top_k must be at least 1")
+            if fields["offset"] >= fields["interval"]:
+                raise ValidationError(f"{name}: offset must be below the interval")
+            if not 0 < fields["recover"] <= 1:
+                raise ValidationError(f"{name}: recover must be above 0 and at most 1")
         if fields["interval"] > 390:
             raise ValidationError(f"{name}: interval is at most 390 ticks")
         object.__setattr__(self, "_fields", fields)
@@ -224,12 +268,37 @@ class Participant:
                    interval=interval, band=band, memory=memory, bucket=bucket,
                    lead=lead, hold=hold, max_spread=max_spread)
 
+    @classmethod
+    def crowd(cls, *, signal: str, name: str = "crowd", size: float = 0.02,
+              rate: float = 0.004, interval: int = 5, band: float = 0.1,
+              lookback: int = 390, offset: int = 0, top_k: int = 5, buffer: int = 2,
+              stop: float = 0.0, recover: float = 0.2) -> "Participant":
+        """Trades a ranked signal: long the ``top_k`` names with the best
+        ``signal`` reading and short the ``top_k`` with the worst, each at
+        ``size`` of the name's daily volume. ``signal`` is ``"momentum"``
+        (long the names that rose most over ``lookback`` open ticks) or
+        ``"reversal"`` (long those that fell most), ranked exactly as
+        :class:`tradefloor.baselines.Momentum` and
+        :class:`tradefloor.baselines.MeanReversion` rank. A held name stays
+        until it slips ``buffer`` ranks past the edge. It decides at the
+        ticks where the session's tick count, modulo ``interval``, equals
+        ``offset``; ``interval`` divides the session's 390 ticks and
+        ``lookback`` is a whole number of intervals. With ``stop`` above
+        zero it sells out when its positions' price P&L has fallen ``stop``
+        of its full book's gross from its best, and takes back ``recover``
+        of its book each session after."""
+        return cls("crowd", name=name, size=size, rate=rate, interval=interval,
+                   band=band, signal=signal, lookback=lookback, offset=offset,
+                   top_k=top_k, buffer=buffer, stop=stop, recover=recover)
+
     def as_dict(self) -> dict[str, Any]:
         """Every field, in a fixed order: kind, name, the four common ones,
-        then the kind's own."""
+        then the kind's own (a crowd's signal first)."""
         f = self._fields
         out = {"kind": f["kind"], "name": f["name"]}
         out.update({k: f[k] for k in _COMMON})
+        if "signal" in f:
+            out["signal"] = f["signal"]
         out.update({k: f[k] for k, _ in _KIND_PARAMS[f["kind"]]})
         return out
 
@@ -261,7 +330,9 @@ class Population:
     face identical markets: see :mod:`tradefloor.population`.
 
     ``Population.standard()`` is the shipped population, one participant of
-    each kind. A custom one is a list of :class:`Participant`:
+    each of the first four kinds; ``Population.crowded()`` adds crowds that
+    trade the ranked rules' own signals. A custom one is a list of
+    :class:`Participant`:
 
     ```python
     from tradefloor.population import Participant
@@ -314,11 +385,55 @@ class Population:
                    name="standard")
 
     @classmethod
+    def crowded(cls, *, reversal: float = 0.002, momentum: float = 0.01,
+                members: int = 3, stop: float = 0.03,
+                recover: float = 0.2) -> "Population":
+        """The standard population plus two crowds trading the ranked rules'
+        own signals, each the long and short five of the roster, with a
+        buffer of two ranks.
+
+        - The reversal crowd trades the one-day reversal (a lookback of 390
+          open ticks) as statistical arbitrage does: it looks every five
+          ticks, so it reaches a new loser before an agent that decides less
+          often.
+        - The momentum crowd trades the five-day momentum (1,950 ticks)
+          once a session, in the last fifteen ticks before the close, so a
+          rule that rebalances at the next open meets the market after it.
+
+        ``reversal`` and ``momentum`` are each crowd's total size per name,
+        as a share of daily volume, split equally over ``members``
+        participants. With ``stop`` above zero the members carry loss limits
+        spread from half of ``stop`` to one and a half times it, so a loss
+        that stops the first out can carry the others after it."""
+        if not isinstance(members, int) or members < 1:
+            raise ValidationError("members is a whole number, at least 1")
+        crowd = []
+        for signal, total in (("reversal", reversal), ("momentum", momentum)):
+            if total <= 0:
+                continue
+            size = total / members
+            for j in range(members):
+                at = 0.5 + j / (members - 1) if members > 1 else 1.0
+                if signal == "reversal":
+                    timing = dict(interval=5, offset=j % 5, rate=size / 2,
+                                  lookback=390)
+                else:
+                    timing = dict(interval=390, offset=389 - 5 * (j % 3),
+                                  rate=2 * size, lookback=1950)
+                crowd.append(Participant.crowd(
+                    signal=signal, name=f"{signal}{j + 1}", size=size,
+                    stop=stop * at, recover=recover, **timing))
+        return cls([*cls.standard().participants, *crowd], name="crowded")
+
+    @classmethod
     def named(cls, name: str) -> "Population":
-        """A shipped population by name. ``"standard"`` is the one there is."""
+        """A shipped population by name: ``"standard"`` or ``"crowded"``."""
         if name == "standard":
             return cls.standard()
-        raise ValidationError(f"no shipped population named {name!r}; there is 'standard'")
+        if name == "crowded":
+            return cls.crowded()
+        raise ValidationError(
+            f"no shipped population named {name!r}; there are 'standard' and 'crowded'")
 
     def as_dict(self) -> dict[str, Any]:
         """The population as plain data: what a manifest carries."""

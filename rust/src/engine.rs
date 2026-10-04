@@ -3873,6 +3873,7 @@ impl Engine {
                 pop.observe_flow(i, tick, bought - sold, volume);
             }
         }
+        pop.prepare(tick, &self.companies);
         let orders = pop.decide(tick, &self.companies, self.market_vol.sigma_daily(), self.economy.vix);
         for (k, i, signed) in orders {
             let label = pop.participants[k].label();

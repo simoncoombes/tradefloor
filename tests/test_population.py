@@ -347,3 +347,162 @@ def test_an_isolated_manifest_has_no_population():
     world.run(1)
     doc = json.loads(world.manifest(strategy="x").to_json())
     assert "population" not in doc and "population" not in doc["fingerprints"]
+
+
+# ------------------------------------------------------------------ crowds
+
+def _crowd_engine(crowd, seed=3):
+    return tf.Engine(seed=seed, universe=UNIVERSE, model="pt-v20",
+                     population=Population([crowd]))
+
+
+def _ranked(prices_now, prices_then, tickers, momentum, k):
+    r = [(a / b - 1.0) for a, b in zip(prices_now, prices_then)]
+    sign = -1.0 if momentum else 1.0
+    order = sorted(range(len(r)), key=lambda i: (sign * r[i], tickers[i]))
+    return set(order[:k]), set(order[-k:])
+
+
+@pytest.mark.parametrize("signal", ["reversal", "momentum"])
+def test_a_crowd_holds_the_book_the_ranked_rule_would(signal):
+    # One decision a session (interval 390), so its book after a decision is
+    # the ranking of that tick's prices against those one session earlier:
+    # the long side all long, the short side all short, the rest flat.
+    crowd = Participant.crowd(signal=signal, size=0.02, rate=0.04,
+                              interval=390, band=0.0, lookback=390, top_k=2,
+                              buffer=0)
+    e = _crowd_engine(crowd)
+    tickers = [c.ticker for c in UNIVERSE]
+    opens = []
+    for _ in range(4):
+        e.open_market()
+        opens.append(_prices(e))
+        e.run_session(9, 30, 3, 1)
+        e.run_session(9, 31, 3, 389, close_at_end=True)
+        e.close_market()
+    longs, shorts = _ranked(opens[-1], opens[-2], tickers, signal == "momentum", 2)
+    held = e.population_report()[0]["names"]
+    for i, t in enumerate(tickers):
+        q = held[t]["position"]
+        assert (q > 0) == (i in longs) and (q < 0) == (i in shorts), (t, q)
+    assert e.population_report()[0]["exposure"] == 1.0
+
+
+def test_a_crowd_with_no_history_does_nothing():
+    e = _crowd_engine(Participant.crowd(signal="momentum", lookback=1950))
+    for _ in range(3):
+        _day(e)
+    assert e.population_report()[0]["orders"] == 0
+
+
+def test_a_crowd_past_its_loss_limit_sells_out_and_comes_back():
+    # A limit no book can stay inside: it stops out on its first marked
+    # loss, holds nothing, and takes its book back a share at a time.
+    crowd = Participant.crowd(signal="reversal", size=0.05, rate=0.05,
+                              interval=5, band=0.0, lookback=390, top_k=2,
+                              stop=1e-9, recover=0.5)
+    e = _crowd_engine(crowd)
+    for _ in range(6):
+        _day(e)
+    report = e.population_report()[0]
+    assert report["stops"] >= 1
+    assert 0.0 <= report["exposure"] <= 1.0
+    free = _crowd_engine(Participant.crowd(
+        signal="reversal", size=0.05, rate=0.05, interval=5, band=0.0,
+        lookback=390, top_k=2))
+    for _ in range(6):
+        _day(free)
+    assert free.population_report()[0]["stops"] == 0
+    assert report["volume"] != free.population_report()[0]["volume"]
+
+
+@pytest.mark.parametrize("mid_day", [False, True])
+def test_a_crowd_restores_in_a_fresh_process(tmp_path, mid_day):
+    crowd = Population([Participant.crowd(signal="reversal", lookback=390,
+                                          stop=0.002), Participant.detector()])
+    e = tf.Engine(seed=3, universe=UNIVERSE, model="pt-v20", population=crowd)
+    for _ in range(3):
+        _day(e, UNIVERSE[2])
+    if mid_day:
+        e.open_market()
+        e.run_session(9, 30, 3, 120)
+    path = tmp_path / "snap.json"
+    path.write_text(json.dumps(crowd.as_dict()))
+    snap = tmp_path / "snap.bin"
+    raw = snapshot_codec.dumps(e.state_snapshot())
+    snap.write_bytes(raw.encode() if isinstance(raw, str) else raw)
+    if mid_day:
+        e.run_session(11, 30, 3, 270, close_at_end=True)
+        e.close_market()
+    for _ in range(2):
+        _day(e, UNIVERSE[2])
+    here = pathlib.Path(__file__).resolve().parent
+    script = textwrap.dedent(f"""
+        import json, sys
+        sys.path.insert(0, {str(here)!r})
+        import snapshot_codec, test_population as t, tradefloor as tf
+        from tradefloor.population import Population
+        raw = open({str(snap)!r}, "rb").read()
+        snap = snapshot_codec.loads(raw.decode() if isinstance(snapshot_codec.dumps({{}}), str) else raw)
+        pop = Population.from_dict(json.load(open({str(path)!r})))
+        e = tf.Engine(seed=3, universe=t.UNIVERSE, model="pt-v20", population=pop)
+        e.restore_state(snap)
+        if {mid_day}:
+            e.run_session(11, 30, 3, 270, close_at_end=True)
+            e.close_market()
+        for _ in range(2):
+            t._day(e, t.UNIVERSE[2])
+        print(e.state_hash())
+    """)
+    out = subprocess.run([sys.executable, "-c", script], check=True,
+                         capture_output=True, text=True).stdout.strip()
+    assert out == e.state_hash()
+    assert e.population_report()[0]["orders"] > 0
+
+
+def test_the_crowded_population_adds_both_crowds_to_the_standard_one():
+    crowded = Population.crowded()
+    assert Population.named("crowded") == crowded
+    kinds = [p.kind for p in crowded.participants]
+    assert kinds[:4] == ["trend", "reversion", "liquidity", "detector"]
+    crowds = [p for p in crowded.participants if p.kind == "crowd"]
+    assert sorted({p.signal for p in crowds}) == ["momentum", "reversal"]
+    reversal = [p for p in crowds if p.signal == "reversal"]
+    momentum = [p for p in crowds if p.signal == "momentum"]
+    assert sum(p.size for p in reversal) == pytest.approx(0.002)
+    assert sum(p.size for p in momentum) == pytest.approx(0.01)
+    # Loss limits spread around `stop`; none at all with stop 0.
+    assert sorted(p.stop for p in reversal) == pytest.approx([0.015, 0.03, 0.045])
+    assert all(p.stop == 0 for p in Population.crowded(stop=0).participants
+               if p.kind == "crowd")
+    # The momentum crowd decides once a session, near the close.
+    assert all(p.interval == 390 and p.offset >= 375 for p in momentum)
+    assert crowded.fingerprint != Population.crowded(momentum=0.02).fingerprint
+    e = tf.Engine(seed=3, universe=UNIVERSE, model="pt-v20", population=crowded)
+    for _ in range(2):
+        _day(e)
+    rows = [r for r in e.population_report() if r["kind"] == "crowd"]
+    assert len(rows) == 6 and {r["signal"] for r in rows} == {"momentum", "reversal"}
+    assert {"exposure", "stops", "price_pnl"} <= set(rows[0])
+
+
+def test_a_crowd_is_part_of_the_fingerprint():
+    a = Population([Participant.crowd(signal="reversal")])
+    b = Population([Participant.crowd(signal="momentum")])
+    c = Population([Participant.crowd(signal="reversal", stop=0.01)])
+    assert len({a.fingerprint, b.fingerprint, c.fingerprint}) == 3
+    assert Population.from_dict(c.as_dict()) == c
+    assert c.participants[0].as_dict()["signal"] == "reversal"
+
+
+@pytest.mark.parametrize("bad", [
+    lambda: Participant.crowd(signal="value"),
+    lambda: Participant.crowd(signal="momentum", lookback=392),
+    lambda: Participant.crowd(signal="momentum", interval=7, lookback=392),
+    lambda: Participant.crowd(signal="momentum", top_k=0),
+    lambda: Participant.crowd(signal="momentum", recover=0.0),
+    lambda: Participant.crowd(signal="momentum", stop=-0.1),
+])
+def test_bad_crowds_are_refused(bad):
+    with pytest.raises((tf.ValidationError, ValueError)):
+        bad()

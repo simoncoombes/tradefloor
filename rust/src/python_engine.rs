@@ -411,10 +411,31 @@ fn population_from(
                 hold: whole("hold")?,
                 max_spread: num("max_spread")?,
             },
+            "crowd" => {
+                let signal: String = get(&d, "signal")?.extract()?;
+                let momentum = match signal.as_str() {
+                    "momentum" => true,
+                    "reversal" => false,
+                    other => {
+                        return Err(ValidationError::new_err(format!(
+                            "a crowd's signal is \"momentum\" or \"reversal\", got {other:?}"
+                        )))
+                    }
+                };
+                Policy::Crowd {
+                    momentum,
+                    lookback: whole("lookback")?,
+                    offset: whole("offset")?,
+                    top_k: whole("top_k")?,
+                    buffer: whole("buffer")?,
+                    stop: num("stop")?,
+                    recover: num("recover")?,
+                }
+            }
             other => {
                 return Err(ValidationError::new_err(format!(
                     "unknown population participant kind {other:?}: trend, reversion, \
-                     liquidity or detector"
+                     liquidity, detector or crowd"
                 )))
             }
         };
@@ -2797,6 +2818,15 @@ impl PyEngine {
                     d.set_item("hold", *hold)?;
                     d.set_item("max_spread", *max_spread)?;
                 }
+                Policy::Crowd { momentum, lookback, offset, top_k, buffer, stop, recover } => {
+                    d.set_item("signal", if *momentum { "momentum" } else { "reversal" })?;
+                    d.set_item("lookback", *lookback)?;
+                    d.set_item("offset", *offset)?;
+                    d.set_item("top_k", *top_k)?;
+                    d.set_item("buffer", *buffer)?;
+                    d.set_item("stop", *stop)?;
+                    d.set_item("recover", *recover)?;
+                }
             }
             items.append(d)?;
         }
@@ -2815,8 +2845,12 @@ impl PyEngine {
     /// `kind` and `label`, and per name (keyed by ticker) its `position` in
     /// shares, `cash`, `volume` (shares traded), `notional` (dollars
     /// traded) and `pnl` (cash plus the position at the last print); then
-    /// the totals `pnl`, `volume`, `notional` and `orders`. An empty list
-    /// on an engine without a population.
+    /// the totals `pnl`, `volume`, `notional` and `orders`. A crowd's row
+    /// also carries its `signal`, its `exposure` (the share of its full book
+    /// it holds: 1 until a loss limit sells it out, then rebuilding), its
+    /// `stops` (how many times it has sold out) and its `price_pnl` (what
+    /// its positions made between its decisions, before what it paid to
+    /// trade). An empty list on an engine without a population.
     fn population_report(&self, py: Python<'_>) -> PyResult<Py<pyo3::types::PyList>> {
         let out = pyo3::types::PyList::empty_bound(py);
         let Some(pop) = self.inner.population() else {
@@ -2854,6 +2888,14 @@ impl PyEngine {
             row.set_item("volume", volume)?;
             row.set_item("notional", notional)?;
             row.set_item("orders", s.orders)?;
+            if let [exposure, _, stops, price_pnl] = s.crowd[..] {
+                if let crate::population::Policy::Crowd { momentum, .. } = p.policy {
+                    row.set_item("signal", if momentum { "momentum" } else { "reversal" })?;
+                }
+                row.set_item("exposure", exposure)?;
+                row.set_item("stops", stops)?;
+                row.set_item("price_pnl", price_pnl)?;
+            }
             out.append(row)?;
         }
         Ok(out.into())
