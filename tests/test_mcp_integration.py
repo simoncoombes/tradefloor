@@ -73,6 +73,15 @@ CALLS = {
                   "arguments": {"strategies": {"m": MOMENTUM}, "days": 1,
                                 "universe_size": 8}},
     "check_job": {},
+    # A fresh server process numbers its sessions from one, so the ids
+    # below are the ones open_session and session_fork return here.
+    "open_session": {"universe_size": 8},
+    "session_step": {"session_id": "session-1", "steps": 2,
+                     "orders": {"AAA": 100}},
+    "session_fork": {"session_id": "session-1"},
+    "session_rewind": {"session_id": "session-1", "step": 0},
+    "session_state": {"session_id": "session-2", "tickers": ["AAA"]},
+    "close_session": {"session_id": "session-2"},
 }
 
 
@@ -260,6 +269,27 @@ def test_a_job_started_over_the_wire_is_visible_over_the_wire(live):
     assert any(j["job_id"] == started["job_id"] for j in listed["jobs"]), (
         "the job listing did not see the job just started"
     )
+
+
+def test_a_session_lives_between_calls_over_the_wire(live):
+    """The session tools are several calls that must agree about one
+    market held in the server process: the fork carries the step and the
+    position the first session reached, and the rewind takes the first
+    back to its open."""
+    _init, _tools, results = live
+    _res, opened = results["open_session"]
+    _res, stepped = results["session_step"]
+    _res, forked = results["session_fork"]
+    _res, rewound = results["session_rewind"]
+    _res, state = results["session_state"]
+    assert opened["session_id"] == "session-1"
+    assert stepped["agents"]["me"]["positions"]["AAA"]["quantity"] == 100.0
+    assert forked["session_id"] == "session-2"
+    assert rewound["clock"]["step"] == 0
+    assert rewound["agents"]["me"]["positions"] == {}
+    assert state["clock"]["step"] == 2
+    assert state["agents"]["me"]["positions"]["AAA"]["quantity"] == 100.0
+    assert set(state["market"]["detail"]) == {"AAA"}
 
 
 def test_a_bad_argument_comes_back_as_a_result_not_a_crash():
