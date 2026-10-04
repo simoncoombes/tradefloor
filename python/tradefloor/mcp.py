@@ -57,12 +57,20 @@ library API, driven by `tools/calibration/atlas_survey.py`.
 **Arbitrary model parameters.** `ModelParams` has over 200 settable
 coefficients and a preset fingerprint that makes a result citable. Letting
 a model improvise coefficients produces markets nobody calibrated, reported
-with the authority of a named preset. No tool here takes a preset argument
-either: every run is the shipped default, named in provenance, and
-selecting another preset is a library call.
+with the authority of a named preset. A run tool takes a shipped preset by
+name and nothing finer. The default runs when none is named, and it is the
+only preset the realism envelope certifies, so a result under another one
+carries a caveat that says so and quotes that preset's own measured record
+(`tf.preset_record`), and its provenance names the preset.
 
-**Anything that writes.** Every tool is read-only and pure: same arguments,
-same bytes, on every platform.
+**Anything that writes, outside a session.** Every tool but the session
+tools and `start_job` is read-only and pure: same arguments, same bytes, on
+every platform. `start_job` adds a job to this process's memory. The session
+tools keep a market in this process between calls, and the sessions block
+further down says why each choice was made. `session_step` advances one,
+`session_fork` copies one, `session_rewind` puts one back to a checkpoint
+and `close_session` frees one. The same calls from the same open give the
+same bytes, apart from the session id.
 
 **The live engine, to a strategy.** A strategy here is data, and it runs
 through `evaluate` and `rank` with `trusted_agents=False`, stated at each
@@ -74,13 +82,22 @@ its row says `uses_hidden_state`. There is no opt-in: a tool call cannot
 carry the code that would need one. `explain_price_move` and `explain`
 answer the experimenter about a run of their own, after it has run; no
 strategy is running inside them, so they hand no agent anything.
+
+A session hands its caller what `MarketView` and `PortfolioView` serve and
+nothing else, so a model trading by hand sees what a sandboxed agent sees.
+It does not stop look-ahead, and cannot: the caller can fork, rewind or
+reopen the market from the same seed. So a session's P&L is never offered
+as a strategy's score, and every session result says so.
 """
 
 from __future__ import annotations
 
+import copy
 import functools
 import inspect
 import json
+import math
+import secrets
 import struct
 import threading
 import time
@@ -92,8 +109,13 @@ from typing import Annotated, Any, Literal
 import tradefloor as tf
 from tradefloor import baselines, envelope
 from tradefloor._arith import ordered_sum
-from tradefloor._core import check_seed
+from tradefloor._core import OrderError, check_seed
 from tradefloor.facts import REAL_MARKETS
+from tradefloor.harness import (History, Observation, _f64, _unknown_ticker,
+                                session_clock)
+from tradefloor.portfolio import check_order, order_items
+from tradefloor.sandbox import (HiddenState, MarketView, PortfolioView,
+                                TamperGuard, declares_hidden_state)
 
 try:
     from mcp.server import MCPServer
@@ -339,26 +361,33 @@ def _whole(name: str, value: Any) -> int:
     return whole
 
 
-def _provenance(**extra: Any) -> dict[str, Any]:
+def _provenance(preset: str | None = None, **extra: Any) -> dict[str, Any]:
     """What is needed to re-run this exact result somewhere else.
 
     Present on every successful result, because a number from a simulator
     without its seed and fingerprints is not a measurement -- it is an
     anecdote, and a model summarising it cannot tell the difference.
 
-    `model_fingerprint` is the default preset's `ModelParams.fingerprint`,
+    `model_fingerprint` is the run's preset's `ModelParams.fingerprint`,
     the value a scorecard and `Engine.model_fingerprint` record. Until 0.8.5
     it was read from `tf.model_preset()`, which carries no fingerprint, so
     every result here sent an empty string. `pretium_version` is the old
     name of `tradefloor_version`, kept for the 0.8 line so a reader of an
     earlier result does not break, and due to go in 0.9.
+
+    `preset` is the run's preset after `_preset_choice`: None for the
+    shipped default, whose provenance is the one every result carried
+    before the run tools took a preset. Another preset is named under the
+    same two keys, and `certified_preset` names the default beside it, so
+    the result says which preset the certification it is outside of is.
     """
-    preset = tf.model_preset()
+    name = tf.model_preset()["name"] if preset is None else preset
     return {
         "tradefloor_version": tf.__version__,
         "pretium_version": tf.__version__,
-        "model_preset": preset["name"],
-        "model_fingerprint": _preset_fingerprint(preset["name"]),
+        "model_preset": name,
+        "model_fingerprint": _preset_fingerprint(name),
+        **({} if preset is None else {"certified_preset": envelope.PRESET}),
         "spec_version": tf.SPEC_VERSION,
         **extra,
     }
@@ -367,6 +396,107 @@ def _provenance(**extra: Any) -> dict[str, Any]:
 @functools.lru_cache(maxsize=None)
 def _preset_fingerprint(name: str) -> str:
     return tf.ModelParams.from_preset(name).fingerprint
+
+
+# -- presets ---------------------------------------------------------------
+#
+# The run tools take a `preset`, a shipped preset's name. The realism
+# envelope certifies one of them, `envelope.PRESET`, the shipped default:
+# every band verdict, gap and measured figure the caveats quote is that
+# preset's. Another preset is a different market, run on request and
+# labelled as outside the certification, with its own measured record
+# (`tf.preset_record`) quoted beside it. Coefficients stay out of reach: a
+# preset is a named, fingerprinted vector somebody measured, and an
+# improvised vector is not.
+
+
+def _preset_choice(preset: Any) -> tuple[str | None, str | None]:
+    """(the preset to run, or None for the default; a refusal, or None).
+
+    The default named explicitly runs as the default, so a call that names
+    it returns the bytes a call that omits it returns.
+    """
+    if preset is None:
+        return None, None
+    names = list(tf.preset_names())
+    if not isinstance(preset, str) or preset not in names:
+        return None, (
+            f"unknown preset {preset!r}. The shipped presets are {names}. "
+            f"Omit preset for the default, {tf.model_preset()['name']}, the "
+            f"one the realism envelope certifies.")
+    if preset == tf.model_preset()["name"]:
+        return None, None
+    return preset, None
+
+
+def _preset_record(name: str) -> dict[str, Any] | None:
+    """A preset's measured record, or None when it has none."""
+    try:
+        return tf.preset_record(name)
+    except LookupError:
+        return None
+
+
+def _preset_summary(name: str) -> dict[str, Any]:
+    """What a preset's measured record says about it, for a result.
+
+    Read from the record that ships in the wheel. `of` is the rows the
+    record grades: the ones in band and the ones it misses. A row the band
+    basis has no band for, or that the run could not read, is in neither.
+    """
+    record = _preset_record(name)
+    out: dict[str, Any] = {
+        "name": name,
+        "fingerprint": _preset_fingerprint(name),
+        "certified": name == envelope.PRESET,
+    }
+    if record is None:
+        out["record"] = None
+        return out
+    in_band, misses = record["in_band"], record["misses"]
+    method = record["measured"]["method"]
+    out["default_since"] = record.get("default_since")
+    out["record"] = {
+        horizon: {"in_band": in_band[horizon],
+                  "of": in_band[horizon] + len(misses[horizon]),
+                  "misses": list(misses[horizon])}
+        for horizon in ("252", "504") if horizon in in_band
+    }
+    out["measured_on"] = (
+        f"{method['roster']}, seeds {method['train_seeds']}, tradefloor "
+        f"{record['measured']['tradefloor_version']}")
+    return out
+
+
+def _preset_caveat(name: str) -> str:
+    """The caveat a result under a preset other than the certified one earns.
+
+    Computed from the preset's own record, so a count here is the count the
+    record carries.
+    """
+    summary = _preset_summary(name)
+    head = (f"PRESET {name}: the realism certification, and every band, gap "
+            f"and measured figure this server quotes from it, describe "
+            f"{envelope.PRESET}, so a run on {name} is outside the certified "
+            f"envelope.")
+    rows = (summary["record"] or {}).get("252")
+    if rows is None:
+        return head + f" {name} has no measured record."
+    missing = (f", missing {', '.join(rows['misses'])}" if rows["misses"]
+               else "")
+    return (head + f" {name}'s own record (tf.preset_record({name!r})) holds "
+            f"{rows['in_band']} of {rows['of']} panel rows in their "
+            f"real-market bands at 252 days{missing}, measured on "
+            f"{summary['measured_on']}. That record measures the preset's "
+            f"statistics; the gaps, level rows and crisis rows the envelope "
+            f"certifies were measured on {envelope.PRESET} only.")
+
+
+def _record_value(name: str, statistic: str) -> float | None:
+    """A preset record's 252-day median for one statistic, or None."""
+    record = _preset_record(name)
+    value = (record or {}).get("panel_252", {}).get(statistic)
+    return float(value) if isinstance(value, (int, float)) else None
 
 
 # -- the caveat engine -----------------------------------------------------
@@ -472,26 +602,32 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
              max_leverage: float | None, universe_size: int,
              scenario_magnitude: bool = False,
              sector_concentrated: bool = False,
-             macro_regime: bool = False) -> list[str]:
+             macro_regime: bool = False,
+             preset: str | None = None) -> list[str]:
     """The caveats this particular call earns.
 
     Computed, not selected from a list of stock warnings. Each branch below
     fires on a property of the request, so a result never carries a caveat
     that does not apply to it, which keeps the ones it does carry worth
     reading.
+
+    `preset` is the run's preset after `_preset_choice`, None for the
+    default. A run under the default carries the caveats it always carried.
     """
     out: list[str] = [
         "The price process is a known model, not a forecast. A strategy that "
         "does well here has done well against this model; that does not "
         "transfer to real returns.",
     ]
+    if preset is not None:
+        out.append(_preset_caveat(preset))
 
     # The envelope decides the horizon question, so the answer cannot drift
     # from what the envelope page says.
     v = envelope.check(horizon_days=days,
                        scenario_magnitude=scenario_magnitude,
                        sector_concentrated=sector_concentrated,
-                       macro_regime=macro_regime)
+                       macro_regime=macro_regime, preset=preset)
     if not v.inside:
         out.append("Outside the certified realism envelope: "
                    + "; ".join(_for_this_server(r) for r in v.reasons))
@@ -530,20 +666,25 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
                    f"needs more before a win rate means much.")
 
     if signals & {"momentum", "mean_reversion"}:
+        own = None if preset is None else _record_value(preset,
+                                                        "return_acf1")
         out.append(
             "This strategy trades a return-continuation or reversal signal, "
             "so its edge depends on the simulator's return autocorrelation: "
+            + ("" if preset is None else
+               f"this run is on {preset}, whose record measures it at "
+               + (f"{own:.4g}" if own is not None else "no value")
+               + f" over 252 days, and on the certified {envelope.PRESET} ")
             + _statistic_line("return_acf1") + "."
         )
 
     if "oracle" in signals:
-        # Every tool here runs the default preset, so whether the Oracle is
-        # a ceiling is the default's answer.
+        # Whether the Oracle is a ceiling is the run's preset's answer.
         out.append(
             "The `oracle` signal is PRIVILEGED: it reads the simulator's own "
             "fair value, which no real trader can observe. "
             + ("It is a ceiling for measuring capture, never a strategy."
-               if baselines.oracle_is_ceiling() else
+               if baselines.oracle_is_ceiling(preset) else
                "It is a reference agent, never a strategy, and on this preset "
                "not a ceiling either: market moves mostly stick, so knowing "
                "fair value leaves little edge.")
@@ -1093,6 +1234,13 @@ TickerArg = Annotated[str | None, Field(description=(
     "(explain_price_move) or the first name (explain)."))]
 DayArg = Annotated[int, Field(description=(
     f"The trading day to explain, 1 to {MAX_DAYS}."))]
+PresetArg = Annotated[str | None, Field(description=(
+    f"A shipped model preset to run, by name: "
+    f"{', '.join(tf.preset_names())}. Omit for the shipped default, "
+    f"{tf.model_preset()['name']}, the only preset the realism envelope "
+    f"certifies; a result under any other carries a caveat saying it is "
+    f"outside the certification, with that preset's own measured record. "
+    f"describe_simulator lists every preset's record."))]
 
 
 # -- the server ------------------------------------------------------------
@@ -1113,12 +1261,21 @@ that drops the caveats is a misreport.
 
 A single seed measures the seed as much as the strategy. `rank_strategies` is
 the honest version of `evaluate_strategies`.
+
+To trade step by step yourself, open a session with `open_session` and advance
+it with `session_step`. A session can be forked and rewound, so its P&L is not
+a strategy's score.
 """
 
-# Every tool says what it does to the world. All but start_job only read:
-# each builds its own engine, runs it and returns what it measured, and the
-# same arguments give the same result. start_job adds a job to this
-# server's memory, so it is not read-only, but it changes nothing else.
+# Every tool says what it does to the world. Most only read: each builds
+# its own engine, runs it and returns what it measured, and the same
+# arguments give the same result. start_job, open_session and session_fork
+# add a job or a session to this server's memory, so they are not
+# read-only, but they change nothing else. session_step advances a session
+# and keeps the state it left as a checkpoint, so it only adds, apart from
+# the oldest checkpoint past MAX_CHECKPOINTS; session_rewind drops the
+# checkpoints after the one it returns to and close_session drops a
+# session, so those two are destructive.
 _READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False,
                              idempotentHint=True, openWorldHint=False)
 _STARTS_JOB = ToolAnnotations(readOnlyHint=False, destructiveHint=False,
@@ -1159,7 +1316,9 @@ def _measured_cost() -> str:
     description=(
         "Describe what this simulator is, what its realism checks certify, "
         "what it cannot do, the caps on every tool and how long a run "
-        "takes. Call it first in a session, before any other tool. It takes "
+        "takes. It also lists every shipped preset with its measured "
+        "record, says which one the certification covers, and describes "
+        "market sessions. Call it first, before any other tool. It takes "
         "no arguments, runs no market and returns the same text on every "
         "call."),
     annotations=_READ_ONLY,
@@ -1280,15 +1439,64 @@ def describe_simulator() -> dict[str, Any]:
                     "conversation. The library imposes none of them.",
             "measured_cost": _measured_cost(),
         },
+        "presets": {
+            "default": tf.model_preset()["name"],
+            "certified": envelope.PRESET,
+            "how": (
+                "Every run tool and open_session take `preset`, a shipped "
+                "preset's name, and run the shipped default when it is "
+                f"omitted. The realism envelope certifies {envelope.PRESET} "
+                "only: its bands, gaps, level rows and crisis rows were "
+                "measured on that preset. A result under any other preset "
+                "says it is outside the certification, in a caveat that "
+                "quotes that preset's own measured record, and its "
+                "provenance names the preset beside `certified_preset`. "
+                "check_envelope takes `preset` too."),
+            "records": (
+                "Each preset's record (tf.preset_record) as `record`: at "
+                "252 and 504 days, the panel rows in their real-market "
+                "bands (`in_band`) of the rows the record grades (`of`), "
+                "and the rows it misses. A record measures a preset; it "
+                "does not certify it."),
+            "shipped": [_preset_summary(name) for name in tf.preset_names()],
+        },
+        "sessions": {
+            "what": (
+                "open_session keeps one market in this server between calls. "
+                "session_step advances it a few steps or days with your "
+                "orders, session_state reads it, session_fork copies it to "
+                "try two actions from one state, session_rewind returns to a "
+                "checkpoint, and close_session frees it. An order is a "
+                "signed share count, {\"quantity\": q, \"limit_price\": "
+                "p} for a limit order, or \"cancel\"."),
+            "what_you_see": (
+                "What a trader sees: prices, the day's bars so far, the "
+                "book's best bid and ask, the published macro figures, which "
+                "names have news, and your own portfolios. Nothing of the "
+                "simulator's own state."),
+            "not_a_score": (
+                "A session can be forked, rewound and reopened from the same "
+                "seed, so its P&L can use knowledge of the market's future. "
+                "Score a strategy with evaluate_strategies or "
+                "rank_strategies."),
+            "limits": {
+                "max_sessions": MAX_SESSIONS,
+                "max_checkpoints": MAX_CHECKPOINTS,
+                "idle_seconds": SESSION_IDLE_SECONDS,
+                "max_days": MAX_SESSION_DAYS,
+                "max_steps_per_call": MAX_SESSION_STEPS,
+                "max_agents": MAX_SESSION_AGENTS,
+                "lifetime": "this server process only",
+            },
+        },
         "not_exposed_here": {
             "atlas": "Response-surface surveys run for hours. Library only.",
-            "model_coefficients": "Every run here uses the shipped default "
-                                  "preset and no tool takes a preset "
-                                  "argument; the 87 settable coefficients "
-                                  "behind a preset are not exposed either, "
-                                  "because improvised coefficients produce a "
-                                  "market nobody calibrated. Selecting "
-                                  "another preset is a library call.",
+            "model_coefficients": "Runs take a shipped preset by name and "
+                                  "nothing else: the settable "
+                                  "coefficients behind a preset are not "
+                                  "exposed, because improvised coefficients "
+                                  "produce a market nobody calibrated. A "
+                                  "custom vector is a library call.",
         },
         "provenance": _provenance(),
     }
@@ -1300,9 +1508,11 @@ def describe_simulator() -> dict[str, Any]:
         "Check whether a question falls inside the range the simulator's "
         "realism was measured for, BEFORE running it. Use it whenever a "
         "conclusion leans on a horizon longer than a year, on particular "
-        "statistics, on a sector-concentrated roster or on the size of a "
-        "scenario's effect. Returns ok or a refusal that names the "
-        "measurement behind it. Runs no market, so it answers at once."),
+        "statistics, on a sector-concentrated roster, on the size of a "
+        "scenario's effect or on a preset other than the default. Returns "
+        "ok or a refusal that names the measurement behind it, and for a "
+        "named preset that preset's measured record. Runs no market, so it "
+        "answers at once."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -1326,6 +1536,13 @@ def check_envelope(
         "state, such as high inflation, stagflation or a policy crisis. "
         "run_stress_scenario sets this itself when a scenario drives "
         "inflation, growth or the cycle."))] = False,
+    preset: Annotated[str | None, Field(description=(
+        f"The preset the run uses, by name: {', '.join(tf.preset_names())}. "
+        f"Omit for the shipped default, {envelope.PRESET}, the only preset "
+        f"the envelope certifies. Any other is answered as outside, with "
+        f"that preset's own measured record beside the answer; the measured "
+        f"roster mixes are granted only on "
+        f"{envelope.ROSTER_MEASUREMENT['preset']}."))] = None,
 ) -> dict[str, Any]:
     """The honesty gate. Cheap, and worth calling before an expensive run.
 
@@ -1333,7 +1550,17 @@ def check_envelope(
     `macro_regime` is exposed, since 0.8.5. Both are `envelope.check`
     arguments this tool left out, which put a named mix and the macro-range
     gap out of reach of a client.
+
+    `preset` is `envelope.check`'s own argument. The library decides the
+    roster grant on it and only warns that its other tables describe the
+    default. This tool answers `inside: false` for any preset but the
+    certified one, with the reason first, because the question a caller
+    asks here is whether the certification covers the run, and for another
+    preset it does not.
     """
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     try:
         v = envelope.check(
             horizon_days=horizon_days,
@@ -1341,6 +1568,7 @@ def check_envelope(
             sector_concentrated=sector_concentrated,
             scenario_magnitude=scenario_magnitude,
             macro_regime=macro_regime,
+            preset=preset,
         )
     except tf.ValidationError as exc:
         # The statistic list only where a statistic was the problem. A
@@ -1352,14 +1580,22 @@ def check_envelope(
                 ". An unknown name is refused rather than ignored, because "
                 "silently dropping one would grant a certification nobody "
                 "measured." if unknown and horizon_days >= 1 else ""))
-    return {
+    out: dict[str, Any] = {
         "ok": True,
         "inside": v.inside,
         "reasons": list(v.reasons),
         "gaps": [{"id": g.id, "forbids": g.forbids, "detail": g.detail}
                  for g in v.gaps],
-        "provenance": _provenance(),
     }
+    if preset is not None:
+        # The library's own reason for a verdict with no gap says the
+        # question met none, which is true of the gaps and not of the run.
+        reasons = [r for r in v.reasons if v.gaps]
+        out["inside"] = False
+        out["reasons"] = [_preset_caveat(preset), *reasons]
+        out["preset"] = _preset_summary(preset)
+    out["provenance"] = _provenance(preset)
+    return out
 
 
 @server.tool(
@@ -1415,8 +1651,9 @@ def validate_strategy(spec: SpecArg) -> dict[str, Any]:
         f"strategy is data, for example {_SPEC_EXAMPLE}, and "
         "validate_strategy checks one without running it. days 1 to "
         f"{MAX_DAYS} here (a few seconds), up to {MAX_DAYS_ASYNC} through "
-        f"start_job; roster 2 to {MAX_UNIVERSE} names. Deterministic: the "
-        "same arguments give the same scores."),
+        f"start_job; roster 2 to {MAX_UNIVERSE} names. `preset` runs another "
+        "shipped model preset, outside the certification. Deterministic: "
+        "the same arguments give the same scores."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -1432,6 +1669,7 @@ def evaluate_strategies(
     cash: CashArg = 1_000_000.0,
     max_leverage: LeverageArg = 2.0,
     include_baselines: BaselinesArg = True,
+    preset: PresetArg = None,
 ) -> dict[str, Any]:
     """The headline tool.
 
@@ -1441,6 +1679,9 @@ def evaluate_strategies(
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -1470,7 +1711,7 @@ def evaluate_strategies(
             steps_per_day=steps_per_day, cash=cash, max_leverage=max_leverage,
             # Stated rather than defaulted: a strategy here is never handed
             # the live engine. See the module docstring.
-            trusted_agents=False,
+            trusted_agents=False, model=preset,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -1510,9 +1751,10 @@ def evaluate_strategies(
     result["caveats"] = _caveats(
         days=days, n_seeds=1, signals=_signals_in(specs),
         max_leverage=max_leverage, universe_size=len(roster),
-        sector_concentrated=concentrated,
+        sector_concentrated=concentrated, preset=preset,
     )
     result["provenance"] = _provenance(
+        preset,
         seed=seed,
         universe=uni_doc,
         universe_fingerprint=next(iter(scores.values())).universe_fingerprint
@@ -1532,7 +1774,8 @@ def evaluate_strategies(
         f"seeds (default six), days 1 to {MAX_DAYS} here, up to "
         f"{MAX_DAYS_ASYNC} through start_job. Returns each entrant's record "
         "across the seeds (median P&L, seeds ahead of buy-and-hold) and each "
-        "pair's sign test. Deterministic."),
+        "pair's sign test. Takes `preset` as evaluate_strategies does. "
+        "Deterministic."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -1546,6 +1789,7 @@ def rank_strategies(
     days: DaysArg = 5,
     steps_per_day: StepsPerDayArg = 6,
     max_leverage: LeverageArg = 2.0,
+    preset: PresetArg = None,
 ) -> dict[str, Any]:
     """The honest version.
 
@@ -1563,6 +1807,9 @@ def rank_strategies(
         return _fail(f"seeds must be 2..{MAX_SEEDS} values, got {len(seeds)}")
     if (refused := _seed_refusal(seed=seeds)) is not None:
         return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -1590,7 +1837,7 @@ def rank_strategies(
         ranking = tf.rank(
             make_agents, seeds=seeds, universe=roster, days=days,
             steps_per_day=steps_per_day, max_leverage=max_leverage,
-            trusted_agents=False,
+            trusted_agents=False, model=preset,
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -1600,7 +1847,8 @@ def rank_strategies(
     if ranking.capture_withheld is not None:
         return _ranking_against_buy_and_hold(ranking, specs, days, seeds,
                                              steps_per_day, max_leverage,
-                                             roster, concentrated, uni_doc)
+                                             roster, concentrated, uni_doc,
+                                             preset)
     records = [
         {
             "name": r.name,
@@ -1654,9 +1902,10 @@ def rank_strategies(
         "caveats": _caveats(
             days=days, n_seeds=len(seeds), signals=_signals_in(specs),
             max_leverage=max_leverage, universe_size=len(roster),
-            sector_concentrated=concentrated,
+            sector_concentrated=concentrated, preset=preset,
         ),
         "provenance": _provenance(
+            preset,
             seeds=list(seeds), days=days, steps_per_day=steps_per_day,
             universe=uni_doc,
             universe_fingerprint=ranking.universe_fingerprint,
@@ -1669,7 +1918,8 @@ def _ranking_against_buy_and_hold(ranking: Any, specs: dict[str, Any],
                                   steps_per_day: int,
                                   max_leverage: float | None, roster: Any,
                                   concentrated: bool,
-                                  uni_doc: Any) -> dict[str, Any]:
+                                  uni_doc: Any,
+                                  preset: str | None = None) -> dict[str, Any]:
     """`rank_strategies`' result on a preset where the Oracle is no ceiling.
 
     The same shape as the capture version, with every capture field left
@@ -1721,9 +1971,10 @@ def _ranking_against_buy_and_hold(ranking: Any, specs: dict[str, Any],
         "caveats": _caveats(
             days=days, n_seeds=len(seeds), signals=_signals_in(specs),
             max_leverage=max_leverage, universe_size=len(roster),
-            sector_concentrated=concentrated,
+            sector_concentrated=concentrated, preset=preset,
         ),
         "provenance": _provenance(
+            preset,
             seeds=list(seeds), days=days, steps_per_day=steps_per_day,
             universe=uni_doc,
             universe_fingerprint=ranking.universe_fingerprint,
@@ -2092,8 +2343,8 @@ def build_scenario(
         "markets together first and start the scenario on that day, as a "
         "fork of one shared history. Use the result to detect a response, "
         "not to forecast its size. days 1 to "
-        f"{MAX_DAYS} here, up to {MAX_DAYS_ASYNC} through start_job. "
-        "Deterministic."),
+        f"{MAX_DAYS} here, up to {MAX_DAYS_ASYNC} through start_job. Takes "
+        "`preset` as evaluate_strategies does. Deterministic."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -2118,6 +2369,7 @@ def run_stress_scenario(
         "shipped document, or build_scenario with `shocks`); a macro path "
         "or a constructor pins the macro from day 0, so it has no fork "
         "point."))] = None,
+    preset: PresetArg = None,
 ) -> dict[str, Any]:
     """Stress testing, always paired against the unshocked control.
 
@@ -2133,6 +2385,9 @@ def run_stress_scenario(
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     cap = _day_cap()
     if not 1 <= days <= cap:
         return _fail(
@@ -2232,7 +2487,7 @@ def run_stress_scenario(
     try:
         shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=built,
-                              trusted_agents=False)
+                              trusted_agents=False, model=preset)
         # The control is the same world WITHOUT the thing being tested. For a
         # macro PATH that is no scenario at all. For a scenario carrying
         # INTERVENTIONS it is the same pins with the interventions removed --
@@ -2242,7 +2497,7 @@ def run_stress_scenario(
                    else None)
         control = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=against or None,
-                              trusted_agents=False)
+                              trusted_agents=False, model=preset)
     except tf.ValidationError as exc:
         return _fail(str(exc))
 
@@ -2268,14 +2523,15 @@ def run_stress_scenario(
         days=days, n_seeds=1, signals=_signals_in(specs),
         max_leverage=2.0, universe_size=len(roster),
         scenario_magnitude=True, sector_concentrated=concentrated,
-        macro_regime=_drives_regime(built),
+        macro_regime=_drives_regime(built), preset=preset,
     )
-    caveats.insert(1, (
+    caveats.insert(1 if preset is None else 2, (
         "Scenario MAGNITUDE is outside the envelope: the direction of a "
         "shock's effect is certified, the size of it is not. Read these "
         "differences as sign and ordering, not as a calibrated loss."
     ))
-    caveats[2:2] = timing
+    at = 2 if preset is None else 3
+    caveats[at:at] = timing
     return {
         "ok": True,
         "scenario": label,
@@ -2295,6 +2551,7 @@ def run_stress_scenario(
         **({} if fork_day is None else {"fork_day": fork_day}),
         "caveats": caveats,
         "provenance": _provenance(
+            preset,
             seed=seed, days=days, scenario=label,
             **({} if fork_day is None else {"fork_day": fork_day}),
             scenario_document=json.loads(built.to_json(days)),
@@ -2316,7 +2573,8 @@ def run_stress_scenario(
         "noise moves fair value, `fair_value_shift` takes that part out of "
         "the mispricing, and the fair-value move itself is not split up. "
         "Without a ticker it returns the top_n largest moves. Builds and "
-        f"runs its own market for up to {MAX_DAYS} days; read-only."),
+        f"runs its own market for up to {MAX_DAYS} days, under `preset` if "
+        "one is named; read-only."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -2331,6 +2589,7 @@ def explain_price_move(
     top_n: Annotated[int, Field(description=(
         "How many instruments to return, largest moves first, when no "
         "ticker is given. 1 or more."))] = 10,
+    preset: PresetArg = None,
 ) -> dict[str, Any]:
     """How much each driver moved each name's mispricing on one day.
 
@@ -2342,6 +2601,9 @@ def explain_price_move(
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
     if top_n < 1:
@@ -2353,7 +2615,7 @@ def explain_price_move(
     except ValueError as exc:
         return _fail(str(exc))
 
-    engine = tf.Engine(universe=roster, seed=seed)
+    engine = tf.Engine(universe=roster, seed=seed, model=preset)
     engine.run_days(day)
     tickers = list(engine.tickers)
 
@@ -2419,8 +2681,21 @@ def explain_price_move(
             "changed the stock's fair value for good, entered as a negative "
             "because it left the mispricing. The other factors report the "
             "whole shock; on presets through pt-v19 this one is zero.",
+            *([] if preset is None else [
+                _preset_caveat(preset),
+                f"The reading note describes {envelope.PRESET}. On "
+                f"{preset}, `fair_value_shift` is "
+                + ("zero on every name returned for this day, so the "
+                   "factors split the whole move in the mispricing and "
+                   "nothing moved fair value."
+                   if all(r["factors"].get("fair_value_shift", 0.0) == 0.0
+                          for r in rows) else
+                   "not zero here, so part of the day's news and noise "
+                   "moved fair value and is not split up."),
+            ]),
         ],
         "provenance": _provenance(
+            preset,
             seed=seed, day=day,
             universe=uni_doc,
             model_fingerprint=engine.model_fingerprint,
@@ -2439,8 +2714,8 @@ def explain_price_move(
         "which factors moved prices across the roster; use this for one "
         "name when you need to know which draws moved those factors. "
         "`depth` sets how much of the tree the `render` text shows. Builds "
-        f"and runs its own market for up to {MAX_DAYS} days; read-only and "
-        "deterministic."),
+        f"and runs its own market for up to {MAX_DAYS} days, under `preset` "
+        "if one is named; read-only and deterministic."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -2455,6 +2730,7 @@ def explain(
     depth: Annotated[int, Field(description=(
         "How many levels of the tree the `render` text shows, 0 to 4. The "
         "`tree` field is always whole."))] = 3,
+    preset: PresetArg = None,
 ) -> dict[str, Any]:
     """One name's day, from its move down to the draws that seeded it.
 
@@ -2468,6 +2744,9 @@ def explain(
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")
     try:
@@ -2477,7 +2756,7 @@ def explain(
     except ValueError as exc:
         return _fail(str(exc))
 
-    engine = tf.Engine(universe=roster, seed=seed)
+    engine = tf.Engine(universe=roster, seed=seed, model=preset)
     # Asked for before the days run, because a day is kept at its open.
     # The run reaches one day past the target so the day before it is on
     # the tape, which is what separates the valuation's move from the
@@ -2534,8 +2813,9 @@ def explain(
         "caveats": list(result.caveats) + _caveats(
             days=day + 1, n_seeds=1, signals=set(), max_leverage=None,
             universe_size=len(roster),
-            sector_concentrated=concentrated),
+            sector_concentrated=concentrated, preset=preset),
         "provenance": _provenance(
+            preset,
             seed=seed, day=day, universe=uni_doc,
             model_fingerprint=engine.model_fingerprint,
         ),
@@ -2657,7 +2937,6 @@ _jobs: dict[str, dict[str, Any]] = {}
 _jobs_lock = threading.Lock()
 _pool = ThreadPoolExecutor(max_workers=MAX_RUNNING_JOBS,
                            thread_name_prefix="tradefloor-mcp-job")
-_job_counter = 0
 
 #: What a run costs, in CPU seconds, measured with `tf.evaluate` on pt-v20
 #: on the 0.8.5 release candidate on an Apple-silicon Mac (rosters of 8, 40
@@ -2811,7 +3090,8 @@ def _run_job(job_id: str, tool: str, args: dict[str, Any]) -> None:
         "arguments are checked before the job starts, and the response "
         f"estimates its run time. At most {MAX_RUNNING_JOBS} jobs run at "
         f"once and the last {MAX_KEPT_JOBS} are kept, in this server's "
-        "memory only. Poll with check_job."),
+        "memory only. A `preset` in the arguments is checked before the job "
+        "starts. Poll with check_job."),
     annotations=_STARTS_JOB,
 )
 @_guarded
@@ -2829,7 +3109,6 @@ def start_job(
     name, the arguments, the day cap and the estimate. A job that has been
     submitted always comes back with its id.
     """
-    global _job_counter
     if tool not in JOBBABLE:
         return _fail(f"{tool!r} cannot be run as a job. Jobbable: "
                      f"{list(JOBBABLE)}. Everything else answers inline.")
@@ -2847,8 +3126,13 @@ def start_job(
         steps = args.get("steps_per_day", params["steps_per_day"].default)
         if (refused := _steps_refusal(days, steps, MAX_DAYS_ASYNC)) is not None:
             return refused
+    # The preset is checked here too, so an unknown name is refused before
+    # a worker is spent, and the response names the preset the job runs.
+    preset, refusal = _preset_choice(args.get("preset"))
+    if refusal is not None:
+        return _fail(refusal)
     est = _estimate_seconds(tool, args)
-    provenance = _provenance()
+    provenance = _provenance(preset)
 
     with _jobs_lock:
         running = sum(1 for j in _jobs.values() if j["status"] == "running")
@@ -2857,8 +3141,7 @@ def start_job(
                 f"{running} jobs already running (cap {MAX_RUNNING_JOBS}). "
                 f"Wait for one to finish -- starting a third would slow both "
                 f"without finishing sooner.")
-        _job_counter += 1
-        job_id = f"job-{_job_counter}"
+        job_id = _unguessable_id("job", _jobs)
         _jobs[job_id] = {"id": job_id, "tool": tool, "arguments": args,
                          "status": "running", "started": time.time(),
                          "finished": None, "result": None}
@@ -2894,7 +3177,7 @@ def start_job(
 @_guarded
 def check_job(
     job_id: Annotated[str | None, Field(description=(
-        "An id from start_job, such as \"job-1\". Omit to list every job "
+        "An id exactly as start_job returned it. Omit to list every job "
         "this server process holds."))] = None,
 ) -> dict[str, Any]:
     """Poll a job, or list what this server is holding."""
@@ -2934,6 +3217,1037 @@ def check_job(
             out["result"] = job["result"]
         out["provenance"] = _provenance()
         return out
+
+
+# -- sessions --------------------------------------------------------------
+#
+# Every tool above builds its own market, runs it and throws it away, so the
+# same arguments give the same bytes. A session keeps one market between
+# calls: the caller opens it, steps it a few decision points at a time with
+# orders of its own, and reads what happened before deciding the next step.
+# That is the loop an agent that trades needs, and no tool above offers it,
+# because a strategy spec decides every step in advance.
+#
+# The design choices, and why:
+#
+# - In this process only, like the jobs. A session is an engine and Python
+#   portfolios in memory. There is no store, and a restart loses every
+#   session, which each refusal for a missing id says.
+# - The loop is `tf.evaluate`'s: the same clock, observe, execute, then the
+#   session with the step's own flow, then the resting fills. A session
+#   with one strategy-spec agent and no orders of the caller's ends on the
+#   net worth `tf.evaluate` scores for that spec, and a test holds the two
+#   together. Several agents share one market and execute in label order
+#   against one book, as a cohort `tf.World` does.
+# - Orders use the harness's `act()` grammar in JSON: a signed share count
+#   is a market order, {"quantity": q, "limit_price": p} is a `tf.Limit`,
+#   and "cancel" is a `tf.Cancel`. The shape is checked before anything
+#   runs; a market refusal (the leverage cap, a book that cannot fill) is
+#   reported per order and the rest trade, as the harness does.
+# - Checkpoints are `Engine.state_snapshot` and `Engine.restore_state` with
+#   copies of the portfolios, the strategy agents and the history: one at
+#   the open and one at the end of every call. A fork and a rewind restore
+#   one onto a fresh engine built from the same seed, roster and preset,
+#   and the restored market continues bit for bit, mid-day included; the
+#   tests check both.
+# - The caller sees the market through `tradefloor.sandbox.MarketView` and
+#   its own portfolios through `PortfolioView`, the views a sandboxed agent
+#   gets, and nothing else: no fundamentals, no mispricing, no economy
+#   block, no true cycle phase. The live engine never leaves the session.
+# - A session can be forked, rewound and reopened from the same seed, so
+#   whoever drives it can have seen the market's future. Every result says
+#   so in a caveat, and the P&L of a session is not a strategy's score.
+#
+# The caps are memory and wall-clock decisions. A checkpoint of a 40-name
+# market pickles to about 23 KB and one of 120 names to about 54 KB, and a
+# 120-name session holding eleven checkpoints traced 1.3 MB of Python
+# memory, all on pt-v20. A session keeps at most `MAX_CHECKPOINTS`, so
+# `MAX_SESSIONS` full sessions on the largest roster hold tens of megabytes.
+# Ten days of 120 names ran in 0.47 s, so the per-call step cap, the budget
+# of a direct evaluate_strategies call, answers in seconds.
+
+#: Sessions open at once in this server process.
+MAX_SESSIONS = 8
+
+#: Checkpoints a session keeps. Past this the oldest after the first is
+#: dropped, so the state a session was opened or forked at stays reachable.
+MAX_CHECKPOINTS = 64
+
+#: A session no call has touched for this long is closed on the next
+#: session call, so a client that forgets to close one does not hold it for
+#: the life of the server.
+SESSION_IDLE_SECONDS = 30 * 60
+
+#: The longest a session may run: two certified horizons, the 504 days the
+#: envelope's longest bands grade. Past it no band reads a result.
+MAX_SESSION_DAYS = 2 * envelope.CERTIFIED_HORIZON_DAYS
+
+#: Steps one `session_step` call may run, the budget of a direct
+#: evaluate_strategies call: `MAX_DAYS` days at the default six steps.
+MAX_SESSION_STEPS = MAX_DAYS * DEFAULT_STEPS_PER_DAY
+
+#: Fills one agent's entry in a step result lists; the rest are counted.
+MAX_FILLS_SHOWN = 50
+
+#: The largest moves over a call that a step result names.
+MOVERS_SHOWN = 5
+
+#: Agents in one session, hand-driven and strategy together.
+MAX_SESSION_AGENTS = MAX_STRATEGIES
+
+#: The clock and the step length `tf.evaluate` uses by default.
+_TICKS_PER_STEP = 65
+_SESSION_START = (9, 30, 3)
+
+_sessions: dict[str, "_Session"] = {}
+_sessions_lock = threading.Lock()
+
+
+def _copy_live(live: dict[str, Any]) -> dict[str, Any]:
+    """An independent copy of a session's state outside the engine.
+
+    The history is copied by its own method: its days are immutable tuples
+    and a deep copy would walk every one of them on every checkpoint.
+    """
+    history = live["history"]
+    rest = {k: v for k, v in live.items() if k != "history"}
+    out = copy.deepcopy(rest)
+    out["history"] = history._copy()
+    return out
+
+
+class _Session:
+    """One market kept between calls. See the comment above."""
+
+    def __init__(self, sid: str, *, seed: int, roster: Any, uni_doc: Any,
+                 concentrated: bool, preset: str | None, steps_per_day: int,
+                 cash: float, max_leverage: float | None,
+                 specs: dict[str, Any], hand: list[str]) -> None:
+        self.id = sid
+        self.seed = seed
+        self.roster = roster
+        self.uni_doc = uni_doc
+        self.concentrated = concentrated
+        self.preset = preset
+        self.steps_per_day = steps_per_day
+        self.cash = cash
+        self.max_leverage = max_leverage
+        self.specs = specs
+        self.hand = list(hand)
+        # Execution order: by label, so the same agents in any order in the
+        # request are the same market.
+        self.labels = sorted([*specs, *hand])
+        self.engine = self._fresh_engine()
+        self.tickers = list(self.engine.tickers)
+        self.adv = tuple(inst.avg_volume for inst in roster)
+        self.live: dict[str, Any] = {
+            "step": 0,
+            "portfolios": {
+                label: tf.Portfolio(cash=cash, max_leverage=max_leverage,
+                                    owner=label)
+                for label in self.labels},
+            "agents": {label: spec.build() for label, spec in specs.items()},
+            "history": History(),
+            "ledger": {label: {"trades": 0, "rejected": 0, "errors": [],
+                               "tampered": False}
+                       for label in self.labels},
+            "orders": [],
+        }
+        self.checkpoints: dict[int, tuple[dict[str, Any], dict[str, Any]]] = {}
+        self.lineage: list[dict[str, Any]] = []
+        self.lock = threading.Lock()
+        self.touched = time.monotonic()
+        self.keep()
+
+    def _fresh_engine(self) -> Any:
+        return tf.Engine(seed=self.seed, universe=self.roster,
+                         model=self.preset)
+
+    # -- the clock --------------------------------------------------------
+
+    @property
+    def step(self) -> int:
+        return self.live["step"]
+
+    def clock(self) -> dict[str, Any]:
+        day, of_day = divmod(self.step, self.steps_per_day)
+        return {"step": self.step, "day": day, "step_of_day": of_day,
+                "market_open": of_day != 0,
+                "days_closed": day}
+
+    def days_touched(self) -> int:
+        """Trading days the session has run into, the one in progress
+        included, and at least one."""
+        return max(1, -(-self.step // self.steps_per_day))
+
+    # -- checkpoints ------------------------------------------------------
+
+    def keep(self) -> None:
+        """Keep the present state as the checkpoint at this step."""
+        self.checkpoints[self.step] = (self.engine.state_snapshot(),
+                                       _copy_live(self.live))
+        if len(self.checkpoints) > MAX_CHECKPOINTS:
+            ordered = sorted(self.checkpoints)
+            self.checkpoints.pop(ordered[1])
+
+    def restore(self, step: int) -> None:
+        """Put the checkpoint at `step` back, on a fresh engine, and drop
+        every checkpoint after it: they were a future of this line."""
+        snapshot, live = self.checkpoints[step]
+        engine = self._fresh_engine()
+        engine.restore_state(snapshot)
+        self.engine = engine
+        self.live = _copy_live(live)
+        for later in [s for s in self.checkpoints if s > step]:
+            del self.checkpoints[later]
+
+    def forked(self, sid: str) -> "_Session":
+        """A copy of this session under a new id, from its present state.
+
+        The engine goes through a snapshot and a restore, as a rewind does.
+        The checkpoints are shared: nothing writes to one once it is kept,
+        and a restore copies what it reads.
+        """
+        child = copy.copy(self)
+        child.id = sid
+        child.engine = self._fresh_engine()
+        child.engine.restore_state(self.engine.state_snapshot())
+        child.live = _copy_live(self.live)
+        child.checkpoints = dict(self.checkpoints)
+        child.lineage = [*self.lineage,
+                         {"forked_at_step": self.step}]
+        child.lock = threading.Lock()
+        child.touched = time.monotonic()
+        return child
+
+    # -- running ----------------------------------------------------------
+
+    def _merged_flow(self) -> dict[str, tuple[float, float]]:
+        """Every portfolio's flow for the session, summed per ticker in
+        label order. One portfolio passes its own mapping, as `World`
+        does, so a one-agent session hands the engine what `evaluate`
+        hands it."""
+        books = self.live["portfolios"]
+        if len(books) == 1:
+            return next(iter(books.values())).pending_flow()
+        merged: dict[str, tuple[float, float]] = {}
+        for label in self.labels:
+            for ticker, (buy, sell) in books[label].pending_flow().items():
+                have = merged.get(ticker)
+                merged[ticker] = ((buy, sell) if have is None
+                                  else (have[0] + buy, have[1] + sell))
+        return merged
+
+    def _ask(self, label: str, obs: Any, guard: Any) -> list[tuple[Any, Any]]:
+        """A strategy agent's orders for this step, as `evaluate` asks."""
+        ledger = self.live["ledger"][label]
+        orders = None
+        try:
+            with guard:
+                orders = self.live["agents"][label].act(obs)
+        except Exception as exc:                      # noqa: BLE001
+            ledger["errors"].append(
+                f"step {obs.step}: {type(exc).__name__}: {exc}")
+        if guard.tampered:
+            ledger["tampered"] = True
+            ledger["errors"].append(f"step {obs.step}: tampered: "
+                                    f"{guard.what}")
+        try:
+            return order_items(orders)
+        except tf.ValidationError as exc:
+            ledger["errors"].append(f"step {obs.step}: {exc}")
+            return []
+
+    def _execute(self, label: str, entries: list[tuple[Any, Any]],
+                 step: int) -> list[str]:
+        """Send one agent's orders, as `evaluate` sends them. Returns the
+        refusals, each naming the ticker."""
+        refused: list[str] = []
+        portfolio = self.live["portfolios"][label]
+        ledger = self.live["ledger"][label]
+        for ticker, value in entries:
+            try:
+                order = check_order(ticker, value)
+                if order is None:
+                    continue
+                if isinstance(order, tf.Cancel):
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    continue
+                if isinstance(order, tf.Limit):
+                    # A new limit on a name replaces the one waiting there.
+                    portfolio.cancel(self.engine, ticker=ticker)
+                    report = portfolio.submit_limit(
+                        self.engine, ticker, order.quantity, order.price)
+                    if report["filled"] > 0:
+                        ledger["trades"] += 1
+                    continue
+                portfolio.execute(self.engine, ticker, order)
+                ledger["trades"] += 1
+            except (OrderError, tf.ValidationError) as exc:
+                ledger["rejected"] += 1
+                refused.append(f"step {step} {ticker}: {exc}")
+        return refused
+
+    def advance(self, steps: int, hand_orders: dict[str, dict[str, Any]]
+                ) -> dict[str, list[str]]:
+        """Run `steps` decision points. `hand_orders` are sent at the first.
+
+        Returns each agent's refusals over the call.
+        """
+        live = self.live
+        books = live["portfolios"]
+        spd = self.steps_per_day
+        refused: dict[str, list[str]] = {label: [] for label in self.labels}
+        for i in range(steps):
+            engine = self.engine
+            step = live["step"]
+            day, of_day = divmod(step, spd)
+            if of_day == 0:
+                engine.open_market()
+            prices = _f64(engine.prices())
+            observed: dict[str, Any] = {}
+            for label in self.labels:
+                if label in self.specs:
+                    agent = live["agents"][label]
+                    observed[label] = Observation(
+                        step, day, list(self.tickers), list(prices),
+                        PortfolioView(books[label], engine),
+                        MarketView(engine), self.adv, spd,
+                        hidden=(HiddenState(engine)
+                                if declares_hidden_state(agent) else None),
+                        history=live["history"])
+                books[label].stamp(day, step, of_day * _TICKS_PER_STEP)
+            guard = TamperGuard(engine, books.values(), trusted=False)
+            asked: dict[str, list[tuple[Any, Any]]] = {}
+            for label in self.labels:
+                if label in self.specs:
+                    asked[label] = self._ask(label, observed[label], guard)
+                else:
+                    sent = hand_orders.get(label) if i == 0 else None
+                    asked[label] = list((sent or {}).items())
+            for label in self.labels:
+                refused[label] += self._execute(label, asked[label], step)
+            engine.run_session(
+                *session_clock(_SESSION_START, of_day, _TICKS_PER_STEP),
+                _TICKS_PER_STEP, fills=self._merged_flow())
+            for book in books.values():
+                book.clear_flow()
+            for label in self.labels:
+                taken = books[label].sync(engine)
+                live["ledger"][label]["trades"] += len(taken)
+            live["step"] = step + 1
+            if of_day == spd - 1:
+                for book in books.values():
+                    book.accrue(engine)
+                live["history"]._close(engine, day)
+                engine.close_market()
+        return refused
+
+
+def _expire_sessions() -> None:
+    """Close every session idle past `SESSION_IDLE_SECONDS`. A session a
+    call is using right now is never closed under it."""
+    now = time.monotonic()
+    with _sessions_lock:
+        for sid, sess in list(_sessions.items()):
+            if now - sess.touched <= SESSION_IDLE_SECONDS:
+                continue
+            if sess.lock.acquire(blocking=False):
+                try:
+                    _sessions.pop(sid, None)
+                finally:
+                    sess.lock.release()
+
+
+def _session(sid: Any) -> tuple["_Session | None", dict[str, Any] | None]:
+    """The session under `sid`, or a refusal saying why there is none."""
+    _expire_sessions()
+    with _sessions_lock:
+        sess = _sessions.get(sid) if isinstance(sid, str) else None
+        held = sorted(_sessions)
+    if sess is None:
+        return None, _fail(
+            f"no session {sid!r}. Open sessions: {held or 'none'}. A session "
+            f"is closed by close_session, after {SESSION_IDLE_SECONDS // 60} "
+            f"minutes with no call, or when the server restarts: sessions "
+            f"live in this server process only.")
+    return sess, None
+
+
+def _closed_under(sess: "_Session") -> dict[str, Any] | None:
+    """A refusal when `sess` was closed while this call waited for its
+    lock, else None. Call holding the session's lock."""
+    with _sessions_lock:
+        if _sessions.get(sess.id) is sess:
+            return None
+    return _fail(f"session {sess.id!r} was closed while this call waited "
+                 f"for it.")
+
+
+@functools.lru_cache(maxsize=256)
+def _house_label(label: str) -> str | None:
+    """The engine's refusal when `label` is one of its book's own owners,
+    else None.
+
+    Read from the engine by placing one order on a two-name market, as
+    `_macro_fields` reads the macro fields, so the list is the engine's and
+    not a copy of it. A session agent under such a name would have every
+    order refused.
+    """
+    probe = tf.Engine(seed=0, universe=tf.Universe.random(2, seed=0))
+    probe.open_market()
+    try:
+        probe.submit(label, probe.tickers[0], 1.0)
+    except OrderError as exc:
+        if "cannot place orders" in str(exc):
+            return str(exc)
+    return None
+
+
+def _unguessable_id(prefix: str, taken: Any) -> str:
+    """A fresh id that no other id predicts.
+
+    Random rather than counted, so a host that serves several clients from
+    one process cannot have one client step, read or close another's
+    session, or collect another's job, by guessing the next number. No
+    result depends on an id: provenance records how a session was opened
+    and what was sent to it, never which id it had.
+    """
+    while True:
+        new = f"{prefix}-{secrets.token_urlsafe(12)}"
+        if new not in taken:
+            return new
+
+
+def _new_session_id() -> str:
+    """Call under the registry lock."""
+    return _unguessable_id("session", _sessions)
+
+
+def _session_capacity() -> dict[str, Any] | None:
+    """A refusal when no other session fits, else None. Call under the
+    registry lock."""
+    if len(_sessions) >= MAX_SESSIONS:
+        return _fail(
+            f"{len(_sessions)} sessions are open (cap {MAX_SESSIONS}): "
+            f"{sorted(_sessions)}. Close one with close_session first. Each "
+            f"holds a market and up to {MAX_CHECKPOINTS} checkpoints in this "
+            f"server's memory.")
+    return None
+
+
+#: The order grammar's word for a `tf.Cancel`.
+_CANCEL = "cancel"
+
+
+def _orders_from(orders: Any, tickers: list[str]
+                 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The wire form of one agent's orders, as an `act()` mapping and as
+    the canonical form a result echoes. Raises ValueError naming the entry.
+
+    The grammar is the harness's: a number is a market order of that many
+    shares, positive to buy; {"quantity": q, "limit_price": p} is a
+    `tf.Limit`; "cancel" is a `tf.Cancel`. Checked whole before anything
+    runs, so a step never advances on half an instruction.
+    """
+    if not isinstance(orders, dict):
+        raise ValueError(
+            f"orders must be an object of ticker to order, for example "
+            f"{{\"{tickers[0]}\": 100}}, got {type(orders).__name__}")
+    mapping: dict[str, Any] = {}
+    echo: dict[str, Any] = {}
+    for ticker, value in orders.items():
+        if ticker not in tickers:
+            raise ValueError(_unknown_ticker(ticker, tickers)
+                             .replace("obs.tickers", "session_state"))
+        if isinstance(value, str) and value.strip().lower() == _CANCEL:
+            mapping[ticker], echo[ticker] = tf.Cancel(), _CANCEL
+            continue
+        if isinstance(value, dict):
+            unknown = sorted(set(value) - {"quantity", "limit_price"})
+            if unknown or not {"quantity", "limit_price"} <= set(value):
+                raise ValueError(
+                    f"order for {ticker!r}: a limit order is "
+                    f"{{\"quantity\": shares, \"limit_price\": price}}, got "
+                    f"{value!r}")
+            try:
+                mapping[ticker] = tf.Limit(value["quantity"],
+                                           value["limit_price"])
+            except (tf.ValidationError, TypeError) as exc:
+                raise ValueError(f"order for {ticker!r}: {exc}") from exc
+            echo[ticker] = {"quantity": mapping[ticker].quantity,
+                            "limit_price": mapping[ticker].price}
+            continue
+        try:
+            quantity = check_order(ticker, value)
+        except tf.ValidationError as exc:
+            raise ValueError(
+                f"{exc}. An order is a signed share count, "
+                f"{{\"quantity\": q, \"limit_price\": p}} or \"cancel\"."
+            ) from exc
+        if quantity is not None:
+            mapping[ticker] = echo[ticker] = quantity
+    return mapping, echo
+
+
+def _rounded(value: float, places: int) -> float | None:
+    """`value` rounded, or None for an infinity or NaN, which JSON lacks."""
+    return round(value, places) if math.isfinite(value) else None
+
+
+def _portfolio_view(view: Any) -> dict[str, Any]:
+    """One agent's book as a result shows it, read through `PortfolioView`."""
+    return {
+        "cash": round(view.cash, 2),
+        "net_worth": round(view.net_worth(), 2),
+        "pnl": round(view.pnl(), 2),
+        "leverage": _rounded(view.leverage(), 4),
+        "positions": {
+            ticker: {"quantity": held.quantity,
+                     "avg_cost": round(held.avg_cost, 4)}
+            for ticker, held in sorted(view.positions.items())
+            if held.quantity != 0},
+        "open_orders": [
+            {k: order[k] for k in ("order_id", "ticker", "side",
+                                   "limit_price", "quantity", "remaining")
+             if k in order}
+            for order in view.open_orders()],
+    }
+
+
+def _prices(view: Any) -> dict[str, float]:
+    return {t: round(p, 4) for t, p in zip(view.tickers, _f64(view.prices()))}
+
+
+def _session_caveats(sess: "_Session") -> list[str]:
+    """The caveats a session's results carry, computed for its state now."""
+    out = _caveats(
+        days=sess.days_touched(), n_seeds=1,
+        signals=_signals_in(sess.specs), max_leverage=sess.max_leverage,
+        universe_size=len(sess.roster),
+        sector_concentrated=sess.concentrated, preset=sess.preset)
+    history = []
+    for event in sess.lineage:
+        if "forked_at_step" in event:
+            history.append(f"was forked from another session at step "
+                           f"{event['forked_at_step']}")
+        else:
+            history.append(f"was rewound from step {event['rewound_from']} "
+                           f"to step {event['to_step']}")
+    out.insert(1 if sess.preset is None else 2, (
+        "SESSION: this market can be forked, rewound and reopened from the "
+        "same seed, so whoever drives it can have seen its future. Its P&L "
+        "measures decisions made with that chance open, and it is not a "
+        "strategy's score: score a strategy with evaluate_strategies or "
+        "rank_strategies, where a strategy is data and sees only the "
+        "present."
+        + (f" This session {'; it '.join(history)}." if history else "")))
+    return out
+
+
+def _session_provenance(sess: "_Session", *, orders: bool) -> dict[str, Any]:
+    """What re-runs this session: how it was opened, and with `orders`
+    every order the caller sent on this line, by step."""
+    extra: dict[str, Any] = {
+        "seed": sess.seed,
+        "universe": sess.uni_doc,
+        "universe_fingerprint": tf.universe_util.fingerprint_of(sess.roster),
+        "steps_per_day": sess.steps_per_day,
+        "cash": sess.cash,
+        "max_leverage": sess.max_leverage,
+        "agents": {label: (sess.specs[label].fingerprint
+                           if label in sess.specs else "orders")
+                   for label in sess.labels},
+        "lineage": list(sess.lineage),
+    }
+    if orders:
+        extra["orders"] = copy.deepcopy(sess.live["orders"])
+    else:
+        extra["orders_sent"] = len(sess.live["orders"])
+    return _provenance(sess.preset, **extra)
+
+
+def _session_view(sess: "_Session", tickers: list[str] | None = None
+                  ) -> dict[str, Any]:
+    """What the caller may see of a session: the market view and its own
+    portfolios, never the engine."""
+    view = MarketView(sess.engine)
+    market: dict[str, Any] = {
+        "prices": _prices(view),
+        "macro": view.macro_fields,
+        "news_today": view.news(),
+    }
+    if tickers:
+        detail = {}
+        columns = {field: _f64(view.column(field))
+                   for field in ("previous_close", "open", "high", "low",
+                                 "volume")}
+        for ticker in tickers:
+            i = view.index_of(ticker)
+            book = view.book(ticker)
+            detail[ticker] = {
+                **{field: round(col[i], 4) for field, col in columns.items()},
+                "best_bid": book.best_bid, "best_ask": book.best_ask,
+                "spread": book.spread,
+            }
+        market["detail"] = detail
+    agents = {}
+    for label in sess.labels:
+        ledger = sess.live["ledger"][label]
+        agents[label] = {
+            "driven_by": "strategy" if label in sess.specs else "orders",
+            **_portfolio_view(PortfolioView(sess.live["portfolios"][label],
+                                            sess.engine)),
+            "trades": ledger["trades"],
+            "rejected": ledger["rejected"],
+            **({"errors": list(ledger["errors"][-10:])}
+               if ledger["errors"] else {}),
+            **({"tampered": True} if ledger["tampered"] else {}),
+            **({"uses_hidden_state": True}
+               if label in sess.specs and declares_hidden_state(
+                   sess.live["agents"][label]) else {}),
+        }
+    return {"clock": sess.clock(), "market": market, "agents": agents,
+            "checkpoints": sorted(sess.checkpoints)}
+
+
+SessionIdArg = Annotated[str, Field(description=(
+    "A session id exactly as open_session or session_fork returned it."))]
+
+
+@server.tool(
+    title='Open a market session',
+    description=(
+        "Open a simulated market that this server keeps between calls, and "
+        "get a session id back. Use a session when you want to decide each "
+        "step yourself and see what happened before the next: send orders "
+        "with session_step, read with session_state, try two actions from "
+        "one state with session_fork, and go back with session_rewind. To "
+        "score a strategy you can write as a spec, use evaluate_strategies "
+        "or rank_strategies instead. `agents` names the traders: null for "
+        "one you drive with orders, or a strategy spec for one that trades "
+        "itself each step. Opening runs no market. At most "
+        f"{MAX_SESSIONS} sessions are open at once, in this server's memory "
+        f"only, and one idle for {SESSION_IDLE_SECONDS // 60} minutes is "
+        "closed."),
+    annotations=_STARTS_JOB,
+)
+@_guarded
+def open_session(
+    agents: Annotated[dict[str, dict[str, Any] | None] | None, Field(
+        description=(
+            f"The traders in this market, keyed by a name you choose. null "
+            f"is one you drive with orders in session_step; a strategy spec, "
+            f"for example {_SPEC_EXAMPLE}, trades by itself each step. At "
+            f"most {MAX_SESSION_AGENTS}. All of them trade one market and "
+            f"move each other's prices. Omit for one agent called \"me\"."))
+    ] = None,
+    seed: SeedArg = 7,
+    universe_size: UniverseSizeArg = 40,
+    universe_seed: UniverseSeedArg = 111,
+    universe_sectors: SectorsArg = None,
+    universe: UniverseArg = None,
+    preset: PresetArg = None,
+    steps_per_day: Annotated[int, Field(description=(
+        f"Decision points per trading day, 1 to {MAX_STEPS_PER_DAY}. A step "
+        f"is 65 minutes, so {DEFAULT_STEPS_PER_DAY} cover the trading "
+        f"session."))] = DEFAULT_STEPS_PER_DAY,
+    cash: CashArg = 1_000_000.0,
+    max_leverage: LeverageArg = 2.0,
+) -> dict[str, Any]:
+    """Open a session. See the sessions comment above for the design."""
+    if (refused := _seed_refusal(seed=seed)) is not None:
+        return refused
+    preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
+    if not 1 <= steps_per_day <= MAX_STEPS_PER_DAY:
+        return _fail(f"steps_per_day must be 1..{MAX_STEPS_PER_DAY}, got "
+                     f"{steps_per_day}")
+    agents = {"me": None} if agents is None else agents
+    if not isinstance(agents, dict) or not agents:
+        return _fail("agents must name at least one trader, for example "
+                     "{\"me\": null}")
+    if len(agents) > MAX_SESSION_AGENTS:
+        return _fail(f"at most {MAX_SESSION_AGENTS} agents in a session, got "
+                     f"{len(agents)}")
+    bad = [name for name in agents
+           if not isinstance(name, str) or not name.strip() or len(name) > 64]
+    if bad:
+        return _fail(f"agent names are non-empty strings of at most 64 "
+                     f"characters, got {bad}")
+    for name in agents:
+        if (house := _house_label(name)) is not None:
+            return _fail(f"agent name {name!r}: {house}. Choose another.")
+    hand = [name for name, spec in agents.items() if spec is None]
+    try:
+        specs, _assumed = (_specs_from({k: v for k, v in agents.items()
+                                        if v is not None})
+                           if len(hand) < len(agents) else ({}, []))
+        roster, concentrated, uni_doc = _resolve_universe(
+            universe or {"size": universe_size, "seed": universe_seed,
+                         "sectors": universe_sectors})
+        # The portfolio's own checks on cash and the leverage cap, before a
+        # session is registered.
+        tf.Portfolio(cash=cash, max_leverage=max_leverage)
+    except (ValueError, tf.ValidationError) as exc:
+        return _fail(str(exc))
+
+    _expire_sessions()
+    with _sessions_lock:
+        if (refused := _session_capacity()) is not None:
+            return refused
+        sid = _new_session_id()
+        sess = _Session(sid, seed=seed, roster=roster, uni_doc=uni_doc,
+                        concentrated=concentrated, preset=preset,
+                        steps_per_day=steps_per_day, cash=float(cash),
+                        max_leverage=max_leverage, specs=specs, hand=hand)
+        _sessions[sid] = sess
+    return {
+        "ok": True,
+        "session_id": sid,
+        **_session_view(sess),
+        "note": (
+            "Advance with session_step, which sends orders for one agent at "
+            "the first step it runs. An order is a signed share count "
+            "(positive buys), {\"quantity\": q, \"limit_price\": p} for a "
+            "limit order, or \"cancel\". A checkpoint is kept at the open "
+            "and after every session_step, and session_rewind returns to "
+            "one. Close the session with close_session when done."),
+        "limits": {
+            "max_sessions": MAX_SESSIONS,
+            "max_checkpoints": MAX_CHECKPOINTS,
+            "idle_seconds": SESSION_IDLE_SECONDS,
+            "max_days": MAX_SESSION_DAYS,
+            "max_steps_per_call": MAX_SESSION_STEPS,
+        },
+        "caveats": _session_caveats(sess),
+        "provenance": _session_provenance(sess, orders=False),
+    }
+
+
+@server.tool(
+    title='Advance a market session',
+    description=(
+        "Advance an open session by a number of steps or days, optionally "
+        "sending orders for one of its agents at the first step, and get "
+        "back the fills, each agent's portfolio, the prices and what "
+        "changed. This is the one session tool that trades. An order is a "
+        "signed share count (positive buys), {\"quantity\": q, "
+        "\"limit_price\": p} for a limit order, or \"cancel\"; a malformed "
+        "order is refused before anything runs, and one the market refuses "
+        "(the leverage cap, a book that cannot fill) is listed and the rest "
+        f"trade. At most {MAX_SESSION_STEPS} steps a call and "
+        f"{MAX_SESSION_DAYS} days a session; a step costs about a sixth of "
+        "a day of evaluate_strategies for one entrant. Keeps a checkpoint "
+        "at the step it ends on. Deterministic: the same calls from the "
+        "same open give the same result."),
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                idempotentHint=False, openWorldHint=False),
+)
+@_guarded
+def session_step(
+    session_id: SessionIdArg,
+    steps: Annotated[int | None, Field(description=(
+        "Decision points to advance, 1 or more. Give steps or days, not "
+        "both; with neither, one step."))] = None,
+    days: Annotated[int | None, Field(description=(
+        "Advance through this many market closes, the day in progress "
+        "counting as the first. Give steps or days, not both."))] = None,
+    agent: Annotated[str | None, Field(description=(
+        "The agent the orders are for, one opened with null. May be "
+        "omitted when the session has exactly one such agent."))] = None,
+    orders: Annotated[dict[str, Any] | None, Field(description=(
+        "Orders sent at the first step this call runs, keyed by ticker: a "
+        "signed share count for a market order (positive buys), "
+        "{\"quantity\": q, \"limit_price\": p} for a limit order that waits "
+        "in the book, or \"cancel\" to withdraw the agent's waiting orders "
+        "on that ticker."))] = None,
+) -> dict[str, Any]:
+    """Step a session, with the caller's orders at the first step."""
+    sess, refused = _session(session_id)
+    if refused is not None:
+        return refused
+    with sess.lock:
+        if (refused := _closed_under(sess)) is not None:
+            return refused
+        sess.touched = time.monotonic()
+        if steps is not None and days is not None:
+            return _fail("give steps or days, not both")
+        spd = sess.steps_per_day
+        if days is not None:
+            if days < 1:
+                return _fail(f"days must be 1 or more, got {days}")
+            n = (spd - sess.step % spd) + (days - 1) * spd
+        else:
+            n = 1 if steps is None else steps
+            if n < 1:
+                return _fail(f"steps must be 1 or more, got {n}")
+        if n > MAX_SESSION_STEPS:
+            return _fail(
+                f"{n} steps is more than the {MAX_SESSION_STEPS} one call may "
+                f"run ({MAX_DAYS} days at {DEFAULT_STEPS_PER_DAY} steps). "
+                f"Step in parts.")
+        if -(-(sess.step + n) // spd) > MAX_SESSION_DAYS:
+            return _fail(
+                f"a session runs at most {MAX_SESSION_DAYS} days, and "
+                f"{n} more steps from step {sess.step} would pass it. Past "
+                f"{MAX_SESSION_DAYS} days no band in the envelope grades a "
+                f"result.")
+        hand_orders: dict[str, dict[str, Any]] = {}
+        echo: dict[str, Any] = {}
+        if orders:
+            if agent is None:
+                if len(sess.hand) != 1:
+                    return _fail(
+                        f"name the agent the orders are for: this session's "
+                        f"agents driven by orders are {sess.hand or 'none'}")
+                agent = sess.hand[0]
+            if agent not in sess.labels:
+                return _fail(f"no agent {agent!r} in this session; it holds "
+                             f"{sess.labels}")
+            if agent in sess.specs:
+                return _fail(
+                    f"{agent!r} trades by its strategy spec, so it takes no "
+                    f"orders. The agents driven by orders are "
+                    f"{sess.hand or 'none'}; open a session with an agent "
+                    f"set to null to trade by hand.")
+            try:
+                hand_orders[agent], echo = _orders_from(orders, sess.tickers)
+            except ValueError as exc:
+                return _fail(str(exc))
+            if echo:
+                sess.live["orders"].append(
+                    {"step": sess.step, "agent": agent, "orders": echo})
+        elif agent is not None and agent not in sess.labels:
+            return _fail(f"no agent {agent!r} in this session; it holds "
+                         f"{sess.labels}")
+
+        view = MarketView(sess.engine)
+        books = sess.live["portfolios"]
+        before = {
+            "clock": sess.clock(),
+            "prices": _f64(view.prices()),
+            "macro": view.macro_fields,
+            "worth": {label: books[label].net_worth(sess.engine)
+                      for label in sess.labels},
+            "fills": {label: len(books[label].fills) for label in sess.labels},
+        }
+        refusals = sess.advance(n, hand_orders)
+        sess.keep()
+
+        view = MarketView(sess.engine)
+        after = _f64(view.prices())
+        moves = [(t, a, b) for t, a, b in zip(view.tickers, before["prices"],
+                                              after) if a > 0]
+        moves.sort(key=lambda m: (-abs(m[2] / m[1] - 1.0), m[0]))
+        macro_now = view.macro_fields
+        state = _session_view(sess)
+        books = sess.live["portfolios"]
+        for label in sess.labels:
+            new = books[label].fills[before["fills"][label]:]
+            entry = state["agents"][label]
+            entry["net_worth_change"] = round(
+                books[label].net_worth(sess.engine)
+                - before["worth"][label], 2)
+            entry["fills"] = [
+                {k: f[k] for k in ("ticker", "quantity", "price", "notional",
+                                   "partial", "day", "step", "order_id",
+                                   "liquidity") if k in f}
+                for f in new[:MAX_FILLS_SHOWN]]
+            entry["fills_this_call"] = len(new)
+            entry["refused"] = refusals[label]
+            if label == agent and echo:
+                entry["orders_sent"] = echo
+        return {
+            "ok": True,
+            "session_id": sess.id,
+            "from": before["clock"],
+            **state,
+            "changed": {
+                "steps_run": n,
+                "movers": [{"ticker": t, "from": round(a, 4),
+                            "to": round(b, 4),
+                            "change_pct": round((b / a - 1.0) * 100.0, 4)}
+                           for t, a, b in moves[:MOVERS_SHOWN]],
+                "macro": {k: {"from": before["macro"][k], "to": v}
+                          for k, v in macro_now.items()
+                          if before["macro"].get(k) != v},
+            },
+            "checkpoint": sess.step,
+            "caveats": _session_caveats(sess),
+            "provenance": _session_provenance(sess, orders=False),
+        }
+
+
+@server.tool(
+    title='Read a market session',
+    description=(
+        "Read an open session without changing it: the clock, every price, "
+        "the published macro figures, today's news by name, each agent's "
+        "portfolio and open orders, and the checkpoints session_rewind can "
+        "return to. Name tickers to add each one's open, high, low, volume "
+        "and best bid and ask. It shows what a trader could see and nothing "
+        "of the simulator's own state. Omit session_id to list the open "
+        "sessions. Runs no market."),
+    annotations=_READ_ONLY,
+)
+@_guarded
+def session_state(
+    session_id: Annotated[str | None, Field(description=(
+        "A session id from open_session or session_fork. Omit to list the "
+        "sessions this server holds."))] = None,
+    tickers: Annotated[list[str] | None, Field(description=(
+        "Tickers to show in detail: the day's open, high, low and volume, "
+        "the previous close, and the book's best bid and ask."))] = None,
+) -> dict[str, Any]:
+    """The session as a trader may see it, or the list of sessions."""
+    if session_id is None:
+        _expire_sessions()
+        with _sessions_lock:
+            held = sorted(_sessions.values(), key=lambda s: s.id)
+        now = time.monotonic()
+        return {
+            "ok": True,
+            "sessions": [
+                {"session_id": s.id, "step": s.step, "agents": s.labels,
+                 "preset": s.preset or tf.model_preset()["name"],
+                 "idle_seconds": round(now - s.touched, 1)}
+                for s in held],
+            "note": (f"Sessions live in this server process only. At most "
+                     f"{MAX_SESSIONS} are open at once, and one idle for "
+                     f"{SESSION_IDLE_SECONDS // 60} minutes is closed."),
+            "provenance": _provenance(),
+        }
+    sess, refused = _session(session_id)
+    if refused is not None:
+        return refused
+    with sess.lock:
+        if (refused := _closed_under(sess)) is not None:
+            return refused
+        sess.touched = time.monotonic()
+        unknown = [t for t in (tickers or []) if t not in sess.tickers]
+        if unknown:
+            return _fail(_unknown_ticker(unknown[0], sess.tickers)
+                         .replace("obs.tickers", "the prices"))
+        return {
+            "ok": True,
+            "session_id": sess.id,
+            **_session_view(sess, tickers),
+            "caveats": _session_caveats(sess),
+            "provenance": _session_provenance(sess, orders=True),
+        }
+
+
+@server.tool(
+    title='Fork a market session',
+    description=(
+        "Copy an open session, at its present state, into a new session "
+        "with its own id, so you can try two different actions from the "
+        "same market and compare them. The copy continues exactly as the "
+        "original would: the same steps and orders give the same prices "
+        "in both. The original is unchanged. Counts against the "
+        f"{MAX_SESSIONS}-session cap; runs no market."),
+    annotations=_STARTS_JOB,
+)
+@_guarded
+def session_fork(session_id: SessionIdArg) -> dict[str, Any]:
+    """Two futures from one state, through a snapshot and a restore."""
+    sess, refused = _session(session_id)
+    if refused is not None:
+        return refused
+    with sess.lock:
+        if (refused := _closed_under(sess)) is not None:
+            return refused
+        sess.touched = time.monotonic()
+        with _sessions_lock:
+            if (refused := _session_capacity()) is not None:
+                return refused
+            child = sess.forked(_new_session_id())
+            _sessions[child.id] = child
+    return {
+        "ok": True,
+        "session_id": child.id,
+        "forked_from": sess.id,
+        **_session_view(child),
+        "caveats": _session_caveats(child),
+        "provenance": _session_provenance(child, orders=False),
+    }
+
+
+@server.tool(
+    title='Rewind a market session',
+    description=(
+        "Put an open session back to a checkpoint it kept, by step, and "
+        "drop every checkpoint after it. Checkpoints are kept at the open "
+        "and at the end of every session_step call; session_state lists "
+        f"them, and a session keeps at most {MAX_CHECKPOINTS}. To keep the "
+        "later state as well, session_fork first. Returns the session as "
+        "session_state does. Runs no market."),
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True,
+                                idempotentHint=True, openWorldHint=False),
+)
+@_guarded
+def session_rewind(
+    session_id: SessionIdArg,
+    step: Annotated[int, Field(description=(
+        "The step to return to, one of the session's checkpoints."))],
+) -> dict[str, Any]:
+    """Back to an earlier state of this line."""
+    sess, refused = _session(session_id)
+    if refused is not None:
+        return refused
+    with sess.lock:
+        if (refused := _closed_under(sess)) is not None:
+            return refused
+        sess.touched = time.monotonic()
+        if step not in sess.checkpoints:
+            return _fail(
+                f"no checkpoint at step {step}. This session keeps "
+                f"{sorted(sess.checkpoints)}: the open, the end of each "
+                f"session_step call, and at most {MAX_CHECKPOINTS} in all.")
+        if step != sess.step:
+            sess.lineage.append({"rewound_from": sess.step, "to_step": step})
+            sess.restore(step)
+        return {
+            "ok": True,
+            "session_id": sess.id,
+            **_session_view(sess),
+            "caveats": _session_caveats(sess),
+            "provenance": _session_provenance(sess, orders=False),
+        }
+
+
+@server.tool(
+    title='Close a market session',
+    description=(
+        "Close an open session and free its memory, returning each agent's "
+        "final portfolio and every order sent on the session's line, which "
+        "is what re-runs it from open_session. The session and its "
+        "checkpoints are gone afterwards. Runs no market."),
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True,
+                                idempotentHint=True, openWorldHint=False),
+)
+@_guarded
+def close_session(session_id: SessionIdArg) -> dict[str, Any]:
+    """Free a session, with its final state."""
+    sess, refused = _session(session_id)
+    if refused is not None:
+        return refused
+    with sess.lock:
+        if (refused := _closed_under(sess)) is not None:
+            return refused
+        out = {
+            "ok": True,
+            "session_id": sess.id,
+            "closed": True,
+            **_session_view(sess),
+            "caveats": _session_caveats(sess),
+            "provenance": _session_provenance(sess, orders=True),
+        }
+        with _sessions_lock:
+            _sessions.pop(sess.id, None)
+    return out
 
 
 def main() -> None:

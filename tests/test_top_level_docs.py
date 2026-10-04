@@ -89,12 +89,20 @@ def test_c9_says_it_measures_one_immediate_order():
 
 
 def test_the_readme_counts_the_mcp_tools_the_server_registers():
-    """The README said twelve; `mcp.py` registers thirteen."""
+    """The README said twelve; `mcp.py` registers thirteen. It then called
+    all thirteen read-only when `start_job` was not, and the session tools
+    are not either, so the row counts both. Read from the source, so this
+    runs without the `mcp` extra; `test_mcp.py` checks the same row against
+    the registered annotations."""
     source = read("python/tradefloor/mcp.py")
     count = source.count("@server.tool")
-    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+    read_only = source.count("annotations=_READ_ONLY,")
+    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+             16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+             20: "twenty"}
     text = read("README.md")
-    assert f"| MCP server | {words[count]} read-only tools" in text
+    assert (f"| MCP server | {words[count]} tools for a coding agent, "
+            f"{words[read_only]} of them read-only") in text
 
 
 def test_the_examples_table_says_what_the_factors_sum_to():
