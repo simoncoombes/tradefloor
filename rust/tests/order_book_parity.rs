@@ -215,11 +215,13 @@ fn matches_the_reference_across_a_replayed_program() {
                     side_of(side),
                     f(quantity),
                     taker_id,
-                    SubmitOptions {
-                        limit_price: limit_price.as_deref().map(f),
-                        post_remainder: post_remainder.unwrap_or(false),
-                        order_id: order_id.clone(),
-                        skip_own: false,
+                    {
+                        let mut submit_options = SubmitOptions::default();
+                        submit_options.limit_price = limit_price.as_deref().map(f);
+                        submit_options.post_remainder = post_remainder.unwrap_or(false);
+                        submit_options.order_id = order_id.clone();
+                        submit_options.skip_own = false;
+                        submit_options
                     },
                 );
             }

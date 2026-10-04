@@ -1245,7 +1245,7 @@ impl Engine {
     /// }
     /// fn day(e: &mut Engine, d: i64) {
     ///     e.open_market();
-    ///     let bell = GameTime { hour: 9, minute: 30, day_of_week: d % 5 };
+    ///     let bell = GameTime::new(9, 30, d % 5);
     ///     e.run_session(&SessionRequest::new(bell, 390), &mut SessionBuffer::new());
     ///     e.close_day(d + 1);
     /// }

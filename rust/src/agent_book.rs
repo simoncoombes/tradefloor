@@ -230,6 +230,7 @@ impl RestMode {
 /// An agent's order that is waiting: resting in the queue, or waiting for the
 /// traded range.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentOrder {
     pub id: String,
     pub agent: String,
@@ -244,6 +245,33 @@ pub struct AgentOrder {
     /// among agents' orders.
     pub sequence: u64,
     pub mode: RestMode,
+}
+
+impl AgentOrder {
+    /// A waiting order with nothing filled: `remaining` is `quantity` and
+    /// `sequence` is 0. Set `remaining` and `sequence` on the value to
+    /// restore one that has part filled or that queued behind others.
+    pub fn new(
+        id: impl Into<String>,
+        agent: impl Into<String>,
+        ticker: impl Into<String>,
+        side: Side,
+        limit: f64,
+        quantity: f64,
+        mode: RestMode,
+    ) -> Self {
+        AgentOrder {
+            id: id.into(),
+            agent: agent.into(),
+            ticker: ticker.into(),
+            side,
+            limit,
+            quantity,
+            remaining: quantity,
+            sequence: 0,
+            mode,
+        }
+    }
 }
 
 /// Which side of a trade an agent was on.
@@ -278,6 +306,7 @@ impl Liquidity {
 
 /// One fill of one agent's order, at one price.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentFill {
     pub agent: String,
     pub order_id: String,
@@ -303,6 +332,7 @@ pub struct AgentFill {
 
 /// One agent's permanent impact on one name, applied on one tick.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentImpact {
     pub agent: String,
     pub ticker: String,
@@ -324,6 +354,7 @@ pub struct AgentImpact {
 /// snapshot, so every run that never uses this hashes as it did before it
 /// existed.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct BookState {
     /// Per company slot, in roster order: see the `TAKEN_*` indices.
     pub taken: Vec<[f64; TAKEN_WIDTH]>,
@@ -537,6 +568,7 @@ pub fn remove_front(book: &mut OrderBook, side: Side, owner: &str, quantity: f64
 }
 
 /// What building the agent-facing book needs.
+#[non_exhaustive]
 pub struct AgentBookInputs<'a> {
     pub company: &'a TickCompany,
     pub vix: f64,
@@ -549,6 +581,28 @@ pub struct AgentBookInputs<'a> {
     pub orders: &'a [AgentOrder],
     /// Leave this agent's own orders out: the book an agent's order meets.
     pub exclude_agent: Option<&'a str>,
+}
+
+impl<'a> AgentBookInputs<'a> {
+    /// The book for `company` with nothing taken from it, no waiting
+    /// orders and no agent left out. Set `taken`, `orders` or
+    /// `exclude_agent` on the value to add them.
+    pub fn new(
+        company: &'a TickCompany,
+        vix: f64,
+        params: &'a ModelParams,
+        market_sigma_daily: f64,
+    ) -> Self {
+        AgentBookInputs {
+            company,
+            vix,
+            params,
+            market_sigma_daily,
+            taken: [0.0; TAKEN_WIDTH],
+            orders: &[],
+            exclude_agent: None,
+        }
+    }
 }
 
 /// The maker's ladder, quoted the way the tick quotes it for this name.

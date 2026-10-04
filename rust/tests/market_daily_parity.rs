@@ -94,41 +94,24 @@ fn load() -> Json {
 
 /// A company carrying only what the close reads.
 fn company(price: f64, previous_close: f64) -> TickCompany {
-    TickCompany {
-        id: "x".into(),
-        ticker: "X".into(),
-        sector: "technology".into(),
-        is_bankrupt: false,
-        is_public: true,
-        sector_volatility: Some(1.0),
-        sector_avg_pe: Some(32.0),
-        eps: Some(4.0),
-        book_value_per_share: Some(20.0),
-        revenue_growth: Some(0.1),
-        stock: TickStock {
-            price,
-            previous_close,
-            previous_tick_price: None,
-            open: 0.0,
-            high: 0.0,
-            low: 0.0,
-            volume: 0.0,
-            avg_volume: 0.0,
-            shares_outstanding: 1e8,
-            market_cap: 0.0,
-            mispricing_s: None,
-            mispricing_s_prev_close: None,
-            mispricing_momentum: None,
-            fair_value_offset: None,
-            maker_inventory: None,
-            garch_variance: 0.0,
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: None,
-            beta: Some(1.0),
-            short_interest: 0.0,
-            float: 1e8,
-        },
-    }
+    let stock = {
+        let mut tick_stock = TickStock::new(price, 1e8);
+        tick_stock.previous_close = previous_close;
+        tick_stock.open = 0.0;
+        tick_stock.high = 0.0;
+        tick_stock.low = 0.0;
+        tick_stock.market_cap = 0.0;
+        tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+        tick_stock.beta = Some(1.0);
+        tick_stock
+    };
+    let mut tick_company = TickCompany::new("x", "X", "technology", stock);
+    tick_company.sector_volatility = Some(1.0);
+    tick_company.sector_avg_pe = Some(32.0);
+    tick_company.eps = Some(4.0);
+    tick_company.book_value_per_share = Some(20.0);
+    tick_company.revenue_growth = Some(0.1);
+    tick_company
 }
 
 fn report(name: &str, problems: Vec<String>, checked: usize) {
@@ -163,14 +146,17 @@ fn replay_case(case: &Json) -> (TickCompany, String) {
 
     close_day(
         &mut c,
-        &CloseInputs {
-            daily_innovation: maybe(&i["dailyInnovation"]),
+        &{
             // Passed in rather than looked up, following the crate's
             // convention: the sector table lives in the reference implementation.
-            sector_base_daily_variance: bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
-            vix: 15.0,
-            vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-            avg_volume: AvgVolumePolicy::ReferenceEma,
+            let mut close_inputs = CloseInputs::new(
+                maybe(&i["dailyInnovation"]),
+                bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
+                15.0,
+                tradefloor::params::PT_V1.market_vol_vix_anchor,
+            );
+            close_inputs.avg_volume = AvgVolumePolicy::ReferenceEma;
+            close_inputs
         },
     );
 
@@ -296,12 +282,15 @@ fn walk_chain(chain: &Json, base: f64, mut visit: impl FnMut(usize, &TickCompany
 
         close_day(
             &mut c,
-            &CloseInputs {
-                daily_innovation: None,
-                sector_base_daily_variance: base,
-                vix: 15.0,
-                vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-                avg_volume: AvgVolumePolicy::ReferenceEma,
+            &{
+                let mut close_inputs = CloseInputs::new(
+                    None,
+                    base,
+                    15.0,
+                    tradefloor::params::PT_V1.market_vol_vix_anchor,
+                );
+                close_inputs.avg_volume = AvgVolumePolicy::ReferenceEma;
+                close_inputs
             },
         );
 

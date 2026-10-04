@@ -116,6 +116,7 @@ pub fn reset_daily_prices(companies: &mut [TickCompany]) {
 
 /// What the close needs beyond the company's own state.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CloseInputs {
     /// The day's accumulated `randomNoise` from the factor attribution.
     ///
@@ -141,6 +142,24 @@ pub struct CloseInputs {
     /// How the close treats `avg_volume`. [`AvgVolumePolicy::Hold`] unless
     /// you are replaying a reference tape.
     pub avg_volume: AvgVolumePolicy,
+}
+
+impl CloseInputs {
+    /// A close under `AvgVolumePolicy::Hold`, the shipped default.
+    pub fn new(
+        daily_innovation: Option<f64>,
+        sector_base_daily_variance: f64,
+        vix: f64,
+        vix_anchor: f64,
+    ) -> Self {
+        CloseInputs {
+            daily_innovation,
+            sector_base_daily_variance,
+            vix,
+            vix_anchor,
+            avg_volume: AvgVolumePolicy::Hold,
+        }
+    }
 }
 
 /// Close-of-day bookkeeping for one company.

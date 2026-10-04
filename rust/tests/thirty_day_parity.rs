@@ -184,40 +184,46 @@ fn load(name: &str) -> Json {
 
 fn build_company(c: &Json) -> TickCompany {
     let s = &c["stock"];
-    TickCompany {
-        id: c["id"].as_str().unwrap().to_string(),
-        ticker: c["ticker"].as_str().unwrap().to_string(),
-        sector: c["sector"].as_str().unwrap().to_string(),
-        is_bankrupt: c["isBankrupt"].as_bool().unwrap(),
-        is_public: c["isPublic"].as_bool().unwrap(),
-        sector_volatility: maybe(&c["sectorVolatility"]),
-        sector_avg_pe: maybe(&c["sectorAvgPe"]),
-        eps: maybe(&c["eps"]),
-        book_value_per_share: maybe(&c["bookValuePerShare"]),
-        revenue_growth: maybe(&c["revenueGrowth"]),
-        stock: TickStock {
-            price: bits(s["price"].as_str().unwrap()),
-            previous_close: bits(s["previousClose"].as_str().unwrap()),
-            previous_tick_price: maybe(&s["previousTickPrice"]),
-            open: bits(s["open"].as_str().unwrap()),
-            high: bits(s["high"].as_str().unwrap()),
-            low: bits(s["low"].as_str().unwrap()),
-            volume: bits(s["volume"].as_str().unwrap()),
-            avg_volume: bits(s["avgVolume"].as_str().unwrap()),
-            shares_outstanding: bits(s["sharesOutstanding"].as_str().unwrap()),
-            market_cap: bits(s["marketCap"].as_str().unwrap()),
-            mispricing_s: maybe(&s["mispricingS"]),
-            mispricing_s_prev_close: maybe(&s["mispricingSPrevClose"]),
-            mispricing_momentum: maybe(&s["mispricingMomentum"]),
-            fair_value_offset: None,
-            maker_inventory: maybe(&s["makerInventory"]),
-            garch_variance: bits(s["garchVariance"].as_str().unwrap()),
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: maybe(&s["lastDailyReturn"]),
-            beta: maybe(&s["beta"]),
-            short_interest: bits(s["shortInterest"].as_str().unwrap()),
-            float: bits(s["float"].as_str().unwrap()),
-        },
+    {
+        let stock = {
+            let mut tick_stock = TickStock::new(
+                bits(s["price"].as_str().unwrap()),
+                bits(s["sharesOutstanding"].as_str().unwrap()),
+            );
+            tick_stock.previous_close = bits(s["previousClose"].as_str().unwrap());
+            tick_stock.previous_tick_price = maybe(&s["previousTickPrice"]);
+            tick_stock.open = bits(s["open"].as_str().unwrap());
+            tick_stock.high = bits(s["high"].as_str().unwrap());
+            tick_stock.low = bits(s["low"].as_str().unwrap());
+            tick_stock.volume = bits(s["volume"].as_str().unwrap());
+            tick_stock.avg_volume = bits(s["avgVolume"].as_str().unwrap());
+            tick_stock.market_cap = bits(s["marketCap"].as_str().unwrap());
+            tick_stock.mispricing_s = maybe(&s["mispricingS"]);
+            tick_stock.mispricing_s_prev_close = maybe(&s["mispricingSPrevClose"]);
+            tick_stock.mispricing_momentum = maybe(&s["mispricingMomentum"]);
+            tick_stock.maker_inventory = maybe(&s["makerInventory"]);
+            tick_stock.garch_variance = bits(s["garchVariance"].as_str().unwrap());
+            tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+            tick_stock.last_daily_return = maybe(&s["lastDailyReturn"]);
+            tick_stock.beta = maybe(&s["beta"]);
+            tick_stock.short_interest = bits(s["shortInterest"].as_str().unwrap());
+            tick_stock.float = bits(s["float"].as_str().unwrap());
+            tick_stock
+        };
+        let mut tick_company = TickCompany::new(
+            c["id"].as_str().unwrap().to_string(),
+            c["ticker"].as_str().unwrap().to_string(),
+            c["sector"].as_str().unwrap().to_string(),
+            stock,
+        );
+        tick_company.is_bankrupt = c["isBankrupt"].as_bool().unwrap();
+        tick_company.is_public = c["isPublic"].as_bool().unwrap();
+        tick_company.sector_volatility = maybe(&c["sectorVolatility"]);
+        tick_company.sector_avg_pe = maybe(&c["sectorAvgPe"]);
+        tick_company.eps = maybe(&c["eps"]);
+        tick_company.book_value_per_share = maybe(&c["bookValuePerShare"]);
+        tick_company.revenue_growth = maybe(&c["revenueGrowth"]);
+        tick_company
     }
 }
 
@@ -284,12 +290,10 @@ fn check(file: &str) {
         // ── 1. DAILY ──────────────────────────────────────────────────────
         let mut tape = Tape::new(tape_of(&draws["daily"]), format!("day {day} daily"));
         let advance = engine.advance_day_with(
-            &DayAdvanceRequest {
-                volatility,
-                active_shocks: &[],
-                market_return_pct: 0.0,
-                game_day: day,
-                timestamp: day * 24 * 60,
+            &{
+                let mut day_advance_request = DayAdvanceRequest::new(day, day * 24 * 60);
+                day_advance_request.volatility = volatility;
+                day_advance_request
             },
             &mut tape,
         );
@@ -339,16 +343,10 @@ fn check(file: &str) {
         for (t, tick_tape) in tick_tapes.iter().enumerate() {
             let mut tape = Tape::new(tape_of(tick_tape), format!("day {day} tick {t}"));
             engine.tick_with(
-                &TickRequest {
-                    time: GameTime {
-                        hour,
-                        minute,
-                        day_of_week: 3,
-                    },
-                    volatility_multiplier: volatility,
-                    news: &[],
-                    news_impact_queue: &[],
-                    order_volumes: &[],
+                &{
+                    let mut tick_request = TickRequest::new(GameTime::new(hour, minute, 3));
+                    tick_request.volatility_multiplier = volatility;
+                    tick_request
                 },
                 &mut tape,
             );
@@ -373,10 +371,11 @@ fn check(file: &str) {
         // must reproduce the reference's state evolution exactly -- the
         // shipped `Hold` policy is an argued divergence tested in
         // `market/daily.rs`, not here.
-        engine.close_market(&DayCloseRequest {
-            daily_innovations: &vec![None; roster],
-            sector_base_variances: &sector_variances,
-            avg_volume: AvgVolumePolicy::ReferenceEma,
+        let innovations = vec![None; roster];
+        engine.close_market(&{
+            let mut day_close_request = DayCloseRequest::new(&innovations, &sector_variances);
+            day_close_request.avg_volume = AvgVolumePolicy::ReferenceEma;
+            day_close_request
         });
 
         // ── Compare ───────────────────────────────────────────────────────

@@ -178,40 +178,46 @@ fn load(name: &str) -> Json {
 
 fn build_company(c: &Json) -> TickCompany {
     let s = &c["stock"];
-    TickCompany {
-        id: c["id"].as_str().unwrap().to_string(),
-        ticker: c["ticker"].as_str().unwrap().to_string(),
-        sector: c["sector"].as_str().unwrap().to_string(),
-        is_bankrupt: c["isBankrupt"].as_bool().unwrap(),
-        is_public: c["isPublic"].as_bool().unwrap(),
-        sector_volatility: maybe(&c["sectorVolatility"]),
-        sector_avg_pe: maybe(&c["sectorAvgPe"]),
-        eps: maybe(&c["eps"]),
-        book_value_per_share: maybe(&c["bookValuePerShare"]),
-        revenue_growth: maybe(&c["revenueGrowth"]),
-        stock: TickStock {
-            price: bits(s["price"].as_str().unwrap()),
-            previous_close: bits(s["previousClose"].as_str().unwrap()),
-            previous_tick_price: maybe(&s["previousTickPrice"]),
-            open: bits(s["open"].as_str().unwrap()),
-            high: bits(s["high"].as_str().unwrap()),
-            low: bits(s["low"].as_str().unwrap()),
-            volume: bits(s["volume"].as_str().unwrap()),
-            avg_volume: bits(s["avgVolume"].as_str().unwrap()),
-            shares_outstanding: bits(s["sharesOutstanding"].as_str().unwrap()),
-            market_cap: bits(s["marketCap"].as_str().unwrap()),
-            mispricing_s: maybe(&s["mispricingS"]),
-            mispricing_s_prev_close: maybe(&s["mispricingSPrevClose"]),
-            mispricing_momentum: maybe(&s["mispricingMomentum"]),
-            fair_value_offset: None,
-            maker_inventory: maybe(&s["makerInventory"]),
-            garch_variance: bits(s["garchVariance"].as_str().unwrap()),
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: maybe(&s["lastDailyReturn"]),
-            beta: maybe(&s["beta"]),
-            short_interest: bits(s["shortInterest"].as_str().unwrap()),
-            float: bits(s["float"].as_str().unwrap()),
-        },
+    {
+        let stock = {
+            let mut tick_stock = TickStock::new(
+                bits(s["price"].as_str().unwrap()),
+                bits(s["sharesOutstanding"].as_str().unwrap()),
+            );
+            tick_stock.previous_close = bits(s["previousClose"].as_str().unwrap());
+            tick_stock.previous_tick_price = maybe(&s["previousTickPrice"]);
+            tick_stock.open = bits(s["open"].as_str().unwrap());
+            tick_stock.high = bits(s["high"].as_str().unwrap());
+            tick_stock.low = bits(s["low"].as_str().unwrap());
+            tick_stock.volume = bits(s["volume"].as_str().unwrap());
+            tick_stock.avg_volume = bits(s["avgVolume"].as_str().unwrap());
+            tick_stock.market_cap = bits(s["marketCap"].as_str().unwrap());
+            tick_stock.mispricing_s = maybe(&s["mispricingS"]);
+            tick_stock.mispricing_s_prev_close = maybe(&s["mispricingSPrevClose"]);
+            tick_stock.mispricing_momentum = maybe(&s["mispricingMomentum"]);
+            tick_stock.maker_inventory = maybe(&s["makerInventory"]);
+            tick_stock.garch_variance = bits(s["garchVariance"].as_str().unwrap());
+            tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+            tick_stock.last_daily_return = maybe(&s["lastDailyReturn"]);
+            tick_stock.beta = maybe(&s["beta"]);
+            tick_stock.short_interest = bits(s["shortInterest"].as_str().unwrap());
+            tick_stock.float = bits(s["float"].as_str().unwrap());
+            tick_stock
+        };
+        let mut tick_company = TickCompany::new(
+            c["id"].as_str().unwrap().to_string(),
+            c["ticker"].as_str().unwrap().to_string(),
+            c["sector"].as_str().unwrap().to_string(),
+            stock,
+        );
+        tick_company.is_bankrupt = c["isBankrupt"].as_bool().unwrap();
+        tick_company.is_public = c["isPublic"].as_bool().unwrap();
+        tick_company.sector_volatility = maybe(&c["sectorVolatility"]);
+        tick_company.sector_avg_pe = maybe(&c["sectorAvgPe"]);
+        tick_company.eps = maybe(&c["eps"]);
+        tick_company.book_value_per_share = maybe(&c["bookValuePerShare"]);
+        tick_company.revenue_growth = maybe(&c["revenueGrowth"]);
+        tick_company
     }
 }
 
@@ -253,10 +259,12 @@ fn check_scenario(file: &str) {
 
     for tick_doc in doc["ticks"].as_array().expect("ticks") {
         let t = tick_doc["tick"].as_i64().unwrap();
-        let time = GameTime {
-            hour: tick_doc["time"]["hour"].as_i64().unwrap(),
-            minute: tick_doc["time"]["minute"].as_i64().unwrap(),
-            day_of_week: tick_doc["time"]["dayOfWeek"].as_i64().unwrap(),
+        let time = {
+            GameTime::new(
+                tick_doc["time"]["hour"].as_i64().unwrap(),
+                tick_doc["time"]["minute"].as_i64().unwrap(),
+                tick_doc["time"]["dayOfWeek"].as_i64().unwrap(),
+            )
         };
         let status = get_market_status(time);
         statuses.insert(status.as_str());
@@ -267,56 +275,43 @@ fn check_scenario(file: &str) {
 
         simulate_market_tick(
             &mut companies,
-            &TickInputs {
+            &{
+                let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
                 // The mechanism ships inert; 0.0 is the value that
                 // preserves the behaviour these tests pin. The lagged
                 // asymmetry branches on this flag and its gain defaults
                 // to 0.0, so false is bit-identical here.
-                prev_day_down: false,
+                tick_inputs.prev_day_down = false;
                 // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-                prev_day_factor: 0.0,
-                day_factor: 0.0,
-            forced_flow_eff: 1.0,
-                universe_stress: 0.0,
-                volume_state: 0.0,
-                volume_idio: &[],
-            jump_move: &[],
-                economy: &economy,
-                market_status: status,
-                intraday_t: intraday_fraction(time),
-                volatility_multiplier: volatility,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
-                sector_keys: &sector_keys,
-                sector_sigmas: &[],
+                tick_inputs.prev_day_factor = 0.0;
+                tick_inputs.market_status = status;
+                tick_inputs.intraday_t = intraday_fraction(time);
+                tick_inputs.volatility_multiplier = volatility;
+                tick_inputs.sector_keys = &sector_keys;
                 // Replaying a RECORDED reference stream: the tape holds the
                 // draws the reference consumed, four-or-zero at settlement,
                 // and `ScriptedRng::finish` asserts exact consumption.
                 // The constant-sigma baseline: these tests predate the factor's
                 // variance process and pin behaviour at its baseline level.
-                market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-                settle_draws: SettleDrawPolicy::FourOrZero,
+                tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+                tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
+                tick_inputs.settle_draws = SettleDrawPolicy::FourOrZero;
                 // The depth counterfactual, off. It reaches no company field.
-                settle_depth_counterfactual: false,
-                resting_orders: &[],
-                fill_impact: &[],
+                tick_inputs.settle_depth_counterfactual = false;
                 // The shipped preset: the parity contract is against the
                 // reference model, which is what PT_V1 carries.
                 // The run's opening nominal output. The growth term is
                 // off on every preset these tests pin, so it is read
                 // nowhere; this tick's own value is what a single-tick
                 // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
+                tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
                 // Trading days closed. The buyback factor is off on
                 // every preset these tests pin, so it is read
                 // nowhere; 0 is what a single-tick caller opens at.
                 // No crisis episode: the mechanism is off on every preset
                 // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+                tick_inputs.crisis_epicentre = None;
+                tick_inputs
             },
             &mut rng,
         );

@@ -36,9 +36,10 @@ exclude = [
     # worse than shipping no test: a consumer running `cargo test` would
     # conclude the crate is broken.
     #
-    # What remains runs on its own: seven integration tests
-    # (circuit_breaker, depth_counterfactual, maker_ladder_allocations,
-    # platform_maths, roster_mutation, snapshot_restore and stream_alignment)
+    # What remains runs on its own: eight integration tests
+    # (circuit_breaker, depth_counterfactual, host_constructors,
+    # maker_ladder_allocations, platform_maths, roster_mutation,
+    # snapshot_restore and stream_alignment)
     # and the unit tests in the source modules. The parity corpus lives in the
     # repository, where suite.yml's rust job runs it with `cargo test
     # --release`. release.yml runs `cargo test --offline` on the packaged

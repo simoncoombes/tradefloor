@@ -93,6 +93,7 @@ pub const PIN_CORPORATE: u8 = 2;
 /// one of the three would restore a market whose untouched domains replay
 /// correctly and whose missing one silently starts a different sequence.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct EngineRngState {
     pub market: RngState,
     pub economy: RngState,
@@ -123,10 +124,91 @@ pub struct EngineRngState {
     pub crisis_epicentre: RngState,
 }
 
+impl EngineRngState {
+    /// Every stream in one flat array of
+    /// [`ENGINE_RNG_STATE_WIDTH`](crate::ENGINE_RNG_STATE_WIDTH) numbers:
+    /// stream `k` of [`crate::rng::stream`] (market 0, economy 1, external
+    /// 2, jumps 3, volume 4, news 5, volume_idio 6, overnight 7,
+    /// market_vol_level 8, crisis_epicentre 9) at words `k * W .. (k + 1) *
+    /// W`, each as [`RngState::to_words`] writes it, where `W` is
+    /// [`RNG_STREAM_WIDTH`](crate::RNG_STREAM_WIDTH). The order is the stream
+    /// ids', not the fields', and a stream added later goes on the end.
+    pub fn to_words(&self) -> [f64; crate::widths::ENGINE_RNG_STATE_WIDTH] {
+        const W: usize = crate::widths::RNG_STREAM_WIDTH;
+        let mut out = [0.0; crate::widths::ENGINE_RNG_STATE_WIDTH];
+        for (k, s) in self.streams().iter().enumerate() {
+            out[k * W..(k + 1) * W].copy_from_slice(&s.to_words());
+        }
+        out
+    }
+
+    /// Read back what [`EngineRngState::to_words`] wrote. Refuses a slice
+    /// that is not exactly `ENGINE_RNG_STATE_WIDTH` long, and any stream
+    /// [`RngState::from_words`] refuses, naming the stream.
+    pub fn from_words(words: &[f64]) -> Result<Self, String> {
+        const W: usize = crate::widths::RNG_STREAM_WIDTH;
+        const N: usize = crate::widths::ENGINE_RNG_STATE_WIDTH;
+        if words.len() != N {
+            return Err(format!(
+                "the engine's RNG state is {N} numbers ({} streams of {W}), got {}",
+                N / W,
+                words.len()
+            ));
+        }
+        let read = |id: u32| {
+            let k = id as usize;
+            RngState::from_words(&words[k * W..(k + 1) * W])
+                .map_err(|e| format!("stream {k}: {e}"))
+        };
+        Ok(EngineRngState {
+            market: read(stream::MARKET)?,
+            economy: read(stream::ECONOMY)?,
+            external: read(stream::EXTERNAL)?,
+            jumps: read(stream::JUMPS)?,
+            volume: read(stream::VOLUME)?,
+            news: read(stream::NEWS)?,
+            volume_idio: read(stream::VOLUME_IDIO)?,
+            overnight: read(stream::OVERNIGHT)?,
+            market_vol_level: read(stream::MARKET_VOL_LEVEL)?,
+            crisis_epicentre: read(stream::CRISIS_EPICENTRE)?,
+        })
+    }
+
+    /// The streams in stream-id order. An array literal, so a stream added
+    /// to `stream::COUNT` without a place here fails to compile.
+    fn streams(&self) -> [RngState; stream::COUNT] {
+        const _: () = assert!(
+            stream::MARKET == 0
+                && stream::ECONOMY == 1
+                && stream::EXTERNAL == 2
+                && stream::JUMPS == 3
+                && stream::VOLUME == 4
+                && stream::NEWS == 5
+                && stream::VOLUME_IDIO == 6
+                && stream::OVERNIGHT == 7
+                && stream::MARKET_VOL_LEVEL == 8
+                && stream::CRISIS_EPICENTRE == 9
+        );
+        [
+            self.market,
+            self.economy,
+            self.external,
+            self.jumps,
+            self.volume,
+            self.news,
+            self.volume_idio,
+            self.overnight,
+            self.market_vol_level,
+            self.crisis_epicentre,
+        ]
+    }
+}
+
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
 /// useful numbers for locating a divergence, and deliberately not part of
 /// any behavioural contract.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct StreamDraws {
     pub market: usize,
     pub economy: usize,
@@ -151,6 +233,7 @@ impl StreamDraws {
 /// `normals_at_open + tick * per_tick + 1 + sectors + k`. That arithmetic
 /// is `Engine::market_day_layout`; the draw log is the check on it.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct DayMark {
     pub day: i64,
     /// `(uniforms, normals)` per stream, indexed by `crate::rng::stream`.
@@ -163,6 +246,7 @@ pub struct DayMark {
 /// A company's market-stream normals on one day, as a strided set:
 /// `first + t * stride` for `t` in `0..ticks`.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MarketDayLayout {
     pub company: u32,
     pub first: u64,
@@ -172,6 +256,7 @@ pub struct MarketDayLayout {
 
 /// What the embedder supplies for one tick.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TickRequest<'a> {
     pub time: GameTime,
     /// Difficulty-driven noise multiplier.
@@ -181,6 +266,21 @@ pub struct TickRequest<'a> {
     pub news_impact_queue: &'a [NewsImpactEntry],
     /// Aggregated pending order volume, keyed by ticker.
     pub order_volumes: &'a [(String, OrderVolume)],
+}
+
+impl<'a> TickRequest<'a> {
+    /// One tick at `time` with a volatility multiplier of 1.0, no news and
+    /// no orders. Set `volatility_multiplier`, `news`, `news_impact_queue`
+    /// or `order_volumes` on the value to add them.
+    pub fn new(time: GameTime) -> Self {
+        TickRequest {
+            time,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+        }
+    }
 }
 
 /// What one tick produced.
@@ -199,6 +299,7 @@ pub struct TickOutcome {
 
 /// What an agent's order did when it met the book.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct OrderReport {
     pub order_id: String,
     pub agent: String,
@@ -226,6 +327,7 @@ pub struct OrderReport {
 
 /// What the embedder supplies at the close of a simulated day.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DayCloseRequest<'a> {
     /// Per company, the day's accumulated `randomNoise` from factor
     /// attribution. `None` falls back to the day's total return.
@@ -238,8 +340,21 @@ pub struct DayCloseRequest<'a> {
     pub avg_volume: AvgVolumePolicy,
 }
 
+impl<'a> DayCloseRequest<'a> {
+    /// A close under `AvgVolumePolicy::Hold`, the shipped default. Both
+    /// slices take one entry per company, in roster order.
+    pub fn new(daily_innovations: &'a [Option<f64>], sector_base_variances: &'a [f64]) -> Self {
+        DayCloseRequest {
+            daily_innovations,
+            sector_base_variances,
+            avg_volume: AvgVolumePolicy::Hold,
+        }
+    }
+}
+
 /// What the embedder supplies for the daily macro step.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DayAdvanceRequest<'a> {
     pub volatility: f64,
     pub active_shocks: &'a [EconomicShock],
@@ -249,7 +364,24 @@ pub struct DayAdvanceRequest<'a> {
     pub timestamp: i64,
 }
 
+impl<'a> DayAdvanceRequest<'a> {
+    /// The macro step as `Engine::advance_macro_day` would take it without
+    /// a market: volatility 1.0, no active shocks and a market return of
+    /// zero. Set `volatility`, `active_shocks` or `market_return_pct` on
+    /// the value to change them.
+    pub fn new(game_day: i64, timestamp: i64) -> Self {
+        DayAdvanceRequest {
+            volatility: 1.0,
+            active_shocks: &[],
+            market_return_pct: 0.0,
+            game_day,
+            timestamp,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct DayAdvanceOutcome {
     pub phase_changed: bool,
     pub meeting_held: bool,
@@ -689,6 +821,7 @@ pub struct Engine {
 /// growth after each of its closes (the opening's value on day 0), and it is
 /// released on the close `lag` sessions after the quarter's last day.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct GdpPublication {
     /// The figure an observer reads: the last quarter released, or the
     /// opening growth before the first release.
@@ -7471,7 +7604,7 @@ impl Rng for Counting<'_> {
 /// use tradefloor::market::GameTime;
 ///
 /// let request = SessionRequest {
-///     start: GameTime { hour: 9, minute: 30, day_of_week: 3 },
+///     start: GameTime::new(9, 30, 3),
 ///     ticks: 390,
 ///     volatility_multiplier: 1.0,
 ///     news: &[],
@@ -7582,7 +7715,7 @@ impl<'a> SessionRequest<'a> {
     /// use tradefloor::engine::SessionRequest;
     /// use tradefloor::market::GameTime;
     ///
-    /// let open = GameTime { hour: 9, minute: 30, day_of_week: 3 };
+    /// let open = GameTime::new(9, 30, 3);
     /// let request = SessionRequest::new(open, 390);
     /// assert_eq!(request.ticks, 390);
     /// assert!(!request.reopen && !request.close_at_end);
@@ -7903,7 +8036,7 @@ pub fn fixed_simulation_digest(
         engine.open_market();
         engine.run_session(
             &SessionRequest {
-                start: crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 },
+                start: crate::market::GameTime::new(9, 30, 3),
                 ticks,
                 volatility_multiplier: 1.0,
                 news: &[],
@@ -9698,7 +9831,7 @@ mod host_tests {
         for day in 1..=3 {
             for e in [&mut a, &mut b] {
                 e.open_market();
-                let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+                let bell = crate::market::GameTime::new(9, 30, 3);
                 e.run_session(&SessionRequest::new(bell, 390), &mut buffer);
                 e.close_day(day);
             }
@@ -9708,7 +9841,7 @@ mod host_tests {
 
     fn run_day(e: &mut Engine, day: i64, buffer: &mut SessionBuffer) -> Vec<f64> {
         e.open_market();
-        let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+        let bell = crate::market::GameTime::new(9, 30, 3);
         e.run_session(&SessionRequest::new(bell, 390), buffer);
         let last_print = e.prices();
         e.close_day(day);
@@ -9741,7 +9874,7 @@ mod host_tests {
                 .zip(&last_print)
                 .filter(|(a, b)| a != b)
                 .count();
-            let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+            let bell = crate::market::GameTime::new(9, 30, 3);
             e.run_session(&SessionRequest::new(bell, 390), &mut buffer);
             last_print = e.prices();
             e.close_day(day);

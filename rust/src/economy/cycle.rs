@@ -72,6 +72,7 @@ fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
 /// (see [`phase_characteristics_for`]). [`CycleSpec::shipped`] is what every
 /// preset reads, and the functions that take `per_month` alone take it.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CycleSpec {
     pub per_month: f64,
     pub month_days: f64,

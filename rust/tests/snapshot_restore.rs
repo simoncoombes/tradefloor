@@ -53,7 +53,7 @@ fn engine(preset: &str) -> Engine {
 }
 
 fn session(e: &mut Engine, dow: i64, hour: i64, minute: i64, ticks: usize) {
-    let request = SessionRequest::new(GameTime { hour, minute, day_of_week: dow }, ticks);
+    let request = SessionRequest::new(GameTime::new(hour, minute, dow), ticks);
     e.run_session(&request, &mut SessionBuffer::new());
 }
 

@@ -192,4 +192,71 @@ mod tests {
         let book = crate::agent_book::BookState::default();
         let _: &[[f64; TAKEN_WIDTH]] = &book.taken;
     }
+
+    #[test]
+    fn rng_words_round_trip_at_the_published_widths() {
+        use crate::engine::{SessionBuffer, SessionRequest};
+        use crate::rng::stream;
+
+        let companies = crate::universe::random_universe(4, 3)
+            .iter()
+            .enumerate()
+            .map(|(i, g)| g.to_init().to_tick_company(i))
+            .collect();
+        let mut engine = crate::engine::Engine::new(
+            3,
+            companies,
+            crate::economy::create_initial_economy_state(&Default::default()),
+            crate::economy::create_initial_central_bank_state(0),
+            crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        );
+        engine.open_market();
+        let bell = crate::market::GameTime::new(9, 30, 3);
+        engine.run_session(&SessionRequest::new(bell, 7), &mut SessionBuffer::new());
+
+        let state = engine.rng_state();
+        let words = state.to_words();
+        assert_eq!(words.len(), ENGINE_RNG_STATE_WIDTH);
+        assert_eq!(EngineRngState::from_words(&words), Ok(state));
+        assert!(
+            [state.market, state.economy].iter().any(|s| s.spare.is_some()),
+            "the test should cover a stream holding a spare"
+        );
+
+        // Stream k sits at words k * W, in stream-id order.
+        let w = RNG_STREAM_WIDTH;
+        for (id, s) in [
+            (stream::MARKET, state.market),
+            (stream::NEWS, state.news),
+            (stream::VOLUME_IDIO, state.volume_idio),
+            (stream::CRISIS_EPICENTRE, state.crisis_epicentre),
+        ] {
+            let k = id as usize;
+            let got: Vec<u64> = words[k * w..(k + 1) * w].iter().map(|x| x.to_bits()).collect();
+            let want: Vec<u64> = s.to_words().iter().map(|x| x.to_bits()).collect();
+            assert_eq!(got, want, "stream {id}");
+        }
+
+        // A restore through the words continues the same sequence.
+        let mut restored = engine.clone();
+        restored.set_rng_state(EngineRngState::from_words(&words).unwrap());
+        for _ in 0..5 {
+            assert_eq!(engine.draw_normal().to_bits(), restored.draw_normal().to_bits());
+        }
+
+        // Refusals.
+        assert!(EngineRngState::from_words(&words[1..]).is_err());
+        assert!(RngState::from_words(&words[..w + 1]).is_err());
+        let mut even = state.market.to_words();
+        even[1] = f64::NAN; // a canonical NaN: its bits are even
+        assert!(RngState::from_words(&even).unwrap_err().contains("even"));
+        let mut spare = state.market.to_words();
+        spare[2] = f64::INFINITY;
+        assert!(RngState::from_words(&spare).is_err());
+        let mut count = state.market.to_words();
+        count[3] = 1.5;
+        assert!(RngState::from_words(&count).is_err());
+        count[3] = -1.0;
+        assert!(RngState::from_words(&count).is_err());
+    }
 }

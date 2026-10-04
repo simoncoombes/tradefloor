@@ -28,6 +28,7 @@
 
 /// One sector's model parameters.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct Sector {
     /// Stable key. This is what crosses the API boundary.
     pub key: &'static str,

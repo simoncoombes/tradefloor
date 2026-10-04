@@ -473,7 +473,8 @@ pub const INFORMED_FLOW_FRACTION: f64 = 0.35;
 /// single market draw reaches every name through its beta, and a sector draw
 /// reaches everything in that sector. Without it a 108-name index would have
 /// almost no aggregate volatility, because independent noise cancels.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct SharedFactors {
     pub market_factor: f64,
     /// Indexed by the same sector key order the tick draws them in.
@@ -522,7 +523,8 @@ impl SharedFactors {
 }
 
 /// A news event, as the factor model reads it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NewsEvent {
     pub company_id: Option<String>,
     pub sector: Option<String>,
@@ -599,6 +601,7 @@ pub fn news_absorption_weight(params: &crate::params::ModelParams,
 
 /// The company fields the live factor subset reads.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct FactorCompany {
     pub id: String,
     pub sector: String,
@@ -613,8 +616,28 @@ pub struct FactorCompany {
     pub last_daily_return: Option<f64>,
 }
 
+impl FactorCompany {
+    /// A name with every number zero and every optional figure absent.
+    /// Set the fields the factor model should read on the value.
+    pub fn new(id: impl Into<String>, sector: impl Into<String>) -> Self {
+        FactorCompany {
+            id: id.into(),
+            sector: sector.into(),
+            beta: None,
+            market_cap: 0.0,
+            avg_volume: 0.0,
+            shares_outstanding: 0.0,
+            short_interest: 0.0,
+            float: 0.0,
+            garch_variance: 0.0,
+            last_daily_return: None,
+        }
+    }
+}
+
 /// The four live factors.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct LiveFactors {
     pub company_news: f64,
     /// The part of `company_news` from MARKET-WIDE events (no company, no

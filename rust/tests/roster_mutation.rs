@@ -19,44 +19,24 @@
 //! something that quietly depends on it.
 
 use tradefloor::engine::{Engine, TickRequest};
-use tradefloor::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+use tradefloor::market::{GameTime, TickCompany, TickStock};
 
 fn company(id: &str, price: f64) -> TickCompany {
-    TickCompany {
-        id: id.to_string(),
-        ticker: id.to_string(),
-        sector: "technology".to_string(),
-        is_bankrupt: false,
-        is_public: true,
-        stock: TickStock {
-            price,
-            previous_close: price,
-            previous_tick_price: None,
-            open: price,
-            high: price,
-            low: price,
-            volume: 0.0,
-            avg_volume: 1e6,
-            shares_outstanding: 1e8,
-            market_cap: price * 1e8,
-            mispricing_s: None,
-            mispricing_s_prev_close: None,
-            mispricing_momentum: None,
-            fair_value_offset: None,
-            maker_inventory: None,
-            garch_variance: 0.000625,
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: None,
-            beta: Some(1.0),
-            short_interest: 0.0,
-            float: 1e8,
-        },
-        sector_volatility: Some(1.2),
-        sector_avg_pe: Some(32.0),
-        eps: Some(4.0),
-        book_value_per_share: Some(20.0),
-        revenue_growth: Some(0.1),
-    }
+    let stock = {
+        let mut tick_stock = TickStock::new(price, 1e8);
+        tick_stock.avg_volume = 1e6;
+        tick_stock.garch_variance = 0.000625;
+        tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+        tick_stock.beta = Some(1.0);
+        tick_stock
+    };
+    let mut tick_company = TickCompany::new(id, id, "technology", stock);
+    tick_company.sector_volatility = Some(1.2);
+    tick_company.sector_avg_pe = Some(32.0);
+    tick_company.eps = Some(4.0);
+    tick_company.book_value_per_share = Some(20.0);
+    tick_company.revenue_growth = Some(0.1);
+    tick_company
 }
 
 fn engine(seed: u64, n: usize) -> Engine {
@@ -73,17 +53,7 @@ fn engine(seed: u64, n: usize) -> Engine {
 }
 
 fn tick(e: &mut Engine, minute: i64) {
-    e.tick(&TickRequest {
-        time: GameTime {
-            hour: 9 + (30 + minute) / 60,
-            minute: (30 + minute) % 60,
-            day_of_week: 3,
-        },
-        volatility_multiplier: 1.0,
-        news: &[] as &[NewsEvent],
-        news_impact_queue: &[] as &[NewsImpactEntry],
-        order_volumes: &[] as &[(String, OrderVolume)],
-    });
+    e.tick(&TickRequest::new(GameTime::new(9 + (30 + minute) / 60, (30 + minute) % 60, 3)));
 }
 
 #[test]
@@ -341,7 +311,6 @@ fn a_roster_can_be_emptied_and_refilled() {
 // delists, and moves nothing else. The tests below state both halves.
 
 use tradefloor::engine::DayCloseRequest;
-use tradefloor::market::AvgVolumePolicy;
 use tradefloor::params::ModelParams;
 use tradefloor::rng::{stream, GameRng};
 
@@ -350,11 +319,7 @@ fn close(e: &mut Engine) {
     let n = e.len();
     let innovations = vec![None; n];
     let variances = vec![0.000225; n];
-    e.close_market(&DayCloseRequest {
-        daily_innovations: &innovations,
-        sector_base_variances: &variances,
-        avg_volume: AvgVolumePolicy::Hold,
-    });
+    e.close_market(&DayCloseRequest::new(&innovations, &variances));
 }
 
 /// A model with the per-name volume process switched ON.

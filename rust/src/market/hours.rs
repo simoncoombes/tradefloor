@@ -52,11 +52,19 @@ impl MarketStatus {
 
 /// The simulation clock fields this module reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct GameTime {
     pub hour: i64,
     pub minute: i64,
     /// 0 = Sunday, 6 = Saturday, matching JavaScript's `Date#getDay`.
     pub day_of_week: i64,
+}
+
+impl GameTime {
+    /// `day_of_week` counts from Sunday as 0, as JavaScript's `getDay` does.
+    pub const fn new(hour: i64, minute: i64, day_of_week: i64) -> Self {
+        GameTime { hour, minute, day_of_week }
+    }
 }
 
 /// Which session a moment falls in.

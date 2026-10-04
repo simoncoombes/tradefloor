@@ -43,6 +43,7 @@ pub enum Side {
 
 /// A resting order.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct BookOrder {
     pub id: String,
     pub side: Side,
@@ -58,6 +59,7 @@ pub struct BookOrder {
 
 /// One executed trade.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Fill {
     /// Always the resting (maker) order's price.
     pub price: f64,
@@ -69,6 +71,7 @@ pub struct Fill {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct MatchResult {
     pub fills: Vec<Fill>,
     /// Shares that could not be filled. Zero when a remainder was posted.
@@ -80,6 +83,7 @@ pub struct MatchResult {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct PriceLevel {
     pub price: f64,
     pub quantity: f64,
@@ -87,6 +91,7 @@ pub struct PriceLevel {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct SweepCost {
     pub average_price: f64,
     pub worst_price: f64,
@@ -95,6 +100,7 @@ pub struct SweepCost {
 
 /// Options for [`OrderBook::submit`].
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct SubmitOptions {
     /// `None` is a market order.
     pub limit_price: Option<f64>,
@@ -111,6 +117,7 @@ pub struct SubmitOptions {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct OrderBook {
     pub company_id: String,
     /// Descending by price, then ascending by sequence.

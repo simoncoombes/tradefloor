@@ -51,7 +51,7 @@ use tradefloor::economy::{
 };
 use tradefloor::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
 use tradefloor::market::{
-    simulate_market_tick, AvgVolumePolicy, GameTime, MarketStatus, SettleDrawPolicy, TickCompany,
+    simulate_market_tick, GameTime, MarketStatus, TickCompany,
     TickInputs, TickStock, MARKET_FACTOR_SIGMA,
 };
 use tradefloor::rng::Rng;
@@ -59,41 +59,21 @@ use tradefloor::rng::Rng;
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
 fn company(id: &str, price: f64) -> TickCompany {
-    TickCompany {
-        id: id.to_string(),
-        ticker: id.to_string(),
-        sector: "technology".to_string(),
-        is_bankrupt: false,
-        is_public: true,
-        stock: TickStock {
-            price,
-            previous_close: price,
-            previous_tick_price: None,
-            open: price,
-            high: price,
-            low: price,
-            volume: 0.0,
-            avg_volume: 1e6,
-            shares_outstanding: 1e8,
-            market_cap: price * 1e8,
-            mispricing_s: None,
-            mispricing_s_prev_close: None,
-            mispricing_momentum: None,
-            fair_value_offset: None,
-            maker_inventory: None,
-            garch_variance: 0.000625,
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: None,
-            beta: Some(1.0),
-            short_interest: 0.0,
-            float: 1e8,
-        },
-        sector_volatility: Some(1.2),
-        sector_avg_pe: Some(32.0),
-        eps: Some(4.0),
-        book_value_per_share: Some(20.0),
-        revenue_growth: Some(0.1),
-    }
+    let stock = {
+        let mut tick_stock = TickStock::new(price, 1e8);
+        tick_stock.avg_volume = 1e6;
+        tick_stock.garch_variance = 0.000625;
+        tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+        tick_stock.beta = Some(1.0);
+        tick_stock
+    };
+    let mut tick_company = TickCompany::new(id, id, "technology", stock);
+    tick_company.sector_volatility = Some(1.2);
+    tick_company.sector_avg_pe = Some(32.0);
+    tick_company.eps = Some(4.0);
+    tick_company.book_value_per_share = Some(20.0);
+    tick_company.revenue_growth = Some(0.1);
+    tick_company
 }
 
 fn sector_keys() -> Vec<String> {
@@ -147,52 +127,36 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
     let mut rng = KindRecorder(String::new());
     simulate_market_tick(
         companies,
-        &TickInputs {
+        &{
+            let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
             // The mechanism ships inert; 0.0 is the value that
             // preserves the behaviour these tests pin. The lagged
             // asymmetry branches on this flag and its gain defaults
             // to 0.0, so false is bit-identical here.
-            prev_day_down: false,
+            tick_inputs.prev_day_down = false;
             // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-            prev_day_factor: 0.0,
-            day_factor: 0.0,
-            forced_flow_eff: 1.0,
-            universe_stress: 0.0,
-            volume_state: 0.0,
-            volume_idio: &[],
-            jump_move: &[],
-            economy: &economy,
-            market_status: status,
-            intraday_t: 0.5,
-            volatility_multiplier: 1.0,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-            sector_keys: &keys,
-            sector_sigmas: &[],
+            tick_inputs.prev_day_factor = 0.0;
+            tick_inputs.market_status = status;
+            tick_inputs.sector_keys = &keys;
             // The constant-sigma baseline: this harness probes the draw
             // schedule, which must not depend on the factor's conditional
             // sigma at all.
-            market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-            settle_draws: SettleDrawPolicy::FourAlways,
+            tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+            tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
             // The depth counterfactual, off. It reaches no company field.
-            settle_depth_counterfactual: false,
-            resting_orders: &[],
-            fill_impact: &[],
-                // The run's opening nominal output. The growth term is
-                // off on every preset these tests pin, so it is read
-                // nowhere; this tick's own value is what a single-tick
-                // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
-                // Trading days closed. The buyback factor is off on
-                // every preset these tests pin, so it is read
-                // nowhere; 0 is what a single-tick caller opens at.
-                // No crisis episode: the mechanism is off on every preset
-                // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+            tick_inputs.settle_depth_counterfactual = false;
+            // The run's opening nominal output. The growth term is
+            // off on every preset these tests pin, so it is read
+            // nowhere; this tick's own value is what a single-tick
+            // caller opens at.
+            tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
+            // Trading days closed. The buyback factor is off on
+            // every preset these tests pin, so it is read
+            // nowhere; 0 is what a single-tick caller opens at.
+            // No crisis episode: the mechanism is off on every preset
+            // these tests pin, and a single-tick caller has none.
+            tick_inputs.crisis_epicentre = None;
+            tick_inputs
         },
         &mut rng,
     );
@@ -256,32 +220,12 @@ fn the_draw_schedule_is_a_pure_function_of_session_and_roster_shape() {
 /// nothing and holds nothing to the reference.
 fn run_day(engine: &mut Engine, day: i64, ticks: i64) {
     let roster = engine.len();
-    engine.advance_day(&DayAdvanceRequest {
-        volatility: 1.0,
-        active_shocks: &[],
-        market_return_pct: 0.0,
-        game_day: day,
-        timestamp: day * 24 * 60,
-    });
+    engine.advance_day(&DayAdvanceRequest::new(day, day * 24 * 60));
     engine.open_market();
     for t in 0..ticks {
-        engine.tick(&TickRequest {
-            time: GameTime {
-                hour: 9 + (30 + t) / 60,
-                minute: (30 + t) % 60,
-                day_of_week: 3,
-            },
-            volatility_multiplier: 1.0,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-        });
+        engine.tick(&TickRequest::new(GameTime::new(9 + (30 + t) / 60, (30 + t) % 60, 3)));
     }
-    engine.close_market(&DayCloseRequest {
-        daily_innovations: &vec![None; roster],
-        sector_base_variances: &vec![0.000625; roster],
-        avg_volume: AvgVolumePolicy::Hold,
-    });
+    engine.close_market(&DayCloseRequest::new(&vec![None; roster], &vec![0.000625; roster]));
 }
 
 fn engine(seed: u64) -> Engine {

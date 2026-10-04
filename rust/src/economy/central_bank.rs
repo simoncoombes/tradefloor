@@ -82,6 +82,7 @@ impl Decision {
 
 /// What a meeting produced.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct MeetingOutcome {
     pub central_bank: CentralBankState,
     pub economy: EconomyState,
@@ -97,12 +98,20 @@ pub struct MeetingOutcome {
 /// What the engine's dials change about a meeting. [`PolicyOptions::shipped`]
 /// is the reference bank exactly.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct PolicyOptions {
     /// The calendar meeting intervals are counted on; see `MacroCalendar`.
     pub calendar: MacroCalendar,
     /// `fed_liftoff_rule`: 0.0 is the shipped ladder. See
     /// [`crate::params::ModelParams::fed_liftoff_rule`].
     pub liftoff: f64,
+}
+
+/// [`PolicyOptions::shipped`].
+impl Default for PolicyOptions {
+    fn default() -> Self {
+        PolicyOptions::shipped()
+    }
 }
 
 impl PolicyOptions {
