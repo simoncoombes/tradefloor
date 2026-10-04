@@ -2088,8 +2088,10 @@ def build_scenario(
         "each one's first_event_day, and the run must be longer than that), "
         "a constructor by name (" + ", ".join(CONSTRUCTORS) + ", timed "
         "with peak_day), or a document from build_scenario. A scenario whose "
-        "events all fall after the run is refused. Use the result to detect "
-        "a response, not to forecast its size. days 1 to "
+        "events all fall after the run is refused. Pass fork_day to run both "
+        "markets together first and start the scenario on that day, as a "
+        "fork of one shared history. Use the result to detect a response, "
+        "not to forecast its size. days 1 to "
         f"{MAX_DAYS} here, up to {MAX_DAYS_ASYNC} through start_job. "
         "Deterministic."),
     annotations=_READ_ONLY,
@@ -2107,6 +2109,15 @@ def run_stress_scenario(
     universe: UniverseArg = None,
     days: DaysArg = 20,
     peak_day: PeakDayArg = None,
+    fork_day: Annotated[int | None, Field(description=(
+        "Run both markets together for this many days, then split them and "
+        "start the scenario on the first day after the split: day "
+        "`fork_day` of the run. The scenario's events keep their spacing, "
+        "and every strategy trades the shared days identically in both "
+        "arms. 0 to days - 1. Only for a scenario made of interventions (a "
+        "shipped document, or build_scenario with `shocks`); a macro path "
+        "or a constructor pins the macro from day 0, so it has no fork "
+        "point."))] = None,
 ) -> dict[str, Any]:
     """Stress testing, always paired against the unshocked control.
 
@@ -2185,6 +2196,24 @@ def run_stress_scenario(
     except (ValueError, tf.ValidationError) as exc:
         return _fail(f"building scenario: {exc}")
 
+    if fork_day is not None:
+        if isinstance(fork_day, bool) or not 0 <= fork_day < days:
+            return _fail(f"fork_day must be a day of the run, 0 to "
+                         f"{days - 1}, got {fork_day}")
+        if name in CONSTRUCTORS:
+            return _fail(
+                f"{name!r} pins the macro path from day 0, so the two "
+                f"markets differ from the first day and there is no shared "
+                f"history to fork from. Time it with peak_day instead, or "
+                f"use a shipped scenario (list_scenarios), which is made of "
+                f"interventions and can start at fork_day.")
+        try:
+            built = built.starting_at(fork_day)
+        except (ValueError, tf.ValidationError) as exc:
+            return _fail(
+                f"fork_day needs a scenario made of interventions: {exc}. "
+                f"Author one with `shocks` in build_scenario.")
+
     refusal, timing = _timing(built, label, days)
     if refusal is not None:
         return _fail(refusal)
@@ -2256,10 +2285,18 @@ def run_stress_scenario(
         "reading_note": (
             "`difference` is shocked minus control on the IDENTICAL seed, so "
             "the market draw cancels and what is left is the scenario."
+            + ("" if fork_day is None else
+               f" The two markets were identical through day "
+               f"{fork_day - 1} and split on day {fork_day}, when the "
+               f"scenario started, so every return includes the shared "
+               f"days and the difference comes from the days after the "
+               f"split.")
         ),
+        **({} if fork_day is None else {"fork_day": fork_day}),
         "caveats": caveats,
         "provenance": _provenance(
             seed=seed, days=days, scenario=label,
+            **({} if fork_day is None else {"fork_day": fork_day}),
             scenario_document=json.loads(built.to_json(days)),
             universe=uni_doc,
         ),

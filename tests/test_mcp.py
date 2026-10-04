@@ -1424,3 +1424,79 @@ def test_the_bundle_manifest_lists_each_tool_by_its_first_sentence():
         first = re.match(r"(.+?[.!?])(\s|$)", served[tool["name"]], re.S)
         assert tool["description"] == " ".join(first.group(1).split()), (
             tool["name"])
+
+
+# -- fork_day ----------------------------------------------------------------
+
+FORK_STRATEGY = {"m": {"signal": {"kind": "momentum", "lookback_days": 1.0},
+                       "portfolio": {"top_k": 3, "gross": 1.0}}}
+
+
+def test_a_fork_shares_every_day_before_it_bit_for_bit():
+    """The arms are one market until the fork: run to the fork day, the
+    shocked arm and the control score every entrant identically, and one
+    day later the packaged crisis has moved them apart."""
+    built = pt.Scenario.load("liquidity_crisis").starting_at(6)
+    universe = pt.Universe.random(12, seed=111)
+
+    def run(days, scenario):
+        entrants = {**pt.baselines.reference_agents(seed=7)}
+        cards = pt.evaluate(entrants, seed=7, universe=universe, days=days,
+                            scenario=scenario, trusted_agents=False)
+        return {k: (c.return_pct, c.final_net_worth) for k, c in cards.items()}
+
+    assert run(6, built) == run(6, None)
+    r = mcp.run_stress_scenario("liquidity_crisis", strategies=FORK_STRATEGY,
+                                days=7, fork_day=6, universe_size=12)
+    assert r["ok"], r
+    assert any(row["difference"] != 0 for row in r["comparison"])
+
+
+def test_a_fork_starts_the_packaged_scenario_and_records_where():
+    r = mcp.run_stress_scenario("liquidity_crisis", strategies=FORK_STRATEGY,
+                                days=30, fork_day=10, universe_size=12)
+    assert r["ok"], r
+    assert r["fork_day"] == 10 and r["provenance"]["fork_day"] == 10
+    assert "split on day 10" in r["reading_note"]
+    document = r["provenance"]["scenario_document"]
+    [origin] = document["origins"]
+    assert origin["first_day"] == 10
+    assert origin["fingerprint"] == pt.Scenario.load("liquidity_crisis").fingerprint
+    again = mcp.run_stress_scenario("liquidity_crisis", strategies=FORK_STRATEGY,
+                                    days=30, fork_day=10, universe_size=12)
+    assert again["comparison"] == r["comparison"]
+
+
+def test_without_a_fork_the_result_is_what_it_was():
+    r = mcp.run_stress_scenario("liquidity_crisis", days=55, universe_size=8)
+    assert r["ok"], r
+    assert "fork_day" not in r and "fork_day" not in r["provenance"]
+    assert "split on day" not in r["reading_note"]
+
+
+@pytest.mark.parametrize("fork_day", [-1, 20, 25, True])
+def test_a_fork_outside_the_run_is_refused(fork_day):
+    r = mcp.run_stress_scenario("liquidity_crisis", days=20,
+                                fork_day=fork_day, universe_size=8)
+    assert r["ok"] is False and "fork_day must be a day of the run" in r["error"]
+
+
+@pytest.mark.parametrize("name", sorted(mcp.CONSTRUCTORS))
+def test_a_constructor_has_no_fork_point(name):
+    r = mcp.run_stress_scenario(name, days=20, fork_day=5, universe_size=8)
+    assert r["ok"] is False and "pins the macro path from day 0" in r["error"]
+
+
+def test_a_macro_path_has_no_fork_point():
+    path = mcp.build_scenario(steps=[{"kind": "hold", "fields": {"vix": 30.0}}])
+    assert path["ok"], path
+    r = mcp.run_stress_scenario(path["scenario"], days=20, fork_day=5,
+                                universe_size=8)
+    assert r["ok"] is False and "interventions" in r["error"]
+
+
+def test_a_background_job_takes_a_fork_day():
+    j = mcp.start_job("run_stress_scenario",
+                      {"scenario": "liquidity_crisis", "days": 12,
+                       "fork_day": 4, "universe_size": 6})
+    assert j["ok"], j

@@ -8,7 +8,14 @@ it instead of its nearest sibling, what it costs and what it returns.
 `explain` opened with a question and did not say how it differs from
 `explain_price_move`; it now does. The MCP bundle's manifest lists each tool
 by the first sentence of the server's own description, and a test keeps the
-two in step. No model, trajectory or digest changes.
+two in step.
+
+`run_stress_scenario` takes `fork_day`: both markets run together to that
+day, then split, and the scenario starts on it with its events' spacing
+kept. Every day before the split is identical in both arms, so the
+difference is the scenario applied to one shared history, the experiment
+the README's demo runs in Python. A constructor or a macro path pins the
+macro from day 0 and is refused. No model, trajectory or digest changes.
 
 <!-- release-note-ends -->
 
