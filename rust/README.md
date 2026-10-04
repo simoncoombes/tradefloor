@@ -76,6 +76,13 @@ no news and no orders; set its `news`, `order_volumes` or `fills` fields to
 add them. `SessionBuffer` holds the last session's prices, volumes and
 attribution, one row per tick.
 
+To pause a run and continue it later, possibly in another process,
+`engine.snapshot()` captures the whole state and `engine.restore(&snapshot)`
+puts it back onto an engine built the same way, and the restored run
+continues bit for bit. The `snapshot` module documents the fields, the checks
+a restore makes, and `EngineSnapshot::to_bytes` and `from_bytes`, which give a
+snapshot one exact binary form to store.
+
 The Rust API is the engine itself and is low level: it takes tick requests
 and day advances and hands back state. Most users want the Python package,
 which wraps this crate and adds universes, scenarios, checkpoints, an
@@ -106,9 +113,10 @@ field to either no longer breaks a build. Make them with
 ## Scope of this crate
 
 The published crate carries the engine, the unit tests in its source
-modules and six integration tests that run standalone:
+modules and seven integration tests that run standalone:
 `circuit_breaker`, `depth_counterfactual`, `maker_ladder_allocations`,
-`platform_maths`, `roster_mutation` and `stream_alignment`. The parity corpus that pins the
+`platform_maths`, `roster_mutation`, `snapshot_restore` and
+`stream_alignment`. The parity corpus that pins the
 engine's output is 140 MB of fixtures and stays in the repository, so the
 tests that read it are left out of the package rather than shipped in a
 state where they cannot pass.
