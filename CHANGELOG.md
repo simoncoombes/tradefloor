@@ -1,4 +1,8 @@
-## Unreleased
+## 0.9.1
+
+A patch release for the MCP server. No coefficient, default or trajectory
+changes, every known-answer digest is 0.9.0's, and `pt-v20` stays the
+default.
 
 The MCP server's tools describe themselves better. Each of the thirteen now
 has a title and annotations saying it only reads, is deterministic and
