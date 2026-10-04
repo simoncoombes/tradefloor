@@ -208,7 +208,7 @@ def test_the_rust_api_breaks_since_0_8_1_are_listed_and_the_growing_structs_are_
         assert item in rust, f"'The Rust crate since 0.8.1' does not name {item}"
 
     readme = (RUST / "README.md").read_text(encoding="utf-8")
-    assert "## Upgrading from 0.8.1" in readme
+    assert "## Versions and API stability" in readme
     assert '"=0.8.1"' in readme
 
     src = RUST / "src"
@@ -224,3 +224,38 @@ def test_the_rust_api_breaks_since_0_8_1_are_listed_and_the_growing_structs_are_
     releasing = (ROOT / "RELEASING.md").read_text(encoding="utf-8")
     assert "cargo semver-checks check-release" in releasing, (
         "RELEASING.md does not check the Rust API against crates.io")
+
+
+def test_a_patch_release_cannot_break_the_crate_api():
+    """From 0.10.0 the crate follows Cargo's semver rules, and CI holds it.
+
+    0.8.5 broke code written for 0.8.1 in a patch release, and the only
+    check was a manual step in RELEASING.md. The release workflow now runs
+    `tools/release/crate_api.py` before either registry is touched, under
+    the release type the version bump implies, and both publish jobs wait
+    for it. The crate README and docs/SUPPORT.md state the policy.
+    """
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert "python tools/release/crate_api.py" in workflow
+    for job in ("publish", "publish_crate"):
+        block = workflow[re.search(rf"(?m)^  {job}:$", workflow).end():]
+        needs = block[block.index("needs:"):].splitlines()[0]
+        assert "crate_api" in needs, f"{job} does not wait for the API check"
+
+    readme = (RUST / "README.md").read_text(encoding="utf-8")
+    support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
+    for text, name in ((readme, "rust/README.md"), (support, "docs/SUPPORT.md")):
+        assert "0.10.0" in text and "semver" in text, (
+            f"{name} does not state the crate's semver policy")
+
+
+def test_the_state_widths_are_exported_at_the_crate_root():
+    """A host sizes its buffers from these, and a derived width once
+    under-sized a saved attribution row by three numbers a company."""
+    lib = (RUST / "src" / "lib.rs").read_text(encoding="utf-8")
+    for name in ("COMPONENT_COUNT", "TICK_COMPONENT_COUNT", "RNG_STREAM_WIDTH",
+                 "ENGINE_RNG_STREAMS", "ENGINE_RNG_STATE_WIDTH"):
+        assert name in lib[lib.index("pub use widths::"):], f"{name} is not at the root"
+    for doc in ("RELEASING.md", "CONTRIBUTING.md"):
+        text = (ROOT / doc).read_text(encoding="utf-8")
+        assert "state width" in text.lower(), f"{doc} has no rule on state widths"

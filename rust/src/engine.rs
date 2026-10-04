@@ -307,6 +307,19 @@ pub struct Engine {
     /// Per-day state like `overnight_moves`: the tape books it onto the row
     /// where the jump is observed, beside the jump.
     jump_fair_value_moves: Vec<f64>,
+    /// Each name's last print at the most recent `close_market`, in roster
+    /// order; the construction price before the first close. Read by
+    /// nothing that prices, so it is outside the state hash and the draw
+    /// schedule. See [`Engine::last_closes`].
+    last_closes: Vec<f64>,
+    /// `last_closes` as it stood at the most recent `open_market`: the
+    /// close the current day's change is measured from. See
+    /// [`Engine::prior_closes`].
+    prior_closes: Vec<f64>,
+    /// Whether construction ran the model's own opening (the macro burn-in
+    /// or the stationary cycle draw) over the economy it was given. See
+    /// [`Engine::opening_settled`].
+    opening_settled: bool,
     /// The day's endogenous news, generated once in `open_market` (§117).
     /// A field rather than a local because a tick loop and a single
     /// `run_session` are two spellings of the same day and both must read
@@ -712,6 +725,15 @@ impl Engine {
     /// scale with `n`, so every subsequent draw shifts and the whole market
     /// changes. A 30-name universe and a 100-name universe from one seed have
     /// nothing to do with each other.
+    ///
+    /// # The economy you pass is a starting point, not the opening
+    ///
+    /// This runs the default preset's opening over `economy` before day 1,
+    /// as [`Engine::with_params`] does: on `pt-v20` a 755-day macro burn-in
+    /// (`macro_burn_in_days`) and a draw of the cycle's phase and age
+    /// (`cycle_stationary_opening`). A VIX, a policy rate or a phase you
+    /// set is relaxed away. To keep the economy you pass, build with
+    /// [`Engine::with_params_keeping_opening`].
     pub fn new(
         seed: u64,
         companies: Vec<TickCompany>,
@@ -1124,6 +1146,26 @@ impl Engine {
     /// With [`crate::params::PT_V1`] this IS `new`: the
     /// preset-constructed engine reproduces the const build's trajectories
     /// bit for bit, draw for draw — the phase-1 acceptance gate.
+    ///
+    /// # It settles the opening, overwriting the economy you pass
+    ///
+    /// Before day 1 this runs the preset's own opening over `economy`:
+    /// `macro_burn_in_days` days of the macro step (755 on `pt-v18` onward)
+    /// and, where `cycle_stationary_opening` is on, a draw of the cycle's
+    /// phase and age. Every macro field you set comes out as the model's
+    /// dynamics left it. Measured on `pt-v20` (the test
+    /// `with_params_settles_a_host_economy_and_keeping_opening_keeps_it`),
+    /// an economy passed in at a VIX of 45 in a contraction opens at a VIX
+    /// of 22.28 in an expansion. Presets before `pt-v18` have no burn-in, so
+    /// this arrived in 0.7.0 under callers who had not changed their code.
+    ///
+    /// That is what you want when `economy` is
+    /// [`crate::economy::create_initial_economy_state`]'s default, which
+    /// would otherwise open every run in expansion at phase age zero. A
+    /// host that owns the macro state, or restores one it saved, wants
+    /// [`Engine::with_params_keeping_opening`] instead.
+    /// [`Engine::opening_settled`] says afterwards which of the two an
+    /// engine got.
     pub fn with_params(
         seed: u64,
         companies: Vec<TickCompany>,
@@ -1136,8 +1178,52 @@ impl Engine {
                                        sector_keys, params, true)
     }
 
+    /// [`Engine::with_params`] when the economy you pass is the opening: the
+    /// constructor for a host that owns the macro state.
+    ///
+    /// No burn-in runs and no cycle phase is drawn, so the engine opens on
+    /// exactly the `economy` and `central_bank` given, and
+    /// [`Engine::opening_settled`] reads `false`. The Python package does
+    /// the same whenever a caller passes `macro_state`. It is
+    /// [`Engine::with_params_from_opening`] with `settle_opening` false,
+    /// under a name that says what it keeps.
+    ///
+    /// Use it when a host supplies its own starting economy, and when it
+    /// rebuilds an engine from saved state. Use [`Engine::with_params`]
+    /// when the economy is the library's default and the model should
+    /// settle it.
+    pub fn with_params_keeping_opening(
+        seed: u64,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+        params: ModelParams,
+    ) -> Self {
+        Self::with_params_from_opening(seed, companies, economy, central_bank,
+                                       sector_keys, params, false)
+    }
+
+    /// Whether construction ran the model's own opening over the economy it
+    /// was given.
+    ///
+    /// `true` when the engine was built with [`Engine::new`] or
+    /// [`Engine::with_params`] (or `settle_opening` true) under a preset
+    /// whose `macro_burn_in_days` or `cycle_stationary_opening` is non-zero,
+    /// which is every preset from `pt-v18` on. Then the economy the engine
+    /// opened on is not the one passed in. `false` when the opening was
+    /// kept, or when the preset has nothing to settle.
+    ///
+    /// A host that supplies its own economy can assert on this once after
+    /// construction, so a constructor swapped in a refactor fails loudly
+    /// rather than quietly replacing the host's opening.
+    pub fn opening_settled(&self) -> bool {
+        self.opening_settled
+    }
+
     /// [`Engine::with_params`], saying whether the opening is the model's to
     /// settle or the caller's to keep.
+    /// [`Engine::with_params_keeping_opening`] is the `false` case by name.
     ///
     /// `settle_opening` is true for `with_params` and every path that takes
     /// the DEFAULT macro state, which is what `macro_burn_in_days` exists to
@@ -1202,6 +1288,9 @@ impl Engine {
             },
             overnight_moves: vec![0.0; companies_len],
             jump_fair_value_moves: vec![0.0; companies_len],
+            last_closes: companies.iter().map(|c| c.stock.price).collect(),
+            prior_closes: companies.iter().map(|c| c.stock.price).collect(),
+            opening_settled: false,
             companies,
             economy,
             central_bank,
@@ -1285,6 +1374,11 @@ impl Engine {
         if settle_opening {
             engine.burn_in_economy();
         }
+        // The same two dials `burn_in_economy` reads: either one rewrites
+        // the economy the caller passed in.
+        engine.opening_settled = settle_opening
+            && (engine.params.macro_burn_in_days > 0.0
+                || engine.params.cycle_stationary_opening != 0.0);
         // The earnings cycle opens at the level of the phase the economy
         // opens in, so a market that opens in a contraction does not spend
         // its first months drifting toward it: a stationary opening, as the
@@ -3929,6 +4023,35 @@ impl Engine {
         (self.crisis_in_episode, self.crisis_sessions_under, who)
     }
 
+    /// The VIX level above which this engine's crisis behaviour runs:
+    /// [`ModelParams::crisis_vix_threshold`], 30.88325108 on `pt-v13` onward
+    /// and 25.5 before. A host with crisis gates of its own should read
+    /// this rather than copy the number, which differs between presets.
+    ///
+    /// It is a coefficient like any other: read it here or as
+    /// `engine.params().crisis_vix_threshold`, and set it on the
+    /// `ModelParams` before construction with
+    /// `ModelParams::with_override("crisis_vix_threshold", x)`. The dollar's
+    /// safe-haven bid has its own threshold,
+    /// [`ModelParams::usd_crisis_vix_threshold`] (25.5 on every preset),
+    /// which does not follow this one.
+    pub fn crisis_vix_threshold(&self) -> f64 {
+        self.params.crisis_vix_threshold
+    }
+
+    /// Whether the VIX is above [`Engine::crisis_vix_threshold`] now: the
+    /// test the crisis gates themselves apply (the universe's stress
+    /// memory, the tick's crisis spike, the economy's crisis premium and the
+    /// start of a crisis episode). A strict `>`, as theirs is.
+    ///
+    /// This is the instantaneous gate. A crisis EPISODE
+    /// ([`Engine::crisis_episode`]) starts on the same test but ends only
+    /// after `crisis_epicentre_end_sessions` sessions back under the
+    /// threshold, so the two can disagree for up to that many sessions.
+    pub fn vix_above_crisis_threshold(&self) -> bool {
+        self.economy.vix > self.params.crisis_vix_threshold
+    }
+
     /// The raw episode state, for the snapshot.
     pub fn crisis_episode_raw(&self) -> (bool, i64, i32, Option<i32>) {
         (
@@ -4152,6 +4275,10 @@ impl Engine {
             }
         }
 
+        // The close today's change is measured from, before the night or
+        // the open's reset can move a price. Read by nothing that prices.
+        self.prior_closes.clone_from(&self.last_closes);
+
         // The night, before the day's marks are set, so the session band
         // anchors on the post-gap open and the gap sits outside it.
         self.apply_overnight();
@@ -4348,6 +4475,60 @@ impl Engine {
         &self.jump_fair_value_moves
     }
 
+    /// Each name's last print at the most recent close, in roster order:
+    /// the price as [`Engine::close_market`] (or [`Engine::close_day`])
+    /// found it, before the close re-marks anything. Before the first
+    /// close, the price the name was built or listed at.
+    ///
+    /// # Why this is not `previous_close`
+    ///
+    /// The `previous_close` field on each stock is reset at
+    /// [`Engine::open_market`] to the day's OPENING price, after the
+    /// overnight gap and after the close's re-mark to newly published macro
+    /// data (`macro_publication_repricing`, on from `pt-v20`). It anchors
+    /// the session's circuit-breaker band and the daily return GARCH reads,
+    /// so it measures open to now, and the move between the last print and
+    /// the open sits outside it by design. For a close-to-close day change,
+    /// divide by [`Engine::prior_closes`] instead.
+    ///
+    /// Not part of the trajectory: nothing that prices reads it, it takes
+    /// no draw, and [`Engine::state_hash`] leaves it out. A host that saves
+    /// and restores an engine between days carries it with
+    /// [`Engine::restore_closes`] if it wants the next day's change to be
+    /// close-to-close.
+    pub fn last_closes(&self) -> &[f64] {
+        &self.last_closes
+    }
+
+    /// The close each name's current day is measured from, in roster
+    /// order: [`Engine::last_closes`] as it stood at the most recent
+    /// [`Engine::open_market`]. So `price / prior_close - 1` is the
+    /// close-to-close change of the day in progress, and it stays that
+    /// day's change after the close until the next open.
+    ///
+    /// On `pt-v20`, over 119 days of a 20-name market, the open differed
+    /// from the previous day's last print on every name and day, by a
+    /// median of 0.12 per cent and at most 0.55, so a day change taken
+    /// against `previous_close` is off by that much.
+    pub fn prior_closes(&self) -> &[f64] {
+        &self.prior_closes
+    }
+
+    /// Restore [`Engine::last_closes`] and [`Engine::prior_closes`], one
+    /// value per name each, as a host's own save carried them. Lengths are
+    /// checked rather than truncated. Changes no price and no draw.
+    pub fn restore_closes(&mut self, last: &[f64], prior: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        for (name, len) in [("last", last.len()), ("prior", prior.len())] {
+            if len != n {
+                return Err(format!("{name} closes have {len} values, expected {n}"));
+            }
+        }
+        self.last_closes = last.to_vec();
+        self.prior_closes = prior.to_vec();
+        Ok(())
+    }
+
     /// Close-of-day bookkeeping. Zero draws.
     ///
     /// Must run BEFORE any earnings shock the embedder applies that evening:
@@ -4366,6 +4547,10 @@ impl Engine {
             self.companies.len(),
             "one sector base variance per company"
         );
+        // The session's last print, before anything below or the macro step
+        // after it can re-mark a price. Read by nothing that prices.
+        self.last_closes.clear();
+        self.last_closes.extend(self.companies.iter().map(|c| c.stock.price));
         // WHAT THE FACTOR'S VARIANCE TARGET MEASURES THE VIX AGAINST, and
         // it has to be read HERE, before the per-name GARCH loop below
         // moves a single name's variance.
@@ -6033,6 +6218,10 @@ impl Engine {
         self.tick_repriced.push(0.0);
         // A name that joins has had nothing written to its price.
         self.repriced_pending.push(0.0);
+        // A name that joins has no earlier close than its listing price.
+        let listing = self.companies.last().map_or(f64::NAN, |c| c.stock.price);
+        self.last_closes.push(listing);
+        self.prior_closes.push(listing);
         // Only where the arm is running. Empty means no arm, and pushing
         // into an empty pair would turn that into a one-row column.
         if !self.tick_unbounded_print.is_empty() {
@@ -6121,6 +6310,12 @@ impl Engine {
         }
         if index < self.repriced_pending.len() {
             self.repriced_pending.remove(index);
+        }
+        if index < self.last_closes.len() {
+            self.last_closes.remove(index);
+        }
+        if index < self.prior_closes.len() {
+            self.prior_closes.remove(index);
         }
         if index < self.tick_unbounded_print.len() {
             self.tick_unbounded_print.remove(index);
@@ -9416,5 +9611,217 @@ mod tests {
                 c.stock.market_cap = *p * c.stock.shares_outstanding;
             }
         }
+    }
+}
+
+/// What a host that drives the engine relies on: whose opening it is, where
+/// the previous close is, and where the crisis line sits.
+#[cfg(test)]
+mod host_tests {
+    use super::*;
+    use crate::economy::{create_initial_central_bank_state, create_initial_economy_state};
+
+    fn roster(seed: u64) -> Vec<TickCompany> {
+        crate::universe::random_universe(6, seed)
+            .iter()
+            .enumerate()
+            .map(|(i, g)| g.to_init().to_tick_company(i))
+            .collect()
+    }
+
+    fn sector_keys() -> Vec<String> {
+        crate::sectors::keys().iter().map(|s| s.to_string()).collect()
+    }
+
+    /// A host's own opening: a crisis VIX, a 5 per cent policy rate and a
+    /// contraction, none of which the default economy holds.
+    fn host_economy() -> EconomyState {
+        let mut e = create_initial_economy_state(&Default::default());
+        e.vix = 45.0;
+        e.federal_funds_rate = 5.0;
+        e.cycle_phase = crate::economy::CyclePhase::Contraction;
+        e
+    }
+
+    #[test]
+    fn with_params_settles_a_host_economy_and_keeping_opening_keeps_it() {
+        let p = ModelParams::preset("pt-v20").unwrap();
+        let settled = Engine::with_params(
+            7, roster(7), host_economy(), create_initial_central_bank_state(0),
+            sector_keys(), p.clone(),
+        );
+        let kept = Engine::with_params_keeping_opening(
+            7, roster(7), host_economy(), create_initial_central_bank_state(0),
+            sector_keys(), p,
+        );
+        eprintln!(
+            "pt-v20 host opening VIX 45.0, policy rate 5.00, contraction: \
+             with_params opens at VIX {:.2}, rate {:.2}, {:?}; \
+             with_params_keeping_opening at VIX {:.2}, rate {:.2}, {:?}",
+            settled.economy().vix, settled.economy().federal_funds_rate,
+            settled.economy().cycle_phase,
+            kept.economy().vix, kept.economy().federal_funds_rate,
+            kept.economy().cycle_phase,
+        );
+        assert!(settled.opening_settled());
+        assert!((settled.economy().vix - 45.0).abs() > 5.0, "the burn-in relaxes the VIX");
+        assert!(!kept.opening_settled());
+        assert_eq!(kept.economy().vix, 45.0);
+        assert_eq!(kept.economy().federal_funds_rate, 5.0);
+        assert_eq!(kept.economy().cycle_phase, crate::economy::CyclePhase::Contraction);
+    }
+
+    #[test]
+    fn a_preset_with_nothing_to_settle_reports_an_unsettled_opening() {
+        // pt-v1 has no burn-in and no stationary draw, so `with_params`
+        // keeps the economy too, and says so.
+        let e = Engine::with_params(
+            7, roster(7), host_economy(), create_initial_central_bank_state(0),
+            sector_keys(), ModelParams::preset("pt-v1").unwrap(),
+        );
+        assert!(!e.opening_settled());
+        assert_eq!(e.economy().vix, 45.0);
+    }
+
+    #[test]
+    fn keeping_the_opening_is_from_opening_with_settle_false() {
+        let p = ModelParams::preset("pt-v20").unwrap();
+        let mut a = Engine::with_params_keeping_opening(
+            9, roster(9), host_economy(), create_initial_central_bank_state(0),
+            sector_keys(), p.clone(),
+        );
+        let mut b = Engine::with_params_from_opening(
+            9, roster(9), host_economy(), create_initial_central_bank_state(0),
+            sector_keys(), p, false,
+        );
+        let mut buffer = crate::engine::SessionBuffer::new();
+        for day in 1..=3 {
+            for e in [&mut a, &mut b] {
+                e.open_market();
+                let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+                e.run_session(&SessionRequest::new(bell, 390), &mut buffer);
+                e.close_day(day);
+            }
+        }
+        assert_eq!(a.state_hash(3, false), b.state_hash(3, false));
+    }
+
+    fn run_day(e: &mut Engine, day: i64, buffer: &mut SessionBuffer) -> Vec<f64> {
+        e.open_market();
+        let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+        e.run_session(&SessionRequest::new(bell, 390), buffer);
+        let last_print = e.prices();
+        e.close_day(day);
+        last_print
+    }
+
+    #[test]
+    fn prior_closes_are_the_last_print_and_previous_close_is_the_open() {
+        let mut e = Engine::with_params(
+            11, roster(11), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(),
+            ModelParams::preset("pt-v20").unwrap(),
+        );
+        let built = e.prices();
+        assert_eq!(e.last_closes(), built.as_slice());
+        assert_eq!(e.prior_closes(), built.as_slice());
+
+        let mut buffer = SessionBuffer::new();
+        let mut last_print = run_day(&mut e, 1, &mut buffer);
+        assert_eq!(e.last_closes(), last_print.as_slice());
+        let mut differed = 0;
+        for day in 2..=6 {
+            e.open_market();
+            assert_eq!(e.prior_closes(), last_print.as_slice());
+            let previous_close = e.column(PriceField::PreviousClose);
+            // pt-v20 re-marks at the close, so the open the session band is
+            // anchored on is not the last print.
+            differed += previous_close
+                .iter()
+                .zip(&last_print)
+                .filter(|(a, b)| a != b)
+                .count();
+            let bell = crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 };
+            e.run_session(&SessionRequest::new(bell, 390), &mut buffer);
+            last_print = e.prices();
+            e.close_day(day);
+            // Still the day's reference after its close, until the next open.
+            assert_ne!(e.prior_closes(), last_print.as_slice());
+            assert_eq!(e.last_closes(), last_print.as_slice());
+        }
+        assert!(differed > 0, "previous_close equalled the last print on every name and day");
+    }
+
+    #[test]
+    fn closes_follow_the_roster_and_restore_checks_lengths() {
+        let mut e = Engine::with_params(
+            12, roster(12), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(),
+            ModelParams::preset("pt-v20").unwrap(),
+        );
+        let n = e.len();
+        let mut joiner = roster(99).remove(0);
+        joiner.id = "JOIN".into();
+        joiner.ticker = "JOIN".into();
+        let price = joiner.stock.price;
+        e.add_company(joiner);
+        assert_eq!(e.last_closes().len(), n + 1);
+        assert_eq!(e.prior_closes()[n], price);
+        let second = e.last_closes()[1];
+        e.remove_company(0);
+        assert_eq!(e.last_closes().len(), n);
+        assert_eq!(e.last_closes()[0], second);
+
+        assert!(e.restore_closes(&[1.0], &[1.0]).is_err());
+        let ones = vec![1.0; n];
+        let twos = vec![2.0; n];
+        e.restore_closes(&ones, &twos).unwrap();
+        assert_eq!(e.last_closes(), ones.as_slice());
+        assert_eq!(e.prior_closes(), twos.as_slice());
+    }
+
+    #[test]
+    fn closes_change_no_price_and_no_hash() {
+        // Restoring nonsense closes moves nothing the trajectory reads.
+        let build = || Engine::with_params(
+            13, roster(13), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(),
+            ModelParams::preset("pt-v20").unwrap(),
+        );
+        let (mut a, mut b) = (build(), build());
+        let n = b.len();
+        b.restore_closes(&vec![1e9; n], &vec![-1.0; n]).unwrap();
+        let mut buffer = SessionBuffer::new();
+        for day in 1..=3 {
+            run_day(&mut a, day, &mut buffer);
+            run_day(&mut b, day, &mut buffer);
+        }
+        assert_eq!(a.prices(), b.prices());
+        assert_eq!(a.state_hash(3, false), b.state_hash(3, false));
+    }
+
+    #[test]
+    fn the_crisis_threshold_is_the_presets_and_follows_an_override() {
+        let p = ModelParams::preset("pt-v20").unwrap();
+        let mut e = Engine::with_params_keeping_opening(
+            5, roster(5), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(), p.clone(),
+        );
+        assert_eq!(e.crisis_vix_threshold(), 30.88325108);
+        assert_eq!(e.crisis_vix_threshold(), e.params().crisis_vix_threshold);
+        e.economy_mut().vix = 30.88325108;
+        assert!(!e.vix_above_crisis_threshold(), "the gate is a strict >");
+        e.economy_mut().vix = 30.9;
+        assert!(e.vix_above_crisis_threshold());
+
+        let moved = p.with_override("crisis_vix_threshold", 30.0).unwrap();
+        let mut e = Engine::with_params_keeping_opening(
+            5, roster(5), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(), moved,
+        );
+        assert_eq!(e.crisis_vix_threshold(), 30.0);
+        e.economy_mut().vix = 30.5;
+        assert!(e.vix_above_crisis_threshold());
+        assert!(e.model_fingerprint().starts_with("custom-"));
     }
 }

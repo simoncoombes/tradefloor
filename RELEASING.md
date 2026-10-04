@@ -676,22 +676,51 @@ among them the README example. The others are excluded
 `goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
 concludes the crate is broken.
 
-**Check the Rust API against the last published crate.** The crate takes
-the Python package's version, so a patch release reaches every user who wrote
-`tradefloor = "0.8"` on their next `cargo update`. 0.8.5 broke code written
-for 0.8.1 (seeds went from `u32` to `u64`, structs gained fields) and nothing
-caught it until a review of the published crate. Before every publish, run
-cargo-semver-checks against the newest version on crates.io:
+**The Rust API against the last published crate.** From 0.10.0 the crate
+follows Cargo's semver rules: while it is 0.x, a minor release may break the
+API and a patch release may not. The crate takes the Python package's
+version, so a patch release reaches every user who wrote `tradefloor =
+"0.10"` on their next `cargo update`. 0.8.5 broke code written for 0.8.1
+(seeds went from `u32` to `u64`, structs gained fields) in a patch release,
+and nothing caught it until a review of the published crate.
+
+The release workflow's `crate_api` job now runs
+`tools/release/crate_api.py`, and both publish jobs wait for it. The script
+reads the newest version on crates.io, works out the release type the bump
+implies (0.9.1 to 0.10.0 may break, 0.10.0 to 0.10.1 may not) and runs
+`cargo semver-checks check-release` under it. `check.py` runs the same
+script, so run it before tagging rather than finding out from the tag:
 
 ```
 cargo install cargo-semver-checks --locked   # once
-cd rust && cargo semver-checks check-release
+python tools/release/crate_api.py --version 0.10.1
 ```
 
-If it reports a break, either take it out or list every item in the
-CHANGELOG, as 0.8.5's "The Rust crate since 0.8.1" does, and in the crate
-README. A new public struct that will grow should be `#[non_exhaustive]`
-with a constructor, as `ModelParams` and `SessionRequest` are.
+A minor release that breaks the API passes the check, and then every item
+it reports goes in the CHANGELOG under its own heading, as 0.8.5's "The
+Rust crate since 0.8.1" does. A new public struct that will grow should be
+`#[non_exhaustive]` with a constructor, as `ModelParams` and
+`SessionRequest` are.
+
+### State shapes and widths
+
+cargo-semver-checks cannot see two kinds of change that break a host as
+surely as a renamed function, because the host's code still compiles:
+
+- **A state width or shape.** An attribution row went from 9 numbers to 10
+  in 0.7.0 and to 11 in 0.8.5, an engine's random state from 7 streams to
+  10, and a stream from 3 numbers to 5. A host that derived a width from
+  another constant kept compiling and saved too few numbers. Every width a
+  host sizes a buffer by is a constant in `rust/src/widths.rs`, re-exported
+  at the crate root, and a test there pins each value. Changing one fails
+  that test on purpose. Update the pinned table only in a release that may
+  break the API, and give the change its own CHANGELOG line naming the old
+  and new width.
+- **What a constructor does with its arguments.** 0.7.0's default preset
+  gained a 755-day macro burn-in, so `Engine::with_params` began relaxing
+  away a host's starting economy with no change to its signature. A change
+  like that gets its own CHANGELOG line naming the function and what a
+  caller who wants the old behaviour calls instead.
 
 Unlike PyPI, the crate upload is not idempotent. PyPI's `skip-existing` lets a
 re-run finish a partial upload; crates.io refuses a version that already
