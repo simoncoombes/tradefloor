@@ -228,6 +228,35 @@ def check_kat_history(r: Report) -> None:
           f"against {ref}" if not found else found[0])
 
 
+def check_crate_api(r: Report, intended: str | None) -> None:
+    """The crate's API against the newest published crate, under the
+    release type the bump implies. The release workflow runs the same
+    script and refuses to publish on a failure, so this is the early
+    warning rather than the gate."""
+    import crate_api  # noqa: PLC0415
+
+    name = "crate API within the bump's semver"
+    if not crate_api.installed():
+        r.add(name, SKIP, "cargo install cargo-semver-checks --locked")
+        return
+    try:
+        new, baseline, kind = crate_api.plan(
+            crate_api.parse(intended) if intended else None)
+    except (OSError, ValueError, SystemExit) as exc:
+        r.add(name, SKIP, f"no baseline: {str(exc)[:60]}")
+        return
+    out = subprocess.run(crate_api.command(baseline, kind), cwd=ROOT / "rust",
+                         capture_output=True, text=True, encoding="utf-8")
+    note = f"{crate_api.show(baseline)} to {crate_api.show(new)}, {kind}"
+    if out.returncode == 0:
+        r.add(name, OK, note)
+    else:
+        failed = [line.strip() for line in out.stdout.splitlines()
+                  if line.startswith("--- failure")]
+        r.add(name, BAD, f"{note}; {len(failed)} break(s), run "
+              "tools/release/crate_api.py to see them")
+
+
 def check_prose(r: Report) -> None:
     out = subprocess.run([sys.executable, "tools/prose/prose.py"], cwd=ROOT,
                          capture_output=True, text=True, encoding="utf-8")
@@ -261,6 +290,7 @@ def main() -> int:
     check_envelope(r, tf)
     check_determinism(r)
     check_kat_history(r)
+    check_crate_api(r, args.version)
     check_prose(r)
     code = r.render()
 

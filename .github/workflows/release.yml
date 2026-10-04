@@ -86,6 +86,35 @@ jobs:
           echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
           echo "event=${{ github.event_name }} publish=$PUBLISH targets=$M"
 
+  crate_api:
+    name: the crate's API against the last published crate
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      # A prebuilt binary rather than `cargo install`, which compiles the
+      # tool from source for several minutes on every release.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      # From 0.10.0 the crate follows Cargo's semver rules: a 0.x patch
+      # release may not break the API. 0.8.5 broke code written for 0.8.1
+      # in a patch release and nothing caught it until a review of the
+      # published crate. The script reads the newest version on crates.io
+      # and checks under the release type the bump implies, so a patch
+      # release that breaks the API stops here, before either registry is
+      # touched. A minor release passes and lists its breaks in the
+      # CHANGELOG by hand.
+      - name: No API break in a patch release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/release/crate_api.py
+
   wheels:
     name: wheel ${{ matrix.target }}
     needs: setup
@@ -221,7 +250,7 @@ jobs:
 
   publish:
     name: publish to PyPI
-    needs: [setup, wheels, sdist, verify]
+    needs: [setup, wheels, sdist, verify, crate_api]
     if: needs.setup.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: pypi
@@ -245,7 +274,7 @@ jobs:
 
   publish_crate:
     name: publish to crates.io
-    needs: [setup, wheels, sdist, verify]
+    needs: [setup, wheels, sdist, verify, crate_api]
     if: needs.setup.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: crates-io
