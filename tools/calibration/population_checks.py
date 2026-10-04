@@ -249,14 +249,14 @@ def rule(name):
 
 def ac3_seed(args):
     import tradefloor as tf
-    model_text, population_path, i, days = args
+    model_text, population_path, i, days, parts = args
     model = model_of(model_text)
     population = population_of(population_path)
     seed, universe = 92000 + i, tf.Universe.random(20, seed=93000 + i)
     out = {"seed": seed}
     for name in RULES:
         per_k = {}
-        for k in (1, 2, 4, 8):
+        for k in ((1, 2, 4, 8) if "a" in parts else ()):
             agents = {f"copy{j}": rule(name).build() for j in range(k)}
             agents["hold"] = tf.StrategySpec.hold().build()
             world = tf.World(seed=seed, universe=universe, agents=agents, model=model,
@@ -265,12 +265,14 @@ def ac3_seed(args):
             worth = {label: world.net_worth(agent=label) for label in agents}
             hold = worth["hold"] / SUITE["cash"] - 1
             per_k[k] = st.fmean(worth[f"copy{j}"] / SUITE["cash"] - 1 - hold for j in range(k))
-        ks = list(per_k)
-        mk, my = st.fmean(ks), st.fmean(per_k.values())
-        slope = (sum((x - mk) * (per_k[x] - my) for x in ks)
-                 / sum((x - mk) ** 2 for x in ks))
-        out[name] = {"excess_by_k": per_k, "slope": slope}
-        for mode, pop in (("iso", None), ("pop", population)):
+        out[name] = {}
+        if per_k:
+            ks = list(per_k)
+            mk, my = st.fmean(ks), st.fmean(per_k.values())
+            out[name] = {"excess_by_k": per_k, "slope": (
+                sum((x - mk) * (per_k[x] - my) for x in ks)
+                / sum((x - mk) ** 2 for x in ks))}
+        for mode, pop in ((("iso", None), ("pop", population)) if "b" in parts else ()):
             cards = tf.evaluate({"rule": rule(name), "hold": tf.StrategySpec.hold()},
                                 seed=seed, universe=universe, days=days, model=model,
                                 population=pop, **SUITE)
@@ -280,7 +282,7 @@ def ac3_seed(args):
 
 
 def ac3(a):
-    jobs = [(a.model, a.population, s, a.days) for s in seeds_of(a.seeds)]
+    jobs = [(a.model, a.population, s, a.days, a.parts) for s in seeds_of(a.seeds)]
     rows = []
     with ProcessPoolExecutor(a.workers) as pool:
         for r in pool.map(ac3_seed, jobs):
@@ -290,15 +292,18 @@ def ac3(a):
     out = {"kind": "population.ac3", "model": a.model,
            "population": population_of(a.population).fingerprint, "rows": rows}
     for name in RULES:
-        out[name] = {
-            "a_slope_below_zero": one_sided([-r[name]["slope"] for r in rows]),
-            "excess_by_k": {k: st.fmean(r[name]["excess_by_k"][k] for r in rows)
-                            for k in (1, 2, 4, 8)},
-            "b_isolated_over_populated": one_sided(
-                [r[name]["excess_iso"] - r[name]["excess_pop"] for r in rows]),
-            "excess_iso": st.fmean(r[name]["excess_iso"] for r in rows),
-            "excess_pop": st.fmean(r[name]["excess_pop"] for r in rows),
-        }
+        out[name] = {}
+        if "a" in a.parts:
+            out[name].update({
+                "a_slope_below_zero": one_sided([-r[name]["slope"] for r in rows]),
+                "excess_by_k": {k: st.fmean(r[name]["excess_by_k"][k] for r in rows)
+                                for k in (1, 2, 4, 8)}})
+        if "b" in a.parts:
+            out[name].update({
+                "b_isolated_over_populated": one_sided(
+                    [r[name]["excess_iso"] - r[name]["excess_pop"] for r in rows]),
+                "excess_iso": st.fmean(r[name]["excess_iso"] for r in rows),
+                "excess_pop": st.fmean(r[name]["excess_pop"] for r in rows)})
     return out
 
 
@@ -351,6 +356,7 @@ def main():
     ap.add_argument("--population", default="")
     ap.add_argument("--seeds", default="201-204")
     ap.add_argument("--days", type=int, default=60)
+    ap.add_argument("--parts", default="ab", help="ac3: a (copies), b (modes) or both")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", default="")
     a = ap.parse_args()

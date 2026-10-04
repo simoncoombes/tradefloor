@@ -236,11 +236,12 @@ pub struct ParticipantState {
     pub orders: f64,
     /// Liquidity: the moving average of the log price. Empty otherwise.
     pub average: Vec<f64>,
-    /// Detector: per name, `buckets` values each of the flow's mean, its
-    /// variance, and today's flow so far. Empty otherwise.
-    pub mean: Vec<f64>,
-    pub variance: Vec<f64>,
-    pub today: Vec<f64>,
+    /// Detector: per name, empty until the agents' flow first reaches the
+    /// name, then `3 * buckets` values: the flow's mean per bucket, its
+    /// variance, and today's flow so far. Empty for the other kinds. Kept
+    /// per name so a run in which agents trade a few names carries a few
+    /// profiles, not one per name.
+    pub profile: Vec<Vec<f64>>,
 }
 
 /// A population running inside one engine: the spec and its state.
@@ -354,10 +355,10 @@ impl PopulationRun {
                     s.average = avg;
                 }
                 Policy::Detector { .. } => {
-                    let b = p.buckets();
-                    s.mean = pick(&s.mean, b, 0.0);
-                    s.variance = pick(&s.variance, b, 0.0);
-                    s.today = pick(&s.today, b, 0.0);
+                    s.profile = from
+                        .iter()
+                        .map(|f| f.and_then(|j| s.profile.get(j).cloned()).unwrap_or_default())
+                        .collect();
                 }
                 _ => {}
             }
@@ -387,15 +388,15 @@ impl PopulationRun {
         for (k, p) in self.participants.iter().enumerate() {
             if let Policy::Detector { memory, .. } = p.policy {
                 let alpha = 1.0 - mathx::pow(0.5, 1.0 / memory);
-                let s = &mut self.states[k];
-                for ((m, v), x) in s.mean.iter_mut().zip(s.variance.iter_mut()).zip(s.today.iter_mut()) {
-                    if *m == 0.0 && *v == 0.0 && *x == 0.0 {
-                        continue;
+                let b = p.buckets();
+                for row in self.states[k].profile.iter_mut().filter(|r| !r.is_empty()) {
+                    for slot in 0..b {
+                        let (m, v, x) = (row[slot], row[b + slot], row[2 * b + slot]);
+                        let d = x - m;
+                        row[slot] = m + alpha * d;
+                        row[b + slot] = (1.0 - alpha) * (v + alpha * d * d);
+                        row[2 * b + slot] = 0.0;
                     }
-                    let d = *x - *m;
-                    *m += alpha * d;
-                    *v = (1.0 - alpha) * (*v + alpha * d * d);
-                    *x = 0.0;
                 }
             }
         }
@@ -412,7 +413,12 @@ impl PopulationRun {
             if let Policy::Detector { bucket, .. } = p.policy {
                 let b = p.buckets();
                 let slot = ((tick / bucket) as usize).min(b - 1);
-                self.states[k].today[index * b + slot] += net / volume;
+                if let Some(row) = self.states[k].profile.get_mut(index) {
+                    if row.is_empty() {
+                        *row = vec![0.0; 3 * b];
+                    }
+                    row[2 * b + slot] += net / volume;
+                }
             }
         }
     }
@@ -451,9 +457,11 @@ impl PopulationRun {
             return 0.0;
         };
         let b = p.buckets();
-        let s = &self.states[k];
-        let row_m = &s.mean[index * b..(index + 1) * b];
-        let row_v = &s.variance[index * b..(index + 1) * b];
+        let row = match self.states[k].profile.get(index) {
+            Some(r) if !r.is_empty() => r,
+            _ => return 0.0,
+        };
+        let (row_m, row_v) = (&row[..b], &row[b..2 * b]);
         // The window wraps across the night: near the close it reaches into
         // the next session's first buckets, and at the open back into the
         // last session's, because the memory is one profile of a session.
@@ -589,9 +597,14 @@ impl PopulationRun {
         out.extend_from_slice(&self.closes);
         for s in &self.states {
             out.push(s.orders);
-            for v in [&s.position, &s.cash, &s.volume, &s.notional, &s.average, &s.mean, &s.variance, &s.today] {
+            for v in [&s.position, &s.cash, &s.volume, &s.notional, &s.average] {
                 out.push(v.len() as f64);
                 out.extend_from_slice(v);
+            }
+            out.push(s.profile.len() as f64);
+            for row in &s.profile {
+                out.push(row.len() as f64);
+                out.extend_from_slice(row);
             }
         }
         out
@@ -628,9 +641,8 @@ impl PopulationRun {
             let widths = [
                 n, n, n, n,
                 if matches!(p.policy, Policy::Liquidity { .. }) { n } else { 0 },
-                n * p.buckets(), n * p.buckets(), n * p.buckets(),
             ];
-            let mut parts: Vec<Vec<f64>> = Vec::with_capacity(8);
+            let mut parts: Vec<Vec<f64>> = Vec::with_capacity(5);
             for w in widths {
                 let len = take(1)?[0];
                 if len != w as f64 {
@@ -644,9 +656,18 @@ impl PopulationRun {
             s.volume = it.next().unwrap_or_default();
             s.notional = it.next().unwrap_or_default();
             s.average = it.next().unwrap_or_default();
-            s.mean = it.next().unwrap_or_default();
-            s.variance = it.next().unwrap_or_default();
-            s.today = it.next().unwrap_or_default();
+            let rows = take(1)?[0];
+            let detector = matches!(p.policy, Policy::Detector { .. });
+            if rows != if detector { n as f64 } else { 0.0 } {
+                return Err(bad("the detector's profiles do not match this population and roster"));
+            }
+            for _ in 0..rows as usize {
+                let len = take(1)?[0];
+                if len != 0.0 && len != (3 * p.buckets()) as f64 {
+                    return Err(bad("a detector profile has the wrong length"));
+                }
+                s.profile.push(take(len as usize)?.to_vec());
+            }
             states.push(s);
         }
         if at != flat.len() {
@@ -709,9 +730,8 @@ mod tests {
         s.cash = vec![0.0; n];
         s.volume = vec![0.0; n];
         s.notional = vec![0.0; n];
-        s.mean = vec![0.0; n * b];
-        s.variance = vec![0.0; n * b];
-        s.today = vec![0.0; n * b];
+        let _ = b;
+        s.profile = vec![Vec::new(); n];
         r
     }
 
