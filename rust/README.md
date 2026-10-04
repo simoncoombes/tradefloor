@@ -63,7 +63,7 @@ let opening = engine.prices();
 let mut buffer = SessionBuffer::new();
 for day in 1..=5 {
     engine.open_market();
-    let bell = GameTime { hour: 9, minute: 30, day_of_week: 3 };
+    let bell = GameTime::new(9, 30, 3);
     engine.run_session(&SessionRequest::new(bell, 390), &mut buffer);
     engine.close_day(day);
 }
@@ -123,7 +123,8 @@ arrived with `pt-v18` in 0.7.0; presets before it have none.
 flat arrays takes every width from the crate root: `COMPONENT_COUNT` (11
 numbers in an attribution row), `TICK_COMPONENT_COUNT` (9 in a tick row),
 `RNG_STREAM_WIDTH` (5 per random stream), `ENGINE_RNG_STREAMS` (10 streams)
-and the others listed in the `widths` module. A width derived from
+and the others listed in the `widths` module. `EngineRngState::to_words`
+and `from_words` pack and read the streams at those widths. A width derived from
 something else, such as `S_COMPONENT_KEYS.len() + 1`, keeps compiling when
 the engine gains a slot and under-sizes the buffer. A test pins every
 value, and a change to one is a breaking change with its own CHANGELOG
@@ -166,19 +167,176 @@ Releases before 0.10.0 did not follow this. 0.8.5 broke code written for
 0.8.1 in a patch release; the CHANGELOG lists every change under "The Rust
 crate since 0.8.1", and `tradefloor = "=0.8.1"` stays on the old API.
 
-`ModelParams`, `SessionRequest`, `SessionBuffer`, `SessionOutcome`,
-`TickTruth` and both `TickOutcome` structs are `#[non_exhaustive]`, so
-adding a field to one breaks no build. Build them with
-`ModelParams::preset`, `with_override`, `SessionRequest::new` and
-`SessionBuffer::new`, then set or read fields on the value.
+From 0.10.0 every public struct with public fields is
+`#[non_exhaustive]`, so adding a field to one breaks no build, and so is
+every public enum except `Side`, so adding a variant breaks none either. Outside this
+crate you build one with its constructor or `Default`, then set or read
+fields on the value. The next section lists the constructors.
+
+## Upgrading to 0.10.0
+
+The breaking changes in 0.10.0 are in how a host builds the crate's structs
+and matches on its enums. No existing function, field or variant changed,
+and a struct built the new way holds what the old literal held. The structs
+a host fills in, such as `TickRequest`, `TickCompany`,
+`EconomyState` and `RngState`, are now `#[non_exhaustive]`. Outside the
+crate a struct literal no longer compiles, `..Default::default()` included,
+and a pattern that destructures one needs a trailing `..`. Code that reads
+or assigns fields is unchanged.
+
+A tick request written as a literal on 0.9.1:
+
+```rust,compile_fail,E0639
+# use tradefloor::engine::TickRequest;
+# use tradefloor::market::GameTime;
+let request = TickRequest {
+    time: GameTime { hour: 9, minute: 30, day_of_week: 3 },
+    volatility_multiplier: 0.9,
+    news: &[],
+    news_impact_queue: &[],
+    order_volumes: &[],
+};
+```
+
+is built from its constructor on 0.10.0, which fills in a quiet tick, and
+the fields you need are set on the value:
+
+```rust
+# use tradefloor::engine::TickRequest;
+# use tradefloor::market::{GameTime, NewsEvent};
+let mut news = NewsEvent::default();
+news.company_id = Some("ACME-0".to_string());
+news.price_impact = Some(0.02);
+let news = [news];
+
+let mut request = TickRequest::new(GameTime::new(9, 30, 3));
+request.volatility_multiplier = 0.9;
+request.news = &news;
+```
+
+A host-built company follows the same shape. `TickStock::new(price,
+shares_outstanding)` opens the stock at `price` with everything else empty,
+and `TickCompany::new(id, ticker, sector, stock)` lists it:
+
+```rust
+# use tradefloor::market::{TickCompany, TickStock};
+let base = tradefloor::sectors::by_key("technology").unwrap().base_daily_variance();
+let mut stock = TickStock::new(120.0, 5e7);
+stock.avg_volume = 2e6;
+stock.garch_variance = base;
+stock.beta = Some(1.3);
+let mut company = TickCompany::new("ACME-0", "ACME", "technology", stock);
+company.eps = Some(6.0);
+```
+
+The constructors for the structs a host builds:
+
+| Struct | Build it with |
+|---|---|
+| `market::GameTime` | `GameTime::new(hour, minute, day_of_week)` |
+| `market::TickStock` | `TickStock::new(price, shares_outstanding)` |
+| `market::TickCompany` | `TickCompany::new(id, ticker, sector, stock)` |
+| `market::OrderVolume` | `OrderVolume::new(buy, sell)` or `Default` |
+| `market::NewsEvent`, `market::NewsImpactEntry` | `Default` |
+| `engine::TickRequest` | `TickRequest::new(time)` |
+| `engine::DayCloseRequest` | `DayCloseRequest::new(daily_innovations, sector_base_variances)` |
+| `engine::DayAdvanceRequest` | `DayAdvanceRequest::new(game_day, timestamp)` |
+| `economy::EconomyState` | `create_initial_economy_state(&options)` or `Default` |
+| `economy::InitialEconomyOptions` | `Default` |
+| `economy::CentralBankState` | `CentralBankState::new(start_timestamp)` or `Default` |
+| `economy::EconomicShock` | `EconomicShock::new(kind, severity, gdp_impact)` |
+| `rng::RngState`, `engine::EngineRngState` | `from_words`, from what `to_words` wrote |
+| `universe::InstrumentInit` | `InstrumentInit::new(ticker, sector, initial_price, shares_outstanding)` |
+| `agent_book::AgentOrder` | `AgentOrder::new(id, agent, ticker, side, limit, quantity, mode)` |
+| `agent_book::BookState`, `engine::GdpPublication` | `Default` |
+
+The inputs to the model's component functions, such as
+`market::TickInputs`, `economy::DailyInputs`, `market::CloseInputs` and
+`microstructure::CompanyMicrostructure`, have a `new` or `Default` too, and
+each one's documentation says what it fills in. Structs the engine only
+hands back, such as `engine::DayAdvanceOutcome` and `agent_book::AgentFill`,
+have no constructor because a host never builds one.
+
+Every public enum except `order_book::Side` is `#[non_exhaustive]` as well,
+so a release can add a variant. Outside the crate a `match` on one needs a
+wildcard arm. `Side` has two variants and keeps them, so a match on it stays
+as it is. The enums are `economy::CyclePhase`, `ForwardGuidance`,
+`ShockKind` and `central_bank::Decision`, `market::MarketStatus`,
+`AvgVolumePolicy` and `SettleDrawPolicy`, `engine::PriceField` and
+`StopCondition`, `agent_book::RestMode` and `Liquidity`, `rates::CurvePoint`,
+`rng::DrawKind` and `Site`, and `types::Difficulty`.
+
+This match on `ShockKind`, written for 0.9.1 with no wildcard arm, no longer
+compiles:
+
+```rust,compile_fail,E0004
+# use tradefloor::economy::ShockKind;
+fn name(kind: ShockKind) -> &'static str {
+    match kind {
+        ShockKind::OilShock => "oilShock",
+        ShockKind::Pandemic => "pandemic",
+        ShockKind::War => "war",
+        ShockKind::Other => "other",
+    }
+}
+```
+
+takes a wildcard arm on 0.10.0, which decides what a variant from a later
+release means to the host:
+
+```rust
+# use tradefloor::economy::ShockKind;
+fn name(kind: ShockKind) -> Option<&'static str> {
+    match kind {
+        ShockKind::OilShock => Some("oilShock"),
+        ShockKind::Pandemic => Some("pandemic"),
+        ShockKind::War => Some("war"),
+        ShockKind::Other => Some("other"),
+        _ => None,
+    }
+}
+```
+
+The random streams no longer need their fields named. `to_words` writes a
+stream as `RNG_STREAM_WIDTH` numbers and the engine's ten as
+`ENGINE_RNG_STATE_WIDTH`, and `from_words` reads them back:
+
+```rust
+# use tradefloor::engine::{Engine, EngineRngState};
+# let companies = tradefloor::universe::random_universe(4, 1)
+#     .iter().enumerate().map(|(i, g)| g.to_init().to_tick_company(i)).collect();
+# let mut engine = Engine::new(
+#     1,
+#     companies,
+#     Default::default(),
+#     Default::default(),
+#     tradefloor::sectors::keys().iter().map(|s| s.to_string()).collect(),
+# );
+let saved: Vec<f64> = engine.rng_state().to_words().to_vec();
+assert_eq!(saved.len(), tradefloor::ENGINE_RNG_STATE_WIDTH);
+engine.set_rng_state(EngineRngState::from_words(&saved)?);
+# Ok::<(), String>(())
+```
+
+The words run in stream-id order (`rng::stream`: market, economy, external,
+jumps, volume, news, volume_idio, overnight, market_vol_level,
+crisis_epicentre), five per stream: the LCG state and increment as the raw
+bits of an `f64`, the Box-Muller spare or NaN for none, and the two draw
+counts. The fields are declared with volume_idio before news, so the
+order differs from theirs in those two streams. A host that packed the fields in declaration order
+and switches to `to_words` swaps those two streams in any state it saved
+before the switch, once, when it loads it. The first two words are bit
+patterns and some are NaNs, so move them as bytes: JavaScript may rewrite a
+NaN's bits and JSON has no NaN. A rewritten NaN has an even increment
+word, and `from_words` refuses one.
 
 ## Scope of this crate
 
 The published crate carries the engine, the unit tests in its source
-modules and seven integration tests that run standalone:
-`circuit_breaker`, `depth_counterfactual`, `maker_ladder_allocations`,
-`platform_maths`, `roster_mutation`, `snapshot_restore` and
-`stream_alignment`. The parity corpus that pins the
+modules and eight integration tests that run standalone:
+`circuit_breaker`, `depth_counterfactual`, `host_constructors`,
+`maker_ladder_allocations`, `platform_maths`, `roster_mutation`,
+`snapshot_restore` and `stream_alignment`. The parity corpus that pins the
 engine's output is 140 MB of fixtures and stays in the repository, so the
 tests that read it are left out of the package rather than shipped in a
 state where they cannot pass.

@@ -179,6 +179,7 @@ pub const FISCAL_MULTIPLIER: f64 = 0.30;
 pub const CRISIS_VIX_THRESHOLD: f64 = 25.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum CyclePhase {
     Expansion,
     Peak,
@@ -240,6 +241,7 @@ impl CyclePhase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct PhaseCharacteristics {
     pub gdp_growth_range: (f64, f64),
     pub unemployment_trend: f64,
@@ -366,6 +368,7 @@ pub fn us_cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
 /// construction, so the `??` sites in the original become ordinary reads
 /// here — with one exception noted at [`EconomyState::market_pe`].
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct EconomyState {
     // Interest rates
     pub federal_funds_rate: f64,
@@ -483,9 +486,20 @@ pub struct EconomyState {
     pub recession_probability: f64,
 }
 
+/// The library's default opening economy:
+/// `create_initial_economy_state(&InitialEconomyOptions::default())`.
+/// A host that sets its own economy starts from this, or from
+/// [`create_initial_economy_state`] with its options, and assigns fields.
+impl Default for EconomyState {
+    fn default() -> Self {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+}
+
 /// Options for [`create_initial_economy_state`]. `None` selects the
 /// reference-implementation default parameter.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct InitialEconomyOptions {
     pub cycle_phase: Option<CyclePhase>,
     pub inflation_rate: Option<f64>,
@@ -632,6 +646,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ForwardGuidance {
     OngoingIncreases,
     Accommodative,
@@ -660,6 +675,7 @@ impl ForwardGuidance {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CentralBankState {
     /// Game timestamps are integer minutes.
     pub last_meeting_date: i64,
@@ -673,6 +689,22 @@ pub struct CentralBankState {
     /// nothing read it, which is the defect D1 corrects.
     pub hawkish_dovish_score: f64,
     pub forward_guidance: ForwardGuidance,
+}
+
+impl CentralBankState {
+    /// The opening central bank, as [`create_initial_central_bank_state`]
+    /// builds it: last meeting at `start_timestamp` (game minutes), the next
+    /// 45 days later, a 2 per cent inflation target, no QE.
+    pub fn new(start_timestamp: i64) -> Self {
+        create_initial_central_bank_state(start_timestamp)
+    }
+}
+
+/// [`CentralBankState::new`] at timestamp 0.
+impl Default for CentralBankState {
+    fn default() -> Self {
+        CentralBankState::new(0)
+    }
 }
 
 pub fn create_initial_central_bank_state(start_timestamp: i64) -> CentralBankState {
@@ -690,13 +722,21 @@ pub fn create_initial_central_bank_state(start_timestamp: i64) -> CentralBankSta
 
 /// An active economic shock, as `update_economy_daily` reads it.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct EconomicShock {
     pub kind: ShockKind,
     pub severity: f64,
     pub gdp_impact: f64,
 }
 
+impl EconomicShock {
+    pub fn new(kind: ShockKind, severity: f64, gdp_impact: f64) -> Self {
+        EconomicShock { kind, severity, gdp_impact }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ShockKind {
     OilShock,
     Pandemic,

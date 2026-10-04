@@ -87,6 +87,7 @@ fn phase_growth_target(stored: f64, range: (f64, f64), range_draw: f64) -> f64 {
 
 /// Inputs that the caller supplies per day.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct DailyInputs<'a> {
     /// Reference default: 1.0.
     pub volatility: f64,
@@ -297,6 +298,7 @@ pub struct DailyInputs<'a> {
 /// 0.5 per cent gate (which that return never crosses, so it never fires),
 /// and the corporate yield moved only at a central-bank meeting.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct YieldDials {
     /// The 10-year's daily noise, percentage points. See
     /// [`crate::params::ModelParams::treasury_10y_noise`].

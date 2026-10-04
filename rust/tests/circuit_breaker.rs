@@ -32,7 +32,7 @@
 
 use tradefloor::economy::{create_initial_economy_state, InitialEconomyOptions};
 use tradefloor::market::{
-    simulate_market_tick, MarketStatus, SettleDrawPolicy, TickCompany, TickInputs, TickStock,
+    simulate_market_tick, MarketStatus, TickCompany, TickInputs, TickStock,
     MARKET_FACTOR_SIGMA,
 };
 use tradefloor::rng::Rng;
@@ -57,41 +57,27 @@ fn sectors() -> Vec<String> {
 
 #[allow(clippy::too_many_arguments)]
 fn company(price: f64, previous_close: f64, eps: f64, s: Option<f64>) -> TickCompany {
-    TickCompany {
-        id: "ACME".into(),
-        ticker: "ACME".into(),
-        sector: "technology".into(),
-        is_bankrupt: false,
-        is_public: true,
-        sector_volatility: Some(1.0),
-        sector_avg_pe: Some(32.0),
-        eps: Some(eps),
-        book_value_per_share: Some(20.0),
-        revenue_growth: Some(0.1),
-        stock: TickStock {
-            price,
-            previous_close,
-            previous_tick_price: None,
-            open: previous_close,
-            high: price,
-            low: price,
-            volume: 0.0,
-            avg_volume: 1e6,
-            shares_outstanding: 1e8,
-            market_cap: price * 1e8,
-            mispricing_s: s,
-            mispricing_s_prev_close: s,
-            mispricing_momentum: Some(0.0),
-            fair_value_offset: None,
-            maker_inventory: None,
-            garch_variance: 0.015 * 0.015,
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: Some(0.0),
-            beta: Some(1.0),
-            short_interest: 0.0,
-            float: 1e8,
-        },
-    }
+    let stock = {
+        let mut tick_stock = TickStock::new(price, 1e8);
+        tick_stock.previous_close = previous_close;
+        tick_stock.open = previous_close;
+        tick_stock.avg_volume = 1e6;
+        tick_stock.mispricing_s = s;
+        tick_stock.mispricing_s_prev_close = s;
+        tick_stock.mispricing_momentum = Some(0.0);
+        tick_stock.garch_variance = 0.015 * 0.015;
+        tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+        tick_stock.last_daily_return = Some(0.0);
+        tick_stock.beta = Some(1.0);
+        tick_stock
+    };
+    let mut tick_company = TickCompany::new("ACME", "ACME", "technology", stock);
+    tick_company.sector_volatility = Some(1.0);
+    tick_company.sector_avg_pe = Some(32.0);
+    tick_company.eps = Some(eps);
+    tick_company.book_value_per_share = Some(20.0);
+    tick_company.revenue_growth = Some(0.1);
+    tick_company
 }
 
 /// Run one open-market tick and return the printed price.
@@ -100,53 +86,39 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
     let previous_close = c.stock.previous_close;
     let mut roster = vec![c.clone()];
     let mut rng = Extreme(rng_value);
+    let sector_keys = sectors();
     simulate_market_tick(
         &mut roster,
-        &TickInputs {
+        &{
+            let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
             // The lagged asymmetry branches on this flag and its gain
             // defaults to 0.0, so false is bit-identical here.
-            prev_day_down: false,
+            tick_inputs.prev_day_down = false;
             // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-            prev_day_factor: 0.0,
-            day_factor: 0.0,
-            forced_flow_eff: 1.0,
+            tick_inputs.prev_day_factor = 0.0;
             // The mechanism ships inert; 0.0 is the value that
             // preserves the behaviour these tests pin.
-            universe_stress: 0.0,
-            volume_state: 0.0,
-            volume_idio: &[],
-            jump_move: &[],
-            economy: &economy,
-            market_status: MarketStatus::Open,
-            intraday_t: 0.5,
-            volatility_multiplier: 0.9,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-            sector_keys: &sectors(),
-            sector_sigmas: &[],
+            tick_inputs.universe_stress = 0.0;
+            tick_inputs.volatility_multiplier = 0.9;
+            tick_inputs.sector_keys = &sector_keys;
             // The constant-sigma baseline: these tests predate the factor's
             // variance process and pin behaviour at its baseline level.
-            market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-            settle_draws: SettleDrawPolicy::FourAlways,
+            tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+            tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
             // The depth counterfactual, off. It reaches no company field.
-            settle_depth_counterfactual: false,
-            resting_orders: &[],
-            fill_impact: &[],
-                // The run's opening nominal output. The growth term is
-                // off on every preset these tests pin, so it is read
-                // nowhere; this tick's own value is what a single-tick
-                // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
-                // Trading days closed. The buyback factor is off on
-                // every preset these tests pin, so it is read
-                // nowhere; 0 is what a single-tick caller opens at.
-                // No crisis episode: the mechanism is off on every preset
-                // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+            tick_inputs.settle_depth_counterfactual = false;
+            // The run's opening nominal output. The growth term is
+            // off on every preset these tests pin, so it is read
+            // nowhere; this tick's own value is what a single-tick
+            // caller opens at.
+            tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
+            // Trading days closed. The buyback factor is off on
+            // every preset these tests pin, so it is read
+            // nowhere; 0 is what a single-tick caller opens at.
+            // No crisis episode: the mechanism is off on every preset
+            // these tests pin, and a single-tick caller has none.
+            tick_inputs.crisis_epicentre = None;
+            tick_inputs
         },
         &mut rng,
     );
@@ -254,53 +226,40 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
         let mut rng = Extreme(rng_value);
 
         for t in 0..390i64 {
+            let sector_keys = sectors();
             simulate_market_tick(
                 &mut roster,
-                &TickInputs {
+                &{
+                    let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
-                    prev_day_down: false,
+                    tick_inputs.prev_day_down = false;
                     // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-                    prev_day_factor: 0.0,
-                    day_factor: 0.0,
-            forced_flow_eff: 1.0,
+                    tick_inputs.prev_day_factor = 0.0;
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
-                    universe_stress: 0.0,
-                    volume_state: 0.0,
-                    volume_idio: &[],
-            jump_move: &[],
-                    economy: &economy,
-                    market_status: MarketStatus::Open,
-                    intraday_t: t as f64 / 390.0,
-                    volatility_multiplier: 0.9,
-                    news: &[],
-                    news_impact_queue: &[],
-                    order_volumes: &[],
-                    sector_keys: &sectors(),
-                    sector_sigmas: &[],
+                    tick_inputs.universe_stress = 0.0;
+                    tick_inputs.intraday_t = t as f64 / 390.0;
+                    tick_inputs.volatility_multiplier = 0.9;
+                    tick_inputs.sector_keys = &sector_keys;
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
-                    market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-                    settle_draws: SettleDrawPolicy::FourAlways,
+                    tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+                    tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
                     // The depth counterfactual, off. It reaches no company field.
-                    settle_depth_counterfactual: false,
-                    resting_orders: &[],
-                    fill_impact: &[],
-                // The run's opening nominal output. The growth term is
-                // off on every preset these tests pin, so it is read
-                // nowhere; this tick's own value is what a single-tick
-                // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
-                // Trading days closed. The buyback factor is off on
-                // every preset these tests pin, so it is read
-                // nowhere; 0 is what a single-tick caller opens at.
-                // No crisis episode: the mechanism is off on every preset
-                // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+                    tick_inputs.settle_depth_counterfactual = false;
+                    // The run's opening nominal output. The growth term is
+                    // off on every preset these tests pin, so it is read
+                    // nowhere; this tick's own value is what a single-tick
+                    // caller opens at.
+                    tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
+                    // Trading days closed. The buyback factor is off on
+                    // every preset these tests pin, so it is read
+                    // nowhere; 0 is what a single-tick caller opens at.
+                    // No crisis episode: the mechanism is off on every preset
+                    // these tests pin, and a single-tick caller has none.
+                    tick_inputs.crisis_epicentre = None;
+                    tick_inputs
                 },
                 &mut rng,
             );
@@ -322,53 +281,41 @@ fn the_band_holds_in_extended_hours_too() {
         for eps in [0.001, 4.0, 10_000.0] {
             let mut roster = vec![company(100.0, 100.0, eps, None)];
             let mut rng = Extreme(0.9);
+            let sector_keys = sectors();
             simulate_market_tick(
                 &mut roster,
-                &TickInputs {
+                &{
+                    let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
-                    prev_day_down: false,
+                    tick_inputs.prev_day_down = false;
                     // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-                    prev_day_factor: 0.0,
-                    day_factor: 0.0,
-            forced_flow_eff: 1.0,
+                    tick_inputs.prev_day_factor = 0.0;
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
-                    universe_stress: 0.0,
-                    volume_state: 0.0,
-                    volume_idio: &[],
-            jump_move: &[],
-                    economy: &economy,
-                    market_status: status,
-                    intraday_t: 0.0,
-                    volatility_multiplier: 0.9,
-                    news: &[],
-                    news_impact_queue: &[],
-                    order_volumes: &[],
-                    sector_keys: &sectors(),
-                    sector_sigmas: &[],
+                    tick_inputs.universe_stress = 0.0;
+                    tick_inputs.market_status = status;
+                    tick_inputs.intraday_t = 0.0;
+                    tick_inputs.volatility_multiplier = 0.9;
+                    tick_inputs.sector_keys = &sector_keys;
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
-                    market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-                    settle_draws: SettleDrawPolicy::FourAlways,
+                    tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+                    tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
                     // The depth counterfactual, off. It reaches no company field.
-                    settle_depth_counterfactual: false,
-                    resting_orders: &[],
-                    fill_impact: &[],
-                // The run's opening nominal output. The growth term is
-                // off on every preset these tests pin, so it is read
-                // nowhere; this tick's own value is what a single-tick
-                // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
-                // Trading days closed. The buyback factor is off on
-                // every preset these tests pin, so it is read
-                // nowhere; 0 is what a single-tick caller opens at.
-                // No crisis episode: the mechanism is off on every preset
-                // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+                    tick_inputs.settle_depth_counterfactual = false;
+                    // The run's opening nominal output. The growth term is
+                    // off on every preset these tests pin, so it is read
+                    // nowhere; this tick's own value is what a single-tick
+                    // caller opens at.
+                    tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
+                    // Trading days closed. The buyback factor is off on
+                    // every preset these tests pin, so it is read
+                    // nowhere; 0 is what a single-tick caller opens at.
+                    // No crisis episode: the mechanism is off on every preset
+                    // these tests pin, and a single-tick caller has none.
+                    tick_inputs.crisis_epicentre = None;
+                    tick_inputs
                 },
                 &mut rng,
             );
@@ -400,53 +347,40 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
         let mut roster = vec![company(100.0, 100.0, eps, None)];
         let mut rng = Extreme(rng_value);
         for t in 0..390i64 {
+            let sector_keys = sectors();
             simulate_market_tick(
                 &mut roster,
-                &TickInputs {
+                &{
+                    let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
                     // The lagged asymmetry branches on this flag and its gain
                     // defaults to 0.0, so false is bit-identical here.
-                    prev_day_down: false,
+                    tick_inputs.prev_day_down = false;
                     // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-                    prev_day_factor: 0.0,
-                    day_factor: 0.0,
-            forced_flow_eff: 1.0,
+                    tick_inputs.prev_day_factor = 0.0;
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
-                    universe_stress: 0.0,
-                    volume_state: 0.0,
-                    volume_idio: &[],
-            jump_move: &[],
-                    economy: &economy,
-                    market_status: MarketStatus::Open,
-                    intraday_t: t as f64 / 390.0,
-                    volatility_multiplier: 0.9,
-                    news: &[],
-                    news_impact_queue: &[],
-                    order_volumes: &[],
-                    sector_keys: &sectors(),
-                    sector_sigmas: &[],
+                    tick_inputs.universe_stress = 0.0;
+                    tick_inputs.intraday_t = t as f64 / 390.0;
+                    tick_inputs.volatility_multiplier = 0.9;
+                    tick_inputs.sector_keys = &sector_keys;
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
-                    market_sigma_daily: MARKET_FACTOR_SIGMA,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-                    settle_draws: SettleDrawPolicy::FourAlways,
+                    tick_inputs.market_sigma_daily = MARKET_FACTOR_SIGMA;
+                    tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
                     // The depth counterfactual, off. It reaches no company field.
-                    settle_depth_counterfactual: false,
-                    resting_orders: &[],
-                    fill_impact: &[],
-                // The run's opening nominal output. The growth term is
-                // off on every preset these tests pin, so it is read
-                // nowhere; this tick's own value is what a single-tick
-                // caller opens at.
-                nominal_output_base: economy.gdp * economy.cpi,
-                // Trading days closed. The buyback factor is off on
-                // every preset these tests pin, so it is read
-                // nowhere; 0 is what a single-tick caller opens at.
-                // No crisis episode: the mechanism is off on every preset
-                // these tests pin, and a single-tick caller has none.
-                crisis_epicentre: None,
-                elapsed_days: 0,
-                params: &tradefloor::params::PT_V1,
+                    tick_inputs.settle_depth_counterfactual = false;
+                    // The run's opening nominal output. The growth term is
+                    // off on every preset these tests pin, so it is read
+                    // nowhere; this tick's own value is what a single-tick
+                    // caller opens at.
+                    tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
+                    // Trading days closed. The buyback factor is off on
+                    // every preset these tests pin, so it is read
+                    // nowhere; 0 is what a single-tick caller opens at.
+                    // No crisis episode: the mechanism is off on every preset
+                    // these tests pin, and a single-tick caller has none.
+                    tick_inputs.crisis_epicentre = None;
+                    tick_inputs
                 },
                 &mut rng,
             );

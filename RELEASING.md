@@ -698,9 +698,13 @@ python tools/release/crate_api.py --version 0.10.1
 
 A minor release that breaks the API passes the check, and then every item
 it reports goes in the CHANGELOG under its own heading, as 0.8.5's "The
-Rust crate since 0.8.1" does. A new public struct that will grow should be
-`#[non_exhaustive]` with a constructor, as `ModelParams` and
-`SessionRequest` are.
+Rust crate since 0.8.1" does. From 0.10.0 every public struct with public
+fields is `#[non_exhaustive]` with a constructor or `Default`, so adding a
+field passes the check in a patch release. Every public enum is
+`#[non_exhaustive]` too, so a variant can be added the same way, except the
+few whose variants are closed by definition, such as `Side`. A new struct or
+enum follows the same rule, and `tests/test_crate_types_extensible.py` fails
+on one that does not.
 
 ### State shapes and widths
 

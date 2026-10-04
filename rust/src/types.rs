@@ -11,6 +11,7 @@
 /// full set is carried so that a difficulty cannot be silently misrouted by
 /// being absent from the enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Difficulty {
     Easy,
     Normal,

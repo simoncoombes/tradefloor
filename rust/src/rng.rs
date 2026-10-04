@@ -146,6 +146,7 @@ use crate::mathx;
 /// 1.033. Read both as no measurable cost rather than as a number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum DrawKind {
     Uniform = 0,
     Normal = 1,
@@ -166,6 +167,7 @@ impl DrawKind {
 /// as a failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum Site {
     Unset = 0,
     /// The market factor's one normal per tick (market/tick.rs).
@@ -248,6 +250,7 @@ impl Site {
 
 /// One recorded draw.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct DrawRecord {
     pub kind: DrawKind,
     pub index: u64,
@@ -263,11 +266,13 @@ const _: () = assert!(std::mem::size_of::<DrawRecord>() == 32);
 
 /// The per-generator table of substitutions and the optional log.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct DrawOverlay {
     pub table: std::collections::BTreeMap<(DrawKind, u64), f64>,
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DrawLog {
     pub from_day: i64,
     pub to_day: i64,
@@ -629,6 +634,7 @@ pub fn to_uint32(value: f64) -> u32 {
 /// the cached Box-Muller spare, and would restore a generator that agreed on
 /// uniforms and disagreed on normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct RngState {
     pub state: u64,
     pub increment: u64,
@@ -638,6 +644,76 @@ pub struct RngState {
     /// generator's addresses start from zero at the restore.
     pub uniforms: u64,
     pub normals: u64,
+}
+
+impl RngState {
+    /// The state as [`RNG_STREAM_WIDTH`](crate::RNG_STREAM_WIDTH) numbers,
+    /// for a host that saves it in a flat array: the LCG state and
+    /// increment as the raw bits of an `f64` (`f64::from_bits`), the spare
+    /// (NaN when there is none), then the uniform and normal draw counts.
+    ///
+    /// The first two words are bit patterns, not quantities, and some of
+    /// them are NaNs. Store and copy them as bits. JavaScript may rewrite a
+    /// NaN's bits when one passes through a number, and JSON has no NaN, so
+    /// a host that crosses either should move the words as bytes.
+    /// A rewritten NaN comes back with an even increment, and
+    /// [`RngState::from_words`] refuses one.
+    pub fn to_words(&self) -> [f64; crate::widths::RNG_STREAM_WIDTH] {
+        [
+            f64::from_bits(self.state),
+            f64::from_bits(self.increment),
+            self.spare.unwrap_or(f64::NAN),
+            self.uniforms as f64,
+            self.normals as f64,
+        ]
+    }
+
+    /// Read back what [`RngState::to_words`] wrote. Refuses a slice of the
+    /// wrong length, an even increment (every PCG increment is odd), an
+    /// infinite spare, and a draw count that is not a whole number from 0
+    /// to 2^53.
+    pub fn from_words(words: &[f64]) -> Result<Self, String> {
+        const W: usize = crate::widths::RNG_STREAM_WIDTH;
+        let words: &[f64; W] = words.try_into().map_err(|_| {
+            format!(
+                "an RNG stream state is {W} numbers (state, increment, spare, \
+                 uniforms, normals), got {}",
+                words.len()
+            )
+        })?;
+        let increment = words[1].to_bits();
+        if increment & 1 == 0 {
+            return Err(format!(
+                "the increment word holds the bits {increment:#018x}, which is \
+                 even. Every PCG increment is odd, so the word was changed on \
+                 the way: a NaN whose bits were rewritten is the usual cause."
+            ));
+        }
+        let spare = if words[2].is_nan() {
+            None
+        } else if words[2].is_finite() {
+            Some(words[2])
+        } else {
+            return Err(format!(
+                "the spare word is {}; a spare is finite, or NaN for none.",
+                words[2]
+            ));
+        };
+        let count = |name: &str, v: f64| -> Result<u64, String> {
+            if v.is_finite() && v >= 0.0 && v.fract() == 0.0 && v <= 9_007_199_254_740_992.0 {
+                Ok(v as u64)
+            } else {
+                Err(format!("the {name} word holds {v}; a draw count is a whole number from 0."))
+            }
+        };
+        Ok(RngState {
+            state: words[0].to_bits(),
+            increment,
+            spare,
+            uniforms: count("uniforms", words[3])?,
+            normals: count("normals", words[4])?,
+        })
+    }
 }
 
 /// PCG-XSH-RR with 64-bit state and 32-bit output.

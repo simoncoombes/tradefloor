@@ -59,25 +59,26 @@ fn allocations() -> u64 {
 }
 
 fn company() -> CompanyMicrostructure {
-    CompanyMicrostructure {
-        id: "ACME".to_string(),
-        sector_volatility: Some(1.0),
-        price: 100.0,
-        market_cap: 5e9,
-        beta: Some(1.0),
-        float: Some(4e7),
-        short_interest: Some(0.02),
-        avg_volume: Some(1e6),
-        volume: Some(5e5),
-        shares_outstanding: Some(5e7),
-        maker_inventory: Some(0.0),
-    }
+    let mut company_microstructure = CompanyMicrostructure::new("ACME", 100.0, 5e9);
+    company_microstructure.sector_volatility = Some(1.0);
+    company_microstructure.beta = Some(1.0);
+    company_microstructure.float = Some(4e7);
+    company_microstructure.short_interest = Some(0.02);
+    company_microstructure.avg_volume = Some(1e6);
+    company_microstructure.volume = Some(5e5);
+    company_microstructure.shares_outstanding = Some(5e7);
+    company_microstructure.maker_inventory = Some(0.0);
+    company_microstructure
 }
 
 /// Allocations `build_live_book` makes for a ladder `levels` deep a side,
 /// and the number of levels it built.
 fn build(levels: f64) -> (u64, usize) {
-    let options = LiveBookOptions { levels, ..LiveBookOptions::default() };
+    let options = {
+        let mut live_book_options = LiveBookOptions::default();
+        live_book_options.levels = levels;
+        live_book_options
+    };
     let company = company();
     let before = allocations();
     let book = build_live_book(&company, &options);

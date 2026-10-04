@@ -309,6 +309,7 @@ const TICKS_PER_SESSION: usize = 390;
 /// `Engine::advance_day_with` builds the day's index return from — and
 /// `sector` indexes the engine's own `sector_keys` order.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NameVariance {
     pub weight: f64,
     pub beta: f64,
@@ -316,6 +317,18 @@ pub struct NameVariance {
     /// The name's GARCH variance state, BEFORE the tick's floor.
     pub garch_variance: f64,
     pub market_cap: f64,
+}
+
+impl NameVariance {
+    pub fn new(
+        weight: f64,
+        beta: f64,
+        sector: usize,
+        garch_variance: f64,
+        market_cap: f64,
+    ) -> Self {
+        NameVariance { weight, beta, sector, garch_variance, market_cap }
+    }
 }
 
 /// The session mean of the intraday multiplier SQUARED — `K` in the
@@ -610,6 +623,7 @@ fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
 /// the jump rate at three different couplings, and the sum alone cannot
 /// say which. Nothing in the engine reads it back.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct IndexVarianceTerms {
     /// `beta_w^2 * v_f`, the market factor's block before `K`.
     pub factor_raw: f64,

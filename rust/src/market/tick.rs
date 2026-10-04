@@ -140,6 +140,7 @@ pub const PRICE_HARD_CAP: f64 = 50_000.0;
 
 /// The mutable stock state a tick reads and writes.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct TickStock {
     pub price: f64,
     pub previous_close: f64,
@@ -182,6 +183,44 @@ pub struct TickStock {
     pub float: f64,
 }
 
+impl TickStock {
+    /// A stock at `price` before its first tick: the open, high, low and
+    /// previous close all at `price`, no volume yet, market cap
+    /// `price * shares_outstanding`, the float equal to the shares
+    /// outstanding, and every carried state absent or zero.
+    ///
+    /// `garch_variance` and `avg_volume` start at zero and a host sets them:
+    /// [`crate::universe::InstrumentInit::to_tick_company`] seeds the
+    /// variance at the sector's base, `sectors::by_key(key)` then
+    /// `base_daily_variance()`. `garch_cascade` is all zeros, the "cascade
+    /// has never run" state, which seeds from the sector base on first use.
+    pub fn new(price: f64, shares_outstanding: f64) -> Self {
+        TickStock {
+            price,
+            previous_close: price,
+            previous_tick_price: None,
+            open: price,
+            high: price,
+            low: price,
+            volume: 0.0,
+            avg_volume: 0.0,
+            shares_outstanding,
+            market_cap: price * shares_outstanding,
+            mispricing_s: None,
+            mispricing_s_prev_close: None,
+            mispricing_momentum: None,
+            fair_value_offset: None,
+            maker_inventory: None,
+            garch_variance: 0.0,
+            garch_cascade: [0.0; crate::market::garch::CASCADE_MAX],
+            last_daily_return: None,
+            beta: None,
+            short_interest: 0.0,
+            float: shares_outstanding,
+        }
+    }
+}
+
 /// One company, as the tick sees it.
 ///
 /// A single struct rather than three composed ones. `fair_value`,
@@ -190,6 +229,7 @@ pub struct TickStock {
 /// invite them to disagree. The narrow views are BUILT from this on demand,
 /// so there is one source of truth per field.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct TickCompany {
     pub id: String,
     pub ticker: String,
@@ -206,6 +246,32 @@ pub struct TickCompany {
     pub eps: Option<f64>,
     pub book_value_per_share: Option<f64>,
     pub revenue_growth: Option<f64>,
+}
+
+impl TickCompany {
+    /// A listed, solvent company with no sector figures or fundamentals.
+    /// Set `sector_volatility`, `sector_avg_pe`, `eps`,
+    /// `book_value_per_share` and `revenue_growth` on the value.
+    pub fn new(
+        id: impl Into<String>,
+        ticker: impl Into<String>,
+        sector: impl Into<String>,
+        stock: TickStock,
+    ) -> Self {
+        TickCompany {
+            id: id.into(),
+            ticker: ticker.into(),
+            sector: sector.into(),
+            is_bankrupt: false,
+            is_public: true,
+            stock,
+            sector_volatility: None,
+            sector_avg_pe: None,
+            eps: None,
+            book_value_per_share: None,
+            revenue_growth: None,
+        }
+    }
 }
 
 /// Trading days in a year, the clock a market rate is quoted on.
@@ -477,13 +543,21 @@ impl TickCompany {
 
 /// Pending order volume for one ticker.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[non_exhaustive]
 pub struct OrderVolume {
     pub buy: f64,
     pub sell: f64,
 }
 
+impl OrderVolume {
+    pub const fn new(buy: f64, sell: f64) -> Self {
+        OrderVolume { buy, sell }
+    }
+}
+
 /// A live news-impact entry, for the volume amplifier.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NewsImpactEntry {
     pub company_id: Option<String>,
     pub sector: Option<String>,
@@ -505,6 +579,7 @@ pub struct NewsImpactEntry {
 /// current builds and observed at -4 draws on an older one: real, rare,
 /// and impossible to rule out while the consumption is conditional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SettleDrawPolicy {
     /// Four uniforms are drawn per active company on every open tick,
     /// whether or not the settle uses them. The draw schedule becomes a
@@ -521,6 +596,7 @@ pub enum SettleDrawPolicy {
 
 /// Everything the tick needs that is not a company.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TickInputs<'a> {
     pub economy: &'a EconomyState,
     pub market_status: MarketStatus,
@@ -643,6 +719,46 @@ pub struct TickInputs<'a> {
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
     /// bit-identical to the const build.
     pub params: &'a ModelParams,
+}
+
+impl<'a> TickInputs<'a> {
+    /// A single open-market tick at mid-session over `economy`: volatility
+    /// multiplier 1.0, no news, orders, sectors, resting orders or jumps,
+    /// the market factor at its baseline sigma
+    /// ([`MARKET_FACTOR_SIGMA`]), the preset's VIX anchor, the generated
+    /// draw schedule, and this tick's own nominal output as the base, so
+    /// the nominal growth ratio is 1.0. Set any other field on the value.
+    pub fn new(economy: &'a EconomyState, params: &'a ModelParams) -> Self {
+        TickInputs {
+            economy,
+            market_status: MarketStatus::Open,
+            intraday_t: 0.5,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            sector_keys: &[],
+            sector_sigmas: &[],
+            prev_day_down: false,
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
+            forced_flow_eff: 1.0,
+            market_sigma_daily: MARKET_FACTOR_SIGMA,
+            vix_anchor: params.market_vol_vix_anchor,
+            universe_stress: 0.0,
+            volume_state: 0.0,
+            volume_idio: &[],
+            jump_move: &[],
+            settle_draws: SettleDrawPolicy::FourAlways,
+            settle_depth_counterfactual: false,
+            resting_orders: &[],
+            fill_impact: &[],
+            nominal_output_base: economy.gdp * economy.cpi,
+            crisis_epicentre: None,
+            elapsed_days: 0,
+            params,
+        }
+    }
 }
 
 /// What one tick produced, beyond the mutations applied to the companies.

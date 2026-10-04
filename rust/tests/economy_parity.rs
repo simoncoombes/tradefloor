@@ -298,11 +298,13 @@ fn initial_state_matches_bit_for_bit() {
             InitialEconomyOptions::default()
         } else {
             let i = &case["input"];
-            InitialEconomyOptions {
-                cycle_phase: CyclePhase::from_name(i["cyclePhase"].as_str().expect("cyclePhase")),
-                inflation_rate: Some(bits(i["inflationRate"].as_str().unwrap())),
-                gdp_growth: Some(bits(i["gdpGrowth"].as_str().unwrap())),
-                unemployment_rate: Some(bits(i["unemploymentRate"].as_str().unwrap())),
+            {
+                let mut initial_economy_options = InitialEconomyOptions::default();
+                initial_economy_options.cycle_phase = CyclePhase::from_name(i["cyclePhase"].as_str().expect("cyclePhase"));
+                initial_economy_options.inflation_rate = Some(bits(i["inflationRate"].as_str().unwrap()));
+                initial_economy_options.gdp_growth = Some(bits(i["gdpGrowth"].as_str().unwrap()));
+                initial_economy_options.unemployment_rate = Some(bits(i["unemploymentRate"].as_str().unwrap()));
+                initial_economy_options
             }
         };
         let note = format!("createInitialEconomyState({})", case["input"]);
@@ -466,11 +468,13 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
 
     // The opening state is rebuilt from the SPEC, not read from the vector,
     // so `create_initial_economy_state` is on the hook for it too.
-    let mut economy = create_initial_economy_state(&InitialEconomyOptions {
-        cycle_phase: Some(start_phase),
-        inflation_rate: doc["initialEconomy"]["inflationRate"].as_str().map(bits),
-        gdp_growth: None,
-        unemployment_rate: None,
+    let mut economy = create_initial_economy_state(&{
+        let mut initial_economy_options = InitialEconomyOptions::default();
+        initial_economy_options.cycle_phase = Some(start_phase);
+        initial_economy_options.inflation_rate = doc["initialEconomy"]["inflationRate"].as_str().map(bits);
+        initial_economy_options.gdp_growth = None;
+        initial_economy_options.unemployment_rate = None;
+        initial_economy_options
     });
     // Re-seed the fields the spec overrode, from the recorded opening state.
     // Cleaner than duplicating the spec's option plumbing, and it still leaves
@@ -505,10 +509,12 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
             .as_array()
             .unwrap()
             .iter()
-            .map(|s| EconomicShock {
-                kind: shock_kind(s["type"].as_str().unwrap()),
-                severity: bits(s["severity"].as_str().unwrap()),
-                gdp_impact: bits(s["gdpImpact"].as_str().unwrap()),
+            .map(|s| {
+                EconomicShock::new(
+                    shock_kind(s["type"].as_str().unwrap()),
+                    bits(s["severity"].as_str().unwrap()),
+                    bits(s["gdpImpact"].as_str().unwrap()),
+                )
             })
             .collect();
 
@@ -520,16 +526,17 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
         let mut rng = ScriptedRng::new(tape, format!("day {day} daily"));
         economy = update_economy_daily(
             &economy,
-            &DailyInputs {
-                volatility,
-                active_shocks: &shocks,
-                market_return_pct: market_return,
-                game_day: day,
+            &{
+                let mut daily_inputs = DailyInputs::default();
+                daily_inputs.volatility = volatility;
+                daily_inputs.active_shocks = &shocks;
+                daily_inputs.market_return_pct = market_return;
+                daily_inputs.game_day = day;
                 // `crisis_vix_threshold` and `vix_mean_reversion` became
                 // parameters after these vectors were generated. `Default`
                 // carries the constants the reference implementation used, so the parity
                 // contract is unchanged by their promotion.
-                ..Default::default()
+                daily_inputs
             },
             &mut rng,
         );
