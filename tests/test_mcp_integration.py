@@ -73,16 +73,19 @@ CALLS = {
                   "arguments": {"strategies": {"m": MOMENTUM}, "days": 1,
                                 "universe_size": 8}},
     "check_job": {},
-    # A fresh server process numbers its sessions from one, so the ids
-    # below are the ones open_session and session_fork return here.
+    # Session ids are random, so OPENED and FORKED stand for the ids
+    # open_session and session_fork return, and `_drive` fills them in.
     "open_session": {"universe_size": 8},
-    "session_step": {"session_id": "session-1", "steps": 2,
+    "session_step": {"session_id": "OPENED", "steps": 2,
                      "orders": {"AAA": 100}},
-    "session_fork": {"session_id": "session-1"},
-    "session_rewind": {"session_id": "session-1", "step": 0},
-    "session_state": {"session_id": "session-2", "tickers": ["AAA"]},
-    "close_session": {"session_id": "session-2"},
+    "session_fork": {"session_id": "OPENED"},
+    "session_rewind": {"session_id": "OPENED", "step": 0},
+    "session_state": {"session_id": "FORKED", "tickers": ["AAA"]},
+    "close_session": {"session_id": "FORKED"},
 }
+
+#: The placeholders in CALLS, and the call whose result names each id.
+_IDS = {"OPENED": "open_session", "FORKED": "session_fork"}
 
 
 def _structured(result):
@@ -115,6 +118,9 @@ async def _drive():
             listed = await session.list_tools()
             results = {}
             for name, args in CALLS.items():
+                args = {k: (results[_IDS[v]][1]["session_id"]
+                            if isinstance(v, str) and v in _IDS else v)
+                        for k, v in args.items()}
                 res = await session.call_tool(name, args)
                 results[name] = (res, _structured(res))
             return init, listed.tools, results
@@ -282,9 +288,10 @@ def test_a_session_lives_between_calls_over_the_wire(live):
     _res, forked = results["session_fork"]
     _res, rewound = results["session_rewind"]
     _res, state = results["session_state"]
-    assert opened["session_id"] == "session-1"
+    assert opened["session_id"].startswith("session-")
     assert stepped["agents"]["me"]["positions"]["AAA"]["quantity"] == 100.0
-    assert forked["session_id"] == "session-2"
+    assert forked["forked_from"] == opened["session_id"]
+    assert forked["session_id"] != opened["session_id"]
     assert rewound["clock"]["step"] == 0
     assert rewound["agents"]["me"]["positions"] == {}
     assert state["clock"]["step"] == 2

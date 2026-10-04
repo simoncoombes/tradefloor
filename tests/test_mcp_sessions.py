@@ -74,6 +74,26 @@ def test_the_same_calls_from_the_same_open_give_the_same_bytes():
     assert [comparable(r) for r in a] == [comparable(r) for r in b]
 
 
+def test_two_identical_opens_get_different_ids_and_identical_results():
+    """Ids are random so that no client can guess another's, and no result
+    depends on one: provenance records the open and the orders, not the
+    id."""
+    first = mcp.open_session(universe_size=8, seed=3)
+    second = mcp.open_session(universe_size=8, seed=3)
+    a, b = first["session_id"], second["session_id"]
+    assert a != b and a.startswith("session-") and b.startswith("session-")
+    assert len(a) >= len("session-") + 16
+    assert a not in json.dumps({**first, "session_id": None})
+    assert comparable(first) == comparable(second)
+    for call in ({"steps": 3, "orders": {"AAA": 100}}, {"days": 1}):
+        x, y = mcp.session_step(a, **call), mcp.session_step(b, **call)
+        assert a not in json.dumps({**x, "session_id": None})
+        assert comparable(x) == comparable(y)
+    fa, fb = mcp.session_fork(a), mcp.session_fork(b)
+    assert fa["provenance"] == fb["provenance"]
+    assert fa["provenance"]["lineage"] == [{"forked_at_step": 6}]
+
+
 def test_a_fork_and_its_original_continue_identically():
     sid = opened(universe_size=12)
     mcp.session_step(sid, steps=4, orders={"AAC": 500})

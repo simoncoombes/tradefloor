@@ -97,6 +97,7 @@ import functools
 import inspect
 import json
 import math
+import secrets
 import struct
 import threading
 import time
@@ -2936,7 +2937,6 @@ _jobs: dict[str, dict[str, Any]] = {}
 _jobs_lock = threading.Lock()
 _pool = ThreadPoolExecutor(max_workers=MAX_RUNNING_JOBS,
                            thread_name_prefix="tradefloor-mcp-job")
-_job_counter = 0
 
 #: What a run costs, in CPU seconds, measured with `tf.evaluate` on pt-v20
 #: on the 0.8.5 release candidate on an Apple-silicon Mac (rosters of 8, 40
@@ -3109,7 +3109,6 @@ def start_job(
     name, the arguments, the day cap and the estimate. A job that has been
     submitted always comes back with its id.
     """
-    global _job_counter
     if tool not in JOBBABLE:
         return _fail(f"{tool!r} cannot be run as a job. Jobbable: "
                      f"{list(JOBBABLE)}. Everything else answers inline.")
@@ -3142,8 +3141,7 @@ def start_job(
                 f"{running} jobs already running (cap {MAX_RUNNING_JOBS}). "
                 f"Wait for one to finish -- starting a third would slow both "
                 f"without finishing sooner.")
-        _job_counter += 1
-        job_id = f"job-{_job_counter}"
+        job_id = _unguessable_id("job", _jobs)
         _jobs[job_id] = {"id": job_id, "tool": tool, "arguments": args,
                          "status": "running", "started": time.time(),
                          "finished": None, "result": None}
@@ -3179,7 +3177,7 @@ def start_job(
 @_guarded
 def check_job(
     job_id: Annotated[str | None, Field(description=(
-        "An id from start_job, such as \"job-1\". Omit to list every job "
+        "An id exactly as start_job returned it. Omit to list every job "
         "this server process holds."))] = None,
 ) -> dict[str, Any]:
     """Poll a job, or list what this server is holding."""
@@ -3303,7 +3301,6 @@ _SESSION_START = (9, 30, 3)
 
 _sessions: dict[str, "_Session"] = {}
 _sessions_lock = threading.Lock()
-_session_counter = 0
 
 
 def _copy_live(live: dict[str, Any]) -> dict[str, Any]:
@@ -3418,7 +3415,7 @@ class _Session:
         child.live = _copy_live(self.live)
         child.checkpoints = dict(self.checkpoints)
         child.lineage = [*self.lineage,
-                         {"forked_from": self.id, "at_step": self.step}]
+                         {"forked_at_step": self.step}]
         child.lock = threading.Lock()
         child.touched = time.monotonic()
         return child
@@ -3607,10 +3604,24 @@ def _house_label(label: str) -> str | None:
     return None
 
 
+def _unguessable_id(prefix: str, taken: Any) -> str:
+    """A fresh id that no other id predicts.
+
+    Random rather than counted, so a host that serves several clients from
+    one process cannot have one client step, read or close another's
+    session, or collect another's job, by guessing the next number. No
+    result depends on an id: provenance records how a session was opened
+    and what was sent to it, never which id it had.
+    """
+    while True:
+        new = f"{prefix}-{secrets.token_urlsafe(12)}"
+        if new not in taken:
+            return new
+
+
 def _new_session_id() -> str:
-    global _session_counter
-    _session_counter += 1
-    return f"session-{_session_counter}"
+    """Call under the registry lock."""
+    return _unguessable_id("session", _sessions)
 
 
 def _session_capacity() -> dict[str, Any] | None:
@@ -3717,9 +3728,9 @@ def _session_caveats(sess: "_Session") -> list[str]:
         sector_concentrated=sess.concentrated, preset=sess.preset)
     history = []
     for event in sess.lineage:
-        if "forked_from" in event:
-            history.append(f"was forked from {event['forked_from']} at step "
-                           f"{event['at_step']}")
+        if "forked_at_step" in event:
+            history.append(f"was forked from another session at step "
+                           f"{event['forked_at_step']}")
         else:
             history.append(f"was rewound from step {event['rewound_from']} "
                            f"to step {event['to_step']}")
@@ -3801,8 +3812,7 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
 
 
 SessionIdArg = Annotated[str, Field(description=(
-    "A session id from open_session or session_fork, such as "
-    "\"session-1\"."))]
+    "A session id exactly as open_session or session_fork returned it."))]
 
 
 @server.tool(
