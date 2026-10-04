@@ -83,6 +83,13 @@ continues bit for bit. The `snapshot` module documents the fields, the checks
 a restore makes, and `EngineSnapshot::to_bytes` and `from_bytes`, which give a
 snapshot one exact binary form to store.
 
+Every preset is fitted with the engine making its own news and jumps, one
+economy step a session and no economic shocks. A host that adds its own
+news, shocks or earnings revisions can keep a `tradefloor::flow::ExternalFlow`
+beside the engine, feed it what it passes in, and call `assess` with the
+engine's `params()` to learn which channels are outside the fitted flow.
+`tradefloor::flow::CalibratedFlow::of` states that flow for any preset.
+
 The Rust API is the engine itself and is low level: it takes tick requests
 and day advances and hands back state. Most users want the Python package,
 which wraps this crate and adds universes, scenarios, checkpoints, an

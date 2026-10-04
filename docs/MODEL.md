@@ -1432,6 +1432,12 @@ fifth and 99% by the 150th. The market
 maker re-quotes by the tick's news term before any trade, so the traded price
 carries the same profile (`news_quote_revision` = 1, `market/tick.rs:1487-1505`).
 
+News a caller passes to `Engine.tick` or `run_session` is added to these
+events, at weight 1 on the company it names, `news_sector_weight` (0.5) on
+each name in the sector it names and `news_market_weight` (0.3) on every
+name when it names neither, and the preset was fitted without it. The flow each preset is fitted at, and the check on a caller's
+own, are in [REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md#the-shock-flow-behind-every-figure).
+
 | Symbol | Dial | Value | Kind | Source |
 |---|---|---|---|---|
 | $\lambda_N$ | `endogenous_news_intensity` | 0.05 a day | fitted | search |
