@@ -23,6 +23,12 @@ A preset under development, on a branch and in no tagged release, can still
 change. pt-v19 went through five compositions before it shipped in 0.8.0.
 Only the vector a tagged release ships is frozen.
 
+## The Rust crate's version policy
+
+From 0.10.0 the crate follows [Cargo's semver rules](https://doc.rust-lang.org/cargo/reference/semver.html). While the version is 0.x, a minor release (0.10 to 0.11) may break the crate's API and a patch release (0.10.0 to 0.10.1) does not, so `tradefloor = "0.10"` in a `Cargo.toml` takes every patch release safely. The release workflow runs `cargo semver-checks` against the newest published crate under the release type the version bump implies, and a patch release that breaks the API does not publish. A minor release lists each break in the CHANGELOG, together with any change to a state width or to what a constructor does with its arguments, which no compiler or semver check catches.
+
+Releases before 0.10.0 did not follow this: 0.8.5 broke code written for 0.8.1 in a patch release.
+
 ## The LTS line
 
 **0.8.5 starts the first LTS line.** It is the first release whose default

@@ -19,6 +19,8 @@
 //! - [`rng`] and [`mathx`]: the random streams and the transcendental
 //!   maths, both written here so that a seed gives the same bits on every
 //!   platform.
+//! - [`widths`]: how many numbers each state row and record holds, for a
+//!   host that saves state into buffers. Re-exported at the root.
 //!
 //! The `python` feature builds the Python extension module and the `wasm`
 //! feature builds the WebAssembly binding. Both drive
@@ -66,6 +68,8 @@ pub mod types;
 pub mod universe;
 /// The single place a factor of 100 exists - see the module docs.
 pub mod units;
+/// The widths a host sizes state buffers by, all re-exported below.
+pub mod widths;
 
 /// Python bindings. Feature-gated: the WASM consumer never compiles PyO3.
 #[cfg(feature = "python")]
@@ -96,3 +100,10 @@ mod python_log;
 mod python_batch;
 
 pub use rng::{stream, to_uint32, GameRng, Pcg32};
+
+/// The state widths, at the crate root so a host finds them first: see
+/// [`widths`] for what each one sizes and why a change to one is breaking.
+pub use widths::{
+    COMPONENT_COUNT, ENGINE_RNG_STATE_WIDTH, ENGINE_RNG_STREAMS, MARKET_VARIANCE_STATE_WIDTH,
+    NOISE_PART_COUNT, RNG_STREAM_WIDTH, SECTOR_COUNT, TAKEN_WIDTH, TICK_COMPONENT_COUNT,
+};

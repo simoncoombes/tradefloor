@@ -95,20 +95,75 @@ pip install tradefloor
 Documentation, including the realism envelope and what the simulator is not
 suitable for, is at <https://docs.tradefloor.dev/>.
 
-## Upgrading from 0.8.1
+## Driving the engine from a host
 
-The crate follows the Python package's version, and 0.8.5 breaks Rust code
-written against 0.8.1 even though Cargo treats 0.8.5 as a compatible update.
-Seeds are `u64` rather than `u32`, several public structs gained fields, the
-default preset is `pt-v20` rather than `pt-v19`, and
-`Engine::tick_components` rows have nine entries rather than eight.
-The repository's
-[CHANGELOG](https://github.com/simoncoombes/tradefloor/blob/main/CHANGELOG.md)
-lists every change under "The Rust crate since 0.8.1". Pin `tradefloor = "=0.8.1"` to stay on the old API.
+A host that owns the economy (a game, a trading desk simulator, anything
+that feeds the engine its own macro state and news) needs four things from
+this crate that the example above does not show.
 
-`ModelParams` and `SessionRequest` are now `#[non_exhaustive]`, so adding a
-field to either no longer breaks a build. Make them with
-`ModelParams::preset`, `with_override` and `SessionRequest::new`.
+**Keep your opening.** `Engine::new` and `Engine::with_params` run the
+preset's own opening over the economy you pass: on `pt-v20` that is 755
+days of the macro step before day 1 and a draw of the business cycle's
+phase. That is right for the library's default economy, which would
+otherwise open every run in expansion, and wrong for yours: an economy
+passed in at a VIX of 45 in a contraction opens at 22.28 in an expansion.
+Build with `Engine::with_params_keeping_opening` to keep exactly what you
+pass, and check `engine.opening_settled()` once after construction if you
+want a refactor that swaps the constructor to fail loudly. The burn-in
+arrived with `pt-v18` in 0.7.0; presets before it have none.
+
+**Size buffers from the width constants.** A host that saves state into
+flat arrays takes every width from the crate root: `COMPONENT_COUNT` (11
+numbers in an attribution row), `TICK_COMPONENT_COUNT` (9 in a tick row),
+`RNG_STREAM_WIDTH` (5 per random stream), `ENGINE_RNG_STREAMS` (10 streams)
+and the others listed in the `widths` module. A width derived from
+something else, such as `S_COMPONENT_KEYS.len() + 1`, keeps compiling when
+the engine gains a slot and under-sizes the buffer. A test pins every
+value, and a change to one is a breaking change with its own CHANGELOG
+line.
+
+**Measure a day change from `prior_closes`.** Each stock's
+`previous_close` is reset at `open_market` to the day's opening price,
+after the overnight gap and after the close re-marks prices to newly
+published macro data. It anchors the session's 25 per cent circuit-breaker
+band and the daily return GARCH reads, so it measures open to now. For a
+close-to-close change use `engine.prior_closes()`, the previous session's
+last print, and `engine.last_closes()` for the session just closed. On
+`pt-v20` the two anchors differ on every name every day, by a median of
+0.12 per cent. Neither is part of the trajectory; a host that saves an
+engine between days carries them with `restore_closes`.
+
+**Read the crisis line from the engine.** The VIX level above which the
+crisis behaviour runs is a preset coefficient, 30.88325108 from `pt-v13` on
+and 25.5 before. Read it with `engine.crisis_vix_threshold()` rather than
+copying it, and `engine.vix_above_crisis_threshold()` applies the same
+strict test the engine's gates use. It is settable like any coefficient:
+`ModelParams::preset("pt-v20")?.with_override("crisis_vix_threshold", x)`.
+The dollar's safe-haven bid has its own threshold,
+`usd_crisis_vix_threshold`, 25.5 on every preset.
+
+## Versions and API stability
+
+The crate takes the Python package's version number and, from 0.10.0,
+follows [Cargo's semver rules](https://doc.rust-lang.org/cargo/reference/semver.html)
+for its public API. While the version is 0.x, a minor release (0.10 to
+0.11) may break the API and a patch release (0.10.0 to 0.10.1) does not.
+So `tradefloor = "0.10"` takes every patch release safely. The release
+workflow runs `cargo semver-checks` against the newest published crate and
+refuses to publish a patch release that breaks the API. Every break in a
+minor release is listed in the CHANGELOG, and so is every change to a
+state width or to what a constructor does with its arguments, which the
+compiler cannot catch for you.
+
+Releases before 0.10.0 did not follow this. 0.8.5 broke code written for
+0.8.1 in a patch release; the CHANGELOG lists every change under "The Rust
+crate since 0.8.1", and `tradefloor = "=0.8.1"` stays on the old API.
+
+`ModelParams`, `SessionRequest`, `SessionBuffer`, `SessionOutcome`,
+`TickTruth` and both `TickOutcome` structs are `#[non_exhaustive]`, so
+adding a field to one breaks no build. Build them with
+`ModelParams::preset`, `with_override`, `SessionRequest::new` and
+`SessionBuffer::new`, then set or read fields on the value.
 
 ## Scope of this crate
 
