@@ -336,10 +336,16 @@ impl Participant {
                     return Err(format!("{}: offset must be below the interval", self.name));
                 }
                 if !(stop.is_finite() && *stop >= 0.0) {
-                    return Err(format!("{}: stop must be finite and not negative", self.name));
+                    return Err(format!(
+                        "{}: stop must be finite and not negative",
+                        self.name
+                    ));
                 }
                 if !(recover.is_finite() && *recover > 0.0 && *recover <= 1.0) {
-                    return Err(format!("{}: recover must be above 0 and at most 1", self.name));
+                    return Err(format!(
+                        "{}: recover must be above 0 and at most 1",
+                        self.name
+                    ));
                 }
             }
         }
@@ -1034,7 +1040,9 @@ impl PopulationRun {
             if matches!(p.policy, Policy::Crowd { .. }) {
                 let len = take(1)?[0];
                 if len != (n * p.samples()) as f64 {
-                    return Err(bad("a crowd's prices do not match this population and roster"));
+                    return Err(bad(
+                        "a crowd's prices do not match this population and roster",
+                    ));
                 }
                 s.samples = take(len as usize)?.to_vec();
                 s.crowd = take(CROWD_SCALARS)?.to_vec();

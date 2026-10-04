@@ -392,37 +392,36 @@ class Population:
         own signals, each the long and short five of the roster, with a
         buffer of two ranks.
 
-        - The reversal crowd trades the one-day reversal (a lookback of 390
-          open ticks) as statistical arbitrage does: it looks every five
-          ticks, so it reaches a new loser before an agent that decides less
-          often.
-        - The momentum crowd trades the five-day momentum (1,950 ticks)
-          once a session, in the last fifteen ticks before the close, so a
-          rule that rebalances at the next open meets the market after it.
+        - The reversal crowd is one participant trading the one-day reversal
+          (a lookback of 390 open ticks) as statistical arbitrage does: it
+          looks every fifteen ticks, so it reaches a new loser before a rule
+          that decides every sixty-five.
+        - The momentum crowd trades the five-day momentum (1,950 ticks) once
+          a session, in the last fifteen ticks before the close, so a rule
+          that rebalances at the next open meets the market after it. It is
+          ``members`` participants sharing its size.
 
         ``reversal`` and ``momentum`` are each crowd's total size per name,
-        as a share of daily volume, split equally over ``members``
-        participants. With ``stop`` above zero the members carry loss limits
+        as a share of daily volume. With ``stop`` above zero each carries a
+        loss limit: the reversal crowd at ``stop``, the momentum members
         spread from half of ``stop`` to one and a half times it, so a loss
         that stops the first out can carry the others after it."""
         if not isinstance(members, int) or members < 1:
             raise ValidationError("members is a whole number, at least 1")
         crowd = []
-        for signal, total in (("reversal", reversal), ("momentum", momentum)):
-            if total <= 0:
-                continue
-            size = total / members
+        if reversal > 0:
+            crowd.append(Participant.crowd(
+                signal="reversal", name="reversal_crowd", size=reversal,
+                rate=2 * reversal, interval=15, band=0.3, lookback=390,
+                stop=stop, recover=recover))
+        if momentum > 0:
+            size = momentum / members
             for j in range(members):
                 at = 0.5 + j / (members - 1) if members > 1 else 1.0
-                if signal == "reversal":
-                    timing = dict(interval=5, offset=j % 5, rate=size / 2,
-                                  lookback=390)
-                else:
-                    timing = dict(interval=390, offset=389 - 5 * (j % 3),
-                                  rate=2 * size, lookback=1950)
                 crowd.append(Participant.crowd(
-                    signal=signal, name=f"{signal}{j + 1}", size=size,
-                    stop=stop * at, recover=recover, **timing))
+                    signal="momentum", name=f"momentum_crowd{j + 1}", size=size,
+                    rate=2 * size, interval=390, offset=389 - 5 * (j % 3),
+                    lookback=1950, stop=stop * at, recover=recover))
         return cls([*cls.standard().participants, *crowd], name="crowded")
 
     @classmethod

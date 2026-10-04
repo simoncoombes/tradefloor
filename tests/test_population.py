@@ -320,9 +320,10 @@ class _Buyer:
         return {self.ticker: 100.0}
 
 
-def test_a_world_forks_and_manifests_with_its_population():
+@pytest.mark.parametrize("pop", [POP, Population.crowded()], ids=["standard", "crowded"])
+def test_a_world_forks_and_manifests_with_its_population(pop):
     world = tf.World(seed=6, universe=UNIVERSE, agent=_Buyer(UNIVERSE[2].ticker),
-                     population=POP)
+                     population=pop)
     world.run(2)
     checkpoint = tf.Checkpoint.from_json(world.checkpoint().to_json())
     assert checkpoint.resume().state_hash() == world.engine.state_hash()
@@ -332,9 +333,9 @@ def test_a_world_forks_and_manifests_with_its_population():
     assert a.engine.state_hash() == b.engine.state_hash()
     manifest = a.manifest(strategy="tests/test_population.py _Buyer")
     doc = json.loads(manifest.to_json())
-    assert doc["fingerprints"]["population"] == POP.fingerprint
+    assert doc["fingerprints"]["population"] == pop.fingerprint
     loaded = tf.RunManifest.from_json(manifest.to_json())
-    assert loaded.population == POP
+    assert loaded.population == pop
     replayed = loaded.reproduce()
     assert replayed.state_hash() == a.engine.state_hash()
     doc["population"]["participants"][0]["size"] = 0.5
@@ -466,13 +467,13 @@ def test_the_crowded_population_adds_both_crowds_to_the_standard_one():
     kinds = [p.kind for p in crowded.participants]
     assert kinds[:4] == ["trend", "reversion", "liquidity", "detector"]
     crowds = [p for p in crowded.participants if p.kind == "crowd"]
-    assert sorted({p.signal for p in crowds}) == ["momentum", "reversal"]
     reversal = [p for p in crowds if p.signal == "reversal"]
     momentum = [p for p in crowds if p.signal == "momentum"]
-    assert sum(p.size for p in reversal) == pytest.approx(0.002)
+    assert len(reversal) == 1 and len(momentum) == 3
+    assert reversal[0].size == pytest.approx(0.002) and reversal[0].interval == 15
     assert sum(p.size for p in momentum) == pytest.approx(0.01)
     # Loss limits spread around `stop`; none at all with stop 0.
-    assert sorted(p.stop for p in reversal) == pytest.approx([0.015, 0.03, 0.045])
+    assert sorted(p.stop for p in momentum) == pytest.approx([0.015, 0.03, 0.045])
     assert all(p.stop == 0 for p in Population.crowded(stop=0).participants
                if p.kind == "crowd")
     # The momentum crowd decides once a session, near the close.
@@ -482,7 +483,7 @@ def test_the_crowded_population_adds_both_crowds_to_the_standard_one():
     for _ in range(2):
         _day(e)
     rows = [r for r in e.population_report() if r["kind"] == "crowd"]
-    assert len(rows) == 6 and {r["signal"] for r in rows} == {"momentum", "reversal"}
+    assert len(rows) == 4 and {r["signal"] for r in rows} == {"momentum", "reversal"}
     assert {"exposure", "stops", "price_pnl"} <= set(rows[0])
 
 

@@ -60,9 +60,10 @@ isolated daily sd, averaged per seed; (a) below zero; the five sessions
 after (the rebound of a liquidity event); and with `--limited4` and
 `--free4` at four times the crowd capital, (b) deeper there.
 
-**runtime.** Wall time of 20 sessions on the certified roster, isolated and
-populated, untraded (`Engine`) and traded (a `World` whose agent buys and
-sells five names every step), interleaved, best of three.
+**runtime.** Wall time of `--days` sessions (60 by default) on the certified
+roster, isolated and populated, untraded (`Engine`) and traded (a `World`
+whose agent buys and sells five names every step), interleaved, best of
+five.
 """
 
 from __future__ import annotations
@@ -558,7 +559,7 @@ def runtime(a):
     model = model_of(a.model)
     population = population_of(a.population)
     universe = tf.Universe.random(ROSTER[0], seed=ROSTER[1])
-    days = 20
+    days = a.days
 
     def untraded(pop):
         e = tf.Engine(seed=5, universe=universe, model=model, population=pop)
@@ -577,7 +578,7 @@ def runtime(a):
     out = {"kind": "population.runtime", "model": a.model, "days": days}
     for label, fn in (("untraded", untraded), ("traded", traded)):
         iso, pop = [], []
-        for _ in range(3):
+        for _ in range(5):
             iso.append(fn(None))
             pop.append(fn(population))
         out[label] = {"isolated_s": min(iso), "populated_s": min(pop),
