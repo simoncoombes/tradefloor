@@ -168,15 +168,17 @@ Releases before 0.10.0 did not follow this. 0.8.5 broke code written for
 crate since 0.8.1", and `tradefloor = "=0.8.1"` stays on the old API.
 
 From 0.10.0 every public struct with public fields is
-`#[non_exhaustive]`, so adding a field to one breaks no build. Outside this
+`#[non_exhaustive]`, so adding a field to one breaks no build, and so is
+every public enum except `Side`, so adding a variant breaks none either. Outside this
 crate you build one with its constructor or `Default`, then set or read
 fields on the value. The next section lists the constructors.
 
 ## Upgrading to 0.10.0
 
-The breaking change in 0.10.0 is how a host builds the crate's structs. No
-existing function or field changed, and a struct built the new way holds
-what the old literal held. The structs a host fills in, such as `TickRequest`, `TickCompany`,
+The breaking changes in 0.10.0 are in how a host builds the crate's structs
+and matches on its enums. No existing function, field or variant changed,
+and a struct built the new way holds what the old literal held. The structs
+a host fills in, such as `TickRequest`, `TickCompany`,
 `EconomyState` and `RngState`, are now `#[non_exhaustive]`. Outside the
 crate a struct literal no longer compiles, `..Default::default()` included,
 and a pattern that destructures one needs a trailing `..`. Code that reads
@@ -254,6 +256,46 @@ The inputs to the model's component functions, such as
 each one's documentation says what it fills in. Structs the engine only
 hands back, such as `engine::DayAdvanceOutcome` and `agent_book::AgentFill`,
 have no constructor because a host never builds one.
+
+Every public enum except `order_book::Side` is `#[non_exhaustive]` as well,
+so a release can add a variant. Outside the crate a `match` on one needs a
+wildcard arm. `Side` has two variants and keeps them, so a match on it stays
+as it is. The enums are `economy::CyclePhase`, `ForwardGuidance`,
+`ShockKind` and `central_bank::Decision`, `market::MarketStatus`,
+`AvgVolumePolicy` and `SettleDrawPolicy`, `engine::PriceField` and
+`StopCondition`, `agent_book::RestMode` and `Liquidity`, `rates::CurvePoint`,
+`rng::DrawKind` and `Site`, and `types::Difficulty`.
+
+This match on `ShockKind`, written for 0.9.1 with no wildcard arm, no longer
+compiles:
+
+```rust,compile_fail,E0004
+# use tradefloor::economy::ShockKind;
+fn name(kind: ShockKind) -> &'static str {
+    match kind {
+        ShockKind::OilShock => "oilShock",
+        ShockKind::Pandemic => "pandemic",
+        ShockKind::War => "war",
+        ShockKind::Other => "other",
+    }
+}
+```
+
+takes a wildcard arm on 0.10.0, which decides what a variant from a later
+release means to the host:
+
+```rust
+# use tradefloor::economy::ShockKind;
+fn name(kind: ShockKind) -> Option<&'static str> {
+    match kind {
+        ShockKind::OilShock => Some("oilShock"),
+        ShockKind::Pandemic => Some("pandemic"),
+        ShockKind::War => Some("war"),
+        ShockKind::Other => Some("other"),
+        _ => None,
+    }
+}
+```
 
 The random streams no longer need their fields named. `to_words` writes a
 stream as `RNG_STREAM_WIDTH` numbers and the engine's ten as

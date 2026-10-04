@@ -170,6 +170,7 @@ pub const INVENTORY_HALF_LIFE_TICKS: f64 = 15.0;
 
 /// Which yield an instrument reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CurvePoint {
     Treasury2Y,
     Treasury10Y,

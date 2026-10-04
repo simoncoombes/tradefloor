@@ -51,6 +51,7 @@ pub const CORPORATE_SPREAD_FLOOR: f64 = 0.8;
 pub const MORTGAGE_SPREAD_FLOOR: f64 = 0.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Decision {
     AggressiveHike,
     Hike,

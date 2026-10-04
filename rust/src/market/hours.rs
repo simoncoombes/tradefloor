@@ -22,6 +22,7 @@ pub const AFTER_HOURS_END: f64 = 20.0;
 pub const MARKET_MINUTES: f64 = (MARKET_CLOSE - MARKET_OPEN) * 60.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MarketStatus {
     Closed,
     PreMarket,

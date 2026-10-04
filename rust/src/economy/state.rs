@@ -179,6 +179,7 @@ pub const FISCAL_MULTIPLIER: f64 = 0.30;
 pub const CRISIS_VIX_THRESHOLD: f64 = 25.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum CyclePhase {
     Expansion,
     Peak,
@@ -645,6 +646,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ForwardGuidance {
     OngoingIncreases,
     Accommodative,
@@ -734,6 +736,7 @@ impl EconomicShock {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ShockKind {
     OilShock,
     Pandemic,

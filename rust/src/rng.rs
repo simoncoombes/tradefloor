@@ -146,6 +146,7 @@ use crate::mathx;
 /// 1.033. Read both as no measurable cost rather than as a number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum DrawKind {
     Uniform = 0,
     Normal = 1,
@@ -166,6 +167,7 @@ impl DrawKind {
 /// as a failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum Site {
     Unset = 0,
     /// The market factor's one normal per tick (market/tick.rs).

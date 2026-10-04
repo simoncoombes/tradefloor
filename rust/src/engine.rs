@@ -7308,6 +7308,7 @@ impl Engine {
 
 /// Fields exposed columnar-wise across the FFI boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PriceField {
     Price,
     PreviousClose,
@@ -7769,6 +7770,7 @@ pub fn merge_order_volumes(
 /// neither of which this engine owns — that belongs with whoever owns order
 /// state, and inventing a half-version here would be worse than not having it.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum StopCondition {
     /// A named company's price leaves a band. `None` on a side means unbounded.
     PriceOutside {

@@ -202,6 +202,7 @@ pub const TAKEN_WIDTH: usize = 5;
 
 /// How an order that did not fill in full waits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RestMode {
     /// In the book, in the queue at its price (`book_resting` on).
     Queue,
@@ -276,6 +277,7 @@ impl AgentOrder {
 
 /// Which side of a trade an agent was on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Liquidity {
     /// The agent's order crossed and took liquidity.
     Taker,

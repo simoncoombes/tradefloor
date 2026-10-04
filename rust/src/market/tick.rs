@@ -579,6 +579,7 @@ pub struct NewsImpactEntry {
 /// current builds and observed at -4 draws on an older one: real, rare,
 /// and impossible to rule out while the consumption is conditional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SettleDrawPolicy {
     /// Four uniforms are drawn per active company on every open tick,
     /// whether or not the settle uses them. The draw schedule becomes a

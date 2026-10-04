@@ -55,6 +55,7 @@ const VOLUME_SCALE_MEAN: f64 = 1.4;
 /// TS-tape parity gates replay recorded reference runs, where bit-fidelity
 /// to the reference -- including its EMA -- is the property under test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum AvgVolumePolicy {
     /// Hold the calibrated level. The shipped default.
     ///
