@@ -70,15 +70,28 @@ def _engine_root() -> pathlib.Path:
 def build_digest(root: str | os.PathLike | None = None) -> str:
     """sha256 over the engine's source files, as relative path and content.
 
-    Two checkouts of one commit give one digest on any platform, and any
-    edit to the Rust crate or the Python package gives another. The compiled
+    In a git checkout the files are the ones git tracks under BUILD_SOURCES
+    (`tracked_sources`); elsewhere, every source file found there. Two
+    checkouts of one commit give one digest on any platform, whether or not
+    either has built the engine, and any edit to the Rust crate or the Python
+    package gives another. The compiled
     extension is not hashed: it is built from these files, and the
     known-answer test is what proves that every platform's build of them
     computes the same bits.
     """
     base = pathlib.Path(root) if root else _engine_root()
     h = hashlib.sha256()
-    files: list[pathlib.Path] = []
+    files = tracked_sources(base)
+    if files is not None:
+        if not files:
+            raise FileNotFoundError(f"no tracked engine sources under {base}")
+        for f in files:
+            rel = f.relative_to(base).as_posix().encode("utf-8")
+            data = f.read_bytes()
+            h.update(len(rel).to_bytes(4, "big") + rel)
+            h.update(len(data).to_bytes(8, "big") + data)
+        return h.hexdigest()
+    files = []
     for rel in BUILD_SOURCES:
         p = base / rel
         if p.is_file():
@@ -95,6 +108,26 @@ def build_digest(root: str | os.PathLike | None = None) -> str:
         h.update(len(rel).to_bytes(4, "big") + rel)
         h.update(len(data).to_bytes(8, "big") + data)
     return h.hexdigest()
+
+
+def tracked_sources(base: pathlib.Path) -> list[pathlib.Path] | None:
+    """The files git tracks under BUILD_SOURCES, sorted, or None outside git.
+
+    Only tracked files: a build writes files beside the sources that git
+    ignores, and `rust/Cargo.lock` is one. Hashing it gave two boxes on one
+    commit two digests, because the first built the engine (and so wrote the
+    lock) and the second installed a cached wheel (and did not). The content
+    hashed is the working tree's, so an uncommitted edit to a tracked source
+    still moves the digest.
+    """
+    import subprocess  # noqa: PLC0415
+    try:
+        out = subprocess.run(["git", "-C", str(base), "ls-files", "-z", "--", *BUILD_SOURCES],
+                             check=True, capture_output=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    names = sorted(n for n in out.decode("utf-8").split("\0") if n)
+    return [base / n for n in names if (base / n).is_file()]
 
 
 def params_digest(model: Any) -> str:

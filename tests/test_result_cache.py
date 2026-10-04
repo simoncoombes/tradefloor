@@ -128,3 +128,26 @@ def test_verify_measures_everything_and_keeps_what_to_compare(tmp_path):
     assert [t.source for t in tasks] == ["measure", "measure"]
     assert tasks[0].expect_from == rc.Key(B, base, "untraded", 1)
     assert tasks[1].expect_from is None
+
+
+def _git(root, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True,
+                   env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                        "GIT_COMMITTER_EMAIL": "t@t", "HOME": str(root), "PATH": "/usr/bin:/bin"})
+
+
+def test_a_build_product_beside_the_sources_keeps_the_build_digest(tmp_path):
+    """A box that built the engine wrote rust/Cargo.lock, which git ignores; a
+    box that installed the cached wheel did not. One commit must give one digest."""
+    _tree(tmp_path)
+    (tmp_path / ".gitignore").write_text("Cargo.lock\n")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "x")
+    clean = rc.build_digest(tmp_path)
+    (tmp_path / "rust" / "Cargo.lock").write_text("[[package]]\nname = \"x\"\n")
+    (tmp_path / "python" / "tradefloor" / "_core.abi3.so").write_bytes(b"\0")
+    assert rc.build_digest(tmp_path) == clean
+    (tmp_path / "python" / "tradefloor" / "facts.py").write_text("X = 2\n")
+    assert rc.build_digest(tmp_path) != clean, "an edit to a tracked source must move it"
