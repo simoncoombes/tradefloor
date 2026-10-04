@@ -58,6 +58,7 @@ pub mod rates;
 pub mod rng;
 /// The twelve sectors and their model parameters.
 pub mod sectors;
+pub mod snapshot;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 pub mod types;

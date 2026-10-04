@@ -52,6 +52,19 @@ Earlier ones lack the day state and are refused, because the day they were
 taken on cannot be recovered from them. A newer schema is refused. If you
 know what a missing field held, write it into the dict and restore that.
 
+The Rust crate has the same pair, and the Python methods call it:
+`Engine::snapshot` returns an `EngineSnapshot` with the dict's fields in the
+dict's order, and `Engine::restore` checks it under the same rules and
+refuses with a `SnapshotError` that names the field. `EngineSnapshot::to_bytes`
+and `from_bytes` give it one exact binary form, for a host that stores state
+itself, a browser included. The engine does not count days or track whether
+one is open, so a caller that does passes its count, its open flag and its
+pending tape rows to `Engine::snapshot_with` as a `DayLoop`, and
+`Engine::restore` hands them back. The crate's tests run a snapshot through
+bytes into a new engine and continue it to the uninterrupted run, bit for
+bit, on `pt-v20`, `pt-v19`, `pt-v16` and `pt-v3`, at a close and in the
+middle of a session.
+
 ## Publishing a result
 
 To let a reader rerun a result, publish its `RunManifest`: it records the
