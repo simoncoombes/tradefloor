@@ -407,8 +407,32 @@ impl OrderBook {
         if !(quantity > 0.0) || !(price > 0.0) {
             return None;
         }
+        let order = self.resting_order(side, price, quantity, owner_id, order_id);
+        self.insert_resting(order.clone());
+        Some(order)
+    }
+
+    /// [`OrderBook::post_limit`] for a caller that does not need the order
+    /// back: the same book, without the copy.
+    pub fn rest_limit(&mut self, side: Side, price: f64, quantity: f64, owner_id: &str) {
+        if !(quantity > 0.0) || !(price > 0.0) {
+            return;
+        }
+        let order = self.resting_order(side, price, quantity, owner_id, None);
+        self.insert_resting(order);
+    }
+
+    /// A new resting order, taking the book's next sequence number.
+    fn resting_order(
+        &mut self,
+        side: Side,
+        price: f64,
+        quantity: f64,
+        owner_id: &str,
+        order_id: Option<String>,
+    ) -> BookOrder {
         let order = BookOrder {
-            id: order_id.unwrap_or_else(|| format!("{}-{}", self.company_id, self.sequence)),
+            id: order_id.unwrap_or_else(|| sequenced_id(&self.company_id, self.sequence)),
             side,
             price,
             quantity,
@@ -417,8 +441,7 @@ impl OrderBook {
             owner_id: owner_id.to_string(),
         };
         self.sequence += 1;
-        self.insert_resting(order.clone());
-        Some(order)
+        order
     }
 
     /// Remove a resting order by id.

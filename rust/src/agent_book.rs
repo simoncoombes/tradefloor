@@ -677,7 +677,7 @@ pub fn append_latent_depth(
         levels.push(level);
     }
     for (price, shares) in levels {
-        book.post_limit(side, price, shares, DEPTH_OWNER, None);
+        book.rest_limit(side, price, shares, DEPTH_OWNER);
     }
 }
 
