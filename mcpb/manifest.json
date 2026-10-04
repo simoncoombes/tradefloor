@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "tradefloor",
   "display_name": "tradefloor",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Simulated stock markets that react to your orders: run, fork and score trading agents.",
   "long_description": "tradefloor generates simulated stock markets with a limit order book and an economy, for testing trading algorithms and AI agents. Markets react to your orders, a year runs in seconds, and any market can be recreated exactly or forked on any day to compare scenarios. The server lets an AI assistant evaluate and rank strategies across many markets, run stress scenarios such as a recession or a liquidity crisis, and check a question against the model's validated limits. It runs on your machine and places no real orders.",
   "author": {
@@ -51,55 +51,55 @@
   "tools": [
     {
       "name": "describe_simulator",
-      "description": "What this simulator is, what it is certified to reproduce, and what it cannot do."
+      "description": "Describe what this simulator is, what its realism checks certify, what it cannot do, the caps on every tool and how long a run takes."
     },
     {
       "name": "check_envelope",
-      "description": "Ask whether a question falls inside the realism envelope BEFORE running it."
+      "description": "Check whether a question falls inside the range the simulator's realism was measured for, BEFORE running it."
     },
     {
       "name": "validate_strategy",
-      "description": "Parse and fingerprint a strategy spec WITHOUT running it."
+      "description": "Parse and fingerprint one strategy spec WITHOUT running it."
     },
     {
       "name": "evaluate_strategies",
-      "description": "Run strategies against one identical market, beside the baseline agents, and score them."
+      "description": "Run strategies on one simulated market, beside the baseline agents on the same market, and score each one: return, P&L, the cost of its own trading in basis points, turnover and errors."
     },
     {
       "name": "rank_strategies",
-      "description": "Score strategies across MANY seeds, beside the baseline agents, and rank them with a paired sign test."
+      "description": "Score strategies across MANY seeds, beside the baseline agents, and rank them with a paired sign test on each pair."
     },
     {
       "name": "list_scenarios",
-      "description": "What scenarios exist and what each intervention target actually reaches, read this before authoring one, because four of the targets are honest mechanisms with effects too small to see over a hundred days."
+      "description": "List the shipped stress scenarios, the scenario constructors and every intervention target, with what each target was measured to reach."
     },
     {
       "name": "build_scenario",
-      "description": "Author a custom scenario, a macro PATH from hold/ramp/step instructions, or explicit INTERVENTIONS as shocks and assumed transmission, and see what it resolves to before running it."
+      "description": "Author a custom scenario and see what it resolves to before running it."
     },
     {
       "name": "run_stress_scenario",
-      "description": "Run strategies through a macro stress scenario, always beside the same market unshocked."
+      "description": "Run strategies through a macro stress scenario, always beside the same market unshocked, and compare each strategy across the two."
     },
     {
       "name": "explain_price_move",
-      "description": "Why did a price move?"
+      "description": "Break one day's move for each name into the 11 factor contributions that sum to the day's change in the mispricing, the log gap between the model price and fair value."
     },
     {
       "name": "explain",
-      "description": "Which draws seeded one name's day?"
+      "description": "Trace one name's price move on one day down to the random draws that caused it, as a tree: the day's log move at the top, then each factor, then the draw addresses beneath them."
     },
     {
       "name": "build_universe",
-      "description": "Build a roster and preview it: generated from (size, seed) with optional sector concentration, or from explicit instruments."
+      "description": "Build a roster of companies and preview it, either generated from a size and seed (optionally concentrated on chosen sectors) or from explicit instruments you supply."
     },
     {
       "name": "start_job",
-      "description": "Start a long simulation in the background and get a job id back immediately."
+      "description": "Start a long run of evaluate_strategies, rank_strategies or run_stress_scenario in the background and get a job id back immediately."
     },
     {
       "name": "check_job",
-      "description": "Check a background job."
+      "description": "Check a background job started by start_job."
     }
   ]
 }
