@@ -299,7 +299,7 @@ def test_engine_positional_arguments_show_the_keyword_call():
         tf.Engine(seed=None, universe=U)
     # The signature a reader sees is the keyword-only one.
     assert tf.Engine.__text_signature__ == \
-        "(*, seed, universe, macro_state=None, model=None)"
+        "(*, seed, universe, macro_state=None, model=None, population=None)"
 
 
 def test_negative_counts_are_refused_in_words():

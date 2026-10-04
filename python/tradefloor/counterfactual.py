@@ -356,6 +356,15 @@ class World:
     change is recorded in :attr:`tampered` under the agent's label, in its
     :meth:`summary` and in :meth:`manifest`. See :mod:`tradefloor.sandbox`.
 
+    ``population`` puts a :class:`tradefloor.Population` of background
+    traders in the world's market (POPULATED mode, see
+    :mod:`tradefloor.population`). They trade in the same book as the
+    world's agents and react to them, so the agents' presence changes the
+    market: a cohort's agents meet each other and the population in one
+    market. The world is as reproducible as ever, and a fork carries the
+    population's state, but a strategy here no longer faces the market it
+    would have faced alone. Left out, the world is the one it always was.
+
     ``history_days=N`` runs the market for N days, with nobody trading,
     when the world is built, so an agent that needs a lookback has one at
     its first decision. ``obs.history`` (:class:`tradefloor.History`) holds
@@ -375,7 +384,8 @@ class World:
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
                  "trusted_agents", "tampered", "history_days", "_history",
-                 "margin_interest", "_origins", "_dividends_today")
+                 "margin_interest", "_origins", "_dividends_today",
+                 "population")
 
     def __init__(
         self,
@@ -397,8 +407,10 @@ class World:
         trusted_agents: bool = False,
         history_days: int = 0,
         margin_interest: bool = True,
+        population: Any = None,
     ) -> None:
         from . import _checks
+        from .population import check as _check_population
         steps_per_day = _checks.whole_number("steps_per_day", steps_per_day)
         ticks_per_step = _checks.whole_number("ticks_per_step", ticks_per_step)
         history_days = _checks.history_days(history_days)
@@ -457,8 +469,12 @@ class World:
         # that day runs, `_verify_surgery` reads the draw log and confirms
         # each patch landed where it was aimed.
         self._expected: dict[int, list[tuple]] = {}
+        #: The background traders sharing this world's market, or None.
+        #: See the class docstring and :mod:`tradefloor.population`.
+        self.population = _check_population(population)
         self.engine = Engine(seed=self.seed, universe=self.universe,
-                             macro_state=macro, model=model)
+                             macro_state=macro, model=model,
+                             population=self.population)
         #: How many untraded days ran before day 0. See the class docstring.
         self.history_days = history_days
         # What every agent is shown as `obs.history`: the warm-up days,
@@ -1327,7 +1343,9 @@ class World:
             macro=self.macro, label=label or self.label,
             model=(dict(self.engine.model_params)
                    if self.engine.model_fingerprint != default else None),
-            written_by=__version__, era=era_fingerprint())
+            written_by=__version__, era=era_fingerprint(),
+            population=(None if self.population is None
+                        else self.population.as_dict()))
 
     def fork(self, *labels: str) -> list["World"]:
         """Independent continuations of this world, one per label.
@@ -1383,7 +1401,8 @@ class World:
                           # tampering with it: both arms share the history
                           # in which it happened.
                           trusted_agents=self.trusted_agents,
-                          margin_interest=self.margin_interest)
+                          margin_interest=self.margin_interest,
+                          population=self.population)
             child.tampered = copy.deepcopy(self.tampered)
             child.engine = engine
             # Built with no warm-up of its own: the arm continues this
@@ -1845,7 +1864,7 @@ class World:
 
         return _replay(self.order_log, seed=self.seed,
                        universe=self.universe, macro=self.macro,
-                       model=self.model)
+                       model=self.model, population=self.population)
 
     def net_worth(self, *, agent: str | None = None) -> float:
         """One agent's cash plus marked positions. ``agent`` names which on

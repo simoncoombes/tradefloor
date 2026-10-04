@@ -531,6 +531,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `set_fundamentals` has moved them, and on a model that runs the
          # variance cascade. Hashed after the book, each behind its name.
          "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # Carried on an engine built with a population, and hashed last.
+         "population",
          # The market's cycle nowcast's generator, only while
          # `cycle_nowcast_accuracy` is set; the belief rides in the economy.
          "cycle_nowcast_rng",
@@ -1175,6 +1177,29 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                 "which is not a whole number of f64s.")
         values = _column(raw, len(raw) // 8, "garch_cascade")
         _text(buf, "garch_cascade")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The population, last, on an engine built with one: its fingerprint,
+    # the roster its state follows and every number of its state.
+    if "population" in snapshot:
+        block = snapshot["population"]
+        if not isinstance(block, dict) or set(block) != {"fingerprint", "tickers", "state"}:
+            raise ValidationError(
+                "this snapshot's population is not the block the state hash "
+                "covers: fingerprint, tickers and state.")
+        raw = block["state"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'population.state' carries {len(raw)} bytes, "
+                "which is not a whole number of f64s.")
+        _text(buf, "population")
+        _text(buf, block["fingerprint"])
+        tickers = list(block["tickers"])
+        _u32(buf, len(tickers))
+        for ticker in tickers:
+            _text(buf, ticker)
+        values = _column(raw, len(raw) // 8, "population.state")
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
@@ -1907,6 +1932,11 @@ class RunManifest:
             "model": engine.model_fingerprint,
             "order_log": _sha(_canonical(log)),
         }
+        # The population, only on a populated run, so every other
+        # document's fingerprints are the ones they were.
+        population_spec = engine.population_spec()
+        if population_spec is not None:
+            fingerprints["population"] = population_spec["fingerprint"]
         seed = check_seed(seed)
         fingerprints["inputs"] = _sha(_canonical(
             {"seed": seed, **fingerprints}))
@@ -1940,6 +1970,9 @@ class RunManifest:
             "strategy": strategy_payload,
             "order_log": log,
             "fingerprints": fingerprints,
+            **({} if population_spec is None else {"population": {
+                "version": 1,
+                "participants": list(population_spec["participants"])}}),
             "result": {
                 "digest": market_digest(engine),
                 "days": days,
@@ -2111,6 +2144,22 @@ class RunManifest:
                 "fingerprint identifies, it cannot reconstruct."
             )
 
+        block = payload.get("population")
+        if (block is None) != (recorded.get("population") is None):
+            raise ValidationError(
+                "this manifest carries a population fingerprint and no "
+                "population, or the reverse. One of them was removed in "
+                "transit.")
+        if block is not None:
+            from .population import Population
+            rebuilt = Population.from_dict({"version": block.get("version"),
+                                            "participants": block.get("participants", [])})
+            if rebuilt.fingerprint != recorded.get("population"):
+                raise ValidationError(
+                    "the population in this manifest does not match its "
+                    "recorded fingerprint. It was edited in transit, and a "
+                    "replay under it would trade a different crowd.")
+
         recorded_model = recorded.get("model")
         if recorded_model is not None:
             carried = (payload.get("written_by") or {}).get("model") or {}
@@ -2177,7 +2226,8 @@ class RunManifest:
 
         engine = replay(self.order_log, seed=self.seed,
                         universe=self.universe, macro=self.macro,
-                        model=self._model_for_replay())
+                        model=self._model_for_replay(),
+                        population=self.population)
 
         recorded = self._doc["result"]
         digest = market_digest(engine)
@@ -2284,6 +2334,19 @@ class RunManifest:
                 "branch continues its parent's history, so it cannot be "
                 "shorter than the point it started from."
             )
+
+    @property
+    def population(self) -> Any:
+        """The :class:`tradefloor.Population` a populated run was recorded
+        with, rebuilt from the carried participants, or None for an
+        isolated run."""
+        block = self._doc.get("population")
+        if block is None:
+            return None
+        from .population import Population
+        return Population.from_dict({"version": block.get("version"),
+                                     "name": "recorded",
+                                     "participants": block["participants"]})
 
     def _model_for_replay(self) -> ModelParams | None:
         """The model the run was recorded under, rebuilt for the replay.
@@ -3053,13 +3116,14 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     universe = manifest.universe
     macro = manifest.macro
     model = manifest._model_for_replay()
+    population = manifest.population
     ticks = 0
     day_runs = 0
     restored = 0
 
     for day in chosen:
         engine = Engine(seed=manifest.seed, universe=universe,
-                        macro_state=macro, model=model)
+                        macro_state=macro, model=model, population=population)
         if ledger.snapshots is not None and day > 0:
             start, end = spans[day]
             # The roster first, and only the roster. `restore_state` refuses a

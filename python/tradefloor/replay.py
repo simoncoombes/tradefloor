@@ -77,6 +77,7 @@ def replay(
     until: int | None = None,
     ledger: Any = None,
     max_ticks_per_day: int = MAX_TICKS_PER_DAY,
+    population: Any = None,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
 
@@ -107,9 +108,13 @@ def replay(
 
     ``max_ticks_per_day`` bounds the ticks between two closes, checked over
     the whole log before anything runs; see :data:`MAX_TICKS_PER_DAY`.
+
+    ``population`` is the :class:`tradefloor.Population` the run was
+    recorded with, if any. Like ``model`` it is identity, not history: its
+    orders are not in the log, because the engine makes them again.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
-                    model=model)
+                    model=model, population=population)
     entries = list(log)[: until if until is not None else len(log)]
     apply_log(engine, entries, ledger=ledger,
               max_ticks_per_day=max_ticks_per_day)

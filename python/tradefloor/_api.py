@@ -66,6 +66,8 @@ ADVANCED: tuple[str, ...] = (
     "AgentRecord", "HiddenState", "MarketView", "PortfolioView", "Position",
     "capture_withheld", "oracle_is_ceiling", "preset_records", "sandbox",
     "spec", "sweep",
+    # populated mode: background traders sharing the book
+    "Population", "population",
     # counterfactual research
     "Agreement", "BoundaryMap", "Comparison", "Divergence", "Externality",
     "Flip", "Invariance", "Resample", "agree", "boundary", "externalities",

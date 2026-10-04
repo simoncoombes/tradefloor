@@ -21,6 +21,7 @@ from .portfolio import Cancel, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
 from .harness import Agent, History, Observation, Scorecard, evaluate, leaderboard
+from .population import Population
 from . import sandbox
 from .sandbox import HiddenState, MarketView, PortfolioView, SandboxError
 from .replay import replay
@@ -179,6 +180,7 @@ __all__ = [
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "counterfactual", "World", "agree", "compare", "resample",
+    "population", "Population",
     "noise",
     "externality", "Externality", "externalities",
     "Agreement", "Comparison", "Resample",

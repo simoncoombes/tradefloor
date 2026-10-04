@@ -111,16 +111,26 @@ from ._core import check_seed
 CHECKPOINT_SCHEMA = 1
 
 
+def _population_doc(engine: Engine) -> dict | None:
+    """The engine's population as `Population.as_dict()`, or None."""
+    spec = engine.population_spec()
+    if spec is None:
+        return None
+    return {"version": 1, "name": "recorded",
+            "participants": list(spec["participants"])}
+
+
 class Checkpoint:
     """A point in a simulation you can return to, as data."""
 
     __slots__ = ("seed", "universe", "log", "macro", "label", "model",
-                 "written_by", "era")
+                 "written_by", "era", "population")
 
     def __init__(self, *, seed: int, universe: Sequence[Instrument],
                  log: Sequence[dict], macro: Macro | None = None,
                  label: str = "", model: dict | None = None,
-                 written_by: str | None = None, era: str | None = None) -> None:
+                 written_by: str | None = None, era: str | None = None,
+                 population: dict | None = None) -> None:
         self.seed = check_seed(seed)
         self.universe = list(universe)
         self.log = [dict(entry) for entry in log]
@@ -138,6 +148,10 @@ class Checkpoint:
         # replayed and only the version can say what to install instead.
         self.written_by = written_by
         self.era = era
+        # The population a populated run was built with
+        # (`Population.as_dict()`), or None for an isolated run. Identity,
+        # like the model: its orders are not in the log.
+        self.population = dict(population) if population else None
 
     @property
     def fingerprint(self) -> str:
@@ -206,7 +220,8 @@ class Checkpoint:
                          macro=macro, label=label,
                          model=(dict(engine.model_params)
                                 if fingerprint != default else None),
-                         written_by=__version__, era=era_fingerprint())
+                         written_by=__version__, era=era_fingerprint(),
+                         population=_population_doc(engine))
         if verify:
             try:
                 reached = checkpoint.resume().state_hash()
@@ -271,10 +286,15 @@ class Checkpoint:
                     "Restoring onto a different roster gives right prices and "
                     "wrong fair values."
                 )
+        population = None
+        if self.population is not None:
+            from .population import Population
+            population = Population.from_dict(self.population)
         return replay(self.log, seed=self.seed, universe=roster,
                       macro=self.macro,
                       model=(ModelParams.from_dict(self.model)
-                             if self.model else None))
+                             if self.model else None),
+                      population=population)
 
     def branch(self, count: int = 2) -> list[Engine]:
         """``count`` independent engines, all at this state.
@@ -312,6 +332,8 @@ class Checkpoint:
             payload["era"] = self.era
         if self.model is not None:
             payload["model"] = self.model
+        if self.population is not None:
+            payload["population"] = self.population
         if self.macro is not None:
             payload["macro"] = {
                 "vix": self.macro.vix,
@@ -391,6 +413,7 @@ class Checkpoint:
             model=payload.get("model"),
             written_by=payload.get("tradefloor_version"),
             era=payload.get("era"),
+            population=payload.get("population"),
         )
 
     def __len__(self) -> int:

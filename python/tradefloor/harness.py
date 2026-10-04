@@ -562,7 +562,8 @@ class Scorecard:
                  "uses_hidden_state", "tampered", "equity_curve",
                  "max_drawdown_pct", "ruined", "leverage_refusals",
                  "explanation_baseline", "partial_fills", "history_days",
-                 "margin_interest", "exposure_curve", "dividends")
+                 "margin_interest", "exposure_curve", "dividends",
+                 "population_fingerprint")
 
     #: Slots :meth:`as_dict` leaves out. ``exposure_curve`` is the input of
     #: two read-only properties and is read off the fills and the prices,
@@ -585,6 +586,7 @@ class Scorecard:
         margin_interest: bool = True,
         exposure_curve: list[float] | None = None,
         dividends: float = 0.0,
+        population_fingerprint: str = "",
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -654,6 +656,10 @@ class Scorecard:
         #: run, reinvested or as cash, already inside ``pnl``. 0.0 on every
         #: model without dividends (``dividend_payout_share``).
         self.dividends = dividends
+        #: The fingerprint of the population the agent traded beside
+        #: (``evaluate(population=...)``), or "" for an isolated run, which
+        #: is every run that did not pass one.
+        self.population_fingerprint = population_fingerprint
         #: Borrowing paid the policy rate. False only for a run that passed
         #: ``margin_interest=False``, whose repr then says "free-borrowing":
         #: a levered score from such a run is not comparable to one that
@@ -737,10 +743,12 @@ class Scorecard:
         # The figures computed from the card (`sharpe` and the rest) are
         # properties and stay out with their input, so a traded known
         # answer hashes what it always did.
-        # `dividends` likewise only when the model paid any.
+        # `dividends` likewise only when the model paid any, and
+        # `population_fingerprint` only on a populated run.
         return {slot: getattr(self, slot) for slot in self.__slots__
                 if (slot != "history_days" or self.history_days)
                 and (slot != "dividends" or self.dividends)
+                and (slot != "population_fingerprint" or self.population_fingerprint)
                 and slot not in self._NOT_IN_DICT}
 
     def __repr__(self) -> str:
@@ -871,6 +879,7 @@ def evaluate(
     history_days: int = 0,
     margin_interest: bool = True,
     reinvest_dividends: bool = True,
+    population: Any = None,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -978,9 +987,24 @@ def evaluate(
     order the book could not fill in full is listed in the card's
     ``partial_fills``.
 
+    ``population`` runs the evaluation in POPULATED mode: a
+    :class:`tradefloor.Population` of background traders shares each
+    agent's market and reacts to what the agent does (see
+    :mod:`tradefloor.population`). Each agent still gets its own copy of the
+    market, and the untraded baseline gets one too, all with the same
+    population; but because the population reacts to each agent, the agents
+    no longer face identical markets. A populated result is reproducible (the
+    same seed and population give the same scorecards), and it measures
+    whether an edge survives other traders, not which of two strategies is
+    better: rank strategies in isolated mode, the default. Each card's
+    ``population_fingerprint`` names the population, and is "" for an
+    isolated run.
+
     Returns a scorecard per agent, keyed by name.
     """
     from .spec import StrategySpec
+    from .population import check as _check_population
+    population = _check_population(population)
     seed = check_seed(seed)
     agents = _checks.agents(agents)
     if not agents:
@@ -1019,7 +1043,7 @@ def evaluate(
     # Built once and copied for the baseline and for each agent. A copy of
     # a fresh engine has its state hash and runs to the same prices.
     template = Engine(seed=seed, universe=universe, macro_state=macro,
-                      model=model)
+                      model=model, population=population)
     # The warm-up runs once, on the template, so the baseline and every
     # agent start day 0 from the same market and the same history.
     warmed = History(history_days)
@@ -1481,6 +1505,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         margin_interest=portfolio.margin_interest,
         exposure_curve=exposure_curve,
         dividends=portfolio.dividends,
+        population_fingerprint=engine.population_fingerprint or "",
     )
 
 

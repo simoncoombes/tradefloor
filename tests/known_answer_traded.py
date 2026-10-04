@@ -95,7 +95,9 @@ SCORECARD_FIELDS = (
 #: they are not zero: the dividends a card received are 0.0 on every model
 #: without dividends (`dividend_payout_share`), which is every preset, so
 #: the digest of a run on one is the one it was before the field existed.
-SCORECARD_NONZERO = ("dividends",)
+#: `population_fingerprint` likewise: "" on every isolated run, which is
+#: every run this script makes.
+SCORECARD_NONZERO = ("dividends", "population_fingerprint")
 
 #: The scorecard fields hashed as a count of their lines.
 SCORECARD_COUNTED = ("errors", "partial_fills")

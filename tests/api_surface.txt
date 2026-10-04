@@ -47,6 +47,7 @@ Node advanced
 Observation stable
 OrderBook advanced
 OrderError stable
+Population advanced
 Portfolio stable
 PortfolioView advanced
 Position advanced
@@ -117,6 +118,7 @@ market_status advanced
 model_preset stable
 noise advanced
 oracle_is_ceiling advanced
+population advanced
 portfolio advanced
 preset_names stable
 preset_record stable
