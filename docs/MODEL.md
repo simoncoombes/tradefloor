@@ -639,6 +639,8 @@ structural rate carries hysteresis (`economy/daily.rs:1052-1064`):
 
 All constants are chosen. Unemployment spends much of an expansion on its
 2.5 floor: the design note's long-run mean is 3.6% against 5.7% in the US.
+Three switches, off on every preset, change this release; see
+[Unemployment's anchor and oil's interior](#unemployments-anchor-and-oils-interior).
 
 ### Inflation
 
@@ -663,7 +665,7 @@ and the terms are these:
 - $-0.2 (u_d - u^{\ast})$ is the Phillips curve.
 - $W = 0.08\max(0, w - 2) + 0.02 (w - 4)(\pi - 3) \cdot \mathbf{1}[w > 4, \pi > 3]$ is wage pressure (`economy/daily.rs:937-945`).
 - $R^{r}$ is a real-rate drag: $-0.04 (r^{p} - \pi)$ when the policy rate is above inflation, $-0.015 (r^{p} - 3)$ when it is below inflation but above 3, else 0 (`economy/daily.rs:899-905`).
-- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs:907-913`).
+- $\Omega$ is the oil pass-through: $0.01 (o - 80)$ above USD 80 a barrel, $0.005 (o - 50)$ below USD 50 (`economy/daily.rs`, `oil_inflation_effect`). `oil_inflation_passthrough`, off on every preset, makes it symmetric.
 - $e$ is the dollar index and $\tau$ the tariff rate. The tariff rate stays at 5, so its term is 0, unless a scenario changes it.
 - The phase trends $\theta^{\pi}$ are E 0.015, P 0.015, C -0.02, T -0.01, R 0.01.
 
@@ -1043,7 +1045,8 @@ o \leftarrow \mathrm{clip}\Big(o + 0.03\,\big[(75 + 3g)(1 + a_d) - o\big] + p^{I
 seasonal term on the target, with $d'$ the day of the macro year. $p^{I}$ is
 an inventory pressure that is zero while inventory is between 40 and 60
 (inventory is a driftless random walk at `oil_supply_response` = 1,
-derived). Every 63 sessions an OPEC decision adds $\pm(2.5 + 3U)$ with
+derived; `oil_inventory_reversion`, off on every preset, pulls it back
+toward 50). Every 63 sessions an OPEC decision adds $\pm(2.5 + 3U)$ with
 probability 0.55 when the price is more than USD 10 from 80, or
 $3(U - 0.5)$ with probability 0.2 otherwise (`economy/daily.rs:1168-1206`).
 
@@ -1234,6 +1237,59 @@ an engine whose half-life is set.
 | Dial | Value | Kind | Source |
 |---|---|---|---|
 | `unemployment_adjustment_half_life` $H_u$ | 84 (0, off); up to 2520 sessions | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
+
+### Unemployment's anchor and oil's interior
+
+**Timescale:** monthly for unemployment and the pass-through, daily for oil
+inventory. **State:** none beyond the fields above. Five switches, each 0.0
+on every shipped preset, where each is a branch to the arithmetic above and
+is left out of the model's digest, and none of them takes a random draw.
+
+Two subsystems have no interior fixed point as shipped. Unemployment's
+cyclical drive averages -0.26 points a month on pt-v20 (seeds 101 to 108,
+5,292 sessions), -0.46 in an expansion, against a NAIRU pull of 0.06 of the
+gap, so the rate runs to its 2.5 floor: over 1,008 sessions it sits there on
+78 per cent of days and ends there on 5 of 8 seeds (issue #172). Oil
+inventory integrates noise with nothing pulling it back, and outside 40 to
+60 it pushes oil by up to 3.2 a day against oil's reversion of 0.03, so a
+long excursion pins oil at a clamp (issue #170). And the oil pass-through
+pays a rise above 80 and almost nothing of a fall to 50, a positive mean
+about oil's own anchor (issue #171).
+
+With `unemployment_okun_coefficient` $\beta > 0$ the drive is Okun's law as
+the annual relation the shipped comment states, divided over twelve
+releases, with no recovery term:
+
+```math
+D = 0.3\,\theta^{u}_{\mathcal{P}} + \frac{\beta}{12}\,(2 - g)
+```
+
+in place of $0.2 (2 - g)$ a month plus the recovery term, which together
+take an expansion down about 5.5 points a year. With
+`unemployment_natural_pull` $k > 0$ the pull is $k (u^{\ast} - u)$ in place
+of $0.06 (u^{\ast} - u)$, and with `unemployment_natural_rate` $u_0 > 0$
+the NAIRU is $u^{\ast} = u_0 + 0.3\,\ell$ in place of $4 + 0.3\,\ell$, so the
+rate and its NAIRU move together and the Phillips gap does not.
+
+With `oil_inventory_reversion` $\kappa > 0$ inventory $I$ closes $\kappa$ of
+its gap to 50 each day beside demand, supply and noise:
+
+```math
+I \leftarrow \mathrm{clip}\big(I - (0.15\,g - S + 0.5\,Z) + \kappa\,(50 - I);\ 0,\ 100\big)
+```
+
+so at `oil_supply_response` = 1 it is stationary with a standard deviation
+of $0.5 / \sqrt{2\kappa}$. With `oil_inflation_passthrough` $c > 0$ the
+pass-through is $\Omega = 0.01\,c\,(o - 81)$, where 81 is oil's reversion
+target at the 2 per cent trend growth Okun's law pivots on.
+
+| Dial | Value | Kind | Source |
+|---|---|---|---|
+| `unemployment_okun_coefficient` $\beta$ | 0 (off); up to 2.4 | not set | Okun (1962) about 1/3; Ball, Leigh and Loungani (2017) about 0.4 to 0.5 for the US |
+| `unemployment_natural_pull` $k$ | 0 (0.06); up to 1 | not set | a monthly share; UNRATE's 120-month windows have a lag-12 autocorrelation of 0.53 (median, 1948 to 2026) |
+| `unemployment_natural_rate` $u_0$ | 0 (4.0); up to 8 | not set | FRED NROU: 4.40 to 4.75 over 2015 to 2026, mean 4.97 over 1990 to 2026 |
+| `oil_inventory_reversion` $\kappa$ | 0 (off); up to 1 | not set | the theory of storage (Working 1949; Brennan 1958; Pindyck 1994); the coefficient is not identified there |
+| `oil_inflation_passthrough` $c$ | 0 (off); up to 3 | not set | Kilian and Vigfusson (2011) find no asymmetry; 1.0 is the shipped 0.01 a dollar above 80 |
 
 ### The fear and greed index
 

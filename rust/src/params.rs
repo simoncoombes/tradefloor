@@ -743,7 +743,7 @@ pub struct ModelParams {
     pub unemployment_adjustment_half_life: f64,
     /// The share of unemployment's gap to the natural rate closed at each
     /// monthly release, a dial. 0.0, on every shipped preset, keeps the
-    /// shipped 0.06 and is a branch, so every preset reproduces bit for bit
+    /// release's own constant 0.06 and is a branch, so every preset reproduces bit for bit
     /// and a value of 0.0 is left out of the model's digest.
     ///
     /// # Why the shipped pull holds nothing
@@ -780,12 +780,14 @@ pub struct ModelParams {
     /// half-life of `ln 2 / -ln(1 - k)` months: 0.03 is 23 months, 0.05 is
     /// 13.5, 0.10 is 6.6. Alone it cannot hold the rate near the natural
     /// rate without losing its persistence, because the drivers' -0.26 a
-    /// month sets the gap at about `-0.26 / k`: measured, k = 0.3 still
-    /// leaves the rate at the floor on 10 per cent of days and its
-    /// 12-month autocorrelation at 0.3, against UNRATE's 0.79 over 1990 to
-    /// 2019. With `unemployment_okun_coefficient` on the drivers average
-    /// -0.02 a month and a pull of 0.03 to 0.06 is enough. It takes no
-    /// draw.
+    /// month set the gap at about `-0.26 / k`. Measured on pt-v20, seeds
+    /// 101-108 over 2,520 sessions: at 0.3 alone the rate still sits at the
+    /// floor on 8 per cent of days, with a 12-month autocorrelation of
+    /// 0.22. With `unemployment_okun_coefficient` at 0.5 the drivers average
+    /// about -0.02 a month, and the constant 0.06 already keeps the rate off
+    /// the floor (mean 3.79, 0.37 under the natural rate); 0.10 takes the
+    /// mean to 3.94 and 0.03 lets the floor back on 6 per cent of days. It
+    /// takes no draw.
     pub unemployment_natural_pull: f64,
     /// Okun's law at the monthly release, as the annual coefficient it
     /// states: points of unemployment a year per point of growth below 2
@@ -818,11 +820,22 @@ pub struct ModelParams {
     /// A contraction at the model's mean growth of -2.6 per cent then adds
     /// about 0.28 a month with the phase's trend, a rise near 2 points over
     /// a nine-month recession; UNRATE rose 1.6 to 2.4 points in 1990-91 and
-    /// 2001 and 5.0 in 2007-09. It takes no draw.
+    /// 2001 and 5.0 in 2007-09. Measured on pt-v20, seeds 101-108 over
+    /// 2,520 sessions, the largest rise in the 18 months after a
+    /// contraction begins goes from 4.5 points at 0.0 to 1.8 at 0.5 and 3.1
+    /// at 1.0 with `unemployment_natural_rate` 5.0.
+    ///
+    /// The central bank's recession cuts read unemployment's LEVEL (above
+    /// 7, 8 and 10 per cent) and its Taylor rule a fixed 4.0 target. At 0.5
+    /// on the shipped natural rate a recession no longer reaches 7, so the
+    /// policy rate changes 0.6 times a year where it changed 1.9 times, and
+    /// cuts 0.4 points in the year after a contraction begins where it cut
+    /// 1.3. At 1.0 with a natural rate of 5.0 it changes 1.7 times a year
+    /// and cuts 1.2. It takes no draw.
     pub unemployment_okun_coefficient: f64,
     /// The natural rate of unemployment with no long-term unemployment,
-    /// percent, a dial. 0.0, on every shipped preset, is the shipped 4.0
-    /// and is a branch, so every preset reproduces bit for bit and a value
+    /// percent, a dial. 0.0, on every shipped preset, is the release's own
+    /// constant 4.0 and is a branch, so every preset reproduces bit for bit and a value
     /// of 0.0 is left out of the model's digest.
     ///
     /// The monthly release sets `EconomyState::structural_unemployment` to
@@ -834,13 +847,17 @@ pub struct ModelParams {
     /// participation in a contraction and discretionary fiscal stimulus
     /// above 7 per cent.
     ///
-    /// The shipped 4.0 gives a NAIRU of 4.15 to about 4.6, which matches
+    /// The constant 4.0 gives a NAIRU of 4.15 to about 4.6, which matches
     /// the CBO's natural rate (FRED NROU) over 2015 to 2026, 4.40 to 4.75.
     /// Over 1990 to 2026 NROU averaged 4.97 and over 1949 to 2026 5.40,
     /// and UNRATE averaged 5.65 over both 1948 to 2026 and 1990 to 2026,
     /// with a 120-month window's mean between 4.62 and 7.12 (10th to 90th
     /// percentile, 1948 to 2026). A screen that wants the long history and
-    /// not the last decade would set about 4.5 to 5.0. It takes no draw.
+    /// not the last decade would set about 4.5 to 5.0. The bank's Taylor
+    /// rule keeps its own 4.0 target, so a higher natural rate is also a
+    /// standing dovish gap: at 5.0 with `unemployment_okun_coefficient` 1.0
+    /// the policy rate averages 0.58 points lower on pt-v20 (seeds 101-108,
+    /// 2,520 sessions). It takes no draw.
     pub unemployment_natural_rate: f64,
     /// The daily share of oil inventory's gap to its normal level, 50,
     /// closed by production and storage, a dial. 0.0, on every shipped
@@ -883,7 +900,8 @@ pub struct ModelParams {
     /// meant beside a supply response of 1.0. It takes no draw.
     pub oil_inventory_reversion: f64,
     /// Inflation's monthly response to the oil price, the same either side of
-    /// oil's anchor, as a multiple of the shipped 0.01 a dollar above 80.
+    /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
+    /// above 80.
     /// 0.0, on every shipped preset, is the
     /// shipped three-way branch and is a branch, so every preset
     /// reproduces bit for bit and a value of 0.0 is left out of the
