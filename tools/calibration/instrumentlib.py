@@ -794,6 +794,14 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    # Unemployment's anchor and oil's interior (issues #170 to #172). Each
+    # hard range is the one `ModelParams::validate` enforces; 0.0 is the
+    # shipped arithmetic on every one of them.
+    "unemployment_natural_pull": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "unemployment_okun_coefficient": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.4)},
+    "unemployment_natural_rate": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 8.0)},
+    "oil_inventory_reversion": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 1.0)},
+    "oil_inflation_passthrough": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the

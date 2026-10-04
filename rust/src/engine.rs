@@ -2123,8 +2123,9 @@ impl Engine {
         let e = &self.economy;
         let phase = crate::economy::phase_characteristics_for(
             e.cycle_phase, self.params.cycle_us_calibration != 0.0);
-        self.economy.unemployment_impulse = crate::economy::daily::unemployment_drive(
-            phase.unemployment_trend, e.cycle_phase, e.gdp_growth);
+        self.economy.unemployment_impulse = crate::economy::daily::unemployment_drive_with(
+            phase.unemployment_trend, e.cycle_phase, e.gdp_growth,
+            self.params.unemployment_okun_coefficient);
     }
 
     /// `gdp_publication_lag` in sessions; 0 is off.
@@ -8468,6 +8469,11 @@ impl Engine {
             trough_growth_floor: self.params.trough_growth_floor,
             phase_target_range_draw: self.params.phase_target_range_draw,
             unemployment_adjustment: self.unemployment_adjustment(),
+            unemployment_natural_pull: self.params.unemployment_natural_pull,
+            unemployment_okun_coefficient: self.params.unemployment_okun_coefficient,
+            unemployment_natural_rate: self.params.unemployment_natural_rate,
+            oil_inventory_reversion: self.params.oil_inventory_reversion,
+            oil_inflation_passthrough: self.params.oil_inflation_passthrough,
             // The phase and growth as an observer reads them tonight,
             // before the step: the same moment the economy's own are
             // read at with the switch off.
