@@ -55,7 +55,10 @@ the name's daily volume. Four kinds:
   ``r = m^2 / (m^2 + v)``, so flow that recurs counts in full and flow seen
   once or at scattered minutes counts for little. It buys ``lead`` ticks
   ahead of flow it expects and sells ``hold`` ticks after; the window wraps
-  across the night, so a programme that runs for days is held through. A programme that trades
+  across the night, so a programme that runs for days is held through. It
+  adds to a position only where the quoted spread is at most ``max_spread``
+  of the name's daily sigma, since on a name whose spread is a large part
+  of its daily move a round trip costs more than the flow can pay. A programme that trades
   the same minutes every day is what it learns best; flow at random minutes
   stays an unreliable, small prediction. It sees the agents' flow per name,
   not per label.
@@ -105,7 +108,7 @@ _KIND_PARAMS: dict[str, tuple[tuple[str, bool], ...]] = {
     "liquidity": (("half_life", False), ("scale", False),
                   ("vix_calm", False), ("vix_stress", False)),
     "detector": (("memory", False), ("bucket", True), ("lead", True),
-                 ("hold", True)),
+                 ("hold", True), ("max_spread", False)),
 }
 
 _COMMON = ("size", "rate", "interval", "band")
@@ -165,7 +168,7 @@ class Participant:
             raise ValidationError(
                 f"{name}: half_life must be above zero and vix_calm below vix_stress")
         if kind == "detector" and (
-                fields["memory"] <= 0 or not 1 <= fields["bucket"] <= 390
+                fields["memory"] <= 0 or fields["max_spread"] <= 0 or not 1 <= fields["bucket"] <= 390
                 or fields["lead"] + fields["hold"] >= 390 - fields["bucket"]):
             raise ValidationError(
                 f"{name}: memory must be above zero, bucket 1 to 390 ticks, and "
@@ -210,14 +213,16 @@ class Participant:
                    scale=scale, vix_calm=vix_calm, vix_stress=vix_stress)
 
     @classmethod
-    def detector(cls, *, name: str = "detector", size: float = 0.05,
-                 rate: float = 0.005, interval: int = 5, band: float = 0.1,
+    def detector(cls, *, name: str = "detector", size: float = 0.02,
+                 rate: float = 0.002, interval: int = 5, band: float = 0.1,
                  memory: float = 1.0, bucket: int = 1, lead: int = 120,
-                 hold: int = 60) -> "Participant":
-        """Learns the agents' flow by minute of the session and trades ahead of it."""
+                 hold: int = 60, max_spread: float = 0.05) -> "Participant":
+        """Learns the agents' flow by minute of the session and trades ahead
+        of it, adding to a position only where the quoted spread is at most
+        ``max_spread`` of the name's daily sigma."""
         return cls("detector", name=name, size=size, rate=rate,
                    interval=interval, band=band, memory=memory, bucket=bucket,
-                   lead=lead, hold=hold)
+                   lead=lead, hold=hold, max_spread=max_spread)
 
     def as_dict(self) -> dict[str, Any]:
         """Every field, in a fixed order: kind, name, the four common ones,

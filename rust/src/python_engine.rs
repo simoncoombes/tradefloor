@@ -409,6 +409,7 @@ fn population_from(
                 bucket: whole("bucket")?,
                 lead: whole("lead")?,
                 hold: whole("hold")?,
+                max_spread: num("max_spread")?,
             },
             other => {
                 return Err(ValidationError::new_err(format!(
@@ -2789,11 +2790,12 @@ impl PyEngine {
                     d.set_item("vix_calm", *vix_calm)?;
                     d.set_item("vix_stress", *vix_stress)?;
                 }
-                Policy::Detector { memory, bucket, lead, hold } => {
+                Policy::Detector { memory, bucket, lead, hold, max_spread } => {
                     d.set_item("memory", *memory)?;
                     d.set_item("bucket", *bucket)?;
                     d.set_item("lead", *lead)?;
                     d.set_item("hold", *hold)?;
+                    d.set_item("max_spread", *max_spread)?;
                 }
             }
             items.append(d)?;

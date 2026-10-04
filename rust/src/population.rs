@@ -45,7 +45,10 @@
 //!   it can learn; flow at random minutes averages out to a small,
 //!   unreliable prediction. It observes the agents' net flow per name, not
 //!   per label, so four labels sending a quarter each look like one label
-//!   sending the whole (co-impact).
+//!   sending the whole (co-impact). It adds to a position only where the
+//!   quoted spread is at most `max_spread` of the name's daily sigma: on a
+//!   name whose spread is a large part of its daily move, a round trip costs
+//!   more than riding the flow can earn.
 //!
 //! # How it trades
 //!
@@ -121,7 +124,7 @@ pub enum Policy {
     Trend { lookback: u32, scale: f64 },
     Reversion { lookback: u32, scale: f64 },
     Liquidity { half_life: f64, scale: f64, vix_calm: f64, vix_stress: f64 },
-    Detector { memory: f64, bucket: u32, lead: u32, hold: u32 },
+    Detector { memory: f64, bucket: u32, lead: u32, hold: u32, max_spread: f64 },
 }
 
 impl Policy {
@@ -188,7 +191,10 @@ impl Participant {
                     return Err(format!("{}: vix_calm must be below vix_stress", self.name));
                 }
             }
-            Policy::Detector { memory, bucket, lead, hold } => {
+            Policy::Detector { memory, bucket, lead, hold, max_spread } => {
+                if !finite_pos(*max_spread) {
+                    return Err(format!("{}: max_spread must be finite and above zero", self.name));
+                }
                 if !finite_pos(*memory) {
                     return Err(format!("{}: memory must be finite and above zero", self.name));
                 }
@@ -534,6 +540,23 @@ impl PopulationRun {
         orders
     }
 
+    /// The widest quoted spread, in the name's daily sigmas, at which a
+    /// participant adds to a position: the detector's `max_spread`, and no
+    /// limit for the other kinds.
+    pub fn max_spread(&self, k: usize) -> Option<f64> {
+        match self.participants[k].policy {
+            Policy::Detector { max_spread, .. } => Some(max_spread),
+            _ => None,
+        }
+    }
+
+    /// Whether a signed order adds to the participant's position on a name
+    /// (rather than reducing it).
+    pub fn adds(&self, k: usize, index: usize, signed: f64) -> bool {
+        let held = self.states[k].position[index];
+        held == 0.0 || (held > 0.0) == (signed > 0.0)
+    }
+
     /// Book one fill on a participant's ledger.
     pub fn book_fill(&mut self, k: usize, index: usize, side: Side, quantity: f64, price: f64) {
         let s = &mut self.states[k];
@@ -660,7 +683,7 @@ mod tests {
             rate: 0.002,
             interval: 1,
             band: 0.0,
-            policy: Policy::Detector { memory: 1.0, bucket: 5, lead: 20, hold: 10 },
+            policy: Policy::Detector { memory: 1.0, bucket: 5, lead: 20, hold: 10, max_spread: 1.0 },
         }
     }
 

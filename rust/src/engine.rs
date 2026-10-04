@@ -3876,6 +3876,23 @@ impl Engine {
         let orders = pop.decide(tick, &self.companies, self.market_vol.sigma_daily(), self.economy.vix);
         for (k, i, signed) in orders {
             let label = pop.participants[k].label();
+            if let Some(limit) = pop.max_spread(k) {
+                if pop.adds(k, i, signed) {
+                    let sigma = crate::agent_book::daily_sigma(&self.companies[i], self.market_vol.sigma_daily());
+                    let wide = match self.agent_book_at(i, Some(&label)) {
+                        Some(book) => match (book.best_bid(), book.best_ask()) {
+                            (Some(b), Some(a)) if a > b && sigma > 0.0 => {
+                                (a - b) / (0.5 * (a + b)) / sigma > limit
+                            }
+                            _ => true,
+                        },
+                        None => true,
+                    };
+                    if wide {
+                        continue;
+                    }
+                }
+            }
             let side = if signed > 0.0 {
                 crate::order_book::Side::Buy
             } else {

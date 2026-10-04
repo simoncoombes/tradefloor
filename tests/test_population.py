@@ -207,11 +207,13 @@ def test_its_fills_stay_on_its_ledger_and_its_labels_are_its_own():
                           "notional", "orders"}
 
 
-def _detector_position(schedule, days=5):
-    """A detector alone, beside a programme of 10% of a name's volume a day
-    in 36 slices; its position at tick 40 of the last day."""
+def _detector_position(schedule, days=5, max_spread=10.0):
+    """A detector alone (5% of volume at most, any spread unless
+    `max_spread` says otherwise), beside a programme of 10% of a name's
+    volume a day in 36 slices; its position at tick 40 of the last day."""
     name = UNIVERSE[3]
-    e = _engine(population=Population([Participant.detector()]))
+    e = _engine(population=Population([Participant.detector(
+        size=0.05, rate=0.005, max_spread=max_spread)]))
     rng = random.Random(9)
     q = 0.1 * name.avg_volume / 36
     for d in range(days):
@@ -241,6 +243,10 @@ def test_the_detector_positions_ahead_of_a_programme_it_can_predict():
     scattered = _detector_position("random")
     assert same > 0.02
     assert scattered < 0.5 * same
+
+
+def test_the_detector_stays_out_where_the_spread_is_wide():
+    assert _detector_position("same", max_spread=1e-6) == 0.0
 
 
 def test_the_detector_does_nothing_without_agent_flow():
