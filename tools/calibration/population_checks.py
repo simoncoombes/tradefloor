@@ -65,10 +65,11 @@ isolated daily sd, averaged per seed; (a) below zero; the five sessions
 after (the rebound of a liquidity event); and with `--limited4` and
 `--free4` at four times the crowd capital, (b) deeper there.
 
-**runtime.** Wall time of `--days` sessions (60 by default) on the certified
+**runtime.** CPU time of `--days` sessions (60 by default) on the certified
 roster, isolated and populated, untraded (`Engine`) and traded (a `World`
-whose agent buys and sells five names every step), interleaved, best of
-five.
+whose agent buys and sells five names every step), interleaved `--repeats`
+times (7): the ratio of the bests and the median of the paired ratios. CPU
+time rather than wall time, because the machine is shared.
 """
 
 from __future__ import annotations
@@ -589,26 +590,27 @@ def runtime(a):
 
     def untraded(pop):
         e = tf.Engine(seed=5, universe=universe, model=model, population=pop)
-        t = time.perf_counter()
+        t = time.process_time()
         for _ in range(days):
             session(e)
-        return time.perf_counter() - t
+        return time.process_time() - t
 
     def traded(pop):
         w = tf.World(seed=5, universe=universe, agent=_Trader([x.ticker for x in universe[:5]]),
                      model=model, population=pop, cash=1e12, max_leverage=None)
-        t = time.perf_counter()
+        t = time.process_time()
         w.run(days)
-        return time.perf_counter() - t
+        return time.process_time() - t
 
     out = {"kind": "population.runtime", "model": a.model, "days": days}
     for label, fn in (("untraded", untraded), ("traded", traded)):
         iso, pop = [], []
-        for _ in range(5):
+        for _ in range(a.repeats):
             iso.append(fn(None))
             pop.append(fn(population))
         out[label] = {"isolated_s": min(iso), "populated_s": min(pop),
-                      "ratio": min(pop) / min(iso)}
+                      "ratio": min(pop) / min(iso),
+                      "median_paired_ratio": st.median(p / i for p, i in zip(pop, iso))}
     return out
 
 
@@ -625,6 +627,7 @@ def main():
                     help="ac3: add a crowd trading each rule's own signal, "
                          "as size=0.03,stop=0.02,rate=...,count=N")
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--repeats", type=int, default=7, help="runtime: interleaved repeats")
     ap.add_argument("--limited", default="", help="cx: ac3 output, crowd with loss limits")
     ap.add_argument("--free", default="", help="cx: ac3 output, the same crowd without")
     ap.add_argument("--limited4", default="", help="cx: as --limited at four times the capital")

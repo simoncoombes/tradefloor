@@ -823,10 +823,12 @@ impl MemoryBound<'_> {
         let mut out: Vec<BookOrder> = Vec::with_capacity(orders.len());
         let mut placed = 0.0;
         let mut last: Option<f64> = None;
+        // One buffer for every order's pieces, emptied at each.
+        let mut pieces: Vec<(f64, f64)> = Vec::new();
         for o in orders {
             let mut left = o.remaining;
             let within = mathx::max(0.0, mathx::min(left, self.reach(side, o.price) - placed));
-            let mut pieces: Vec<(f64, f64)> = Vec::new();
+            pieces.clear();
             if within > 0.0 {
                 pieces.push((o.price, within));
                 left -= within;
@@ -840,7 +842,7 @@ impl MemoryBound<'_> {
                 let bound = cents_away(self.price(side, placed), side);
                 pieces.push((worse(o.price, bound), take));
             }
-            for (k, (price, shares)) in pieces.into_iter().enumerate() {
+            for (k, &(price, shares)) in pieces.iter().enumerate() {
                 let price = match last {
                     Some(prev) => worse(price, prev),
                     None => price,

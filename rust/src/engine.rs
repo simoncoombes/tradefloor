@@ -3879,17 +3879,27 @@ impl Engine {
             let label = pop.participants[k].label();
             if let Some(limit) = pop.max_spread(k) {
                 if pop.adds(k, i, signed) {
-                    let sigma = crate::agent_book::daily_sigma(&self.companies[i], self.market_vol.sigma_daily());
-                    let wide = match self.agent_book_at(i, Some(&label)) {
-                        Some(book) => match (book.best_bid(), book.best_ask()) {
-                            (Some(b), Some(a)) if a > b && sigma > 0.0 => {
-                                (a - b) / (0.5 * (a + b)) / sigma > limit
+                    // The quoted spread in daily sigmas, read once a session
+                    // per name (`PopulationRun::spreads`); infinite when the
+                    // book is not two-sided.
+                    let spread = match pop.spreads.get(i).copied() {
+                        Some(x) if !x.is_nan() => x,
+                        _ => {
+                            let sigma = crate::agent_book::daily_sigma(&self.companies[i], self.market_vol.sigma_daily());
+                            let x = match self.agent_book_at(i, Some(&label)) {
+                                Some(book) => match (book.best_bid(), book.best_ask()) {
+                                    (Some(b), Some(a)) if a > b && sigma > 0.0 => (a - b) / (0.5 * (a + b)) / sigma,
+                                    _ => f64::INFINITY,
+                                },
+                                None => f64::INFINITY,
+                            };
+                            if let Some(slot) = pop.spreads.get_mut(i) {
+                                *slot = x;
                             }
-                            _ => true,
-                        },
-                        None => true,
+                            x
+                        }
                     };
-                    if wide {
+                    if spread > limit {
                         continue;
                     }
                 }

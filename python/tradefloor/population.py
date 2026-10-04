@@ -387,7 +387,7 @@ class Population:
     @classmethod
     def crowded(cls, *, reversal: float = 0.006, momentum: float = 0.01,
                 members: int = 3, stop: float = 0.03,
-                recover: float = 0.2) -> "Population":
+                recover: float = 0.2, detectors: int = 5) -> "Population":
         """The standard population plus two crowds trading the ranked rules'
         own signals, each the long and short five of the roster, with a
         buffer of two ranks.
@@ -405,9 +405,20 @@ class Population:
         as a share of daily volume. With ``stop`` above zero each carries a
         loss limit: the reversal crowd at ``stop``, the momentum members
         spread from half of ``stop`` to one and a half times it, so a loss
-        that stops the first out can carry the others after it."""
+        that stops the first out can carry the others after it.
+
+        Its other participants are the standard population's, with two
+        changes. The trend follower and the mean reverter decide as often as
+        their signals move (every 130 and every 65 ticks). And in place of
+        one flow detector it holds ``detectors`` of them, identical (with
+        five-tick buckets) and deciding on different ticks, competing to
+        trade ahead of the same flow: high-frequency trading is several
+        firms, and five is about as many as the flow of a predictable
+        programme keeps profitable together."""
         if not isinstance(members, int) or members < 1:
             raise ValidationError("members is a whole number, at least 1")
+        if not isinstance(detectors, int) or detectors < 1:
+            raise ValidationError("detectors is a whole number, at least 1")
         crowd = []
         if reversal > 0:
             crowd.append(Participant.crowd(
@@ -422,7 +433,14 @@ class Population:
                     signal="momentum", name=f"momentum_crowd{j + 1}", size=size,
                     rate=2 * size, interval=390, offset=389 - 5 * (j % 3),
                     lookback=1950, stop=stop * at, recover=recover))
-        return cls([*cls.standard().participants, *crowd], name="crowded")
+        # The standard population's trend follower and mean reverter, deciding
+        # as often as their signals move: a five-day trend every 130 ticks, a
+        # one-session reversion every 65. Its liquidity provider as it is.
+        base = [Participant.trend(interval=130), Participant.reversion(interval=65),
+                Participant.liquidity()]
+        hfts = [Participant.detector(name=f"detector{j + 1}", bucket=5)
+                for j in range(detectors)]
+        return cls([*base, *hfts, *crowd], name="crowded")
 
     @classmethod
     def named(cls, name: str) -> "Population":

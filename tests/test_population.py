@@ -465,7 +465,9 @@ def test_the_crowded_population_adds_both_crowds_to_the_standard_one():
     crowded = Population.crowded()
     assert Population.named("crowded") == crowded
     kinds = [p.kind for p in crowded.participants]
-    assert kinds[:4] == ["trend", "reversion", "liquidity", "detector"]
+    assert kinds[:8] == ["trend", "reversion", "liquidity"] + ["detector"] * 5
+    assert [p.interval for p in crowded.participants[:2]] == [130, 65]
+    assert Population.crowded(detectors=2).fingerprint != crowded.fingerprint
     crowds = [p for p in crowded.participants if p.kind == "crowd"]
     reversal = [p for p in crowds if p.signal == "reversal"]
     momentum = [p for p in crowds if p.signal == "momentum"]
