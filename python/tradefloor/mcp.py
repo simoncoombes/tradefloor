@@ -880,6 +880,10 @@ def _scorecard_row(s: Any) -> dict[str, Any]:
         # oracle, and a blend holding one, read hidden state by declaration.
         **({"uses_hidden_state": True} if s.uses_hidden_state else {}),
         **({"tampered": True} if s.tampered else {}),
+        # Only when any were paid, for the same reason: a model without
+        # dividends pays none and its rows are the rows they were.
+        **({"dividends": round(s.dividends, 2)}
+           if getattr(s, "dividends", 0.0) else {}),
     }
 
 
@@ -2419,6 +2423,9 @@ def explain_price_move(
             "changed the stock's fair value for good, entered as a negative "
             "because it left the mispricing. The other factors report the "
             "whole shock; on presets through pt-v19 this one is zero.",
+            "`dividend` is the change in the mispricing at an ex-date open, "
+            "where the price drops by the cash dividend; it is zero on a "
+            "model without dividends.",
         ],
         "provenance": _provenance(
             seed=seed, day=day,

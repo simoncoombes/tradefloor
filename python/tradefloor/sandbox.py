@@ -27,6 +27,10 @@ and nothing else:
 - which names and sectors have news today, without the size or direction of
   the move, because the engine's own field is the move the story will have
   made by the close
+- the earnings calendar (``earnings_calendar``): which names report and on
+  which session, as a real company announces its date. Dates only: the
+  surprise is realised at the reaction session's opening print, and what it
+  was (``earnings_surprises``) is not served
 - the agent's own portfolio, through :class:`PortfolioView`, which reads and
   cannot trade or write
 
@@ -135,6 +139,9 @@ PUBLIC_COLUMNS = frozenset({
     "price", "previous_close", "previous_tick_price", "open", "high", "low",
     "volume", "avg_volume", "market_cap", "last_daily_return", "beta",
     "short_interest", "float_shares",
+    # The cash dividend per share each name went ex for at today's open:
+    # public, like a real ex-date, and zero on a model without dividends.
+    "dividend",
 })
 
 #: Macro fields withheld from the view. ``qe_pe_boost`` is the P/E the model
@@ -180,6 +187,9 @@ HIDDEN_STATE = {
     "model_params": "the model's dials, the cycle's hazards among them",
     "macro_table": "the full macro path, the true phase included",
     "fork": "a copy of the market that can be run ahead: look-ahead",
+    "earnings_surprises": "each report's surprise as the opening print "
+                          "realised it, split from the night's own move: "
+                          "the price shows the gap, not what caused it",
 }
 
 _OPT_IN = ("Agents see a read-only market view. An agent that needs hidden "
@@ -386,6 +396,41 @@ class MarketView:
                  "day": e.get("day")}
                 for e in _WRAPPED[self].session_news()]
 
+    # -- dividends --------------------------------------------------------
+
+    @property
+    def pays_dividends(self) -> bool:
+        """Whether this market pays cash dividends
+        (``dividend_payout_share``), as a real market's reader knows."""
+        return _WRAPPED[self].model.dividend_payout_share != 0.0
+
+    def dividends_today(self) -> list[float]:
+        """``Engine.dividends_today``: the cash dividend per share each
+        instrument went ex for at this session's open, 0.0 elsewhere."""
+        return list(_WRAPPED[self].dividends_today())
+
+    def distributions(self, day: int | None = None):
+        """``Engine.distributions``: every dividend declared so far, from
+        its declaration session on, as a real one is announced."""
+        return _WRAPPED[self].distributions(day)
+
+    # -- earnings calendar ------------------------------------------------
+
+    def earnings_calendar(self, horizon: int = 63) -> list[dict[str, Any]]:
+        """``Engine.earnings_calendar``: the reports ahead, dates only.
+
+        One dict per report in the next ``horizon`` sessions, with
+        ``ticker``, ``session`` (the reaction session, the first to trade the
+        report) and ``sessions_ahead`` (0 is the session now open, or the
+        next to open when the market is closed), ordered by session. A real
+        company announces its date weeks ahead, so a trader deciding whether
+        to hold a name through its report can read it here. The surprise is
+        a draw nobody reads before the reaction session's opening print
+        realises it, and nothing here reads it. Empty on a model without the
+        calendar (``earnings_surprise_sigma`` 0.0, every shipped preset).
+        """
+        return [dict(row) for row in _WRAPPED[self].earnings_calendar(horizon)]
+
     # -- identity and the clock -------------------------------------------
 
     @property
@@ -451,6 +496,12 @@ class HiddenState(MarketView):
         the whole snapshot carries the generator state."""
         return dict(_WRAPPED[self].economy())
 
+    def dividend_states(self) -> bytes | None:
+        """The ``dividend`` block of ``Engine.state_snapshot``: seven f64s a
+        name (payout, target yield, price EMA, amount, declared, accrual,
+        paid today), or None on a model without dividends."""
+        return _WRAPPED[self].state_snapshot().get("dividend")
+
     def fundamentals(self) -> tuple[list[float], list[float], list[float]]:
         eps, bv, growth = _WRAPPED[self].fundamentals()
         return list(eps), list(bv), list(growth)
@@ -460,6 +511,11 @@ class HiddenState(MarketView):
 
     def truth(self, **kwargs: Any):
         return _WRAPPED[self].truth(**kwargs)
+
+    def earnings_surprises(self) -> bytes:
+        """``Engine.earnings_surprises``: the surprise each name's opening
+        print realised at the last open."""
+        return _WRAPPED[self].earnings_surprises()
 
     def __getattr__(self, name: str) -> Any:
         raise _refuse("hidden state", name)
@@ -510,6 +566,18 @@ class PortfolioView:
     @property
     def interest(self) -> float:
         return _WRAPPED[self][0].interest
+
+    @property
+    def dividends(self) -> float:
+        """Net dividends received so far (paid, on a short), reinvested or
+        as cash."""
+        return _WRAPPED[self][0].dividends
+
+    @property
+    def reinvest_dividends(self) -> bool:
+        """Whether a long position's dividends buy more of the paying name
+        (the portfolio's dividend reinvestment plan)."""
+        return _WRAPPED[self][0].reinvest_dividends
 
     @property
     def owner(self) -> str:
@@ -619,6 +687,13 @@ def hidden_state(obs: Any) -> Any:
         "scorecard records as uses_hidden_state.")
 
 
+def dividend_states_of(source: Any) -> bytes | None:
+    """The dividend block, from a :class:`HiddenState` or a live engine."""
+    if isinstance(source, HiddenState):
+        return source.dividend_states()
+    return source.state_snapshot().get("dividend")
+
+
 def economy_of(source: Any) -> dict[str, Any]:
     """The economy block, from a :class:`HiddenState` or a live engine."""
     if isinstance(source, HiddenState):
@@ -634,7 +709,9 @@ def _portfolio_state(portfolio: Any) -> tuple:
     return (portfolio.cash, portfolio.starting_cash, portfolio.interest,
             portfolio.max_leverage, portfolio.cash_interest,
             portfolio.margin_interest, portfolio.owner,
-            len(portfolio.fills), positions, flow, portfolio._in_book)
+            len(portfolio.fills), positions, flow, portfolio._in_book,
+            portfolio.dividends, len(portfolio.distributions),
+            portfolio.reinvest_dividends)
 
 
 class TamperGuard:

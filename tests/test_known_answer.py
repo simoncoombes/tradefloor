@@ -235,7 +235,7 @@ def test_the_traded_run_hashes_every_scorecard_field():
     between platforms."""
     k = known_answer_traded
     placed = (set(k.SCORECARD_FIELDS) | set(k.SCORECARD_COUNTED)
-              | set(k.SCORECARD_DERIVED))
+              | set(k.SCORECARD_NONZERO) | set(k.SCORECARD_DERIVED))
     assert placed == set(tradefloor.Scorecard.__slots__), (
         "Scorecard's fields and the ones known_answer_traded.py hashes "
         f"differ: {sorted(placed ^ set(tradefloor.Scorecard.__slots__))}. "

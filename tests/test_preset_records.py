@@ -449,6 +449,31 @@ def test_the_panel_measures_every_shipped_preset():
             "the numbering has a gap and the tool still stops at it")
 
 
+def _perturbation(name):
+    """A value that switches `name` on and the companions it needs, from
+    tests/test_model_params.py's tables, which the validation accepts on
+    pt-v20. 1.0 is not in every new dial's domain (a degrees of freedom
+    from 3, a VIX level from 10)."""
+    import importlib.util  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    module = sys.modules.get("_tmp_model_params_tables")
+    if module is None:
+        path = pathlib.Path(__file__).with_name("test_model_params.py")
+        spec = importlib.util.spec_from_file_location("_tmp_model_params_tables", path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["_tmp_model_params_tables"] = module
+        spec.loader.exec_module(module)
+    value = next(row[1] for row in module.PERTURBATIONS if row[0] == name)
+    return value, dict(module.COMPANIONS.get(name, {}))
+
+
+def _switched_on(preset, name):
+    value, companions = _perturbation(name)
+    if value == 0.0:
+        value = 1.0
+    return tradefloor.ModelParams.from_preset(preset, **{**companions, name: value})
+
+
 @pytest.mark.parametrize("path", records(), ids=lambda p: p.stem)
 def test_a_silent_switch_at_zero_moves_no_record(path):
     """Adding a switch that is inert at 0.0 leaves every record as it was.
@@ -471,9 +496,22 @@ def test_a_silent_switch_at_zero_moves_no_record(path):
         without = {k: v for k, v in shipped.items() if k != name}
         assert coefficient_digest(without) == rec["coefficient_digest"]
         assert coefficient_digest(dict(shipped, **{name: -0.0})) == rec["coefficient_digest"]
-        on = tradefloor.ModelParams.from_preset(rec["preset"], **{name: 1.0}).to_dict()
+        try:
+            on = _switched_on(rec["preset"], name).to_dict()
+        except tradefloor.ValidationError:
+            # A companion the old preset lacks: the record's own rule is
+            # the question here, and it reads the vector alone.
+            on = dict(shipped, **{name: _perturbation(name)[0] or 1.0})
         assert coefficient_digest(on) != rec["coefficient_digest"]
         assert name in recorded_values(on)
+    at_default = tradefloor.ModelParams.digest_silent_at_default()
+    for name, default in at_default.items():
+        assert shipped[name] == default, (rec["preset"], name)
+        assert name not in rec["coefficients"], (rec["preset"], name)
+        without = {k: v for k, v in shipped.items() if k != name}
+        assert coefficient_digest(without) == rec["coefficient_digest"]
+        moved = dict(shipped, **{name: default + 1.0})
+        assert coefficient_digest(moved) != rec["coefficient_digest"]
     assert set(rec["coefficients"]) == set(recorded_values(shipped))
 
 
@@ -487,6 +525,7 @@ def test_the_rust_and_python_digests_agree_on_which_keys_are_silent():
     from tools.presets.record import coefficient_digest  # noqa: PLC0415
 
     silent = set(tradefloor.ModelParams.digest_silent_at_zero())
+    at_default = tradefloor.ModelParams.digest_silent_at_default()
     base = tradefloor.ModelParams.from_preset("pt-v20")
 
     def vector(params):
@@ -512,8 +551,17 @@ def test_the_rust_and_python_digests_agree_on_which_keys_are_silent():
                         != coefficient_digest(shipped))
         assert rust_moved == python_moved, name
     for name in silent:
-        on = tradefloor.ModelParams.from_preset("pt-v20", **{name: 1.0})
+        on = _switched_on("pt-v20", name)
         assert on.fingerprint != base.fingerprint, name
         assert coefficient_digest(vector(on)) != coefficient_digest(shipped), name
         at_zero = tradefloor.ModelParams.from_preset("pt-v20", **{name: 0.0})
         assert at_zero.fingerprint == base.fingerprint, name
+    for name, default in at_default.items():
+        # At its default the dial drops out of both digests; anywhere else
+        # it is in both.
+        dropped = {k: v for k, v in shipped.items() if k != name}
+        assert coefficient_digest(dropped) == coefficient_digest(shipped), name
+        value, companions = _perturbation(name)
+        on = tradefloor.ModelParams.from_preset("pt-v20", **{**companions, name: value})
+        assert on.fingerprint != base.fingerprint, name
+        assert coefficient_digest(vector(on)) != coefficient_digest(shipped), name

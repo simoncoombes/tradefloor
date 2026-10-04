@@ -807,11 +807,13 @@ class Buyer:
 def test_a_cohort_takes_levels_from_each_other():
     """Two agents buying one name every step. Off the shared book (pt-v19)
     they fill at the same price; on it the second in label order pays more, and each
-    one's permanent impact is its own."""
+    one's permanent impact is its own. Label order is arrival order at
+    `book_arrival_shuffle` 0.0, which the live arm pins so the claim holds
+    whatever the default carries (test_arrival_order.py covers the shuffle)."""
     u = tf.Universe.random(8, seed=99)
     t, q = u[0].ticker, round(0.03 * u[0].avg_volume)
     prices = {}
-    for name, model in (("off", OFF), ("live", live())):
+    for name, model in (("off", OFF), ("live", live(book_arrival_shuffle=0.0))):
         w = World(seed=42, universe=u, model=model, cash=1e9, max_leverage=None,
                   agents={"a": Buyer(t, q), "b": Buyer(t, q)})
         w.run(days=1)
@@ -825,11 +827,12 @@ def test_externalities_show_agents_taking_levels_from_each_other():
     """`levels[a][b]`: what b's execution cost against each step's opening
     mid changes by when a stops trading. Off the shared book (pt-v19) it
     is zero; on it, a (first in the arrival order) makes b's fills dearer by
-    the levels it takes, and b barely reaches a, which met the book first."""
+    the levels it takes, and b barely reaches a, which met the book first.
+    That is label order, pinned at `book_arrival_shuffle` 0.0."""
     u = tf.Universe.random(8, seed=99)
     t, q = u[0].ticker, round(0.03 * u[0].avg_volume)
     out = {}
-    for name, model in (("off", OFF), ("live", live())):
+    for name, model in (("off", OFF), ("live", live(book_arrival_shuffle=0.0))):
         w = World(seed=42, universe=u, model=model, cash=1e9, max_leverage=None,
                   agents={"a": Buyer(t, q), "b": Buyer(t, q)})
         out[name] = tf.externalities(w, days=1)

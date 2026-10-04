@@ -176,6 +176,7 @@ _LABELS: dict[str, dict[str, str]] = {
         "avg_daily_volume": "  avg daily volume",
         "position": "  your position",
         "max_order_shares": "  max order this step",
+        "dividend": "  dividend paid today",
         "cash": "cash",
         "net_worth": "net worth",
         "leverage": "leverage",
@@ -222,6 +223,7 @@ _LABELS: dict[str, dict[str, str]] = {
         "avg_daily_volume": "  volume quotidien moyen",
         "position": "  votre position",
         "max_order_shares": "  ordre maximal ce pas",
+        "dividend": "  dividende verse ce jour",
         "cash": "liquidites",
         "net_worth": "valeur nette",
         "leverage": "levier",
@@ -596,6 +598,10 @@ class TextRenderer:
             f"{L['max_order_shares']:<23}"
             f"{_qty(asset['max_order_shares'])} {L['shares']}",
         ]
+        # Only on a model that pays dividends, whose payload carries the
+        # key, and only on a name that went ex today.
+        if asset.get("dividend"):
+            out.append(f"{L['dividend']:<23}{_money(asset['dividend'])}")
         for key, value in sorted(asset["fundamentals"].items()):
             out.append(f"  {key:<20} {_num(value)}")
         return out

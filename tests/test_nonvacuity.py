@@ -156,9 +156,11 @@ def test_every_truth_component_can_be_non_zero():
     # `overnight` is structurally zero at every shipped preset, since the
     # dial that moves it ships at 0.0; it is reachable, and the test that
     # proves it turns the dial on (tests/test_overnight.py, the tape test),
-    # the same arrangement `circuit_breaker` has.
+    # the same arrangement `circuit_breaker` has. So is `dividend`, whose
+    # dial ships at 0.0 on every preset; tests/test_truth.py turns it on
+    # (`test_the_reconstruction_holds_across_an_ex_date`).
     dead = [name for name in tradefloor.Engine.FACTORS
-            if name not in ("circuit_breaker", "overnight")
+            if name not in ("circuit_breaker", "overnight", "dividend")
             and all(v == 0.0 for v in table[name])]
     assert dead == [], dead
     # And momentum specifically is zero on day one and non-zero on day two,

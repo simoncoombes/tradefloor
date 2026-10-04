@@ -271,6 +271,34 @@ PERTURBATIONS = [
     # the perturbation has to be TO a non-zero value; measured to move the
     # probe at 0.05 and at every larger value tried, and to move no draw.
     ("market_vol_gamma", 0.3, True),
+    # The slow component's GJR loading (crash-vol-state). Ships at 0.0, so
+    # the perturbation is TO the design's stage-1 value; the default runs a
+    # slow component, so a down day loads it from the first close.
+    ("market_vol_slow_gamma", 0.6, True),
+    # The return memory's gain, read with its half-life as the companion
+    # (refused without one). LIVE: the first close moves the memory and the
+    # next session draws at the multiplied variance.
+    ("market_vol_leverage", 3.0, True),
+    # INERT: unread at `market_vol_leverage` 0.0, the default's value.
+    ("market_vol_leverage_half_life", 40.0, False),
+    # LIVE with the memory on (its companions): counting falls only moves
+    # the memory on every up day.
+    ("market_vol_leverage_down", 1.0, True),
+    # LIVE with the memory on (its companions): counting a day in its own
+    # sd moves the memory on every session drawn off the baseline.
+    ("market_vol_leverage_standardise", 1.0, True),
+    # The roster's beta normalised at construction (tails). Ships at 0.0, so
+    # the perturbation is TO a roster whose cap-weighted beta is one; LIVE
+    # from the first tick, which loads every name on the market factor by
+    # its beta.
+    ("market_beta_normalise", 1.0, True),
+    # The day's market t scale (d1tail). Ships at 0.0, so the perturbation
+    # is TO the tape's GJR-t fit; LIVE from the first open, which draws a
+    # multiplier on the session's market variance.
+    ("market_day_tail_df", 7.0, True),
+    # LIVE with the day scale on (its companion): the close's variance
+    # update reads the day as it landed rather than at its own variance.
+    ("market_day_tail_state_share", 1.0, True),
     # The shock share's rotation with the factor's own excursion, added at
     # 0.8.0. Ships at 0.0, so the perturbation is TO a non-zero value.
     # MEASURED to move the probe at 0.20 and to move no draw, on either
@@ -925,10 +953,29 @@ PERTURBATIONS = [
     ("book_depth_coefficient", 0.5, False),
     ("book_depth_exponent", 0.6, False),
     ("book_depth_reach", 2.0, False),
+    ("book_depth_nesting", 1.0, False),
     ("book_shared", 0.0, False),
     ("book_refill_half_life", 10.0, False),
     ("book_resting", 0.0, False),
+    # INERT: read only by a World cohort of two or more agents, and the
+    # probe runs none. tests/test_arrival_order.py moves it with a cohort.
+    ("book_arrival_shuffle", 1.0, False),
     ("fill_impact_coefficient", 0.5, False),
+    # The metaorder memory (sqrt-impact). INERT on this probe by the same
+    # construction: it is fed only by agents' taker flow, and the probe
+    # sends none. The four shape dials are read only with the coefficient
+    # on; the coefficient's companion is the half-life it is refused
+    # without. `test_impact_memory.py` moves them with agents trading.
+    ("impact_memory_coefficient", 0.5, False),
+    ("impact_memory_half_life", 120.0, False),
+    ("impact_memory_slow_half_life", 15600.0, False),
+    ("impact_memory_slow_weight", 0.1, False),
+    ("impact_memory_crossover", 0.001, False),
+    # INERT on this probe: both read only on an agent's resting orders, and
+    # the probe sends none. tests/test_wash_round_trip.py moves them (r17
+    # wash).
+    ("impact_memory_refill", 1.0, False),
+    ("book_cross_at_limit", 1.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
@@ -999,6 +1046,11 @@ PERTURBATIONS = [
     # never reaches 1.5 times the base; 0.5 binds on every tick and is
     # LIVE. Was (1.5, False). tests/test_market_linear.py holds it.
     ("fair_value_market_vol_cap", 0.5, True),
+    # INERT on this probe: the share it puts back is read only above the
+    # ceiling (1.5 base sigmas on pt-v20), which the probe's market sigma
+    # never reaches (see the ceiling's row above: 2.0 and 0.0 are inert
+    # here too). tests/test_market_linear.py holds the mechanism (r16 spike).
+    ("fair_value_market_excess_share", 1.0, False),
     # INERT on this probe: the discount applies only while the VIX is above
     # its knee (40 on pt-v20, 30 by default), and the probe's three calm
     # days sit below it. tests/test_vix_discount.py holds the mechanism.
@@ -1011,9 +1063,248 @@ PERTURBATIONS = [
     # the knee, which is zero on this probe (above), so it stays 0.0 at
     # any half-life. Was inert because the default carried no discount.
     ("fair_value_vix_half_life", 10.0, False),
+    # INERT on this probe for the same reason as the half-life above: the
+    # exposure is read only while the VIX has been above the knee, which the
+    # probe's calm days never reach. tests/test_vix_discount.py holds it
+    # (r16 spike).
+    ("fair_value_vix_release_half_life", 60.0, False),
+    # INERT on this probe: the knee pulls only a name whose fair-value level
+    # sits more than the knee below the roster's mean, and three calm days
+    # open no name more than about 0.9 below it. Its half-life is read only
+    # with the knee set (COMPANIONS). tests/test_relative_knee.py holds the
+    # mechanism (r17 floor).
+    ("fair_value_relative_knee", 2.0, False),
+    ("fair_value_relative_half_life", 252.0, False),
+    # INERT: both read only on a session a caller pinned a macro field, and
+    # the probe pins nothing. tests/test_macro_pins_hold.py holds the
+    # mechanisms.
+    ("macro_pins_hold", 1.0, False),
+    ("pinned_vix_feedback", 1.0, False),
+    # INERT: read only with `pinned_vix_feedback` on and a VIX pinned that
+    # session; tests/test_pinned_vix_variance.py holds the mechanism.
+    ("pinned_vix_variance_share", 0.7, False),
+    # INERT: all three read only with `pinned_vix_feedback` on and a VIX
+    # pinned that session; tests/test_pinned_vix_calm.py holds them (r17).
+    ("pinned_vix_calm_knee", 17.6, False),
+    ("pinned_vix_calm_share", 0.3, False),
+    ("pinned_vix_priced_cap", 1.0, False),
     # LIVE: the default carries buyback_payout_share, and a cap of a tenth
     # of a per cent binds on every profitable name from the first session.
     ("buyback_yield_cap", 0.001, True),
+    # The market's cycle nowcast (r13). LIVE: the anticipation reads the
+    # belief's pi . g, which the first session's report moves off the true
+    # phase's g, and the default reprices at the close
+    # (`macro_publication_repricing`) and moves the corporate yield daily.
+    ("cycle_nowcast_accuracy", 0.4, True),
+    # LIVE: the default moves the corporate yield daily, and the blend
+    # prices the multiplier toward its occupancy mean and carries the
+    # formula's change on the daily path, so the corporate yield and the
+    # rate term of every fair value move from the first meeting.
+    ("corporate_spread_cycle", 0.75, True),
+    # The anticipation's left-out drift (r13 macro-clock). LIVE: the default
+    # runs the anticipation, so the first close adds rho (A - e) to D, the
+    # valuation reads (A - e) - D, and the default reprices at the close
+    # (`macro_publication_repricing`).
+    ("earnings_anticipation_drift_share", 1.0, True),
+    # INERT: D's half-life is read only with the share above set.
+    ("earnings_anticipation_drift_half_life", 252.0, False),
+    # LIVE: the probe's first meeting finds true growth under 2 per cent,
+    # inflation under target plus 1.5 and the rate above zero, so the bank
+    # cuts a quarter point where the ladder held, and the rate term of every
+    # fair value moves.
+    ("fed_growth_cut", 2.0, True),
+    # INERT on this probe: the drawn schedule publishes a turn no sooner than
+    # 84 sessions after it, so over the probe's three days the published
+    # phase is the opening phase, as the fixed 252-session lag's is.
+    # tests/test_macro_clock.py holds the schedule.
+    ("cycle_publication_lag_draw", 1.0, False),
+    # LIVE: the default carries buyback_payout_share, and the accrued
+    # share count replaces the term that compounds today's yield over the
+    # elapsed days from the first session.
+    ("buyback_accrual", 1.0, True),
+    # The thirteenth registration's bond timing (r13). INERT: the probe's
+    # universe holds no rate instruments, so there is no rate book to
+    # re-mark, and the equities never read one; with rate indices listed the
+    # close re-marks them to the published curve (tests/test_bond_timing.py).
+    ("rate_close_remark", 1.0, False),
+    # INERT for the same reason: the live mark is computed only for an
+    # engine holding rate indices and only ever moves their prints. Carries
+    # the close's re-mark as its companion, which it requires.
+    ("rate_intraday_live", 1.0, False),
+    # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
+    # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
+    # row at 0.25 alone is inert), and at 15 the first meeting cuts a
+    # quarter point and the macro path moves (+34 economy draws).
+    ("fed_stress_cut", 0.25, True),
+    # LIVE: with the cut on (the companion), a start of 15 in place of 30
+    # fires it in the burn-in, as above.
+    ("fed_stress_vix", 15.0, True),
+    # LIVE: with the cut on and starting at 15 (the companions), a gap of
+    # 0.5 in place of 1.0 closes the gate at a meeting the base cuts at
+    # (measured; 2.0 and 5.0 move nothing on this probe).
+    ("fed_stress_inflation_gap", 0.5, True),
+    # LIVE: a name's fair value accrues its next dividend from the first
+    # session after its state is made, so every payer's `s` moves at once.
+    # tests/test_dividends.py holds the mechanism.
+    ("dividend_payout_share", 1.0, True),
+    # The four below are read only with dividend_payout_share set, so each
+    # row carries it as a companion (COMPANIONS) and reads the dial on it.
+    # A cutoff of zero stops every name with non-negative revenue growth
+    # from paying.
+    ("dividend_growth_cutoff", 0.0, True),
+    # The accrual before a declaration is the amount the rule would declare
+    # today, which the speed sets.
+    ("dividend_adjustment_speed", 1.0, True),
+    # LIVE at 1.0: the accrual before a declaration is the amount the rule
+    # would declare today, and at a ceiling of the target yield itself it
+    # binds on any name whose close sits under its price EMA (measured).
+    ("dividend_yield_ceiling", 1.0, True),
+    # LIVE: pt-v20 carries buyback_payout_share 0.75, and substitution takes
+    # each payer's dividend payout out of its buyback term.
+    ("dividend_buyback_substitution", 1.0, True),
+    # The business cycle in the market factor's volatility (bear-dynamics).
+    # Ships at 0.0, so the perturbation is TO the design's measured ratio:
+    # LIVE, the first close sets the multiplier at its phase's value (the
+    # derived expansion multiplier, since the default carries 0.0 there)
+    # and the next session draws at the scaled variance.
+    ("market_vol_cycle_ratio", 2.0, True),
+    # LIVE with the ratio on (its companion): an explicit expansion
+    # multiplier replaces the derived one from the first close.
+    ("market_vol_cycle_expansion", 0.75, True),
+    # INERT even with the ratio on (its companion): the first close puts
+    # the multiplier on its target whatever the half-life, and the probe's
+    # phase does not change in three sessions, so there is nothing to
+    # smooth. Measured.
+    ("market_vol_cycle_half_life", 21.0, False),
+    # LIVE with the ratio on and an expansion multiplier over one (its
+    # companions): the power is read while the multiplier is at or over
+    # one, and the VIX coupling's denominator is scaled from the first
+    # close.
+    ("market_vol_cycle_relative", 1.0, True),
+    # LIVE with the ratio on (its companion): the derived expansion
+    # multiplier is under one, where this power is read, and the VIX
+    # coupling's denominator is scaled from the first close.
+    ("market_vol_cycle_relative_calm", 1.0, True),
+    # INERT even with the ratio on and an expansion multiplier of 2 (its
+    # companions): the multiplier is over one from the first close, but
+    # the factor's variance moves toward the scaled baseline at its own
+    # rate and its sigma does not cross `fair_value_market_vol_cap`'s
+    # ceiling within the probe, so the scaled ceiling changes nothing yet.
+    # Measured; tests/test_market_vol_cycle.py sees it move over 15
+    # sessions.
+    ("market_vol_cycle_cap_relative", 1.0, False),
+    # INERT with the ratio on (its companion): the switch acts only on a
+    # session whose VIX a caller pinned, and the probe pins nothing.
+    # tests/test_market_vol_cycle.py pins one.
+    ("market_vol_cycle_pin_neutral", 1.0, False),
+    # INERT for the same reason: nothing pins the probe's phase.
+    ("market_vol_cycle_pin_phase", 1.0, False),
+    # INERT with the ratio on (its companion): the probe's engine is not in
+    # a trough, where alone the share is read. Measured.
+    ("market_vol_cycle_trough_release", 0.5, False),
+    # INERT with the ratio on (its companion): the first close lands the
+    # multiplier on its target and the probe's phase does not change in
+    # three sessions, so it never falls. Measured.
+    ("market_vol_cycle_release_half_life", 5.0, False),
+    # INERT with the ratio on (its companions): the probe's engine is in
+    # neither a contraction nor a trough, where alone the rally is read; its
+    # window moves no price. Measured.
+    ("market_vol_cycle_recovery_release", 1.0, False),
+    # INERT: read only with the release above set.
+    ("market_vol_cycle_recovery_scale", 0.1, False),
+    # INERT on every column this probe reads, at any value: the premium
+    # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
+    # inside the engine reads the quote, and on this probe's three calm days
+    # the memory sits below the knee as well. Carries its cap as a companion,
+    # without which it is refused. tests/test_vix_stress_premium.py holds
+    # the mechanism, including prices bit-identical with it on.
+    ("vix_stress_premium", 1.0, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_knee", 0.5, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_cap", 0.25, False),
+    # INERT on this probe, measured: the put reads the index's fall since
+    # the last meeting, and the burn-in's prices do not move, the probe's
+    # three sessions hold no meeting, and no burn-in meeting is at a VIX of
+    # 30 or more, so nothing is cut, held or owed. Carries its half-life as
+    # a companion, without which it is refused. tests/test_fed_put.py holds
+    # the mechanism.
+    ("fed_put_gain", 5.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_threshold", 0.05, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_half_life", 126.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("fed_put_emergency_vix", 40.0, False),
+    # INERT: read only with fed_put_gain non-zero.
+    ("treasury_put_pricing", 1.0, False),
+    # LIVE: the burn-in's VIX sits above 20 on some sessions with inflation
+    # under 4, so the 10-year's term premium falls, and fair value reads
+    # the rate. No draw: the economy stream is untouched.
+    ("treasury_haven_gain", 0.015, True),
+    # sim/r15-postcut. INERT: the probe's published VIX never reaches
+    # fed_stress_vix, so the clock never starts and no rise is held.
+    # tests/test_postcut.py holds the mechanism.
+    ("fed_stress_hold", 63.0, False),
+    # LIVE: the probe's first meeting changes the rate, so the forecast the
+    # curve reads moves the 10-year, the corporate yield and every fair
+    # value. No draw.
+    ("treasury_path_pricing", 1.0, True),
+    # INERT: read only with treasury_path_pricing non-zero.
+    ("treasury_path_half_life", 63.0, False),
+    # LIVE: the 10-year's anchor reads the rate pulled toward 2.5 from the
+    # first close, and fair value reads the corporate yield on it. No draw.
+    ("treasury_policy_damping", 0.5, True),
+    # sim/r17-c10c. INERT on this probe: the shadow meeting on its calm
+    # economy would hold (or cut, which the cut share of 0.0 leaves
+    # unpriced), so nothing is priced and no yield moves. No draw either
+    # way. tests/test_policy_anticipation.py holds the mechanism.
+    ("policy_anticipation", 1.0, False),
+    # INERT: read only with policy_anticipation non-zero.
+    ("policy_anticipation_cut_share", 1.0, False),
+    # LIVE: the default moves the corporate yield every close
+    # (`corporate_yield_daily`) by the formula's VIX slope, and the VIX moves
+    # every session, so cutting the slope moves the discount rate fair value
+    # reads. No draw.
+    ("corporate_spread_vix_cut", 0.5, True),
+    # LIVE: the gap steps on every session's index return and the daily move
+    # carries it into the corporate yield, which fair value reads. Carries
+    # its half-life as a companion, without which it is refused. No draw.
+    ("corporate_spread_equity_gain", 1.5, True),
+    # INERT: read only with corporate_spread_equity_gain non-zero.
+    ("corporate_spread_equity_half_life", 126.0, False),
+    # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
+    # half-life as a companion, without which it is refused. INERT on this
+    # probe: the ladder reads the gap only in an expansion or at a peak past
+    # its minimum age, and the gain the knee leaves at 0.0 adds hazard only
+    # on a fall below the slow average, so the probe's roll is not moved.
+    # The cycle's roll takes its one uniform whatever the probability, so no
+    # draw either way. tests/test_cycle_equity_hazard.py holds the mechanism.
+    ("cycle_equity_hazard", 5.0, False),
+    # INERT: read only with cycle_equity_hazard non-zero.
+    ("cycle_equity_hazard_knee", 0.05, False),
+    # LIVE: the stationary opening's law and the burn-in read it, so the
+    # phase the run opens in, and every field the burn-in relaxes under it,
+    # can move. It takes no draw of its own; the burn-in's phase path moves
+    # which macro sites fire (ECONOMY_STREAM_MOVERS).
+    ("cycle_equity_hazard_opening", 0.05, True),
+    # LIVE: the run opens with a copy's volatility state (the VIX, the factor
+    # variance, the names' GARCH), so every price moves from the first tick.
+    # The copy draws from surgery generators of its own; the run's market
+    # stream is untouched.
+    ("market_prehistory_sessions", 21.0, True),
+    # LIVE, on its companion prehistory: the run opens with the copy's
+    # mispricing and valuation state, booked into the fair-value levels, so
+    # the same draws price from other levels from the first tick. No stream
+    # moves: the copy draws from generators of its own.
+    ("market_prehistory_valuation", 1.0, True),
+    # INERT: read only with fed_put_gain non-zero, and then only at a
+    # meeting's restart of the put's clock. tests/test_fed_put_carry.py holds
+    # the mechanism.
+    ("fed_put_carry", 1.0, False),
+    # INERT: read only at a meeting, where it holds a rise, and the
+    # three-session probe holds none; its window moves no price.
+    ("fed_drawdown_hold", 0.05, False),
     # The variance-neutral down-tick REALLOCATION: the idiosyncratic shock
     # is suppressed on a down tick of the factor and inflated on an up tick.
     # Ships at 0.0 on every preset, so the perturbation is TO a non-zero
@@ -1188,6 +1479,30 @@ PERTURBATIONS = [
     # first tick, so the first session opens where it always did, and every
     # open after it carries a gap.
     ("overnight_variance_ratio", 0.5, True),
+    # The night as a SHARE of the day. Each moves the market from the
+    # second day's open, as the ratio does, and the session's draws from
+    # the first tick, which are scaled by sqrt(1 - share).
+    ("overnight_market_share", 0.5, True),
+    ("overnight_idio_share", 0.2, True),
+    # The night's student t, read under its companion share: the scale
+    # multiplies the night's own draw from the second open on.
+    ("overnight_idio_df", 4.0, True),
+    # THE EARNINGS CALENDAR, each read under its companions (the calendar
+    # needs a split, and its sizes the calendar). INERT over a probe this
+    # short: the earliest reaction session is the fifth (the smallest real
+    # offset, 8, less the jitter's 3), so the probe's three sessions carry
+    # no report. `tests/test_earnings_calendar.py` holds the mechanism.
+    ("earnings_surprise_sigma", 3.0, False),
+    ("earnings_surprise_df", 4.0, False),
+    ("earnings_session_sigma", 1.5, False),
+    ("earnings_followthrough_sigma", 1.1, False),
+    ("earnings_volume_multiple", 1.3, False),
+    # The cycle a name holds back for its report. INERT over the probe:
+    # the share is of the cycle's MOVE, and at seed 42 the cycle sits at its
+    # phase's target through the probe's three closes, so there is nothing
+    # to hold back (it moves on a phase change, measured in
+    # `tests/test_earnings_calendar.py`).
+    ("earnings_cycle_report_share", 1.0, False),
     # How much of the jump's drift is given back. The compensator is
     # subtracted every day whether or not a jump fires, so unlike its two
     # neighbours it bites on the first close.
@@ -1298,6 +1613,18 @@ PERTURBATIONS = [
     # `sector_vol_alpha` is also 0.0 -- was true and pt-v19 now ships alpha
     # at 0.067, so the sector variance state is read and beta with it.
     ("sector_vol_beta", 0.9, True),
+    # The per-name idiosyncratic variance state (0.8.5, vol-clustering),
+    # off on every preset. The shock share is LIVE: from the first close the
+    # ratio moves with each name's own noise and the next session's own draw
+    # reads it. The persistence is MEASURED False for the reason
+    # `sector_vol_beta` once was: the ratio's fixed point is 1.0, and with no
+    # shock share and no jump bump beta alone leaves it there, so every
+    # draw is multiplied by 1.0. The jump bump is LIVE: the re-centring
+    # term -c lambda moves every name's ratio at the first close, jump or
+    # not.
+    ("idio_vol_alpha", 0.2, True),
+    ("idio_vol_beta", 0.5, False),
+    ("idio_vol_jump_bump", 1.0, True),
     # RE-VALUED at the 0.8.0 vector adoption. pt-v19 now ships 2.0, so this
     # row perturbed to the SHIPPED value: the fingerprint never became
     # `custom-` and the row could not fail. Measured at 0.0, 1.0 and 4.0,
@@ -1451,6 +1778,10 @@ PERTURBATIONS = [
 #: more sites and would find more dials here, which is why the assertion
 #: below names the site rather than asserting a count.
 ECONOMY_STREAM_MOVERS = frozenset({
+    # The central bank's stress cut (r13): the cut its companion start fires
+    # in the burn-in moves the policy rate, and with it which
+    # state-dependent macro sites fire (+34 draws, measured).
+    "fed_stress_cut", "fed_stress_vix",
     # pt-v20's 2-year takes its own normal each session when its noise is
     # on: the draw IS the mechanism, as for the VIX jump below.
     "treasury_2y_noise",
@@ -1459,6 +1790,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     "earnings_cycle_sigma",
     "vix_jump_intensity", "macro_burn_in_days", "phase_target_range_draw",
     "cycle_stationary_opening",
+    # The opening's stand-in for the market's cycle hazard (sim/r17-b12):
+    # it moves the phase the opening draws and the phase path the 755-day
+    # burn-in lives through, and with them which state-dependent macro
+    # sites fire there, as `cycle_stationary_opening` does.
+    "cycle_equity_hazard_opening",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -1505,6 +1841,13 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # follow the path the two dials move. Both were here at 0.8.0 and left
     # with pt-v20's first composition.
     "oil_supply_response", "oil_opec_symmetry",
+    # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
+    # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
+    # (9172 to 9206), the market stream by 0. It acts on the 755-day
+    # burn-in's meetings, where it cuts earlier than the ladder, so the rate
+    # path, the cycle's transition roll and the state-dependent sites that
+    # read them follow.
+    "fed_growth_cut",
     # THREE ARRIVED WITH THE FIFTH COMPOSITION (2026-09-23), and all three
     # through the drawn opening it switched on: at seed 42 the burn-in now
     # runs from an expansion past its minimum duration, where the cycle's
@@ -1585,6 +1928,17 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The knee pulls at its half-life, and the pair is refused without it.
+    "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
+    # The valuation is carried from the prehistory, and refused without one.
+    "market_prehistory_valuation": {"market_prehistory_sessions": 21.0},
+    # The live mark requires the close's re-mark (`ModelParams::invariants`).
+    "rate_intraday_live": {"rate_close_remark": 1.0},
+    # The stress cut's start at 15, where the probe's burn-in reads it (see
+    # the rows), and the cut on for the two dials read only with it.
+    "fed_stress_cut": {"fed_stress_vix": 15.0},
+    "fed_stress_vix": {"fed_stress_cut": 0.25},
+    "fed_stress_inflation_gap": {"fed_stress_cut": 0.25, "fed_stress_vix": 15.0},
     # `market_vol_vix_excursion` reads the VIX's distance above the level the
     # index's own variance implies, and off `vix_level_identity` there is no
     # such level, so `ModelParams.from_preset` refuses the pair -- with no
@@ -1657,6 +2011,39 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                       "vix_anchor_weight_level_knee": 0.0},
     "vix_anchor_weight_level_knee_fixed": {"vix_level_identity": 1.0, "vix_anchor_weight": 0.375,
                                            "vix_anchor_weight_level": 1.0},
+    # The return memory's gain is refused without a half-life, and the
+    # down share is read only with the memory on (crash-vol-state).
+    "market_vol_leverage": {"market_vol_leverage_half_life": 40.0},
+    "market_vol_leverage_down": {"market_vol_leverage": 3.0,
+                                 "market_vol_leverage_half_life": 40.0},
+    "market_vol_leverage_standardise": {"market_vol_leverage": 3.0,
+                                        "market_vol_leverage_half_life": 40.0},
+    # The state's share of the day's t scale is read only with the scale on
+    # (d1tail).
+    "market_day_tail_state_share": {"market_day_tail_df": 7.0},
+    # The cycle's expansion multiplier, half-life and VIX powers are read
+    # only with its ratio on (bear-dynamics). The stormy-side power is read
+    # only while the multiplier is at or over one, so its probe carries an
+    # expansion multiplier over one; the calm-side power's probe keeps the
+    # derived multiplier, which is under one outside a contraction.
+    "market_vol_cycle_expansion": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_half_life": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_relative": {"market_vol_cycle_ratio": 2.0,
+                                  "market_vol_cycle_expansion": 1.25},
+    "market_vol_cycle_relative_calm": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_cap_relative": {"market_vol_cycle_ratio": 2.0,
+                                      "market_vol_cycle_expansion": 2.0},
+    # The bearcycle fix's pin switches, the trough's release and the
+    # release half-life are read only with the ratio on.
+    "market_vol_cycle_pin_neutral": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_pin_phase": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_trough_release": {"market_vol_cycle_ratio": 2.0},
+    "market_vol_cycle_release_half_life": {"market_vol_cycle_ratio": 2.0},
+    # The rally's release is refused without its scale, and both are read
+    # only with the ratio on.
+    "market_vol_cycle_recovery_release": {"market_vol_cycle_ratio": 2.0,
+                                          "market_vol_cycle_recovery_scale": 0.1},
+    "market_vol_cycle_recovery_scale": {"market_vol_cycle_ratio": 2.0},
     # The post-news drift splits the fast absorption profile, so each of its
     # two dials is refused without the profile's half-life (news-speed).
     "news_absorption_drift_share": {"news_absorption_half_life": 0.6},
@@ -1666,11 +2053,20 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # refill without both the depth and the shared book (order-book-depth).
     "book_depth_exponent": {"book_depth_coefficient": 0.5},
     "book_depth_reach": {"book_depth_coefficient": 0.5},
+    "book_depth_nesting": {"book_depth_coefficient": 0.5},
     "book_refill_half_life": {"book_depth_coefficient": 0.5, "book_shared": 1.0},
     # The shared book goes off in its row, and the refill it would read is
     # refused without it, so the refill is off in both arms: 0.0 against
     # pt-v20's 27, as the depth companions above carry 0.5 against its 0.75.
     "book_shared": {"book_refill_half_life": 0.0},
+    # The metaorder memory is refused without its fast half-life, and its
+    # slow weight without the slow half-life (sqrt-impact). It also needs
+    # the shared book and its depth, which pt-v20 ships and a base before
+    # it does not (the earnings derivation sweeps on pt-v18).
+    "impact_memory_coefficient": {"impact_memory_half_life": 120.0,
+                                  "book_shared": 1.0,
+                                  "book_depth_coefficient": 0.75},
+    "impact_memory_slow_weight": {"impact_memory_slow_half_life": 15600.0},
     # The excursion reads the VIX's distance above the identity's read-back,
     # so it is refused off the identity; a no-op on the default.
     "market_vol_vix_excursion": {"vix_level_identity": 1.0},
@@ -1678,9 +2074,50 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # only, and the probe's VIX stays below it. 0.0 on the calm exponent is
     # the branch that reads this one on both sides (see the row).
     "market_vol_vix_exponent": {"market_vol_vix_exponent_below": 0.0},
+    # The dividend's companions are read only with a dividend.
+    "dividend_growth_cutoff": {"dividend_payout_share": 1.0},
+    "dividend_adjustment_speed": {"dividend_payout_share": 1.0},
+    "dividend_yield_ceiling": {"dividend_payout_share": 1.0},
+    "dividend_buyback_substitution": {"dividend_payout_share": 1.0},
     # The fixed opening the row's decomposition was measured on, where the
     # probe's first two days are phase-change days (see the row).
     "phase_target_range_draw": {"cycle_stationary_opening": 0.0},
+    # The night's t is read under a split, and the calendar needs one; the
+    # calendar's sizes are read under the calendar (earnings-gaps).
+    "overnight_idio_df": {"overnight_idio_share": 0.2},
+    "earnings_surprise_sigma": {"overnight_idio_share": 0.2},
+    "earnings_surprise_df": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_session_sigma": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_followthrough_sigma": {"overnight_idio_share": 0.2,
+                                     "earnings_surprise_sigma": 3.0},
+    "earnings_volume_multiple": {"overnight_idio_share": 0.2, "earnings_surprise_sigma": 3.0},
+    "earnings_cycle_report_share": {"overnight_idio_share": 0.2,
+                                    "earnings_surprise_sigma": 3.0},
+    # The published VIX's premium approaches its cap, so the gain is refused
+    # without one; the cap alone is unread, so both arms are the default's.
+    # The premium also reads the identity's read-back at the anchor memory's
+    # rate, so it is refused without both. They are the default's own shipped
+    # values (the memory needs its weight), so on the default only the cap
+    # bites; they bite on a base that ships the identity off, which is the
+    # nominal-growth derivation's pt-v18.
+    "vix_stress_premium": {"vix_stress_premium_cap": 0.25,
+                           "vix_level_identity": 1.0,
+                           "vix_anchor_weight": 0.375,
+                           "vix_anchor_memory": 1.0 / 18.0},
+    # The Fed put's stock decays at its half-life, so the gain is refused
+    # without one; the half-life alone is unread, so both arms are the
+    # default's.
+    "fed_put_gain": {"fed_put_half_life": 126.0},
+    # The priced path's forecast decays at its half-life, so the pricing is
+    # refused without one; the half-life alone is unread.
+    "treasury_path_pricing": {"treasury_path_half_life": 63.0},
+    # Credit's leverage gap is averaged at its half-life, so the gain is
+    # refused without one; the half-life alone is unread, so both arms are
+    # the default's.
+    "corporate_spread_equity_gain": {"corporate_spread_equity_half_life": 126.0},
+    # The cycle's hazard reads the same gap at the same half-life, so it is
+    # refused without one.
+    "cycle_equity_hazard": {"corporate_spread_equity_half_life": 126.0},
 }
 
 

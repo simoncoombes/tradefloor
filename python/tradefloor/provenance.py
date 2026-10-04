@@ -371,6 +371,459 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # The thirteenth registration's two dials (r13, the phase re-anchor),
+    # inert on every preset. When pt-v20 takes them they leave this table:
+    # the nowcast's 0.4 as fitted, the blend's 0.75 as fitted and
+    # undetermined (a guard on the spread's daily noise against the
+    # recession widening T4 reports short).
+    "cycle_nowcast_accuracy":
+        "inert at 0.0 as shipped: `Engine::refresh_earnings_anticipation` "
+        "reads the true phase's `g`, `update_cycle_nowcast` is never called, "
+        "stream::CYCLE_NOWCAST is never drawn, and the belief is neither "
+        "snapshotted nor hashed. Off zero the market prices a filtered "
+        "belief over the phase in place of the true phase (0.8.5, r13 "
+        "audit: the true phase re-marked the index by about 4 per cent at "
+        "every turn's close)",
+    "corporate_spread_cycle":
+        "inert at 0.0 while `cycle_nowcast_accuracy` is also 0.0, as every "
+        "preset ships them: the meeting and the daily VIX term read the "
+        "true phase's multiplier as they did "
+        "(`PolicyOptions::spread_multiplier` and "
+        "`YieldDials::spread_multiplier` are None). Off zero the spread "
+        "prices a blend toward the multiplier's occupancy mean and the "
+        "daily move carries the formula's whole change (0.8.5, r13 audit: "
+        "the first meeting after a turn re-anchored the spread by 111 bp "
+        "on average)",
+    # The thirteenth registration's macro-clock dials (r13), inert on every
+    # preset. When pt-v20 takes them they leave this table with the value's
+    # kind and source.
+    "earnings_anticipation_drift_share":
+        "inert at 0.0 as shipped: `Engine::refresh_earnings_anticipation` "
+        "writes `A - e` as it did, `advance_anticipation_drift` returns "
+        "without reading anything, and `D` is neither snapshotted nor "
+        "hashed. Off zero the valuation leaves out that share of the "
+        "anticipated level's expected drift `rho (A - e)`, accumulated in "
+        "`D` (0.8.5, r13 macro-clock audit: the drift made the published "
+        "phase a timing signal, 2x in peak or contraction beating holding "
+        "in 0.97 of 90 histories)",
+    "earnings_anticipation_drift_half_life":
+        "unread while `earnings_anticipation_drift_share` is 0.0, as every "
+        "preset ships it (0.8.5, r13 macro-clock)",
+    "fed_growth_cut":
+        "inert at 0.0 as shipped: the risk-management branch of "
+        "`update_central_bank_with` is guarded on the dial being non-zero, "
+        "so the ladder is the one that stood. Off zero the bank cuts 25 bp "
+        "when true growth is under the dial (0.8.5, r13 macro-clock audit: "
+        "the first cut came a median 105 sessions after a contraction began, "
+        "at the trough)",
+    "cycle_publication_lag_draw":
+        "inert at 0.0 as shipped: `Engine::published_cycle_phase` and "
+        "`record_cycle_phase` read the fixed `cycle_publication_lag` as they "
+        "did, and the schedule is neither kept, snapshotted nor hashed. At "
+        "1.0 each turn draws its own lag, statelessly off the root seed "
+        "(0.8.5, r13 macro-clock audit: a fixed 252-session lag made the "
+        "published phase the true phase shifted, a clock)",
+    "buyback_accrual":
+        "inert at 0.0 as shipped: `market::tick::buyback_factor` returns "
+        "`buyback_scale`, the term that stood, and the close accrues "
+        "nothing. At 1.0 each name carries a log share-count reduction the "
+        "close adds `min(payout * E * exp(L) / P, cap) / 252` to, and fair "
+        "value reads exp(L), so it no longer moves against today's price "
+        "with a gain that grows with the elapsed years (d ln FV / d ln P "
+        "-0.29 by year 10 and -0.49 by year 40 on pt-v20; a period-2 "
+        "oscillation from about year 30 of a 100-year run) and relabelling "
+        "the calendar origin no longer moves prices. Snapshotted and hashed "
+        "only while it and `buyback_payout_share` are both set (0.8.5, "
+        "thirteenth registration work: the long-run audit, boxes "
+        "r13bb2-r13bb3)",
+    # The thirteenth registration's bond timing (r13), inert on every
+    # preset. When pt-v20 takes them they leave this table: the two switches
+    # derived, the cut and its start and gap fitted to FRED's target rate
+    # after VIX closes over 30 (1990-2025).
+    "rate_close_remark":
+        "inert at 0.0 as shipped: `Engine::advance_macro_day` and the pin "
+        "path do not call `RateBook::remark_now`, so the rate indices take "
+        "each close's curve at the next open (`RateBook::open`), and nothing "
+        "is booked to their `repriced` column; an engine without rate "
+        "instruments has nothing to re-mark at any value. Off zero they "
+        "reprice to the published curve at the close (0.8.5, r13 audit: "
+        "IGCORP's close-to-close return matched the previous close's curve "
+        "move to 0.000 bp and missed the same close's by 35 bp)",
+    "rate_intraday_live":
+        "inert at 0.0 as shipped: `Engine::tick` passes no live curve to "
+        "`RateBook::tick_live`, `refresh_rate_live` never runs, and nothing "
+        "is snapshotted or hashed; requires `rate_close_remark`. Off zero "
+        "the rate indices print around the published curve plus E[tonight's "
+        "curve | the session] - E[tonight's curve | the open] (0.8.5, r13 "
+        "audit: with the close re-mark alone a sign-timing agent on IGCORP "
+        "still earned 13 per cent a year)",
+    "fed_stress_cut":
+        "inert at 0.0 as shipped: `update_central_bank_with` skips the "
+        "stress branch and `Engine::advance_day_with` never updates the "
+        "stress level, which is neither snapshotted nor hashed. Off zero a "
+        "meeting after a VIX at or over `fed_stress_vix` cuts (0.8.5, r13 "
+        "audit: P(cut within 42 sessions | VIX 30-40) 0.29 with P(hike) "
+        "0.25, against 0.53 and 0.01 on FRED's target rate 1990-2025)",
+    "fed_stress_vix":
+        "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
+        "stress branch that reads it does not run",
+    "fed_stress_inflation_gap":
+        "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
+        "stress branch that reads it does not run",
+    "book_arrival_shuffle":
+        "inert at 0.0 as shipped: `World.run` executes a cohort in sorted "
+        "label order, so on a live book the same label takes the levels and "
+        "the queue first on every step. Read only by a cohort of two or "
+        "more agents; a single agent, `evaluate` and an untraded market "
+        "never read it (0.8.5, arrival-order work: the later of two "
+        "identical 10%-of-ADV buyers paid about 23 bp more on 30 of 30 "
+        "held-out seeds on pt-v20)",
+    "impact_memory_coefficient":
+        "inert at 0.0 as shipped: `Engine::plan_memory` is never called and "
+        "the latent depth is not shifted, so an agent's temporary impact "
+        "stays off the tape and only `fill_impact_coefficient`'s linear "
+        "gamma reaches `s`. The square-root law of impact on the tape, "
+        "fitted on held-out seeds against the metaorder rows Q1-Q9 "
+        "(`tools/calibration/metaorder_curve.py`; 0.8.5 realism work, "
+        "sqrt-impact); for a new registration. After the house-flow fix, "
+        "confirmed on seeds 2401-2430 x 12 names (box sqfix2): 0.65 with "
+        "half-life 12, slow half-life 780, slow weight 0.1, crossover "
+        "0.001 and fill_impact_coefficient 0.15, where Q1-Q7 pass, a day "
+        "TWAP costs 0.82 of a block at 10% and 0.83 at 3% (Q8, Q9 read "
+        "0.8 as their ceiling), C9 is unchanged and no round trip, wash "
+        "included, pays",
+    "impact_memory_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's fast half-life in open ticks",
+    "impact_memory_slow_half_life":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the memory's slow half-life in open ticks, 0.0 none",
+    "impact_memory_slow_weight":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ", and refused off zero without "
+        "`impact_memory_slow_half_life`: the slow part's weight",
+    "book_depth_nesting":
+        "inert at 0.0 as shipped: `append_latent_depth` places the latent "
+        "pool beside the maker's ladder exactly as before, and the dial is "
+        "read nowhere else. Read only in the book an agent meets, so no "
+        "untraded statistic moves. At 1.0 the latent curve counts the "
+        "ladder's shares as its own front (the ladder is the displayed part "
+        "of the latent book, Toth et al. 2011), so a block of 3 to 10 per "
+        "cent of daily volume pays the law past the ladder rather than the "
+        "ladder's and the law's depth summed; for a new registration "
+        "(0.8.5 realism work, sim/r15-impact3: row Q9, a day TWAP over a "
+        "block at 3 per cent of daily volume, 0.83 on N4 against a band of "
+        "0.5 to 0.8). At 1.0 on N4 (boxes r15imp1 and r15imp2, held-out "
+        "seeds 2501-2530 x 12 names): Q9 0.676, Q8 0.641, Q1-Q7 unmoved, "
+        "C9 0.456 / 0.469, best round trip -0.91 bp, all 40 registered "
+        "rows pass",
+    "impact_memory_crossover":
+        "unread while `impact_memory_coefficient` is 0.0 as shipped, so inert"
+        ": the linear regime below m* of daily volume (Bucci, "
+        "Benzaquen, Lillo and Bouchaud, PRL 122, 108302, 2019)",
+    "impact_memory_refill":
+        "inert at 0.0 as shipped: `Engine::refill_memory` is never called, "
+        "so only taker flow against the house moves the metaorder memory, "
+        "and it is unread while `impact_memory_coefficient` is 0.0. Read "
+        "only when an agent's RESTING order fills against the memory's lean "
+        "(by the market's flow, or crossed during the session): at 1.0 it "
+        "takes its size off the memory, never past zero, as new depth on "
+        "the side the lean consumed (Obizhaeva and Wang 2013; Alfonsi, "
+        "Fruth and Schied 2010). Target: row G-rt's wash on names quoted a "
+        "cent wide, +0.51 bp on the thirteenth grade (R16A, trip seed 15532, "
+        "name 19) and up to +18 bp on held-out trip seeds (0.8.5 "
+        "fourteenth-round work, sim/r17-wash)",
+    "book_cross_at_limit":
+        "inert at 0.0 as shipped: a resting order the book leaves crossed "
+        "during the session trades at the ladder's prices, as it stood. "
+        "Read only when an agent's resting order is crossed: at 1.0 it "
+        "trades at its own limit and the improvement is the arriving "
+        "re-quote's (price-time priority, Nasdaq Rule 4757). Target: row "
+        "G-rt's wash, where resting asks at the touch sold at the maker's "
+        "higher bid after the group's own taker buys lifted it, +19 bp on "
+        "the two wash legs alone on a held-out trip seed (R16A; 0.8.5 "
+        "fourteenth-round work, sim/r17-wash)",
+    # CASH DIVIDENDS (0.8.5 realism work, sim/real-dividends). Inert on
+    # every shipped preset; a candidate for a new registration, with the
+    # graded arm as the fallback.
+    "dividend_payout_share":
+        "inert at 0.0 as shipped: `Engine::apply_dividends` returns before "
+        "touching anything, no name carries a `DividendState`, and "
+        "`market::dividends::with_accrual` returns fair value bit for bit. "
+        "Off zero it scales `Sector::dividend_payout` (payers' yield times "
+        "the anchor P/E, measured on the forty-name tape 2015-2025 and "
+        "Damodaran's sector yields, January 2026). US large caps paid 1.8 "
+        "per cent a year in dividends and 0.80 of earnings in dividends and "
+        "buybacks together over 2001-2025 (Damodaran, S&P 500 implied "
+        "premium file); without dividends pt-v20's equity premium over "
+        "bills is 4.3 points a year on held-out seeds against a real 6.6 "
+        "(Ken French Mkt-RF, log, 1926-2025)",
+    "dividend_growth_cutoff":
+        "unread while `dividend_payout_share` is 0.0: the revenue growth at "
+        "or above which a profitable name pays no dividend. 0.30 is CHOSEN "
+        "so that the roster's fast growers are the non-payers, as growth "
+        "names are on the tape",
+    "dividend_adjustment_speed":
+        "unread while `dividend_payout_share` is 0.0: the annual Lintner "
+        "speed of the declared amount toward its target. 0.4 is CALIBRATED "
+        "to the dividend-growth row, not measured: it puts the sd of the "
+        "index's annual dividend growth at 5.2 per cent against a real 7.1 "
+        "(Shiller D, 1990-2023), with cuts in 14 per cent of years against "
+        "a real 9 (dvgrid1, held-out seeds); 0.25 gives 4.0, near the "
+        "band's floor. No real fit supplies it: Lintner fits of the S&P "
+        "500's dividend on its earnings (Shiller, 1946-2023 and 1990-2023) "
+        "give 0.11 to 0.13 a year (R2 0.25 to 0.30), and on its price the "
+        "speed is about 0 (R2 0.00 to 0.01). The rule reads the price "
+        "because the model's earnings are hidden state, and prices are far "
+        "smoother than S&P earnings (EPS growth sd 42 to 50 per cent a year "
+        "over 1990-2023), so a faster speed on the smoother input is what "
+        "gives dividends their real variability",
+    "dividend_yield_ceiling":
+        "unread while `dividend_payout_share` is 0.0: a forced cut once a "
+        "name's yield on its declaring close is this many times its target. "
+        "A GUARD: without it a collapsed name paid 20 to 46 per cent a year "
+        "(offline design, held-out seeds)",
+    "dividend_buyback_substitution":
+        "unread while `dividend_payout_share` is 0.0: at 1 a name's buyback "
+        "share is `buyback_payout_share` less its dividend payout, so the "
+        "former reads as the total payout (Grullon and Michaely 2002, JF "
+        "57(4)); without it dividends on top of buybacks gave a D/P-quintile "
+        "total-return spread of +4.1 to +4.4 points a year against a real "
+        "+0.9 (Ken French D/P portfolios, 1927-2025)",
+    "overnight_market_share":
+        "inert at 0.0 as shipped: `Engine::night_split_on` is false and "
+        "`apply_overnight` takes the shipped branch, and `market::tick` "
+        "branches on `== 0.0` and draws the session's market factor at the "
+        "whole day's scale. Splits the day's market variance between the "
+        "night and the session rather than adding to it (0.8.5, "
+        "earnings-gaps: real forty-name index night share 0.461)",
+    "overnight_idio_share":
+        "inert at 0.0 as shipped: the same gate as "
+        "`overnight_market_share`, and `market::tick` branches on `== 0.0` "
+        "for the session's sector and own draws. The real forty's median "
+        "idiosyncratic night share is 0.31 (0.8.5, earnings-gaps)",
+    "overnight_idio_df":
+        "unread while neither night share is set: the chi-square draws "
+        "(`Site::OvernightIdioChi2`) are taken only under a split with this "
+        "dial off zero, and 0.0 is a normal night",
+    "earnings_surprise_sigma":
+        "inert at 0.0 as shipped: the calendar's master switch. "
+        "`Engine::carries_earnings` is false, no report is priced, "
+        "`earnings_calendar()` lists nothing, and the key is neither "
+        "snapshotted nor hashed. Refused without a night share, since the "
+        "opening print that realises the surprise is the split's",
+    "earnings_surprise_df":
+        "unread while `earnings_surprise_sigma` is 0.0; 0.0 is a normal "
+        "surprise",
+    "earnings_session_sigma":
+        "unread while `earnings_surprise_sigma` is 0.0 (no reaction "
+        "session exists)",
+    "earnings_followthrough_sigma":
+        "unread while `earnings_surprise_sigma` is 0.0 (no reaction "
+        "session exists)",
+    "earnings_cycle_report_share":
+        "inert at 0.0 as shipped: `Engine::carries_earnings_withheld` is "
+        "false and `advance_macro_day` takes no share of the cycle's move "
+        "out of any fair-value level. Refused without the calendar, since "
+        "the share is given back at a name's report",
+    "earnings_volume_multiple":
+        "unread while `earnings_surprise_sigma` is 0.0: "
+        "`Engine::earnings_volume_column` is empty and the tick reads no "
+        "multiple; 0.0 and 1.0 are both no multiple",
+    "vix_stress_premium":
+        "inert at 0.0 as shipped: `Engine::published_vix` returns the VIX "
+        "state untouched and the close writes no memory. Off zero it scales "
+        "the PUBLISHED VIX only (macro_fields, macro_state, the macro table, "
+        "the wasm getter) by a premium on the variance read-back's memory "
+        "above `vix_stress_premium_knee`, capped by `vix_stress_premium_cap`; "
+        "no internal reader moves. Target: the median VIX over trailing "
+        "21-session realised volatility on sessions with it at 40 or more, "
+        "0.831 on the S&P 500 and ^VIX tape 1990-2025 (calendar-year "
+        "bootstrap SE 0.045) against pt-v20's 0.668 on held-out seeds "
+        "(0.8.5 realism work, vix-peaks)",
+    "vix_stress_premium_knee":
+        "unread while `vix_stress_premium` is 0.0 (0.8.5 realism work, "
+        "vix-peaks)",
+    "vix_stress_premium_cap":
+        "unread while `vix_stress_premium` is 0.0 (0.8.5 realism work, "
+        "vix-peaks)",
+    "fed_put_gain":
+        "inert at 0.0 as shipped: the close writes no intermeeting return, "
+        "the ladder decides every meeting and the curve reads the policy "
+        "rate as it stands. Off zero the bank cuts at a meeting by the gain "
+        "times the index's log fall since the last one (inflation under 4), "
+        "holds any hike at a VIX of 30 or more, and gives the cut back at "
+        "calm meetings as the put's stock decays. Target: the policy rate's "
+        "change over the 63 sessions after a VIX close at or above 30 "
+        "(rate at least 0.5, CPI inflation under 4), -0.41pp on the S&P 500 "
+        "and VIX tape with FRED DFF 1990-2025 (calendar-year bootstrap SE "
+        "0.14), against pt-v20's -0.03 on held-out seeds; no FOMC target "
+        "change at a VIX of 30 or more with CPI inflation under 4 was a hike "
+        "(0 of 9, FRED DFEDTAR and DFEDTARU; 0 of 14 at any inflation) "
+        "against 52 per cent on pt-v20 on the same filter (0.8.5 realism "
+        "work, bond-hedge-fed)",
+    "fed_put_threshold":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "fed_put_half_life":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "fed_put_emergency_vix":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "treasury_put_pricing":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "treasury_haven_gain":
+        "inert at 0.0 as shipped: the 10-year's term premium does not read "
+        "the VIX. Off zero it falls by the gain per VIX point above 20 while "
+        "inflation is under 4, daily and at a meeting. Target: the 10-year's "
+        "change over 63-session windows with the index down more than 10 per "
+        "cent and CPI inflation under 4, -0.62pp on FRED DGS10 against the "
+        "tape 1990-2025 (SE 0.11), against pt-v20's 0.00 on held-out seeds. "
+        "Fitted with `flight_to_quality_gain`, which also makes the monthly "
+        "stock-bond correlation more negative at low inflation (0.8.5 "
+        "realism work, bond-hedge-fed)",
+    "fed_stress_hold":
+        "inert at 0.0 as shipped: the bank may raise the rate at any meeting "
+        "the ladder asks. Off zero no rise, and no put give-back, for that "
+        "many sessions after a close with the published VIX at or over "
+        "`fed_stress_vix`, while inflation is under target plus "
+        "`fed_stress_inflation_gap`. Target: P(a hike within 42 sessions | "
+        "VIX 30+) 0.07 on FRED DFEDTAR/DFEDTARU against VIXCLS 1990-2025 "
+        "(about 0.01 with CPI under 4), against 0.19 on r14's N4 arm "
+        "(sim/r15-postcut)",
+    "treasury_path_pricing":
+        "inert at 0.0 as shipped: the 10-year's anchor and the 2-year read the "
+        "policy rate as it stands. Off zero they read the rate plus this "
+        "share of the market's forecast of its further change, each past "
+        "change decayed at `treasury_path_half_life`, and a meeting's 10-year "
+        "surprise carries the forecast's move. Target: no drift in the "
+        "corporate yield or the index after a published cut (r14's N4 arm: "
+        "the corporate yield falls a further 0.18pp by 63 sessions after a "
+        "cut and the index outruns its mean by 0.46 per cent) "
+        "(sim/r15-postcut)",
+    "treasury_path_half_life":
+        "unread while `treasury_path_pricing` is 0.0 (sim/r15-postcut)",
+    "treasury_policy_damping":
+        "inert at 0.0 as shipped: the 10-year reads the policy rate one for "
+        "one. Off zero its anchor and a meeting's target read the priced rate "
+        "pulled toward a neutral 2.5 by this share, and a meeting's surprise "
+        "moves it by the rest; paired with `treasury_path_pricing` so a "
+        "decision moves the 10-year on the day by what it did before while "
+        "the forecast takes out the drift after (sim/r15-postcut)",
+    "policy_anticipation":
+        "inert at 0.0 as shipped: the close branches on `== 0.0` and the curve "
+        "learns a decision the day it is published. Off zero, each close runs "
+        "the meeting on the published economy with a silent draw source (no "
+        "stream is touched) and the curve prices this share of its change, "
+        "times the share of the meeting interval elapsed, so a decision the "
+        "market saw coming moves the 10-year, the 2-year and the corporate "
+        "yield before the meeting and not after it. Target: the index's drift "
+        "after a published hike (C10c's out_federal_funds_rate_up21 levered 2x, "
+        "ahead in 0.68 of R16A's 90 exam histories against 2/3) and the curve "
+        "around real hikes (FRED DGS2 +0.46 over the 63 sessions before, +0.01 "
+        "on the day, 1990-2025). Measured at 2 on R16A with the haven at "
+        "0.010 (boxes c10c1-c10c3, held-out sets A and B): that rule ahead "
+        "in 0.41 and 0.44 of histories against 0.62 and 0.64, the index's "
+        "hike-day excess -0.04 per cent against -1.08 (0.8.5 "
+        "thirteenth-registration work, sim/r17-c10c)",
+    "policy_anticipation_cut_share":
+        "unread while `policy_anticipation` is 0.0; at 0.0 only an expected "
+        "rise is priced, at 1.0 a cut as a rise (sim/r17-c10c)",
+    "corporate_spread_vix_cut":
+        "inert at 0.0 as shipped: the corporate spread is the meeting "
+        "formula's 2 bp a VIX point times the cycle multiplier, which the "
+        "close's daily move tracks. Off zero the slope is cut by this share "
+        "at the meeting, the close and a pinned VIX's credit leg. Target: "
+        "the stock-IG correlation, +0.27 daily and +0.47 monthly for SPY "
+        "and LQD 2015-2025, and the Baa spread's daily change sd, 3.1 bp on "
+        "FRED BAA10Y 1990-2026; the spread's VIX-borne move reverses as the "
+        "VIX reverts, so the daily reading runs high and the monthly low "
+        "(0.8.5 realism work, bondcorr)",
+    "corporate_spread_equity_gain":
+        "inert at 0.0 as shipped: no leverage gap is written and the spread "
+        "reads the VIX alone. Off zero the spread's base gains the gain times "
+        "the index's log fall below its own slow average (a structural "
+        "credit model's leverage), times the cycle multiplier, at the close, "
+        "the meeting and the live mark. Target: the monthly stock-IG "
+        "correlation, +0.47 for SPY and LQD 2015-2025, against 0.15 on the "
+        "r14 screen's N4 arm (0.8.5 realism work, bondcorr)",
+    "corporate_spread_equity_half_life":
+        "unread while `corporate_spread_equity_gain` is 0.0 (0.8.5 realism "
+        "work, bondcorr)",
+    "cycle_equity_hazard":
+        "inert at 0.0 as shipped: `adjust_transition_probability` "
+        "(economy/cycle.rs) branches on `== 0.0` before reading the gap, so "
+        "the cycle's ladder is the one that stood, and the gap is not run "
+        "unless `corporate_spread_equity_gain` runs it. Off zero, in an "
+        "expansion and at a peak, the monthly hazard gains the dial times "
+        "the index's log fall below its slow average past "
+        "`cycle_equity_hazard_knee`. Target: B12, the share of 20 per cent "
+        "bears with a true contraction between the peak and the trough plus "
+        "63 sessions, 0.48 on R17T over 180 held-out histories against 7 of "
+        "11 post-war S&P 500 bears (0.64), band [0.45, 0.85] (0.8.5 "
+        "fourteenth-registration work, sim/r17-b12)",
+    "cycle_equity_hazard_knee":
+        "unread while `cycle_equity_hazard` is 0.0 (0.8.5 "
+        "fourteenth-registration work, sim/r17-b12)",
+    "cycle_equity_hazard_opening":
+        "inert at 0.0 as shipped: the engine reads it only while the "
+        "economy runs alone before day zero (the stationary opening's law "
+        "and the macro burn-in), and the ladder and the hazard-only law "
+        "branch on `== 0.0`, so the opening is the one that stood. Off zero "
+        "it adds monthly hazard in an expansion and at a peak there, as the "
+        "stand-in for the market's average contribution under "
+        "`cycle_equity_hazard`, which has no index to read before day zero. "
+        "Target: PH5's volatility clause, year 0 against years 1-7, which "
+        "the extra recessions of `cycle_equity_hazard` push apart (0.8.5 "
+        "fourteenth-registration work, sim/r17-b12)",
+    "market_prehistory_sessions":
+        "inert at 0.0 as shipped: the constructor branches on `> 0.0`, so "
+        "no copy is made or run and every volatility state opens at the "
+        "constructor's baseline, as it stood. Off zero, a copy of the "
+        "opening engine lives the last this many sessions of the macro "
+        "burn-in on the economy's recorded phases, on generators of its own, "
+        "and the run opens with the copy's volatility state (factor "
+        "variance and its return memory, the VIX and its slow level, the "
+        "anchor's and stress premium's memories, the cycle's volatility "
+        "multiplier, each sector's and name's variance). Target: PH5's "
+        "volatility clause, whose year 0 read about 0.004 hotter than years "
+        "1-7 over 1350 held-out histories because a run opening in an "
+        "expansion started at the phase-free baseline (0.8.5 "
+        "fourteenth-registration work, sim/r18-opening)",
+    "market_prehistory_valuation":
+        "inert at 0.0 as shipped: the constructor branches on `!= 0.0`, so "
+        "nothing but the volatility state is carried from the market's "
+        "prehistory and every valuation state opens as it stood. Off zero "
+        "(a switch, and only with `market_prehistory_sessions` set) the run "
+        "opens with the copy's mispricing per name, VIX feedback exposure, "
+        "anticipation drift, earnings cycle, credit's leverage gap and the "
+        "Fed put's owed cut, with the corporate yield and the curve moved "
+        "by what the gap and the owed cut change, all booked into the "
+        "names' fair-value levels by the opening's split so no opening "
+        "price moves. Target: PH5's return clause, whose year 0 read 1.95 "
+        "points below year 1 over 1350 held-out histories because those "
+        "states opened where a market that never traded leaves them "
+        "(0.8.5 fourteenth-registration work, sim/r18-valopen)",
+    "fed_put_carry":
+        "inert at 0.0 as shipped: the meeting restarts the Fed put's clock "
+        "at zero, and it is read only with `fed_put_gain` set. Off zero the "
+        "clock restarts at that share of the intermeeting fall the "
+        "meeting's cut did not answer, so a bear that falls under the "
+        "put's quarter-point rounding between each pair of meetings is "
+        "still answered. Target: F-bear, whose median policy change from "
+        "peak to trough sat on the -0.50 atom on R19V's held-out histories "
+        "(0.8.5 fifteenth-round work, sim/r20-fedbear)",
+    "fed_drawdown_hold":
+        "inert at 0.0 as shipped: only the stress hold's VIX clock holds a "
+        "rise. Off zero a meeting also holds any rise, and the put gives "
+        "nothing back, while credit's leverage gap (the index's log fall "
+        "below its slow average) is at or over the dial, with inflation "
+        "under target plus `fed_stress_inflation_gap`. Target: F-bear, as "
+        "0.43 to 0.47 of R19V's held-out 20 per cent bears saw a rise "
+        "between peak and trough (0.8.5 fifteenth-round work, "
+        "sim/r20-fedbear)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "
@@ -419,6 +872,146 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    # The per-name idiosyncratic variance state (0.8.5, realism work
+    # vol-clustering). Inert on every preset; a value is for a registration.
+    "idio_vol_alpha":
+        "inert at 0.0 with `idio_vol_beta` and `idio_vol_jump_bump` 0.0: `Engine::idio_state_on` is "
+        "false, no state is read or written, the tick receives an empty "
+        "ratio slice and the snapshot and state hash omit the state. The "
+        "reference panel's idiosyncratic |e| lag-1 ACF (0.088) and "
+        "aftershock (1.29) are the targets a registration would fit it to",
+    "idio_vol_beta":
+        "inert at 0.0 with `idio_vol_alpha` and `idio_vol_jump_bump` 0.0 "
+        "(see that entry); off zero with both of those still 0.0 the state "
+        "runs but the ratio stays at exactly one, so nothing moves. With "
+        "`idio_vol_jump_bump` on, beta carries each jump's bump into "
+        "later sessions",
+    "idio_vol_jump_bump":
+        "inert at 0.0 with `idio_vol_alpha` and `idio_vol_beta` 0.0 (see "
+        "that entry); off zero it moves the ratio the session after an own "
+        "jump, re-centred on the jump rate so the ratio's mean stays one",
+    "market_vol_slow_gamma":
+        "inert at 0.0 as shipped: `market::factor_vol::slow_step` branches "
+        "on `== 0.0` and makes the symmetric call the close always made. "
+        "GJR asymmetry on the slow variance component, persistence kept "
+        "(0.8.5 realism work, crash-vol-state design: the index leverage "
+        "sum reads -0.53 against the tape's -1.35 on held-out pt-v20 "
+        "histories)",
+    "market_vol_leverage":
+        "inert at 0.0 as shipped: `MarketVarianceState::close_day_scaled` "
+        "branches on `!= 0.0` before its return-memory path, the memory is "
+        "never written, and the snapshot and state hash omit it. A return "
+        "memory on the market factor's variance (0.8.5 realism work, "
+        "crash-vol-state design, stage 2)",
+    "market_vol_leverage_half_life":
+        "unread while `market_vol_leverage` is 0.0",
+    "market_vol_leverage_down":
+        "unread while `market_vol_leverage` is 0.0",
+    "fair_value_market_excess_share":
+        "inert at 0.0 as shipped: `market::tick::market_permanent_share` "
+        "branches on `== 0.0` and returns the ceiling's share as it stood. "
+        "Off zero it puts back that share of what `fair_value_market_vol_cap` "
+        "takes off the market's permanent share above the ceiling, so a "
+        "fear regime's market moves are not almost wholly transient. Target: "
+        "the index's path after a VIX spike, +1.96/+4.81/+7.61 per cent at "
+        "21/63/126 sessions over the drift on the r15 screen's R15F against "
+        "-1.44/-0.50/+2.75 on the S&P 500 1990-2025, and the C10 rules that "
+        "lever up after a spike (0.8.5 thirteenth-registration work, "
+        "sim/r16-spike)",
+    "fair_value_vix_release_half_life":
+        "inert at 0.0 as shipped: the close branches on `== 0.0` and pulls the "
+        "volatility feedback's exposure at `fair_value_vix_half_life` both "
+        "ways, as it stood. Off zero, a fall toward a lower target is pulled "
+        "at this half-life, so the discount outlasts the VIX's own fall. "
+        "Target: the discount's give-back after a VIX spike, +2.5/+3.8 per "
+        "cent at 63/126 sessions on the r15 screen's R15F (desk "
+        "decomposition) against the S&P 500's whole excess of -0.5/+2.75 "
+        "after the same events 1990-2025, and the audit's xfb lever rule "
+        "(0.8.5 thirteenth-registration work, sim/r16-spike)",
+    "fair_value_relative_knee":
+        "inert at 0.0 as shipped: the close branches on `== 0.0` and pulls "
+        "nothing. Off zero, a name whose fair-value level `v` sits more than "
+        "this many log units below the roster's equal-weighted mean is pulled "
+        "back toward the knee at `fair_value_relative_half_life`, so a name "
+        "cannot walk to the 0.01 price floor over a century and sit there. "
+        "Target: H1-100y's floor clause (0 floor share per decade; the "
+        "thirteenth grade had one name at the floor for 277 sessions in "
+        "decade 60-70), with no crossing on a 21-year history so no other "
+        "row moves (0.8.5 fourteenth-registration work, sim/r17-floor)",
+    "fair_value_relative_half_life":
+        "unread while `fair_value_relative_knee` is 0.0; with the knee set it "
+        "is the pull's half-life in sessions and must be positive (0.8.5 "
+        "fourteenth-registration work, sim/r17-floor)",
+    "market_vol_leverage_standardise":
+        "unread while `market_vol_leverage` is 0.0; at 0.0 the return "
+        "memory counts a day in the baseline sd, the form that stood "
+        "(0.8.5 thirteenth-registration work, sim/r15-volstate)",
+    "market_beta_normalise":
+        "inert at 0.0 as shipped: `Engine::with_params_from_opening` "
+        "branches on `== 0.0` before any sum, so every name keeps the "
+        "instrument's beta bit for bit. Off zero each public name's beta is "
+        "divided by B^d at construction, B the roster's cap-weighted beta at "
+        "the opening caps, so at 1.0 the market factor is the systematic "
+        "part of the roster's own index. Target: the certification's tail "
+        "row, index_tail_dn3_pct, 0.62 and 0.67 on R17A over 360 held-out "
+        "varying-roster seeds per set against [0.64, 2.34], while roster "
+        "111 (cap-weighted beta 1.06, a random roster's median 0.97) reads "
+        "the tape's -3 per cent rate on the long run (0.8.5 "
+        "fourteenth-registration work, sim/r17-tails)",
+    "market_day_tail_df":
+        "inert at 0.0 as shipped: `Engine::draw_market_day_scale` returns "
+        "before any draw, the day's multiplier stays exactly 1.0 and "
+        "`market_sigma_today` skips the product, so the session's market "
+        "sigma is the bits it was and the snapshot and state hash omit it. "
+        "Off zero each session's market variance is multiplied by "
+        "(nu - 2) / chi-square(nu), a Student-t day at the state's variance. "
+        "Target: the certification's tail row, index_tail_dn3_pct, 0.52 on "
+        "R16A's thirteenth grade against [0.64, 2.34] and 0.81 on 60 "
+        "held-out varying-roster seeds, and the index's one-year excess "
+        "kurtosis, 0.9 against the tape's 1.46; the S&P 500's GJR-t fit "
+        "1990-2025 reads nu = 6.9 (0.8.5 fourteenth-registration work, "
+        "sim/r17-d1tail)",
+    "market_day_tail_state_share":
+        "unread while `market_day_tail_df` is 0.0; at 0.0 the variance "
+        "state reads the day as if drawn at its own variance (0.8.5 "
+        "fourteenth-registration work, sim/r17-d1tail)",
+    "market_vol_cycle_ratio":
+        "inert at 0.0 as shipped: `Engine::close_market` branches on "
+        "`== 0.0` before the cycle multiplier, which is never stepped, and "
+        "the snapshot and state hash omit it. The business cycle in the "
+        "market factor's volatility (0.8.5 realism work, bear-dynamics "
+        "design: index volatility in a true contraction over the rest reads "
+        "1.27 on held-out pt-v20 histories against the S&P 500's 1.66 to "
+        "2.24 by NBER recession month)",
+    "market_vol_cycle_expansion":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_half_life":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_relative":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_relative_calm":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_cap_relative":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_pin_neutral":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_pin_phase":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_trough_release":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_release_half_life":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_recovery_release":
+        "inert at 0.0 as shipped, and unread while `market_vol_cycle_ratio` "
+        "is 0.0: a contraction and a trough keep their multiplier. Off zero "
+        "the index's rally off its low over the last 252 sessions gives back "
+        "that share of the excess, so the storm eases as the market climbs "
+        "and not on the cycle's phase, which a rule reading the published "
+        "phase can time. Target: VC4f (ACF1 of log monthly realised vol) "
+        "without C10c's published contraction-and-trough lever (0.8.5 "
+        "fifteenth-round work, sim/r20-mktrelease)",
+    "market_vol_cycle_recovery_scale":
+        "unread while `market_vol_cycle_recovery_release` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "
@@ -665,6 +1258,56 @@ OUT_OF_SCOPE = {
         "there and stays inert",
     "volume_idio_sigma":
         "unread while `volume_idio_persistence` is 0.0",
+    "macro_pins_hold":
+        "inert at 0.0 as shipped: `Engine::mark_macro_pins_today` keeps no "
+        "mark beyond the VIX and corporate ones `corporate_yield_daily` "
+        "reads, so `advance_day_with` clones nothing and restores nothing, "
+        "`PolicyOptions::hold_rate` is false and `YieldDials` pins neither "
+        "treasury. Read only on a session a caller pinned a macro field "
+        "(0.8.5, r13 scenario-frontrun: a held contraction flipped to "
+        "trough at the close 2-3 times a seed under recession.yml, and a "
+        "permanent 10-year moved 0.66-1.03 pp close to close)",
+    "pinned_vix_feedback":
+        "inert at 0.0 as shipped: `Engine::price_pinned_vix` returns at "
+        "once and the close pulls `vix_feedback` on every session. Read "
+        "only with `fair_value_vix_discount` and `fair_value_vix_half_life` "
+        "both set and a VIX pinned that session (0.8.5, r13 "
+        "scenario-frontrun: a VIX held at x3.5 for 25 sessions moved the "
+        "paired index 0.00 on the morning it was published and -21.7 per "
+        "cent over the next 24 sessions, which an agent reading the VIX "
+        "front-ran). A share since r15: 1.0 is the switch as it stood",
+    "pinned_vix_variance_share":
+        "inert at 0.0 as shipped: no pin records a priced move, so "
+        "`Engine::market_sigma_today` is the state's sigma bit for bit. Read "
+        "only with `pinned_vix_feedback` on and a VIX pinned that session "
+        "(0.8.5, r15 scenario: with the pinned VIX priced when published, "
+        "the 2008 replay's worst month read 131.8 against the real 84.3 on "
+        "seed 201, because the session drew the market factor at its full "
+        "variance on top of the priced move)",
+    "pinned_vix_calm_knee":
+        "inert at 0.0 as shipped: `market::tick::pinned_vix_excess` returns "
+        "the knee's excess bit for bit. Read only with "
+        "`pinned_vix_calm_share` and `pinned_vix_feedback` on and a VIX "
+        "pinned that session (0.8.5, r17 sf1: SF1, a forced VIX priced the "
+        "day it is published, read 0.82 on held-out seeds and 0.33 on the "
+        "thirteenth grade's, because a x2.5 pin from a VIX under 16 stayed "
+        "under the knee of 40 and moved no price, 11 of 30 held-out seeds "
+        "and 15 of 30 on 20201-20230). Target: the real median VIX 17.6 "
+        "(1990-2025)",
+    "pinned_vix_calm_share":
+        "inert at 0.0 as shipped: `market::tick::pinned_vix_excess` returns "
+        "the knee's excess bit for bit. Read only with "
+        "`pinned_vix_calm_knee` and `pinned_vix_feedback` on and a VIX "
+        "pinned that session (0.8.5, r17 sf1). Target: the S&P 500's "
+        "same-day log return on a one-day VIX spike from under 20, -0.05 "
+        "per log point (1990-2025)",
+    "pinned_vix_priced_cap":
+        "inert at 0.0 as shipped: `Engine::price_pinned_vix` takes the "
+        "share-of-the-gap step as it stood. Read only with "
+        "`pinned_vix_feedback` on and a VIX pinned that session (0.8.5, r17 "
+        "sf1: at `pinned_vix_feedback` 0.8 a held pin closed the last fifth "
+        "of the gap over the next four sessions, which capped SF1 near 0.8 "
+        "and was a fall an agent reading the VIX could sell ahead of)",
 }
 
 #: The provenance of each shipped dial value.
@@ -1694,9 +2337,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "ptv20e7 then passed its 33 rows at 0.75, and the graded "
                   "arm keeps it (box ptv20vr9, B8 the long-run return 7.2 "
                   "against 6.25 plus or minus 2). At the model's median "
-                  "earnings yield of 0.0555 it is a buyback yield of about "
-                  "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
-                  "value record; the model pays no dividends "
+                  "earnings yield of 0.0555 it would be a buyback yield of "
+                  "about 4.2 per cent, but the index's delivered yield (the "
+                  "cap-weighted log rate of the buyback factor) is 2.0 per "
+                  "cent on held-out seeds, decaying from 3.3 in year 2 to "
+                  "0.8 in year 21; the shipped preset pays no dividends "
+                  "(`dividend_payout_share`) "
                   "(validation/pt-v20/programme/ptv20-registration.md, "
                   "tenth and eleventh registrations and 'The graded arm')",
     },

@@ -97,8 +97,9 @@ A world takes ``agents={"a": agent_a, "b": agent_b}`` in place of ``agent=``,
 and then holds one :class:`~tradefloor.Portfolio` per label against one
 engine, which `portfolio.py` was written to allow. Within a step every agent
 sees the same prices and the same book, each over its own portfolio; they are
-asked in label order, they execute in label order against the shared book,
-and every portfolio's pending flow is merged per ticker and reaches the
+asked in label order, they execute in arrival order against the shared book
+(label order unless ``book_arrival_shuffle`` is on; see below), and every
+portfolio's pending flow is merged per ticker and reaches the
 market as the one ``fills`` argument of the one session. Agents see each
 other's impact and never each other's orders, and :meth:`Scenario.apply` runs
 once a day for the whole cohort.
@@ -122,8 +123,8 @@ the next step on and never inside the step it happened.
 
 Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20,
 the default, has it, each portfolio's orders execute in the engine's book,
-under the portfolio's label (its ``owner``). Label order is then arrival
-order: the second agent meets the book the first left, pays for the levels
+under the portfolio's label (its ``owner``). Arrival order then matters:
+the second agent meets the book the first left, pays for the levels
 the first took, and can hit the first's resting limit order. Each agent's
 flow reaches the market once, on the next tick, and is attributed to it
 (``Engine.take_impacts``). An agent's value in the ``act()`` mapping may be
@@ -135,14 +136,30 @@ What fills during a session is collected into the agent's portfolio after
 the session, and a live-book row carries it under ``book_fills``.
 ``tests/test_order_book_depth.py`` measures both regimes.
 
-Label order therefore decides, off, three things and no price: the order
-agents are asked, the order their flows are summed into the merged mapping,
-and the order :attr:`World.rejected` is written; and on, the arrival order at
-the book as well. It is sorted order, so the same labels give the same market
-whatever order the mapping was built in. A dict literal's own order would
-make the market a property of how the caller typed it, and with three or
-more agents on one ticker the summation order is a float-associativity
-question rather than a cosmetic one.
+Label order decides three things and no price: the order agents are asked,
+the order their flows are summed into the merged mapping, and the order
+resting fills are collected. It is sorted order, so the same labels give the
+same market whatever order the mapping was built in. A dict literal's own
+order would make the market a property of how the caller typed it, and with
+three or more agents on one ticker the summation order is a float-
+associativity question rather than a cosmetic one.
+
+Arrival order is the order the agents' orders reach the book, and the order
+:attr:`World.rejected` is written. At ``book_arrival_shuffle`` 0.0, which
+every preset carries, it is label order too, so on a live book the same
+label takes the levels first and stands first in the queue on every step:
+on pt-v20, the later label of two identical buyers of a tenth of a name's
+daily volume pays about 23 bp more on every held-out seed. With the switch
+on (:meth:`Engine.arrival_order`) it is a seeded shuffle, fresh every step:
+the labels sorted by a counter-based priority of the seed, the day, the step
+within the day and the label, so each label is first equally often and a
+name buys no priority. Arriving second still costs what it costs; it just
+falls on each agent in turn. A label's priority does not depend on which
+other labels are present, so a :meth:`World.without` arm or a world built on
+a subset keeps the others' relative order, and it takes no draw, so the
+market's streams, snapshots and state hash are untouched. A cohort row then
+carries the step's order under ``arrival``. A one-agent world never reads
+it.
 
 The single-agent form is a one-element cohort under its old names.
 :attr:`World.agent` and :attr:`World.portfolio` read that one element and
@@ -358,7 +375,7 @@ class World:
                  "on_refusal", "surgeries", "_expected", "_day", "_step",
                  "_adv", "_ran", "_step_mids", "_step_opens", "_fork_worth",
                  "trusted_agents", "tampered", "history_days", "_history",
-                 "margin_interest", "_origins")
+                 "margin_interest", "_origins", "_dividends_today")
 
     def __init__(
         self,
@@ -463,6 +480,10 @@ class World:
                            margin_interest=self.margin_interest)
             for key in self._agents}
         self.trace: list[dict[str, Any]] = []
+        # The cash dividends each portfolio collected at today's open,
+        # carried to the day's first trace row and cleared there; None when
+        # nothing went ex, which is every day on a model without dividends.
+        self._dividends_today: dict[str, float] | None = None
         self.rejected: list[str] = []
         # The step this world was forked at, or None for a root. It is
         # what lets a comparison quote the window the intervention acted
@@ -686,6 +707,11 @@ class World:
         self._ran = scenario
         hour, minute, day_of_week = self.start
         tickers = self.engine.tickers
+        # Whether a cohort's arrival order at the book is the seeded
+        # per-step shuffle rather than label order. Read once: a run's model
+        # does not change under it. Only a cohort asks the engine.
+        shuffled = (not self._single and bool(
+            self.engine.model_params.get("book_arrival_shuffle", 0.0)))
 
         for _ in range(days):
             day = self._day
@@ -703,6 +729,12 @@ class World:
             self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
             self.engine.open_market()
+            # The cash dividends this open made payable, into each
+            # portfolio in label order before any agent is asked, as
+            # `evaluate` collects them. Nothing on a model without dividends.
+            paid = {label: self._portfolios[label].collect_dividends(self.engine)
+                    for label in self._agents}
+            self._dividends_today = paid if any(paid.values()) else None
 
             for _ in range(self.steps_per_day):
                 prices = _f64(self.engine.prices())
@@ -733,14 +765,22 @@ class World:
                             f"changed or copied the market during act() "
                             f"({guard.what})")
                 self._step_mids = {}
-                # Execution in label order, against the one book. Off a live
-                # book the order fixes which agent's rejection is written
-                # first and nothing about price: `sweep_cost` reads the
-                # ladder and removes nothing, so both agents meet the same
-                # levels and fill at the same price. On one, it is the
-                # arrival order at the book. See the module docstring.
-                done = {label: self._execute(asked[label][0], tickers, label)
-                        for label in self._agents}
+                # Execution in arrival order, against the one book: label
+                # order at `book_arrival_shuffle` 0.0, and a seeded shuffle
+                # fresh every step with it on (`Engine.arrival_order`). Off
+                # a live book the order fixes which agent's rejection is
+                # written first and nothing about price: `sweep_cost` reads
+                # the ladder and removes nothing, so both agents meet the
+                # same levels and fill at the same price. On one, it is who
+                # takes the levels first and who stands first in the queue.
+                # See the module docstring.
+                order = (self.engine.arrival_order(
+                    day, self._step % self.steps_per_day, list(self._agents))
+                    if shuffled else list(self._agents))
+                done_by = {label: self._execute(asked[label][0], tickers,
+                                                label)
+                           for label in order}
+                done = {label: done_by[label] for label in self._agents}
 
                 self.engine.run_session(
                     *session_clock((hour, minute, day_of_week),
@@ -756,7 +796,8 @@ class World:
                 synced = {label: self._portfolios[label].sync(self.engine)
                           for label in self._agents}
 
-                self.trace.append(self._row(day, macro, asked, done, synced))
+                self.trace.append(self._row(day, macro, asked, done, synced,
+                                            order if shuffled else None))
                 self._step += 1
 
             # A day's interest before the close, as `tradefloor.evaluate`
@@ -821,14 +862,18 @@ class World:
         return access or None
 
     def _row(self, day: int, macro: dict[str, Any], asked: dict, done: dict,
-             synced: dict | None = None) -> dict[str, Any]:
+             synced: dict | None = None,
+             arrival: list[str] | None = None) -> dict[str, Any]:
         """One trace row, in whichever of the two shapes this world has.
 
         A single-agent row carries the per-agent fields at the top level, in
         the order and under the names it has always used, because those rows
         are pinned. A cohort row carries the shared fields and an `agents`
         map keyed by label, since there is no single decision, order set or
-        net worth for a step in which three agents traded.
+        net worth for a step in which three agents traded. A cohort row
+        under `book_arrival_shuffle` also carries `arrival`, the step's
+        order at the book; at 0.0 it is label order and the row is the row
+        it always was.
         """
         # End of step: what this step's session produced. The orders below
         # are what opened it. Both in one row, so a divergence can be
@@ -847,12 +892,21 @@ class World:
             {k: f[k] for k in ("ticker", "order_id", "side", "quantity",
                                "price", "liquidity", "counterparty", "tick")}
             for f in fills] for label, fills in (synced or {}).items() if fills}
+        # The cash dividends collected at the day's open, on the day's first
+        # row only, and only when any were: a row of a model without
+        # dividends is the row it always was.
+        paid, self._dividends_today = self._dividends_today, None
         if not self._single:
             row["prices"] = prices
             row["agents"] = {label: self._fields(label, asked, done)
                              for label in self._agents}
             for label, fills in book_fills.items():
                 row["agents"][label]["book_fills"] = fills
+            if arrival is not None:
+                row["arrival"] = list(arrival)
+            if paid:
+                for label, amount in paid.items():
+                    row["agents"][label]["dividends"] = amount
             return row
         fields = self._fields(SOLO, asked, done)
         for name in ("decision", "orders", "fills", "refused", "unusable"):
@@ -862,6 +916,8 @@ class World:
             row[name] = fields[name]
         if SOLO in book_fills:
             row["book_fills"] = book_fills[SOLO]
+        if paid:
+            row["dividends"] = paid[SOLO]
         return row
 
     def _fields(self, label: str, asked: dict, done: dict) -> dict[str, Any]:
@@ -1359,6 +1415,8 @@ class World:
             child._expected = copy.deepcopy(self._expected)
             child._day = self._day
             child._step = self._step
+            child._dividends_today = (dict(self._dividends_today)
+                                      if self._dividends_today else None)
             child.fork_step = self._step
             child._fork_worth = dict(worth_at_fork)
             out.append(child)

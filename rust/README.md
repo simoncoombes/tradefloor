@@ -106,9 +106,10 @@ field to either no longer breaks a build. Make them with
 ## Scope of this crate
 
 The published crate carries the engine, the unit tests in its source
-modules and six integration tests that run standalone:
-`circuit_breaker`, `depth_counterfactual`, `maker_ladder_allocations`,
-`platform_maths`, `roster_mutation` and `stream_alignment`. The parity corpus that pins the
+modules and eight integration tests that run standalone:
+`circuit_breaker`, `depth_counterfactual`, `fed_put`,
+`maker_ladder_allocations`, `platform_maths`, `postcut`, `roster_mutation`
+and `stream_alignment`. The parity corpus that pins the
 engine's output is 140 MB of fixtures and stays in the repository, so the
 tests that read it are left out of the package rather than shipped in a
 state where they cannot pass.

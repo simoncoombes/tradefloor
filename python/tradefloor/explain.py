@@ -44,22 +44,25 @@ is the day's last print on every preset through pt-v19; under
 ``macro_publication_repricing`` (pt-v20) the close re-marks every traded
 name to the macro state it publishes, after that print.
 
-Its children are fourteen contributions, of kind ``factor``. Eleven are
+Its children are fifteen contributions, of kind ``factor``. Twelve are
 the ``truth()`` columns for the name on that day, in ``Engine.FACTORS``
-order, and they sum to the day's change in ``mispricing_s``. The last of
-them, ``fair_value_shift``, is minus the part of the day's shocks that
+order, and they sum to the day's change in ``mispricing_s``. The
+eleventh, ``fair_value_shift``, is minus the part of the day's shocks that
 moved the name's fair value for good rather than its mispricing (pt-v20's
-permanent share; zero on every earlier preset). Two more close the
+permanent share; zero on every earlier preset). The twelfth, ``dividend``,
+is the change in ``mispricing_s`` at an ex-date open, where the price drops
+by the amount and fair value gives up the dividend it had accrued (zero on
+every model without dividends, ``dividend_payout_share``). Two more close the
 arithmetic: ``fair_value`` is the day's change in log fundamental value,
 which carries that same permanent part with the opposite sign, and
 ``book`` is the change in the log distance from the model price to the
-day's last print. The fourteenth, ``repricing``, is the change in the log
+day's last print. The fifteenth, ``repricing``, is the change in the log
 distance from that print to the price the close left: the close's re-mark
 tonight less the one the day opened on. The tape's fundamental value is
 the one the last tick read, before the close's macro step, so a published
 decision reaches ``fair_value`` on the next day's tape while the price
 took it the evening before, and ``repricing`` carries it between the two.
-It is exactly zero on every preset through pt-v19. All fourteen are
+It is exactly zero on every preset through pt-v19. All fifteen are
 measured, so their sum against the move is an identity the engine can
 fail; :meth:`Explanation.check` states the residual rather than
 asserting it. Where the day before is not on the tape its closing levels
@@ -200,7 +203,7 @@ class Mechanism(NamedTuple):
     offset: int = 0
 
 
-#: The Rust that produced each contribution. The eleven ``truth()`` columns
+#: The Rust that produced each contribution. The twelve ``truth()`` columns
 #: in ``Engine.FACTORS`` order, then the two that close the arithmetic
 #: between the mispricing decomposition and the tape.
 MECHANISMS: tuple[Mechanism, ...] = (
@@ -327,6 +330,20 @@ MECHANISMS: tuple[Mechanism, ...] = (
         via=("engine::Engine::apply_jumps",),
     ),
     Mechanism(
+        # The ex-date open: the price drops by the declared amount and `s`
+        # is re-read against a fair value whose accrued dividend has just
+        # returned to zero. Zero on every model without dividends.
+        factor="dividend",
+        function="engine::Engine::go_ex",
+        state=("mispricing_s", "mispricing_s_prev_close", "price"),
+        dials=("dividend_payout_share", "dividend_adjustment_speed",
+               "dividend_yield_ceiling"),
+        via=("engine::Engine::apply_dividends",
+             "market::dividends::declare",
+             "market::dividends::quarterly_speed",
+             "market::tick::tick_fair_value"),
+    ),
+    Mechanism(
         factor="fair_value",
         function="fair_value::compute_fair_value_with",
         macro=("qe_pe_boost",),
@@ -365,12 +382,12 @@ MECHANISMS: tuple[Mechanism, ...] = (
     ),
 )
 
-#: The contributions the root carries, in order: the eleven ``truth()``
+#: The contributions the root carries, in order: the twelve ``truth()``
 #: columns, the two that close the arithmetic to the day's last print, and
 #: the close's re-mark from that print to the price the engine holds.
 #:
 #: Named for what they are rather than ``FACTORS``, which is what
-#: ``Engine.FACTORS`` calls the eleven. Two names for two different lists
+#: ``Engine.FACTORS`` calls the twelve. Two names for two different lists
 #: is a trap for anyone importing both.
 CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 
@@ -380,7 +397,7 @@ CONTRIBUTIONS: tuple[str, ...] = tuple(m.factor for m in MECHANISMS)
 #: The three are per-tick sums off the print table and their parent is a
 #: change in a level, so they are not a re-split of it in any obvious
 #: sense; that they add up to it is arithmetic worth stating. Writing A
-#: for the anchor's move, which is the other twelve contributions, the
+#: for the anchor's move, which is the other thirteen contributions, the
 #: identity is that summed shock plus summed absorbed plus summed
 #: repriced telescopes to the move between the two days' last prints, so
 #: summed absorbed plus (summed shock and repriced minus A) is that move
@@ -404,11 +421,11 @@ DEPTH: tuple[tuple[str, str], ...] = (
 #: The kinds a node can be.
 KINDS = ("move", "factor", "mechanism", "state", "draw")
 
-#: How close the fourteen contributions have to come to the move before
+#: How close the fifteen contributions have to come to the move before
 #: :meth:`Explanation.check` calls it a miss, and how close a replayed
 #: value has to come to the recorded one. The truth test holds the
 #: decomposition to 1e-15 over one day's rows; this is the same order,
-#: loosened for the fourteen-term sum and the two logs the move is taken
+#: loosened for the fifteen-term sum and the two logs the move is taken
 #: through.
 TOLERANCE = 1e-12
 
@@ -900,7 +917,7 @@ class Explanation:
         # day's move is the change in each of the four. All three of the
         # ones here are MEASURED against the day before's closing levels
         # rather than taken as what the mispricing leaves over: a
-        # remainder would make the fourteen sum to the move whatever the
+        # remainder would make the fifteen sum to the move whatever the
         # engine had done, and the sum is the claim.
         #
         # The last is the close's re-mark (`macro_publication_repricing`,
@@ -980,7 +997,7 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        Four claims, each stated as a line per miss. The fourteen
+        Four claims, each stated as a line per miss. The fifteen
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
         the replay reproduces both the eleven columns the run recorded and

@@ -679,6 +679,16 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
         assert field is None
         return
     assert field in engine.macro_fields
+    if name == "macro.corporate_spread":
+        # The one derived target: it writes the corporate yield's level, as
+        # the 10-year plus the spread.
+        assert field == "corporate_bond_yield"
+        value = target.read(engine) + 0.005
+        target.write(engine, value)
+        fields = true_macro_fields(engine)
+        assert fields[field] - fields["treasury_yield_10y"] == pytest.approx(value)
+        assert target.read(engine) == pytest.approx(value)
+        return
     value = "contraction" if name == "macro.cycle" else (
         target.read(engine) + 0.005 if name != "macro.fear_greed" else 60.0)
     target.write(engine, value)

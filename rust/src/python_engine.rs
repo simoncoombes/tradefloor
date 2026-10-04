@@ -381,6 +381,9 @@ const SNAPSHOT_KEYS: &[&str] = &[
 const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
     "state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
     "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
+    // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
+    // close, carried exactly while `macro_pins_today` marks it.
+    "pinned_corporate_spread",
 ];
 
 const CENTRAL_BANK_KEYS: &[&str] = &[
@@ -391,6 +394,8 @@ const CENTRAL_BANK_KEYS: &[&str] = &[
 const NEWS_KEYS: &[&str] = &["ticker", "sector", "price_impact"];
 const GDP_PUBLICATION_KEYS: &[&str] =
     &["published", "quarter", "count", "sum", "pending_days", "pending_values"];
+const CYCLE_PUBLICATION_KEYS: &[&str] =
+    &["key", "published", "last_true", "closes", "turns", "pending_closes", "pending_phases"];
 const FUNDAMENTALS_KEYS: &[&str] = &["eps", "book_value_per_share", "revenue_growth"];
 const RATES_KEYS: &[&str] = &["instruments", "ig_spread", "last_corporate", "closed_since_open"];
 
@@ -408,9 +413,15 @@ const LEGACY_NOTE: &str = " This snapshot carries no state_schema, so a release 
 
 /// A key a snapshot carries only under a model dial: whether this engine's
 /// model calls for it, and the sentence that says why.
+///
+/// A key is `held` when the model's dial allows it but the engine writes it
+/// only while it holds something (a day scale drawn at an open and cleared
+/// at the close, say): then it may be carried where the dial is set, and
+/// never where it is not.
 struct Gated {
     key: &'static str,
     wanted: bool,
+    held: bool,
     why: String,
 }
 
@@ -420,7 +431,24 @@ impl Gated {
         Gated {
             key,
             wanted: value != 0.0,
+            held: false,
             why: format!("{dial} is not 0, and this engine's {dial} is {value}"),
+        }
+    }
+
+    /// A key carried exactly when `wanted`, for the reason `why`.
+    fn when(key: &'static str, wanted: bool, why: String) -> Self {
+        Gated { key, wanted, held: false, why }
+    }
+
+    /// A key that may be carried only when `dial` is not 0, and is carried
+    /// there only while it holds something.
+    fn held(key: &'static str, dial: &str, value: f64) -> Self {
+        Gated {
+            key,
+            wanted: value != 0.0,
+            held: true,
+            why: format!("{dial} is not 0 and it holds something, and this engine's {dial} is {value}"),
         }
     }
 }
@@ -449,7 +477,7 @@ fn key_mismatch(
     }
     let mut missing: Vec<String> = required
         .iter()
-        .chain(gated.iter().filter(|g| g.wanted).map(|g| &g.key))
+        .chain(gated.iter().filter(|g| g.wanted && !g.held).map(|g| &g.key))
         .filter(|k| !carried.contains(**k))
         .map(|k| k.to_string())
         .collect();
@@ -473,7 +501,10 @@ fn key_mismatch(
         py_names(&unexpected)
     );
     for g in gated {
-        if g.wanted != carried.contains(g.key) {
+        let has = carried.contains(g.key);
+        if g.held && has && !g.wanted {
+            out.push_str(&format!(" {} is carried only when {}.", g.key, g.why));
+        } else if !g.held && g.wanted != has {
             out.push_str(&format!(" {} is carried exactly when {}.", g.key, g.why));
         }
     }
@@ -618,6 +649,43 @@ impl EconomyScalar for Option<f64> {
 
 fn snap_economy_value<T: EconomyScalar>(d: &Bound<'_, PyDict>, key: &str) -> PyResult<T> {
     T::read(d, key)
+}
+
+/// A snapshot's `economy["cycle_publication"]` block
+/// (`cycle_publication_lag_draw`), every key required.
+fn cycle_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::CyclePublication> {
+    let d = v.downcast::<PyDict>().map_err(|_| {
+        ValidationError::new_err("snapshot economy.cycle_publication is not a dict")
+    })?;
+    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
+        d.get_item(key)?.ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "snapshot economy.cycle_publication has no {key:?} (cycle_publication_lag_draw)"))
+        })
+    };
+    let phase = |name: String| -> PyResult<CyclePhase> {
+        CyclePhase::from_name(&name)
+            .ok_or_else(|| ValidationError::new_err(format!("unknown cycle phase {name:?}")))
+    };
+    let closes: Vec<i64> = need("pending_closes")?.extract()?;
+    let names: Vec<String> = need("pending_phases")?.extract()?;
+    if closes.len() != names.len() {
+        return Err(ValidationError::new_err(format!(
+            "snapshot economy.cycle_publication has {} pending closes and {} pending \
+             phases (cycle_publication_lag_draw)", closes.len(), names.len())));
+    }
+    let mut pending = std::collections::VecDeque::with_capacity(closes.len());
+    for (close, name) in closes.into_iter().zip(names) {
+        pending.push_back((close, phase(name)?));
+    }
+    Ok(crate::engine::CyclePublication {
+        key: need("key")?.extract()?,
+        published: phase(need("published")?.extract()?)?,
+        last_true: phase(need("last_true")?.extract()?)?,
+        closes: need("closes")?.extract()?,
+        turns: need("turns")?.extract()?,
+        pending,
+    })
 }
 
 #[pymethods]
@@ -1004,6 +1072,18 @@ impl PyEngine {
             }
             self.pending_overnight.clear();
         }
+        // The twelfth is the ex-date's move in `s`, which happens at the
+        // open like the overnight move and is booked the same way.
+        let before = self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].len();
+        self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_dividend.is_empty() {
+            for (i, v) in self.pending_dividend.iter().enumerate().take(width) {
+                if let Some(slot) = self.day_buffer.components[crate::market::factors::DIVIDEND_SLOT].get_mut(before + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_dividend.clear();
+        }
     }
 
     /// Write the day's jump into the eighth component series, on the last
@@ -1049,6 +1129,22 @@ impl PyEngine {
     fn padded(&self, mut values: Vec<f64>, fill: f64) -> Vec<f64> {
         values.resize(values.len() + self.inner.rates().len(), fill);
         values
+    }
+
+    /// Today's ex-date amounts across every instrument, zero on a rate
+    /// index and on every model without dividends.
+    fn dividends_padded(&self) -> Vec<f64> {
+        self.padded(self.inner.dividends_today(), 0.0)
+    }
+
+    /// [`Self::dividends_padded`] for the tape: EMPTY on a model without
+    /// dividends, whose `prints` carry no `distribution` column.
+    fn distribution_row(&self) -> Vec<f64> {
+        if self.inner.carries_dividends() {
+            self.dividends_padded()
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -1621,6 +1717,9 @@ pub struct PyEngine {
     /// jump is observed, as `pending_jump` waits. Empty unless the preset
     /// carries fair-value offsets and a name's jump moved one.
     pending_fair_value: Vec<f64>,
+    /// The ex-date's move in `s` at the last open, waiting for the day's
+    /// first tape row; empty unless a name went ex (`dividend_payout_share`).
+    pending_dividend: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -1769,22 +1868,95 @@ impl PyEngine {
              opening_market_sigma is not 0), and this engine's model {}",
             if fair_value { "can" } else { "cannot" }
         );
+        let drawdown = p.fed_drawdown_hold != 0.0 || p.market_vol_cycle_recovery_release != 0.0;
+        let drawdown_why = format!(
+            "fed_drawdown_hold or market_vol_cycle_recovery_release is not 0, and \
+             this engine's are {} and {}",
+            p.fed_drawdown_hold, p.market_vol_cycle_recovery_release
+        );
+        let idio = self.inner.carries_idio_vol_state();
+        let idio_why = format!(
+            "idio_vol_alpha, idio_vol_beta or idio_vol_jump_bump is not 0, and this \
+             engine's are {}, {} and {}",
+            p.idio_vol_alpha, p.idio_vol_beta, p.idio_vol_jump_bump
+        );
         let gated = [
             Gated::dial("vix_anchor_slow", "vix_anchor_memory", p.vix_anchor_memory),
-            Gated { key: "fair_value_offset", wanted: fair_value, why: fair_value_why.clone() },
-            Gated { key: "opening_z", wanted: fair_value, why: fair_value_why },
+            Gated::when("fair_value_offset", fair_value, fair_value_why.clone()),
+            Gated::when("opening_z", fair_value, fair_value_why),
             Gated {
                 key: "garch_cascade",
                 wanted: self.inner.carries_garch_cascade(),
+                held: false,
                 why: format!(
                     "garch_cascade_components is 1 or more, and this engine's \
                      garch_cascade_components is {}",
                     p.garch_cascade_components
                 ),
             },
+            // The dial-gated state the r21 mechanisms carry (every dial 0.0
+            // on every shipped preset, so no shipped snapshot carries one).
+            Gated::dial("market_vol_leverage_memory", "market_vol_leverage", p.market_vol_leverage),
+            Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
+            Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
+            Gated::dial("cycle_nowcast_rng", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
+            Gated::dial("fed_stress_vix_max", "fed_stress_cut", p.fed_stress_cut),
+            Gated::dial("fed_stress_hold_age", "fed_stress_hold", p.fed_stress_hold),
+            Gated::dial("treasury_policy_path", "treasury_path_pricing", p.treasury_path_pricing),
+            Gated::when("fed_drawdown_returns", drawdown, drawdown_why.clone()),
+            Gated::when("fed_drawdown_mcap_prev", drawdown, drawdown_why),
+            Gated::dial("policy_anticipation_priced", "policy_anticipation", p.policy_anticipation),
+            Gated::held("rate_live_marks", "rate_intraday_live", p.rate_intraday_live),
+            Gated::held("pinned_vix_jump", "pinned_vix_variance_share", p.pinned_vix_variance_share),
+            Gated::held("market_day_scale", "market_day_tail_df", p.market_day_tail_df),
+            Gated::when(
+                "buyback_log_shares",
+                self.inner.carries_buyback_log_shares(),
+                format!(
+                    "buyback_accrual and buyback_payout_share are both not 0, and \
+                     this engine's are {} and {}",
+                    p.buyback_accrual, p.buyback_payout_share
+                ),
+            ),
+            Gated::when(
+                "opening_carry",
+                fair_value && p.market_prehistory_valuation != 0.0,
+                format!(
+                    "market_prehistory_valuation is not 0 on a model that can move a \
+                     fair-value level, and this engine's market_prehistory_valuation is {}",
+                    p.market_prehistory_valuation
+                ),
+            ),
+            Gated::dial("dividend", "dividend_payout_share", p.dividend_payout_share),
+            Gated::held("pending_dividend", "dividend_payout_share", p.dividend_payout_share),
+            Gated::dial("earnings_key", "earnings_surprise_sigma", p.earnings_surprise_sigma),
+            Gated::when(
+                "earnings_withheld",
+                self.inner.carries_earnings_withheld(),
+                format!(
+                    "earnings_surprise_sigma, earnings_cycle_report_share and \
+                     earnings_cycle_depth are all not 0, and this engine's are {}, {} and {}",
+                    p.earnings_surprise_sigma, p.earnings_cycle_report_share, p.earnings_cycle_depth
+                ),
+            ),
+            Gated::when(
+                "night_market_factor",
+                self.inner.carries_night_market_factor(),
+                format!(
+                    "overnight_market_share, market_beta_down_asym_lag and \
+                     market_beta_down_asym_lag_live are all not 0, and this engine's are \
+                     {}, {} and {}",
+                    p.overnight_market_share, p.market_beta_down_asym_lag,
+                    p.market_beta_down_asym_lag_live
+                ),
+            ),
+            Gated::when("idio_variance", idio, idio_why.clone()),
+            Gated::when("idio_jump_pending", idio, idio_why.clone()),
+            Gated::when("idio_jump_var_pending", idio, idio_why),
             Gated {
                 key: "rates",
                 wanted: !held.is_empty(),
+                held: false,
                 why: if held.is_empty() {
                     "the engine holds rate instruments, and this one holds none".to_string()
                 } else {
@@ -1812,6 +1984,7 @@ impl PyEngine {
             Gated {
                 key: "vix_feedback",
                 wanted: feedback,
+                held: false,
                 why: format!(
                     "fair_value_vix_discount and fair_value_vix_half_life are \
                      both not 0, and this engine's are {} and {}",
@@ -1819,7 +1992,41 @@ impl PyEngine {
                 ),
             },
             Gated::dial("qe_assets_ratio", "qe_pe_stock_gain", p.qe_pe_stock_gain),
-            Gated::dial("cycle_history", "cycle_publication_lag", p.cycle_publication_lag),
+            Gated::when(
+                "cycle_history",
+                self.inner.carries_cycle_history(),
+                format!(
+                    "cycle_publication_lag is not 0 and cycle_publication_lag_draw is 0, \
+                     and this engine's are {} and {}",
+                    p.cycle_publication_lag, p.cycle_publication_lag_draw
+                ),
+            ),
+            Gated::dial("cycle_nowcast", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
+            Gated::dial(
+                "cycle_publication", "cycle_publication_lag_draw", p.cycle_publication_lag_draw),
+            Gated::dial(
+                "anticipation_drift",
+                "earnings_anticipation_drift_share",
+                p.earnings_anticipation_drift_share,
+            ),
+            Gated::dial(
+                "anticipation_raw",
+                "earnings_anticipation_drift_share",
+                p.earnings_anticipation_drift_share,
+            ),
+            Gated::dial("intermeeting_return", "fed_put_gain", p.fed_put_gain),
+            Gated::dial("fed_put", "fed_put_gain", p.fed_put_gain),
+            Gated::dial("fed_put_owed", "fed_put_gain", p.fed_put_gain),
+            Gated::dial("fed_put_mcap_prev", "fed_put_gain", p.fed_put_gain),
+            Gated::when(
+                "spread_equity_gap",
+                self.inner.carries_spread_equity_gap(),
+                format!(
+                    "corporate_spread_equity_gain or cycle_equity_hazard is not 0, and \
+                     this engine's are {} and {}",
+                    p.corporate_spread_equity_gain, p.cycle_equity_hazard
+                ),
+            ),
             Gated::dial(
                 "unemployment_impulse",
                 "unemployment_adjustment_half_life",
@@ -1976,6 +2183,13 @@ impl PyEngine {
         let nights: Vec<f64> = self.inner.overnight_moves().to_vec();
         if nights.iter().any(|v| *v != 0.0) {
             self.pending_overnight = nights;
+        }
+        // The ex-date's move in `s`, booked onto the same row.
+        if self.inner.carries_dividends() {
+            let moves: Vec<f64> = self.inner.dividend_moves().to_vec();
+            if moves.iter().any(|v| *v != 0.0) {
+                self.pending_dividend = moves;
+            }
         }
     }
 
@@ -2189,11 +2403,20 @@ fn book_to_py(py: Python<'_>, book: &crate::agent_book::BookState) -> PyResult<P
         x.set_item("bought", r.bought)?;
         x.set_item("sold", r.sold)?;
         x.set_item("permanent", r.permanent)?;
+        if let Some(v) = r.transient {
+            x.set_item("transient", v)?;
+        }
         x.set_item("day", r.day)?;
         x.set_item("tick", r.tick)?;
         impacts.append(x)?;
     }
     d.set_item("impacts", impacts)?;
+    // The metaorder memory, only while it holds something: an entry absent
+    // is a book without one, as every snapshot before it was.
+    if !book.memory.is_empty() {
+        let flat: Vec<f64> = book.memory.iter().flat_map(|row| row.iter().copied()).collect();
+        d.set_item("memory", f64_bytes(py, &flat))?;
+    }
     Ok(d.into())
 }
 
@@ -2286,9 +2509,28 @@ fn book_from_py(d: &Bound<'_, PyDict>) -> PyResult<crate::agent_book::BookState>
             bought: g("bought")?.extract()?,
             sold: g("sold")?.extract()?,
             permanent: g("permanent")?.extract()?,
+            transient: match r.get_item("transient")? {
+                Some(v) => Some(v.extract()?),
+                None => None,
+            },
             day: g("day")?.extract()?,
             tick: g("tick")?.extract()?,
         });
+    }
+    if let Some(raw) = d.get_item("memory")? {
+        let raw: Vec<u8> = raw.extract()?;
+        if raw.len() % (8 * MEMORY_WIDTH) != 0 {
+            return Err(ValidationError::new_err("the snapshot's book `memory` is not whole rows"));
+        }
+        for row in raw.chunks(8 * MEMORY_WIDTH) {
+            let mut r = [0.0; MEMORY_WIDTH];
+            for (k, bytes) in row.chunks(8).enumerate() {
+                let mut b = [0u8; 8];
+                b.copy_from_slice(bytes);
+                r[k] = f64::from_le_bytes(b);
+            }
+            state.memory.push(r);
+        }
     }
     Ok(state)
 }
@@ -2400,6 +2642,7 @@ impl PyEngine {
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),
             pending_fair_value: Vec::new(),
+            pending_dividend: Vec::new(),
             day_buffer: DayBuffer::default(),
             session_volume_base: Vec::new(),
             market_open: false,
@@ -3089,8 +3332,49 @@ impl PyEngine {
     /// `last_daily_return`, `previous_tick_price`); the mispricing fields read
     /// zero, because an index level is its own fair value.
     fn column(&self, py: Python<'_>, field: &str) -> PyResult<Py<PyBytes>> {
+        // The cash dividend per share each instrument went ex for at this
+        // session's open: zero on every other session, on a rate index and
+        // on every model without dividends.
+        if field == "dividend" {
+            return Ok(f64_bytes(py, &self.dividends_padded()));
+        }
         let f = parse_field(field)?;
         Ok(f64_bytes(py, &self.all_column(f)))
+    }
+
+    /// The cash dividend per share each instrument went ex for at this
+    /// session's open, in `tickers` order: 0.0 on any other session, on a
+    /// rate index, and on every model without dividends
+    /// (`dividend_payout_share`). The price already carries the drop; a
+    /// holder is owed `quantity * amount` (`Portfolio.collect_dividends`).
+    fn dividends_today(&self) -> Vec<f64> {
+        self.dividends_padded()
+    }
+
+    /// The `distributions` table: one row per declared cash dividend, in
+    /// declaration order. `day` is the ex-date, so the table joins `bars`
+    /// on `(day, instrument_id)` at the session whose open carries the
+    /// drop; `declared_day` is when the amount became public, 21 sessions
+    /// before (or the run's first session, for a first ex-date closer than
+    /// that), and a row exists only from that session on. `kind` is `"cash"`. Pass
+    /// `day` for the rows going ex that session. Empty on every model
+    /// without dividends. A record, like the tape: a restored engine starts
+    /// it afresh.
+    #[pyo3(signature = (day = None))]
+    fn distributions(&self, day: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows: Vec<&crate::engine::Distribution> = self
+            .inner
+            .distributions()
+            .iter()
+            .filter(|d| day.map_or(true, |x| d.ex_day == x))
+            .collect();
+        let batch = crate::python_arrow::distributions_batch(&rows)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "distributions",
+            crate::python_arrow::distributions_schema(),
+            vec![batch],
+        ))
     }
 
     /// Current price per instrument, as little-endian f64 bytes.
@@ -3208,7 +3492,7 @@ impl PyEngine {
                 // later name's entry stays on that name's row (#154). Its
                 // own value is dropped: it has no row on the next tape.
                 for pending in [&mut self.pending_jump, &mut self.pending_overnight,
-                                &mut self.pending_fair_value] {
+                                &mut self.pending_fair_value, &mut self.pending_dividend] {
                     if index < pending.len() {
                         pending.remove(index);
                     }
@@ -3226,6 +3510,13 @@ impl PyEngine {
     /// Index of a ticker, or None. Indices shift after a delisting.
     fn index_of(&self, ticker: &str) -> Option<usize> {
         self.tickers.iter().position(|t| t == ticker)
+    }
+
+    /// The number of sessions this engine has closed: the day the current
+    /// (or next) session is numbered, as `open_market` numbers it.
+    #[getter]
+    fn day_count(&self) -> u32 {
+        self.day_count
     }
 
     /// Instrument tickers, in roster order.
@@ -3800,7 +4091,9 @@ impl PyEngine {
     fn macro_state(&self) -> PyMacro {
         let e = self.inner.economy();
         PyMacro {
-            vix: e.vix,
+            // The VIX as PUBLISHED (`Engine::published_vix`): the state
+            // with `vix_stress_premium` at 0.0, which every preset carries.
+            vix: self.inner.published_vix(),
             federal_funds_rate: crate::units::percent_to_fraction(e.federal_funds_rate),
             corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
@@ -3894,7 +4187,7 @@ impl PyEngine {
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
         oil_price = None, cycle = None, epicentre = None, vix_sets_variance = false,
-        treasury_yield_2y = None, treasury_yield_10y = None
+        treasury_yield_2y = None, treasury_yield_10y = None, corporate_spread = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -3915,7 +4208,21 @@ impl PyEngine {
         vix_sets_variance: bool,
         treasury_yield_2y: Option<f64>,
         treasury_yield_10y: Option<f64>,
+        corporate_spread: Option<f64>,
     ) -> PyResult<()> {
+        if let Some(v) = corporate_spread {
+            if !v.is_finite() || !(0.0..=0.2).contains(&v) {
+                return Err(ValidationError::new_err(format!(
+                    "corporate_spread must be a fraction in [0, 0.2], got {v}"
+                )));
+            }
+            if corporate_bond_yield.is_some() {
+                return Err(ValidationError::new_err(
+                    "pin the corporate yield's level or its spread over the \
+                     10-year, not both in one call",
+                ));
+            }
+        }
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
         // first three fields and then rejected the fourth would leave the
         // scenario half-applied, and the run would continue on a macro state
@@ -4043,6 +4350,7 @@ impl PyEngine {
             ("oil_price", oil_price),
             ("treasury_yield_2y", treasury_yield_2y),
             ("treasury_yield_10y", treasury_yield_10y),
+            ("corporate_spread", corporate_spread),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -4059,6 +4367,7 @@ impl PyEngine {
         // below; `None` with `macro_publication_repricing` off.
         let marks = self.inner.published_macro_marks();
         let e = self.inner.economy_mut();
+        let vix_before = e.vix;
         if let Some(v) = vix {
             e.vix = v;
         }
@@ -4099,12 +4408,23 @@ impl PyEngine {
             e.treasury_yield_10y = crate::units::fraction_to_percent(v);
         }
         if let Some(p) = phase {
-            e.cycle_phase = p;
+            self.inner.pin_cycle_phase(p);
+        }
+        // After the 10-year, so the spread sits over the pinned curve.
+        if let Some(v) = corporate_spread {
+            self.inner
+                .pin_corporate_spread(crate::units::fraction_to_percent(v));
+        }
+        // A pinned corporate yield holds through tonight's close. Marked
+        // before the VIX's credit leg below, which never moves a level or a
+        // spread pinned today.
+        if corporate_bond_yield.is_some() {
+            self.inner.pin_corporate_level();
         }
         // A pinned corporate yield is the corporate index's yield, including
         // when the pin repeats yesterday's value. Nothing without rate
         // instruments.
-        if corporate_bond_yield.is_some() {
+        if corporate_bond_yield.is_some() || corporate_spread.is_some() {
             self.inner.remark_credit_spread();
         }
         if let Some(pin) = epicentre_pin {
@@ -4126,17 +4446,60 @@ impl PyEngine {
         // A pinned corporate yield holds through tonight's close.
         if vix.is_some() {
             self.inner.mark_macro_pins_today(crate::engine::PIN_VIX);
+            // The published VIX's stress memory restarts, so the quote is
+            // the pin (`vix_stress_premium`; nothing with it at 0.0).
+            self.inner.note_vix_pinned();
+            // `pinned_vix_feedback`: the discount lands in this pin's
+            // re-mark, and the credit leg, where it applies, in the corporate
+            // index's.
+            if self.inner.price_pinned_vix(vix_before) {
+                self.inner.remark_credit_spread();
+            }
+        }
+        // `macro_pins_hold`: every other field written here holds through
+        // tonight's close. The marks are kept only under the dial.
+        {
+            use crate::engine::*;
+            let mut bits = 0u16;
+            for (bit, set) in [
+                (PIN_CYCLE, phase.is_some()),
+                (PIN_T10, treasury_yield_10y.is_some()),
+                (PIN_T2, treasury_yield_2y.is_some()),
+                (PIN_POLICY, federal_funds_rate.is_some()),
+                (PIN_INFLATION, inflation_rate.is_some()),
+                (PIN_GROWTH, gdp_growth.is_some()),
+                (PIN_UNEMPLOYMENT, unemployment_rate.is_some()),
+                (PIN_FEAR_GREED, fear_greed_index.is_some()),
+                (PIN_OIL, oil_price.is_some()),
+                (PIN_QE_PE, qe_pe_boost.is_some()),
+                (PIN_QE_ASSETS, qe_assets_ratio.is_some()),
+                (PIN_TARIFF, tariff_rate.is_some()),
+            ] {
+                if set {
+                    bits |= bit;
+                }
+            }
+            if bits != 0 {
+                self.inner.mark_macro_pins_today(bits);
+            }
         }
         // A pinned phase is news of a turn, which the anticipated earnings
-        // price at once (`earnings_anticipation_half_life`).
-        self.inner.refresh_earnings_anticipation();
-        if corporate_bond_yield.is_some() {
-            self.inner.mark_macro_pins_today(crate::engine::PIN_CORPORATE);
+        // price at once (`earnings_anticipation_half_life`); under
+        // `cycle_nowcast_accuracy` the market's belief goes onto it and
+        // holds there through tonight's close, since a caller's write is
+        // public (`Engine::cycle_phase_pinned`, which refreshes as well).
+        if phase.is_some() {
+            self.inner.cycle_phase_pinned();
+        } else {
+            self.inner.refresh_earnings_anticipation();
         }
         // A pin is published the moment it is written, so with
         // `macro_publication_repricing` on the price takes it now rather
         // than at the next tick (`Engine::reprice_to_published_macro`).
         self.inner.reprice_to_published_macro(marks);
+        // And the rate indices, to the curve as pinned
+        // (`rate_close_remark`); nothing with the switch off.
+        self.inner.remark_rates_after_pin();
         Ok(())
     }
 
@@ -4197,7 +4560,11 @@ impl PyEngine {
     fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let e = self.inner.economy();
         let out = PyDict::new_bound(py);
-        out.set_item("vix", e.vix)?;
+        // The VIX as PUBLISHED: under `vix_stress_premium` the quote carries
+        // a stress premium over the state, which
+        // `state_snapshot()["economy"]["vix"]` holds and every internal
+        // reader reads. The state itself with the dial at 0.0.
+        out.set_item("vix", self.inner.published_vix())?;
         out.set_item(
             "federal_funds_rate",
             crate::units::percent_to_fraction(e.federal_funds_rate),
@@ -4423,7 +4790,7 @@ impl PyEngine {
     /// Accumulated per DAY and reset at `open_market`, so a read after
     /// `close_market` still returns the day just finished.
     ///
-    /// # Eleven components, the same eleven the `truth` table carries
+    /// # Twelve components, the same twelve the `truth` table carries
     ///
     /// In `FACTORS` order. `reversion`, `momentum` and `crowd_lean` are the
     /// model's own dynamics. `company_news`, `order_flow_impact`,
@@ -4431,9 +4798,11 @@ impl PyEngine {
     /// `circuit_breaker` is the correction when the session breaker clamps a
     /// price. `jump` is the daily jump and `overnight` the move applied at
     /// the open. `fair_value_shift` is minus the part of the shocks that
-    /// moved the name's fair value for good instead of `s`.
+    /// moved the name's fair value for good instead of `s`. `dividend` is the
+    /// change in `s` at an ex-date open, zero on every model without
+    /// dividends (`dividend_payout_share`).
     ///
-    /// All eleven sum to the day's change in `mispricing_s`. What that
+    /// All twelve sum to the day's change in `mispricing_s`. What that
     /// change covers depends on the preset. Measured over the first 40 days
     /// of `Universe.random(40, seed=111)` with seed 101, where the sum matched
     /// the change in `s` to within 1e-13 on both presets, and "explained" is
@@ -4478,6 +4847,43 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.padded(self.inner.attribution_column(index), 0.0)))
     }
 
+    /// The earnings reports ahead, as a real calendar lists them: one dict
+    /// per report with `ticker`, `session` (the engine's session number of
+    /// the reaction session, the first to trade the report) and
+    /// `sessions_ahead` (0 is the session now open, or the next to open when
+    /// the market is closed), for every reaction session in the next
+    /// `horizon` sessions, ordered by session. Dates only: the surprise is
+    /// realised at the reaction session's opening print and nothing here
+    /// reads it. Empty unless the model runs the calendar
+    /// (`earnings_surprise_sigma` non-zero).
+    #[pyo3(signature = (horizon = 63))]
+    fn earnings_calendar(&self, py: Python<'_>, horizon: i64) -> PyResult<Vec<Py<PyDict>>> {
+        if !(0..=2520).contains(&horizon) {
+            return Err(ValidationError::new_err(format!(
+                "horizon is {horizon}. It is a number of sessions, in [0, 2520]."
+            )));
+        }
+        let from = i64::from(self.day_count);
+        let mut out = Vec::new();
+        for (i, day) in self.inner.earnings_calendar(from, horizon) {
+            let d = PyDict::new_bound(py);
+            d.set_item("ticker", self.inner.companies()[i].ticker.clone())?;
+            d.set_item("session", day)?;
+            d.set_item("sessions_ahead", day - from)?;
+            out.push(d.unbind());
+        }
+        Ok(out)
+    }
+
+    /// The earnings surprise each name's opening print realised at the last
+    /// open, in `tickers` order, as f64 bytes (a log move of fair value);
+    /// 0.0 where no report was realised, and in every rate instrument's slot.
+    fn earnings_surprises(&self, py: Python<'_>) -> Py<PyBytes> {
+        let mut moves = self.inner.earnings_moves().to_vec();
+        moves.resize(self.inner.companies().len(), 0.0);
+        f64_bytes(py, &self.padded(moves, 0.0))
+    }
+
     /// The rate components of today's move, one value per instrument in
     /// `tickers` order, as f64 bytes. Zero for every equity.
     ///
@@ -4493,11 +4899,41 @@ impl PyEngine {
     /// in the day it lands on.
     fn rate_attribution(&self, py: Python<'_>, component: &str) -> PyResult<Py<PyBytes>> {
         let rates = &self.inner.rates().instruments;
+        // Under `rate_intraday_live` a session's print is around the live
+        // mark, which commits nothing: its repricing from the committed
+        // yield joins the day's terms, and the flow is the premium over it.
+        let live: Vec<crate::rates::Repricing> = match self.inner.rate_live_curve() {
+            Some(c) => rates
+                .iter()
+                .map(|i| crate::rates::Repricing::new(
+                    i.spec.duration, i.spec.convexity, c.dy(i.spec.point), 0.0))
+                .collect(),
+            None => Vec::new(),
+        };
+        let marks = self.inner.rate_marks();
         let values: Vec<f64> = match component {
             "carry" => rates.iter().map(|i| i.day_carry).collect(),
-            "duration" => rates.iter().map(|i| i.day_duration).collect(),
-            "convexity" => rates.iter().map(|i| i.day_convexity).collect(),
-            "flow" => rates.iter().map(|i| i.price / i.level - 1.0).collect(),
+            "duration" => rates
+                .iter()
+                .enumerate()
+                .map(|(j, i)| match live.get(j) {
+                    Some(r) => i.day_duration + r.duration,
+                    None => i.day_duration,
+                })
+                .collect(),
+            "convexity" => rates
+                .iter()
+                .enumerate()
+                .map(|(j, i)| match live.get(j) {
+                    Some(r) => i.day_convexity + r.convexity,
+                    None => i.day_convexity,
+                })
+                .collect(),
+            "flow" => rates
+                .iter()
+                .zip(marks.iter())
+                .map(|(i, m)| i.price / m.0 - 1.0)
+                .collect(),
             other => {
                 return Err(ValidationError::new_err(format!(
                     "unknown rate component {other:?}. Valid: {}",
@@ -4524,7 +4960,8 @@ impl PyEngine {
     #[getter]
     fn rate_instruments<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         let mut out = Vec::new();
-        for inst in &self.inner.rates().instruments {
+        let marks = self.inner.rate_marks();
+        for (inst, mark) in self.inner.rates().instruments.iter().zip(marks.iter()) {
             let d = PyDict::new_bound(py);
             d.set_item("ticker", inst.spec.ticker)?;
             d.set_item("name", inst.spec.name)?;
@@ -4532,8 +4969,9 @@ impl PyEngine {
             d.set_item("duration", inst.spec.duration)?;
             d.set_item("convexity", inst.spec.convexity)?;
             d.set_item("spread_bps", inst.spec.spread_bps)?;
-            d.set_item("level", inst.level)?;
-            d.set_item("yield", inst.marked_yield)?;
+            // The live mark's during a session under `rate_intraday_live`.
+            d.set_item("level", mark.0)?;
+            d.set_item("yield", mark.1)?;
             d.set_item("price", inst.price)?;
             d.set_item("avg_volume", inst.avg_volume)?;
             out.push(d);
@@ -4704,7 +5142,8 @@ impl PyEngine {
     fn state_hash(&self) -> String {
         let bytes = self.inner.state_hash_with_pending(
             self.day_count, self.market_open,
-            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value);
+            &self.pending_jump, &self.pending_overnight, &self.pending_fair_value,
+            &self.pending_dividend);
         crate::params::lower_hex(&bytes)
     }
 
@@ -4804,8 +5243,16 @@ impl PyEngine {
         // re-opens the day and re-anchors `previous_close`.
         // Two widths now: the engine's attribution carries the daily jump in
         // an eighth slot, the tick's own decomposition does not (§74).
+        // The dividend's slot, the last, only on a model that pays dividends
+        // (`dividend_payout_share`), where it can be non-zero, so every other
+        // snapshot is the eleven-wide one it was.
+        let width = if self.inner.carries_dividends() {
+            crate::market::factors::COMPONENT_COUNT
+        } else {
+            crate::market::factors::DIVIDEND_SLOT
+        };
         let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
-            rows.iter().flat_map(|r| r.iter().copied()).collect()
+            rows.iter().flat_map(|r| r[..width].iter().copied()).collect()
         };
         let flat = |rows: &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
@@ -4872,6 +5319,25 @@ impl PyEngine {
         if self.inner.params().vix_anchor_memory != 0.0 {
             out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
         }
+        // The market factor's return memory, on the same rule: carried, and
+        // hashed, only with `market_vol_leverage` set.
+        if self.inner.carries_market_vol_leverage() {
+            out.set_item("market_vol_leverage_memory",
+                         self.inner.market_vol_leverage_memory())?;
+        }
+        // The cycle's volatility multiplier, on the same rule: carried, and
+        // hashed, only with `market_vol_cycle_ratio` set and once a close
+        // has set it.
+        if self.inner.carries_market_vol_cycle() {
+            if let Some(l) = self.inner.market_vol_cycle_log() {
+                out.set_item("market_vol_cycle_log", l)?;
+            }
+        }
+        // The published VIX's stress memory, only where the hash covers it:
+        // with `vix_stress_premium` non-zero.
+        if self.inner.carries_vix_stress_memory() {
+            out.set_item("vix_stress_memory", self.inner.vix_stress_memory())?;
+        }
         // THE CRISIS EPISODE: whether one is running, how many consecutive
         // sessions it has spent under the threshold, the sector index its
         // epicentre was drawn at (`-1` for `none`, a crisis with no
@@ -4897,6 +5363,62 @@ impl PyEngine {
         }
         if self.inner.macro_pins_today() != 0 {
             out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
+        }
+        // The market's cycle nowcast's generator (`cycle_nowcast_accuracy`),
+        // a key only while the dial is set: (state, increment, spare) as the
+        // `rng` array carries a stream, then its uniform and normal counts.
+        // The belief itself is `economy["cycle_nowcast"]`.
+        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
+            let s = self.inner.cycle_nowcast_rng_state();
+            out.set_item(
+                "cycle_nowcast_rng",
+                vec![f64::from_bits(s.state), f64::from_bits(s.increment),
+                     s.spare.unwrap_or(f64::NAN), s.uniforms as f64, s.normals as f64],
+            )?;
+        }
+        // The central bank's stress level, a key only while `fed_stress_cut`
+        // is set, and the rate indices' live mark, only while
+        // `rate_intraday_live` is set and a session holds one.
+        if let Some(level) = self.inner.stress_vix_max() {
+            out.set_item("fed_stress_vix_max", level)?;
+        }
+        // The stress hold's clock and the priced path's forecast, a key each
+        // only while its dial is set.
+        if let Some(age) = self.inner.stress_hold_age() {
+            out.set_item("fed_stress_hold_age", age)?;
+        }
+        if let Some(path) = self.inner.policy_path() {
+            out.set_item("treasury_policy_path", path)?;
+        }
+        // The drawdown hold's window and its base, two keys only while
+        // `fed_drawdown_hold` is set.
+        if let Some((returns, prev)) = self.inner.drawdown_state() {
+            out.set_item("fed_drawdown_returns", f64_bytes(py, &returns))?;
+            out.set_item("fed_drawdown_mcap_prev", prev)?;
+        }
+        // What the curve prices of the next meeting, a key only while
+        // `policy_anticipation` is set.
+        if let Some(priced) = self.inner.policy_anticipation_priced() {
+            out.set_item("policy_anticipation_priced", priced)?;
+        }
+        if let Some(marks) = self.inner.rate_live_marks() {
+            out.set_item("rate_live_marks", marks.to_vec())?;
+        }
+        // Today's priced VIX move (`pinned_vix_variance_share`), a key only
+        // while a pin has made one: the session's market draws read it.
+        if self.inner.pinned_vix_jump() != 0.0 {
+            out.set_item("pinned_vix_jump", self.inner.pinned_vix_jump())?;
+        }
+        // The day's market t scale (`market_day_tail_df`), a key only between
+        // an open that drew one and the close: the session's market draws
+        // read it.
+        if self.inner.market_day_scale() != 1.0 {
+            out.set_item("market_day_scale", self.inner.market_day_scale())?;
+        }
+        // The spread a `corporate_spread` pin holds tonight, only while its
+        // mark stands.
+        if let Some(spread) = self.inner.pinned_corporate_spread() {
+            out.set_item("pinned_corporate_spread", spread)?;
         }
         // Nominal output when the run opened, the base of the growth
         // term's ratio. A constant of the run rather than advancing state,
@@ -4925,6 +5447,12 @@ impl PyEngine {
         // preset through pt-v18 actually held.
         out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
         out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
+        // The accrued buyback share-count reductions: their own key, and
+        // only while `buyback_accrual` and the payout share are both set, so
+        // every preset's snapshot is the one it was.
+        if self.inner.carries_buyback_log_shares() {
+            out.set_item("buyback_log_shares", f64_bytes(py, &self.inner.buyback_log_shares()))?;
+        }
         // The fair-value levels pt-v20 turned on. Their own key, and only
         // when the model can move them, so every earlier preset's snapshot
         // is the one it was.
@@ -4933,6 +5461,43 @@ impl PyEngine {
             // The opening draws the hash covers beside the levels: empty once
             // the market has opened, the roster's plus one before it.
             out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
+            // The prehistory's carried opening (`market_prehistory_valuation`),
+            // under its own key and only with that dial on.
+            if self.inner.params().market_prehistory_valuation != 0.0 {
+                out.set_item("opening_carry", f64_bytes(py, self.inner.opening_carry()))?;
+            }
+        }
+        // The dividend states, only on a model that pays dividends, so every
+        // other snapshot is the one it was. Seven f64s a name
+        // (`market::dividends::STATE_WIDTH`), NaN for a name without one.
+        if self.inner.carries_dividends() {
+            out.set_item("dividend", f64_bytes(py, &self.inner.dividend_states()))?;
+        }
+        // The earnings calendar's key, only with the calendar on: every
+        // report's date and draws derive from it, so a restore into an
+        // engine built from another seed must carry it or report on other
+        // dates.
+        if self.inner.carries_earnings() {
+            out.set_item("earnings_key", self.inner.earnings_key())?;
+        }
+        // What names hold back of the earnings cycle for their reports, only
+        // while `earnings_cycle_report_share` runs.
+        if self.inner.carries_earnings_withheld() {
+            out.set_item("earnings_withheld", f64_bytes(py, self.inner.earnings_withheld()))?;
+        }
+        // Tonight's market draw under a night split, only while the
+        // session's live lagged wire reads it: a fork taken mid-session
+        // needs it to key the wire on the session's own draws.
+        if self.inner.carries_night_market_factor() {
+            out.set_item("night_market_factor", self.inner.night_market_factor())?;
+        }
+        // The per-name idiosyncratic variance state, only while it runs, so
+        // every preset's snapshot is the one it was.
+        if self.inner.carries_idio_vol_state() {
+            let (ratio, jump, jump_var) = self.inner.idio_vol_state();
+            out.set_item("idio_variance", f64_bytes(py, ratio))?;
+            out.set_item("idio_jump_pending", f64_bytes(py, jump))?;
+            out.set_item("idio_jump_var_pending", f64_bytes(py, jump_var))?;
         }
         // The sector state's two per-DAY companions, carried for the
         // reason `attribution` and `tick_components` are: a fork taken
@@ -4964,6 +5529,9 @@ impl PyEngine {
         // fair-value offsets is the one it was.
         if !self.pending_fair_value.is_empty() {
             out.set_item("pending_fair_value", f64_bytes(py, &self.pending_fair_value))?;
+        }
+        if !self.pending_dividend.is_empty() {
+            out.set_item("pending_dividend", f64_bytes(py, &self.pending_dividend))?;
         }
         // The day's endogenous news, generated once in `open_market` and read
         // by every tick of that day. Per-DAY state, not a per-tick input, and
@@ -4997,10 +5565,13 @@ impl PyEngine {
         economy_scalars!(econ_put);
         econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
         econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
+            econ.set_item("cycle_nowcast", self.inner.cycle_nowcast().to_vec())?;
+        }
         // The published-phase history, oldest first, only while
         // `cycle_publication_lag` keeps one, so every other snapshot is the
         // dict it was. A restore without it re-seeds from the true phase.
-        if self.inner.params().cycle_publication_lag != 0.0 {
+        if self.inner.carries_cycle_history() {
             let history: Vec<&str> =
                 self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
             econ.set_item("cycle_history", history)?;
@@ -5028,6 +5599,32 @@ impl PyEngine {
             block.set_item("pending_values", values)?;
             econ.set_item("gdp_publication", block)?;
         }
+        // The drawn publication schedule, only while
+        // `cycle_publication_lag_draw` is set (the fixed lag's history is
+        // then not kept). A restore without it re-seeds from the phase
+        // restored.
+        if self.inner.params().cycle_publication_lag_draw != 0.0 {
+            let p = self.inner.cycle_publication();
+            let block = PyDict::new_bound(py);
+            block.set_item("key", p.key)?;
+            block.set_item("published", p.published.as_str())?;
+            block.set_item("last_true", p.last_true.as_str())?;
+            block.set_item("closes", p.closes)?;
+            block.set_item("turns", p.turns)?;
+            let closes: Vec<i64> = p.pending.iter().map(|&(c, _)| c).collect();
+            let phases: Vec<&str> = p.pending.iter().map(|&(_, ph)| ph.as_str()).collect();
+            block.set_item("pending_closes", closes)?;
+            block.set_item("pending_phases", phases)?;
+            econ.set_item("cycle_publication", block)?;
+        }
+        // The anticipation's left-out drift `D` and the last `A - e`, only
+        // while `earnings_anticipation_drift_share` is set. A restore
+        // without them opens `D` at zero.
+        if self.inner.carries_anticipation_drift() {
+            let (drift, raw) = self.inner.anticipation_drift();
+            econ.set_item("anticipation_drift", drift)?;
+            econ.set_item("anticipation_raw", raw)?;
+        }
         // The aggregate earnings cycle, only when the model moves it, so
         // every earlier preset's snapshot is the dict it was.
         if self.inner.params().earnings_cycle_depth != 0.0 {
@@ -5043,6 +5640,18 @@ impl PyEngine {
         // it, so every other snapshot is the dict it was.
         if self.inner.params().qe_pe_stock_gain != 0.0 {
             econ.set_item("qe_assets_ratio", economy.qe_assets_ratio)?;
+        }
+        // The Fed put's state, on the same rule: only with `fed_put_gain` set.
+        if self.inner.carries_fed_put() {
+            econ.set_item("intermeeting_return", economy.intermeeting_return)?;
+            econ.set_item("fed_put", economy.fed_put)?;
+            econ.set_item("fed_put_owed", economy.fed_put_owed)?;
+            econ.set_item("fed_put_mcap_prev", economy.fed_put_mcap_prev)?;
+        }
+        // Credit's leverage gap, on the same rule: only with
+        // `corporate_spread_equity_gain` set.
+        if self.inner.carries_spread_equity_gap() {
+            econ.set_item("spread_equity_gap", economy.spread_equity_gap)?;
         }
         out.set_item("economy", econ)?;
 
@@ -5296,7 +5905,13 @@ impl PyEngine {
         }
 
         // The per-day accumulators, at the widths this build writes.
-        let width = crate::market::factors::COMPONENT_COUNT;
+        // Without dividends the snapshot leaves the dividend's slot, the
+        // last, out (`state_snapshot`).
+        let width = if inner.carries_dividends() {
+            crate::market::factors::COMPONENT_COUNT
+        } else {
+            crate::market::factors::DIVIDEND_SLOT
+        };
         let tick_width = crate::market::factors::TICK_COMPONENT_COUNT;
         let attribution = snap_buffer(snapshot, "", "attribution")?;
         let components = snap_buffer(snapshot, "", "tick_components")?;
@@ -5328,6 +5943,12 @@ impl PyEngine {
             Some(_) => snap_buffer(snapshot, "", "pending_fair_value")?,
             None => Vec::new(),
         };
+        // Absent means no ex-date move was waiting (`dividend_payout_share`;
+        // the key check refuses it on a model without dividends).
+        let pending_dividend = match snapshot.get_item("pending_dividend")? {
+            Some(_) => snap_buffer(snapshot, "", "pending_dividend")?,
+            None => Vec::new(),
+        };
         inner
             .set_volume_idio(&snap_buffer(snapshot, "", "volume_idio")?)
             .map_err(ValidationError::new_err)?;
@@ -5343,6 +5964,45 @@ impl PyEngine {
                 .map_err(ValidationError::new_err)?;
             inner
                 .set_opening_z(&snap_buffer(snapshot, "", "opening_z")?)
+                .map_err(ValidationError::new_err)?;
+            if inner.params().market_prehistory_valuation != 0.0 {
+                inner
+                    .set_opening_carry(&snap_buffer(snapshot, "", "opening_carry")?)
+                    .map_err(ValidationError::new_err)?;
+            }
+        }
+        // The per-name state of the dial-gated mechanisms. The key check
+        // above has required each exactly where this engine's model sets
+        // its dial, so a key read here is present.
+        if inner.carries_dividends() {
+            inner
+                .set_dividend_states(&snap_buffer(snapshot, "", "dividend")?)
+                .map_err(ValidationError::new_err)?;
+        }
+        if inner.carries_buyback_log_shares() {
+            inner
+                .set_buyback_log_shares(&snap_buffer(snapshot, "", "buyback_log_shares")?)
+                .map_err(ValidationError::new_err)?;
+        }
+        if inner.carries_earnings() {
+            let key: u64 = snap_value(snapshot, "", "earnings_key", "an integer")?;
+            inner.set_earnings_key(key);
+        }
+        if inner.carries_night_market_factor() {
+            inner.set_night_market_factor(snap_finite(snapshot, "", "night_market_factor")?);
+        }
+        if inner.carries_earnings_withheld() {
+            inner
+                .set_earnings_withheld(&snap_buffer(snapshot, "", "earnings_withheld")?)
+                .map_err(ValidationError::new_err)?;
+        }
+        if inner.carries_idio_vol_state() {
+            inner
+                .set_idio_vol_state(
+                    &snap_buffer(snapshot, "", "idio_variance")?,
+                    &snap_buffer(snapshot, "", "idio_jump_pending")?,
+                    &snap_buffer(snapshot, "", "idio_jump_var_pending")?,
+                )
                 .map_err(ValidationError::new_err)?;
         }
         inner
@@ -5374,6 +6034,17 @@ impl PyEngine {
         if inner.params().vix_anchor_memory != 0.0 {
             inner.set_vix_anchor_slow(snap_finite(snapshot, "", "vix_anchor_slow")?);
         }
+        // The cycle's volatility multiplier (`market_vol_cycle_ratio`), unset
+        // where the snapshot carries none: taken before the first close set
+        // it.
+        let cycle_log = match snapshot.get_item("market_vol_cycle_log")? {
+            Some(_) => Some(snap_finite(snapshot, "", "market_vol_cycle_log")?),
+            None => None,
+        };
+        inner.set_market_vol_cycle_log(cycle_log);
+        if inner.carries_vix_stress_memory() {
+            inner.set_vix_stress_memory(snap_finite(snapshot, "", "vix_stress_memory")?);
+        }
         // The crisis episode: -1 is the epicentre `none`, and -2 is no pin.
         let in_episode: bool = snap_value(snapshot, "", "crisis_in_episode", "a bool")?;
         let sessions_under: i64 =
@@ -5401,11 +6072,84 @@ impl PyEngine {
             None => false,
         };
         inner.set_vix_sets_variance_pending(pending);
-        let pins: u8 = match snapshot.get_item("macro_pins_today")? {
-            Some(_) => snap_value(snapshot, "", "macro_pins_today", "an integer from 0 to 255")?,
+        let pins: u16 = match snapshot.get_item("macro_pins_today")? {
+            Some(_) => snap_value(snapshot, "", "macro_pins_today", "an integer from 0 to 65535")?,
             None => 0,
         };
-        inner.set_macro_pins_today(pins);
+        // The spread a spread pin holds, present exactly while its mark is.
+        let spread: Option<f64> = match snapshot.get_item("pinned_corporate_spread")? {
+            Some(_) => Some(snap_finite(snapshot, "", "pinned_corporate_spread")?),
+            None => None,
+        };
+        if spread.is_some() != (pins & crate::engine::PIN_SPREAD != 0) {
+            return Err(ValidationError::new_err(
+                "this snapshot carries pinned_corporate_spread without its \
+                 mark in macro_pins_today, or the mark without the spread. \
+                 The engine writes both or neither.",
+            ));
+        }
+        inner.set_macro_pins_today(pins, spread.unwrap_or(0.0));
+        // The central bank's and the curve's dial-gated state. The key check
+        // has required each exactly where this engine's model sets its dial.
+        let gated_finite = |key: &str, carried: bool| -> PyResult<Option<f64>> {
+            if carried { Ok(Some(snap_finite(snapshot, "", key)?)) } else { Ok(None) }
+        };
+        let p = inner.params().clone();
+        inner
+            .set_stress_vix_max(gated_finite("fed_stress_vix_max", p.fed_stress_cut != 0.0)?)
+            .map_err(ValidationError::new_err)?;
+        inner
+            .set_stress_hold_age(gated_finite("fed_stress_hold_age", p.fed_stress_hold != 0.0)?)
+            .map_err(ValidationError::new_err)?;
+        inner
+            .set_policy_path(gated_finite("treasury_policy_path", p.treasury_path_pricing != 0.0)?)
+            .map_err(ValidationError::new_err)?;
+        let drawdown = if p.fed_drawdown_hold != 0.0 || p.market_vol_cycle_recovery_release != 0.0 {
+            Some((
+                snap_buffer(snapshot, "", "fed_drawdown_returns")?,
+                snap_finite(snapshot, "", "fed_drawdown_mcap_prev")?,
+            ))
+        } else {
+            None
+        };
+        inner.set_drawdown_state(drawdown).map_err(ValidationError::new_err)?;
+        inner
+            .set_policy_anticipation_priced(
+                gated_finite("policy_anticipation_priced", p.policy_anticipation != 0.0)?)
+            .map_err(ValidationError::new_err)?;
+        // Absent means no session held a live mark when it was taken.
+        let live: Option<[f64; 6]> = match snapshot.get_item("rate_live_marks")? {
+            Some(_) => {
+                let values: Vec<f64> =
+                    snap_value(snapshot, "", "rate_live_marks", "a list of six numbers")?;
+                let arr: [f64; 6] = values.as_slice().try_into().map_err(|_| {
+                    ValidationError::new_err(format!(
+                        "this snapshot's rate_live_marks carries {} values; the live mark \
+                         is six: the open's projection and the session's, three yields each.",
+                        values.len()))
+                })?;
+                Some(arr)
+            }
+            None => None,
+        };
+        inner.set_rate_live_marks(live).map_err(ValidationError::new_err)?;
+        // Absent means no pin had priced a VIX move that session.
+        let jump = match snapshot.get_item("pinned_vix_jump")? {
+            Some(_) => snap_finite(snapshot, "", "pinned_vix_jump")?,
+            None => 0.0,
+        };
+        inner.set_pinned_vix_jump(jump);
+        // Absent means no open had drawn a day scale (a snapshot at a close).
+        let day_scale = match snapshot.get_item("market_day_scale")? {
+            Some(_) => snap_finite(snapshot, "", "market_day_scale")?,
+            None => 1.0,
+        };
+        if day_scale <= 0.0 {
+            return Err(ValidationError::new_err(format!(
+                "this snapshot's market_day_scale is {day_scale}; the engine writes a \
+                 positive finite multiplier.")));
+        }
+        inner.set_market_day_scale(day_scale);
         inner.set_nominal_output_base(snap_finite(snapshot, "", "nominal_output_base")?);
         let variance: Vec<f64> =
             snap_value(snapshot, "", "market_variance", "a list of numbers")?;
@@ -5418,6 +6162,12 @@ impl PyEngine {
         }
         inner.set_market_variance_state_with_components(
             variance[0], variance[1], variance[2], variance[3], variance[4], variance[5]);
+        // The market factor's return memory, after the variance state, whose
+        // restore resets it.
+        if inner.carries_market_vol_leverage() {
+            inner.set_market_vol_leverage_memory(
+                snap_finite(snapshot, "", "market_vol_leverage_memory")?);
+        }
 
         // The macro chain's state, every field by name.
         let d = snap_dict(snapshot, "", "economy")?;
@@ -5453,9 +6203,48 @@ impl PyEngine {
         if params.qe_pe_stock_gain != 0.0 {
             inner.economy_mut().qe_assets_ratio = snap_finite(&d, "economy.", "qe_assets_ratio")?;
         }
+        if inner.carries_fed_put() {
+            let e = inner.economy_mut();
+            e.intermeeting_return = snap_finite(&d, "economy.", "intermeeting_return")?;
+            e.fed_put = snap_finite(&d, "economy.", "fed_put")?;
+            e.fed_put_owed = snap_finite(&d, "economy.", "fed_put_owed")?;
+            e.fed_put_mcap_prev = snap_finite(&d, "economy.", "fed_put_mcap_prev")?;
+        }
+        if inner.carries_spread_equity_gap() {
+            inner.economy_mut().spread_equity_gap =
+                snap_finite(&d, "economy.", "spread_equity_gap")?;
+        }
+        // The market's cycle nowcast (`cycle_nowcast_accuracy`), before the
+        // anticipation that reads it: the belief, and its generator as
+        // (state, increment, spare, uniforms, normals).
+        if params.cycle_nowcast_accuracy != 0.0 {
+            let belief: Vec<f64> =
+                snap_value(&d, "economy.", "cycle_nowcast", "a list of five numbers")?;
+            if belief.len() != 5 || belief.iter().any(|v| !v.is_finite()) {
+                return Err(ValidationError::new_err(format!(
+                    "snapshot field economy.cycle_nowcast must be 5 finite numbers, got {belief:?}"
+                )));
+            }
+            let r: Vec<f64> =
+                snap_value(snapshot, "", "cycle_nowcast_rng", "a list of five numbers")?;
+            if r.len() != 5 {
+                return Err(ValidationError::new_err(format!(
+                    "snapshot field cycle_nowcast_rng must be 5 numbers, got {}", r.len())));
+            }
+            let rng = crate::rng::RngState {
+                state: r[0].to_bits(),
+                increment: r[1].to_bits(),
+                spare: if r[2].is_nan() { None } else { Some(r[2]) },
+                uniforms: r[3] as u64,
+                normals: r[4] as u64,
+            };
+            inner
+                .set_cycle_nowcast([belief[0], belief[1], belief[2], belief[3], belief[4]], Some(rng))
+                .map_err(ValidationError::new_err)?;
+        }
         // Derived from the phase and the level just restored.
         inner.refresh_earnings_anticipation();
-        if params.cycle_publication_lag != 0.0 {
+        if inner.carries_cycle_history() {
             let names: Vec<String> =
                 snap_value(&d, "economy.", "cycle_history", "a list of cycle phases")?;
             let mut history = Vec::with_capacity(names.len());
@@ -5468,6 +6257,25 @@ impl PyEngine {
                 })?);
             }
             inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
+        }
+        // The drawn publication schedule (`cycle_publication_lag_draw`).
+        if params.cycle_publication_lag_draw != 0.0 {
+            let block = snap_dict(&d, "economy.", "cycle_publication")?;
+            check_keys(
+                "snapshot field economy.cycle_publication",
+                &block,
+                CYCLE_PUBLICATION_KEYS,
+                &[],
+                &[],
+            )?;
+            let state = cycle_publication_from(block.as_any())?;
+            inner.set_cycle_publication(state).map_err(ValidationError::new_err)?;
+        }
+        // `D` and the last `A - e` (`earnings_anticipation_drift_share`).
+        if inner.carries_anticipation_drift() {
+            let drift = snap_finite(&d, "economy.", "anticipation_drift")?;
+            let raw = snap_finite(&d, "economy.", "anticipation_raw")?;
+            inner.set_anticipation_drift(drift, raw).map_err(ValidationError::new_err)?;
         }
         if params.unemployment_adjustment_half_life != 0.0 {
             inner.economy_mut().unemployment_impulse =
@@ -5641,6 +6449,7 @@ impl PyEngine {
         self.pending_jump = pending_jump;
         self.pending_overnight = pending_overnight;
         self.pending_fair_value = pending_fair_value;
+        self.pending_dividend = pending_dividend;
         // The snapshot carries no clock, so the restored engine's next
         // session is treated as the day's first and does not warn.
         self.session_clock = None;
@@ -5684,11 +6493,14 @@ impl PyEngine {
             repriced: self.day_buffer.repriced.clone(),
             unbounded_print: self.day_buffer.unbounded_print.clone(),
             liquidity_share: self.day_buffer.liquidity_share.clone(),
+            distribution: self.distribution_row(),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
             day,
-            vix: e.vix,
+            // As published (`vix_stress_premium`), as `macro_fields`
+            // reports it: the state with the dial at 0.0.
+            vix: self.inner.published_vix(),
             // Fractional on the way out, matching the way in. A results table
             // reporting percent while the constructor takes fractions would
             // reintroduce the unit trap on the return journey.
@@ -5779,6 +6591,7 @@ impl PyEngine {
                 repriced: Vec::new(),
                 unbounded_print: Vec::new(),
                 liquidity_share: Vec::new(),
+                distribution: Vec::new(),
             }]
         } else {
             self.select_recorded(day)?
@@ -6007,6 +6820,14 @@ impl PyEngine {
             DepthColumns::PartialDay => "part way through",
         };
 
+        // The `distribution` column, on a model that pays dividends only.
+        let distribution_now: Option<Vec<f64>> =
+            if self.inner.carries_dividends() { Some(self.distribution_row()) } else { None };
+        let with_distribution = if self.recorded.is_empty() {
+            distribution_now.is_some()
+        } else {
+            self.recorded.iter().any(|d| !d.distribution.is_empty())
+        };
         let (batches, depth) = if self.recorded.is_empty() {
             let ticks = self.buffer.ticks_written;
             let instruments = self.buffer.companies;
@@ -6015,7 +6836,7 @@ impl PyEngine {
                 ticks * instruments,
             );
             (
-                vec![crate::python_arrow::prints_batch(
+                vec![crate::python_arrow::prints_batch_with(
                     // Nothing is recorded, so there is no day to select and
                     // the argument is the label on the rows, as it is on the
                     // same path in `bars` and `truth`.
@@ -6031,6 +6852,7 @@ impl PyEngine {
                     self.written(&self.buffer.unbounded_print),
                     self.written(&self.buffer.liquidity_share),
                     depth,
+                    distribution_now.as_deref(),
                 )
                 .map_err(crate::python_arrow::arrow_err)?],
                 depth,
@@ -6062,8 +6884,16 @@ impl PyEngine {
             }
             let mut out = Vec::with_capacity(selected.len());
             for d in &selected {
+                let zeros = vec![0.0; d.instruments];
+                let amounts: Option<&[f64]> = if !with_distribution {
+                    None
+                } else if d.distribution.is_empty() {
+                    Some(&zeros)
+                } else {
+                    Some(&d.distribution)
+                };
                 out.push(
-                    crate::python_arrow::prints_batch(
+                    crate::python_arrow::prints_batch_with(
                         d.day,
                         d.ticks,
                         d.instruments,
@@ -6076,6 +6906,7 @@ impl PyEngine {
                         &d.unbounded_print,
                         &d.liquidity_share,
                         depth,
+                        amounts,
                     )
                     .map_err(crate::python_arrow::arrow_err)?,
                 );
@@ -6084,7 +6915,7 @@ impl PyEngine {
         };
         Ok(crate::python_arrow::PyArrowStream::new(
             "prints",
-            crate::python_arrow::prints_schema(depth),
+            crate::python_arrow::prints_schema_with(depth, with_distribution),
             batches,
         ))
     }
@@ -6362,7 +7193,11 @@ impl PyEngine {
     /// ``permanent`` is the change to the name's ``s`` the agent's fills
     /// made, in log units: exact under ``fill_impact_coefficient``, whose
     /// law is linear and additive, and the tick's flow impact shared pro
-    /// rata by signed shares under the imbalance law. Recorded in the log.
+    /// rata by signed shares under the imbalance law. With
+    /// ``impact_memory_coefficient`` set, ``transient`` is the metaorder
+    /// memory's part of the tick: what the tick's flow moved the name's
+    /// displacement, shared by signed net shares; the key is absent
+    /// otherwise. Recorded in the log.
     #[pyo3(signature = (agent = None))]
     fn take_impacts(&mut self, py: Python<'_>, agent: Option<String>) -> PyResult<Vec<PyObject>> {
         self.log.push(crate::python_log::LogEntry::TakeImpacts { agent: agent.clone() });
@@ -6376,6 +7211,9 @@ impl PyEngine {
                 d.set_item("bought", r.bought)?;
                 d.set_item("sold", r.sold)?;
                 d.set_item("permanent", r.permanent)?;
+                if let Some(v) = r.transient {
+                    d.set_item("transient", v)?;
+                }
                 d.set_item("day", r.day)?;
                 d.set_item("tick", r.tick)?;
                 Ok(d.into())
@@ -6389,6 +7227,20 @@ impl PyEngine {
     #[getter]
     fn book_live(&self) -> bool {
         self.inner.book_live()
+    }
+
+    /// The order in which a cohort's orders reach the book on one step.
+    ///
+    /// ``labels`` sorted at ``book_arrival_shuffle`` 0.0, the order every
+    /// preset carries. With the switch on, a seeded shuffle that is fresh
+    /// every step: the labels sorted by a counter-based priority of this
+    /// engine's seed, ``day``, ``step_of_day`` and the label
+    /// (``rust/src/rng.rs``, ``arrival_priority``). It takes no draw and
+    /// moves nothing, and a label's priority does not depend on which other
+    /// labels are present, so removing one never reorders the rest.
+    /// ``World.run`` reads it for a cohort.
+    fn arrival_order(&self, day: u64, step_of_day: u64, labels: Vec<String>) -> Vec<String> {
+        self.inner.arrival_order(day, step_of_day, &labels)
     }
 
     /// Every input that crossed into this engine, in order.
@@ -6667,6 +7519,7 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::JUMP_COMPONENT_KEY,
     crate::market::factors::OVERNIGHT_COMPONENT_KEY,
     crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
+    crate::market::factors::DIVIDEND_COMPONENT_KEY,
 ];
 
 /// A rate instrument's state in a snapshot, in the order the state hash

@@ -204,6 +204,8 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_s_prev_close: maybe(&s["mispricingSPrevClose"]),
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             fair_value_offset: None,
+            buyback_log_shares: None,
+            dividend: None,
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -281,6 +283,7 @@ fn check_scenario(file: &str) {
                 volume_state: 0.0,
                 volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),
@@ -290,12 +293,14 @@ fn check_scenario(file: &str) {
                 order_volumes: &[],
                 sector_keys: &sector_keys,
                 sector_sigmas: &[],
+                idio_vol_ratios: &[],
                 // Replaying a RECORDED reference stream: the tape holds the
                 // draws the reference consumed, four-or-zero at settlement,
                 // and `ScriptedRng::finish` asserts exact consumption.
                 // The constant-sigma baseline: these tests predate the factor's
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
+                market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                 settle_draws: SettleDrawPolicy::FourOrZero,
                 // The depth counterfactual, off. It reaches no company field.

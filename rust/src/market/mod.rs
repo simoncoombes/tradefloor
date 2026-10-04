@@ -47,6 +47,7 @@
 //! are that gap and are not a defect. See the port notes §D6.
 
 pub mod daily;
+pub mod dividends;
 pub mod factor_vol;
 pub mod factors;
 pub mod garch;

@@ -83,6 +83,8 @@ fn company(price: f64, previous_close: f64, eps: f64, s: Option<f64>) -> TickCom
             mispricing_s_prev_close: s,
             mispricing_momentum: Some(0.0),
             fair_value_offset: None,
+            buyback_log_shares: None,
+            dividend: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -116,6 +118,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             volume_state: 0.0,
             volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
             economy: &economy,
             market_status: MarketStatus::Open,
             intraday_t: 0.5,
@@ -125,9 +128,11 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             order_volumes: &[],
             sector_keys: &sectors(),
             sector_sigmas: &[],
+            idio_vol_ratios: &[],
             // The constant-sigma baseline: these tests predate the factor's
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
+            market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
             settle_draws: SettleDrawPolicy::FourAlways,
             // The depth counterfactual, off. It reaches no company field.
@@ -270,6 +275,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     volume_state: 0.0,
                     volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,
@@ -279,9 +285,11 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
@@ -338,6 +346,7 @@ fn the_band_holds_in_extended_hours_too() {
                     volume_state: 0.0,
                     volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                     economy: &economy,
                     market_status: status,
                     intraday_t: 0.0,
@@ -347,9 +356,11 @@ fn the_band_holds_in_extended_hours_too() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.
@@ -416,6 +427,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     volume_state: 0.0,
                     volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,
@@ -425,9 +437,11 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     order_volumes: &[],
                     sector_keys: &sectors(),
                     sector_sigmas: &[],
+                    idio_vol_ratios: &[],
                     // The constant-sigma baseline: these tests predate the factor's
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
+                    market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                     settle_draws: SettleDrawPolicy::FourAlways,
                     // The depth counterfactual, off. It reaches no company field.

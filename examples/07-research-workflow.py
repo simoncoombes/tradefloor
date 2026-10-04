@@ -287,7 +287,7 @@ def main() -> dict:
     print("     what the book quoted is what the portfolio paid, exactly")
 
     # 5. Ground truth for the same market. One row per instrument per tick,
-    #    and the eleven components sum to the change in mispricing, so the
+    #    and the twelve components sum to the change in mispricing, so the
     #    label can be checked rather than trusted.
     mark = time.time()
     engine = tf.Engine(seed=7, universe=universe)

@@ -338,14 +338,26 @@ class Portfolio:
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
                  "max_leverage", "_stamp", "cash_interest", "interest",
-                 "owner", "_in_book", "margin_interest")
+                 "owner", "_in_book", "margin_interest", "dividends", "distributions",
+                 "_collected", "reinvest_dividends")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
                  cash_interest: bool = False,
                  owner: str = "agent",
-                 margin_interest: bool = True) -> None:
+                 margin_interest: bool = True,
+                 reinvest_dividends: bool = True) -> None:
         """
+        ``reinvest_dividends`` is a dividend reinvestment plan: on a model
+        that pays dividends, a long position's dividend buys more of the
+        paying name at the ex-date open, fractional shares, so a holder that
+        never trades earns the total return, as a total-return index and
+        every fund comparison assume. On by default. Off, the dividend is
+        credited as cash, which earns nothing unless ``cash_interest`` is
+        set. A short pays its dividend in cash either way. Nothing is read
+        or changed on a model without dividends. See
+        :meth:`collect_dividends`.
+
         ``cash_interest`` makes cash earn the policy rate, one day at a time,
         when :meth:`accrue` is called; the harness and a World call it once a
         day before the close. Off by default, and with it off cash earns
@@ -381,8 +393,18 @@ class Portfolio:
         self.cash_interest = _checks.flag("cash_interest", cash_interest)
         self.margin_interest = _checks.flag("margin_interest",
                                             margin_interest)
+        self.reinvest_dividends = bool(reinvest_dividends)
         # Interest credited so far, net of any charged on a negative balance.
         self.interest = 0.0
+        #: Cash dividends received so far, net of any paid on a short.
+        self.dividends = 0.0
+        #: One entry per position that went ex: ``day``, ``ticker``,
+        #: ``quantity``, ``amount`` per share and ``cash`` (quantity x
+        #: amount, negative on a short). See :meth:`collect_dividends`.
+        self.distributions: list[dict] = []
+        # The (engine, day) last collected, so a second call on one open
+        # credits nothing.
+        self._collected = None
         self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
@@ -810,6 +832,88 @@ class Portfolio:
         self.cash += amount
         self.interest += amount
         return amount
+
+    def collect_dividends(self, engine: Engine) -> float:
+        """Credit the dividends this session's open made payable.
+
+        On a model that pays dividends (``dividend_payout_share``), a name
+        going ex opens lower by the amount per share; a holder of record is
+        owed ``quantity * amount`` and a short owes it in cash, as a stock
+        loan makes the borrower pay the lender. With ``reinvest_dividends``
+        (the default) a long position's dividend buys ``quantity * amount /
+        open`` more shares of the paying name at the ex-date open, where the
+        price already carries the drop, and its cost goes into
+        ``avg_cost``; the purchase sends no flow to the market, as a plan's
+        pooled purchase is a rounding error on the name's volume. Without
+        it the long's dividend is credited as cash.
+
+        Why reinvestment is the default: a holder that buys once and keeps
+        its dividends as cash holds less of the market every quarter, and
+        with cash earning nothing any strategy that re-targets its net worth
+        beats it by reinvesting them. On pt-v20 with dividends on (held-out
+        seeds 201-230, ten years), the registered rate-news agent (R7b) beat
+        such a holder by 0.25 to 0.29 points a year, ahead in 21 to 24 of
+        30 histories; under the plan it trails by 0.48 to 0.49, ahead in 4
+        or 5 (0.34 behind, 5 of 30, without dividends). The paired
+        difference is the plan's +0.75 points; the market's own change is
+        -0.15.
+
+        Call it once per session, right after ``open_market`` and before
+        trading; the harness, the gym, a World and the TCA path all do.
+        Returns the dividends received, net of those paid on shorts, all of
+        which are added to :attr:`dividends`; :attr:`cash` gains the part
+        not reinvested. One entry per position goes to
+        :attr:`distributions`, with ``reinvested`` the shares bought (0.0
+        for cash). 0.0 on every model without dividends, where nothing is
+        read. A second call on the same open credits nothing.
+        """
+        amounts = struct.unpack("<%dd" % len(engine.tickers),
+                                engine.column("dividend"))
+        if not any(amounts):
+            return 0.0
+        key = (id(engine), int(engine.day_count))
+        if self._collected == key:
+            return 0.0
+        self._collected = key
+        index = {t: i for i, t in enumerate(engine.tickers)}
+        prices = None
+        total = 0.0
+        credited = 0.0
+        for ticker, position in self.positions.items():
+            i = index.get(ticker)
+            if i is None or not position.quantity:
+                continue
+            amount = amounts[i]
+            if amount == 0.0:
+                continue
+            quantity = position.quantity
+            cash = quantity * amount
+            total += cash
+            shares = 0.0
+            if self.reinvest_dividends and quantity > 0.0:
+                if prices is None:
+                    raw = engine.prices()
+                    prices = struct.unpack("<%dd" % (len(raw) // 8), raw)
+                price = prices[i]
+                if price > 0.0:
+                    shares = cash / price
+                    held = quantity + shares
+                    position.avg_cost = (position.avg_cost * quantity + cash) / held
+                    position.quantity = held
+            if shares == 0.0:
+                credited += cash
+            self.distributions.append({
+                "day": int(engine.day_count), "ticker": ticker,
+                "quantity": quantity, "amount": amount, "cash": cash,
+                "reinvested": shares,
+            })
+        self.cash += credited
+        self.dividends += total
+        return total
+
+    def distributions_table(self):
+        """:attr:`distributions` as a list of dicts, oldest first."""
+        return list(self.distributions)
 
     # -- impact -----------------------------------------------------------
 

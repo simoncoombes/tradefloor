@@ -91,6 +91,12 @@ SCORECARD_FIELDS = (
     "explanation_baseline", "history_days", "margin_interest",
 )
 
+#: The scorecard fields hashed by value after the others, and only where
+#: they are not zero: the dividends a card received are 0.0 on every model
+#: without dividends (`dividend_payout_share`), which is every preset, so
+#: the digest of a run on one is the one it was before the field existed.
+SCORECARD_NONZERO = ("dividends",)
+
 #: The scorecard fields hashed as a count of their lines.
 SCORECARD_COUNTED = ("errors", "partial_fills")
 
@@ -328,6 +334,11 @@ def part_buffers(scores: dict, recorders: dict) -> dict:
             if field == "explanations":
                 value = [list(pair) for pair in value]
             _value(scorecard, value)
+        for field in SCORECARD_NONZERO:
+            value = getattr(card, field)
+            if value:
+                _text(scorecard, field)
+                _value(scorecard, value)
         for field in SCORECARD_COUNTED:
             _text(scorecard, field)
             _int(scorecard, len(getattr(card, field)))

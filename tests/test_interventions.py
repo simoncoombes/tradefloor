@@ -158,7 +158,7 @@ def test_the_registry_docstring_counts_the_registry():
     from tradefloor import interventions
 
     words = {"ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-             "fourteen": 14, "fifteen": 15}
+             "fourteen": 14, "fifteen": 15, "sixteen": 16}
     source = pathlib.Path(interventions.__file__).read_text(encoding="utf-8")
     claims = re.findall(r"of the (\w+) targets|list of (\w+) names", source)
     found = [w for pair in claims for w in pair if w]

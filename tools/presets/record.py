@@ -100,11 +100,16 @@ def recorded_values(values: dict[str, float]) -> dict[str, float]:
     is 0.0, the rule the Rust digest follows, because at zero it is the
     model that existed before it was added. So adding one moves no
     record's `coefficients` or `coefficient_digest`. Off zero it is kept.
+    A dial in `ModelParams.digest_silent_at_default()` is left out the same
+    way while it holds its default.
     """
     import tradefloor  # noqa: PLC0415
 
     silent = set(tradefloor.ModelParams.digest_silent_at_zero())
-    return {k: v for k, v in values.items() if not (k in silent and v == 0.0)}
+    at_default = tradefloor.ModelParams.digest_silent_at_default()
+    return {k: v for k, v in values.items()
+            if not (k in silent and v == 0.0)
+            and not (k in at_default and v == at_default[k])}
 
 
 def coefficient_digest(values: dict[str, float]) -> str:

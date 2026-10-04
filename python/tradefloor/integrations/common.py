@@ -1180,6 +1180,20 @@ def refusal_lines(refused: Sequence[dict[str, Any]]) -> list[str]:
 # -- observation -> framework -------------------------------------------------
 
 
+def _dividends_paid(engine: Any) -> list[float] | None:
+    """Today's ex-date amounts per instrument on a model that pays
+    dividends, from a :class:`~tradefloor.sandbox.MarketView` or a live
+    engine; None on any other model, and on an engine without the method."""
+    try:
+        on = engine.pays_dividends
+    except Exception:
+        try:
+            on = engine.model.dividend_payout_share != 0.0
+        except Exception:
+            return None
+    return list(engine.dividends_today()) if on else None
+
+
 def serialize_observation(obs: Any, *,
                           history: Sequence[Sequence[float]] = (),
                           fundamentals: dict[str, dict[str, Any]] | None = None,
@@ -1254,10 +1268,23 @@ def serialize_observation(obs: Any, *,
 
     rows = [list(row) for row in history]
     facts = fundamentals or {}
+    # The cash dividend per share each name went ex for at today's open, on
+    # a model that pays dividends (`dividend_payout_share`) only: public, on
+    # the tape's `distribution` column, and the reason a holder's price
+    # opened lower. Absent otherwise, so every other payload is the one it
+    # was.
+    paid = _dividends_paid(obs.engine)
+    # The earnings calendar, where the model runs one: a real company
+    # announces its report date, so the payload says how many sessions away
+    # each name's next report is. Dates only (see `MarketView.
+    # earnings_calendar`). Absent, and the payload the bytes it was, on a
+    # model without the calendar, which is every shipped preset.
+    reports = _next_reports(obs.engine)
     assets = []
     for i, ticker in enumerate(obs.tickers):
         book = obs.book(ticker)
         adv = obs.avg_volume(ticker)
+        extra = {} if paid is None else {"dividend": paid[i]}
         assets.append({
             "symbol": ticker,
             "price": obs.price(ticker),
@@ -1270,7 +1297,10 @@ def serialize_observation(obs: Any, *,
             "max_order_shares": max_participation * adv,
             "position": obs.position(ticker),
             "fundamentals": dict(facts.get(ticker, {})),
+            **extra,
         })
+        if reports:
+            assets[-1]["next_earnings_in_sessions"] = reports.get(ticker)
 
     portfolio = obs.portfolio
     equity = portfolio.net_worth(obs.engine)
@@ -1322,6 +1352,26 @@ def open_orders_of(obs: Any) -> list[dict[str, Any]]:
              "limit_price": order["limit_price"],
              "remaining": order["remaining"]}
             for order in obs.portfolio.open_orders(obs.engine)]
+
+
+def _next_reports(engine: Any) -> dict[str, int]:
+    """Each name's next report, in sessions ahead, off the engine's public
+    earnings calendar; empty where the model runs none (or the engine, a
+    test proxy say, has no calendar to read).
+
+    ``sessions_ahead`` 0 is the session now open, or the next to open when
+    the market is closed: a report on it has printed, or prints at that
+    open. The dates are the calendar's and nothing else is read.
+    """
+    calendar = getattr(engine, "earnings_calendar", None)
+    if calendar is None:
+        return {}
+    out: dict[str, int] = {}
+    for row in calendar(63):
+        ticker, ahead = row["ticker"], int(row["sessions_ahead"])
+        if ticker not in out or ahead < out[ticker]:
+            out[ticker] = ahead
+    return out
 
 
 def _window_return(rows: Sequence[Sequence[float]], i: int,

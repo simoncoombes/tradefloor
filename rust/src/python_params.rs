@@ -286,6 +286,19 @@ impl PyModelParams {
         crate::params::DIGEST_SILENT_AT_ZERO.iter().map(|s| s.to_string()).collect()
     }
 
+    /// The dials left out of the model's digest while they hold their
+    /// default, which is not 0.0, as `{name: default}`. Each is read only
+    /// while a switch silent at zero is set, so at its default it is the
+    /// model that existed before it. The preset records follow the same
+    /// rule.
+    #[staticmethod]
+    fn digest_silent_at_default() -> std::collections::BTreeMap<String, f64> {
+        crate::params::DIGEST_SILENT_AT_DEFAULT
+            .iter()
+            .map(|(n, v)| (n.to_string(), *v))
+            .collect()
+    }
+
     /// Read any parameter as an attribute: `params.garch_alpha`.
     fn __getattr__(&self, name: &str) -> PyResult<f64> {
         self.inner.get(name).ok_or_else(|| {

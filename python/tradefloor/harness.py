@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     from .spec import StrategySpec
 
 
-# The eleven components, as literals a checker can match against
+# The twelve components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #
@@ -91,19 +91,23 @@ if TYPE_CHECKING:
 # `fair_value_shift`, arrived with pt-v20 (0.8.5): the part of the day's news
 # and noise that changed the name's fair value for good, entered as a negative
 # because it left the mispricing. The ten above report the whole shock, which
-# is what moved the price; zero on every preset through pt-v19.
+# is what moved the price; zero on every preset through pt-v19. The twelfth,
+# `dividend`, is the change in `s` at an ex-date open, where the price drops
+# by the amount and fair value gives up its accrued dividend; zero on every
+# model without dividends (`dividend_payout_share`).
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
     Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
-    Literal["fair_value_shift"],
+    Literal["fair_value_shift"], Literal["dividend"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
      "order_flow_impact", "short_squeeze_effect", "random_noise",
-     "circuit_breaker", "jump", "overnight", "fair_value_shift")
+     "circuit_breaker", "jump", "overnight", "fair_value_shift", "dividend")
 
 # The answers ``explain`` is scored against: the ten factors that move a
-# price. ``fair_value_shift`` is left out because it moves no price. It books
+# price. ``fair_value_shift`` is left out because it moves no price, and
+# ``dividend``, the ex-date's mechanical drop, with it. It books
 # the part of a shock that left the mispricing for fair value, and the shock's
 # own column (``random_noise``, ``company_news`` or ``jump``) already holds the
 # whole move. Until 0.8.5's decision 8 the scorer ranked all eleven, so a
@@ -558,7 +562,7 @@ class Scorecard:
                  "uses_hidden_state", "tampered", "equity_curve",
                  "max_drawdown_pct", "ruined", "leverage_refusals",
                  "explanation_baseline", "partial_fills", "history_days",
-                 "margin_interest", "exposure_curve")
+                 "margin_interest", "exposure_curve", "dividends")
 
     #: Slots :meth:`as_dict` leaves out. ``exposure_curve`` is the input of
     #: two read-only properties and is read off the fills and the prices,
@@ -580,6 +584,7 @@ class Scorecard:
         history_days: int = 0,
         margin_interest: bool = True,
         exposure_curve: list[float] | None = None,
+        dividends: float = 0.0,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -645,6 +650,10 @@ class Scorecard:
         #: scored days of a run with a warm-up are later days of the
         #: seed's market, so the seed alone no longer names them.
         self.history_days = history_days
+        #: Net dividends the portfolio received (paid, on a short) over the
+        #: run, reinvested or as cash, already inside ``pnl``. 0.0 on every
+        #: model without dividends (``dividend_payout_share``).
+        self.dividends = dividends
         #: Borrowing paid the policy rate. False only for a run that passed
         #: ``margin_interest=False``, whose repr then says "free-borrowing":
         #: a levered score from such a run is not comparable to one that
@@ -728,8 +737,10 @@ class Scorecard:
         # The figures computed from the card (`sharpe` and the rest) are
         # properties and stay out with their input, so a traded known
         # answer hashes what it always did.
+        # `dividends` likewise only when the model paid any.
         return {slot: getattr(self, slot) for slot in self.__slots__
                 if (slot != "history_days" or self.history_days)
+                and (slot != "dividends" or self.dividends)
                 and slot not in self._NOT_IN_DICT}
 
     def __repr__(self) -> str:
@@ -859,6 +870,7 @@ def evaluate(
     trusted_agents: bool = False,
     history_days: int = 0,
     margin_interest: bool = True,
+    reinvest_dividends: bool = True,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -935,6 +947,13 @@ def evaluate(
     day. The reference agents and :class:`tradefloor.StrategySpec`
     strategies keep their own price history and do not read
     ``obs.history``. Left at 0, the run is the one it always was.
+
+    ``reinvest_dividends`` (on by default) is each portfolio's dividend
+    reinvestment plan, on a model that pays dividends: a long position's
+    dividend buys more of the paying name at the ex-date open, so an agent
+    that buys and never trades earns the total return. Off, dividends are
+    credited as cash. Nothing changes on a model without dividends. See
+    :meth:`Portfolio.collect_dividends`.
 
     One exception does end the run.
     :class:`~tradefloor.integrations.common.ReplayMiss` means a recording
@@ -1029,6 +1048,7 @@ def evaluate(
             cash_interest, bool(trusted_agents),
             engine=template.fork(1)[0], history=warmed._copy(),
             margin_interest=margin_interest,
+            reinvest_dividends=bool(reinvest_dividends),
         )
         _warn_if_every_step_failed(results[name], days * steps_per_day)
     return results
@@ -1204,13 +1224,14 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   model=None, cash_interest=False,
                   trusted=False, *, engine=None,
                   history: History | None = None,
-                  margin_interest=True) -> Scorecard:
+                  margin_interest=True, reinvest_dividends=True) -> Scorecard:
     if engine is None:
         engine = Engine(seed=seed, universe=universe, macro_state=macro,
                         model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage,
                           cash_interest=cash_interest,
-                          margin_interest=margin_interest)
+                          margin_interest=margin_interest,
+                          reinvest_dividends=reinvest_dividends)
     if history is None:
         history = History()
     tickers = engine.tickers
@@ -1248,6 +1269,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
         engine.open_market()
+        # The dividends this open made payable, before the agent acts: the
+        # price already carries the ex-date drop. Reinvested in the paying
+        # name under the portfolio's plan, cash otherwise. Nothing on a
+        # model without dividends.
+        portfolio.collect_dividends(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
@@ -1454,6 +1480,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         history_days=history.warmup_days,
         margin_interest=portfolio.margin_interest,
         exposure_curve=exposure_curve,
+        dividends=portfolio.dividends,
     )
 
 

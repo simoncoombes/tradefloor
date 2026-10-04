@@ -76,6 +76,8 @@ fn company(id: &str, price: f64, avg_volume: f64, shares: f64) -> TickCompany {
             mispricing_s_prev_close: None,
             mispricing_momentum: None,
             fair_value_offset: None,
+            buyback_log_shares: None,
+            dividend: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
@@ -135,6 +137,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 volume_state: 0.0,
                 volume_idio: &[],
             jump_move: &[],
+            earnings_volume: &[],
                 economy: &economy,
                 market_status: MarketStatus::Open,
                 // Held mid-session so the intraday volume curve is flat and
@@ -146,9 +149,11 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 order_volumes: &order_volumes,
                 sector_keys: &sector_keys,
                 sector_sigmas: &[],
+                idio_vol_ratios: &[],
                 // The constant-sigma baseline: these tests predate the factor's
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
+                market_permanent_ceiling_scale: 1.0,
                     vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
                 settle_draws: policy,
                 // The depth counterfactual, off. It reaches no company field.

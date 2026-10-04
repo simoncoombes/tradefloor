@@ -420,6 +420,12 @@ def _column(buffer: bytes, count: int, name: str) -> tuple[float, ...]:
     return struct.unpack("<%dd" % count, buffer)
 
 
+#: The per-name idiosyncratic variance state's snapshot keys, in the order
+#: the state hash covers them: carried together, and only while
+#: `idio_vol_alpha`, `idio_vol_beta` or `idio_vol_jump_bump` is set.
+_IDIO_VOL_KEYS = ("idio_variance", "idio_jump_pending", "idio_jump_var_pending")
+
+
 def state_hash(snapshot: dict[str, Any]) -> str:
     """sha256 over an engine's state: the per-day ledger leaf, in Python.
 
@@ -502,13 +508,21 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         )
     carried = set(snapshot)
     # The anchor's slow memory is carried, and hashed, only on a run with
-    # `vix_anchor_memory` off zero; every other snapshot omits it.
+    # `vix_anchor_memory` off zero; every other snapshot omits it, and the
+    # published VIX's stress memory only with `vix_stress_premium` set. So is
+    # the market factor's return memory, only with `market_vol_leverage` set,
+    # and the cycle's volatility multiplier, only with
+    # `market_vol_cycle_ratio` set and once a close has set it.
     # So are the rate instruments, only on an engine that holds them, and
     # the agent-facing book, only once an agent has used it.
     # From pt-v20 the fair-value levels and the unapplied opening draws are
-    # carried, together, on a model that can move a level.
+    # carried, together, on a model that can move a level. The accrued
+    # buyback share-count reductions are carried only with
+    # `buyback_accrual` and `buyback_payout_share` both set.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "rates", "book", "fair_value_offset", "opening_z",
+        {"vix_anchor_slow", "vix_stress_memory", "market_vol_leverage_memory",
+         "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
+         "buyback_log_shares", "opening_carry",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -517,6 +531,44 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `set_fundamentals` has moved them, and on a model that runs the
          # variance cascade. Hashed after the book, each behind its name.
          "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # The market's cycle nowcast's generator, only while
+         # `cycle_nowcast_accuracy` is set; the belief rides in the economy.
+         "cycle_nowcast_rng",
+         # The central bank's stress level, only while `fed_stress_cut` is
+         # set, and the rate indices' live mark, only while
+         # `rate_intraday_live` is set and a session holds one.
+         "fed_stress_vix_max", "rate_live_marks",
+         # The stress hold's clock, only while `fed_stress_hold` is set, and
+         # the market's forecast of the policy path, only while
+         # `treasury_path_pricing` is set.
+         "fed_stress_hold_age", "treasury_policy_path",
+         # The drawdown hold's window and base, only while
+         # `fed_drawdown_hold` is set.
+         "fed_drawdown_returns", "fed_drawdown_mcap_prev",
+         # What the curve prices of the next meeting, only while
+         # `policy_anticipation` is set.
+         "policy_anticipation_priced",
+         # and the spread a spread pin holds tonight, only with its mark.
+         "pinned_corporate_spread",
+         # Today's priced VIX move, only while a pin has made one.
+         "pinned_vix_jump",
+         # The day's market t scale, only between an open that drew one
+         # and the close (`market_day_tail_df`).
+         "market_day_scale",
+         # The dividend states, on a model that pays dividends, and an
+         # ex-date's move in `s` waiting for its tape row.
+         "dividend", "pending_dividend",
+         # The earnings calendar's key, only with the calendar on, and what
+         # names hold back of the cycle for their reports, only while that
+         # share runs.
+         "earnings_key", "earnings_withheld",
+         # Tonight's market draw under a night split, only while the
+         # session's live lagged wire reads it.
+         "night_market_factor",
+         # The per-name idiosyncratic variance state, its three vectors
+         # together, only while `idio_vol_alpha`, `_beta` or `_jump_bump`
+         # is set.
+         *_IDIO_VOL_KEYS,
          # Carried by every snapshot since 0.8.5 and hashed by none: the
          # ticks the day has run, the tick the book stamps a fill with. See
          # `_UNHASHED_KEYS`.
@@ -528,6 +580,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         raise ValidationError(
             f"this snapshot's state_schema is {layout!r}, and this build "
             f"hashes versions 1 to {Engine.STATE_SCHEMA}.")
+    if carried & set(_IDIO_VOL_KEYS) and not set(_IDIO_VOL_KEYS) <= carried:
+        raise ValidationError(
+            "this snapshot carries part of the idiosyncratic variance state "
+            f"({sorted(carried & set(_IDIO_VOL_KEYS))}). The engine writes "
+            "all three vectors or none, so it was edited or assembled from "
+            "two snapshots.")
     if ("fair_value_offset" in carried) != ("opening_z" in carried):
         raise ValidationError(
             "this snapshot carries one of fair_value_offset and opening_z "
@@ -583,19 +641,30 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # fair-value offsets (whose snapshot has the "fair_value_offset" key), as
     # `Engine::state_hash_with_pending` does, so every other engine hashes as
     # it did before the slot existed.
-    width_a, width_t = len(Engine.FACTORS), 9
+    # The dividend's slot follows it in an attribution row, and is hashed
+    # after the fair-value shift's on the same rule: only on a model that
+    # pays dividends (whose snapshot has the "dividend" key) or where it is
+    # non-zero.
+    # A snapshot of a model without dividends leaves the dividend's slot out
+    # of its attribution rows, which are then the eleven-wide rows they were.
+    fv_slot = len(Engine.FACTORS) - 2
+    width_a = len(Engine.FACTORS) if "dividend" in snapshot else fv_slot + 1
+    width_t = 9
     rows_a = _column(snapshot["attribution"], n * width_a, "attribution")
     rows_t = _column(snapshot["tick_components"], n * width_t, "tick_components")
     for i in range(n):
-        for value in rows_a[i * width_a:(i + 1) * width_a - 1]:
+        for value in rows_a[i * width_a:i * width_a + fv_slot]:
             _f64(buf, value)
     for i in range(n):
         for value in rows_t[i * width_t:(i + 1) * width_t - 1]:
             _f64(buf, value)
-    fv_a = [rows_a[(i + 1) * width_a - 1] for i in range(n)]
+    fv_a = [rows_a[i * width_a + fv_slot] for i in range(n)]
     fv_t = [rows_t[(i + 1) * width_t - 1] for i in range(n)]
     if ("fair_value_offset" in snapshot or any(fv_a) or any(fv_t)):
         for value in fv_a + fv_t:
+            _f64(buf, value)
+    if "dividend" in snapshot:
+        for value in (rows_a[i * width_a + fv_slot + 1] for i in range(n)):
             _f64(buf, value)
     for name, width in (("tick_fundamental", 1), ("tick_anchor", 1),
                         # The day's noise split, its idiosyncratic scale and
@@ -644,6 +713,18 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     _f64(buf, snapshot.get("vix_log_level", 0.0))
     if "vix_anchor_slow" in snapshot:
         _f64(buf, snapshot["vix_anchor_slow"])
+    # The market factor's return memory, only on a model with
+    # `market_vol_leverage` set: `Engine::state_hash`'s order and rule.
+    if "market_vol_leverage_memory" in snapshot:
+        _f64(buf, snapshot["market_vol_leverage_memory"])
+    # The cycle's volatility multiplier, only on a model with
+    # `market_vol_cycle_ratio` set: `Engine::state_hash`'s order and rule.
+    if "market_vol_cycle_log" in snapshot:
+        _f64(buf, snapshot["market_vol_cycle_log"])
+    # The published VIX's stress memory, only on a model with
+    # `vix_stress_premium` set: `Engine::state_hash`'s order and rule.
+    if "vix_stress_memory" in snapshot:
+        _f64(buf, snapshot["vix_stress_memory"])
     # The aggregate earnings cycle, only on a model with the cycle on, and
     # then the fair-value levels and the unapplied opening draws, only on a
     # model that can move a level: `Engine::state_hash`'s order and rule.
@@ -653,6 +734,33 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `fair_value_vix_discount` and `fair_value_vix_half_life` set.
     if "vix_feedback" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["vix_feedback"])
+    # The accrued buyback share-count reductions, only on a model with
+    # `buyback_accrual` and `buyback_payout_share` both set, one per name in
+    # roster order: `Engine::state_hash`'s order, before the levels.
+    if "buyback_log_shares" in snapshot:
+        raw = snapshot["buyback_log_shares"]
+        for value in _column(raw, n, "buyback_log_shares"):
+            _f64(buf, value)
+    # The earnings calendar's key, only with `earnings_surprise_sigma` set.
+    if "earnings_key" in snapshot:
+        _u64(buf, snapshot["earnings_key"])
+    if "earnings_withheld" in snapshot:
+        raw = snapshot["earnings_withheld"]
+        values = _column(raw, len(raw) // 8, "earnings_withheld")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # Tonight's market draw, only while the live lagged wire reads it.
+    if "night_market_factor" in snapshot:
+        _f64(buf, snapshot["night_market_factor"])
+    # The Fed put's state, only on a model with `fed_put_gain` set.
+    if "fed_put" in snapshot["economy"]:
+        for name in ("intermeeting_return", "fed_put", "fed_put_owed",
+                     "fed_put_mcap_prev"):
+            _f64(buf, snapshot["economy"][name])
+    # Credit's leverage gap, only on a model with `corporate_spread_equity_gain` set.
+    if "spread_equity_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["spread_equity_gap"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -667,6 +775,37 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+        # The prehistory's carried opening (`market_prehistory_valuation`),
+        # only while one waits: empty after the first open.
+        raw = snapshot.get("opening_carry", b"")
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'opening_carry' carries {len(raw)} bytes, "
+                "which is not a whole number of f64s.")
+        if raw:
+            values = _column(raw, len(raw) // 8, "opening_carry")
+            _u32(buf, len(values))
+            for value in values:
+                _f64(buf, value)
+    # The dividend states, seven f64s a name, only on a model that pays
+    # dividends: `Engine::state_hash`'s order and rule.
+    if "dividend" in snapshot:
+        raw = snapshot["dividend"]
+        for value in _column(raw, len(raw) // 8, "dividend"):
+            _f64(buf, value)
+    # The per-name idiosyncratic variance state, only while it runs, each
+    # vector length-prefixed: `Engine::state_hash`'s order and rule.
+    if "idio_variance" in snapshot:
+        for name in _IDIO_VOL_KEYS:
+            raw = snapshot[name]
+            if len(raw) % 8:
+                raise ValidationError(
+                    f"snapshot field {name!r} carries {len(raw)} bytes, which "
+                    "is not a whole number of f64s.")
+            values = _column(raw, len(raw) // 8, name)
+            _u32(buf, len(values))
+            for value in values:
+                _f64(buf, value)
     # The crisis episode, hashed for the reason the levels above are: two
     # engines alike in every column, one three sessions into a
     # financial-services episode and the other outside one, price the
@@ -684,6 +823,54 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("macro_pins_today"):
         _f64(buf, 7.0)
         _f64(buf, float(snapshot["macro_pins_today"]))
+        # The pinned corporate spread, only while its mark (0x4000) stands.
+        if int(snapshot["macro_pins_today"]) & 0x4000:
+            _f64(buf, float(snapshot["pinned_corporate_spread"]))
+    # The stress level and the live mark, each behind its own tag, only
+    # while carried: `Engine::state_hash`'s order and rule.
+    if "fed_stress_vix_max" in snapshot:
+        _f64(buf, 8.0)
+        _f64(buf, float(snapshot["fed_stress_vix_max"]))
+    # The stress hold's clock and the priced path's forecast, each behind its
+    # own tag, only while carried.
+    if "fed_stress_hold_age" in snapshot:
+        _f64(buf, 10.0)
+        _f64(buf, float(snapshot["fed_stress_hold_age"]))
+    if "treasury_policy_path" in snapshot:
+        _f64(buf, 11.0)
+        _f64(buf, float(snapshot["treasury_policy_path"]))
+    # The drawdown hold's window and base, behind their tag, the window
+    # length-prefixed, only while carried.
+    if "fed_drawdown_returns" in snapshot:
+        raw = snapshot["fed_drawdown_returns"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'fed_drawdown_returns' carries {len(raw)} "
+                "bytes, which is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "fed_drawdown_returns")
+        _f64(buf, 32.0)
+        _f64(buf, float(len(values)))
+        for value in values:
+            _f64(buf, value)
+        _f64(buf, float(snapshot["fed_drawdown_mcap_prev"]))
+    if "policy_anticipation_priced" in snapshot:
+        _f64(buf, 31.0)
+        _f64(buf, float(snapshot["policy_anticipation_priced"]))
+    if "rate_live_marks" in snapshot:
+        marks = list(snapshot["rate_live_marks"])
+        if len(marks) != 6:
+            raise ValidationError(
+                f"this snapshot's rate_live_marks carries {len(marks)} values; "
+                "the state hash covers 6.")
+        _f64(buf, 9.0)
+        for value in marks:
+            _f64(buf, float(value))
+    if snapshot.get("pinned_vix_jump"):
+        _f64(buf, 10.0)
+        _f64(buf, float(snapshot["pinned_vix_jump"]))
+    if "market_day_scale" in snapshot and float(snapshot["market_day_scale"]) != 1.0:
+        _f64(buf, 12.0)
+        _f64(buf, float(snapshot["market_day_scale"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -703,6 +890,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("pending_fair_value"):
         raw = snapshot["pending_fair_value"]
         values = _column(raw, len(raw) // 8, "pending_fair_value")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The ex-date's move in `s` waiting for its tape row, on the same rule.
+    if snapshot.get("pending_dividend"):
+        raw = snapshot["pending_dividend"]
+        values = _column(raw, len(raw) // 8, "pending_dividend")
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
@@ -727,14 +921,39 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # hashed after the history. `unemployment_impulse` only on a model with
     # `unemployment_adjustment_half_life` set; hashed before it.
     # `vix_feedback` only with the volatility feedback smoothed; hashed
-    # after `earnings_cycle`.
+    # after `earnings_cycle`. The Fed put's four fields only with
+    # `fed_put_gain` set, together; hashed after the night's market draw.
+    # `spread_equity_gap` only with `corporate_spread_equity_gain` set;
+    # hashed after the Fed put's fields.
+    # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
+    # together with the snapshot's `cycle_nowcast_rng`; hashed after the
+    # phase, before the history.
+    # `cycle_publication` only on a model with `cycle_publication_lag_draw`
+    # set, and `anticipation_drift` with `anticipation_raw` only on a model
+    # with `earnings_anticipation_drift_share` set; both hashed after
+    # `gdp_publication`, in that order.
     # `qe_assets_ratio` only with `qe_pe_stock_gain` set, and not hashed:
     # the engine's state hash has never covered it, and covering it now would
     # move every leaf of such a run.
     economy_expected = set(_ECONOMY_KEYS) | (
         {"earnings_cycle", "cycle_history", "gdp_publication",
-         "unemployment_impulse", "vix_feedback", "qe_assets_ratio"}
+         "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
+         "cycle_nowcast", "cycle_publication", "anticipation_drift",
+         "anticipation_raw", "spread_equity_gap"}
         & set(economy))
+    if "fed_put" in economy:
+        economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
+                             "fed_put_mcap_prev"}
+    if ("anticipation_drift" in economy) != ("anticipation_raw" in economy):
+        raise ValidationError(
+            "this snapshot carries one of the economy's anticipation_drift "
+            "and anticipation_raw without the other. The engine writes both "
+            "or neither.")
+    if ("cycle_nowcast" in economy) != ("cycle_nowcast_rng" in snapshot):
+        raise ValidationError(
+            "this snapshot carries one of the economy's cycle_nowcast and "
+            "cycle_nowcast_rng without the other. The engine writes both or "
+            "neither, so it was edited or assembled from two snapshots.")
     if set(economy) != economy_expected:
         raise ValidationError(
             "this snapshot's economy is not the one the state hash covers: "
@@ -758,6 +977,24 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     for value in trend:
         _f64(buf, value)
     _text(buf, economy["cycle_phase"])
+    # The market's cycle nowcast, only while `cycle_nowcast_accuracy` is set:
+    # the five weights, then its generator's state, increment and spare as
+    # bit patterns and its uniform and normal counts. `Engine::state_hash`'s
+    # order and rule.
+    if "cycle_nowcast" in economy:
+        belief = list(economy["cycle_nowcast"])
+        rng = list(snapshot["cycle_nowcast_rng"])
+        if len(belief) != 5 or len(rng) != 5:
+            raise ValidationError(
+                f"this snapshot's cycle nowcast carries {len(belief)} weights "
+                f"and {len(rng)} generator numbers; the state hash covers 5 "
+                "and 5.")
+        for value in belief:
+            _f64(buf, value)
+        for value in rng[:3]:
+            _bits(buf, value)
+        for value in rng[3:]:
+            _f64(buf, value)
     # The published-phase history, oldest first, LENGTH-PREFIXED, only while
     # `cycle_publication_lag` keeps one: `Engine::state_hash`'s order and rule.
     if "cycle_history" in economy:
@@ -794,6 +1031,38 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for day, value in zip(days, values):
             _i64(buf, day)
             _f64(buf, value)
+    # The drawn publication schedule, only while `cycle_publication_lag_draw`
+    # is set: `Engine::state_hash`'s order and rule, the pending turns
+    # LENGTH-PREFIXED, each its close then its phase.
+    if "cycle_publication" in economy:
+        pub = economy["cycle_publication"]
+        keys = {"key", "published", "last_true", "closes", "turns",
+                "pending_closes", "pending_phases"}
+        if set(pub) != keys:
+            raise ValidationError(
+                "this snapshot's cycle_publication is not the one the state "
+                f"hash covers: missing {sorted(keys - set(pub))}, "
+                f"unexpected {sorted(set(pub) - keys)}.")
+        closes = list(pub["pending_closes"])
+        phases = list(pub["pending_phases"])
+        if len(closes) != len(phases):
+            raise ValidationError(
+                f"this snapshot's cycle_publication has {len(closes)} pending "
+                f"closes and {len(phases)} pending phases.")
+        _u64(buf, pub["key"])
+        _text(buf, pub["published"])
+        _text(buf, pub["last_true"])
+        _i64(buf, pub["closes"])
+        _u64(buf, pub["turns"])
+        _u32(buf, len(closes))
+        for close, phase in zip(closes, phases):
+            _i64(buf, close)
+            _text(buf, phase)
+    # The anticipation's left-out drift and the last `A - e`, only while
+    # `earnings_anticipation_drift_share` is set.
+    if "anticipation_drift" in economy:
+        _f64(buf, economy["anticipation_drift"])
+        _f64(buf, economy["anticipation_raw"])
 
     bank = snapshot["central_bank"]
     if set(bank) != set(_CENTRAL_BANK_FIELDS):
@@ -926,6 +1195,17 @@ _RATE_STATE_FIELDS = (
 _BOOK_KEYS = ("sequence", "fill_sequence", "taken", "orders", "flow",
               "fills", "impacts")
 
+#: The book's optional entries: the metaorder memory, present only while
+#: ``impact_memory_coefficient`` is set and the memory holds something, and
+#: hashed after everything else when it is.
+_BOOK_OPTIONAL_KEYS = ("memory",)
+
+#: Values per company in the book's ``memory`` buffer: the fast and slow
+#: memories of agents' net flow against the house, the displacement booked
+#: into ``s``, what the flow waiting for the next tick paid, and that flow
+#: (signed shares the house took the other side of).
+_MEMORY_WIDTH = 5
+
 #: Values per company in the book's ``taken`` buffer: the maker's bid and
 #: ask consumed, the latent depth's bid and ask consumed, and the maker's
 #: inventory change waiting for its next quote.
@@ -934,11 +1214,11 @@ _TAKEN_WIDTH = 5
 
 def _book(buf: bytearray, book: dict[str, Any]) -> None:
     """The agent-facing book's entry, as the engine hashes it."""
-    if set(book) != set(_BOOK_KEYS):
+    if not set(_BOOK_KEYS) <= set(book) <= set(_BOOK_KEYS + _BOOK_OPTIONAL_KEYS):
         raise ValidationError(
             "this snapshot's book is not the one the state hash covers: "
             f"missing {sorted(set(_BOOK_KEYS) - set(book))}, unexpected "
-            f"{sorted(set(book) - set(_BOOK_KEYS))}.")
+            f"{sorted(set(book) - set(_BOOK_KEYS + _BOOK_OPTIONAL_KEYS))}.")
     _text(buf, "book")
     _u64(buf, book["sequence"])
     _u64(buf, book["fill_sequence"])
@@ -994,7 +1274,22 @@ def _book(buf: bytearray, book: dict[str, Any]) -> None:
         _f64(buf, r["bought"])
         _f64(buf, r["sold"])
         _f64(buf, r["permanent"])
+        # Only while the metaorder memory is on; see `Engine::state_hash`.
+        if "transient" in r:
+            _text(buf, "transient")
+            _f64(buf, r["transient"])
         _i64(buf, r["day"])
+    if "memory" in book:
+        raw = book["memory"]
+        if len(raw) % (8 * _MEMORY_WIDTH):
+            raise ValidationError(
+                f"the book's memory buffer carries {len(raw)} bytes, which is "
+                f"not a whole number of {_MEMORY_WIDTH}-value rows.")
+        rows = len(raw) // (8 * _MEMORY_WIDTH)
+        _text(buf, "memory")
+        _u32(buf, rows)
+        for value in _column(raw, rows * _MEMORY_WIDTH, "book.memory"):
+            _f64(buf, value)
 
 
 
@@ -1114,12 +1409,20 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 
 #: Byte buffers only some snapshots carry: the fair-value levels and the
 #: unapplied opening draws on a model that can move a level (pt-v20 on), a
-#: jump's fair-value shift waiting for its tape row, and the variance
-#: cascade on a model that runs it. Encoded where present and left out where
-#: not. The ``fundamentals`` block's three buffers and the book's consumed
-#: depth are encoded beside them.
+#: jump's fair-value shift waiting for its tape row, the variance cascade on
+#: a model that runs it, and the dial-gated per-name state of the
+#: mechanisms that are off on every shipped preset: the accrued buyback
+#: share-count reductions, what names hold back of the earnings cycle for
+#: their reports, the idiosyncratic variance state, the prehistory's carried
+#: opening, the dividend states and an ex-date's move waiting for its tape
+#: row, and the drawdown hold's window. Encoded where
+#: present and left out where not. The ``fundamentals`` block's three
+#: buffers and the book's consumed depth are encoded beside them.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
-                            "garch_cascade")
+                            "garch_cascade", "buyback_log_shares", "earnings_withheld",
+                            "idio_variance", "idio_jump_pending",
+                            "idio_jump_var_pending", "opening_carry", "dividend",
+                            "pending_dividend", "fed_drawdown_returns")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
@@ -1411,6 +1714,8 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     if "book" in snapshot:
         book = dict(snapshot["book"])
         book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
+        if "memory" in book:
+            book["memory"] = base64.b64encode(book["memory"]).decode("ascii")
         out["book"] = book
     if "fundamentals" in snapshot:
         out["fundamentals"] = {
@@ -1419,6 +1724,11 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     values = list(snapshot["rng"])
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
+    # Bit patterns wearing floats, as `rng` is, so NaN payloads survive.
+    if "cycle_nowcast_rng" in snapshot:
+        values = list(snapshot["cycle_nowcast_rng"])
+        out["cycle_nowcast_rng"] = base64.b64encode(
+            struct.pack("<%dd" % len(values), *values)).decode("ascii")
     return out
 
 
@@ -1435,6 +1745,8 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
     if "book" in payload:
         book = dict(payload["book"])
         book["taken"] = base64.b64decode(book["taken"])
+        if "memory" in book:
+            book["memory"] = base64.b64decode(book["memory"])
         out["book"] = book
     if "fundamentals" in payload:
         out["fundamentals"] = {
@@ -1442,6 +1754,10 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
             for name in _LEDGER_FUNDAMENTALS}
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
+    if "cycle_nowcast_rng" in payload:
+        raw = base64.b64decode(payload["cycle_nowcast_rng"])
+        out["cycle_nowcast_rng"] = list(
+            struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out
 
 

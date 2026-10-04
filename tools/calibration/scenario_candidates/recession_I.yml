@@ -1,0 +1,170 @@
+# PACKAGED in r15 as python/tradefloor/scenarios/recession.yml, whose header
+# carries the measured figures; the shocks there are these, with a new
+# description (r13 scenario-frontrun, thirteenth registration candidate).
+# Kept here for the r13, r14 and r15 screens' records; only this comment
+# changed since they read it (their logs cite sha256 6f0ae653...). Load it with `tf.Scenario.from_yaml(path)`.
+#
+# Why the packaged file cannot stay as it is on the r13 arm: it fires
+# everything on day 50 (the contraction pin, whose anticipated earnings take
+# about -8 per cent, a corporate LEVEL +150 bp held for 378 sessions, and the
+# VIX x3 for 60 sessions). With `pinned_vix_feedback` the VIX is priced the
+# morning it is published, and the morning of day 50 moved the paired index
+# -43 per cent (log, median, desk seeds 201-212) with S1a 0.410, under its
+# band. Real: Baa was 35 bp wider by March 2008, and the Lehman leg began
+# about day 250.
+#
+# The NBER-phased shape: peak held from day 50 (December 2007); contraction
+# from day 71 to 364 with growth held at -2 per cent; trough on 365; recovery
+# on 428 (June 2009) and the model's own cycle after. Earnings x0.93 by day
+# 249 and x0.70 by 364, held, then back to x0.96 and x1. The VIX x2.5 over
+# 20 sessions from day 250 (Lehman), held 40, eased to x0.6 by day 428, then
+# released. Credit on `macro.corporate_spread`: +70 bp by day 249, +150 by
+# 289, held, then back to 0 and released.
+#
+# Variant I (desk grid, r13): N16 with the VIX x2.0 rather than x2.5, the
+# spread back 115 bp over 252 sessions from day 365, and earnings back to
+# x0.96 over 252 sessions from day 491. The slowest recovery on the grid.
+#
+# DESK, as N16's: macro_pins_hold=1, pinned_vix_feedback=1, seeds 201-212:
+# S1a 0.734, S1b 12/12, S2 +89.4 (FAILS). Other grid points on the same arm
+# and seeds: spread back over 252 alone S2 +108.2; earnings back over 252
+# alone +101.0; both +100.0; the spread held to day 428 +107.7 and with the
+# slower earnings +99.5; VIX x2.0 alone +98.1; the VIX eased to day 491
+# +110.9; eased to x0.8 +117.4. None reaches the band on these seeds.
+
+version: 1
+
+scenario:
+  name: recession
+
+  description: >
+    Candidate I: N16 with a smaller VIX and a slower recovery. Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    - target: macro.cycle
+      operation: set
+      value: 'peak'
+      at: 50
+      shape: hold
+      duration: 21
+
+    - target: macro.cycle
+      operation: set
+      value: 'contraction'
+      at: 71
+      shape: hold
+      duration: 294
+
+    - target: macro.cycle
+      operation: set
+      value: 'trough'
+      at: 365
+      shape: impulse
+
+    - target: macro.cycle
+      operation: set
+      value: 'recovery'
+      at: 428
+      shape: impulse
+
+    - target: macro.growth
+      operation: set
+      value: -0.02
+      at: 71
+      shape: hold
+      duration: 294
+
+    - target: market.earnings
+      operation: multiply
+      value: 0.93
+      at: 50
+      shape: ramp
+      duration: 200
+
+    - target: market.earnings
+      operation: multiply
+      value: 0.7526881720430106
+      at: 250
+      shape: ramp
+      duration: 115
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.0
+      at: 365
+      shape: hold
+      duration: 126
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.3714285714285714
+      at: 491
+      shape: ramp
+      duration: 252
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.0416666666666667
+      at: 743
+      shape: ramp
+      duration: 252
+
+  transmission:
+
+    - target: macro.vix
+      operation: multiply
+      value: 2.0
+      at: 250
+      shape: ramp
+      duration: 20
+
+    - target: macro.vix
+      operation: multiply
+      value: 1.0
+      at: 270
+      shape: hold
+      duration: 40
+
+    - target: macro.vix
+      operation: multiply
+      value: 0.6
+      at: 310
+      shape: ramp
+      duration: 118
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.007
+      at: 50
+      shape: ramp
+      duration: 200
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.008
+      at: 250
+      shape: ramp
+      duration: 40
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.0
+      at: 290
+      shape: hold
+      duration: 75
+
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.0115
+      at: 365
+      shape: ramp
+      duration: 252
+
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.0035
+      at: 617
+      shape: ramp
+      duration: 189
+
