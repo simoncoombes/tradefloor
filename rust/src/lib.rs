@@ -16,6 +16,8 @@
 //! - [`fair_value`] and [`mispricing`]: what a stock is worth and how far
 //!   its price has strayed from it.
 //! - [`rates`]: bond indices priced off the engine's yield curve.
+//! - [`flow`]: the shock flow each preset was fitted at, and a tally a host
+//!   keeps of the news, shocks and revisions it adds.
 //! - [`rng`] and [`mathx`]: the random streams and the transcendental
 //!   maths, both written here so that a seed gives the same bits on every
 //!   platform.
@@ -45,6 +47,7 @@ pub mod agent_book;
 pub mod economy;
 pub mod engine;
 pub mod fair_value;
+pub mod flow;
 pub mod market;
 pub mod market_maker;
 pub mod mathx;

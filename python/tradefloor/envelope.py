@@ -64,7 +64,8 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._arith import ordered_sum
-from ._core import ValidationError, preset_names
+from ._core import (ValidationError, assess_external_flow, calibrated_flow,
+                    preset_names)
 from . import facts as _facts
 from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
@@ -1351,6 +1352,48 @@ GAPS: tuple[Gap, ...] = (
         ),
         statistics=_facts.LEVEL + _facts.CRISIS + ("sector_excess_corr",),
     ),
+    Gap(
+        id="external-flow",
+        summary=("every statistic is measured under the preset's own shock "
+                 "flow, and the news, economic shocks, earnings revisions and "
+                 "VIX levels a host adds are outside it"),
+        detail=(
+            "Every statistic this module states, the two-year panel and the "
+            "long-run criteria were measured with the engine making its own "
+            "shocks and nothing else: company news drawn at each open, "
+            "idiosyncratic and market jumps, one macro step a trading "
+            "session with no economic shocks, and only the 390 minutes of "
+            "the regular session. CALIBRATED_FLOW states that flow for every "
+            "preset. A host that adds its own news, economic shocks, "
+            "earnings revisions or VIX levels is outside it, and "
+            "`external_flow` says which channels and by how much.\n\n"
+            "Measured on one host-driven embedder over 504 sessions and five "
+            "seeds, every channel was outside: company news at 1.9 to 2.6 "
+            "times the fitted company news variance, sector and market-wide "
+            "news at 0.41 to 0.80 of the market factor's base daily "
+            "variance, earnings revisions at 50 to 105 times the fitted "
+            "company news variance, economic shocks on 52 to 74 percent of "
+            "macro steps, the VIX written by 0.08 to 0.72 points a session, "
+            "and the economy stepped 1.39 times a session. Replayed into "
+            "pt-v20 on a 108-name roster over 20 seeds, that flow took "
+            "index volatility from 12.0 to 23.1 percent a year, the VIX "
+            "mean from 13.4 to 18.8, the share of days with the VIX above "
+            "40 from 0.2 to 1.3 percent and the largest daily index move "
+            "from 3.1 to 7.3 percent, and the host's GDP writes held GDP "
+            "growth at its 5 percent cap on 47 percent of days. The economic "
+            "shocks moved the VIX most, through its target and, on pt-v20, "
+            "the market factor's variance that follows it. The response "
+            "grows about as the square of the flow's size and does not run "
+            "away: news and shocks at half, full and double size read 14.9, "
+            "18.9 and 32.4 percent against 12.2 without them. "
+            "docs/REALISM.md gives every arm."
+        ),
+        forbids=(
+            "citing the certification, the two-year panel or the long-run "
+            "criteria for a market a host drives with its own news or "
+            "economic shocks beyond the flow in CALIBRATED_FLOW"
+        ),
+    ),
 )
 
 
@@ -1772,6 +1815,136 @@ def _row_note(name: str, value: float, band: tuple[float, float] | None,
     return " ".join(parts) or None
 
 
+#: The shock flow each preset generates for itself, read from the engine
+#: (`tradefloor.flow::CalibratedFlow`): company news a name a session and its
+#: log-size sd, the sector and market-wide news rates (zero on every preset),
+#: the jump rates and sizes, the market factor's base daily sigma, the share
+#: of macro steps with an active economic shock (zero) and macro steps a
+#: trading session (one). Every statistic this module states was measured
+#: under the flow on its preset's row and nothing else; `external_flow` says
+#: whether a caller's own news and shocks stay inside it.
+CALIBRATED_FLOW: dict[str, dict[str, float]] = {
+    name: calibrated_flow(name) for name in preset_names()
+}
+
+
+def external_flow(
+    *,
+    sessions: int,
+    names: int,
+    company_news: Iterable[float] = (),
+    sector_news: Iterable[float] = (),
+    market_news: Iterable[float] = (),
+    fundamental_moves: Iterable[float] = (),
+    vix_writes: Iterable[float] = (),
+    macro_steps: int | None = None,
+    macro_shock_loads: Iterable[float] = (),
+    preset: str | None = None,
+) -> Verdict:
+    """Is the news and shock flow a caller adds inside the flow the preset
+    was fitted at?
+
+    Pass what the engine was handed over `sessions` trading sessions on a
+    roster of `names`. `company_news`, `sector_news` and `market_news` are
+    the log moves each event landed, one entry an event, as fractions (0.05
+    for five per cent): an event handed to one `Engine.tick` lands its
+    `price_impact` divided by 390, and one handed to a whole `run_session`
+    lands its `price_impact`. Scope is the engine's: a company event names a
+    company, a sector event names a sector and no company, a market event
+    names neither. `fundamental_moves` are the log changes in earnings the
+    host wrote with `Engine.set_fundamentals`, one entry a revision that
+    moved a figure: fair value is earnings times a target multiple, so each
+    moves that name's fair value by the same log amount. `vix_writes` are
+    the changes, in VIX points, the host made by writing the economy's VIX
+    directly. `macro_steps` is how many macro steps ran (the default is one
+    a session) and `macro_shock_loads` has one entry for each step that
+    carried active economic shocks, the sum of `gdp_impact * severity` over
+    them.
+
+    Returns a `Verdict`, falsy when any channel is outside, with one reason
+    a channel. The arithmetic is the engine's own
+    (`tradefloor.flow::ExternalFlow::assess` in the Rust crate), so the two
+    languages give the same answer. A preset is fitted with its own flow and
+    no other (`CALIBRATED_FLOW`); see the `external-flow` gap for what a
+    measured host flow did to pt-v20.
+    """
+    if preset is None:
+        preset = PRESET
+    elif preset not in preset_names():
+        raise ValidationError(
+            f"unknown preset {preset!r}; the presets are {preset_names()}")
+    if sessions < 1 or names < 1:
+        raise ValidationError(
+            f"sessions and names must be positive, got {sessions} and {names}")
+    def tally(moves: Iterable[float], what: str) -> tuple[int, float]:
+        xs = [float(x) for x in moves]
+        if any(not math.isfinite(x) for x in xs):
+            raise ValidationError(f"{what} holds a value that is not finite")
+        xs = [x for x in xs if x != 0.0]
+        return len(xs), ordered_sum(x * x for x in xs)
+    c_n, c_sq = tally(company_news, "company_news")
+    s_n, s_sq = tally(sector_news, "sector_news")
+    m_n, m_sq = tally(market_news, "market_news")
+    f_n, f_sq = tally(fundamental_moves, "fundamental_moves")
+    vix = [abs(float(x)) for x in vix_writes]
+    if any(not math.isfinite(x) for x in vix):
+        raise ValidationError("vix_writes holds a value that is not finite")
+    vix = [x for x in vix if x != 0.0]
+    loads = [abs(float(x)) for x in macro_shock_loads]
+    steps = sessions if macro_steps is None else int(macro_steps)
+    if steps < len(loads):
+        raise ValidationError(
+            f"macro_shock_loads has {len(loads)} entries and macro_steps is "
+            f"{steps}; each entry is one step that carried shocks")
+    a = assess_external_flow({
+        "names": int(names), "sessions": int(sessions),
+        "company_events": c_n, "company_sum_sq": c_sq,
+        "sector_events": s_n, "sector_sum_sq": s_sq,
+        "market_events": m_n, "market_sum_sq": m_sq,
+        "fundamental_events": f_n, "fundamental_sum_sq": f_sq,
+        "vix_writes": len(vix), "vix_write_abs": ordered_sum(vix),
+        "vix_write_max": max(vix, default=0.0),
+        "macro_steps": steps, "macro_shock_steps": len(loads),
+        "macro_shock_load": ordered_sum(loads),
+    }, preset)
+    fit = CALIBRATED_FLOW[preset]
+    summary = (
+        f"{preset} is fitted with company news at {fit['company_news_rate']:g} "
+        f"events a name a session of log sd {fit['company_news_sigma']:.4f}, "
+        f"no sector or market-wide news, no macro shocks and one macro step "
+        f"a session. The flow passed adds {a['company_news_ratio']:.2f}x the "
+        f"fitted company news variance and {a['common_news_ratio']:.2f} of "
+        f"the market factor's base daily variance as common news, and "
+        f"its fundamental revisions {a['fundamental_ratio']:.2f}x the fitted "
+        f"company news variance; it wrote "
+        f"{a['vix_write_per_session']:.2f} VIX points a session; "
+        f"{100 * a['macro_shock_share']:.0f}% of its macro steps carried a "
+        f"shock, and it stepped the economy "
+        f"{a['macro_steps_per_session']:.2f} times a session")
+    findings = tuple(a["findings"])
+    if findings:
+        reasons = tuple(findings) + (
+            "the statistics this module states, and the long-run criteria, "
+            "were measured under the preset's own flow, so they do not "
+            "describe a market driven this way. The external-flow gap gives "
+            "what a measured host flow did to pt-v20",)
+    else:
+        reasons = ("the flow passed is inside the flow the preset was "
+                   "fitted at",)
+    return Verdict(
+        inside=bool(a["inside"]),
+        reasons=reasons,
+        warnings=(summary,),
+        gaps=() if a["inside"] else tuple(
+            g for g in GAPS if g.id == "external-flow"),
+    )
+
+
+#: `external_flow` under another name, for `check`, whose keyword of the same
+#: name hides it.
+_external_flow_verdict = external_flow
+
+
 def check(
     *,
     horizon_days: int,
@@ -1781,6 +1954,7 @@ def check(
     macro_regime: bool = False,
     preset: str | None = None,
     basis: str = DEFAULT_BAND_BASIS,
+    external_flow: Mapping[str, Any] | None = None,
 ) -> Verdict:
     """Does this question fall inside the envelope?
 
@@ -1829,6 +2003,12 @@ def check(
     roster is refused on any other preset, the default pt-v20 included.
     Every other table here describes `PRESET` whatever is passed, and a
     verdict on another preset says so in a warning. An unknown name raises.
+
+    `external_flow` is for a host that hands the engine its own news,
+    economic shocks, earnings revisions or VIX levels: the keyword arguments of `envelope.external_flow` other
+    than `preset`, as a mapping. A flow outside the one the preset was
+    fitted at (`CALIBRATED_FLOW`) fires the `external-flow` gap, with one
+    reason a channel; one inside it adds a warning that says so.
 
     Returns a `Verdict`, which is falsy when the answer is no. Every reason
     names the measurement behind it, so a refusal can be checked rather
@@ -2171,6 +2351,16 @@ def check(
             "through a scenario, and note that the crisis cadence responds to "
             "STAGFLATION rather than to high inflation alone"
         ))
+
+    if external_flow is not None:
+        flow = _external_flow_verdict(**dict(external_flow), preset=preset)
+        if flow:
+            warnings.append(flow.reasons[0] + ". " + flow.warnings[0])
+        else:
+            g = by_id["external-flow"]
+            for why in flow.reasons:
+                fire(g, why)
+            warnings.extend(flow.warnings)
 
     if preset != PRESET:
         warnings.append(
