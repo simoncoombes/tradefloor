@@ -3899,16 +3899,14 @@ impl Engine {
             } else {
                 crate::order_book::Side::Sell
             };
-            let (fills, _) = self.meet_book(i, &label, &label, side, signed.abs(), None, true, false, false);
+            let (fills, _) = self.meet_book_as(i, &label, &label, side, signed.abs(), None, true, false, false, true);
             pop.book_order(k);
             for f in &fills {
                 pop.book_fill(k, i, side, f.quantity, f.price);
             }
         }
-        // Its fills live on its own ledger, not in what `take_fills` returns.
-        if self.book.fills.iter().any(|f| crate::population::is_population_label(&f.agent)) {
-            self.book.fills.retain(|f| !crate::population::is_population_label(&f.agent));
-        }
+        // Its fills live on its own ledger, not in what `take_fills` returns
+        // (`meet_book` does not record them).
         self.population = Some(pop);
     }
 
@@ -4852,6 +4850,25 @@ impl Engine {
         at_limit: bool,
         crossing: bool,
     ) -> (Vec<crate::agent_book::AgentFill>, f64) {
+        self.meet_book_as(index, agent, order_id, side, quantity, limit, count_flow, at_limit, crossing, false)
+    }
+
+    /// [`Engine::meet_book`], with `quiet` for a population participant's
+    /// order: its own fills are returned but not recorded.
+    #[allow(clippy::too_many_arguments)]
+    fn meet_book_as(
+        &mut self,
+        index: usize,
+        agent: &str,
+        order_id: &str,
+        side: crate::order_book::Side,
+        quantity: f64,
+        limit: Option<f64>,
+        count_flow: bool,
+        at_limit: bool,
+        crossing: bool,
+        quiet: bool,
+    ) -> (Vec<crate::agent_book::AgentFill>, f64) {
         use crate::agent_book::{self as ab, AgentFill, Liquidity};
         use crate::order_book::{Side, SubmitOptions};
         let Some(mut book) = self.agent_book_at(index, Some(agent)) else {
@@ -4863,7 +4880,7 @@ impl Engine {
             side,
             quantity,
             agent,
-            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None, skip_own: true },
+            SubmitOptions { limit_price: limit, post_remainder: false, order_id: None, skip_own: true, house_ids: false },
         );
         let shared = self.params.book_shared != 0.0;
         if shared {
@@ -4872,7 +4889,7 @@ impl Engine {
         let (day, tick) = (self.current_day, self.ticks_today());
         let mut taker = Vec::with_capacity(r.fills.len());
         for f in &r.fills {
-            let owner = f.maker_id.as_str();
+            let owner: &str = &f.maker_id;
             // `book_cross_at_limit`: a resting order crossed during the
             // session takes the house's side at its own limit.
             let price = match limit {
@@ -4909,20 +4926,43 @@ impl Engine {
                     sequence: 0,
                 });
             }
-            let fill = self.push_fill(AgentFill {
-                agent: agent.to_string(),
-                order_id: order_id.to_string(),
-                ticker: ticker.clone(),
-                side,
-                quantity: f.quantity,
-                price,
-                liquidity: Liquidity::Taker,
-                counterparty: owner.to_string(),
-                reference,
-                day,
-                tick,
-                sequence: 0,
-            });
+            // A population participant's own fills go on its ledger, not in
+            // the fills `take_fills` returns: it keeps the sequence number
+            // the fill would have taken and only the price and size, so the
+            // agents' fills are numbered as they were.
+            let fill = if quiet {
+                let sequence = self.book.fill_sequence;
+                self.book.fill_sequence += 1;
+                AgentFill {
+                    agent: String::new(),
+                    order_id: String::new(),
+                    ticker: String::new(),
+                    side,
+                    quantity: f.quantity,
+                    price,
+                    liquidity: Liquidity::Taker,
+                    counterparty: String::new(),
+                    reference,
+                    day,
+                    tick,
+                    sequence,
+                }
+            } else {
+                self.push_fill(AgentFill {
+                    agent: agent.to_string(),
+                    order_id: order_id.to_string(),
+                    ticker: ticker.clone(),
+                    side,
+                    quantity: f.quantity,
+                    price,
+                    liquidity: Liquidity::Taker,
+                    counterparty: owner.to_string(),
+                    reference,
+                    day,
+                    tick,
+                    sequence: 0,
+                })
+            };
             if count_flow {
                 // With the metaorder memory on, a fill against another
                 // agent's resting order is not flow to the market: it took

@@ -200,9 +200,10 @@ impl PyOrderBook {
         let s = parse_side(side)?;
         check_size("price", price)?;
         check_size("quantity", quantity)?;
+        let company = self.inner.company_id.clone();
         self.inner
             .post_limit(s, price, quantity, owner, order_id)
-            .map(|o| o.id)
+            .map(|o| o.id_in(&company))
             .ok_or_else(|| OrderError::new_err("the book rejected the limit order"))
     }
 
@@ -238,6 +239,7 @@ impl PyOrderBook {
                 post_remainder,
                 order_id,
                 skip_own: false,
+                house_ids: true,
             },
         );
         Ok(PyMatchResult {
@@ -248,14 +250,14 @@ impl PyOrderBook {
                     price: f.price,
                     quantity: f.quantity,
                     maker_order_id: f.maker_order_id,
-                    maker_id: f.maker_id,
-                    taker_id: f.taker_id,
+                    maker_id: f.maker_id.into_owned(),
+                    taker_id: f.taker_id.into_owned(),
                     taker_side: side_name(f.taker_side).to_string(),
                 })
                 .collect(),
             unfilled: r.unfilled,
             average_price: r.average_price,
-            resting_order_id: r.resting.map(|o| o.id),
+            resting_order_id: r.resting.map(|o| o.id_in(&self.inner.company_id)),
         })
     }
 
@@ -290,7 +292,7 @@ impl PyOrderBook {
         Ok(self
             .inner
             .append_maker_level(s, price, quantity, owner)
-            .map(|o| o.id))
+            .map(|o| o.id_in(&self.inner.company_id)))
     }
 
     /// What sweeping `quantity` would cost, without executing it.

@@ -674,7 +674,7 @@ impl RateBook {
                         side,
                         quantity,
                         "flow",
-                        SubmitOptions { limit_price: None, post_remainder: false, order_id: None, skip_own: false },
+                        SubmitOptions { limit_price: None, post_remainder: false, order_id: None, skip_own: false, house_ids: false },
                     );
                     for fill in &result.fills {
                         traded += fill.quantity;

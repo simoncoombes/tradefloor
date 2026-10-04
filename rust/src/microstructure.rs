@@ -709,6 +709,7 @@ fn settle_inner(
                 post_remainder: true,
                 order_id: Some(o.id.clone()),
                 skip_own: true,
+                house_ids: false,
             },
         );
         for f in &r.fills {
@@ -720,12 +721,12 @@ fn settle_inner(
                 quantity: f.quantity,
                 price: f.price,
                 taker: true,
-                counterparty: f.maker_id.clone(),
+                counterparty: f.maker_id.to_string(),
             });
             if is_agent(&f.maker_id) {
                 agent_fills.push(SettledAgentFill {
                     order_id: f.maker_order_id.clone(),
-                    agent: f.maker_id.clone(),
+                    agent: f.maker_id.to_string(),
                     side: opposite(o.side),
                     quantity: f.quantity,
                     price: f.price,
@@ -776,6 +777,7 @@ fn settle_inner(
                 post_remainder: false,
                 order_id: None,
                 skip_own: false,
+                house_ids: false,
             },
         );
         for f in &result.fills {
@@ -787,12 +789,12 @@ fn settle_inner(
                 if is_agent(&f.maker_id) {
                     agent_fills.push(SettledAgentFill {
                         order_id: f.maker_order_id.clone(),
-                        agent: f.maker_id.clone(),
+                        agent: f.maker_id.to_string(),
                         side: opposite(side),
                         quantity: f.quantity,
                         price: f.price,
                         taker: false,
-                        counterparty: f.taker_id.clone(),
+                        counterparty: f.taker_id.to_string(),
                     });
                 }
             }
@@ -1325,8 +1327,8 @@ mod tests {
             price: 100.0,
             quantity: 50.0,
             maker_order_id: "x".to_string(),
-            maker_id: MARKET_MAKER_ID.to_string(),
-            taker_id: "flow".to_string(),
+            maker_id: MARKET_MAKER_ID.into(),
+            taker_id: "flow".into(),
             taker_side,
         };
         assert_eq!(maker_delta_from_fills(&[fill(Side::Buy)]), -50.0);
@@ -1381,8 +1383,8 @@ mod tests {
             price: 100.0,
             quantity: 50.0,
             maker_order_id: "x".to_string(),
-            maker_id: "player".to_string(),
-            taker_id: "flow".to_string(),
+            maker_id: "player".into(),
+            taker_id: "flow".into(),
             taker_side: Side::Buy,
         }];
         assert_eq!(maker_delta_from_fills(&fills), 0.0);

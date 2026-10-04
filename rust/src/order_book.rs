@@ -41,10 +41,37 @@ pub enum Side {
     Sell,
 }
 
+/// Who owns a resting order. The house owners are static strings, so a book
+/// of house levels allocates nothing to name them.
+pub type OwnerId = std::borrow::Cow<'static, str>;
+
+/// An owner as an [`OwnerId`], borrowed when it is one of the house's own.
+pub fn owner_id(owner: &str) -> OwnerId {
+    match owner {
+        "mm" => OwnerId::Borrowed("mm"),
+        "depth" => OwnerId::Borrowed("depth"),
+        "flow" => OwnerId::Borrowed("flow"),
+        "range" => OwnerId::Borrowed("range"),
+        other => OwnerId::Owned(other.to_string()),
+    }
+}
+
+/// A resting order's id as it is stored: a caller's own, or the book's,
+/// which reads `{company_id}-{sequence}` and is written out only when asked
+/// for ([`BookOrder::id_in`]).
+#[derive(Debug, Clone, PartialEq)]
+pub enum OrderId {
+    Given(String),
+    Sequenced,
+}
+
 /// A resting order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BookOrder {
-    pub id: String,
+    pub id: OrderId,
+    /// A piece of an order split in place: 0 for a whole order, `k` for the
+    /// piece whose id is the order's with `.k` after it.
+    pub piece: u32,
     pub side: Side,
     pub price: f64,
     /// Original size, in shares.
@@ -53,7 +80,42 @@ pub struct BookOrder {
     pub remaining: f64,
     /// Monotonic arrival counter — the "time" half of price-time priority.
     pub sequence: u64,
-    pub owner_id: String,
+    pub owner_id: OwnerId,
+}
+
+impl BookOrder {
+    /// The order's id, written out, in the book of `company_id`.
+    pub fn id_in(&self, company_id: &str) -> String {
+        let base = match &self.id {
+            OrderId::Given(id) => id.clone(),
+            OrderId::Sequenced => sequenced_id(company_id, self.sequence),
+        };
+        if self.piece == 0 {
+            base
+        } else {
+            format!("{base}.{}", self.piece)
+        }
+    }
+
+    /// Piece `k` of this order, at a price and size: its id is this order's
+    /// with `.k` after it (`k` at least 1), and it keeps the arrival counter.
+    pub fn piece(&self, k: u32, price: f64, shares: f64, company_id: &str) -> BookOrder {
+        let id = if self.piece == 0 {
+            self.id.clone()
+        } else {
+            OrderId::Given(self.id_in(company_id))
+        };
+        BookOrder {
+            id,
+            piece: k,
+            side: self.side,
+            price,
+            quantity: shares,
+            remaining: shares,
+            sequence: self.sequence,
+            owner_id: self.owner_id.clone(),
+        }
+    }
 }
 
 /// One executed trade.
@@ -62,10 +124,19 @@ pub struct Fill {
     /// Always the resting (maker) order's price.
     pub price: f64,
     pub quantity: f64,
+    /// The resting order's id. Against one of the house's own levels it is
+    /// written out only when [`SubmitOptions::house_ids`] asks for it, and
+    /// is empty otherwise: the engine never reads it there.
     pub maker_order_id: String,
-    pub maker_id: String,
-    pub taker_id: String,
+    pub maker_id: OwnerId,
+    pub taker_id: OwnerId,
     pub taker_side: Side,
+}
+
+/// Whether an owner is one of the house's own (the maker, latent depth,
+/// flow, range).
+pub fn is_house_owner(owner: &str) -> bool {
+    matches!(owner, "mm" | "depth" | "flow" | "range")
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +179,9 @@ pub struct SubmitOptions {
     /// Off, the book matches whoever is first in the queue, as the
     /// reference implementation does.
     pub skip_own: bool,
+    /// Write out the ids of house levels a fill takes. Off, a fill against
+    /// the house carries an empty `maker_order_id`.
+    pub house_ids: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -325,15 +399,19 @@ impl OrderBook {
             }
 
             let (traded, exhausted, maker_order_id, maker_id) = {
-                let maker = &mut self.side_mut(opposite_side)[at];
+                let company = &self.company_id;
+                let maker = match opposite_side {
+                    Side::Buy => &mut self.bids[at],
+                    Side::Sell => &mut self.asks[at],
+                };
                 let traded = mathx::min(remaining, maker.remaining);
                 maker.remaining -= traded;
-                (
-                    traded,
-                    maker.remaining <= 0.0,
-                    maker.id.clone(),
-                    maker.owner_id.clone(),
-                )
+                let id = if options.house_ids || !is_house_owner(&maker.owner_id) {
+                    maker.id_in(company)
+                } else {
+                    String::new()
+                };
+                (traded, maker.remaining <= 0.0, id, maker.owner_id.clone())
             };
 
             remaining -= traded;
@@ -342,7 +420,7 @@ impl OrderBook {
                 quantity: traded,
                 maker_order_id,
                 maker_id,
-                taker_id: taker_id.to_string(),
+                taker_id: owner_id(taker_id),
                 taker_side: side,
             });
 
@@ -356,15 +434,14 @@ impl OrderBook {
         if remaining > 0.0 {
             if let (true, Some(limit)) = (options.post_remainder, limit_price) {
                 let order = BookOrder {
-                    id: options
-                        .order_id
-                        .unwrap_or_else(|| format!("{}-{}", self.company_id, self.sequence)),
+                    id: options.order_id.map_or(OrderId::Sequenced, OrderId::Given),
+                    piece: 0,
                     side,
                     price: limit,
                     quantity,
                     remaining,
                     sequence: self.sequence,
-                    owner_id: taker_id.to_string(),
+                    owner_id: owner_id(taker_id),
                 };
                 self.sequence += 1;
                 self.insert_resting(order.clone());
@@ -432,13 +509,14 @@ impl OrderBook {
         order_id: Option<String>,
     ) -> BookOrder {
         let order = BookOrder {
-            id: order_id.unwrap_or_else(|| sequenced_id(&self.company_id, self.sequence)),
+            id: order_id.map_or(OrderId::Sequenced, OrderId::Given),
+            piece: 0,
             side,
             price,
             quantity,
             remaining: quantity,
             sequence: self.sequence,
-            owner_id: owner_id.to_string(),
+            owner_id: self::owner_id(owner_id),
         };
         self.sequence += 1;
         order
@@ -447,8 +525,12 @@ impl OrderBook {
     /// Remove a resting order by id.
     pub fn cancel_order(&mut self, order_id: &str) -> bool {
         for side in [Side::Buy, Side::Sell] {
-            let orders = self.side_mut(side);
-            if let Some(idx) = orders.iter().position(|o| o.id == order_id) {
+            let company = &self.company_id;
+            let orders = match side {
+                Side::Buy => &mut self.bids,
+                Side::Sell => &mut self.asks,
+            };
+            if let Some(idx) = orders.iter().position(|o| o.id_in(company) == order_id) {
                 orders.remove(idx);
                 return true;
             }
@@ -551,13 +633,14 @@ impl OrderBook {
             return false;
         }
         let order = BookOrder {
-            id: sequenced_id(&self.company_id, self.sequence),
+            id: OrderId::Sequenced,
+            piece: 0,
             side,
             price,
             quantity,
             remaining: quantity,
             sequence: self.sequence,
-            owner_id: owner_id.to_string(),
+            owner_id: self::owner_id(owner_id),
         };
         self.sequence += 1;
         self.side_mut(side).push(order);
@@ -601,7 +684,7 @@ mod tests {
         b.post_limit(Side::Buy, 100.0, 10.0, "a", None);
         b.post_limit(Side::Buy, 101.0, 10.0, "b", None);
         b.post_limit(Side::Buy, 100.0, 10.0, "c", None); // ties with `a`
-        let owners: Vec<&str> = b.bids.iter().map(|o| o.owner_id.as_str()).collect();
+        let owners: Vec<&str> = b.bids.iter().map(|o| &*o.owner_id).collect();
         assert_eq!(
             owners,
             vec!["b", "a", "c"],
@@ -615,7 +698,7 @@ mod tests {
         b.post_limit(Side::Sell, 101.0, 10.0, "a", None);
         b.post_limit(Side::Sell, 100.0, 10.0, "b", None);
         b.post_limit(Side::Sell, 101.0, 10.0, "c", None);
-        let owners: Vec<&str> = b.asks.iter().map(|o| o.owner_id.as_str()).collect();
+        let owners: Vec<&str> = b.asks.iter().map(|o| &*o.owner_id).collect();
         assert_eq!(owners, vec!["b", "a", "c"]);
     }
 
@@ -658,11 +741,11 @@ mod tests {
             "me",
             SubmitOptions { limit_price: Some(101.5), skip_own: true, ..Default::default() },
         );
-        let got: Vec<_> = r.fills.iter().map(|f| (f.price, f.quantity, f.maker_id.as_str())).collect();
+        let got: Vec<_> = r.fills.iter().map(|f| (f.price, f.quantity, &*f.maker_id)).collect();
         assert_eq!(got, vec![(100.0, 4.0, "other")]);
         assert_eq!(r.unfilled, 16.0);
-        let left: Vec<_> = b.asks.iter().map(|o| (o.id.as_str(), o.remaining)).collect();
-        assert_eq!(left[..2], [("me-0", 10.0), ("me-1", 10.0)]);
+        let left: Vec<_> = b.asks.iter().map(|o| (o.id_in(&b.company_id), o.remaining)).collect();
+        assert_eq!(left[..2], [("me-0".to_string(), 10.0), ("me-1".to_string(), 10.0)]);
 
         let mut plain = book();
         plain.post_limit(Side::Sell, 100.0, 10.0, "me", None);
@@ -716,6 +799,7 @@ mod tests {
                 post_remainder: true,
                 order_id: None,
                 skip_own: false,
+                house_ids: false,
             },
         );
         assert_eq!(r.unfilled, 0.0);

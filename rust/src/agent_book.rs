@@ -814,7 +814,7 @@ impl MemoryBound<'_> {
     /// a ten-thousandth of daily volume), each piece priced at its LAST
     /// share and rounded away from the touch, as the latent levels are. The
     /// result is sorted as the book requires.
-    fn apply(&self, orders: Vec<BookOrder>, side: Side) -> Vec<BookOrder> {
+    fn apply(&self, orders: Vec<BookOrder>, side: Side, company_id: &str) -> Vec<BookOrder> {
         let worse = |a: f64, b: f64| match side {
             Side::Sell => mathx::max(a, b),
             Side::Buy => mathx::min(a, b),
@@ -846,14 +846,15 @@ impl MemoryBound<'_> {
                     None => price,
                 };
                 last = Some(price);
-                out.push(BookOrder {
-                    id: if k == 0 { o.id.clone() } else { format!("{}.{k}", o.id) },
-                    side: o.side,
-                    price,
-                    quantity: shares,
-                    remaining: shares,
-                    sequence: o.sequence,
-                    owner_id: o.owner_id.clone(),
+                out.push(if k == 0 {
+                    BookOrder {
+                        price,
+                        quantity: shares,
+                        remaining: shares,
+                        ..o.clone()
+                    }
+                } else {
+                    o.piece(k as u32, price, shares, company_id)
                 });
             }
         }
@@ -994,9 +995,9 @@ pub fn agent_book(inputs: &AgentBookInputs<'_>) -> OrderBook {
             // no memory there is no bound, so an order on a fresh book
             // meets the book it always did.
             if m > 0.0 {
-                book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy);
+                book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy, &book.company_id);
             } else if m < 0.0 {
-                book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell);
+                book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell, &book.company_id);
             }
         }
     }

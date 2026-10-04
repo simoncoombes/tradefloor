@@ -30,9 +30,10 @@ part of any difference between the isolated and the populated market at the
 start (a price or an inventory leaning one way) and the detector's exposure
 to the market's own moves. Isolated and populated runs share the seed. The
 rows: (a) the predictable programme's populated cost over its isolated cost,
-(b) that excess against the randomised programme's, (c) the detector's P&L
+(b) that excess against the randomised programme's, (c) the detectors' P&L
 on the predictable programme (traded fork less the twin, in dollars and in
-units of the name's daily dollar volume times its daily sigma), and the
+units of the name's daily dollar volume times its daily sigma; all detectors
+together, and each on its own), and the
 populated predictable cost against the populated randomised cost. Each
 mode's cost is in its own warm-up sigma, as registered;
 `a_excess_predictable_iso_sigma` also reads the populated cost in the isolated
@@ -220,10 +221,13 @@ def _programme(e, twin, ticker, q_day, days, plan_of, side):
 
 
 def _pnl(engine, name):
-    for r in engine.population_report():
-        if r["kind"] == "detector" and (name is None or r["name"] == name):
-            return r["pnl"]
-    return 0.0
+    """A detector's P&L, or with `name` None every detector's together."""
+    return sum(r["pnl"] for r in engine.population_report()
+               if r["kind"] == "detector" and (name is None or r["name"] == name))
+
+
+def _detectors(engine):
+    return [r["name"] for r in engine.population_report() if r["kind"] == "detector"]
 
 
 def ac4_seed(args):
@@ -242,6 +246,7 @@ def ac4_seed(args):
             for mode in ("iso", "pop"):
                 _, base, sigma = bases[mode]
                 costs, pnl = [], 0.0
+                each = {}
                 for side in (1, -1):
                     rng = random.Random(seed * 1000 + i)
 
@@ -256,6 +261,8 @@ def ac4_seed(args):
                     costs.append(_programme(e, twin, ticker, q, days, plan, side) / sigma[i])
                     if mode == "pop":
                         pnl += _pnl(e, None) - _pnl(twin, None)
+                        for d in _detectors(e):
+                            each[d] = each.get(d, 0.0) + _pnl(e, d) - _pnl(twin, d)
                 row[f"{sched}_{mode}"] = st.fmean(costs)
                 # The same cost in the isolated market's sigma, so the two
                 # modes are read in one unit: a population that moves the
@@ -267,6 +274,8 @@ def ac4_seed(args):
                     row[f"{sched}_detector_pnl"] = pnl
                     row[f"{sched}_detector_pnl_units"] = pnl / (
                         universe[i].avg_volume * price * sigma[i])
+                    row[f"{sched}_each_detector_pnl_units"] = {
+                        d: v / (universe[i].avg_volume * price * sigma[i]) for d, v in each.items()}
         rows.append(row)
     return rows
 
@@ -294,6 +303,9 @@ def ac4(a):
             [x - y for x, y in zip(ex_pred, ex_rand)]),
         "c_detector_pnl_units": one_sided([r["pred_detector_pnl_units"] for r in rows]),
         "c_detector_pnl_dollars": one_sided([r["pred_detector_pnl"] for r in rows]),
+        "c_each_detector_pnl_units": {
+            d: one_sided([r["pred_each_detector_pnl_units"][d] for r in rows])
+            for d in rows[0]["pred_each_detector_pnl_units"]},
         "detector_pnl_units_randomised": one_sided(
             [r["rand_detector_pnl_units"] for r in rows]),
         "isolated_predictable_over_randomised": one_sided(
