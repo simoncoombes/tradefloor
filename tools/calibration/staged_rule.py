@@ -276,7 +276,7 @@ def decide(row: Row, *, n: int, N: int, value: float | None = None,
        (lo is not None and value < lo - c_kill * se_):
         edge = hi if (hi is not None and value > hi) else lo
         return Decision(row.id, "out", n, N, value, se,
-                        f"{abs(value - edge) / se_:.2f} se outside, kill line {c_kill:.2f}")
+                        f"{_in_se(abs(value - edge), se_)} se outside, kill line {c_kill:.2f}")
     se_N = se_ * math.sqrt(n / N)
     lo_m = None if lo is None else lo + row.margin_se * se_N
     hi_m = None if hi is None else hi - row.margin_se * se_N
@@ -286,8 +286,13 @@ def decide(row: Row, *, n: int, N: int, value: float | None = None,
                                 (hi_m - value) if hi_m is not None else None)
                     if d is not None] or [math.inf])
         return Decision(row.id, "in", n, N, value, se,
-                        f"{room / se_:.2f} se inside the margin, settle line {c_settle:.2f}")
+                        f"{_in_se(room, se_)} se inside the margin, settle line {c_settle:.2f}")
     return Decision(row.id, "open", n, N, value, se, "near a limit")
+
+
+def _in_se(distance: float, se: float) -> str:
+    """A distance in standard errors, for a message; a zero se reads as inf."""
+    return f"{distance / se:.2f}" if se > 0 else "inf"
 
 
 def candidate_state(decisions: Iterable[Decision]) -> str:

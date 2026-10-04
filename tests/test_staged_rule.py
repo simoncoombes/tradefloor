@@ -112,3 +112,10 @@ def test_bootstrap_se_is_close_to_the_formula_for_a_mean():
     xs = [rng.gauss(0, 1) for _ in range(30)]
     _, se = R.mean_se(xs)
     assert R.bootstrap_se(xs, lambda v: sum(v) / len(v)) == pytest.approx(se, rel=0.2)
+
+
+def test_a_reading_with_no_spread_is_decided_without_dividing_by_zero():
+    """Two identical seeds give a bootstrap se of 0 (box readings, 2026-10-04)."""
+    row = R.Row("sk2", lo=0.998, hi=1.502)
+    assert R.decide(row, n=2, N=30, value=1.02, se=0.0, c_kill=9.0, c_settle=9.0).state == "in"
+    assert R.decide(row, n=2, N=30, value=1.9, se=0.0, c_kill=9.0, c_settle=9.0).state == "out"
