@@ -109,8 +109,9 @@ def population_of(path):
     if not path.endswith(".json"):
         head, _, args = path.partition(":")
         kw = {k: float(v) for k, v in (kv.split("=") for kv in args.split(",") if kv)}
-        if "members" in kw:
-            kw["members"] = int(kw["members"])
+        for whole in ("members", "detectors"):
+            if whole in kw:
+                kw[whole] = int(kw[whole])
         return tf.Population.crowded(**kw) if head == "crowded" else tf.Population.named(head)
     return tf.Population.from_dict(json.load(open(path)))
 

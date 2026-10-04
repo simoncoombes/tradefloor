@@ -136,7 +136,7 @@ pub const SESSION_TICKS: u32 = 390;
 pub const MAX_LOOKBACK: u32 = 60;
 
 /// Layout version of [`PopulationRun::to_flat`].
-const FLAT_VERSION: f64 = 2.0;
+const FLAT_VERSION: f64 = 1.0;
 
 /// One participant's policy and its parameters.
 #[derive(Debug, Clone, PartialEq)]
@@ -423,11 +423,6 @@ pub struct PopulationRun {
     /// NaN where not yet seen.
     pub closes: Vec<f64>,
     pub depth: usize,
-    /// With a detector: per name, the quoted spread of the agent-facing book
-    /// in the name's daily sigmas, read the first time a detector would add
-    /// to a position on the name in a session and kept for the rest of it;
-    /// NaN until read. Empty without a detector.
-    pub spreads: Vec<f64>,
     pub states: Vec<ParticipantState>,
     /// Per participant, the participant whose detector profile it reads:
     /// detectors with the same `memory` and `bucket` see the same flow and so
@@ -488,7 +483,6 @@ impl PopulationRun {
             last: Vec::new(),
             closes: Vec::new(),
             depth,
-            spreads: Vec::new(),
             states: Vec::new(),
             owners: Vec::new(),
         };
@@ -543,15 +537,7 @@ impl PopulationRun {
             })
             .collect();
         self.closes = pick(&self.closes, self.depth, f64::NAN);
-        let detector = self
-            .participants
-            .iter()
-            .any(|p| matches!(p.policy, Policy::Detector { .. }));
-        self.spreads = if detector {
-            pick(&self.spreads, 1, f64::NAN)
-        } else {
-            Vec::new()
-        };
+
         self.last = last;
         for (k, p) in self.participants.iter().enumerate() {
             let s = &mut self.states[k];
@@ -630,7 +616,6 @@ impl PopulationRun {
                 }
             }
         }
-        self.spreads.iter_mut().for_each(|x| *x = f64::NAN);
         self.day = Some(day);
     }
 
@@ -983,8 +968,6 @@ impl PopulationRun {
         ];
         out.extend_from_slice(&self.last);
         out.extend_from_slice(&self.closes);
-        out.push(self.spreads.len() as f64);
-        out.extend_from_slice(&self.spreads);
         for (k, s) in self.states.iter().enumerate() {
             out.push(s.orders);
             for v in [&s.position, &s.cash, &s.volume, &s.notional, &s.average] {
@@ -1039,15 +1022,7 @@ impl PopulationRun {
         };
         let last = take(n)?.to_vec();
         let closes = take(n * self.depth)?.to_vec();
-        let detector = self
-            .participants
-            .iter()
-            .any(|p| matches!(p.policy, Policy::Detector { .. }));
-        let width = take(1)?[0];
-        if width != if detector { n as f64 } else { 0.0 } {
-            return Err(bad("the spreads do not match this population and roster"));
-        }
-        let spreads = take(width as usize)?.to_vec();
+
         let mut states = Vec::with_capacity(self.participants.len());
         for (k, p) in self.participants.iter().enumerate() {
             let mut s = ParticipantState {
@@ -1114,7 +1089,6 @@ impl PopulationRun {
         self.day = day;
         self.last = last;
         self.closes = closes;
-        self.spreads = spreads;
         self.states = states;
         Ok(())
     }
@@ -1162,7 +1136,6 @@ mod tests {
             day: None,
             last: Vec::new(),
             closes: Vec::new(),
-            spreads: Vec::new(),
             owners: vec![0],
         }
     }
@@ -1170,7 +1143,6 @@ mod tests {
     fn with_names(mut r: PopulationRun, n: usize) -> PopulationRun {
         r.tickers = (0..n).map(|i| format!("N{i}")).collect();
         r.last = vec![10.0; n];
-        r.spreads = vec![0.5; n];
         let b = r.participants[0].buckets();
         let s = &mut r.states[0];
         s.position = vec![0.0; n];
