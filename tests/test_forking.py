@@ -1496,13 +1496,6 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "prehistory_valuation.py::test_a_pre_open_snapshot_carries_the_"
         "opening_into_an_engine_of_another_seed restores before the open into "
         "another seed's engine, where a snapshot without it opens elsewhere.",
-    "fed_drawdown_returns":
-        "the drawdown hold's window of index returns (`fed_drawdown_hold`, "
-        "r20 fedbear). A meeting reads it only to hold a rise, and `CRISIS` "
-        "starts the policy rate at 0.05 in a contraction, where no meeting "
-        "has a rise to hold. tests/test_fed_put_carry.py::test_the_hashes_"
-        "agree_and_a_restore_reproduces_the_run carries the window across a "
-        "restore and asserts the state hash reads it and its base.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "
