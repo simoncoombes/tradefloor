@@ -1,7 +1,8 @@
 """Measure the cost of size in the agent-facing book, against the square-root law.
 
     python tools/calibration/impact_curve.py [--seeds 3] [--names 40]
-        [--days 60] [--coefficient 0.75] [--exponent 0.5] [--out FILE]
+        [--days 60] [--coefficient 0.75] [--exponent 0.5] [--base pt-v19]
+        [--set name=value[,name=value...] ...] [--out FILE]
 
 What it measures, on `Universe.random(names, seed=111 + k)` for each seed k,
 after `days` untraded sessions (so each name's realised daily volatility can
@@ -73,6 +74,10 @@ def f64(buf: bytes) -> list[float]:
 
 BASE = "pt-v19"
 
+#: Further `ModelParams` overrides from `--set`, applied to every model the
+#: script builds, so a switch's effect on the curve can be read.
+EXTRA: dict[str, float] = {}
+
 
 def model(coefficient: float, exponent: float, shared: bool = False,
           half_life: float = 27.0, base: str | None = None,
@@ -88,7 +93,7 @@ def model(coefficient: float, exponent: float, shared: bool = False,
             over["book_refill_half_life"] = half_life
     if gamma:
         over["fill_impact_coefficient"] = gamma
-    return tf.ModelParams.from_preset(base, **over)
+    return tf.ModelParams.from_preset(base, **{**over, **EXTRA})
 
 
 def warm(seed: int, universe, params, days: int, vix: float | None = None):
@@ -222,13 +227,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=None)
     ap.add_argument("--base", default="pt-v19",
                     help="the preset whose market the book is measured in")
+    ap.add_argument("--set", action="append", default=[],
+                    help="further ModelParams overrides, name=value or a comma-"
+                         "separated list of them; repeatable")
     args = ap.parse_args(argv)
     global BASE
     BASE = args.base
+    for item in args.set:
+        for kv in item.split(","):
+            if kv.strip():
+                k, v = kv.split("=", 1)
+                EXTRA[k.strip()] = float(v)
 
     result: dict = {"coefficient": args.coefficient, "exponent": args.exponent,
                     "seeds": args.seeds, "names": args.names, "days": args.days,
-                    "base": args.base}
+                    "base": args.base, "set": dict(EXTRA)}
     for label, coef in (("off", 0.0), ("on", args.coefficient)):
         rows = []
         for k in range(args.seeds):
