@@ -99,9 +99,9 @@
 //! strategy is better".
 
 use crate::agent_book::{daily_sigma, daily_volume};
+use crate::market::TickCompany;
 use crate::mathx;
 use crate::order_book::Side;
-use crate::market::TickCompany;
 
 /// Every participant's book label starts with this; an agent may not use it
 /// on an engine that holds a population.
@@ -121,10 +121,27 @@ const FLAT_VERSION: f64 = 1.0;
 /// One participant's policy and its parameters.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Policy {
-    Trend { lookback: u32, scale: f64 },
-    Reversion { lookback: u32, scale: f64 },
-    Liquidity { half_life: f64, scale: f64, vix_calm: f64, vix_stress: f64 },
-    Detector { memory: f64, bucket: u32, lead: u32, hold: u32, max_spread: f64 },
+    Trend {
+        lookback: u32,
+        scale: f64,
+    },
+    Reversion {
+        lookback: u32,
+        scale: f64,
+    },
+    Liquidity {
+        half_life: f64,
+        scale: f64,
+        vix_calm: f64,
+        vix_stress: f64,
+    },
+    Detector {
+        memory: f64,
+        bucket: u32,
+        lead: u32,
+        hold: u32,
+        max_spread: f64,
+    },
 }
 
 impl Policy {
@@ -163,13 +180,22 @@ impl Participant {
     fn check(&self) -> Result<(), String> {
         let finite_pos = |v: f64| v.is_finite() && v > 0.0;
         if self.name.is_empty() || self.name.chars().any(|c| c.is_whitespace()) {
-            return Err(format!("a participant's name is non-empty with no spaces, got {:?}", self.name));
+            return Err(format!(
+                "a participant's name is non-empty with no spaces, got {:?}",
+                self.name
+            ));
         }
         if !finite_pos(self.size) || !finite_pos(self.rate) {
-            return Err(format!("{}: size and rate must be finite and above zero", self.name));
+            return Err(format!(
+                "{}: size and rate must be finite and above zero",
+                self.name
+            ));
         }
         if self.interval == 0 || self.interval > SESSION_TICKS {
-            return Err(format!("{}: interval must be 1 to {SESSION_TICKS} ticks", self.name));
+            return Err(format!(
+                "{}: interval must be 1 to {SESSION_TICKS} ticks",
+                self.name
+            ));
         }
         if !(self.band.is_finite() && (0.0..1.0).contains(&self.band)) {
             return Err(format!("{}: band must be in [0, 1)", self.name));
@@ -177,29 +203,58 @@ impl Participant {
         match &self.policy {
             Policy::Trend { lookback, scale } | Policy::Reversion { lookback, scale } => {
                 if *lookback == 0 || *lookback > MAX_LOOKBACK {
-                    return Err(format!("{}: lookback must be 1 to {MAX_LOOKBACK} sessions", self.name));
+                    return Err(format!(
+                        "{}: lookback must be 1 to {MAX_LOOKBACK} sessions",
+                        self.name
+                    ));
                 }
                 if !finite_pos(*scale) {
-                    return Err(format!("{}: scale must be finite and above zero", self.name));
+                    return Err(format!(
+                        "{}: scale must be finite and above zero",
+                        self.name
+                    ));
                 }
             }
-            Policy::Liquidity { half_life, scale, vix_calm, vix_stress } => {
+            Policy::Liquidity {
+                half_life,
+                scale,
+                vix_calm,
+                vix_stress,
+            } => {
                 if !finite_pos(*half_life) || !finite_pos(*scale) {
-                    return Err(format!("{}: half_life and scale must be finite and above zero", self.name));
+                    return Err(format!(
+                        "{}: half_life and scale must be finite and above zero",
+                        self.name
+                    ));
                 }
                 if !(vix_calm.is_finite() && vix_stress.is_finite() && vix_calm < vix_stress) {
                     return Err(format!("{}: vix_calm must be below vix_stress", self.name));
                 }
             }
-            Policy::Detector { memory, bucket, lead, hold, max_spread } => {
+            Policy::Detector {
+                memory,
+                bucket,
+                lead,
+                hold,
+                max_spread,
+            } => {
                 if !finite_pos(*max_spread) {
-                    return Err(format!("{}: max_spread must be finite and above zero", self.name));
+                    return Err(format!(
+                        "{}: max_spread must be finite and above zero",
+                        self.name
+                    ));
                 }
                 if !finite_pos(*memory) {
-                    return Err(format!("{}: memory must be finite and above zero", self.name));
+                    return Err(format!(
+                        "{}: memory must be finite and above zero",
+                        self.name
+                    ));
                 }
                 if *bucket == 0 || *bucket > SESSION_TICKS {
-                    return Err(format!("{}: bucket must be 1 to {SESSION_TICKS} ticks", self.name));
+                    return Err(format!(
+                        "{}: bucket must be 1 to {SESSION_TICKS} ticks",
+                        self.name
+                    ));
                 }
                 if lead + hold >= SESSION_TICKS - bucket {
                     return Err(format!(
@@ -287,7 +342,9 @@ impl PopulationRun {
         let depth = participants
             .iter()
             .map(|p| match p.policy {
-                Policy::Trend { lookback, .. } | Policy::Reversion { lookback, .. } => lookback as usize,
+                Policy::Trend { lookback, .. } | Policy::Reversion { lookback, .. } => {
+                    lookback as usize
+                }
                 _ => 0,
             })
             .max()
@@ -312,7 +369,11 @@ impl PopulationRun {
     /// dropped. A no-op while the roster is unchanged.
     pub fn align(&mut self, companies: &[TickCompany]) {
         if self.tickers.len() == companies.len()
-            && self.tickers.iter().zip(companies).all(|(t, c)| *t == c.ticker)
+            && self
+                .tickers
+                .iter()
+                .zip(companies)
+                .all(|(t, c)| *t == c.ticker)
         {
             return;
         }
@@ -327,7 +388,8 @@ impl PopulationRun {
             for (i, f) in from.iter().enumerate() {
                 if let Some(j) = f {
                     if (j + 1) * width <= v.len() {
-                        out[i * width..(i + 1) * width].copy_from_slice(&v[j * width..(j + 1) * width]);
+                        out[i * width..(i + 1) * width]
+                            .copy_from_slice(&v[j * width..(j + 1) * width]);
                     }
                 }
             }
@@ -357,7 +419,10 @@ impl PopulationRun {
                 Policy::Detector { .. } => {
                     s.profile = from
                         .iter()
-                        .map(|f| f.and_then(|j| s.profile.get(j).cloned()).unwrap_or_default())
+                        .map(|f| {
+                            f.and_then(|j| s.profile.get(j).cloned())
+                                .unwrap_or_default()
+                        })
                         .collect();
                 }
                 _ => {}
@@ -442,7 +507,11 @@ impl PopulationRun {
                     }
                     let x = mathx::log(price);
                     if let Some(avg) = s.average.get_mut(i) {
-                        *avg = if avg.is_nan() { x } else { *avg + a * (x - *avg) };
+                        *avg = if avg.is_nan() {
+                            x
+                        } else {
+                            *avg + a * (x - *avg)
+                        };
                     }
                 }
             }
@@ -453,7 +522,10 @@ impl PopulationRun {
     /// volume, at this tick.
     fn predicted(&self, k: usize, index: usize, tick: u32) -> f64 {
         let p = &self.participants[k];
-        let Policy::Detector { bucket, lead, hold, .. } = p.policy else {
+        let Policy::Detector {
+            bucket, lead, hold, ..
+        } = p.policy
+        else {
             return 0.0;
         };
         let b = p.buckets();
@@ -512,17 +584,26 @@ impl PopulationRun {
                         if !(past > 0.0) {
                             continue;
                         }
-                        let m = mathx::log(price / past)
-                            / (sigma * mathx::sqrt(lookback as f64));
-                        let sign = if matches!(p.policy, Policy::Trend { .. }) { 1.0 } else { -1.0 };
+                        let m = mathx::log(price / past) / (sigma * mathx::sqrt(lookback as f64));
+                        let sign = if matches!(p.policy, Policy::Trend { .. }) {
+                            1.0
+                        } else {
+                            -1.0
+                        };
                         sign * cap * mathx::clamp(m / scale, -1.0, 1.0)
                     }
-                    Policy::Liquidity { half_life, scale, vix_calm, vix_stress } => {
+                    Policy::Liquidity {
+                        half_life,
+                        scale,
+                        vix_calm,
+                        vix_stress,
+                    } => {
                         let avg = s.average.get(i).copied().unwrap_or(f64::NAN);
                         if avg.is_nan() {
                             continue;
                         }
-                        let w = mathx::clamp((vix_stress - vix) / (vix_stress - vix_calm), 0.0, 1.0);
+                        let w =
+                            mathx::clamp((vix_stress - vix) / (vix_stress - vix_calm), 0.0, 1.0);
                         let z = (mathx::log(price) - avg)
                             / (sigma * mathx::sqrt(half_life / SESSION_TICKS as f64));
                         -cap * w * mathx::clamp(z / scale, -1.0, 1.0)
@@ -616,7 +697,10 @@ impl PopulationRun {
         let bad = |what: &str| format!("snapshot field population.state is malformed: {what}");
         let mut at = 0usize;
         let mut take = |count: usize| -> Result<&[f64], String> {
-            let end = at.checked_add(count).filter(|e| *e <= flat.len()).ok_or_else(|| bad("too short"))?;
+            let end = at
+                .checked_add(count)
+                .filter(|e| *e <= flat.len())
+                .ok_or_else(|| bad("too short"))?;
             let out = &flat[at..end];
             at = end;
             Ok(out)
@@ -632,21 +716,37 @@ impl PopulationRun {
         if head[2] != self.depth as f64 {
             return Err(bad("the close depth does not match this population"));
         }
-        let day = if head[3] == 1.0 { Some(head[4] as i64) } else { None };
+        let day = if head[3] == 1.0 {
+            Some(head[4] as i64)
+        } else {
+            None
+        };
         let last = take(n)?.to_vec();
         let closes = take(n * self.depth)?.to_vec();
         let mut states = Vec::with_capacity(self.participants.len());
         for p in &self.participants {
-            let mut s = ParticipantState { orders: take(1)?[0], ..Default::default() };
+            let mut s = ParticipantState {
+                orders: take(1)?[0],
+                ..Default::default()
+            };
             let widths = [
-                n, n, n, n,
-                if matches!(p.policy, Policy::Liquidity { .. }) { n } else { 0 },
+                n,
+                n,
+                n,
+                n,
+                if matches!(p.policy, Policy::Liquidity { .. }) {
+                    n
+                } else {
+                    0
+                },
             ];
             let mut parts: Vec<Vec<f64>> = Vec::with_capacity(5);
             for w in widths {
                 let len = take(1)?[0];
                 if len != w as f64 {
-                    return Err(bad("an array's length does not match this population and roster"));
+                    return Err(bad(
+                        "an array's length does not match this population and roster",
+                    ));
                 }
                 parts.push(take(w)?.to_vec());
             }
@@ -659,7 +759,9 @@ impl PopulationRun {
             let rows = take(1)?[0];
             let detector = matches!(p.policy, Policy::Detector { .. });
             if rows != if detector { n as f64 } else { 0.0 } {
-                return Err(bad("the detector's profiles do not match this population and roster"));
+                return Err(bad(
+                    "the detector's profiles do not match this population and roster",
+                ));
             }
             for _ in 0..rows as usize {
                 let len = take(1)?[0];
@@ -704,7 +806,13 @@ mod tests {
             rate: 0.002,
             interval: 1,
             band: 0.0,
-            policy: Policy::Detector { memory: 1.0, bucket: 5, lead: 20, hold: 10, max_spread: 1.0 },
+            policy: Policy::Detector {
+                memory: 1.0,
+                bucket: 5,
+                lead: 20,
+                hold: 10,
+                max_spread: 1.0,
+            },
         }
     }
 
@@ -767,6 +875,8 @@ mod tests {
         s.states[0].position[2] = 0.0;
         s.set_flat(r.tickers.clone(), &flat).unwrap();
         assert_eq!(s, r);
-        assert!(s.set_flat(r.tickers.clone(), &flat[..flat.len() - 1]).is_err());
+        assert!(s
+            .set_flat(r.tickers.clone(), &flat[..flat.len() - 1])
+            .is_err());
     }
 }
