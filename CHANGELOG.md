@@ -1,3 +1,17 @@
+## Unreleased
+
+The MCP server's tools describe themselves better. Each of the thirteen now
+has a title and annotations saying it only reads, is deterministic and
+reaches nothing outside the server, except `start_job`, which adds a job to
+the server's memory. Each description says what the tool does, when to use
+it instead of its nearest sibling, what it costs and what it returns.
+`explain` opened with a question and did not say how it differs from
+`explain_price_move`; it now does. The MCP bundle's manifest lists each tool
+by the first sentence of the server's own description, and a test keeps the
+two in step. No model, trajectory or digest changes.
+
+<!-- release-note-ends -->
+
 ## 0.9.0
 
 A library release, not a model change. No coefficient, default or

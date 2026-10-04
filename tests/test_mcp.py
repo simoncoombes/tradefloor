@@ -1381,3 +1381,46 @@ def test_the_cost_figures_are_dated_and_match_the_job_estimate():
 def test_a_top_n_below_one_is_refused(top_n):
     r = mcp.explain_price_move(universe_size=4, top_n=top_n)
     assert r["ok"] is False and "top_n" in r["error"]
+
+
+def test_every_tool_says_what_it_does_to_the_world():
+    """Directories and clients read these annotations, and Anthropic's
+    connector directory requires a title and the read-only hint on every
+    tool. Every tool builds its own engine and only reads, except start_job,
+    which adds a job to the server's memory."""
+    tools = asyncio.run(mcp.server.list_tools())
+    assert len(tools) == 13
+    for t in tools:
+        a = t.annotations
+        assert t.title, t.name
+        assert a is not None, t.name
+        assert a.destructive_hint is False and a.open_world_hint is False, t.name
+        assert a.read_only_hint is (t.name != "start_job"), t.name
+        assert a.idempotent_hint is (t.name != "start_job"), t.name
+
+
+def test_explain_says_when_to_use_it_instead_of_explain_price_move():
+    tools = {t.name: t for t in asyncio.run(mcp.server.list_tools())}
+    text = tools["explain"].description
+    assert text.startswith("Trace one name's price move")
+    assert "explain_price_move" in text
+    assert "explain" in tools["explain_price_move"].description
+
+
+def test_the_bundle_manifest_lists_each_tool_by_its_first_sentence():
+    """mcpb/manifest.json is what Claude Desktop and Smithery show before the
+    server runs. It once still said "Which draws seeded one name's day?"
+    after the server's own description had been rewritten."""
+    import json
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    manifest = json.loads((root / "mcpb" / "manifest.json").read_text("utf-8"))
+    served = {t.name: t.description
+              for t in asyncio.run(mcp.server.list_tools())}
+    assert sorted(t["name"] for t in manifest["tools"]) == sorted(served)
+    for tool in manifest["tools"]:
+        first = re.match(r"(.+?[.!?])(\s|$)", served[tool["name"]], re.S)
+        assert tool["description"] == " ".join(first.group(1).split()), (
+            tool["name"])

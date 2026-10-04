@@ -97,6 +97,7 @@ from tradefloor.facts import REAL_MARKETS
 
 try:
     from mcp.server import MCPServer
+    from mcp.types import ToolAnnotations
 except ImportError as exc:  # pragma: no cover - exercised by the install path
     raise ImportError(
         "The MCP server needs the `mcp` package, which tradefloor does not "
@@ -1114,6 +1115,15 @@ A single seed measures the seed as much as the strategy. `rank_strategies` is
 the honest version of `evaluate_strategies`.
 """
 
+# Every tool says what it does to the world. All but start_job only read:
+# each builds its own engine, runs it and returns what it measured, and the
+# same arguments give the same result. start_job adds a job to this
+# server's memory, so it is not read-only, but it changes nothing else.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                             idempotentHint=True, openWorldHint=False)
+_STARTS_JOB = ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                              idempotentHint=False, openWorldHint=False)
+
 server = MCPServer(
     name="tradefloor",
     title="tradefloor market simulator",
@@ -1145,8 +1155,14 @@ def _measured_cost() -> str:
 
 
 @server.tool(
-    description="What this simulator is, what it is certified to reproduce, "
-                "and what it cannot do. Call this first."
+    title='Describe the simulator',
+    description=(
+        "Describe what this simulator is, what its realism checks certify, "
+        "what it cannot do, the caps on every tool and how long a run "
+        "takes. Call it first in a session, before any other tool. It takes "
+        "no arguments, runs no market and returns the same text on every "
+        "call."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def describe_simulator() -> dict[str, Any]:
@@ -1279,8 +1295,15 @@ def describe_simulator() -> dict[str, Any]:
 
 
 @server.tool(
-    description="Ask whether a question falls inside the realism envelope "
-                "BEFORE running it. Names the measurement behind any refusal."
+    title='Check a question against the realism envelope',
+    description=(
+        "Check whether a question falls inside the range the simulator's "
+        "realism was measured for, BEFORE running it. Use it whenever a "
+        "conclusion leans on a horizon longer than a year, on particular "
+        "statistics, on a sector-concentrated roster or on the size of a "
+        "scenario's effect. Returns ok or a refusal that names the "
+        "measurement behind it. Runs no market, so it answers at once."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def check_envelope(
@@ -1340,9 +1363,14 @@ def check_envelope(
 
 
 @server.tool(
-    description="Parse and fingerprint a strategy spec WITHOUT running it. "
-                "Use this to iterate on a spec cheaply; grammar errors come "
-                "back naming what was wrong."
+    title='Validate a strategy spec',
+    description=(
+        "Parse and fingerprint one strategy spec WITHOUT running it. Use it "
+        "to iterate on a spec cheaply before evaluate_strategies or "
+        "rank_strategies: a grammar error comes back naming the field that "
+        "was wrong, and a valid spec comes back normalised with its "
+        f"fingerprint. A spec looks like {_SPEC_EXAMPLE}. Runs no market."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def validate_strategy(spec: SpecArg) -> dict[str, Any]:
@@ -1378,13 +1406,18 @@ def validate_strategy(spec: SpecArg) -> dict[str, Any]:
 
 
 @server.tool(
+    title='Evaluate strategies on one market',
     description=(
-        "Run strategies against one identical market, beside the baseline "
-        "agents, and score them. The right first look, but it is ONE seed, "
-        "so use rank_strategies before believing an ordering. A strategy is "
-        f"data, for example {_SPEC_EXAMPLE}. days 1 to {MAX_DAYS} here, up "
-        f"to {MAX_DAYS_ASYNC} through start_job; roster 2 to {MAX_UNIVERSE} "
-        f"names.")
+        "Run strategies on one simulated market, beside the baseline agents "
+        "on the same market, and score each one: return, P&L, the cost of "
+        "its own trading in basis points, turnover and errors. The right first look, but it is ONE "
+        "seed, so use rank_strategies before believing an ordering. A "
+        f"strategy is data, for example {_SPEC_EXAMPLE}, and "
+        "validate_strategy checks one without running it. days 1 to "
+        f"{MAX_DAYS} here (a few seconds), up to {MAX_DAYS_ASYNC} through "
+        f"start_job; roster 2 to {MAX_UNIVERSE} names. Deterministic: the "
+        "same arguments give the same scores."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def evaluate_strategies(
@@ -1490,12 +1523,17 @@ def evaluate_strategies(
 
 
 @server.tool(
+    title='Rank strategies across many seeds',
     description=(
         "Score strategies across MANY seeds, beside the baseline agents, and "
-        "rank them with a paired sign test. Slower than evaluate_strategies "
-        f"and the only version whose ordering is worth believing. 2 to "
-        f"{MAX_SEEDS} seeds (default six), days 1 to {MAX_DAYS} here, up to "
-        f"{MAX_DAYS_ASYNC} through start_job.")
+        "rank them with a paired sign test on each pair. Use it after "
+        "evaluate_strategies, because one seed's ordering is often luck. "
+        f"Costs about one evaluate_strategies call per seed: 2 to {MAX_SEEDS} "
+        f"seeds (default six), days 1 to {MAX_DAYS} here, up to "
+        f"{MAX_DAYS_ASYNC} through start_job. Returns each entrant's record "
+        "across the seeds (median P&L, seeds ahead of buy-and-hold) and each "
+        "pair's sign test. Deterministic."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def rank_strategies(
@@ -1852,10 +1890,15 @@ def _scenario_from(doc: Any, days: int) -> Any:
 
 
 @server.tool(
-    description="What scenarios exist and what each intervention target "
-                "actually reaches -- read this before authoring one, because "
-                "four of the targets are honest mechanisms with effects too "
-                "small to see over a hundred days."
+    title='List scenarios and intervention targets',
+    description=(
+        "List the shipped stress scenarios, the scenario constructors and "
+        "every intervention target, with what each target was measured to "
+        "reach. Read it before build_scenario or run_stress_scenario: each "
+        "shipped scenario's first_event_day sets the shortest useful run, "
+        "and four targets have effects too small to see over a hundred "
+        "days. Takes no arguments and runs no market."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def list_scenarios() -> dict[str, Any]:
@@ -1932,11 +1975,16 @@ def list_scenarios() -> dict[str, Any]:
 
 
 @server.tool(
-    description="Author a custom scenario -- a macro PATH from hold/ramp/step "
-                "instructions, or explicit INTERVENTIONS as shocks and "
-                "assumed transmission -- and see what it resolves to before "
-                "running it. Days count from 0, so an event at day 50 needs "
-                "a run of at least 51 days."
+    title='Build and preview a custom scenario',
+    description=(
+        "Author a custom scenario and see what it resolves to before running "
+        "it. Give a macro PATH as hold, ramp and step instructions in "
+        "`steps`, or explicit INTERVENTIONS as `shocks` and assumed "
+        "`transmission`. Returns the resolved document, its fingerprint and "
+        "any warnings; pass that document to run_stress_scenario as "
+        "`scenario`. Days count from 0, so an event at day 50 needs a run of "
+        "at least 51 days. Runs no market."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def build_scenario(
@@ -2032,15 +2080,19 @@ def build_scenario(
 
 
 @server.tool(
+    title='Run strategies through a stress scenario',
     description=(
         "Run strategies through a macro stress scenario, always beside the "
-        "same market unshocked. `scenario` is a shipped document by name "
-        "(list_scenarios gives each one's first_event_day, and the run must "
-        "be longer than that), a constructor by name ("
-        + ", ".join(CONSTRUCTORS) + ", timed with peak_day), or a document "
-        "from build_scenario. A scenario whose events all fall after the "
-        f"run is refused. days 1 to {MAX_DAYS} here, up to {MAX_DAYS_ASYNC} "
-        "through start_job.")
+        "same market unshocked, and compare each strategy across the two. "
+        "`scenario` is a shipped document by name (list_scenarios gives "
+        "each one's first_event_day, and the run must be longer than that), "
+        "a constructor by name (" + ", ".join(CONSTRUCTORS) + ", timed "
+        "with peak_day), or a document from build_scenario. A scenario whose "
+        "events all fall after the run is refused. Use the result to detect "
+        "a response, not to forecast its size. days 1 to "
+        f"{MAX_DAYS} here, up to {MAX_DAYS_ASYNC} through start_job. "
+        "Deterministic."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def run_stress_scenario(
@@ -2215,15 +2267,20 @@ def run_stress_scenario(
 
 
 @server.tool(
-    description="Why did a price move? Returns the "
-                f"{len(tf.Engine.FACTORS)} factor contributions that sum to "
-                "the day's change in the mispricing, the log gap between the "
-                "model price and fair value. They are the simulator's own "
-                "bookkeeping, and they are not the whole price move. On the "
-                "default preset most of the day's news and noise moves fair "
-                "value, `fair_value_shift` takes that part out of the "
-                "mispricing, and the fair-value move itself is not split up. "
-                "`explain` breaks down the price move."
+    title='Explain a price move by factor',
+    description=(
+        "Break one day's move for each name into the "
+        f"{len(tf.Engine.FACTORS)} factor contributions that sum to the "
+        "day's change in the mispricing, the log gap between the model "
+        "price and fair value. Use it to ask which factors moved prices; use "
+        "explain to trace one name's move down to the random draws behind "
+        "it. They are the simulator's own bookkeeping, and they are not the "
+        "whole price move. On the default preset most of the day's news and "
+        "noise moves fair value, `fair_value_shift` takes that part out of "
+        "the mispricing, and the fair-value move itself is not split up. "
+        "Without a ticker it returns the top_n largest moves. Builds and "
+        f"runs its own market for up to {MAX_DAYS} days; read-only."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def explain_price_move(
@@ -2335,10 +2392,19 @@ def explain_price_move(
 
 
 @server.tool(
-    description="Which draws seeded one name's day? Returns a tree from the "
-                "day's log move down to the addresses of the draws behind "
-                "it, with every node replayable and every number measured "
-                "by running the day again."
+    title='Trace a move to its random draws',
+    description=(
+        "Trace one name's price move on one day down to the random draws "
+        "that caused it, as a tree: the day's log move at the top, then each "
+        "factor, then the draw addresses beneath them. Every node can be "
+        "replayed, and every number is measured by running the day again. "
+        "Use explain_price_move to see "
+        "which factors moved prices across the roster; use this for one "
+        "name when you need to know which draws moved those factors. "
+        "`depth` sets how much of the tree the `render` text shows. Builds "
+        f"and runs its own market for up to {MAX_DAYS} days; read-only and "
+        "deterministic."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def explain(
@@ -2440,9 +2506,16 @@ def explain(
 
 
 @server.tool(
-    description="Build a roster and preview it: generated from (size, seed) "
-                "with optional sector concentration, or from explicit "
-                "instruments. Returns a universe document the run tools take."
+    title='Build and preview a roster',
+    description=(
+        "Build a roster of companies and preview it, either generated from "
+        "a size and seed (optionally concentrated on chosen sectors) or from "
+        "explicit instruments you supply. Use it when the default random "
+        "roster will not do, for example to test one sector or your own "
+        "companies. Returns a `universe` document that every run tool takes "
+        "as `universe`, with the roster's fingerprint and any envelope "
+        "warning. Runs no market."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def build_universe(
@@ -2691,11 +2764,18 @@ def _run_job(job_id: str, tool: str, args: dict[str, Any]) -> None:
 
 
 @server.tool(
-    description="Start a long simulation in the background and get a job id "
-                "back immediately. This is the ONLY way to run to the "
-                "certified 252-day horizon; a direct call is capped at 60 "
-                "days so it can answer inside a conversation. The arguments "
-                "are checked before the job starts."
+    title='Start a background simulation',
+    description=(
+        "Start a long run of evaluate_strategies, rank_strategies or "
+        "run_stress_scenario in the background and get a job id back "
+        "immediately. This is the ONLY way to run to the certified "
+        f"{MAX_DAYS_ASYNC}-day horizon; a direct call is capped at "
+        f"{MAX_DAYS} days so it can answer inside a conversation. The "
+        "arguments are checked before the job starts, and the response "
+        f"estimates its run time. At most {MAX_RUNNING_JOBS} jobs run at "
+        f"once and the last {MAX_KEPT_JOBS} are kept, in this server's "
+        "memory only. Poll with check_job."),
+    annotations=_STARTS_JOB,
 )
 @_guarded
 def start_job(
@@ -2766,8 +2846,13 @@ def start_job(
 
 
 @server.tool(
-    description="Check a background job. Returns its status, and the full "
-                "result once it has finished. Omit job_id to list all jobs."
+    title='Check a background job',
+    description=(
+        "Check a background job started by start_job. Returns its status "
+        "and, once it has finished, the full result in the same form the "
+        "direct tool returns. Omit job_id to list every job this server "
+        "still holds. Changes nothing, so it is safe to poll."),
+    annotations=_READ_ONLY,
 )
 @_guarded
 def check_job(
