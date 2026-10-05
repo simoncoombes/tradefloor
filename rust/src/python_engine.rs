@@ -30,7 +30,7 @@ use pyo3::types::PyDict;
 use pyo3::types::PyBytes;
 
 use crate::economy::{create_initial_central_bank_state, create_initial_economy_state};
-use crate::economy::{CyclePhase, ForwardGuidance, InitialEconomyOptions};
+use crate::economy::{CyclePhase, InitialEconomyOptions};
 use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
 use crate::engine::{TickOutcome};
 use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany};
@@ -285,75 +285,9 @@ pub struct PyMacro {
     pub cycle: String,
 }
 
-/// A snapshot's `economy["gdp_publication"]` block (`gdp_publication_lag`),
-/// every key required.
-fn gdp_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::GdpPublication> {
-    let d = v.downcast::<PyDict>().map_err(|_| {
-        ValidationError::new_err("snapshot economy.gdp_publication is not a dict")
-    })?;
-    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
-        d.get_item(key)?.ok_or_else(|| {
-            ValidationError::new_err(format!(
-                "snapshot economy.gdp_publication has no {key:?} (gdp_publication_lag)"))
-        })
-    };
-    let days: Vec<i64> = need("pending_days")?.extract()?;
-    let values: Vec<f64> = need("pending_values")?.extract()?;
-    if days.len() != values.len() {
-        return Err(ValidationError::new_err(format!(
-            "snapshot economy.gdp_publication has {} pending release days and {} \
-             pending figures (gdp_publication_lag)", days.len(), values.len())));
-    }
-    Ok(crate::engine::GdpPublication {
-        published: need("published")?.extract()?,
-        quarter: need("quarter")?.extract()?,
-        count: need("count")?.extract()?,
-        sum: need("sum")?.extract()?,
-        pending: days.into_iter().zip(values).collect(),
-    })
-}
-
 /// The layout version of the dict `Engine.state_snapshot` writes and
-/// `Engine.restore_state` reads.
-///
-/// Version 1 is the layout tradefloor 0.8.5 wrote, plus
-/// `economy.qe_assets_ratio` on a model with `qe_pe_stock_gain` set. A new
-/// field, a field gone, or a field whose meaning changes is a new version,
-/// and the restore names what an older one lacks rather than filling it in.
-pub const STATE_SCHEMA: i64 = 1;
-
-/// Calls `$m!` with every scalar field of the economy a snapshot carries, in
-/// snapshot order, so the writer, the reader and the key check share one
-/// list.
-macro_rules! economy_scalars {
-    ($m:ident) => {
-        $m!(
-            federal_funds_rate, prime_rate, corporate_bond_yield,
-            treasury_yield_10y, treasury_yield_2y, mortgage_rate_30y,
-            cpi, inflation_rate, core_inflation,
-            gdp_growth, gdp,
-            unemployment_rate, jobs_created, labor_force_participation,
-            usd_index, oil_price, gold_price, copper_price,
-            housing_index, home_starts_monthly, housing_transaction_volume,
-            long_term_unemployment_rate, structural_unemployment,
-            consumer_confidence, business_confidence, fear_greed_index, vix,
-            tariff_rate, trade_balance,
-            oil_inventory_level, oil_last_opec_day,
-            wage_growth,
-            previous_day_market_return, rolling_market_return_30d,
-            market_pe, qe_pe_boost,
-            fiscal_stimulus, government_debt_to_gdp,
-            months_in_current_phase, phase_gdp_target, recession_probability,
-        )
-    };
-}
-
-macro_rules! field_names {
-    ($($field:ident),* $(,)?) => { &[$(stringify!($field)),*] };
-}
-
-/// The economy's scalar keys, from [`economy_scalars`].
-const ECONOMY_SCALARS: &[&str] = economy_scalars!(field_names);
+/// `Engine.restore_state` reads: the core's [`crate::snapshot::STATE_SCHEMA`].
+pub use crate::snapshot::STATE_SCHEMA;
 
 /// A population's engine spec, read from the object `population=` was
 /// given: anything with `_engine_spec()` returning `{"fingerprint": str,
@@ -451,337 +385,130 @@ fn population_from(
     Ok((fingerprint, out))
 }
 
-/// The top-level keys every version-1 snapshot carries. `manifest.py`'s
-/// `_SNAPSHOT_KEYS` is the same list less `session_tick`, which the state
-/// hash leaves out, and a test holds the two together.
-const SNAPSHOT_KEYS: &[&str] = &[
-    "columns", "rng", "tickers", "model_fingerprint",
-    "attribution", "tick_components", "tick_fundamental", "tick_anchor",
-    "noise_parts", "noise_own_scale2", "jump_move",
-    "market_open", "market_variance", "forced_flow_spent",
-    "market_vol_log_level", "vix_log_level",
-    "crisis_in_episode", "crisis_sessions_under",
-    "crisis_epicentre", "crisis_epicentre_pin",
-    "nominal_output_base", "volume_state",
-    "universe_stress", "volume_idio", "sector_variance", "jump_excitation",
-    "sector_day_factor", "sector_target_day",
-    "session_news", "economy", "central_bank", "day_count",
-    "draw_counts", "draw_overlay", "pending_jump", "pending_overnight",
-    "session_tick",
-];
-
-/// Top-level keys carried only while they hold something. Their absence is
-/// a value: a pristine book, no close forced tonight, no pins today, no
-/// fair-value shift waiting, the day the counter gives, the fundamentals
-/// the engine was built with.
-const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
-    "state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
-    "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
-    // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
-    // close, carried exactly while `macro_pins_today` marks it.
-    "pinned_corporate_spread",
-];
-
-const CENTRAL_BANK_KEYS: &[&str] = &[
-    "last_meeting_date", "next_meeting_date", "target_inflation",
-    "target_unemployment", "qe_active", "qe_monthly_purchases",
-    "hawkish_dovish_score", "forward_guidance",
-];
-const NEWS_KEYS: &[&str] = &["ticker", "sector", "price_impact"];
-const GDP_PUBLICATION_KEYS: &[&str] =
-    &["published", "quarter", "count", "sum", "pending_days", "pending_values"];
-const CYCLE_PUBLICATION_KEYS: &[&str] =
-    &["key", "published", "last_true", "closes", "turns", "pending_closes", "pending_phases"];
-const FUNDAMENTALS_KEYS: &[&str] = &["eps", "book_value_per_share", "revenue_growth"];
-const RATES_KEYS: &[&str] = &["instruments", "ig_spread", "last_corporate", "closed_since_open"];
-
-/// Added to a key refusal when the snapshot carries no `state_schema`.
-const LEGACY_NOTE: &str = " This snapshot carries no state_schema, so a release \
-    before the version was recorded wrote it. tradefloor 0.8.5 to 0.8.8 wrote \
-    every field version 1 needs, apart from economy.qe_assets_ratio under a \
-    model with qe_pe_stock_gain set. A snapshot missing anything else was \
-    written before 0.8.5, when the session tick was not carried and the day \
-    label and the valuation clock were one field that was not carried either, \
-    or it was edited. A restore cannot know what the missing fields held. \
-    Resume it under the release that wrote it, or replay a Checkpoint, which \
-    carries the order log. A caller who knows what a missing field held can \
-    write it into the dict and restore that.";
-
-/// A key a snapshot carries only under a model dial: whether this engine's
-/// model calls for it, and the sentence that says why.
-///
-/// A key is `held` when the model's dial allows it but the engine writes it
-/// only while it holds something (a day scale drawn at an open and cleared
-/// at the close, say): then it may be carried where the dial is set, and
-/// never where it is not.
-struct Gated {
-    key: &'static str,
-    wanted: bool,
-    held: bool,
-    why: String,
-}
-
-impl Gated {
-    /// A key carried exactly when `dial` is not 0.
-    fn dial(key: &'static str, dial: &str, value: f64) -> Self {
-        Gated {
-            key,
-            wanted: value != 0.0,
-            held: false,
-            why: format!("{dial} is not 0, and this engine's {dial} is {value}"),
+/// A snapshot field tree as the dict `Engine.state_snapshot` returns: each
+/// value as the Python type it names, maps in field order.
+fn snapshot_value_to_py(py: Python<'_>, value: &crate::snapshot::SnapshotValue) -> PyResult<PyObject> {
+    use crate::snapshot::SnapshotValue as V;
+    Ok(match value {
+        V::None => py.None(),
+        V::Bool(b) => b.into_py(py),
+        V::Int(i) => i.into_py(py),
+        V::UInt(u) => u.into_py(py),
+        V::Float(f) => f.into_py(py),
+        V::Str(s) => s.into_py(py),
+        V::Bytes(b) => PyBytes::new_bound(py, b).into_any().unbind(),
+        V::List(items) => {
+            let items: PyResult<Vec<PyObject>> =
+                items.iter().map(|v| snapshot_value_to_py(py, v)).collect();
+            pyo3::types::PyList::new_bound(py, items?).into_any().unbind()
         }
-    }
-
-    /// A key carried exactly when `wanted`, for the reason `why`.
-    fn when(key: &'static str, wanted: bool, why: String) -> Self {
-        Gated { key, wanted, held: false, why }
-    }
-
-    /// A key that may be carried only when `dial` is not 0, and is carried
-    /// there only while it holds something.
-    fn held(key: &'static str, dial: &str, value: f64) -> Self {
-        Gated {
-            key,
-            wanted: value != 0.0,
-            held: true,
-            why: format!("{dial} is not 0 and it holds something, and this engine's {dial} is {value}"),
+        V::Tuple(items) => {
+            let items: PyResult<Vec<PyObject>> =
+                items.iter().map(|v| snapshot_value_to_py(py, v)).collect();
+            pyo3::types::PyTuple::new_bound(py, items?).into_any().unbind()
         }
+        V::Map(map) => snapshot_map_to_py(py, map)?.into_any(),
+    })
+}
+
+fn snapshot_map_to_py(py: Python<'_>, map: &crate::snapshot::SnapshotMap) -> PyResult<Py<PyDict>> {
+    let out = PyDict::new_bound(py);
+    for (key, value) in map.iter() {
+        out.set_item(key, snapshot_value_to_py(py, value)?)?;
     }
+    Ok(out.unbind())
 }
 
-fn py_names(names: &[String]) -> String {
-    let quoted: Vec<String> = names.iter().map(|n| format!("'{n}'")).collect();
-    format!("[{}]", quoted.join(", "))
-}
-
-/// Compare a dict's keys with the ones it must carry: `None` when they
-/// agree, and otherwise the refusal, in the words `manifest.state_hash`
-/// uses for the same mismatch.
-fn key_mismatch(
-    what: &str,
-    d: &Bound<'_, PyDict>,
-    required: &[&str],
-    gated: &[Gated],
-    optional: &[&str],
-) -> PyResult<Option<String>> {
-    let mut carried = std::collections::BTreeSet::new();
-    for key in d.keys() {
+/// A dict handed to `Engine.restore_state` as the core's field tree, for
+/// `Engine::restore` to check. Every value converts by its Python type, so
+/// a value of the wrong type reaches the core's check, which names the
+/// field; only a key that is not a string, or an object no snapshot field
+/// can hold, is refused here. `prefix` is the dict's path in the snapshot,
+/// empty at the top and `economy.` inside the economy.
+fn snapshot_map_from_py(d: &Bound<'_, PyDict>, prefix: &str) -> PyResult<crate::snapshot::SnapshotMap> {
+    let mut out = crate::snapshot::SnapshotMap::new();
+    for (key, value) in d.iter() {
         let name: String = key.extract().map_err(|_| {
+            let what = match prefix.strip_suffix('.') {
+                Some(path) => format!("snapshot field {path}"),
+                None => "this snapshot".to_string(),
+            };
             ValidationError::new_err(format!("{what} has a key that is not a string: {key}"))
         })?;
-        carried.insert(name);
+        let value = snapshot_value_from_py(&value, &format!("{prefix}{name}"))?;
+        out.insert(name, value);
     }
-    let mut missing: Vec<String> = required
-        .iter()
-        .chain(gated.iter().filter(|g| g.wanted && !g.held).map(|g| &g.key))
-        .filter(|k| !carried.contains(**k))
-        .map(|k| k.to_string())
-        .collect();
-    missing.sort();
-    let unexpected: Vec<String> = carried
-        .iter()
-        .filter(|k| {
-            !required.contains(&k.as_str())
-                && !optional.contains(&k.as_str())
-                && !gated.iter().any(|g| g.wanted && g.key == k.as_str())
-        })
-        .cloned()
-        .collect();
-    if missing.is_empty() && unexpected.is_empty() {
-        return Ok(None);
-    }
-    let mut out = format!(
-        "{what} does not match the fields this engine's state carries: \
-         missing {}, unexpected {}.",
-        py_names(&missing),
-        py_names(&unexpected)
-    );
-    for g in gated {
-        let has = carried.contains(g.key);
-        if g.held && has && !g.wanted {
-            out.push_str(&format!(" {} is carried only when {}.", g.key, g.why));
-        } else if !g.held && g.wanted != has {
-            out.push_str(&format!(" {} is carried exactly when {}.", g.key, g.why));
+    Ok(out)
+}
+
+fn snapshot_value_from_py(v: &Bound<'_, PyAny>, at: &str) -> PyResult<crate::snapshot::SnapshotValue> {
+    use crate::snapshot::SnapshotValue as V;
+    use pyo3::types::{PyBool, PyFloat, PyList, PyLong, PyString, PyTuple};
+    let items = |seq: &Bound<'_, PyAny>| -> PyResult<Vec<V>> {
+        let mut out = Vec::new();
+        for item in seq.iter()? {
+            out.push(snapshot_value_from_py(&item?, &format!("{at}[]"))?);
         }
-    }
-    Ok(Some(out))
-}
-
-fn check_keys(
-    what: &str,
-    d: &Bound<'_, PyDict>,
-    required: &[&str],
-    gated: &[Gated],
-    optional: &[&str],
-) -> PyResult<()> {
-    match key_mismatch(what, d, required, gated, optional)? {
-        None => Ok(()),
-        Some(message) => Err(ValidationError::new_err(message)),
-    }
-}
-
-/// Whether the snapshot names its layout version, refusing one this build
-/// does not read.
-fn snapshot_version(snapshot: &Bound<'_, PyDict>) -> PyResult<bool> {
-    let Some(v) = snapshot.get_item("state_schema")? else {
-        return Ok(false);
+        Ok(out)
     };
-    if v.is_instance_of::<pyo3::types::PyBool>() || !v.is_instance_of::<pyo3::types::PyLong>() {
-        return Err(ValidationError::new_err(format!(
-            "snapshot field state_schema must be an integer, got {}",
-            v.get_type().name()?
-        )));
+    if v.is_none() {
+        return Ok(V::None);
     }
-    let version: i64 = v.extract().unwrap_or(i64::MAX);
-    if version > STATE_SCHEMA {
-        return Err(ValidationError::new_err(format!(
-            "this snapshot's state_schema is {v}, newer than this build reads \
-             ({STATE_SCHEMA}). Upgrade tradefloor rather than restoring it in part."
-        )));
+    if v.is_instance_of::<PyBool>() {
+        return Ok(V::Bool(v.extract()?));
     }
-    if version < 1 {
-        return Err(ValidationError::new_err(format!(
-            "this snapshot's state_schema is {version}, and versions run from 1."
-        )));
-    }
-    Ok(true)
-}
-
-/// A snapshot field the key check has already found present.
-fn snap_field<'py>(d: &Bound<'py, PyDict>, at: &str, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    d.get_item(key)?
-        .ok_or_else(|| ValidationError::new_err(format!("snapshot has no {at}{key}")))
-}
-
-/// A snapshot field as `T`, refusing a value of another type by name.
-fn snap_value<'py, T: FromPyObject<'py>>(
-    d: &Bound<'py, PyDict>,
-    at: &str,
-    key: &str,
-    kind: &str,
-) -> PyResult<T> {
-    snap_field(d, at, key)?.extract().map_err(|e| {
-        ValidationError::new_err(format!("snapshot field {at}{key} must be {kind}: {e}"))
-    })
-}
-
-/// A snapshot scalar that must be a finite number.
-fn snap_finite(d: &Bound<'_, PyDict>, at: &str, key: &str) -> PyResult<f64> {
-    let value: f64 = snap_value(d, at, key, "a number")?;
-    if !value.is_finite() {
-        return Err(ValidationError::new_err(format!(
-            "snapshot field {at}{key} is {value}, and it must be finite"
-        )));
-    }
-    Ok(value)
-}
-
-fn snap_dict<'py>(d: &Bound<'py, PyDict>, at: &str, key: &str) -> PyResult<Bound<'py, PyDict>> {
-    snap_field(d, at, key)?
-        .downcast_into::<PyDict>()
-        .map_err(|_| ValidationError::new_err(format!("snapshot field {at}{key} must be a dict")))
-}
-
-/// A snapshot buffer of little-endian f64s, refusing one that is not bytes
-/// or not a whole number of values.
-fn snap_buffer(d: &Bound<'_, PyDict>, at: &str, key: &str) -> PyResult<Vec<f64>> {
-    let raw = snap_field(d, at, key)?;
-    let bytes = raw.downcast::<PyBytes>().map_err(|_| {
-        ValidationError::new_err(format!(
-            "snapshot field {at}{key} must be bytes of little-endian f64s"
-        ))
-    })?;
-    let bytes = bytes.as_bytes();
-    if bytes.len() % 8 != 0 {
-        return Err(ValidationError::new_err(format!(
-            "snapshot field {at}{key} carries {} bytes, which is not a whole \
-             number of f64s.",
-            bytes.len()
-        )));
-    }
-    Ok(bytes
-        .chunks_exact(8)
-        .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
-        .collect())
-}
-
-fn snap_len(key: &str, got: usize, want: usize) -> PyResult<()> {
-    if got != want {
-        return Err(ValidationError::new_err(format!(
-            "snapshot field {key} carries {got} values and this engine holds {want}."
-        )));
-    }
-    Ok(())
-}
-
-/// One economy scalar, read at its field's type.
-trait EconomyScalar: Sized {
-    fn read(d: &Bound<'_, PyDict>, key: &str) -> PyResult<Self>;
-}
-
-impl EconomyScalar for f64 {
-    fn read(d: &Bound<'_, PyDict>, key: &str) -> PyResult<Self> {
-        snap_finite(d, "economy.", key)
-    }
-}
-
-impl EconomyScalar for i64 {
-    fn read(d: &Bound<'_, PyDict>, key: &str) -> PyResult<Self> {
-        snap_value(d, "economy.", key, "an integer")
-    }
-}
-
-impl EconomyScalar for Option<f64> {
-    fn read(d: &Bound<'_, PyDict>, key: &str) -> PyResult<Self> {
-        let value: Option<f64> = snap_value(d, "economy.", key, "a number or None")?;
-        if value.is_some_and(|v| !v.is_finite()) {
-            return Err(ValidationError::new_err(format!(
-                "snapshot field economy.{key} is {value:?}, and it must be finite or None"
-            )));
+    if v.is_instance_of::<PyLong>() {
+        if let Ok(i) = v.extract::<i64>() {
+            return Ok(V::Int(i));
         }
-        Ok(value)
-    }
-}
-
-fn snap_economy_value<T: EconomyScalar>(d: &Bound<'_, PyDict>, key: &str) -> PyResult<T> {
-    T::read(d, key)
-}
-
-/// A snapshot's `economy["cycle_publication"]` block
-/// (`cycle_publication_lag_draw`), every key required.
-fn cycle_publication_from(v: &Bound<'_, PyAny>) -> PyResult<crate::engine::CyclePublication> {
-    let d = v.downcast::<PyDict>().map_err(|_| {
-        ValidationError::new_err("snapshot economy.cycle_publication is not a dict")
-    })?;
-    let need = |key: &str| -> PyResult<Bound<'_, PyAny>> {
-        d.get_item(key)?.ok_or_else(|| {
+        // A 64-bit key above i64::MAX.
+        return v.extract::<u64>().map(V::UInt).map_err(|_| {
             ValidationError::new_err(format!(
-                "snapshot economy.cycle_publication has no {key:?} (cycle_publication_lag_draw)"))
-        })
-    };
-    let phase = |name: String| -> PyResult<CyclePhase> {
-        CyclePhase::from_name(&name)
-            .ok_or_else(|| ValidationError::new_err(format!("unknown cycle phase {name:?}")))
-    };
-    let closes: Vec<i64> = need("pending_closes")?.extract()?;
-    let names: Vec<String> = need("pending_phases")?.extract()?;
-    if closes.len() != names.len() {
-        return Err(ValidationError::new_err(format!(
-            "snapshot economy.cycle_publication has {} pending closes and {} pending \
-             phases (cycle_publication_lag_draw)", closes.len(), names.len())));
+                "snapshot field {at} holds {v}, an integer outside 64 bits"
+            ))
+        });
     }
-    let mut pending = std::collections::VecDeque::with_capacity(closes.len());
-    for (close, name) in closes.into_iter().zip(names) {
-        pending.push_back((close, phase(name)?));
+    if v.is_instance_of::<PyFloat>() {
+        return Ok(V::Float(v.extract()?));
     }
-    Ok(crate::engine::CyclePublication {
-        key: need("key")?.extract()?,
-        published: phase(need("published")?.extract()?)?,
-        last_true: phase(need("last_true")?.extract()?)?,
-        closes: need("closes")?.extract()?,
-        turns: need("turns")?.extract()?,
-        pending,
-    })
+    if v.is_instance_of::<PyString>() {
+        return Ok(V::Str(v.extract()?));
+    }
+    if let Ok(b) = v.downcast::<PyBytes>() {
+        return Ok(V::Bytes(b.as_bytes().to_vec()));
+    }
+    if let Ok(d) = v.downcast::<PyDict>() {
+        return Ok(V::Map(snapshot_map_from_py(d, &format!("{at}."))?));
+    }
+    if v.is_instance_of::<PyList>() {
+        return Ok(V::List(items(v)?));
+    }
+    if v.is_instance_of::<PyTuple>() {
+        return Ok(V::Tuple(items(v)?));
+    }
+    // A bool, number or sequence of another type (a numpy scalar, say), read
+    // as pyo3 reads one, and any other sequence as a list.
+    if let Ok(b) = v.extract::<bool>() {
+        return Ok(V::Bool(b));
+    }
+    if let Ok(i) = v.extract::<i64>() {
+        return Ok(V::Int(i));
+    }
+    if let Ok(f) = v.extract::<f64>() {
+        return Ok(V::Float(f));
+    }
+    // pyo3's own sequence read, which is what a list field accepted.
+    if let Ok(seq) = v.extract::<Vec<Bound<'_, PyAny>>>() {
+        let mut out = Vec::with_capacity(seq.len());
+        for item in &seq {
+            out.push(snapshot_value_from_py(item, &format!("{at}[]"))?);
+        }
+        return Ok(V::List(out));
+    }
+    Err(ValidationError::new_err(format!(
+        "snapshot field {at} holds a {}, which no snapshot field is",
+        v.get_type().name()?
+    )))
 }
 
 #[pymethods]
@@ -1569,31 +1296,11 @@ pub fn parse_field_public(name: &str) -> PyResult<PriceField> {
 }
 
 fn parse_field(name: &str) -> PyResult<PriceField> {
-    Ok(match name {
-        "price" => PriceField::Price,
-        "previous_close" => PriceField::PreviousClose,
-        "open" => PriceField::Open,
-        "high" => PriceField::High,
-        "low" => PriceField::Low,
-        "volume" => PriceField::Volume,
-        "market_cap" => PriceField::MarketCap,
-        "mispricing_s" => PriceField::MispricingS,
-        "maker_inventory" => PriceField::MakerInventory,
-        "garch_variance" => PriceField::GarchVariance,
-        "previous_tick_price" => PriceField::PreviousTickPrice,
-        "mispricing_s_prev_close" => PriceField::MispricingSPrevClose,
-        "mispricing_momentum" => PriceField::MispricingMomentum,
-        "last_daily_return" => PriceField::LastDailyReturn,
-        "avg_volume" => PriceField::AvgVolume,
-        "beta" => PriceField::Beta,
-        "short_interest" => PriceField::ShortInterest,
-        "float_shares" => PriceField::FloatShares,
-        other => {
-            return Err(ValidationError::new_err(format!(
-                "unknown field {other:?}. Valid: {}",
-                COLUMN_FIELDS.join(", ")
-            )))
-        }
+    crate::snapshot::parse_column(name).ok_or_else(|| {
+        ValidationError::new_err(format!(
+            "unknown field {name:?}. Valid: {}",
+            COLUMN_FIELDS.join(", ")
+        ))
     })
 }
 
@@ -1943,216 +1650,15 @@ fn repeated_clock_warning(start: i64, end: i64) -> String {
 /// every method of a `#[pymethods]` block becomes a binding and every
 /// binding has to be declared in the stub.
 impl PyEngine {
-    /// Hold a snapshot's keys against the ones this engine's state carries:
-    /// the top level, the economy, the central bank and the columns. A key
-    /// carried only under a model dial is required exactly when this
-    /// engine's model sets the dial, which is the snapshot's model once the
-    /// fingerprint check has passed.
-    fn check_snapshot_keys(&self, snapshot: &Bound<'_, PyDict>, versioned: bool) -> PyResult<()> {
-        let refuse = |mut message: String| {
-            if !versioned {
-                message.push_str(LEGACY_NOTE);
-            }
-            ValidationError::new_err(message)
-        };
-        let p = self.inner.params();
-        let held: Vec<&str> = self.inner.rates().instruments.iter().map(|i| i.spec.ticker).collect();
-        let fair_value = self.inner.carries_fair_value_offsets();
-        let fair_value_why = format!(
-            "the model can move a fair-value level (fair_value_news_share, \
-             fair_value_market_share, opening_mispricing_sigma or \
-             opening_market_sigma is not 0), and this engine's model {}",
-            if fair_value { "can" } else { "cannot" }
-        );
-        let drawdown = p.fed_drawdown_hold != 0.0 || p.market_vol_cycle_recovery_release != 0.0;
-        let drawdown_why = format!(
-            "fed_drawdown_hold or market_vol_cycle_recovery_release is not 0, and \
-             this engine's are {} and {}",
-            p.fed_drawdown_hold, p.market_vol_cycle_recovery_release
-        );
-        let idio = self.inner.carries_idio_vol_state();
-        let idio_why = format!(
-            "idio_vol_alpha, idio_vol_beta or idio_vol_jump_bump is not 0, and this \
-             engine's are {}, {} and {}",
-            p.idio_vol_alpha, p.idio_vol_beta, p.idio_vol_jump_bump
-        );
-        let gated = [
-            Gated::dial("vix_anchor_slow", "vix_anchor_memory", p.vix_anchor_memory),
-            Gated::when("fair_value_offset", fair_value, fair_value_why.clone()),
-            Gated::when("opening_z", fair_value, fair_value_why),
-            Gated {
-                key: "garch_cascade",
-                wanted: self.inner.carries_garch_cascade(),
-                held: false,
-                why: format!(
-                    "garch_cascade_components is 1 or more, and this engine's \
-                     garch_cascade_components is {}",
-                    p.garch_cascade_components
-                ),
-            },
-            // The dial-gated state the r21 mechanisms carry (every dial 0.0
-            // on every shipped preset, so no shipped snapshot carries one).
-            Gated::dial("market_vol_leverage_memory", "market_vol_leverage", p.market_vol_leverage),
-            Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
-            Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
-            Gated::dial("cycle_nowcast_rng", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
-            Gated::dial("fed_stress_vix_max", "fed_stress_cut", p.fed_stress_cut),
-            Gated::dial("fed_stress_hold_age", "fed_stress_hold", p.fed_stress_hold),
-            Gated::dial("treasury_policy_path", "treasury_path_pricing", p.treasury_path_pricing),
-            Gated::when("fed_drawdown_returns", drawdown, drawdown_why.clone()),
-            Gated::when("fed_drawdown_mcap_prev", drawdown, drawdown_why),
-            Gated::dial("policy_anticipation_priced", "policy_anticipation", p.policy_anticipation),
-            Gated::held("rate_live_marks", "rate_intraday_live", p.rate_intraday_live),
-            Gated::held("pinned_vix_jump", "pinned_vix_variance_share", p.pinned_vix_variance_share),
-            Gated::held("market_day_scale", "market_day_tail_df", p.market_day_tail_df),
-            Gated::when(
-                "buyback_log_shares",
-                self.inner.carries_buyback_log_shares(),
-                format!(
-                    "buyback_accrual and buyback_payout_share are both not 0, and \
-                     this engine's are {} and {}",
-                    p.buyback_accrual, p.buyback_payout_share
-                ),
-            ),
-            Gated::when(
-                "opening_carry",
-                fair_value && p.market_prehistory_valuation != 0.0,
-                format!(
-                    "market_prehistory_valuation is not 0 on a model that can move a \
-                     fair-value level, and this engine's market_prehistory_valuation is {}",
-                    p.market_prehistory_valuation
-                ),
-            ),
-            Gated::dial("dividend", "dividend_payout_share", p.dividend_payout_share),
-            Gated::held("pending_dividend", "dividend_payout_share", p.dividend_payout_share),
-            Gated::dial("earnings_key", "earnings_surprise_sigma", p.earnings_surprise_sigma),
-            Gated::when(
-                "earnings_withheld",
-                self.inner.carries_earnings_withheld(),
-                format!(
-                    "earnings_surprise_sigma, earnings_cycle_report_share and \
-                     earnings_cycle_depth are all not 0, and this engine's are {}, {} and {}",
-                    p.earnings_surprise_sigma, p.earnings_cycle_report_share, p.earnings_cycle_depth
-                ),
-            ),
-            Gated::when(
-                "night_market_factor",
-                self.inner.carries_night_market_factor(),
-                format!(
-                    "overnight_market_share, market_beta_down_asym_lag and \
-                     market_beta_down_asym_lag_live are all not 0, and this engine's are \
-                     {}, {} and {}",
-                    p.overnight_market_share, p.market_beta_down_asym_lag,
-                    p.market_beta_down_asym_lag_live
-                ),
-            ),
-            Gated::when("idio_variance", idio, idio_why.clone()),
-            Gated::when("idio_jump_pending", idio, idio_why.clone()),
-            Gated::when("idio_jump_var_pending", idio, idio_why),
-            Gated::when(
-                "population",
-                self.inner.population().is_some(),
-                "the engine was built with a population".to_string(),
-            ),
-            Gated {
-                key: "rates",
-                wanted: !held.is_empty(),
-                held: false,
-                why: if held.is_empty() {
-                    "the engine holds rate instruments, and this one holds none".to_string()
-                } else {
-                    format!(
-                        "the engine holds rate instruments. This engine holds {} \
-                         and the snapshot carries none of them; it was taken on \
-                         a roster without them",
-                        held.join(", ")
-                    )
-                },
-            },
-        ];
-        if let Some(message) =
-            key_mismatch("this snapshot", snapshot, SNAPSHOT_KEYS, &gated, SNAPSHOT_OPTIONAL_KEYS)?
-        {
-            return Err(refuse(message));
-        }
-
-        let economy = snap_dict(snapshot, "", "economy")?;
-        let mut required: Vec<&str> = ECONOMY_SCALARS.to_vec();
-        required.extend(["gdp_trend", "cycle_phase"]);
-        let feedback = self.inner.carries_vix_feedback();
-        let gated = [
-            Gated::dial("earnings_cycle", "earnings_cycle_depth", p.earnings_cycle_depth),
-            Gated {
-                key: "vix_feedback",
-                wanted: feedback,
-                held: false,
-                why: format!(
-                    "fair_value_vix_discount and fair_value_vix_half_life are \
-                     both not 0, and this engine's are {} and {}",
-                    p.fair_value_vix_discount, p.fair_value_vix_half_life
-                ),
-            },
-            Gated::dial("qe_assets_ratio", "qe_pe_stock_gain", p.qe_pe_stock_gain),
-            Gated::when(
-                "cycle_history",
-                self.inner.carries_cycle_history(),
-                format!(
-                    "cycle_publication_lag is not 0 and cycle_publication_lag_draw is 0, \
-                     and this engine's are {} and {}",
-                    p.cycle_publication_lag, p.cycle_publication_lag_draw
-                ),
-            ),
-            Gated::dial("cycle_nowcast", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
-            Gated::dial(
-                "cycle_publication", "cycle_publication_lag_draw", p.cycle_publication_lag_draw),
-            Gated::dial(
-                "anticipation_drift",
-                "earnings_anticipation_drift_share",
-                p.earnings_anticipation_drift_share,
-            ),
-            Gated::dial(
-                "anticipation_raw",
-                "earnings_anticipation_drift_share",
-                p.earnings_anticipation_drift_share,
-            ),
-            Gated::dial("intermeeting_return", "fed_put_gain", p.fed_put_gain),
-            Gated::dial("fed_put", "fed_put_gain", p.fed_put_gain),
-            Gated::dial("fed_put_owed", "fed_put_gain", p.fed_put_gain),
-            Gated::dial("fed_put_mcap_prev", "fed_put_gain", p.fed_put_gain),
-            Gated::when(
-                "spread_equity_gap",
-                self.inner.carries_spread_equity_gap(),
-                format!(
-                    "corporate_spread_equity_gain or cycle_equity_hazard is not 0, and \
-                     this engine's are {} and {}",
-                    p.corporate_spread_equity_gain, p.cycle_equity_hazard
-                ),
-            ),
-            Gated::dial(
-                "unemployment_impulse",
-                "unemployment_adjustment_half_life",
-                p.unemployment_adjustment_half_life,
-            ),
-            Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
-        ];
-        if let Some(message) =
-            key_mismatch("this snapshot's economy", &economy, &required, &gated, &[])?
-        {
-            return Err(refuse(message));
-        }
-        let bank = snap_dict(snapshot, "", "central_bank")?;
-        if let Some(message) =
-            key_mismatch("this snapshot's central_bank", &bank, CENTRAL_BANK_KEYS, &[], &[])?
-        {
-            return Err(refuse(message));
-        }
-        let columns = snap_dict(snapshot, "", "columns")?;
-        if let Some(message) =
-            key_mismatch("this snapshot's columns", &columns, &COLUMN_FIELDS, &[], &[])?
-        {
-            return Err(refuse(message));
-        }
-        Ok(())
+    /// What this binding keeps beside the core and a snapshot carries: the
+    /// day counter, the open flag and the tape rows in waiting.
+    fn day_loop(&self) -> crate::snapshot::DayLoop {
+        let mut day_loop = crate::snapshot::DayLoop::new(self.day_count, self.market_open);
+        day_loop.pending_jump = self.pending_jump.clone();
+        day_loop.pending_overnight = self.pending_overnight.clone();
+        day_loop.pending_fair_value = self.pending_fair_value.clone();
+        day_loop.pending_dividend = self.pending_dividend.clone();
+        day_loop
     }
 
     /// `state_snapshot` for this binding's own reads, which the copy count
@@ -2421,14 +1927,6 @@ fn side_str(side: crate::order_book::Side) -> &'static str {
     }
 }
 
-fn parse_side_str(s: &str) -> PyResult<crate::order_book::Side> {
-    match s {
-        "buy" => Ok(crate::order_book::Side::Buy),
-        "sell" => Ok(crate::order_book::Side::Sell),
-        other => Err(ValidationError::new_err(format!("unknown side {other:?}"))),
-    }
-}
-
 fn fill_to_py(py: Python<'_>, f: &crate::agent_book::AgentFill) -> PyResult<PyObject> {
     let d = PyDict::new_bound(py);
     d.set_item("agent", &f.agent)?;
@@ -2477,163 +1975,6 @@ fn report_to_py(py: Python<'_>, r: &crate::engine::OrderReport) -> PyResult<PyOb
     let fills: PyResult<Vec<PyObject>> = r.fills.iter().map(|f| fill_to_py(py, f)).collect();
     d.set_item("fills", fills?)?;
     Ok(d.into())
-}
-
-/// The snapshot's `book` entry. See `Engine::state_hash`, which hashes the
-/// same fields in the same order.
-fn book_to_py(py: Python<'_>, book: &crate::agent_book::BookState) -> PyResult<Py<PyDict>> {
-    let d = PyDict::new_bound(py);
-    d.set_item("sequence", book.sequence)?;
-    d.set_item("fill_sequence", book.fill_sequence)?;
-    let flat: Vec<f64> = book.taken.iter().flat_map(|row| row.iter().copied()).collect();
-    d.set_item("taken", f64_bytes(py, &flat))?;
-    let orders: PyResult<Vec<PyObject>> = book.orders.iter().map(|o| order_to_py(py, o)).collect();
-    d.set_item("orders", orders?)?;
-    let flow = pyo3::types::PyList::empty_bound(py);
-    for (agent, ticker, bought, sold) in &book.flow {
-        flow.append((agent.as_str(), ticker.as_str(), *bought, *sold))?;
-    }
-    d.set_item("flow", flow)?;
-    let fills: PyResult<Vec<PyObject>> = book.fills.iter().map(|f| fill_to_py(py, f)).collect();
-    d.set_item("fills", fills?)?;
-    let impacts = pyo3::types::PyList::empty_bound(py);
-    for r in &book.impacts {
-        let x = PyDict::new_bound(py);
-        x.set_item("agent", &r.agent)?;
-        x.set_item("ticker", &r.ticker)?;
-        x.set_item("bought", r.bought)?;
-        x.set_item("sold", r.sold)?;
-        x.set_item("permanent", r.permanent)?;
-        if let Some(v) = r.transient {
-            x.set_item("transient", v)?;
-        }
-        x.set_item("day", r.day)?;
-        x.set_item("tick", r.tick)?;
-        impacts.append(x)?;
-    }
-    d.set_item("impacts", impacts)?;
-    // The metaorder memory, only while it holds something: an entry absent
-    // is a book without one, as every snapshot before it was.
-    if !book.memory.is_empty() {
-        let flat: Vec<f64> = book.memory.iter().flat_map(|row| row.iter().copied()).collect();
-        d.set_item("memory", f64_bytes(py, &flat))?;
-    }
-    Ok(d.into())
-}
-
-fn book_from_py(d: &Bound<'_, PyDict>) -> PyResult<crate::agent_book::BookState> {
-    use crate::agent_book::*;
-    let get = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
-        d.get_item(k)?
-            .ok_or_else(|| ValidationError::new_err(format!("the snapshot's book has no {k:?}")))
-    };
-    let mut state = BookState {
-        sequence: get("sequence")?.extract()?,
-        fill_sequence: get("fill_sequence")?.extract()?,
-        ..Default::default()
-    };
-    let raw: Vec<u8> = get("taken")?.extract()?;
-    if raw.len() % (8 * TAKEN_WIDTH) != 0 {
-        return Err(ValidationError::new_err("the snapshot's book `taken` is not whole rows"));
-    }
-    for row in raw.chunks(8 * TAKEN_WIDTH) {
-        let mut r = [0.0; TAKEN_WIDTH];
-        for (k, bytes) in row.chunks(8).enumerate() {
-            let mut b = [0u8; 8];
-            b.copy_from_slice(bytes);
-            r[k] = f64::from_le_bytes(b);
-        }
-        state.taken.push(r);
-    }
-    for item in get("orders")?.iter()? {
-        let o = item?;
-        let o = o.downcast::<PyDict>()?;
-        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
-            o.get_item(k)?
-                .ok_or_else(|| ValidationError::new_err(format!("a snapshot order has no {k:?}")))
-        };
-        let side: String = g("side")?.extract()?;
-        let mode: String = g("mode")?.extract()?;
-        state.orders.push(AgentOrder {
-            id: g("order_id")?.extract()?,
-            agent: g("agent")?.extract()?,
-            ticker: g("ticker")?.extract()?,
-            side: parse_side_str(&side)?,
-            limit: g("limit_price")?.extract()?,
-            quantity: g("quantity")?.extract()?,
-            remaining: g("remaining")?.extract()?,
-            sequence: g("sequence")?.extract()?,
-            mode: RestMode::parse(&mode)
-                .ok_or_else(|| ValidationError::new_err(format!("unknown order mode {mode:?}")))?,
-        });
-    }
-    for item in get("flow")?.iter()? {
-        let (agent, ticker, bought, sold): (String, String, f64, f64) = item?.extract()?;
-        state.flow.push((agent, ticker, bought, sold));
-    }
-    for item in get("fills")?.iter()? {
-        let f = item?;
-        let f = f.downcast::<PyDict>()?;
-        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
-            f.get_item(k)?
-                .ok_or_else(|| ValidationError::new_err(format!("a snapshot fill has no {k:?}")))
-        };
-        let side: String = g("side")?.extract()?;
-        let liquidity: String = g("liquidity")?.extract()?;
-        state.fills.push(AgentFill {
-            agent: g("agent")?.extract()?,
-            order_id: g("order_id")?.extract()?,
-            ticker: g("ticker")?.extract()?,
-            side: parse_side_str(&side)?,
-            quantity: g("quantity")?.extract()?,
-            price: g("price")?.extract()?,
-            liquidity: Liquidity::parse(&liquidity).ok_or_else(|| {
-                ValidationError::new_err(format!("unknown liquidity {liquidity:?}"))
-            })?,
-            counterparty: g("counterparty")?.extract()?,
-            reference: g("reference")?.extract()?,
-            day: g("day")?.extract()?,
-            tick: g("tick")?.extract()?,
-            sequence: g("sequence")?.extract()?,
-        });
-    }
-    for item in get("impacts")?.iter()? {
-        let r = item?;
-        let r = r.downcast::<PyDict>()?;
-        let g = |k: &str| -> PyResult<Bound<'_, pyo3::PyAny>> {
-            r.get_item(k)?
-                .ok_or_else(|| ValidationError::new_err(format!("a snapshot impact has no {k:?}")))
-        };
-        state.impacts.push(AgentImpact {
-            agent: g("agent")?.extract()?,
-            ticker: g("ticker")?.extract()?,
-            bought: g("bought")?.extract()?,
-            sold: g("sold")?.extract()?,
-            permanent: g("permanent")?.extract()?,
-            transient: match r.get_item("transient")? {
-                Some(v) => Some(v.extract()?),
-                None => None,
-            },
-            day: g("day")?.extract()?,
-            tick: g("tick")?.extract()?,
-        });
-    }
-    if let Some(raw) = d.get_item("memory")? {
-        let raw: Vec<u8> = raw.extract()?;
-        if raw.len() % (8 * MEMORY_WIDTH) != 0 {
-            return Err(ValidationError::new_err("the snapshot's book `memory` is not whole rows"));
-        }
-        for row in raw.chunks(8 * MEMORY_WIDTH) {
-            let mut r = [0.0; MEMORY_WIDTH];
-            for (k, bytes) in row.chunks(8).enumerate() {
-                let mut b = [0u8; 8];
-                b.copy_from_slice(bytes);
-                r[k] = f64::from_le_bytes(b);
-            }
-            state.memory.push(r);
-        }
-    }
-    Ok(state)
 }
 
 #[pymethods]
@@ -5418,567 +4759,11 @@ impl PyEngine {
     /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         self.copies.bump();
-        let out = PyDict::new_bound(py);
-        // The layout version, which `restore_state` reads first. Outside the
-        // state hash: it describes the dict, not the market.
-        out.set_item("state_schema", STATE_SCHEMA)?;
-        let columns = PyDict::new_bound(py);
-        for name in COLUMN_FIELDS {
-            let field = parse_field(name)?;
-            columns.set_item(name, f64_bytes(py, &self.inner.column(field)))?;
-        }
-        out.set_item("columns", columns)?;
-        let rng = self.inner.rng_state();
-        // Five streams, three numbers each: (state, increment, spare) for
-        // market, economy, external, jumps, volume, in that order. Snapshots
-        // written before those last two carry nine or twelve, and restore
-        // detects that by LENGTH rather than by a version field. The u64s ride as f64 bit
-        // patterns: a u64 does not survive a Python float, and this has to
-        // round-trip exactly rather than closely. Nine numbers rather than a
-        // nested structure so a pre-split snapshot (three numbers) is
-        // unmistakable at a glance and on restore.
-        let mut rng_out = Vec::with_capacity(3 * crate::rng::stream::COUNT);
-        for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
-                  rng.news, rng.volume_idio, rng.overnight, rng.market_vol_level,
-                  rng.crisis_epicentre] {
-            rng_out.push(f64::from_bits(s.state));
-            rng_out.push(f64::from_bits(s.increment));
-            rng_out.push(s.spare.unwrap_or(f64::NAN));
-        }
-        out.set_item("rng", rng_out)?;
-        // Draw addressing (phase 1): the counts that give every draw its
-        // address, and the overlay, both additive. A snapshot from before
-        // this key restores with counts of zero and no overlay.
-        let positions = self.inner.stream_positions();
-        let counts: Vec<f64> = positions
-            .iter()
-            .flat_map(|(u, n)| [*u as f64, *n as f64])
-            .collect();
-        out.set_item("draw_counts", counts)?;
-        let mut overlay: Vec<(u32, u8, u64, f64)> = Vec::new();
-        for id in 0..crate::rng::stream::COUNT as u32 {
-            if let Some(o) = self.inner.draw_overlay(id) {
-                for ((kind, index), value) in &o.table {
-                    overlay.push((id, *kind as u8, *index, *value));
-                }
-            }
-        }
-        out.set_item("draw_overlay", overlay)?;
-        out.set_item("tickers", self.inner.ids().to_vec())?;
-        // The model the frozen market was priced under. `restore_state`
-        // refuses a mismatch: a snapshot restored onto an engine running
-        // other coefficients would continue plausibly and wrongly -- the
-        // same failure class as the roster check above, for the model.
-        out.set_item("model_fingerprint", self.inner.model_fingerprint())?;
-        // The per-DAY accumulators. The columns above are per-company state;
-        // these live beside them and were missing, which made a mid-day fork
-        // diverge in PRICE -- `attribution` is the day's GARCH innovation at
-        // the close, and `market_open` decides whether the next session
-        // re-opens the day and re-anchors `previous_close`.
-        // Two widths now: the engine's attribution carries the daily jump in
-        // an eighth slot, the tick's own decomposition does not (§74).
-        // The dividend's slot, the last, only on a model that pays dividends
-        // (`dividend_payout_share`), where it can be non-zero, so every other
-        // snapshot is the eleven-wide one it was.
-        let width = if self.inner.carries_dividends() {
-            crate::market::factors::COMPONENT_COUNT
-        } else {
-            crate::market::factors::DIVIDEND_SLOT
-        };
-        let flat10 = |rows: &[[f64; crate::market::factors::COMPONENT_COUNT]]| -> Vec<f64> {
-            rows.iter().flat_map(|r| r[..width].iter().copied()).collect()
-        };
-        let flat = |rows: &[[f64; crate::market::factors::TICK_COMPONENT_COUNT]]| -> Vec<f64> {
-            rows.iter().flat_map(|r| r.iter().copied()).collect()
-        };
-        out.set_item("attribution", f64_bytes(py, &flat10(self.inner.attribution())))?;
-        out.set_item(
-            "tick_components",
-            f64_bytes(py, &flat(self.inner.tick_components())),
-        )?;
-        out.set_item(
-            "tick_fundamental",
-            f64_bytes(py, self.inner.tick_fundamental()),
-        )?;
-        out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
-        // The day's `random_noise` split and the scale its idiosyncratic
-        // part was drawn at, beside the accumulators above because they are
-        // the same per-DAY state and lost the same way: off zero on
-        // `garch_innovation_commensurate` the close builds the per-name GJR
-        // innovation out of them, so a mid-day fork that dropped them closed
-        // on a different innovation and priced differently from its parent.
-        // Their own keys, so a snapshot written before they were carried
-        // restores to the zeros a day that has not started holds -- which is
-        // every run recorded while the dial shipped 0.0.
-        let flat3 = |rows: &[[f64; 3]]| -> Vec<f64> {
-            rows.iter().flat_map(|r| r.iter().copied()).collect()
-        };
-        out.set_item("noise_parts", f64_bytes(py, &flat3(self.inner.noise_parts())))?;
-        out.set_item(
-            "noise_own_scale2",
-            f64_bytes(py, self.inner.noise_own_scale2()),
-        )?;
-        // The jump each name booked at the last close, kept across the open
-        // for the session that trades the gap in. Written and read only off
-        // the shipped `volume_move_jump_share` of 1.0, and carried here so a
-        // restored engine's first session reads the gap a copy's reads.
-        out.set_item("jump_move", f64_bytes(py, self.inner.jump_move()))?;
-        out.set_item("market_open", self.market_open)?;
-        // The market factor's variance state: (variance, day_factor).
-        // Engine-level rather than per-company, so it has no column; a
-        // fork that lost it would re-open at the baseline factor sigma
-        // mid-regime and diverge from its parent at the next close.
-        let (market_variance, market_day_factor, market_fast_variance,
-             market_slow_variance, market_prev_day_factor, market_smoothed_vix) =
-            self.inner.market_variance_state();
-        out.set_item(
-            "market_variance",
-            vec![market_variance, market_day_factor, market_fast_variance,
-                 market_slow_variance, market_prev_day_factor,
-                 market_smoothed_vix],
-        )?;
-        // The forced-flow segment's spent budget (round 143). Its own key:
-        // a snapshot without it restores to 0.0, which is bit-exact for
-        // every run recorded while the reservoir dial shipped 0.0.
-        out.set_item("forced_flow_spent", self.inner.forced_flow_spent())?;
-        // The market factor's slow variance level, in logs. Its own key
-        // for the reason the line above has one: a snapshot without it
-        // restores to 0.0, a multiplier of exactly 1.0, which is what
-        // every run recorded while `market_vol_level_sigma` shipped 0.0
-        // actually carried.
-        out.set_item("market_vol_log_level", self.inner.market_vol_log_level())?;
-        out.set_item("vix_log_level", self.inner.vix_log_level())?;
-        // Only where the hash covers it: the memory moves, and is hashed,
-        // only with `vix_anchor_memory` nonzero.
-        if self.inner.params().vix_anchor_memory != 0.0 {
-            out.set_item("vix_anchor_slow", self.inner.vix_anchor_slow())?;
-        }
-        // The market factor's return memory, on the same rule: carried, and
-        // hashed, only with `market_vol_leverage` set.
-        if self.inner.carries_market_vol_leverage() {
-            out.set_item("market_vol_leverage_memory",
-                         self.inner.market_vol_leverage_memory())?;
-        }
-        // The cycle's volatility multiplier, on the same rule: carried, and
-        // hashed, only with `market_vol_cycle_ratio` set and once a close
-        // has set it.
-        if self.inner.carries_market_vol_cycle() {
-            if let Some(l) = self.inner.market_vol_cycle_log() {
-                out.set_item("market_vol_cycle_log", l)?;
-            }
-        }
-        // The published VIX's stress memory, only where the hash covers it:
-        // with `vix_stress_premium` non-zero.
-        if self.inner.carries_vix_stress_memory() {
-            out.set_item("vix_stress_memory", self.inner.vix_stress_memory())?;
-        }
-        // THE CRISIS EPISODE: whether one is running, how many consecutive
-        // sessions it has spent under the threshold, the sector index its
-        // epicentre was drawn at (`-1` for `none`, a crisis with no
-        // epicentre) and the pin a scenario has set (`-2` for no pin, which
-        // is no sector index and not the `-1` that means `none`).
-        //
-        // Four keys of their own, for the reason the two levels above have
-        // theirs: a snapshot written before they existed restores to the
-        // state a run with `crisis_epicentre_extra` at 0.0 carries, which is
-        // every run ever recorded. A fork that dropped them would resume
-        // outside the episode its parent is three sessions into, price the
-        // epicentre's names without the multiple, and redraw a fresh
-        // epicentre on the next crossing.
-        let (in_episode, sessions_under, epicentre, pin) = self.inner.crisis_episode_raw();
-        out.set_item("crisis_in_episode", in_episode)?;
-        out.set_item("crisis_sessions_under", sessions_under)?;
-        out.set_item("crisis_epicentre", epicentre)?;
-        out.set_item("crisis_epicentre_pin", pin.unwrap_or(-2))?;
-        // A forced close pending tonight. A key only while true, so every
-        // snapshot of an engine that was never forced is the one it was.
-        if self.inner.vix_sets_variance_pending() {
-            out.set_item("vix_sets_variance_pending", true)?;
-        }
-        if self.inner.macro_pins_today() != 0 {
-            out.set_item("macro_pins_today", self.inner.macro_pins_today())?;
-        }
-        // The market's cycle nowcast's generator (`cycle_nowcast_accuracy`),
-        // a key only while the dial is set: (state, increment, spare) as the
-        // `rng` array carries a stream, then its uniform and normal counts.
-        // The belief itself is `economy["cycle_nowcast"]`.
-        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
-            let s = self.inner.cycle_nowcast_rng_state();
-            out.set_item(
-                "cycle_nowcast_rng",
-                vec![f64::from_bits(s.state), f64::from_bits(s.increment),
-                     s.spare.unwrap_or(f64::NAN), s.uniforms as f64, s.normals as f64],
-            )?;
-        }
-        // The central bank's stress level, a key only while `fed_stress_cut`
-        // is set, and the rate indices' live mark, only while
-        // `rate_intraday_live` is set and a session holds one.
-        if let Some(level) = self.inner.stress_vix_max() {
-            out.set_item("fed_stress_vix_max", level)?;
-        }
-        // The stress hold's clock and the priced path's forecast, a key each
-        // only while its dial is set.
-        if let Some(age) = self.inner.stress_hold_age() {
-            out.set_item("fed_stress_hold_age", age)?;
-        }
-        if let Some(path) = self.inner.policy_path() {
-            out.set_item("treasury_policy_path", path)?;
-        }
-        // The drawdown hold's window and its base, two keys only while
-        // `fed_drawdown_hold` is set.
-        if let Some((returns, prev)) = self.inner.drawdown_state() {
-            out.set_item("fed_drawdown_returns", f64_bytes(py, &returns))?;
-            out.set_item("fed_drawdown_mcap_prev", prev)?;
-        }
-        // What the curve prices of the next meeting, a key only while
-        // `policy_anticipation` is set.
-        if let Some(priced) = self.inner.policy_anticipation_priced() {
-            out.set_item("policy_anticipation_priced", priced)?;
-        }
-        if let Some(marks) = self.inner.rate_live_marks() {
-            out.set_item("rate_live_marks", marks.to_vec())?;
-        }
-        // Today's priced VIX move (`pinned_vix_variance_share`), a key only
-        // while a pin has made one: the session's market draws read it.
-        if self.inner.pinned_vix_jump() != 0.0 {
-            out.set_item("pinned_vix_jump", self.inner.pinned_vix_jump())?;
-        }
-        // The day's market t scale (`market_day_tail_df`), a key only between
-        // an open that drew one and the close: the session's market draws
-        // read it.
-        if self.inner.market_day_scale() != 1.0 {
-            out.set_item("market_day_scale", self.inner.market_day_scale())?;
-        }
-        // The spread a `corporate_spread` pin holds tonight, only while its
-        // mark stands.
-        if let Some(spread) = self.inner.pinned_corporate_spread() {
-            out.set_item("pinned_corporate_spread", spread)?;
-        }
-        // Nominal output when the run opened, the base of the growth
-        // term's ratio. A constant of the run rather than advancing state,
-        // and carried for the reason the two above are: an engine restored
-        // without it would rebase its valuation on the restore day and
-        // grow from there, which is a plausible market and not the one the
-        // snapshot describes. A snapshot written before this key
-        // leaves the engine on the base it was built with, and such a
-        // snapshot comes from a build where the growth term did not exist,
-        // so it names a preset carrying the dial at 0.0.
-        out.set_item("nominal_output_base", self.inner.nominal_output_base())?;
-        // The common log-volume state. Same reason as the variance above, and
-        // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
-        // and diverges through the book (§74).
-        out.set_item("volume_state", self.inner.volume_state())?;
-        // The universe's remembered stress and the per-name volume states.
-        // Both are engine-level dials that are INERT under every preset
-        // through pt-v15, which is exactly the position `volume_state` above
-        // was in before pt-v10 turned it on and a restored engine started
-        // trading different volume. `set_universe_stress` was written for
-        // this and nothing called it. Carried now, while it is free.
-        out.set_item("universe_stress", self.inner.universe_stress())?;
-        out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
-        // The two states pt-v19 turned on. Their own keys, so a snapshot
-        // written before they were carried restores to the zeros every
-        // preset through pt-v18 actually held.
-        out.set_item("sector_variance", f64_bytes(py, self.inner.sector_variance()))?;
-        out.set_item("jump_excitation", f64_bytes(py, self.inner.jump_excitation()))?;
-        // The accrued buyback share-count reductions: their own key, and
-        // only while `buyback_accrual` and the payout share are both set, so
-        // every preset's snapshot is the one it was.
-        if self.inner.carries_buyback_log_shares() {
-            out.set_item("buyback_log_shares", f64_bytes(py, &self.inner.buyback_log_shares()))?;
-        }
-        // The fair-value levels pt-v20 turned on. Their own key, and only
-        // when the model can move them, so every earlier preset's snapshot
-        // is the one it was.
-        if self.inner.carries_fair_value_offsets() {
-            out.set_item("fair_value_offset", f64_bytes(py, &self.inner.fair_value_offsets()))?;
-            // The opening draws the hash covers beside the levels: empty once
-            // the market has opened, the roster's plus one before it.
-            out.set_item("opening_z", f64_bytes(py, self.inner.opening_z()))?;
-            // The prehistory's carried opening (`market_prehistory_valuation`),
-            // under its own key and only with that dial on.
-            if self.inner.params().market_prehistory_valuation != 0.0 {
-                out.set_item("opening_carry", f64_bytes(py, self.inner.opening_carry()))?;
-            }
-        }
-        // The dividend states, only on a model that pays dividends, so every
-        // other snapshot is the one it was. Seven f64s a name
-        // (`market::dividends::STATE_WIDTH`), NaN for a name without one.
-        if self.inner.carries_dividends() {
-            out.set_item("dividend", f64_bytes(py, &self.inner.dividend_states()))?;
-        }
-        // The earnings calendar's key, only with the calendar on: every
-        // report's date and draws derive from it, so a restore into an
-        // engine built from another seed must carry it or report on other
-        // dates.
-        if self.inner.carries_earnings() {
-            out.set_item("earnings_key", self.inner.earnings_key())?;
-        }
-        // What names hold back of the earnings cycle for their reports, only
-        // while `earnings_cycle_report_share` runs.
-        if self.inner.carries_earnings_withheld() {
-            out.set_item("earnings_withheld", f64_bytes(py, self.inner.earnings_withheld()))?;
-        }
-        // Tonight's market draw under a night split, only while the
-        // session's live lagged wire reads it: a fork taken mid-session
-        // needs it to key the wire on the session's own draws.
-        if self.inner.carries_night_market_factor() {
-            out.set_item("night_market_factor", self.inner.night_market_factor())?;
-        }
-        // The per-name idiosyncratic variance state, only while it runs, so
-        // every preset's snapshot is the one it was.
-        if self.inner.carries_idio_vol_state() {
-            let (ratio, jump, jump_var) = self.inner.idio_vol_state();
-            out.set_item("idio_variance", f64_bytes(py, ratio))?;
-            out.set_item("idio_jump_pending", f64_bytes(py, jump))?;
-            out.set_item("idio_jump_var_pending", f64_bytes(py, jump_var))?;
-        }
-        // The sector state's two per-DAY companions, carried for the
-        // reason `attribution` and `tick_components` are: a fork taken
-        // mid-day needs the day's accumulated sector factor and the
-        // scale it was drawn at.
-        out.set_item("sector_day_factor", f64_bytes(py, self.inner.sector_day_factor()))?;
-        out.set_item("sector_target_day", self.inner.sector_target_day())?;
-        // THE DAY'S JUMP AND OVERNIGHT MOVE, WAITING FOR A TAPE ROW.
-        //
-        // Both are applied at a day boundary, so no tick of that day can
-        // carry them; they are written onto the FIRST TICK OF THE NEXT DAY,
-        // which is where a reader reconstructing the day finds them. Between
-        // the close that produced them and that row they are pending, and a
-        // snapshot taken in that window used to drop them -- so a resumed
-        // run's tape was missing the jump on its first recorded row while the
-        // continuous run's carried it.
-        //
-        // Invisible until 0.7.0: the jump slot is zero unless a jump fired,
-        // and pt-v18 switches on `jump_mean_compensated`, whose compensator
-        // is deterministic and lands EVERY day. `test_a_resumed_run_carries_
-        // its_whole_record` found it at day 2, tick 0.
-        //
-        // RECORDING state, not market state. Restoring them changes what the
-        // tape says and no price, which is why the drift guard in
-        // `test_forking.py` names them rather than seeing them move a market.
-        out.set_item("pending_jump", f64_bytes(py, &self.pending_jump))?;
-        out.set_item("pending_overnight", f64_bytes(py, &self.pending_overnight))?;
-        // A key only while non-empty, so every snapshot of an engine without
-        // fair-value offsets is the one it was.
-        if !self.pending_fair_value.is_empty() {
-            out.set_item("pending_fair_value", f64_bytes(py, &self.pending_fair_value))?;
-        }
-        if !self.pending_dividend.is_empty() {
-            out.set_item("pending_dividend", f64_bytes(py, &self.pending_dividend))?;
-        }
-        // The day's endogenous news, generated once in `open_market` and read
-        // by every tick of that day. Per-DAY state, not a per-tick input, and
-        // omitting it made a mid-day restore run the rest of the day with the
-        // news missing -- a divergence in PRICE, on the shipped default
-        // preset, with nothing to indicate it.
-        let news = pyo3::types::PyList::empty_bound(py);
-        for event in self.inner.session_news() {
-            let item = PyDict::new_bound(py);
-            item.set_item("ticker", event.company_id.clone())?;
-            item.set_item("sector", event.sector.clone())?;
-            item.set_item("price_impact", event.price_impact)?;
-            news.append(item)?;
-        }
-        out.set_item("session_news", news)?;
-
-        // The macro chain's state. The chain advances at every close now, so
-        // a fork that did not carry these would snap back to the initial
-        // economy and diverge from its parent on the first day boundary --
-        // the same failure class the per-day accumulators above fix, one
-        // level up. Field-by-field rather than opaque bytes, for the same
-        // reason the columns are named: a snapshot someone archived should
-        // be inspectable data, not a blob only this build can read.
-        let economy = self.inner.economy();
-        let econ = PyDict::new_bound(py);
-        macro_rules! econ_put {
-            ($($field:ident),* $(,)?) => {
-                $(econ.set_item(stringify!($field), economy.$field)?;)*
-            };
-        }
-        economy_scalars!(econ_put);
-        econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
-        econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
-        if self.inner.params().cycle_nowcast_accuracy != 0.0 {
-            econ.set_item("cycle_nowcast", self.inner.cycle_nowcast().to_vec())?;
-        }
-        // The published-phase history, oldest first, only while
-        // `cycle_publication_lag` keeps one, so every other snapshot is the
-        // dict it was. A restore without it re-seeds from the true phase.
-        if self.inner.carries_cycle_history() {
-            let history: Vec<&str> =
-                self.inner.cycle_history().iter().map(|p| p.as_str()).collect();
-            econ.set_item("cycle_history", history)?;
-        }
-        // Unemployment's impulse, in percentage points a month, only while
-        // `unemployment_adjustment_half_life` is set. A restore without it
-        // re-seeds from the economy restored.
-        if self.inner.params().unemployment_adjustment_half_life != 0.0 {
-            econ.set_item("unemployment_impulse", economy.unemployment_impulse)?;
-        }
-        // The published GDP growth figure's state, in the economy's percent,
-        // only while `gdp_publication_lag` is set, so every other snapshot is
-        // the dict it was. `gdp_growth` above is the TRUE daily growth. A
-        // restore without this block re-seeds from the growth restored.
-        if self.inner.params().gdp_publication_lag != 0.0 {
-            let p = self.inner.gdp_publication();
-            let block = PyDict::new_bound(py);
-            block.set_item("published", p.published)?;
-            block.set_item("quarter", p.quarter)?;
-            block.set_item("count", p.count)?;
-            block.set_item("sum", p.sum)?;
-            let days: Vec<i64> = p.pending.iter().map(|&(d, _)| d).collect();
-            let values: Vec<f64> = p.pending.iter().map(|&(_, v)| v).collect();
-            block.set_item("pending_days", days)?;
-            block.set_item("pending_values", values)?;
-            econ.set_item("gdp_publication", block)?;
-        }
-        // The drawn publication schedule, only while
-        // `cycle_publication_lag_draw` is set (the fixed lag's history is
-        // then not kept). A restore without it re-seeds from the phase
-        // restored.
-        if self.inner.params().cycle_publication_lag_draw != 0.0 {
-            let p = self.inner.cycle_publication();
-            let block = PyDict::new_bound(py);
-            block.set_item("key", p.key)?;
-            block.set_item("published", p.published.as_str())?;
-            block.set_item("last_true", p.last_true.as_str())?;
-            block.set_item("closes", p.closes)?;
-            block.set_item("turns", p.turns)?;
-            let closes: Vec<i64> = p.pending.iter().map(|&(c, _)| c).collect();
-            let phases: Vec<&str> = p.pending.iter().map(|&(_, ph)| ph.as_str()).collect();
-            block.set_item("pending_closes", closes)?;
-            block.set_item("pending_phases", phases)?;
-            econ.set_item("cycle_publication", block)?;
-        }
-        // The anticipation's left-out drift `D` and the last `A - e`, only
-        // while `earnings_anticipation_drift_share` is set. A restore
-        // without them opens `D` at zero.
-        if self.inner.carries_anticipation_drift() {
-            let (drift, raw) = self.inner.anticipation_drift();
-            econ.set_item("anticipation_drift", drift)?;
-            econ.set_item("anticipation_raw", raw)?;
-        }
-        // The aggregate earnings cycle, only when the model moves it, so
-        // every earlier preset's snapshot is the dict it was.
-        if self.inner.params().earnings_cycle_depth != 0.0 {
-            econ.set_item("earnings_cycle", economy.earnings_cycle)?;
-        }
-        // The volatility feedback's smoothed exposure, on the same rule.
-        if self.inner.carries_vix_feedback() {
-            econ.set_item("vix_feedback", economy.vix_feedback)?;
-        }
-        // The stock of assets QE has bought, against its level at the
-        // start, only where the fair value reads it (`qe_pe_stock_gain`).
-        // The central bank moves it on every preset, and nothing else reads
-        // it, so every other snapshot is the dict it was.
-        if self.inner.params().qe_pe_stock_gain != 0.0 {
-            econ.set_item("qe_assets_ratio", economy.qe_assets_ratio)?;
-        }
-        // The Fed put's state, on the same rule: only with `fed_put_gain` set.
-        if self.inner.carries_fed_put() {
-            econ.set_item("intermeeting_return", economy.intermeeting_return)?;
-            econ.set_item("fed_put", economy.fed_put)?;
-            econ.set_item("fed_put_owed", economy.fed_put_owed)?;
-            econ.set_item("fed_put_mcap_prev", economy.fed_put_mcap_prev)?;
-        }
-        // Credit's leverage gap, on the same rule: only with
-        // `corporate_spread_equity_gain` set.
-        if self.inner.carries_spread_equity_gap() {
-            econ.set_item("spread_equity_gap", economy.spread_equity_gap)?;
-        }
-        out.set_item("economy", econ)?;
-
-        let bank = self.inner.central_bank();
-        let cb = PyDict::new_bound(py);
-        cb.set_item("last_meeting_date", bank.last_meeting_date)?;
-        cb.set_item("next_meeting_date", bank.next_meeting_date)?;
-        cb.set_item("target_inflation", bank.target_inflation)?;
-        cb.set_item("target_unemployment", bank.target_unemployment)?;
-        cb.set_item("qe_active", bank.qe_active)?;
-        cb.set_item("qe_monthly_purchases", bank.qe_monthly_purchases)?;
-        cb.set_item("hawkish_dovish_score", bank.hawkish_dovish_score)?;
-        cb.set_item("forward_guidance", bank.forward_guidance.as_str())?;
-        out.set_item("central_bank", cb)?;
-
-        out.set_item("day_count", self.day_count)?;
-        // The rate instruments, only when the engine holds any, so every
-        // snapshot of an engine without them is the one it always was. Each
-        // instrument's state by name, in `RATE_STATE_FIELDS` order, which is
-        // the order the state hash walks.
-        let rates = self.inner.rates();
-        if !rates.is_empty() {
-            let block = PyDict::new_bound(py);
-            let items = pyo3::types::PyList::empty_bound(py);
-            for inst in &rates.instruments {
-                let item = PyDict::new_bound(py);
-                item.set_item("ticker", inst.spec.ticker)?;
-                for (name, value) in RATE_STATE_FIELDS.iter().zip(rate_state(inst)) {
-                    item.set_item(*name, value)?;
-                }
-                items.append(item)?;
-            }
-            block.set_item("instruments", items)?;
-            block.set_item("ig_spread", rates.ig_spread)?;
-            block.set_item("last_corporate", rates.last_corporate)?;
-            block.set_item("closed_since_open", rates.closed_since_open)?;
-            out.set_item("rates", block)?;
-        }
-        // The agent-facing book, only once it has been used, so every
-        // snapshot of a run that never saw an agent's order is the dict it
-        // was before the book existed. `manifest.state_hash` accepts it
-        // exactly when it is here.
-        if !self.inner.book_state().is_pristine() {
-            out.set_item("book", book_to_py(py, self.inner.book_state())?)?;
-        }
-        // THE DAY'S TWO NUMBERS, each only where it is not the day
-        // `day_count` and the session flag give (`engine::default_day`), so
-        // every snapshot of a run that numbered its days from the counter is
-        // the dict it was. `current_day` is the label the draws and the fills
-        // carry; `elapsed_days` is the valuation's clock. A restore set the
-        // label to `day_count` until 0.8.5, a day ahead of the original after
-        // a close, and a fill after it was stamped with the wrong day.
-        let usual = crate::engine::default_day(self.day_count, self.market_open);
-        if self.inner.current_day() != usual {
-            out.set_item("current_day", self.inner.current_day())?;
-        }
-        if self.inner.elapsed_days() != usual {
-            out.set_item("elapsed_days", self.inner.elapsed_days())?;
-        }
-        // The ticks the day has run, which is the tick the book stamps a
-        // fill with. Recording state, like the pending tape buffers, and the
-        // one key here the state hash does not cover: every snapshot of an
-        // open or a closed day carries a count, so hashing it would have
-        // moved every leaf already written, and it moves no price.
-        out.set_item("session_tick", self.inner.session_ticks())?;
-        // The fair-value inputs, once `set_fundamentals` has moved them off
-        // the figures each company was built or listed with. Absent, a
-        // restore puts those figures back.
-        if self.inner.fundamentals_changed() {
-            let (eps, book, growth) = self.inner.fundamentals();
-            let block = PyDict::new_bound(py);
-            block.set_item("eps", f64_bytes(py, &eps))?;
-            block.set_item("book_value_per_share", f64_bytes(py, &book))?;
-            block.set_item("revenue_growth", f64_bytes(py, &growth))?;
-            out.set_item("fundamentals", block)?;
-        }
-        // The variance cascade's components, only on a model that runs it
-        // (`garch_cascade_components` at 1 or more; off on every shipped
-        // preset), for the reason `fair_value_offset` is carried.
-        if self.inner.carries_garch_cascade() {
-            out.set_item("garch_cascade", f64_bytes(py, &self.inner.garch_cascade()))?;
-        }
-        // The population's ledger and memories, only on an engine built with
-        // one (`crate::population`), so every other snapshot is the dict it
-        // was.
-        if let Some(pop) = self.inner.population() {
-            let block = PyDict::new_bound(py);
-            block.set_item("fingerprint", pop.fingerprint.clone())?;
-            block.set_item("tickers", pop.tickers.clone())?;
-            block.set_item("state", f64_bytes(py, &pop.to_flat()))?;
-            out.set_item("population", block)?;
-        }
-        Ok(out.into())
+        // `Engine::snapshot_with` writes every field, in order, with this
+        // binding's day counter, open flag and pending tape rows; this only
+        // turns the tree into a dict.
+        let snapshot = self.inner.snapshot_with(&self.day_loop());
+        snapshot_map_to_py(py, snapshot.fields())
     }
 
     /// Put a market back to a captured state.
@@ -6034,684 +4819,21 @@ impl PyEngine {
     /// resized roster, not a substituted one.
     fn restore_state(&mut self, snapshot: &Bound<'_, PyDict>) -> PyResult<()> {
         self.copies.bump();
-        let versioned = snapshot_version(snapshot)?;
-        self.check_snapshot_keys(snapshot, versioned)?;
-
-        let tickers: Vec<String> = snap_value(snapshot, "", "tickers", "a list of tickers")?;
-        if tickers != self.inner.ids() {
-            return Err(ValidationError::new_err(
-                "snapshot roster does not match this engine. Columns are \
-                 positional, so restoring across rosters would attach every \
-                 value to the wrong instrument.",
-            ));
-        }
-        // The model check mirrors the roster check: state restored under
-        // different coefficients continues a market the snapshot does not
-        // describe, with no visible symptom.
-        let recorded: String = snap_value(snapshot, "", "model_fingerprint", "a string")?;
-        let ours = self.inner.model_fingerprint();
-        if recorded != ours {
-            return Err(ValidationError::new_err(format!(
-                "this snapshot was taken under model {recorded:?} and \
-                 this engine runs {ours:?}. Restoring across models \
-                 would continue the frozen market under coefficients \
-                 it was never priced with; build the engine with the \
-                 snapshot's model instead."
-            )));
-        }
-
-        // Everything below writes to `inner`, a copy, and to locals, and the
-        // engine takes them only at the end.
-        let mut inner = self.inner.clone();
-        let n = inner.len();
-
-        let columns = snap_dict(snapshot, "", "columns")?;
-        for name in COLUMN_FIELDS {
-            let values = snap_buffer(&columns, "columns.", name)?;
-            inner
-                .set_column(parse_field(name)?, &values)
-                .map_err(|e| ValidationError::new_err(format!("snapshot column {name:?}: {e}")))?;
-        }
-
-        let rng: Vec<f64> = snap_value(snapshot, "", "rng", "a list of numbers")?;
-        let streams = crate::rng::stream::COUNT;
-        if rng.len() != 3 * streams {
-            return Err(ValidationError::new_err(format!(
-                "snapshot field rng carries {} numbers and version {STATE_SCHEMA} \
-                 carries {}: {streams} generator streams, each as (state, \
-                 increment, spare).",
-                rng.len(),
-                3 * streams
-            )));
-        }
-        let counts: Vec<f64> = snap_value(snapshot, "", "draw_counts", "a list of numbers")?;
-        if counts.len() != 2 * streams {
-            return Err(ValidationError::new_err(format!(
-                "snapshot field draw_counts carries {} numbers and version \
-                 {STATE_SCHEMA} carries {}, two per stream.",
-                counts.len(),
-                2 * streams
-            )));
-        }
-        if let Some(bad) = counts
-            .iter()
-            .find(|c| !c.is_finite() || **c < 0.0 || c.fract() != 0.0 || **c > 9.007_199_254_740_992e15)
-        {
-            return Err(ValidationError::new_err(format!(
-                "snapshot field draw_counts holds {bad}. Each is a count of \
-                 draws taken: a whole number from 0."
-            )));
-        }
-        let stream = |k: usize| crate::rng::RngState {
-            state: rng[3 * k].to_bits(),
-            increment: rng[3 * k + 1].to_bits(),
-            spare: if rng[3 * k + 2].is_nan() { None } else { Some(rng[3 * k + 2]) },
-            uniforms: counts[2 * k] as u64,
-            normals: counts[2 * k + 1] as u64,
-        };
-        // Each stream's offset is its own position in the flat array, fixed
-        // once written.
-        inner.set_rng_state(crate::engine::EngineRngState {
-            market: stream(0),
-            economy: stream(1),
-            external: stream(2),
-            jumps: stream(3),
-            volume: stream(4),
-            news: stream(5),
-            volume_idio: stream(6),
-            overnight: stream(7),
-            market_vol_level: stream(8),
-            crisis_epicentre: stream(9),
-        });
-        let overlay: Vec<(u32, u8, u64, f64)> = snap_value(
-            snapshot, "", "draw_overlay", "a list of (stream, kind, index, value)")?;
-        for id in 0..streams as u32 {
-            inner.set_draw_overlay(id, None);
-        }
-        for (id, kind, index, value) in overlay {
-            if id as usize >= streams {
-                return Err(ValidationError::new_err(format!(
-                    "snapshot field draw_overlay names stream {id}, and there \
-                     are {streams}."
-                )));
-            }
-            let kind = match kind {
-                0 => crate::rng::DrawKind::Uniform,
-                1 => crate::rng::DrawKind::Normal,
-                other => {
-                    return Err(ValidationError::new_err(format!(
-                        "snapshot field draw_overlay has kind {other}; a kind is 0 \
-                         (uniform) or 1 (normal)."
-                    )))
-                }
-            };
-            inner.patch_draw(id, kind, index, value);
-        }
-
-        // The per-day accumulators, at the widths this build writes.
-        // Without dividends the snapshot leaves the dividend's slot, the
-        // last, out (`state_snapshot`).
-        let width = if inner.carries_dividends() {
-            crate::market::factors::COMPONENT_COUNT
-        } else {
-            crate::market::factors::DIVIDEND_SLOT
-        };
-        let tick_width = crate::market::factors::TICK_COMPONENT_COUNT;
-        let attribution = snap_buffer(snapshot, "", "attribution")?;
-        let components = snap_buffer(snapshot, "", "tick_components")?;
-        let fundamental = snap_buffer(snapshot, "", "tick_fundamental")?;
-        let anchor = snap_buffer(snapshot, "", "tick_anchor")?;
-        snap_len("attribution", attribution.len(), n * width)?;
-        snap_len("tick_components", components.len(), n * tick_width)?;
-        snap_len("tick_fundamental", fundamental.len(), n)?;
-        snap_len("tick_anchor", anchor.len(), n)?;
-        inner
-            .restore_day_state(&attribution, &components, &fundamental, &anchor)
-            .map_err(ValidationError::new_err)?;
-        inner
-            .restore_noise_split(
-                &snap_buffer(snapshot, "", "noise_parts")?,
-                &snap_buffer(snapshot, "", "noise_own_scale2")?,
-            )
-            .map_err(ValidationError::new_err)?;
-        inner
-            .set_jump_move(&snap_buffer(snapshot, "", "jump_move")?)
-            .map_err(ValidationError::new_err)?;
-        let market_open: bool = snap_value(snapshot, "", "market_open", "a bool")?;
-        inner.set_volume_state(snap_finite(snapshot, "", "volume_state")?);
-        inner.set_universe_stress(snap_finite(snapshot, "", "universe_stress")?);
-        let pending_jump = snap_buffer(snapshot, "", "pending_jump")?;
-        let pending_overnight = snap_buffer(snapshot, "", "pending_overnight")?;
-        // Absent means no jump's fair-value shift was waiting.
-        let pending_fair_value = match snapshot.get_item("pending_fair_value")? {
-            Some(_) => snap_buffer(snapshot, "", "pending_fair_value")?,
-            None => Vec::new(),
-        };
-        // Absent means no ex-date move was waiting (`dividend_payout_share`;
-        // the key check refuses it on a model without dividends).
-        let pending_dividend = match snapshot.get_item("pending_dividend")? {
-            Some(_) => snap_buffer(snapshot, "", "pending_dividend")?,
-            None => Vec::new(),
-        };
-        inner
-            .set_volume_idio(&snap_buffer(snapshot, "", "volume_idio")?)
-            .map_err(ValidationError::new_err)?;
-        inner
-            .set_sector_day(
-                &snap_buffer(snapshot, "", "sector_day_factor")?,
-                snap_finite(snapshot, "", "sector_target_day")?,
-            )
-            .map_err(ValidationError::new_err)?;
-        if inner.carries_fair_value_offsets() {
-            inner
-                .set_fair_value_offsets(&snap_buffer(snapshot, "", "fair_value_offset")?)
-                .map_err(ValidationError::new_err)?;
-            inner
-                .set_opening_z(&snap_buffer(snapshot, "", "opening_z")?)
-                .map_err(ValidationError::new_err)?;
-            if inner.params().market_prehistory_valuation != 0.0 {
-                inner
-                    .set_opening_carry(&snap_buffer(snapshot, "", "opening_carry")?)
-                    .map_err(ValidationError::new_err)?;
-            }
-        }
-        // The per-name state of the dial-gated mechanisms. The key check
-        // above has required each exactly where this engine's model sets
-        // its dial, so a key read here is present.
-        if inner.carries_dividends() {
-            inner
-                .set_dividend_states(&snap_buffer(snapshot, "", "dividend")?)
-                .map_err(ValidationError::new_err)?;
-        }
-        if inner.carries_buyback_log_shares() {
-            inner
-                .set_buyback_log_shares(&snap_buffer(snapshot, "", "buyback_log_shares")?)
-                .map_err(ValidationError::new_err)?;
-        }
-        if inner.carries_earnings() {
-            let key: u64 = snap_value(snapshot, "", "earnings_key", "an integer")?;
-            inner.set_earnings_key(key);
-        }
-        if inner.carries_night_market_factor() {
-            inner.set_night_market_factor(snap_finite(snapshot, "", "night_market_factor")?);
-        }
-        if inner.carries_earnings_withheld() {
-            inner
-                .set_earnings_withheld(&snap_buffer(snapshot, "", "earnings_withheld")?)
-                .map_err(ValidationError::new_err)?;
-        }
-        if inner.carries_idio_vol_state() {
-            inner
-                .set_idio_vol_state(
-                    &snap_buffer(snapshot, "", "idio_variance")?,
-                    &snap_buffer(snapshot, "", "idio_jump_pending")?,
-                    &snap_buffer(snapshot, "", "idio_jump_var_pending")?,
-                )
-                .map_err(ValidationError::new_err)?;
-        }
-        inner
-            .set_sector_variance(&snap_buffer(snapshot, "", "sector_variance")?)
-            .map_err(ValidationError::new_err)?;
-        inner
-            .set_jump_excitation(&snap_buffer(snapshot, "", "jump_excitation")?)
-            .map_err(ValidationError::new_err)?;
-        let news_raw = snap_field(snapshot, "", "session_news")?;
-        let items = news_raw.downcast::<pyo3::types::PyList>().map_err(|_| {
-            ValidationError::new_err("snapshot field session_news must be a list of dicts")
-        })?;
-        let mut events = Vec::with_capacity(items.len());
-        for item in items.iter() {
-            let d = item.downcast::<PyDict>().map_err(|_| {
-                ValidationError::new_err("snapshot field session_news must be a list of dicts")
-            })?;
-            check_keys("snapshot field session_news[]", d, NEWS_KEYS, &[], &[])?;
-            events.push(NewsEvent {
-                company_id: snap_value(d, "session_news[].", "ticker", "a string or None")?,
-                sector: snap_value(d, "session_news[].", "sector", "a string or None")?,
-                price_impact: snap_value(d, "session_news[].", "price_impact", "a number or None")?,
-            });
-        }
-        inner.set_session_news(events);
-        inner.set_forced_flow_spent(snap_finite(snapshot, "", "forced_flow_spent")?);
-        inner.set_market_vol_log_level(snap_finite(snapshot, "", "market_vol_log_level")?);
-        inner.set_vix_log_level(snap_finite(snapshot, "", "vix_log_level")?);
-        if inner.params().vix_anchor_memory != 0.0 {
-            inner.set_vix_anchor_slow(snap_finite(snapshot, "", "vix_anchor_slow")?);
-        }
-        // The cycle's volatility multiplier (`market_vol_cycle_ratio`), unset
-        // where the snapshot carries none: taken before the first close set
-        // it.
-        let cycle_log = match snapshot.get_item("market_vol_cycle_log")? {
-            Some(_) => Some(snap_finite(snapshot, "", "market_vol_cycle_log")?),
-            None => None,
-        };
-        inner.set_market_vol_cycle_log(cycle_log);
-        if inner.carries_vix_stress_memory() {
-            inner.set_vix_stress_memory(snap_finite(snapshot, "", "vix_stress_memory")?);
-        }
-        // The crisis episode: -1 is the epicentre `none`, and -2 is no pin.
-        let in_episode: bool = snap_value(snapshot, "", "crisis_in_episode", "a bool")?;
-        let sessions_under: i64 =
-            snap_value(snapshot, "", "crisis_sessions_under", "an integer")?;
-        let epicentre: i32 = snap_value(snapshot, "", "crisis_epicentre", "an integer")?;
-        let pin: i32 = snap_value(snapshot, "", "crisis_epicentre_pin", "an integer")?;
-        if sessions_under < 0 || epicentre < -1 || pin < -2 {
-            return Err(ValidationError::new_err(format!(
-                "this snapshot's crisis episode is out of range: \
-                 crisis_sessions_under {sessions_under} (from 0), \
-                 crisis_epicentre {epicentre} (from -1, which is none) and \
-                 crisis_epicentre_pin {pin} (from -2, which is no pin)."
-            )));
-        }
-        inner.set_crisis_episode_raw(
-            in_episode,
-            sessions_under,
-            epicentre,
-            if pin == -2 { None } else { Some(pin) },
-        );
-        // Absent means no forced close was pending, and no pin was standing
-        // today, when it was taken.
-        let pending: bool = match snapshot.get_item("vix_sets_variance_pending")? {
-            Some(_) => snap_value(snapshot, "", "vix_sets_variance_pending", "a bool")?,
-            None => false,
-        };
-        inner.set_vix_sets_variance_pending(pending);
-        let pins: u16 = match snapshot.get_item("macro_pins_today")? {
-            Some(_) => snap_value(snapshot, "", "macro_pins_today", "an integer from 0 to 65535")?,
-            None => 0,
-        };
-        // The spread a spread pin holds, present exactly while its mark is.
-        let spread: Option<f64> = match snapshot.get_item("pinned_corporate_spread")? {
-            Some(_) => Some(snap_finite(snapshot, "", "pinned_corporate_spread")?),
-            None => None,
-        };
-        if spread.is_some() != (pins & crate::engine::PIN_SPREAD != 0) {
-            return Err(ValidationError::new_err(
-                "this snapshot carries pinned_corporate_spread without its \
-                 mark in macro_pins_today, or the mark without the spread. \
-                 The engine writes both or neither.",
-            ));
-        }
-        inner.set_macro_pins_today(pins, spread.unwrap_or(0.0));
-        // The central bank's and the curve's dial-gated state. The key check
-        // has required each exactly where this engine's model sets its dial.
-        let gated_finite = |key: &str, carried: bool| -> PyResult<Option<f64>> {
-            if carried { Ok(Some(snap_finite(snapshot, "", key)?)) } else { Ok(None) }
-        };
-        let p = inner.params().clone();
-        inner
-            .set_stress_vix_max(gated_finite("fed_stress_vix_max", p.fed_stress_cut != 0.0)?)
-            .map_err(ValidationError::new_err)?;
-        inner
-            .set_stress_hold_age(gated_finite("fed_stress_hold_age", p.fed_stress_hold != 0.0)?)
-            .map_err(ValidationError::new_err)?;
-        inner
-            .set_policy_path(gated_finite("treasury_policy_path", p.treasury_path_pricing != 0.0)?)
-            .map_err(ValidationError::new_err)?;
-        let drawdown = if p.fed_drawdown_hold != 0.0 || p.market_vol_cycle_recovery_release != 0.0 {
-            Some((
-                snap_buffer(snapshot, "", "fed_drawdown_returns")?,
-                snap_finite(snapshot, "", "fed_drawdown_mcap_prev")?,
-            ))
-        } else {
-            None
-        };
-        inner.set_drawdown_state(drawdown).map_err(ValidationError::new_err)?;
-        inner
-            .set_policy_anticipation_priced(
-                gated_finite("policy_anticipation_priced", p.policy_anticipation != 0.0)?)
-            .map_err(ValidationError::new_err)?;
-        // Absent means no session held a live mark when it was taken.
-        let live: Option<[f64; 6]> = match snapshot.get_item("rate_live_marks")? {
-            Some(_) => {
-                let values: Vec<f64> =
-                    snap_value(snapshot, "", "rate_live_marks", "a list of six numbers")?;
-                let arr: [f64; 6] = values.as_slice().try_into().map_err(|_| {
-                    ValidationError::new_err(format!(
-                        "this snapshot's rate_live_marks carries {} values; the live mark \
-                         is six: the open's projection and the session's, three yields each.",
-                        values.len()))
-                })?;
-                Some(arr)
-            }
-            None => None,
-        };
-        inner.set_rate_live_marks(live).map_err(ValidationError::new_err)?;
-        // Absent means no pin had priced a VIX move that session.
-        let jump = match snapshot.get_item("pinned_vix_jump")? {
-            Some(_) => snap_finite(snapshot, "", "pinned_vix_jump")?,
-            None => 0.0,
-        };
-        inner.set_pinned_vix_jump(jump);
-        // Absent means no open had drawn a day scale (a snapshot at a close).
-        let day_scale = match snapshot.get_item("market_day_scale")? {
-            Some(_) => snap_finite(snapshot, "", "market_day_scale")?,
-            None => 1.0,
-        };
-        if day_scale <= 0.0 {
-            return Err(ValidationError::new_err(format!(
-                "this snapshot's market_day_scale is {day_scale}; the engine writes a \
-                 positive finite multiplier.")));
-        }
-        inner.set_market_day_scale(day_scale);
-        inner.set_nominal_output_base(snap_finite(snapshot, "", "nominal_output_base")?);
-        let variance: Vec<f64> =
-            snap_value(snapshot, "", "market_variance", "a list of numbers")?;
-        if variance.len() != 6 || variance.iter().any(|v| !v.is_finite()) {
-            return Err(ValidationError::new_err(format!(
-                "snapshot field market_variance must be six finite numbers \
-                 (variance, day factor, the fast and slow components, the \
-                 previous day's factor and the smoothed VIX), got {variance:?}"
-            )));
-        }
-        inner.set_market_variance_state_with_components(
-            variance[0], variance[1], variance[2], variance[3], variance[4], variance[5]);
-        // The market factor's return memory, after the variance state, whose
-        // restore resets it.
-        if inner.carries_market_vol_leverage() {
-            inner.set_market_vol_leverage_memory(
-                snap_finite(snapshot, "", "market_vol_leverage_memory")?);
-        }
-
-        // The macro chain's state, every field by name.
-        let d = snap_dict(snapshot, "", "economy")?;
-        {
-            let economy = inner.economy_mut();
-            macro_rules! econ_get {
-                ($($field:ident),* $(,)?) => {
-                    $(economy.$field = snap_economy_value(&d, stringify!($field))?;)*
-                };
-            }
-            economy_scalars!(econ_get);
-            let trend: Vec<f64> = snap_value(&d, "economy.", "gdp_trend", "a list of numbers")?;
-            if trend.len() != 4 || trend.iter().any(|v| !v.is_finite()) {
-                return Err(ValidationError::new_err(format!(
-                    "snapshot field economy.gdp_trend must be 4 finite numbers, got {trend:?}"
-                )));
-            }
-            economy.gdp_trend = [trend[0], trend[1], trend[2], trend[3]];
-            let name: String = snap_value(&d, "economy.", "cycle_phase", "a string")?;
-            economy.cycle_phase = CyclePhase::from_name(&name).ok_or_else(|| {
-                ValidationError::new_err(format!(
-                    "snapshot field economy.cycle_phase is {name:?}, which is not a cycle phase"
-                ))
-            })?;
-        }
-        let params = inner.params().clone();
-        if params.earnings_cycle_depth != 0.0 {
-            inner.economy_mut().earnings_cycle = snap_finite(&d, "economy.", "earnings_cycle")?;
-        }
-        if inner.carries_vix_feedback() {
-            inner.economy_mut().vix_feedback = snap_finite(&d, "economy.", "vix_feedback")?;
-        }
-        if params.qe_pe_stock_gain != 0.0 {
-            inner.economy_mut().qe_assets_ratio = snap_finite(&d, "economy.", "qe_assets_ratio")?;
-        }
-        if inner.carries_fed_put() {
-            let e = inner.economy_mut();
-            e.intermeeting_return = snap_finite(&d, "economy.", "intermeeting_return")?;
-            e.fed_put = snap_finite(&d, "economy.", "fed_put")?;
-            e.fed_put_owed = snap_finite(&d, "economy.", "fed_put_owed")?;
-            e.fed_put_mcap_prev = snap_finite(&d, "economy.", "fed_put_mcap_prev")?;
-        }
-        if inner.carries_spread_equity_gap() {
-            inner.economy_mut().spread_equity_gap =
-                snap_finite(&d, "economy.", "spread_equity_gap")?;
-        }
-        // The market's cycle nowcast (`cycle_nowcast_accuracy`), before the
-        // anticipation that reads it: the belief, and its generator as
-        // (state, increment, spare, uniforms, normals).
-        if params.cycle_nowcast_accuracy != 0.0 {
-            let belief: Vec<f64> =
-                snap_value(&d, "economy.", "cycle_nowcast", "a list of five numbers")?;
-            if belief.len() != 5 || belief.iter().any(|v| !v.is_finite()) {
-                return Err(ValidationError::new_err(format!(
-                    "snapshot field economy.cycle_nowcast must be 5 finite numbers, got {belief:?}"
-                )));
-            }
-            let r: Vec<f64> =
-                snap_value(snapshot, "", "cycle_nowcast_rng", "a list of five numbers")?;
-            if r.len() != 5 {
-                return Err(ValidationError::new_err(format!(
-                    "snapshot field cycle_nowcast_rng must be 5 numbers, got {}", r.len())));
-            }
-            let rng = crate::rng::RngState {
-                state: r[0].to_bits(),
-                increment: r[1].to_bits(),
-                spare: if r[2].is_nan() { None } else { Some(r[2]) },
-                uniforms: r[3] as u64,
-                normals: r[4] as u64,
-            };
-            inner
-                .set_cycle_nowcast([belief[0], belief[1], belief[2], belief[3], belief[4]], Some(rng))
-                .map_err(ValidationError::new_err)?;
-        }
-        // Derived from the phase and the level just restored.
-        inner.refresh_earnings_anticipation();
-        if inner.carries_cycle_history() {
-            let names: Vec<String> =
-                snap_value(&d, "economy.", "cycle_history", "a list of cycle phases")?;
-            let mut history = Vec::with_capacity(names.len());
-            for name in &names {
-                history.push(CyclePhase::from_name(name).ok_or_else(|| {
-                    ValidationError::new_err(format!(
-                        "snapshot field economy.cycle_history holds {name:?}, \
-                         which is not a cycle phase"
-                    ))
-                })?);
-            }
-            inner.set_cycle_history(history).map_err(ValidationError::new_err)?;
-        }
-        // The drawn publication schedule (`cycle_publication_lag_draw`).
-        if params.cycle_publication_lag_draw != 0.0 {
-            let block = snap_dict(&d, "economy.", "cycle_publication")?;
-            check_keys(
-                "snapshot field economy.cycle_publication",
-                &block,
-                CYCLE_PUBLICATION_KEYS,
-                &[],
-                &[],
-            )?;
-            let state = cycle_publication_from(block.as_any())?;
-            inner.set_cycle_publication(state).map_err(ValidationError::new_err)?;
-        }
-        // `D` and the last `A - e` (`earnings_anticipation_drift_share`).
-        if inner.carries_anticipation_drift() {
-            let drift = snap_finite(&d, "economy.", "anticipation_drift")?;
-            let raw = snap_finite(&d, "economy.", "anticipation_raw")?;
-            inner.set_anticipation_drift(drift, raw).map_err(ValidationError::new_err)?;
-        }
-        if params.unemployment_adjustment_half_life != 0.0 {
-            inner.economy_mut().unemployment_impulse =
-                snap_finite(&d, "economy.", "unemployment_impulse")?;
-        }
-        let gdp_publication = if params.gdp_publication_lag != 0.0 {
-            let block = snap_dict(&d, "economy.", "gdp_publication")?;
-            check_keys("snapshot field economy.gdp_publication", &block, GDP_PUBLICATION_KEYS, &[], &[])?;
-            Some(gdp_publication_from(block.as_any())?)
-        } else {
-            None
-        };
-
-        let bank_d = snap_dict(snapshot, "", "central_bank")?;
-        {
-            let bank = inner.central_bank_mut();
-            bank.last_meeting_date = snap_value(&bank_d, "central_bank.", "last_meeting_date", "an integer")?;
-            bank.next_meeting_date = snap_value(&bank_d, "central_bank.", "next_meeting_date", "an integer")?;
-            bank.target_inflation = snap_finite(&bank_d, "central_bank.", "target_inflation")?;
-            bank.target_unemployment = snap_finite(&bank_d, "central_bank.", "target_unemployment")?;
-            bank.qe_active = snap_value(&bank_d, "central_bank.", "qe_active", "a bool")?;
-            bank.qe_monthly_purchases = snap_finite(&bank_d, "central_bank.", "qe_monthly_purchases")?;
-            bank.hawkish_dovish_score = snap_finite(&bank_d, "central_bank.", "hawkish_dovish_score")?;
-            let name: String = snap_value(&bank_d, "central_bank.", "forward_guidance", "a string")?;
-            bank.forward_guidance = ForwardGuidance::from_name(&name).ok_or_else(|| {
-                ValidationError::new_err(format!(
-                    "snapshot field central_bank.forward_guidance is {name:?}, \
-                     which is not a forward guidance"
-                ))
-            })?;
-        }
-        // The marks name the days THIS engine opened, and a restore replaces
-        // the run. Kept across one, they named days the restored engine had
-        // not run: two days, then a three-day snapshot, then two more
-        // reported marks for 0, 1, 3 and 4.
-        inner.clear_day_marks();
-        let count: i64 = snap_value(snapshot, "", "day_count", "an integer")?;
-        let day_count = u32::try_from(count).map_err(|_| {
-            ValidationError::new_err(format!(
-                "this snapshot's day_count is {count}. It counts the days \
-                 the engine has closed, from 0."
-            ))
-        })?;
-        // The core's two day numbers, pushed rather than left where
-        // construction put them: the label the draws and the fills carry,
-        // and the valuation's clock, which the buyback factor reads as
-        // elapsed time. Each from the snapshot when it carries one, and
-        // otherwise the day the counter and the session flag give, which is
-        // what the snapshot's absence of the key means.
-        let usual = crate::engine::default_day(day_count, market_open);
-        let label: i64 = match snapshot.get_item("current_day")? {
-            Some(_) => snap_value(snapshot, "", "current_day", "an integer")?,
-            None => usual,
-        };
-        let elapsed: i64 = match snapshot.get_item("elapsed_days")? {
-            Some(_) => snap_value(snapshot, "", "elapsed_days", "an integer")?,
-            None => usual,
-        };
-        if label < 0 || elapsed < 0 {
-            return Err(ValidationError::new_err(format!(
-                "this snapshot's day numbers are {label} (current_day) and \
-                 {elapsed} (elapsed_days). Days count from 0."
-            )));
-        }
-        inner.set_day_label(label);
-        inner.set_elapsed_days(elapsed);
-        // The ticks the day had run, for the fills stamped before the next
-        // open.
-        inner.set_session_ticks(snap_value(snapshot, "", "session_tick", "a whole number")?);
-        // The fair-value inputs. Absent means a snapshot of an engine whose
-        // inputs had not moved, so the figures each company was built with
-        // go back, whatever this engine was told since.
-        match snapshot.get_item("fundamentals")? {
-            Some(_) => {
-                let block = snap_dict(snapshot, "", "fundamentals")?;
-                check_keys("snapshot field fundamentals", &block, FUNDAMENTALS_KEYS, &[], &[])?;
-                let (eps, book, growth) = (
-                    snap_buffer(&block, "fundamentals.", "eps")?,
-                    snap_buffer(&block, "fundamentals.", "book_value_per_share")?,
-                    snap_buffer(&block, "fundamentals.", "revenue_growth")?,
-                );
-                if eps.iter().chain(&book).chain(&growth).any(|v| v.is_infinite()) {
-                    return Err(ValidationError::new_err(
-                        "this snapshot's fundamentals hold an infinite value. Each \
-                         is finite, or NaN where the company has none.",
-                    ));
-                }
-                inner
-                    .set_fundamentals(&eps, &book, &growth)
-                    .map_err(ValidationError::new_err)?;
-            }
-            None => inner.reset_fundamentals(),
-        }
-        if inner.carries_garch_cascade() {
-            inner
-                .set_garch_cascade(&snap_buffer(snapshot, "", "garch_cascade")?)
-                .map_err(ValidationError::new_err)?;
-        }
-        if let Some(state) = gdp_publication {
-            inner.set_gdp_publication(state).map_err(ValidationError::new_err)?;
-        }
-
-        // The rate instruments, for the same tickers in the same order: a
-        // snapshot restored without them would leave the indices at this
-        // engine's own levels under a restored curve, and they would reprice
-        // by the difference at the next open. The key check has already
-        // required the block exactly when this engine holds them.
-        let held: Vec<String> = inner
-            .rates()
-            .instruments
-            .iter()
-            .map(|i| i.spec.ticker.to_string())
-            .collect();
-        if !held.is_empty() {
-            let block = snap_dict(snapshot, "", "rates")?;
-            check_keys("snapshot field rates", &block, RATES_KEYS, &[], &[])?;
-            let items: Vec<Bound<'_, PyDict>> =
-                snap_value(&block, "rates.", "instruments", "a list of dicts")?;
-            let mut tickers = Vec::with_capacity(items.len());
-            let mut values: Vec<[f64; RATE_STATE_FIELDS.len()]> = Vec::new();
-            for item in &items {
-                let mut wanted = vec!["ticker"];
-                wanted.extend(RATE_STATE_FIELDS);
-                check_keys("a rate instrument in this snapshot", item, &wanted, &[], &[])?;
-                let t: String = snap_value(item, "rates.instruments[].", "ticker", "a string")?;
-                tickers.push(t);
-                let mut row = [0.0; RATE_STATE_FIELDS.len()];
-                for (k, name) in RATE_STATE_FIELDS.iter().enumerate() {
-                    row[k] = snap_value(item, "rates.instruments[].", name, "a number")?;
-                }
-                values.push(row);
-            }
-            if tickers != held {
-                return Err(ValidationError::new_err(format!(
-                    "the snapshot's rate instruments are [{}] and this engine \
-                     holds [{}]. Columns are positional, so they must match.",
-                    tickers.join(", "),
-                    held.join(", ")
-                )));
-            }
-            let ig_spread: f64 = snap_value(&block, "rates.", "ig_spread", "a number")?;
-            let last_corporate: f64 = snap_value(&block, "rates.", "last_corporate", "a number")?;
-            let closed: bool = snap_value(&block, "rates.", "closed_since_open", "a bool")?;
-            let book = inner.rates_mut();
-            for (inst, row) in book.instruments.iter_mut().zip(values) {
-                set_rate_state(inst, &row);
-            }
-            book.ig_spread = ig_spread;
-            book.last_corporate = last_corporate;
-            book.closed_since_open = closed;
-        }
-        // The book is part of the state: restored when the snapshot carries
-        // it, and pristine when it does not, so a restore never keeps the
-        // orders or the consumed depth of the market it replaced.
-        let book = match snapshot.get_item("book")? {
-            Some(_) => book_from_py(&snap_dict(snapshot, "", "book")?)?,
-            None => crate::agent_book::BookState::default(),
-        };
-        inner.set_book_state(book).map_err(ValidationError::new_err)?;
-        // The population, on an engine built with one: the snapshot must
-        // come from the same population (the key check above has already
-        // required the block exactly when this engine holds one).
-        if let Some(fingerprint) = inner.population().map(|p| p.fingerprint.clone()) {
-            let block = snap_dict(snapshot, "", "population")?;
-            check_keys("this snapshot's population", &block, &["fingerprint", "tickers", "state"], &[], &[])?;
-            let carried: String = snap_value(&block, "population.", "fingerprint", "a string")?;
-            if carried != fingerprint {
-                return Err(ValidationError::new_err(format!(
-                    "this snapshot was taken with population {carried}, and this engine \
-                     holds population {fingerprint}. Build the engine with the population \
-                     the snapshot came from."
-                )));
-            }
-            let tickers: Vec<String> = snap_value(&block, "population.", "tickers", "a list of tickers")?;
-            let state = snap_buffer(&block, "population.", "state")?;
-            inner.set_population_state(tickers, &state).map_err(ValidationError::new_err)?;
-        }
-        // What was written to each price since its last print is tape, not
-        // state: the snapshot does not carry it, and the engine restored
-        // into must not keep its own. So the next print's `repriced` reads
-        // NaN, not known, on a model that can write a price between prints,
-        // and zero on one that cannot.
-        inner.forget_repriced();
-
-        // Every field has been read. Nothing above touched the engine.
-        self.inner = inner;
-        self.market_open = market_open;
-        self.day_count = day_count;
-        self.pending_jump = pending_jump;
-        self.pending_overnight = pending_overnight;
-        self.pending_fair_value = pending_fair_value;
-        self.pending_dividend = pending_dividend;
+        // The dict as the core's field tree, then `Engine::restore`, which
+        // checks every field and builds the new state on a copy: one
+        // implementation behind this and the Rust API.
+        let fields = snapshot_map_from_py(snapshot, "")?;
+        let day_loop = self
+            .inner
+            .restore(&crate::snapshot::EngineSnapshot::from_map(fields))
+            .map_err(|e| ValidationError::new_err(e.to_string()))?;
+        // Every field has been read. Nothing above touched this binding.
+        self.market_open = day_loop.market_open;
+        self.day_count = day_loop.day_count;
+        self.pending_jump = day_loop.pending_jump;
+        self.pending_overnight = day_loop.pending_overnight;
+        self.pending_fair_value = day_loop.pending_fair_value;
+        self.pending_dividend = day_loop.pending_dividend;
         // The snapshot carries no clock, so the restored engine's next
         // session is treated as the day's first and does not warn.
         self.session_clock = None;
@@ -7784,64 +5906,11 @@ pub const FACTOR_NAMES: [&str; crate::market::factors::COMPONENT_COUNT] = [
     crate::market::factors::DIVIDEND_COMPONENT_KEY,
 ];
 
-/// A rate instrument's state in a snapshot, in the order the state hash
-/// walks it (`Engine::state_hash_with_pending`, `manifest.state_hash`).
-pub const RATE_STATE_FIELDS: [&str; 14] = [
-    "level", "marked_yield", "price", "previous_close", "open", "high", "low",
-    "volume", "avg_volume", "units_outstanding", "maker_inventory", "day_carry",
-    "day_duration", "day_convexity",
-];
-
-fn rate_state(inst: &crate::rates::RateInstrument) -> [f64; 14] {
-    [
-        inst.level, inst.marked_yield, inst.price, inst.previous_close, inst.open,
-        inst.high, inst.low, inst.volume, inst.avg_volume, inst.units_outstanding,
-        inst.maker_inventory, inst.day_carry, inst.day_duration, inst.day_convexity,
-    ]
-}
-
-fn set_rate_state(inst: &mut crate::rates::RateInstrument, row: &[f64; 14]) {
-    let [level, marked_yield, price, previous_close, open, high, low, volume, avg_volume,
-         units_outstanding, maker_inventory, day_carry, day_duration, day_convexity] = *row;
-    inst.level = level;
-    inst.marked_yield = marked_yield;
-    inst.price = price;
-    inst.previous_close = previous_close;
-    inst.open = open;
-    inst.high = high;
-    inst.low = low;
-    inst.volume = volume;
-    inst.avg_volume = avg_volume;
-    inst.units_outstanding = units_outstanding;
-    inst.maker_inventory = maker_inventory;
-    inst.day_carry = day_carry;
-    inst.day_duration = day_duration;
-    inst.day_convexity = day_convexity;
-}
-
 /// The components `Engine.rate_attribution` reports.
 pub const RATE_COMPONENTS: [&str; 4] = ["carry", "duration", "convexity", "flow"];
 
-pub const COLUMN_FIELDS: [&str; 18] = [
-    "price",
-    "previous_close",
-    "previous_tick_price",
-    "open",
-    "high",
-    "low",
-    "volume",
-    "avg_volume",
-    "market_cap",
-    "mispricing_s",
-    "mispricing_s_prev_close",
-    "mispricing_momentum",
-    "last_daily_return",
-    "maker_inventory",
-    "garch_variance",
-    "beta",
-    "short_interest",
-    "float_shares",
-];
+/// The column names, in snapshot and state-hash order: the core's list.
+pub(crate) use crate::snapshot::COLUMN_FIELDS;
 
 /// A sector's relative volatility multiplier.
 ///

@@ -27,6 +27,7 @@
 
 /// The value, absolute change and percentage change of an index.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct IndexValue {
     pub value: f64,
     pub change: f64,
@@ -35,10 +36,18 @@ pub struct IndexValue {
 
 /// One constituent, as the index reads it.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct IndexConstituent {
     pub id: String,
     pub market_cap: f64,
     pub is_bankrupt: bool,
+}
+
+impl IndexConstituent {
+    /// A solvent constituent.
+    pub fn new(id: impl Into<String>, market_cap: f64) -> Self {
+        IndexConstituent { id: id.into(), market_cap, is_bankrupt: false }
+    }
 }
 
 /// Recompute an index from its constituents.

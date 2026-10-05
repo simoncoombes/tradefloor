@@ -17,12 +17,12 @@ use tradefloor::rng::{GameRng, Rng};
 /// the Taylor rate, so the ladder holds: every rate change below is the
 /// put's.
 fn calm_economy() -> EconomyState {
-    let mut e = create_initial_economy_state(&InitialEconomyOptions {
-        cycle_phase: Some(CyclePhase::Expansion),
-        inflation_rate: Some(2.0),
-        gdp_growth: Some(2.5),
-        unemployment_rate: Some(4.0),
-    });
+    let mut opening = InitialEconomyOptions::default();
+    opening.cycle_phase = Some(CyclePhase::Expansion);
+    opening.inflation_rate = Some(2.0);
+    opening.gdp_growth = Some(2.5);
+    opening.unemployment_rate = Some(4.0);
+    let mut e = create_initial_economy_state(&opening);
     e.federal_funds_rate = 2.0;
     e.treasury_yield_10y = 3.0;
     e.vix = 18.0;
@@ -30,7 +30,9 @@ fn calm_economy() -> EconomyState {
 }
 
 fn put(gain: f64) -> PolicyOptions {
-    PolicyOptions { put_gain: gain, ..PolicyOptions::shipped() }
+    let mut o = PolicyOptions::shipped();
+    o.put_gain = gain;
+    o
 }
 
 fn meet(cb: &CentralBankState, e: &EconomyState, options: &PolicyOptions) -> MeetingOutcome {
@@ -62,7 +64,7 @@ fn a_ten_per_cent_fall_asks_for_half_a_point_under_inflation_of_four() {
     assert_eq!(out.economy.intermeeting_return, 0.0);
     // A threshold of 5 per cent leaves 0.0554 of log fall: 0.28 rounds to
     // a quarter.
-    let with_threshold = meet(&bank(), &e, &PolicyOptions { put_threshold: 0.05, ..put(5.0) });
+    let with_threshold = meet(&bank(), &e, &{ let mut o = put(5.0); o.put_threshold = 0.05; o });
     assert_eq!(with_threshold.economy.federal_funds_rate, 1.75);
 }
 
@@ -146,7 +148,7 @@ fn a_priced_put_is_no_surprise_to_the_ten_year() {
     let mut e = calm_economy();
     e.intermeeting_return = -0.1;
     let target = 1.5 + 1.0;
-    let priced = meet(&bank(), &e, &PolicyOptions { put_pricing: 1.0, ..put(5.0) });
+    let priced = meet(&bank(), &e, &{ let mut o = put(5.0); o.put_pricing = 1.0; o });
     assert_eq!(priced.economy.federal_funds_rate, 1.5);
     let want = 3.0 + (target - 3.0) * 0.5;
     assert!((priced.economy.treasury_yield_10y - want).abs() < 1e-12);
@@ -161,14 +163,14 @@ fn the_haven_lowers_the_meetings_ten_year_target() {
     let mut e = calm_economy();
     e.vix = 50.0;
     let off = meet(&bank(), &e, &PolicyOptions::shipped());
-    let on = meet(&bank(), &e, &PolicyOptions { haven_gain: 0.02, ..PolicyOptions::shipped() });
+    let on = meet(&bank(), &e, &{ let mut o = PolicyOptions::shipped(); o.haven_gain = 0.02; o });
     // Half of the target's 0.6 lower on the day.
     let gap = off.economy.treasury_yield_10y - on.economy.treasury_yield_10y;
     assert!((gap - 0.3).abs() < 1e-12, "gap {gap}");
     // Not with inflation at 4 or more.
     e.inflation_rate = 4.5;
     let off = meet(&bank(), &e, &PolicyOptions::shipped());
-    let on = meet(&bank(), &e, &PolicyOptions { haven_gain: 0.02, ..PolicyOptions::shipped() });
+    let on = meet(&bank(), &e, &{ let mut o = PolicyOptions::shipped(); o.haven_gain = 0.02; o });
     assert_eq!(off.economy.treasury_yield_10y, on.economy.treasury_yield_10y);
 }
 
@@ -194,7 +196,7 @@ fn the_put_takes_no_draw() {
     let cb = bank();
     let mut counts = Vec::new();
     for options in [PolicyOptions::shipped(),
-                    PolicyOptions { put_pricing: 1.0, haven_gain: 0.02, ..put(5.0) }] {
+                    { let mut o = put(5.0); o.put_pricing = 1.0; o.haven_gain = 0.02; o }] {
         let mut rng = Counting(GameRng::new(7, 3), 0);
         update_central_bank_with(&cb, &e, cb.next_meeting_date, &mut rng, &options);
         counts.push(rng.1);

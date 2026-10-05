@@ -66,7 +66,8 @@ pub const DEFAULT_SECTOR_ANCHOR_PE: f64 = 18.0;
 ///
 /// `Option` mirrors JavaScript's optional-chaining: `None` is the `undefined`
 /// that `?? 0` turns into zero.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[non_exhaustive]
 pub struct CompanyValuationInputs {
     /// The sector's average PE, already looked up from `SECTOR_CONFIGS`.
     ///
@@ -81,6 +82,7 @@ pub struct CompanyValuationInputs {
 
 /// The three economy fields the valuation reads.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct EconomyValuationInputs {
     /// `None` means the field is absent, and the policy rate is used instead.
     /// A `Some(0.0)` is a real zero yield and MUST be used — see
@@ -96,8 +98,21 @@ pub struct EconomyValuationInputs {
     pub qe_assets_ratio: Option<f64>,
 }
 
+impl EconomyValuationInputs {
+    /// Only the policy rate; the corporate yield and the QE terms are absent.
+    pub fn new(federal_funds_rate: f64) -> Self {
+        EconomyValuationInputs {
+            corporate_bond_yield: None,
+            federal_funds_rate,
+            qe_pe_boost: None,
+            qe_assets_ratio: None,
+        }
+    }
+}
+
 /// The decomposition, as the attribution UI renders it.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct FairValueBreakdown {
     pub fair_value: f64,
     /// The multiple actually applied. Zero on the book-value path.
@@ -111,6 +126,7 @@ pub struct FairValueBreakdown {
 
 /// Just the multiple and its parts.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct TargetPe {
     pub target_pe: f64,
     pub sector_anchor_pe: f64,

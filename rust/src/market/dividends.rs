@@ -52,7 +52,8 @@ pub const PRICE_EMA_HALF_LIFE: f64 = 21.0;
 /// A name's dividend state. Present on every public name while
 /// `dividend_payout_share` is set (a non-payer carries a zero payout), and
 /// absent otherwise.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[non_exhaustive]
 pub struct DividendState {
     /// Share of earnings distributed: `min(1, dial * sector payout)`, or 0.
     pub payout: f64,

@@ -96,6 +96,7 @@ pub const CROWD_MOMENTUM_GAIN: f64 = 0.02;
 pub const CROWD_LEAN_CAP: f64 = 0.02;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MispricingState {
     /// Current log-mispricing.
     pub s: f64,
@@ -116,6 +117,7 @@ pub fn create_mispricing_state(initial: f64) -> MispricingState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MispricingInputs {
     /// GARCH-scaled daily innovation, zero-mean and already sized by the
     /// caller. **Not clamped** — only `shock` is.
@@ -123,6 +125,12 @@ pub struct MispricingInputs {
     /// Sum of the day's directional shocks in log-price terms: news impacts,
     /// net order-flow pressure, squeeze/cascade effects, whale events.
     pub shock: f64,
+}
+
+impl MispricingInputs {
+    pub const fn new(innovation: f64, shock: f64) -> Self {
+        MispricingInputs { innovation, shock }
+    }
 }
 
 /// One daily step. Pure: returns the new state, does not mutate.

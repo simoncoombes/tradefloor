@@ -38,6 +38,7 @@ use crate::mathx::clamp;
 pub const MARKET_MAKER_ID: &str = "mm";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MakerQuote {
     pub bid_price: f64,
     pub ask_price: f64,
@@ -46,6 +47,7 @@ pub struct MakerQuote {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MakerInventory {
     /// Net shares held. Positive = long, negative = short.
     pub position: f64,
@@ -53,7 +55,14 @@ pub struct MakerInventory {
     pub limit: f64,
 }
 
+impl MakerInventory {
+    pub const fn new(position: f64, limit: f64) -> Self {
+        MakerInventory { position, limit }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct QuoteParams {
     /// Fair value from the factor model.
     pub fair_value: f64,
@@ -91,12 +100,14 @@ impl Default for QuoteParams {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct LadderLevel {
     pub price: f64,
     pub size: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct LadderParams {
     pub quote: QuoteParams,
     /// Number of price levels to quote per side.
@@ -114,6 +125,12 @@ pub struct LadderParams {
     /// legacy display book used 0.5, preserved so quoted depth keeps the
     /// shape it has always had.
     pub level_step: f64,
+}
+
+impl LadderParams {
+    pub fn new(quote: QuoteParams, levels: f64, level_step: f64) -> Self {
+        LadderParams { quote, levels, level_step }
+    }
 }
 
 /// Exchanges quote in cents; keeping prices on the tick grid avoids drift.

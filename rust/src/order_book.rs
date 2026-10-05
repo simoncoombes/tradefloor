@@ -60,6 +60,7 @@ pub fn owner_id(owner: &str) -> OwnerId {
 /// which reads `{company_id}-{sequence}` and is written out only when asked
 /// for ([`BookOrder::id_in`]).
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum OrderId {
     Given(String),
     Sequenced,
@@ -67,6 +68,7 @@ pub enum OrderId {
 
 /// A resting order.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct BookOrder {
     pub id: OrderId,
     /// A piece of an order split in place: 0 for a whole order, `k` for the
@@ -120,6 +122,7 @@ impl BookOrder {
 
 /// One executed trade.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Fill {
     /// Always the resting (maker) order's price.
     pub price: f64,
@@ -140,6 +143,7 @@ pub fn is_house_owner(owner: &str) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct MatchResult {
     pub fills: Vec<Fill>,
     /// Shares that could not be filled. Zero when a remainder was posted.
@@ -151,6 +155,7 @@ pub struct MatchResult {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct PriceLevel {
     pub price: f64,
     pub quantity: f64,
@@ -158,6 +163,7 @@ pub struct PriceLevel {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct SweepCost {
     pub average_price: f64,
     pub worst_price: f64,
@@ -166,6 +172,7 @@ pub struct SweepCost {
 
 /// Options for [`OrderBook::submit`].
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct SubmitOptions {
     /// `None` is a market order.
     pub limit_price: Option<f64>,
@@ -185,6 +192,7 @@ pub struct SubmitOptions {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct OrderBook {
     pub company_id: String,
     /// Descending by price, then ascending by sequence.

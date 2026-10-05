@@ -83,6 +83,7 @@ fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
 /// expansion and at a peak, by the ladder and by the hazard-only law the
 /// opening is drawn from. 0.0 adds nothing.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CycleSpec {
     pub per_month: f64,
     pub month_days: f64,

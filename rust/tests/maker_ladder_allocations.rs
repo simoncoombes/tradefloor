@@ -59,25 +59,26 @@ fn allocations() -> u64 {
 }
 
 fn company() -> CompanyMicrostructure {
-    CompanyMicrostructure {
-        id: "ACME".to_string(),
-        sector_volatility: Some(1.0),
-        price: 100.0,
-        market_cap: 5e9,
-        beta: Some(1.0),
-        float: Some(4e7),
-        short_interest: Some(0.02),
-        avg_volume: Some(1e6),
-        volume: Some(5e5),
-        shares_outstanding: Some(5e7),
-        maker_inventory: Some(0.0),
-    }
+    let mut company_microstructure = CompanyMicrostructure::new("ACME", 100.0, 5e9);
+    company_microstructure.sector_volatility = Some(1.0);
+    company_microstructure.beta = Some(1.0);
+    company_microstructure.float = Some(4e7);
+    company_microstructure.short_interest = Some(0.02);
+    company_microstructure.avg_volume = Some(1e6);
+    company_microstructure.volume = Some(5e5);
+    company_microstructure.shares_outstanding = Some(5e7);
+    company_microstructure.maker_inventory = Some(0.0);
+    company_microstructure
 }
 
 /// Allocations `build_live_book` makes for a ladder `levels` deep a side,
 /// and the number of levels it built.
 fn build(levels: f64) -> (u64, usize) {
-    let options = LiveBookOptions { levels, ..LiveBookOptions::default() };
+    let options = {
+        let mut live_book_options = LiveBookOptions::default();
+        live_book_options.levels = levels;
+        live_book_options
+    };
     let company = company();
     let before = allocations();
     let book = build_live_book(&company, &options);
@@ -104,7 +105,7 @@ fn a_ladder_level_costs_its_two_strings() {
 fn pushing_a_level_hands_nothing_back() {
     // `push_maker_level` is the engine's path and returns a bool.
     // `append_maker_level` keeps its signature for the Python book, and its
-    // copy is the two strings `push_maker_level` does not make.
+    // copy is the owner string `push_maker_level` does not make.
     let mut book = OrderBook::new("ACME", Some(100.0));
     book.bids.reserve(64);
     book.asks.reserve(64);
@@ -112,18 +113,18 @@ fn pushing_a_level_hands_nothing_back() {
     for i in 0..30 {
         assert!(book.push_maker_level(Side::Buy, 99.0 - i as f64 * 0.01, 100.0, "maker"));
     }
-    assert_eq!(allocations() - before, 60, "an id and an owner per level");
+    assert_eq!(allocations() - before, 30, "an owner per level; the id is written out only when asked for");
 
     let before = allocations();
     for i in 0..30 {
         let order = book.append_maker_level(Side::Sell, 101.0 + i as f64 * 0.01, 100.0, "maker");
         assert!(order.is_some());
     }
-    assert_eq!(allocations() - before, 120, "two for the level, two for its copy");
+    assert_eq!(allocations() - before, 60, "the owner for the level and for its copy");
 
     // The ids run on from one call to the other, as they did.
-    assert_eq!(book.bids[0].id, "ACME-0");
-    assert_eq!(book.bids[29].id, "ACME-29");
-    assert_eq!(book.asks[0].id, "ACME-30");
-    assert_eq!(book.asks[29].id, "ACME-59");
+    assert_eq!(book.bids[0].id_in("ACME"), "ACME-0");
+    assert_eq!(book.bids[29].id_in("ACME"), "ACME-29");
+    assert_eq!(book.asks[0].id_in("ACME"), "ACME-30");
+    assert_eq!(book.asks[29].id_in("ACME"), "ACME-59");
 }

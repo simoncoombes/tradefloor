@@ -133,6 +133,7 @@ fn side_of(s: &str) -> Side {
 
 fn check_side(
     label: &str,
+    company_id: &str,
     step: &Step,
     actual: &[tradefloor::order_book::BookOrder],
     expected: &[RestingOrder],
@@ -149,11 +150,13 @@ fn check_side(
         return;
     }
     for (i, (got, want)) in actual.iter().zip(expected).enumerate() {
-        // Order matters as much as content: position IS priority.
-        if got.id != want.id || got.owner_id != want.owner_id || got.sequence != want.sequence {
+        // Order matters as much as content: position IS priority. A book's
+        // own ids are written out only when asked for.
+        let got_id = got.id_in(company_id);
+        if got_id != want.id || got.owner_id != want.owner_id || got.sequence != want.sequence {
             problems.push(format!(
                 "step {} ({}): {label}[{i}] identity — rust id={} owner={} seq={} / ts id={} owner={} seq={}",
-                step.step, step.note, got.id, got.owner_id, got.sequence, want.id, want.owner_id, want.sequence
+                step.step, step.note, got_id, got.owner_id, got.sequence, want.id, want.owner_id, want.sequence
             ));
         }
         for (field, g, w) in [
@@ -215,11 +218,13 @@ fn matches_the_reference_across_a_replayed_program() {
                     side_of(side),
                     f(quantity),
                     taker_id,
-                    SubmitOptions {
-                        limit_price: limit_price.as_deref().map(f),
-                        post_remainder: post_remainder.unwrap_or(false),
-                        order_id: order_id.clone(),
-                        skip_own: false,
+                    {
+                        let mut submit_options = SubmitOptions::default();
+                        submit_options.limit_price = limit_price.as_deref().map(f);
+                        submit_options.post_remainder = post_remainder.unwrap_or(false);
+                        submit_options.order_id = order_id.clone();
+                        submit_options.skip_own = false;
+                        submit_options
                     },
                 );
             }
@@ -244,8 +249,8 @@ fn matches_the_reference_across_a_replayed_program() {
             }
         }
 
-        check_side("bids", step, &book.bids, &step.state.bids, &mut problems);
-        check_side("asks", step, &book.asks, &step.state.asks, &mut problems);
+        check_side("bids", "ACME", step, &book.bids, &step.state.bids, &mut problems);
+        check_side("asks", "ACME", step, &book.asks, &step.state.asks, &mut problems);
 
         if book.sequence != step.state.sequence {
             problems.push(format!(

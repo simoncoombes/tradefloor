@@ -178,6 +178,7 @@ pub const INVENTORY_HALF_LIFE_TICKS: f64 = 15.0;
 
 /// Which yield an instrument reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CurvePoint {
     Treasury2Y,
     Treasury10Y,
@@ -198,6 +199,7 @@ impl CurvePoint {
 
 /// One instrument's fixed terms.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct RateSpec {
     pub ticker: &'static str,
     /// What it is, in words, for anyone reading a roster.
@@ -294,6 +296,7 @@ pub fn credit_spread(economy: &EconomyState) -> f64 {
 /// quadratic turns. `carry_yield` is the overnight yield on the step that
 /// accrues carry and zero on every other.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct Repricing {
     pub carry: f64,
     pub duration: f64,
@@ -323,6 +326,7 @@ impl Repricing {
 
 /// One instrument's state.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct RateInstrument {
     pub spec: RateSpec,
     /// The index level: what the instrument is worth at the yield it is
@@ -497,6 +501,7 @@ fn inventory_decay() -> f64 {
 /// the corporate yield's, since its yield is the 10-year plus a spread that
 /// is the corporate yield less the 10-year.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[non_exhaustive]
 pub struct LiveCurve {
     pub d2y: f64,
     pub d10y: f64,
@@ -519,6 +524,7 @@ impl LiveCurve {
 /// Empty on every engine built without rate instruments, and an empty book
 /// is never touched: no hook below runs, no column grows, nothing is hashed.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct RateBook {
     pub instruments: Vec<RateInstrument>,
     /// The corporate index's credit spread over the 10-year, as a fraction,

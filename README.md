@@ -108,7 +108,7 @@ The walkthrough is
 | `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | scenarios | seven packaged shocks, and a file format for your own |
-| MCP server | thirteen read-only tools for a coding agent, scenarios included |
+| MCP server | nineteen tools for a coding agent, thirteen of them read-only, with scenarios, any shipped preset, and market sessions you step, fork and rewind |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
 
 ## Drive it from an agent
@@ -122,7 +122,9 @@ claude mcp add tradefloor -- tradefloor-mcp
 
 `tradefloor-mcp` speaks MCP over stdio, and `tradefloor mcp` starts the same
 server. Strategies, universes and scenarios are data, so a tool argument
-cannot reach code. Each result carries its own caveats. See
+cannot reach code. Each result carries its own caveats. A session keeps one
+market in the server between calls, so an agent can place orders a step at a
+time, fork the market to try two actions, and rewind. See
 [the MCP page](https://docs.tradefloor.dev/mcp-local.html).
 
 ## Scenarios

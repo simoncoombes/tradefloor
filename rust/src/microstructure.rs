@@ -109,6 +109,7 @@ const FLOW_LEAN_TILT: f64 = 10.0;
 /// `Option` mirrors JavaScript's `undefined`. Which fallback applies to each
 /// one is NOT uniform — see the module note on `||` versus `??`.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct CompanyMicrostructure {
     pub id: String,
     /// `SECTOR_CONFIGS[company.sector]?.volatility`, already looked up.
@@ -124,6 +125,26 @@ pub struct CompanyMicrostructure {
     pub volume: Option<f64>,
     pub shares_outstanding: Option<f64>,
     pub maker_inventory: Option<f64>,
+}
+
+impl CompanyMicrostructure {
+    /// A name with only its price and market cap; every optional figure is
+    /// absent. Set the others on the value.
+    pub fn new(id: impl Into<String>, price: f64, market_cap: f64) -> Self {
+        CompanyMicrostructure {
+            id: id.into(),
+            sector_volatility: None,
+            price,
+            market_cap,
+            beta: None,
+            float: None,
+            short_interest: None,
+            avg_volume: None,
+            volume: None,
+            shares_outstanding: None,
+            maker_inventory: None,
+        }
+    }
 }
 
 /// JavaScript truthiness for a possibly-absent number.
@@ -284,6 +305,7 @@ pub fn base_quote_size(company: &CompanyMicrostructure) -> f64 {
 /// A resting player/AI limit order seeded into the book alongside maker
 /// liquidity, giving genuine queue position.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct RestingOrder {
     pub id: String,
     pub side: Side,
@@ -292,9 +314,22 @@ pub struct RestingOrder {
     pub owner_id: String,
 }
 
+impl RestingOrder {
+    pub fn new(
+        id: impl Into<String>,
+        side: Side,
+        price: f64,
+        quantity: f64,
+        owner_id: impl Into<String>,
+    ) -> Self {
+        RestingOrder { id: id.into(), side, price, quantity, owner_id: owner_id.into() }
+    }
+}
+
 /// Options for [`build_live_book`]. `Default` carries the reference implementation
 /// destructuring defaults (`vix = 15`, `levels = BOOK_LEVELS`).
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct LiveBookOptions {
     pub vix: f64,
     pub difficulty: Option<Difficulty>,
@@ -382,6 +417,7 @@ pub fn build_live_book(company: &CompanyMicrostructure, options: &LiveBookOption
 // ── Price discovery through the book ───────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct SettlementResult {
     /// Printed price — the last trade, or fair value if nothing traded.
     pub price: f64,
@@ -429,6 +465,7 @@ pub fn decompose(last_price: f64, model_price: f64, print: f64) -> (f64, f64) {
 
 /// Options for [`settle_price_through_book`].
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct SettleOptions {
     pub vix: f64,
     pub difficulty: Option<Difficulty>,
@@ -536,6 +573,7 @@ pub fn settle_price_through_book(
 
 /// One fill of an agent's order inside a settlement.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct SettledAgentFill {
     /// The agent's order that filled.
     pub order_id: String,

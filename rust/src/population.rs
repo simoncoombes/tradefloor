@@ -143,6 +143,7 @@ const FLAT_VERSION: f64 = 1.0;
 
 /// One participant's policy and its parameters.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Policy {
     Trend {
         lookback: u32,
@@ -202,6 +203,7 @@ impl Policy {
 
 /// One participant: its label, its sizing and its policy.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Participant {
     /// Unique within the population; the book label is
     /// `population:<name>`.
@@ -218,6 +220,20 @@ pub struct Participant {
 }
 
 impl Participant {
+    /// A participant with every field given: its name, its sizing and its
+    /// policy, as the fields above describe them. The engine checks it when
+    /// a population is set.
+    pub fn new(
+        name: impl Into<String>,
+        size: f64,
+        rate: f64,
+        interval: u32,
+        band: f64,
+        policy: Policy,
+    ) -> Self {
+        Participant { name: name.into(), size, rate, interval, band, policy }
+    }
+
     pub fn label(&self) -> String {
         format!("{LABEL_PREFIX}{}", self.name)
     }
@@ -380,6 +396,7 @@ const CROWD_SCALARS: usize = 4;
 
 /// One participant's ledger and memory, per name in roster order.
 #[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct ParticipantState {
     /// Shares held.
     pub position: Vec<f64>,
@@ -409,7 +426,8 @@ pub struct ParticipantState {
 }
 
 /// A population running inside one engine: the spec and its state.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct PopulationRun {
     /// The digest of the spec, as the caller computed it; it travels with
     /// the snapshot, so a snapshot restores only into an engine built with
@@ -648,7 +666,7 @@ impl PopulationRun {
                     continue;
                 }
                 let b = p.buckets();
-                let slot = ((tick / bucket) as usize).min(b - 1);
+                let slot = std::cmp::min((tick / bucket) as usize, b - 1);
                 if let Some(row) = self.states[k].profile.get_mut(index) {
                     if row.is_empty() {
                         *row = vec![0.0; 3 * b];
@@ -744,11 +762,11 @@ impl PopulationRun {
             ranked.push((if momentum { -r } else { r }, i));
         }
         let n = ranked.len();
-        let kk = (top_k as usize).min(n / 2);
+        let kk = std::cmp::min(top_k as usize, n / 2);
         if kk == 0 {
             return None;
         }
-        let keep = (kk + buffer as usize).min(n / 2);
+        let keep = std::cmp::min(kk + buffer as usize, n / 2);
         ranked.sort_by(|a, b| {
             a.0.partial_cmp(&b.0)
                 .unwrap_or(std::cmp::Ordering::Equal)

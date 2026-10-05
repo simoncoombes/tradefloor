@@ -87,6 +87,7 @@ pub fn fed_put_ask(gain: f64, threshold: f64, intermeeting_return: f64) -> f64 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Decision {
     AggressiveHike,
     Hike,
@@ -118,6 +119,7 @@ impl Decision {
 
 /// What a meeting produced.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct MeetingOutcome {
     pub central_bank: CentralBankState,
     pub economy: EconomyState,
@@ -133,6 +135,7 @@ pub struct MeetingOutcome {
 /// What the engine's dials change about a meeting. [`PolicyOptions::shipped`]
 /// is the reference bank exactly.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct PolicyOptions {
     /// The calendar meeting intervals are counted on; see `MacroCalendar`.
     pub calendar: MacroCalendar,
@@ -203,6 +206,13 @@ pub struct PolicyOptions {
     /// formula's base per unit of `EconomyState::spread_equity_gap`. 0.0 is
     /// none.
     pub spread_equity_gain: f64,
+}
+
+/// [`PolicyOptions::shipped`].
+impl Default for PolicyOptions {
+    fn default() -> Self {
+        PolicyOptions::shipped()
+    }
 }
 
 impl PolicyOptions {

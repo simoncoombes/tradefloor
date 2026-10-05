@@ -11206,6 +11206,7 @@ pub const VIX_STATE_FLOOR: f64 = 10.0;
 ///
 /// `expected` is a plain `fn` rather than a closure so the claim tables can
 /// be `'static`. It reads only fields of the vector handed to it.
+#[non_exhaustive]
 pub struct Claim {
     /// The dial the identity determines.
     pub dial: &'static str,
@@ -11221,6 +11222,7 @@ pub struct Claim {
 
 /// One claim that did not hold, with both sides of it.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Inconsistency {
     pub dial: &'static str,
     pub identity: &'static str,

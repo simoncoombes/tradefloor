@@ -22,6 +22,17 @@ In practice:
   a `KAT_VERSION` bump. If it moves without one, two builds have disagreed,
   which is the thing the gate exists to catch.
 
+## Changes a host cannot compile its way out of
+
+Two more changes are breaking even though the code that depends on them
+keeps compiling. A change to a state width or shape a host saves (an
+attribution row, a tick row, a random stream's record, the number of
+streams) is one: update `rust/src/widths.rs` and its pinned table, and
+add a CHANGELOG line giving the old and new width. A change to what a
+constructor does with the state it is given is the other: say in the
+CHANGELOG which function changed and what to call for the old behaviour.
+RELEASING.md, "State shapes and widths", has the history behind both.
+
 ## Setup
 
 ```bash

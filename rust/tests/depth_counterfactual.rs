@@ -15,10 +15,7 @@
 //! run out.
 
 use tradefloor::economy::{create_initial_economy_state, InitialEconomyOptions};
-use tradefloor::market::{
-    simulate_market_tick, MarketStatus, SettleDrawPolicy, TickCompany, TickInputs, TickStock,
-    MARKET_FACTOR_SIGMA,
-};
+use tradefloor::market::{simulate_market_tick, SettleDrawPolicy, TickCompany, TickInputs, TickStock};
 use tradefloor::microstructure::{settle_price_through_book, SettleOptions};
 use tradefloor::rng::Rng;
 
@@ -39,43 +36,27 @@ fn sectors() -> Vec<String> {
 }
 
 fn company(price: f64, previous_close: f64, avg_volume: f64) -> TickCompany {
-    TickCompany {
-        id: "ACME".into(),
-        ticker: "ACME".into(),
-        sector: "technology".into(),
-        is_bankrupt: false,
-        is_public: true,
-        sector_volatility: Some(1.0),
-        sector_avg_pe: Some(32.0),
-        eps: Some(4.0),
-        book_value_per_share: Some(20.0),
-        revenue_growth: Some(0.1),
-        stock: TickStock {
-            price,
-            previous_close,
-            previous_tick_price: None,
-            open: previous_close,
-            high: price,
-            low: price,
-            volume: 0.0,
-            avg_volume,
-            shares_outstanding: 1e8,
-            market_cap: price * 1e8,
-            mispricing_s: Some(0.0),
-            mispricing_s_prev_close: Some(0.0),
-            mispricing_momentum: Some(0.0),
-            fair_value_offset: None,
-            buyback_log_shares: None,
-            dividend: None,
-            maker_inventory: None,
-            garch_variance: 0.015 * 0.015,
-            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
-            last_daily_return: Some(0.0),
-            beta: Some(1.0),
-            short_interest: 0.0,
-            float: 1e8,
-        },
-    }
+    let stock = {
+        let mut tick_stock = TickStock::new(price, 1e8);
+        tick_stock.previous_close = previous_close;
+        tick_stock.open = previous_close;
+        tick_stock.avg_volume = avg_volume;
+        tick_stock.mispricing_s = Some(0.0);
+        tick_stock.mispricing_s_prev_close = Some(0.0);
+        tick_stock.mispricing_momentum = Some(0.0);
+        tick_stock.garch_variance = 0.015 * 0.015;
+        tick_stock.garch_cascade = [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX];
+        tick_stock.last_daily_return = Some(0.0);
+        tick_stock.beta = Some(1.0);
+        tick_stock
+    };
+    let mut tick_company = TickCompany::new("ACME", "ACME", "technology", stock);
+    tick_company.sector_volatility = Some(1.0);
+    tick_company.sector_avg_pe = Some(32.0);
+    tick_company.eps = Some(4.0);
+    tick_company.book_value_per_share = Some(20.0);
+    tick_company.revenue_growth = Some(0.1);
+    tick_company
 }
 
 /// The one construction all three tests run on.
@@ -114,50 +95,31 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
     let before = c.clone();
     let params = &tradefloor::params::PT_V1;
     let mut roster = vec![c];
+    let sector_keys = sectors();
     let outcome = simulate_market_tick(
         &mut roster,
-        &TickInputs {
-            prev_day_down: false,
+        &{
+            let mut tick_inputs = TickInputs::new(&economy, params);
             // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-            prev_day_factor: 0.0,
-            day_factor: 0.0,
-            forced_flow_eff: 1.0,
-            universe_stress: 0.0,
-            volume_state: 0.0,
-            volume_idio: &[],
-            jump_move: &[],
-            earnings_volume: &[],
-            economy: &economy,
-            market_status: MarketStatus::Open,
-            intraday_t: 0.5,
-            volatility_multiplier: volatility,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-            sector_keys: &sectors(),
-            sector_sigmas: &[],
-            idio_vol_ratios: &[],
-            market_sigma_daily: MARKET_FACTOR_SIGMA,
-            market_permanent_ceiling_scale: 1.0,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-            settle_draws: SettleDrawPolicy::FourAlways,
-            settle_depth_counterfactual: true,
-            resting_orders: &[],
-            fill_impact: &[],
+            tick_inputs.prev_day_factor = 0.0;
+            tick_inputs.volatility_multiplier = volatility;
+            tick_inputs.sector_keys = &sector_keys;
+            tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
+            tick_inputs.settle_depth_counterfactual = true;
             // The run's opening nominal output. The growth term is
             // off on every preset these tests pin, so it is read
             // nowhere; this tick's own value is what a single-tick
             // caller opens at.
-            nominal_output_base: economy.gdp * economy.cpi,
+            tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
             // No crisis episode: the mechanism is off on every preset
             // these tests pin, and a single-tick caller has no episode
             // state to carry.
-            crisis_epicentre: None,
+            tick_inputs.crisis_epicentre = None;
             // Trading days closed. The buyback factor is off on
             // every preset these tests pin, so it is read
             // nowhere; 0 is what a single-tick caller opens at.
-            elapsed_days: 0,
-            params,
+            tick_inputs.elapsed_days = 0;
+            tick_inputs
         },
         &mut Fixed(uniform),
     );
@@ -183,16 +145,18 @@ fn tick(c: TickCompany, uniform: f64, volatility: f64) -> (Run, TickCompany, Tic
 
 fn settle_options(vix: f64) -> SettleOptions {
     let params = &tradefloor::params::PT_V1;
-    SettleOptions {
-        spread_size_smoothness: params.spread_size_smoothness,
-        spread_size_exponent: params.spread_size_exponent,
-        vix,
-        difficulty: None,
+    {
+        let mut settle_options = SettleOptions::default();
+        settle_options.spread_size_smoothness = params.spread_size_smoothness;
+        settle_options.spread_size_exponent = params.spread_size_exponent;
+        settle_options.vix = vix;
+        settle_options.difficulty = None;
         // Zero rather than the tick's own crowd lean. The assertions below
         // are equalities, so a preset whose crowd moved this would fail them
         // rather than pass on a coincidence.
-        flow_lean: Some(0.0),
-        depth_multiplier: f64::INFINITY,
+        settle_options.flow_lean = Some(0.0);
+        settle_options.depth_multiplier = f64::INFINITY;
+        settle_options
     }
 }
 
@@ -343,50 +307,31 @@ fn the_clamp_is_the_breakers_share_and_the_book_is_the_rest() {
 fn the_arm_reports_nothing_on_the_replay_path() {
     let economy = create_initial_economy_state(&InitialEconomyOptions::default());
     let mut roster = vec![thin_ask_book(100.0)];
+    let sector_keys = sectors();
     let outcome = simulate_market_tick(
         &mut roster,
-        &TickInputs {
-            prev_day_down: false,
+        &{
+            let mut tick_inputs = TickInputs::new(&economy, &tradefloor::params::PT_V1);
             // Read only by `market_beta_down_asym_lag_live`, which is 0.0 here.
-            prev_day_factor: 0.0,
-            day_factor: 0.0,
-            forced_flow_eff: 1.0,
-            universe_stress: 0.0,
-            volume_state: 0.0,
-            volume_idio: &[],
-            jump_move: &[],
-            earnings_volume: &[],
-            economy: &economy,
-            market_status: MarketStatus::Open,
-            intraday_t: 0.5,
-            volatility_multiplier: 1.0,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-            sector_keys: &sectors(),
-            sector_sigmas: &[],
-            idio_vol_ratios: &[],
-            market_sigma_daily: MARKET_FACTOR_SIGMA,
-            market_permanent_ceiling_scale: 1.0,
-                    vix_anchor: tradefloor::params::PT_V1.market_vol_vix_anchor,
-            settle_draws: SettleDrawPolicy::FourOrZero,
-            settle_depth_counterfactual: true,
-            resting_orders: &[],
-            fill_impact: &[],
+            tick_inputs.prev_day_factor = 0.0;
+            tick_inputs.sector_keys = &sector_keys;
+            tick_inputs.vix_anchor = tradefloor::params::PT_V1.market_vol_vix_anchor;
+            tick_inputs.settle_draws = SettleDrawPolicy::FourOrZero;
+            tick_inputs.settle_depth_counterfactual = true;
             // The run's opening nominal output. The growth term is
             // off on every preset these tests pin, so it is read
             // nowhere; this tick's own value is what a single-tick
             // caller opens at.
-            nominal_output_base: economy.gdp * economy.cpi,
+            tick_inputs.nominal_output_base = economy.gdp * economy.cpi;
             // No crisis episode: the mechanism is off on every preset
             // these tests pin, and a single-tick caller has no episode
             // state to carry.
-            crisis_epicentre: None,
+            tick_inputs.crisis_epicentre = None;
             // Trading days closed. The buyback factor is off on
             // every preset these tests pin, so it is read
             // nowhere; 0 is what a single-tick caller opens at.
-            elapsed_days: 0,
-            params: &tradefloor::params::PT_V1,
+            tick_inputs.elapsed_days = 0;
+            tick_inputs
         },
         &mut Fixed(0.02),
     );

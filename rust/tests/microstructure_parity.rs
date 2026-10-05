@@ -148,21 +148,18 @@ fn difficulty_of(name: &Option<String>) -> Option<Difficulty> {
 }
 
 fn company_of(fx: &Fixture) -> CompanyMicrostructure {
-    CompanyMicrostructure {
-        // The generator builds every fixture with this id, and the book bakes
-        // it into order ids, so it is part of the comparison.
-        id: "ACME".to_string(),
-        sector_volatility: maybe(&fx.sector_volatility),
-        price: f(&fx.price),
-        market_cap: f(&fx.market_cap),
-        beta: maybe(&fx.beta),
-        float: maybe(&fx.float),
-        short_interest: maybe(&fx.short_interest),
-        avg_volume: maybe(&fx.avg_volume),
-        volume: maybe(&fx.volume),
-        shares_outstanding: maybe(&fx.shares_outstanding),
-        maker_inventory: maybe(&fx.maker_inventory),
-    }
+    // The generator builds every fixture with this id, and the book bakes
+    // it into order ids, so it is part of the comparison.
+    let mut company_microstructure = CompanyMicrostructure::new("ACME", f(&fx.price), f(&fx.market_cap));
+    company_microstructure.sector_volatility = maybe(&fx.sector_volatility);
+    company_microstructure.beta = maybe(&fx.beta);
+    company_microstructure.float = maybe(&fx.float);
+    company_microstructure.short_interest = maybe(&fx.short_interest);
+    company_microstructure.avg_volume = maybe(&fx.avg_volume);
+    company_microstructure.volume = maybe(&fx.volume);
+    company_microstructure.shares_outstanding = maybe(&fx.shares_outstanding);
+    company_microstructure.maker_inventory = maybe(&fx.maker_inventory);
+    company_microstructure
 }
 
 /// Bit comparison, with NaN treated as equal to NaN.
@@ -223,17 +220,18 @@ fn pure_functions_match_the_reference_bit_for_bit() {
             // of both thresholds.
             let book = build_live_book(
                 &company,
-                &LiveBookOptions {
-                    vix: 22.0,
-                    difficulty: Some(Difficulty::Hard),
-                    levels: f(&b.levels),
-                    resting_orders: Vec::new(),
+                &{
+                    let mut live_book_options = LiveBookOptions::default();
+                    live_book_options.vix = 22.0;
+                    live_book_options.difficulty = Some(Difficulty::Hard);
+                    live_book_options.levels = f(&b.levels);
+                    live_book_options.resting_orders = Vec::new();
                     // The goldens were generated from the reference implementation, which
                     // has the four-tier spread. `Default` carries smoothness
                     // 0.0 -- the pure step function -- which is that
                     // behaviour, so the continuous size curve added later
                     // stays out of the parity contract.
-                    ..Default::default()
+                    live_book_options
                 },
             );
 
@@ -262,13 +260,15 @@ fn pure_functions_match_the_reference_bit_for_bit() {
             {
                 for (i, (got, want)) in got_side.iter().zip(want_side.iter()).enumerate() {
                     // Identity and ORDER, not just prices: position is priority.
-                    if got.id != want.id
+                    // A book's own ids are written out only when asked for.
+                    let got_id = got.id_in(&book.company_id);
+                    if got_id != want.id
                         || got.owner_id != want.owner_id
                         || got.sequence != want.sequence
                     {
                         problems.push(format!(
                             "{note}\n      {side_label}[{i}] identity — rust id={} owner={} seq={} / ts id={} owner={} seq={}",
-                            got.id, got.owner_id, got.sequence, want.id, want.owner_id, want.sequence
+                            got_id, got.owner_id, got.sequence, want.id, want.owner_id, want.sequence
                         ));
                     }
                     for (field, g, w) in [
@@ -329,13 +329,14 @@ fn settlement_matches_the_reference_in_output_and_in_draws_consumed() {
             &company,
             f(&inputs.fair_value),
             f(&inputs.tick_volume),
-            &SettleOptions {
+            &{
+                let mut settle_options = SettleOptions::default();
                 // `None` in the vector means the reference implementation's default applied.
-                vix: maybe(&inputs.vix).unwrap_or(15.0),
-                difficulty: difficulty_of(&inputs.difficulty),
-                flow_lean: maybe(&inputs.flow_lean),
+                settle_options.vix = maybe(&inputs.vix).unwrap_or(15.0);
+                settle_options.difficulty = difficulty_of(&inputs.difficulty);
+                settle_options.flow_lean = maybe(&inputs.flow_lean);
                 // Step function, as above: the vectors predate the curve.
-                ..Default::default()
+                settle_options
             },
             &mut rng,
         );

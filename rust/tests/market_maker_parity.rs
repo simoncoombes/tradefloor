@@ -132,19 +132,18 @@ fn matches_the_reference_bit_for_bit() {
 
     for case in &vectors.cases {
         let i = &case.inputs;
-        let params = QuoteParams {
-            fair_value: f(&i.fair_value),
-            half_spread_bps: f(&i.half_spread_bps),
-            base_size: f(&i.base_size),
-            inventory: MakerInventory {
-                position: f(&i.position),
-                limit: f(&i.limit),
-            },
+        let params = {
+            let mut quote_params = QuoteParams::default();
+            quote_params.fair_value = f(&i.fair_value);
+            quote_params.half_spread_bps = f(&i.half_spread_bps);
+            quote_params.base_size = f(&i.base_size);
+            quote_params.inventory = MakerInventory::new(f(&i.position), f(&i.limit));
             // `None` in the vector means the reference implementation's destructuring
             // default
             // applied, which is 1 for both.
-            volatility_multiplier: i.volatility_multiplier.as_deref().map(f).unwrap_or(1.0),
-            max_skew: i.max_skew.as_deref().map(f).unwrap_or(1.0),
+            quote_params.volatility_multiplier = i.volatility_multiplier.as_deref().map(f).unwrap_or(1.0);
+            quote_params.max_skew = i.max_skew.as_deref().map(f).unwrap_or(1.0);
+            quote_params
         };
 
         let q = compute_quote(&params);
@@ -161,10 +160,12 @@ fn matches_the_reference_bit_for_bit() {
         }
         compared += 4;
 
-        let (bids, asks) = quote_ladder(&LadderParams {
-            quote: params,
-            levels: f(&i.levels),
-            level_step: i.level_step.as_deref().map(f).unwrap_or(0.5),
+        let (bids, asks) = quote_ladder(&{
+            LadderParams::new(
+                params,
+                f(&i.levels),
+                i.level_step.as_deref().map(f).unwrap_or(0.5),
+            )
         });
 
         // Depth counts matter as much as values: the bid side drops levels
@@ -217,10 +218,7 @@ fn matches_the_reference_bit_for_bit() {
             "sell" => Side::Sell,
             other => panic!("bad side {other}"),
         };
-        let inv = MakerInventory {
-            position: f(&fc.position),
-            limit: 1000.0,
-        };
+        let inv = MakerInventory::new(f(&fc.position), 1000.0);
         let got = apply_fill_to_inventory(inv, side, f(&fc.quantity)).position;
         if let Some(p) = diff("applyFillToInventory", &fc.side, got, &fc.result) {
             problems.push(p);
