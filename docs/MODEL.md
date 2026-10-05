@@ -11,11 +11,12 @@ market's permanent share, volatility feedback, the packaged recession) on
 `file:line` under `rust/src/`, on the tree it was read from. The sections on
 mechanisms pt-v21 switches on were read off the 0.10.0 code.
 
-**Parameter values.** Where a section gives a value without naming a
-preset, it is pt-v20's, as `tf.ModelParams.from_preset("pt-v20").to_dict()`
-returns it, rounded to four significant figures, and where a table gives two
-values the second is pt-v19's. [pt-v21](#pt-v21) lists every value pt-v21
-moves, and that table overrides any pt-v20 value given below.
+**Parameter values.** Every parameter table below gives a dial's value on
+pt-v20 and on pt-v21 in two columns, "same" where they agree, as
+`tf.ModelParams.from_preset(...).to_dict()` returns them, rounded to four
+significant figures; where the pt-v20 column holds two values, the second is
+pt-v19's. A value written in the text without naming a preset is pt-v20's.
+[pt-v21](#pt-v21) lists every value pt-v21 moves.
 
 A preset is a frozen set of coefficients. The equations below hold for every
 preset, but many terms are switched on or off by a preset's dials. Terms
@@ -542,11 +543,11 @@ The macro clock runs on trading sessions. A month starts when
 $d \bmod 21 = 0$ and a quarter when $d \bmod 63 = 0$ (`economy/daily.rs:720-721`).
 Levels compound over 252 sessions a year.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `macro_calendar_days_per_year` | 252 | derived | sessions in a trading year |
-| `macro_compound_days_per_year` | 252 | derived | same; at 365 the long-run index return was 3.8% a year, at 252 it is 4.9% (design note results/longrun-drift) |
-| `macro_burn_in_days` | 755 | chosen | the day the slowest field, the corporate yield, enters one stationary sd of its mean |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `macro_calendar_days_per_year` | 252 | same | derived | sessions in a trading year |
+| `macro_compound_days_per_year` | 252 | same | derived | same; at 365 the long-run index return was 3.8% a year, at 252 it is 4.9% (design note results/longrun-drift) |
+| `macro_burn_in_days` | 755 | same | chosen | the day the slowest field, the corporate yield, enters one stationary sd of its mean |
 
 ### Business cycle
 
@@ -602,11 +603,11 @@ bears, with 0.89 bears a decade outside a recession against the tape's 0.53.
 On the certified roster the gap reads about 0.1 at a bear's 20 per cent line
 and about -0.06 at the median session.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $h_q$ | `cycle_equity_hazard` | 0 (off) | | in [0, 20], per month |
-| $q_0$ | `cycle_equity_hazard_knee` | 0 | | in [0, 1] |
-| $h_0$ | `cycle_equity_hazard_opening` | 0 (off) | | in [0, 1], per month |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $h_q$ | `cycle_equity_hazard` | 0 (off) | 5 | | in [0, 20], per month |
+| $q_0$ | `cycle_equity_hazard_knee` | 0 | 0.1 | | in [0, 1] |
+| $h_0$ | `cycle_equity_hazard_opening` | 0 (off) | 0.011 | | in [0, 1], per month |
 
 Before day zero the economy runs without an index (the stationary opening's
 law and the macro burn-in), so the fall's hazard cannot act there and the
@@ -876,13 +877,13 @@ and the terms are these:
 The price level compounds daily: $Q_d = Q_{d-1} (1 + \pi_d / (100 \cdot 252))$
 (`economy/daily.rs:1108`).
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| inflation target | 2.0 | chosen | |
-| `inflation_reversion` $\kappa_\pi$ | 0.55 a month | chosen | reference value; it gives too little persistence against FRED CPI (lag-1 autocorrelation 0.936 against 0.978, `params.rs:313-325`) |
-| `inflation_floor` $\pi_{\min}$ | -1.0 | guard | |
-| `inflation_ceiling` $\pi_{\max}$ | 6.0 | guard | real CPI inflation peaked at 9.0 in June 2022, so this binds in a 2022-like episode |
-| `phillips_curve_coeff` | 0.2 | chosen | |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| inflation target | 2.0 | | chosen | |
+| `inflation_reversion` $\kappa_\pi$ | 0.55 a month | same | chosen | reference value; it gives too little persistence against FRED CPI (lag-1 autocorrelation 0.936 against 0.978, `params.rs:313-325`) |
+| `inflation_floor` $\pi_{\min}$ | -1.0 | same | guard | |
+| `inflation_ceiling` $\pi_{\max}$ | 6.0 | same | guard | real CPI inflation peaked at 9.0 in June 2022, so this binds in a 2022-like episode |
+| `phillips_curve_coeff` | 0.2 | same | chosen | |
 
 ### Fiscal policy
 
@@ -1182,14 +1183,14 @@ Collin-Dufresne, Goldstein and Martin 2001). A VIX pin removes the VIX term
 only. The gap is `EconomyState::spread_equity_gap`, carried by the snapshot
 and the state hash only while $g_L$ is set. No draw.
 
-| Symbol | Dial | Value (pt-v19) | Kind | Source |
-|---|---|---|---|---|
-| $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
-| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | measured | FRED DGS2, 5.23 bp; row R1 reads 3.87 against 3.65 to 6.80 (box ptv20g6) |
-| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
-| | `flight_to_quality_day` | 1 (0) | derived | a switch: the step reads the session's own return |
-| | `corporate_yield_daily` | 1 (0) | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
-| | `daily_credit_floor_gain` | 1.0 | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4884-4899`) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | same | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
+| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | 0.008 | measured | FRED DGS2, 5.23 bp; row R1 reads 3.87 against 3.65 to 6.80 (box ptv20g6) |
+| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | 0.013 | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
+| | `flight_to_quality_day` | 1 (0) | same | derived | a switch: the step reads the session's own return |
+| | `corporate_yield_daily` | 1 (0) | same | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
+| | `daily_credit_floor_gain` | 1.0 | same | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4884-4899`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
 the 0.8 floor are chosen. One limit: the model's inflation almost never
@@ -1222,11 +1223,11 @@ company's restated earnings and book value through $n_d$ in
 [Fair value](#fair-value), so a move written at the close reaches prices on
 the next session.
 
-| Symbol | Dial | Value (pt-v19) | Kind | Source |
-|---|---|---|---|---|
-| $\delta_E$ | `earnings_cycle_depth` | 0.2 (0, off) | measured | the depth at which row E1, the median fall of aggregate earnings in a contraction, meets Shiller's reported earnings around NBER recessions (median -17%) once the market's plain shocks are permanent: -0.280 at 0.35, -0.173 at 0.2, -0.132 at 0.15 (box ptv20vr4); graded, E1 reads -0.172 (box ptv20g6). pt-v20 before its graded arm had 0.35, picked on row B9 when the cycle carried the index's yearly spread; no error bar |
-| $u_E$ | `earnings_cycle_upside` | 0.09 (0) | derived | $q/(1-q)$ with $q$ = 9/108, the share of months in contraction and trough in the US phase table |
-| $H_E$ | `earnings_cycle_half_life` | 60 sessions | chosen | not searched |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\delta_E$ | `earnings_cycle_depth` | 0.2 (0, off) | same | measured | the depth at which row E1, the median fall of aggregate earnings in a contraction, meets Shiller's reported earnings around NBER recessions (median -17%) once the market's plain shocks are permanent: -0.280 at 0.35, -0.173 at 0.2, -0.132 at 0.15 (box ptv20vr4); graded, E1 reads -0.172 (box ptv20g6). pt-v20 before its graded arm had 0.35, picked on row B9 when the cycle carried the index's yearly spread; no error bar |
+| $u_E$ | `earnings_cycle_upside` | 0.09 (0) | same | derived | $q/(1-q)$ with $q$ = 9/108, the share of months in contraction and trough in the US phase table |
+| $H_E$ | `earnings_cycle_half_life` | 60 sessions | 150 | chosen | not searched |
 
 With the cycle carrying part of the index's year-to-year variance, pt-v20
 took transient variance out by as much before its graded arm, and keeps it
@@ -1341,9 +1342,9 @@ any history on an engine whose lag is 0. It refuses a snapshot without one
 under the dial too, naming the dial, because a history refilled from the
 restored phase would publish a path the original run did not.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `cycle_publication_lag` $L_c$ | 252 (0, off); a whole number of sessions up to 2520 | chosen | the NBER's announcement delay, about a year for the 2007-09 recession; the owner's ruling of 2026-09-25 |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `cycle_publication_lag` $L_c$ | 252 (0, off); a whole number of sessions up to 2520 | same | chosen | the NBER's announcement delay, about a year for the 2007-09 recession; the owner's ruling of 2026-09-25 |
 
 ### Published GDP growth
 
@@ -1390,9 +1391,9 @@ is 0, a quarter with no close in it, a non-finite figure and releases out of
 order. It refuses a snapshot without the block under the dial too, naming
 the dial.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `gdp_publication_lag` $L_g$ | 0, off (growth reported daily); a whole number of sessions up to 2520. pt-v20 sets 21 | chosen | the BEA's advance estimate, about a month after the quarter; the owner's ruling of 2026-09-25 |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `gdp_publication_lag` $L_g$ | 0, off (growth reported daily); a whole number of sessions up to 2520. pt-v20 sets 21 | same | chosen | the BEA's advance estimate, about a month after the quarter; the owner's ruling of 2026-09-25 |
 
 ### Unemployment's adjustment
 
@@ -1438,9 +1439,9 @@ history and before the GDP figure (`engine.rs:6620-6622`). A restore refuses
 it on an engine whose half-life is 0, and refuses a snapshot without it on
 an engine whose half-life is set.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `unemployment_adjustment_half_life` $H_u$ | 84 (0, off); up to 2520 sessions | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `unemployment_adjustment_half_life` $H_u$ | 84 (0, off); up to 2520 sessions | same | fitted | FRED UNRATE over the 2001 and 2007-09 recessions; matched to their first months, with no standard error |
 
 ### Unemployment's anchor and oil's interior
 
@@ -1487,13 +1488,13 @@ of $0.5 / \sqrt{2\kappa}$. With `oil_inflation_passthrough` $c > 0$ the
 pass-through is $\Omega = 0.01\,c\,(o - 81)$, where 81 is oil's reversion
 target at the 2 per cent trend growth Okun's law pivots on.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `unemployment_okun_coefficient` $\beta$ | 0 (off); up to 2.4 | not set | Okun (1962) about 1/3; Ball, Leigh and Loungani (2017) about 0.4 to 0.5 for the US |
-| `unemployment_natural_pull` $k$ | 0 (0.06); up to 1 | not set | a monthly share; UNRATE's 120-month windows have a lag-12 autocorrelation of 0.53 (median, 1948 to 2026) |
-| `unemployment_natural_rate` $u_0$ | 0 (4.0); up to 8 | not set | FRED NROU: 4.40 to 4.75 over 2015 to 2026, mean 4.97 over 1990 to 2026 |
-| `oil_inventory_reversion` $\kappa$ | 0 (off); up to 1 | not set | the theory of storage (Working 1949; Brennan 1958; Pindyck 1994); the coefficient is not identified there |
-| `oil_inflation_passthrough` $c$ | 0 (off); up to 3 | not set | Kilian and Vigfusson (2011) find no asymmetry; 1.0 is the shipped 0.01 a dollar above 80 |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `unemployment_okun_coefficient` $\beta$ | 0 (off); up to 2.4 | 0.75 | not set | Okun (1962) about 1/3; Ball, Leigh and Loungani (2017) about 0.4 to 0.5 for the US |
+| `unemployment_natural_pull` $k$ | 0 (0.06); up to 1 | same | not set | a monthly share; UNRATE's 120-month windows have a lag-12 autocorrelation of 0.53 (median, 1948 to 2026) |
+| `unemployment_natural_rate` $u_0$ | 0 (4.0); up to 8 | same | not set | FRED NROU: 4.40 to 4.75 over 2015 to 2026, mean 4.97 over 1990 to 2026 |
+| `oil_inventory_reversion` $\kappa$ | 0 (off); up to 1 | 0.002 | not set | the theory of storage (Working 1949; Brennan 1958; Pindyck 1994); the coefficient is not identified there |
+| `oil_inflation_passthrough` $c$ | 0 (off); up to 3 | 1 | not set | Kilian and Vigfusson (2011) find no asymmetry; 1.0 is the shipped 0.01 a dollar above 80 |
 
 ### The fear and greed index
 
@@ -1524,9 +1525,9 @@ lags at 0 it changes nothing. On desk seeds 201 to 212, with the cycle lag at
 fall in the index beat holding in 1 of 12 histories with the switch on,
 against 9 of 12 with it off.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `fear_greed_published_inputs` | 1 (0, off); a switch, 0 or 1 | derived | the real index is built from market data and dates no recession |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `fear_greed_published_inputs` | 1 (0, off); a switch, 0 or 1 | same | derived | the real index is built from market data and dates no recession |
 
 ### Repricing at publication
 
@@ -1569,9 +1570,9 @@ for them the two agree. For the phase it prices only what the next tick
 would, and publishes nothing. It takes no draw and adds no state: the price
 it writes is already in the snapshot and the state hash.
 
-| Dial | Value | Kind | Source |
-|---|---|---|---|
-| `macro_publication_repricing` | 1 (0, off); a switch, 0 or 1 | derived | pt-v20 audit, finding 3; FOMC event studies |
+| Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|
+| `macro_publication_repricing` | 1 (0, off); a switch, 0 or 1 | same | derived | pt-v20 audit, finding 3; FOMC event studies |
 
 ### The economy's outputs
 
@@ -1655,17 +1656,17 @@ What follows from this:
 - **Dividends** are off on every preset (`dividend_payout_share` 0). When the dial is set, a profitable company whose revenue growth is under `dividend_growth_cutoff` pays a payout $\delta_i = \min(1, s\,\pi_{\text{sector}})$ of its earnings, a target yield $y_i = \delta_i E_i / P_{i,0}$. Ex-dates fall every 63 sessions from a phase hashed from the ticker. Each amount is declared 21 sessions ahead as $D \leftarrow \max(0, D + c_q(y_i \bar P_i/4 - D))$, capped at `dividend_yield_ceiling` $\cdot\, y_i P_i / 4$, where $\bar P_i$ is an EMA of the company's closes (half-life 21) and $c_q = 1-(1-c)^{1/4}$ for `dividend_adjustment_speed` $c$. Fair value adds $D\,k/63$ at $k$ sessions since the last ex-date, and at the ex-date open the price drops by $D$ exactly (`market/dividends.rs`, `Engine::apply_dividends`). Under `dividend_buyback_substitution` the buyback share in $B$ is $\max(0, \kappa - \delta_i)$, so $\kappa$ is the total payout.
 - Nominal output grows 4.8% a year over a long run, against 4.8% in the US 1990 to 2025 (design note results/macro-cycle §0). On pt-v20 the index returns 6.4% a year over 21 years against a target of 6.25% (row B8), and its annual returns have a standard deviation of 16.3% against the S&P 500's 17.4% (row B9), on 90 histories (box ptv20g6).
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2912-2954`); see [Known gaps](#known-gaps) |
-| $\eta$ | `earnings_nominal_growth` | 1.0 | derived | holds the earnings share of nominal output constant |
-| $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
-| $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | guard | keeps the buyback term finite for a company near the price floor |
-| $\lambda$ | `rate_pe_sensitivity` | 3 (1.5) | fitted (chosen) | pt-v20's 3 was picked on a grid; pt-v19's 1.5 is the reference implementation's. The S&P 500's P/E fell 4.9% to 5.5% per 100 bp of Baa in 2022 |
-| | rate-term floor | 0.5 | guard | |
-| | duration scale | 2.0 | chosen | reference implementation |
-| | loss-maker price to book | 1.2 | chosen | reference implementation |
-| | `market_pe_buybacks` | 1.0 | derived | the market P/E divides by the same buyback factor |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $r^{\ast}$ | `neutral_discount_rate` | 0.0482 | same | derived | the corporate yield the economy rests at after pt-v18's burn-in (`params.rs:2912-2954`); see [Known gaps](#known-gaps) |
+| $\eta$ | `earnings_nominal_growth` | 1.0 | same | derived | holds the earnings share of nominal output constant |
+| $\kappa$ | `buyback_payout_share` | 0.75 (0.3333) | 0.9 | fitted (chosen) | pt-v20's 0.75 is calibrated to the index's one-year drift, not to buybacks: about 4.2% a year at a typical earnings yield. pt-v19's 0.3333 is US large-cap net buybacks of 1.5% to 2.0% of market value, 2000 to 2025 (`params.rs`, `ModelParams::buyback_payout_share`); no error bar |
+| $\bar b$ | `buyback_yield_cap` | 0.15 (0, off) | same | guard | keeps the buyback term finite for a company near the price floor |
+| $\lambda$ | `rate_pe_sensitivity` | 3 (1.5) | same | fitted (chosen) | pt-v20's 3 was picked on a grid; pt-v19's 1.5 is the reference implementation's. The S&P 500's P/E fell 4.9% to 5.5% per 100 bp of Baa in 2022 |
+| | rate-term floor | 0.5 | | guard | |
+| | duration scale | 2.0 | | chosen | reference implementation |
+| | loss-maker price to book | 1.2 | | chosen | reference implementation |
+| | `market_pe_buybacks` | 1.0 | same | derived | the market P/E divides by the same buyback factor |
 
 The sector anchors $\Pi_k$ are in [The sectors](#the-sectors). They are
 chosen: carried from the reference implementation, with no market data named.
@@ -1736,12 +1737,12 @@ aggregate fall in a contraction reads -0.173 against Shiller's median -0.17.
 `opening_market_sigma`, the spread of the market's opening mispricing, goes
 from 0.10 to 0.001, since little of the market's variance stays in $s$.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
-| | `fair_value_market_linear` | 1 (0, off); a switch | derived | the plain loading is the zero-mean part |
-| $c$ | `fair_value_market_vol_cap` | 1.5 (0, no ceiling) | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
-| $e$ | `fair_value_market_excess_share` | 0 (the ceiling as it stood) | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | same | fitted | the end point; row V1 on grids ptv20vr1 to vr9 |
+| | `fair_value_market_linear` | 1 (0, off); a switch | same | derived | the plain loading is the zero-mean part |
+| $c$ | `fair_value_market_vol_cap` | 1.5 (0, no ceiling) | same | fitted | a ceiling of 2 took the index volatility to 27.9% against 18.1% (box ptv20vr4) |
+| $e$ | `fair_value_market_excess_share` | 0 (the ceiling as it stood) | 0.5 | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
 
 A floor under the share above the ceiling (`fair_value_market_excess_share`
 $e$, 0 on every preset; `market/tick.rs`, `market_permanent_share`) puts back
@@ -1813,12 +1814,12 @@ sessions and the sessions under -5% 11.5 a decade, against the tape's 6.2 and
 a band up to twice it (box ptv20vr9). At knees of 30 and 35 every smoothed
 arm tried ran past twice the tape.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $g$ | `fair_value_vix_discount` | 0.35 (0, off) | fitted | held-out grids ptv20vr6 to vr9 |
-| $K$ | `fair_value_vix_knee` | 40 (30, unread at $g = 0$) | fitted | held-out grids ptv20vr8 and vr9 |
-| $H_x$ | `fair_value_vix_half_life` | 5 (0, the VIX as it stands) | fitted | held-out grids ptv20vr6 to vr9 |
-| $H_r$ | `fair_value_vix_release_half_life` | 0 (the build's $H_x$ both ways) | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $g$ | `fair_value_vix_discount` | 0.35 (0, off) | same | fitted | held-out grids ptv20vr6 to vr9 |
+| $K$ | `fair_value_vix_knee` | 40 (30, unread at $g = 0$) | same | fitted | held-out grids ptv20vr8 and vr9 |
+| $H_x$ | `fair_value_vix_half_life` | 5 (0, the VIX as it stands) | same | fitted | held-out grids ptv20vr6 to vr9 |
+| $H_r$ | `fair_value_vix_release_half_life` | 0 (the build's $H_x$ both ways) | 504 | fitted on a candidate | r16 spike boxes r16cal1 to r16cal3b, held-out seeds |
 
 The give-back (`fair_value_vix_release_half_life` $H_r$, 0 on every preset;
 `engine.rs`, the close's pull): while the target is below the exposure, the
@@ -1914,9 +1915,9 @@ constituents average one against it. The generated rosters' $B$ scatters with
 their sector mix: the certified roster 111 reads 1.06 (technology 33 per cent
 of its cap), a random 40-name roster's median 0.97 (technology 7 per cent).
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $d$ | `market_beta_normalise` | 0 (off) | | in [0, 1] |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $d$ | `market_beta_normalise` | 0 (off) | 1 | | in [0, 1] |
 
 What it was measured to do (sim/r17-tails, on R17A, 252 sessions from the
 opening; the certification's varying rosters over 360 held-out seeds per set,
@@ -1957,10 +1958,10 @@ at the open: $V_{i,0} e^{v_{i,0}} e^{s_{i,0}} = P_{i,0}$. A company listed
 later opens with $s_0 = \mathrm{clip}(g_i;\ -0.9,\ 0.9)$
 (`market/tick.rs:1130-1138`).
 
-| Symbol | Dial | Value (pt-v19) | Kind | Source |
-|---|---|---|---|---|
-| $\sigma_o$ | `opening_mispricing_sigma` | 0.016 (0, off) | measured | the cross-sectional sd of $s$ over sessions 250 to 2,660 on seeds 201 to 212; 0.0155 to 0.0165 |
-| $\sigma_c$ | `opening_market_sigma` | 0.001 (0, off) | chosen | with the market's plain shocks permanent, little of the market's variance stays in $s$, and 0.001 is the smallest opening that keeps the stationary form (0 would take the roster's day-zero premium). Not measured on the graded arm; pt-v20 before it had 0.10, the time-series sd of the cap-weighted $s$ on seeds 201 to 203 (0.148, 0.105, 0.042) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\sigma_o$ | `opening_mispricing_sigma` | 0.016 (0, off) | same | measured | the cross-sectional sd of $s$ over sessions 250 to 2,660 on seeds 201 to 212; 0.0155 to 0.0165 |
+| $\sigma_c$ | `opening_market_sigma` | 0.001 (0, off) | same | chosen | with the market's plain shocks permanent, little of the market's variance stays in $s$, and 0.001 is the smallest opening that keeps the stationary form (0 would take the roster's day-zero premium). Not measured on the graded arm; pt-v20 before it had 0.10, the time-series sd of the cap-weighted $s$ on seeds 201 to 203 (0.148, 0.105, 0.042) |
 
 Graded: the start-up ratio in row B9, the index's volatility over the first
 60 sessions against sessions 250 to 490, reads 0.80 against a band of two
@@ -2032,15 +2033,15 @@ process is stationary. The effective half-life is about 40 sessions, not the
 nominal 60, because the crowd's valuation lean adds its own pull. This daily
 form is our derivation from the tick equation, not a formula in the code.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $H$ | `mispricing_half_life_days` | 60 | chosen | |
-| $\phi_\tau$ | `s_phi_tick` | 0.99997 | derived | $0.5^{1/(390 \cdot 60)}$ |
-| $\theta$ | `momentum_theta` | 0.01855 | fitted | cut in steps from 0.25; the last cut kept the two-year `return_acf1` under its ceiling |
-| $g_v$ | `crowd_valuation_gain` | 0.006 a day | chosen | reference implementation |
-| $g_m$ | `crowd_momentum_gain` | 0.02 a day | chosen | reference implementation |
-| $\bar L$ | `crowd_lean_cap` | 0.02 | guard | |
-| $\bar s$ | `mispricing_cap` | 0.9 | guard | $e^{\pm 0.9}$ is 0.41 to 2.46 times fair value |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $H$ | `mispricing_half_life_days` | 60 | same | chosen | |
+| $\phi_\tau$ | `s_phi_tick` | 0.99997 | same | derived | $0.5^{1/(390 \cdot 60)}$ |
+| $\theta$ | `momentum_theta` | 0.01855 | same | fitted | cut in steps from 0.25; the last cut kept the two-year `return_acf1` under its ceiling |
+| $g_v$ | `crowd_valuation_gain` | 0.006 a day | same | chosen | reference implementation |
+| $g_m$ | `crowd_momentum_gain` | 0.02 a day | same | chosen | reference implementation |
+| $\bar L$ | `crowd_lean_cap` | 0.02 | same | guard | |
+| $\bar s$ | `mispricing_cap` | 0.9 | same | guard | $e^{\pm 0.9}$ is 0.41 to 2.46 times fair value |
 
 ### The fair-value level
 
@@ -2085,10 +2086,10 @@ term, reversion, herding, the crowd and the breaker. On pt-v20 the plain
 market loading, market-wide news and the market jump move to $v$ too, up
 to the volatility ceiling.
 
-| Symbol | Dial | Value (pt-v19) | Kind | Source |
-|---|---|---|---|---|
-| $\psi$ | `fair_value_news_share` | 1.0 (0, off) | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
-| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\psi$ | `fair_value_news_share` | 1.0 (0, off) | same | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | same | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
 
 #### The knee under a name's level
 
@@ -2122,10 +2123,10 @@ v_i \leftarrow v_i + \big(1 - 2^{-1/h}\big)\,\big(\bar v - k - v_i\big)
 and no other name moves. It draws nothing, and the price follows $v$ from
 the next tick ($s$ is not touched). $k = 0$ is off on every preset.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $k$ | `fair_value_relative_knee` | 0 (off) | fitted on a candidate | r17 floor box r17floor1c, held-out seeds |
-| $h$ | `fair_value_relative_half_life` | 0 (read only with $k$) | fitted on a candidate | the same |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $k$ | `fair_value_relative_knee` | 0 (off) | 4 | fitted on a candidate | r17 floor box r17floor1c, held-out seeds |
+| $h$ | `fair_value_relative_half_life` | 0 (read only with $k$) | 63 | fitted on a candidate | the same |
 
 Measured on a candidate (no preset sets it). On R16A with $k = 4$ and
 $h = 63$ (box r17floor1c; 100-year runs on the certified roster), no name
@@ -2205,21 +2206,21 @@ the only loadings. There are no style factors such as value, momentum, size
 or crowding, and a caller cannot supply a covariance matrix, so a factor
 crowding study cannot be set up on this structure.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\bar\sigma_M$ | `market_factor_sigma` | 0.006454 (0.007593) a day | fitted | 0.85 of pt-v19's, picked on a grid over 90 pooled histories (box ptv20e4) to hold the bear-market count and the spread of annual returns in band once the earnings cycle carries part of the variance; the baseline of $v_d$ |
-| $\bar\sigma_S$ | `sector_factor_sigma` | 0.008583 a day | fitted | a derivation exists only for another value, 0.0107 |
-| | `sector_vix_coupling` | 1.0 | chosen | makes the sector sigma scale with the VIX like the market's |
-| $\ell_0$ | `sector_loading` | 0.6 | measured | centres `sector_excess_corr` on the reference roster, 1987 to 2025 |
-| $b_\ell$ | `sector_loading_beta_slope` | 0.7 | fitted | |
-| $\kappa_I$ | `idio_sigma_scale` | 0.5126 | fitted | search |
-| $h_{\min}$ | `idio_sigma_floor` | 0.0001 | guard | binds on many company-days |
-| $a$ | `market_beta_down_asym` | 0.025 | chosen | no daily measurement on record |
-| $a_L$ | `market_beta_down_asym_lag` | 0.46 | fitted | fitted to the lagged correlation-asymmetry statistic; a 7-point grid's best was 0.375 |
-| | `market_beta_down_asym_recentre` | 1.0 | derived | $E[f \mathbf{1}(f < 0)] = -\sigma/\sqrt{2\pi}$ |
-| $T_A$ | `crash_amplifier_threshold` | 2.0 | chosen | reference implementation |
-| $m_A$ | `crash_amplifier_slope` | 0.2 | chosen | reference implementation |
-| | `crash_amplifier_conditional_sigma` | 1.0 | derived | measures the shock in today's sigma, which keeps the VIX loop stable |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\bar\sigma_M$ | `market_factor_sigma` | 0.006454 (0.007593) a day | 0.007099 | fitted | 0.85 of pt-v19's, picked on a grid over 90 pooled histories (box ptv20e4) to hold the bear-market count and the spread of annual returns in band once the earnings cycle carries part of the variance; the baseline of $v_d$ |
+| $\bar\sigma_S$ | `sector_factor_sigma` | 0.008583 a day | same | fitted | a derivation exists only for another value, 0.0107 |
+| | `sector_vix_coupling` | 1.0 | same | chosen | makes the sector sigma scale with the VIX like the market's |
+| $\ell_0$ | `sector_loading` | 0.6 | same | measured | centres `sector_excess_corr` on the reference roster, 1987 to 2025 |
+| $b_\ell$ | `sector_loading_beta_slope` | 0.7 | same | fitted | |
+| $\kappa_I$ | `idio_sigma_scale` | 0.5126 | 0.52 | fitted | search |
+| $h_{\min}$ | `idio_sigma_floor` | 0.0001 | same | guard | binds on many company-days |
+| $a$ | `market_beta_down_asym` | 0.025 | same | chosen | no daily measurement on record |
+| $a_L$ | `market_beta_down_asym_lag` | 0.46 | same | fitted | fitted to the lagged correlation-asymmetry statistic; a 7-point grid's best was 0.375 |
+| | `market_beta_down_asym_recentre` | 1.0 | same | derived | $E[f \mathbf{1}(f < 0)] = -\sigma/\sqrt{2\pi}$ |
+| $T_A$ | `crash_amplifier_threshold` | 2.0 | same | chosen | reference implementation |
+| $m_A$ | `crash_amplifier_slope` | 0.2 | same | chosen | reference implementation |
+| | `crash_amplifier_conditional_sigma` | 1.0 | same | derived | measures the shock in today's sigma, which keeps the VIX loop stable |
 
 ### Squeeze and cascade terms
 
@@ -2286,16 +2287,16 @@ each name in the sector it names and `news_market_weight` (0.3) on every
 name when it names neither, and the preset was fitted without it. The flow each preset is fitted at, and the check on a caller's
 own, are in [REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md#the-shock-flow-behind-every-figure).
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\lambda_N$ | `endogenous_news_intensity` | 0.05 a day | fitted | search |
-| $\sigma_N$ | `endogenous_news_sigma` | 0.01751 | fitted | search |
-| $w_p$ | `news_peer_weight`, `news_peer_weight_down` | 0.05, 0.05 | chosen | motivated by Foster (1981) and Freeman and Tse (1992) on intra-industry information transfer |
-| $c_p$ | `news_peer_vix_coupling` | 8.0 | fitted | |
-| $h_f$ | `news_absorption_half_life` | 0.6 ticks | derived | one-minute share of the earnings-announcement move, Christensen, Timmermann and Veliyev (arXiv 2601.08962, Table 7, 2008 to 2020) |
-| $\delta$ | `news_absorption_drift_share` | 0.12 | derived | same table: 1 - 1.58/1.80 |
-| $h_D$ | `news_absorption_drift_half_life` | 42 ticks | chosen | a 60-minute mean life for the drift, to fit Patell and Wolfson (1984)'s "several hours"; not measured |
-| | `news_quote_revision` | 1.0 | derived | with it the tape holds 0.615 of an event after one tick against the profile's 0.605; without it 0.086 |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\lambda_N$ | `endogenous_news_intensity` | 0.05 a day | same | fitted | search |
+| $\sigma_N$ | `endogenous_news_sigma` | 0.01751 | same | fitted | search |
+| $w_p$ | `news_peer_weight`, `news_peer_weight_down` | 0.05, 0.05 | same | chosen | motivated by Foster (1981) and Freeman and Tse (1992) on intra-industry information transfer |
+| $c_p$ | `news_peer_vix_coupling` | 8.0 | same | fitted | |
+| $h_f$ | `news_absorption_half_life` | 0.6 ticks | same | derived | one-minute share of the earnings-announcement move, Christensen, Timmermann and Veliyev (arXiv 2601.08962, Table 7, 2008 to 2020) |
+| $\delta$ | `news_absorption_drift_share` | 0.12 | same | derived | same table: 1 - 1.58/1.80 |
+| $h_D$ | `news_absorption_drift_half_life` | 42 ticks | same | chosen | a 60-minute mean life for the drift, to fit Patell and Wolfson (1984)'s "several hours"; not measured |
+| | `news_quote_revision` | 1.0 | same | derived | with it the tape holds 0.615 of an event after one tick against the profile's 0.605; without it 0.086 |
 
 ### Jumps
 
@@ -2320,15 +2321,15 @@ session's first ticks, through the book. At $X = A$ there are about 7
 market-jump days a year, of mean -0.85%, and each company has about 1.7
 idiosyncratic jumps a year, of standard deviation 7.5%.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\lambda_M$ | `jump_intensity_market` | 0.02829 (0.05658) a day | fitted | half pt-v19's rate, picked on the same grid as the market factor's sigma; pt-v19's was a search for the two-year excess kurtosis |
-| $\mu_M$ | `jump_mean_market` | -0.008522 | fitted | search; negative for skew |
-| $\sigma_M^{J}$ | `jump_sigma_market` | 0.002460 | fitted | search |
-| $\lambda_I$ | `jump_intensity_idio` | 0.006890 a day | fitted | search |
-| $\sigma_I^{J}$ | `jump_sigma_idio` | 0.07521 | fitted | search |
-| $c_J$ | `jump_vix_coupling` | 0.2626 | fitted | |
-| | `jump_mean_compensated` | 1.0 | derived | a compensated Poisson process |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\lambda_M$ | `jump_intensity_market` | 0.02829 (0.05658) a day | 0.005 | fitted | half pt-v19's rate, picked on the same grid as the market factor's sigma; pt-v19's was a search for the two-year excess kurtosis |
+| $\mu_M$ | `jump_mean_market` | -0.008522 | -0.03 | fitted | search; negative for skew |
+| $\sigma_M^{J}$ | `jump_sigma_market` | 0.002460 | 0.01 | fitted | search |
+| $\lambda_I$ | `jump_intensity_idio` | 0.006890 a day | 0.009 | fitted | search |
+| $\sigma_I^{J}$ | `jump_sigma_idio` | 0.07521 | 0.0318 | fitted | search |
+| $c_J$ | `jump_vix_coupling` | 0.2626 | same | fitted | |
+| | `jump_mean_compensated` | 1.0 | same | derived | a compensated Poisson process |
 
 ### The attribution
 
@@ -2418,19 +2419,19 @@ The fast component's persistence is $\alpha_f + \beta_f + \gamma_f/2 = 0.979$,
 a half-life of 33 sessions; the slow one's is 0.9913, 79 sessions. The
 ceiling caps the market factor at 4.3% a day.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\alpha_f$ | `market_vol_alpha` | 0.0066 | measured | GJR-GARCH(1,1) QML on S&P 500 daily log returns, 1990 to 2025; s.e. 0.0082 |
-| $\beta_f$ | `market_vol_beta` | 0.8946 | measured | same fit; s.e. 0.0181 |
-| $\gamma_f$ | `market_vol_gamma` | 0.1556 | measured | same fit; s.e. 0.0236 |
-| $p_s$ | `market_vol_slow_persistence` | 0.9913 | derived | the slow pole of the S&P 500 variance impulse response; bootstrap interval 0.975 to 1.000 |
-| $g_s$ | `market_vol_slow_gain` | 0.05 | chosen | a round number |
-| $w_s$ | `market_vol_slow_weight` | 0.35 | fitted | |
-| $\delta_s$ | `market_vol_slow_vix_damp` | 0.374 | fitted | |
-| $c_m$ | `market_vol_vix_coupling` | 0.9540 | fitted | search |
-| $e_+$ | `market_vol_vix_exponent` | 4.0 | fitted | fitted to the held-VIX crisis lever: 10.3 times against 10.5 on the data |
-| $e_-$ | `market_vol_vix_exponent_below` | 2.5 | chosen | inside the measured range: shared variance on the reference roster rises as the VIX to the power 2.25 (1.95 to 2.57) |
-| | floor, ceiling multiples | 0.05, 32 | guard | a record VIX of 82.7 against 15 is about 30 times the variance |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\alpha_f$ | `market_vol_alpha` | 0.0066 | same | measured | GJR-GARCH(1,1) QML on S&P 500 daily log returns, 1990 to 2025; s.e. 0.0082 |
+| $\beta_f$ | `market_vol_beta` | 0.8946 | 0.9446 | measured | same fit; s.e. 0.0181 |
+| $\gamma_f$ | `market_vol_gamma` | 0.1556 | 0.06 | measured | same fit; s.e. 0.0236 |
+| $p_s$ | `market_vol_slow_persistence` | 0.9913 | same | derived | the slow pole of the S&P 500 variance impulse response; bootstrap interval 0.975 to 1.000 |
+| $g_s$ | `market_vol_slow_gain` | 0.05 | same | chosen | a round number |
+| $w_s$ | `market_vol_slow_weight` | 0.35 | same | fitted | |
+| $\delta_s$ | `market_vol_slow_vix_damp` | 0.374 | same | fitted | |
+| $c_m$ | `market_vol_vix_coupling` | 0.9540 | 0.75 | fitted | search |
+| $e_+$ | `market_vol_vix_exponent` | 4.0 | same | fitted | fitted to the held-VIX crisis lever: 10.3 times against 10.5 on the data |
+| $e_-$ | `market_vol_vix_exponent_below` | 2.5 | same | chosen | inside the measured range: shared variance on the reference roster rises as the VIX to the power 2.25 (1.95 to 2.57) |
+| | floor, ceiling multiples | 0.05, 32 | | guard | a record VIX of 82.7 against 15 is about 30 times the variance |
 
 Two further mechanisms act on this state. Both are off on every shipped
 preset, where the recursions above are the whole of it.
@@ -2473,13 +2474,13 @@ not counted twice. A forced close (a scenario's `vix_sets_variance`) steps
 $\ell$ but writes the forced level without the multiplier. The snapshot and
 the state hash carry $\ell$ only while $k$ is set.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\gamma_s$ | `market_vol_slow_gamma` | 0 (off) | | crash-vol-state design; in $[0, 1]$ and at most $2(1 - g_s)p_s$ |
-| $k$ | `market_vol_leverage` | 0 (off) | | in $[0, 50]$ |
-| $H$ | `market_vol_leverage_half_life` | 0 | | sessions; positive when $k$ is set |
-| $a$ | `market_vol_leverage_down` | 0 | | 0 counts rises and falls alike, 1 falls only |
-| $\varsigma$ | `market_vol_leverage_standardise` | 0 | | the unit a day is counted in: $\sqrt{b_m}^{\,1-\varsigma}\sqrt{v_d}^{\,\varsigma}$ in place of $\sqrt{b_m}$ above; 1 is the day's z-score |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\gamma_s$ | `market_vol_slow_gamma` | 0 (off) | 0.05 | | crash-vol-state design; in $[0, 1]$ and at most $2(1 - g_s)p_s$ |
+| $k$ | `market_vol_leverage` | 0 (off) | 2.5 | | in $[0, 50]$ |
+| $H$ | `market_vol_leverage_half_life` | 0 | 15 | | sessions; positive when $k$ is set |
+| $a$ | `market_vol_leverage_down` | 0 | same | | 0 counts rises and falls alike, 1 falls only |
+| $\varsigma$ | `market_vol_leverage_standardise` | 0 | 1 | | the unit a day is counted in: $\sqrt{b_m}^{\,1-\varsigma}\sqrt{v_d}^{\,\varsigma}$ in place of $\sqrt{b_m}$ above; 1 is the day's z-score |
 
 With $\varsigma = 1$ the memory's spread is the same at every variance, so the
 multiplier's mean is one in a storm as in a calm and a fall raises the next
@@ -2535,10 +2536,10 @@ day moves the next day's variance no more than a normal one, at 1 it moves it
 by its size (the GARCH-t recursion). The close clears $m_d$ to 1; the snapshot
 and the state hash carry it only between the open and the close.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\nu$ | `market_day_tail_df` | 0 (off) | | 0 or in [3, 200]; the S&P 500's GJR-GARCH(1,1)-t fit 1990-2025 reads 6.9 (profile 95% interval 6.0 to 8.0) |
-| $\varsigma_t$ | `market_day_tail_state_share` | 0 | | in [0, 1]; read only with $\nu$ set |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\nu$ | `market_day_tail_df` | 0 (off) | same | | 0 or in [3, 200]; the S&P 500's GJR-GARCH(1,1)-t fit 1990-2025 reads 6.9 (profile 95% interval 6.0 to 8.0) |
+| $\varsigma_t$ | `market_day_tail_state_share` | 0 | same | | in [0, 1]; read only with $\nu$ set |
 
 What it was measured to do (sim/r17-d1tail, R16A, the certification's
 varying-roster protocol, 720 held-out seeds: 201-230, 501-530, 801-830,
@@ -2596,20 +2597,20 @@ recession months over the rest is 1.66 (1950 to 2025), 1.87 (1928 to 2025) and
 2.24 (1990 to 2025), and the VIX's median is 27.5 in a recession against 17.0
 outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $R$ | `market_vol_cycle_ratio` | 0 (off) | | bear-dynamics design; recession over expansion index volatility |
-| $k_e$ | `market_vol_cycle_expansion` | 0 (derived) | | read only with $R$ set |
-| $h$ | `market_vol_cycle_half_life` | 0 | | sessions; read only with $R$ set |
-| $d_{+}$ | `market_vol_cycle_relative` | 0 | | a power in [0, 1], read at $\ell \ge 0$; read only with $R$ set |
-| $d_{-}$ | `market_vol_cycle_relative_calm` | 0 | | a power in [0, 1], read at $\ell < 0$; read only with $R$ set |
-| $p$ | `market_vol_cycle_cap_relative` | 0 | | a power in [0, 1], read at $\ell > 0$; read only with $R$ set |
-| | `market_vol_cycle_pin_neutral` | 0 | switch | 0 or 1; read only with $R$ set |
-| | `market_vol_cycle_pin_phase` | 0 | switch | 0 or 1; read only with $R$ set |
-| $g$ | `market_vol_cycle_trough_release` | 0 | | a share in [0, 1]; read only with $R$ set |
-| $h_{r}$ | `market_vol_cycle_release_half_life` | 0 | | sessions, 0 is $h$; read only with $R$ set |
-| $g_{m}$ | `market_vol_cycle_recovery_release` | 0 | | a share in [0, 1]; read only with $R$ set |
-| $x_{m}$ | `market_vol_cycle_recovery_scale` | 0 | | log points of the index in (0, 2]; read only with $g_{m}$ set |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $R$ | `market_vol_cycle_ratio` | 0 (off) | 2.471 | | bear-dynamics design; recession over expansion index volatility |
+| $k_e$ | `market_vol_cycle_expansion` | 0 (derived) | 0.82 | | read only with $R$ set |
+| $h$ | `market_vol_cycle_half_life` | 0 | 10 | | sessions; read only with $R$ set |
+| $d_{+}$ | `market_vol_cycle_relative` | 0 | 0.75 | | a power in [0, 1], read at $\ell \ge 0$; read only with $R$ set |
+| $d_{-}$ | `market_vol_cycle_relative_calm` | 0 | same | | a power in [0, 1], read at $\ell < 0$; read only with $R$ set |
+| $p$ | `market_vol_cycle_cap_relative` | 0 | 1 | | a power in [0, 1], read at $\ell > 0$; read only with $R$ set |
+| | `market_vol_cycle_pin_neutral` | 0 | 1 | switch | 0 or 1; read only with $R$ set |
+| | `market_vol_cycle_pin_phase` | 0 | 1 | switch | 0 or 1; read only with $R$ set |
+| $g$ | `market_vol_cycle_trough_release` | 0 | same | | a share in [0, 1]; read only with $R$ set |
+| $h_{r}$ | `market_vol_cycle_release_half_life` | 0 | same | | sessions, 0 is $h$; read only with $R$ set |
+| $g_{m}$ | `market_vol_cycle_recovery_release` | 0 | 0.45 | | a share in [0, 1]; read only with $R$ set |
+| $x_{m}$ | `market_vol_cycle_recovery_scale` | 0 | 0.1 | | log points of the index in (0, 2]; read only with $g_{m}$ set |
 
 `fair_value_market_vol_cap`'s ceiling is in multiples of the unscaled
 `market_factor_sigma`, so a contraction's higher baseline counts as fear
@@ -2747,15 +2748,15 @@ $\omega / (1 - 0.9416) = 3.4 \times 10^{-5}$, sits below the floor
 $0.25 \sigma_k^{2}$ in 8 of the 12 sectors, so in those sectors the floor,
 not $\omega$, holds the resting level.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\omega$ | `garch_omega` | 0.000002 | chosen | reference implementation |
-| $\alpha$ | `garch_alpha` | 0.05951 | fitted | search |
-| $\beta$ | `garch_beta` | 0.7905 | derived | $0.9416 - \alpha - \gamma/2$, where 0.9416 is the decay of the absolute-return autocorrelation on the reference roster |
-| $\gamma$ | `garch_gamma` | 0.1832 | chosen | the value the same identity gives, 0.65, is not stationary |
-| $c_g$ | `garch_vix_coupling` | 0.1422 | fitted | search |
-| | `garch_vix_exponent` | 2.0 | chosen | |
-| $f_g$, $C_g$ | `garch_floor_multiple`, `garch_ceiling_multiple` | 0.25, 5.0 | guard | the floor binds; see above |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\omega$ | `garch_omega` | 0.000002 | same | chosen | reference implementation |
+| $\alpha$ | `garch_alpha` | 0.05951 | same | fitted | search |
+| $\beta$ | `garch_beta` | 0.7905 | same | derived | $0.9416 - \alpha - \gamma/2$, where 0.9416 is the decay of the absolute-return autocorrelation on the reference roster |
+| $\gamma$ | `garch_gamma` | 0.1832 | same | chosen | the value the same identity gives, 0.65, is not stationary |
+| $c_g$ | `garch_vix_coupling` | 0.1422 | same | fitted | search |
+| | `garch_vix_exponent` | 2.0 | same | chosen | |
+| $f_g$, $C_g$ | `garch_floor_multiple`, `garch_ceiling_multiple` | 0.25, 5.0 | same | guard | the floor binds; see above |
 
 ### Sector variance
 
@@ -2769,10 +2770,10 @@ h^{S}_{k,d+1} = \mathrm{clip}\Big((1 - a_s - b_s) + a_s\,\frac{D_{k,d}^{2}}{(\ba
 
 Its persistence is 0.904, a half-life of 7 sessions.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $a_s$ | `sector_vol_alpha` | 0.067 | measured | GARCH(1,1) QML on seven sectors' residuals after the market, reference roster 2015 to 2025, scaled by the VIX; s.e. 0.043 |
-| $b_s$ | `sector_vol_beta` | 0.837 | measured | same fit; s.e. 0.111 |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $a_s$ | `sector_vol_alpha` | 0.067 | same | measured | GARCH(1,1) QML on seven sectors' residuals after the market, reference roster 2015 to 2025, scaled by the VIX; s.e. 0.043 |
+| $b_s$ | `sector_vol_beta` | 0.837 | same | measured | same fit; s.e. 0.111 |
 
 ## The VIX
 
@@ -2881,26 +2882,26 @@ J_d = J_s\,\sigma^{X}_d\,E\cdot\mathbf{1}\Big[U < \frac{\lambda_J \max(0,\ -r_d)
 The VIX reverts with a half-life of about 2.2 sessions. On a day the index
 does not move, it takes no noise and no jump.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $\varpi$ | `vix_variance_premium` | 0.252 | measured | median yearly VIX over realised volatility, S&P 500 and VIX 1990 to 2025; interquartile range ±0.13 |
-| | `vix_level_identity` | 1.0 | measured | switches the target to the index's implied VIX; chosen on a 120-seed paired comparison |
-| $\kappa_X$ | `vix_mean_reversion` | 0.27 a day | chosen | needs a joint solve with the fear gain |
-| | `vix_decay_ratio` | 1.0 | measured | the same reversion up and down; 120-seed comparison |
-| $G_\downarrow$ | `vix_return_gain` | 8.83 | fitted | matches the data's same-day response at $\kappa_X$ = 0.27 |
-| $e_\downarrow$ | `vix_return_exponent` | 1.448 | measured | regression of the VIX change on the index move and the VIX level, 1990 to 2025; s.e. 0.12 |
-| $G_\uparrow$ | `vix_return_gain_up` | 0.049 | chosen | |
-| $e_\uparrow$ | `vix_return_exponent_up` | 0.5433 | measured | up-day fit; s.e. 0.04 |
-| $C$ | `vix_target_shock_cap` | 158.9 | derived | the largest value $\Phi$ can take; never binds |
-| $X_{\max}$ | `vix_ceiling` | 181.3 | guard | a lower bound carried from an earlier solve |
-| $c_r$ | `vix_innovation_return_sigma` | 0.0175 | measured | residual fit on the VIX, 1990 to 2025; s.e. 0.0015 |
-| $J_s$ | `vix_jump_level_scale` | 1.7 | measured | cumulant fit of the residual; s.e. 0.35 |
-| $\lambda_J$ | `vix_jump_return_intensity` | 6.199 | derived | 2.24 fear jumps a year, spread over down days |
-| $a_0$ | `vix_anchor_weight` | 0.375 | derived | from the data's level elasticity, 0.655 |
-| $h_M$ | `vix_anchor_memory` | 0.0556 | fitted | fitted to the VIX persistence statistic |
-| $c_A$ | `vix_anchor_centre` | 0.1515 | derived | $\ln(1.252/1.076)$ |
-| $\phi_q$, $\sigma_\ell$, $G_\ell$ | `vix_level_persistence`, `vix_level_sigma`, `vix_level_loop_gain` | 0.9979, 0.0181, 1.79 | derived | yearly medians of the log VIX, 1990 to 2024 |
-| | `vix_return_clamp` | 15 | guard | |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\varpi$ | `vix_variance_premium` | 0.252 | same | measured | median yearly VIX over realised volatility, S&P 500 and VIX 1990 to 2025; interquartile range ±0.13 |
+| | `vix_level_identity` | 1.0 | same | measured | switches the target to the index's implied VIX; chosen on a 120-seed paired comparison |
+| $\kappa_X$ | `vix_mean_reversion` | 0.27 a day | same | chosen | needs a joint solve with the fear gain |
+| | `vix_decay_ratio` | 1.0 | same | measured | the same reversion up and down; 120-seed comparison |
+| $G_\downarrow$ | `vix_return_gain` | 8.83 | same | fitted | matches the data's same-day response at $\kappa_X$ = 0.27 |
+| $e_\downarrow$ | `vix_return_exponent` | 1.448 | same | measured | regression of the VIX change on the index move and the VIX level, 1990 to 2025; s.e. 0.12 |
+| $G_\uparrow$ | `vix_return_gain_up` | 0.049 | same | chosen | |
+| $e_\uparrow$ | `vix_return_exponent_up` | 0.5433 | same | measured | up-day fit; s.e. 0.04 |
+| $C$ | `vix_target_shock_cap` | 158.9 | same | derived | the largest value $\Phi$ can take; never binds |
+| $X_{\max}$ | `vix_ceiling` | 181.3 | same | guard | a lower bound carried from an earlier solve |
+| $c_r$ | `vix_innovation_return_sigma` | 0.0175 | same | measured | residual fit on the VIX, 1990 to 2025; s.e. 0.0015 |
+| $J_s$ | `vix_jump_level_scale` | 1.7 | same | measured | cumulant fit of the residual; s.e. 0.35 |
+| $\lambda_J$ | `vix_jump_return_intensity` | 6.199 | same | derived | 2.24 fear jumps a year, spread over down days |
+| $a_0$ | `vix_anchor_weight` | 0.375 | same | derived | from the data's level elasticity, 0.655 |
+| $h_M$ | `vix_anchor_memory` | 0.0556 | same | fitted | fitted to the VIX persistence statistic |
+| $c_A$ | `vix_anchor_centre` | 0.1515 | same | derived | $\ln(1.252/1.076)$ |
+| $\phi_q$, $\sigma_\ell$, $G_\ell$ | `vix_level_persistence`, `vix_level_sigma`, `vix_level_loop_gain` | 0.9979, 0.0181, 1.79 | same | derived | yearly medians of the log VIX, 1990 to 2024 |
+| | `vix_return_clamp` | 15 | same | guard | |
 
 ### The published quote
 
@@ -2934,11 +2935,11 @@ every other macro series is the one the premium-off run gives, and
 are the state. A pin writes the state and resets $m_d$, so the quote reads
 the pin back.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $g$ | `vix_stress_premium` | 0 (off) | fitted | vix-peaks design, held-out seeds 201-230, 501-530, 801-830; not adopted |
-| $k$ | `vix_stress_premium_knee` | 0 | fitted | on $M_d$'s log scale |
-| $P$ | `vix_stress_premium_cap` | 0 | chosen | the largest log premium; the quote is at most $e^{P}$ times the state |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $g$ | `vix_stress_premium` | 0 (off) | 3 | fitted | vix-peaks design, held-out seeds 201-230, 501-530, 801-830; not adopted |
+| $k$ | `vix_stress_premium_knee` | 0 | 0.6 | fitted | on $M_d$'s log scale |
+| $P$ | `vix_stress_premium_cap` | 0 | 0.35 | chosen | the largest log premium; the quote is at most $e^{P}$ times the state |
 
 ## Crisis regimes
 
@@ -2991,15 +2992,15 @@ changed. In Rust it is `engine.crisis_vix_threshold()` (or
 host with crisis gates of its own should read it from the engine, because
 it is 30.88325108 from pt-v13 on and 25.5 before.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $X_c$ | `crisis_vix_threshold` | 30.88 | fitted | search |
-| $e$ | `crisis_epicentre_extra` | 1.93 | derived | median of the epicentre's volatility ratio in three crises on the reference roster: 2.43 (2008-09), 1.93 (2011), 1.41 (2020) |
-| | epicentre weights | 0.6, 0.4 | derived | see [The sectors](#the-sectors) |
-| | `crisis_epicentre_end_sessions` | 21 | chosen | a month of sessions |
-| | `crisis_blend_gain` | 0 | derived | the data show no crisis correlation beyond common volatility |
-| | `crisis_blend_cap`, `crisis_blend_ramp` | 0.98, 1.4 | chosen | now shape only the news spike |
-| $c_p$ | `news_peer_vix_coupling` | 8.0 | fitted | |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $X_c$ | `crisis_vix_threshold` | 30.88 | same | fitted | search |
+| $e$ | `crisis_epicentre_extra` | 1.93 | same | derived | median of the epicentre's volatility ratio in three crises on the reference roster: 2.43 (2008-09), 1.93 (2011), 1.41 (2020) |
+| | epicentre weights | 0.6, 0.4 | | derived | see [The sectors](#the-sectors) |
+| | `crisis_epicentre_end_sessions` | 21 | same | chosen | a month of sessions |
+| | `crisis_blend_gain` | 0 | same | derived | the data show no crisis correlation beyond common volatility |
+| | `crisis_blend_cap`, `crisis_blend_ramp` | 0.98, 1.4 | same | chosen | now shape only the news spike |
+| $c_p$ | `news_peer_vix_coupling` | 8.0 | same | fitted | |
 
 ## The market maker and the book
 
@@ -3415,27 +3416,27 @@ registered and proposed row reads as at $k = 0$, bar C4b (-0.1 points
 against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 +0.03). At $k = 0.5$ the day TWAP costs 0.75 and 0.70 of a block.
 
-| Symbol | Dial | Value (pt-v19) | Kind | Source |
-|---|---|---|---|---|
-| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
-| $\delta$ | `book_depth_exponent` | 0.5 | derived | the square-root law (Tóth et al. 2011) |
-| $R$ | `book_depth_reach` | 1.0 | derived | the latent book reaches one day's volume |
-| $k$ | `book_depth_nesting` | 0 (beside) | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
-| | `book_shared` | 1 (0) | derived | a switch: agents consume one book |
-| $H_B$ | `book_refill_half_life` | 27 ticks (0) | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
-| | `book_resting` | 1 (0) | derived | a switch: limit orders rest with queue priority |
-| | `book_arrival_shuffle` | 0 | out of scope | a switch: a cohort's arrival order at the book is a seeded shuffle, fresh every step; 0 is label order |
-| $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
-| $Y_M$ | `impact_memory_coefficient` | 0 (off) | for a new registration | the square-root law on the tape for agents' metaorders; at most $Y$; Tóth et al. (2011), Zarinelli et al. (2015), Bucci et al. (2019) |
-| $H_1$ | `impact_memory_half_life` | 0 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
-| $H_2$ | `impact_memory_slow_half_life` | 0 (none) | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
-| $w$ | `impact_memory_slow_weight` | 0 | for a new registration | the slow part's weight; refused without $H_2$ |
-| | `impact_memory_refill` | 0 (off) | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
-| | `book_cross_at_limit` | 0 (off) | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
-| $m^*$ | `impact_memory_crossover` | 0 (pure power) | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
-| $c_{OF}$ | `order_flow_coefficient` | 50 | chosen | reference implementation |
-| | `order_flow_depth_law` | 0 | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
-| $f_I$ | `informed_flow_fraction` | 0.35 | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | same | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
+| $\delta$ | `book_depth_exponent` | 0.5 | same | derived | the square-root law (Tóth et al. 2011) |
+| $R$ | `book_depth_reach` | 1.0 | same | derived | the latent book reaches one day's volume |
+| $k$ | `book_depth_nesting` | 0 (beside) | 1 | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
+| | `book_shared` | 1 (0) | same | derived | a switch: agents consume one book |
+| $H_B$ | `book_refill_half_life` | 27 ticks (0) | same | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
+| | `book_resting` | 1 (0) | same | derived | a switch: limit orders rest with queue priority |
+| | `book_arrival_shuffle` | 0 | 1 | out of scope | a switch: a cohort's arrival order at the book is a seeded shuffle, fresh every step; 0 is label order |
+| $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | 0.15 | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
+| $Y_M$ | `impact_memory_coefficient` | 0 (off) | 0.65 | for a new registration | the square-root law on the tape for agents' metaorders; at most $Y$; Tóth et al. (2011), Zarinelli et al. (2015), Bucci et al. (2019) |
+| $H_1$ | `impact_memory_half_life` | 0 | 12 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
+| $H_2$ | `impact_memory_slow_half_life` | 0 (none) | 780 | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
+| $w$ | `impact_memory_slow_weight` | 0 | 0.1 | for a new registration | the slow part's weight; refused without $H_2$ |
+| | `impact_memory_refill` | 0 (off) | 1 | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
+| | `book_cross_at_limit` | 0 (off) | 1 | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
+| $m^*$ | `impact_memory_crossover` | 0 (pure power) | 0.001 | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
+| $c_{OF}$ | `order_flow_coefficient` | 50 | 800 | chosen | reference implementation |
+| | `order_flow_depth_law` | 0 | 1 | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
+| $f_I$ | `informed_flow_fraction` | 0.35 | same | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 
 ### Cash and borrowing
 
@@ -3573,16 +3574,16 @@ stepped at each close (`engine.rs:4805-4817`):
 Average daily volume $\bar A_i$ is fixed for the run. Tick volume also sets
 the size of the settlement slices, so a volume dial is also a price dial.
 
-| Symbol | Dial | Value | Kind | Source |
-|---|---|---|---|---|
-| $g_V$ | `volume_variance_gain` | 0.02840 | fitted | search |
-| $\rho_V$ | `volume_persistence` | 0.7 | fitted | a 30-seed sweep against `volume_change_acf1` and `volume_abs_return_corr` |
-| $\sigma_V$ | `volume_innovation_sigma` | 0.21 | fitted | same sweep |
-| $g_h$ | `volume_idio_variance_gain` | 0.2 | measured | 120-seed paired measurement on `volume_change_acf1`; flat from 0.2 to 0.3 |
-| $f_0$ | `volume_move_floor` | 0.6 | chosen | reference implementation |
-| $r_V$ | `volume_move_response` | 0.6 (1.0) | chosen | pt-v1's value. With less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2); pt-v20 takes pt-v1's 0.6, where the graded arm read 0.508 at one year and 0.561 at two on the bars before 0.8.5's fix, and reads 0.596 and 0.627 on the fixed bars (`presets/pt-v20.json`) |
-| $c_V$ | `volume_move_cap` | 12 | fitted | a sweep found 8, 12 and 20 alike |
-| $n_V$ | `volume_move_noise` | 0.2 | chosen | reference implementation |
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $g_V$ | `volume_variance_gain` | 0.02840 | same | fitted | search |
+| $\rho_V$ | `volume_persistence` | 0.7 | same | fitted | a 30-seed sweep against `volume_change_acf1` and `volume_abs_return_corr` |
+| $\sigma_V$ | `volume_innovation_sigma` | 0.21 | same | fitted | same sweep |
+| $g_h$ | `volume_idio_variance_gain` | 0.2 | 0.65 | measured | 120-seed paired measurement on `volume_change_acf1`; flat from 0.2 to 0.3 |
+| $f_0$ | `volume_move_floor` | 0.6 | same | chosen | reference implementation |
+| $r_V$ | `volume_move_response` | 0.6 (1.0) | same | chosen | pt-v1's value. With less transient market noise, volume tracked a company's own move too tightly: the two-year panel's `volume_abs_return_corr` read 0.639 against a ceiling of 0.63 at 1.0 and 0.618 at 0.8 (box ptv20g2); pt-v20 takes pt-v1's 0.6, where the graded arm read 0.508 at one year and 0.561 at two on the bars before 0.8.5's fix, and reads 0.596 and 0.627 on the fixed bars (`presets/pt-v20.json`) |
+| $c_V$ | `volume_move_cap` | 12 | same | fitted | a sweep found 8, 12 and 20 alike |
+| $n_V$ | `volume_move_noise` | 0.2 | same | chosen | reference implementation |
 
 The volume rows these dials were fitted or chosen against,
 `volume_abs_return_corr` and `volume_change_acf1`, are read off day bars.
