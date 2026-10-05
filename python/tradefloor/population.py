@@ -408,8 +408,8 @@ class Population:
         that stops the first out can carry the others after it.
 
         Its other participants are the standard population's, with two
-        changes. The trend follower and the mean reverter decide as often as
-        their signals move (every 130 and every 65 ticks). And in place of
+        changes. The trend follower decides as often as its five-day signal
+        moves (every 130 ticks). And in place of
         one flow detector it holds ``detectors`` of them, identical (with
         five-tick buckets) and deciding on different ticks, competing to
         trade ahead of the same flow: high-frequency trading is several
@@ -433,10 +433,10 @@ class Population:
                     signal="momentum", name=f"momentum_crowd{j + 1}", size=size,
                     rate=2 * size, interval=390, offset=389 - 5 * (j % 3),
                     lookback=1950, stop=stop * at, recover=recover))
-        # The standard population's trend follower and mean reverter, deciding
-        # as often as their signals move: a five-day trend every 130 ticks, a
-        # one-session reversion every 65. Its liquidity provider as it is.
-        base = [Participant.trend(interval=130), Participant.reversion(interval=65),
+        # The standard population's trend follower deciding as often as a
+        # five-day signal moves, every 130 ticks; its mean reverter and
+        # liquidity provider as they are.
+        base = [Participant.trend(interval=130), Participant.reversion(),
                 Participant.liquidity()]
         hfts = [Participant.detector(name=f"detector{j + 1}", bucket=5)
                 for j in range(detectors)]
