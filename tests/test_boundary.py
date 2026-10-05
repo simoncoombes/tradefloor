@@ -757,6 +757,11 @@ def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
     shown = {name for name in targets
              if macro_field_of(tf.TARGETS[name]) in OBSERVABLE_MACRO}
     shown.add("market.liquidity")
+    # On pt-v21, the default from 0.10.0, the open prints each name through
+    # its fair value (the night split, `overnight_market_share`), so an
+    # earnings write before the open reaches the first price the agent is
+    # shown. On pt-v20 the open was the last close and the write did not.
+    shown.add("market.earnings")
 
     atlas = map_boundaries(world, targets=targets,
                            scenarios=[None, "rate_shock"],
