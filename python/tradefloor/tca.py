@@ -139,6 +139,22 @@ def _f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 
+#: How far a fill may fall short of its request, as a share of the request,
+#: and still count as complete. The book matches in floating point, so an
+#: order for 9,375.987599922682 shares can fill 9,375.98759992268: short by
+#: 2e-12 shares, which the engine's own `partial` flag reports. One part in
+#: a billion is far below a share on any order the harness can send.
+PARTIAL_TOLERANCE = 1e-9
+
+
+def _short_of_request(fill: dict) -> bool:
+    """Whether a fill came up short of its request by more than rounding."""
+    requested, filled = fill.get("requested"), fill.get("quantity")
+    if requested is None or filled is None:
+        return bool(fill.get("partial"))
+    return abs(requested) - abs(filled) > PARTIAL_TOLERANCE * abs(requested)
+
+
 class Execution:
     """What one trader's activity cost, measured against not having traded."""
 
@@ -262,7 +278,7 @@ class Execution:
         is the one that did not occur, which is not a result anyone should
         quote.
         """
-        return [f for f in self.fills if f.get("partial")]
+        return [f for f in self.fills if _short_of_request(f)]
 
     # -- impact decomposition ---------------------------------------------
 
