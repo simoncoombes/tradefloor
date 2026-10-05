@@ -515,3 +515,67 @@ def test_a_manifest_from_before_the_python_field_still_loads():
     with pytest.raises(tradefloor.ValidationError) as raised:
         tradefloor.RunManifest.from_json(json.dumps(doc)).reproduce()
     assert "Python" not in str(raised.value)
+
+
+# -- the writer's version key (#237) ----------------------------------------
+
+import hashlib  # noqa: E402
+import pathlib  # noqa: E402
+
+FIXTURE_091 = (pathlib.Path(__file__).parent / "fixtures" / "manifests"
+               / "v0.9.1-pt-v20.json")
+
+
+def test_a_new_manifest_names_its_writer_as_tradefloor_version():
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
+    engine.run_days(1, record=False)
+    wrote = json.loads(tradefloor.RunManifest.of(
+        engine, seed=7, universe=UNIVERSE).to_json())["written_by"]
+    assert wrote["tradefloor_version"] == tradefloor.__version__
+    assert "pretium_version" not in wrote
+
+
+def test_a_manifest_written_by_0_9_1_still_loads_and_reproduces():
+    """Written by the published 0.9.1 wheel: six names, two days on pt-v20,
+    order flow on the second. It names its writer `pretium_version`."""
+    text = FIXTURE_091.read_text(encoding="utf-8")
+    assert "pretium_version" in json.loads(text)["written_by"]
+    manifest = tradefloor.RunManifest.from_json(text)
+    rebuilt = manifest.reproduce()
+    assert hashlib.sha256(rebuilt.prices()).hexdigest() == (
+        "a5e69d7fe2e65093afe643b1cbe35a382c7e2dcb81d9afadff892ec352a4f1af")
+    assert "written by tradefloor 0.9.1 on" in manifest.describe()
+
+
+def test_the_writer_key_is_in_no_fingerprint():
+    payload = json.loads(FIXTURE_091.read_text(encoding="utf-8"))
+    wrote = payload["written_by"]
+    wrote["tradefloor_version"] = wrote.pop("pretium_version")
+    renamed = tradefloor.RunManifest.from_json(json.dumps(payload))
+    original = tradefloor.RunManifest.from_json(
+        FIXTURE_091.read_text(encoding="utf-8"))
+    assert renamed.fingerprints == original.fingerprints
+    assert renamed.reproduce().prices() == original.reproduce().prices()
+
+
+def test_a_new_manifest_names_the_preset_its_era_probe_ran_under():
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
+    engine.run_days(1, record=False)
+    era = json.loads(tradefloor.RunManifest.of(
+        engine, seed=7, universe=UNIVERSE).to_json())["written_by"]["era"]
+    assert era["preset"] == tradefloor.model_preset()["name"]
+    assert era["digest"] == era_fingerprint() == era_fingerprint(era["preset"])
+
+
+def test_the_era_default_table_is_the_records_table():
+    import ast
+
+    from tradefloor import manifest as manifest_module
+
+    tree = ast.parse((pathlib.Path(__file__).parents[1] / "tools" / "presets"
+                      / "record.py").read_text(encoding="utf-8"))
+    table = next(ast.literal_eval(node.value) for node in tree.body
+                 if isinstance(node, ast.Assign)
+                 and getattr(node.targets[0], "id", None) == "DEFAULT_SINCE")
+    assert dict((preset, since) for since, preset
+                in manifest_module._DEFAULT_SINCE) == table

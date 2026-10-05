@@ -1313,7 +1313,7 @@ def test_the_record_tool_writes_a_regression_and_carries_it_rather_than_refusing
     lost = json.loads(json.dumps(on_disk["mechanism_252"]))
     lost["shown"] = [r for r in lost["shown"] if r != "leverage_effect"]
     lost["not_shown"] = sorted(lost["not_shown"] + ["leverage_effect"])
-    panel = {"pretium_version": "test", "method": "test",
+    panel = {"tradefloor_version": "test", "method": "test",
              "presets": {"pt-v18": {
                  "mechanism_252": lost,
                  "mechanism_heldout_seeds": on_disk["mechanism_heldout_seeds"]}}}

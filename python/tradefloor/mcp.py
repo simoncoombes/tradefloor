@@ -375,9 +375,9 @@ def _provenance(preset: str | None = None, population: Any = None,
     `model_fingerprint` is the run's preset's `ModelParams.fingerprint`,
     the value a scorecard and `Engine.model_fingerprint` record. Until 0.8.5
     it was read from `tf.model_preset()`, which carries no fingerprint, so
-    every result here sent an empty string. `pretium_version` is the old
-    name of `tradefloor_version`, kept for the 0.8 line so a reader of an
-    earlier result does not break, and due to go in 0.9.
+    every result here sent an empty string. Results from 0.9.1 and earlier
+    also carried `pretium_version`, the package's name before 0.5.0, with
+    the same value; 0.10.0 dropped it.
 
     `preset` is the run's preset after `_preset_choice`: None for the
     shipped default, whose provenance is the one every result carried
@@ -393,7 +393,6 @@ def _provenance(preset: str | None = None, population: Any = None,
     name = tf.model_preset()["name"] if preset is None else preset
     return {
         "tradefloor_version": tf.__version__,
-        "pretium_version": tf.__version__,
         "model_preset": name,
         "model_fingerprint": _preset_fingerprint(name),
         **({} if preset is None else {"certified_preset": envelope.PRESET}),

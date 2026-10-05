@@ -127,6 +127,7 @@ from ._core import (
     check_seed,
     fair_value,
     model_preset,
+    preset_names,
     sectors,
     step_mispricing_daily,
     version,
@@ -1330,8 +1331,50 @@ def _book(buf: bytearray, book: dict[str, Any]) -> None:
 
 
 
-def era_fingerprint() -> str:
+def _writer_version(written_by: dict[str, Any]) -> Any:
+    """The tradefloor version a manifest's `written_by` names.
+
+    0.10.0 and later write `tradefloor_version`; 0.9.1 and earlier wrote the
+    same value as `pretium_version`, and those manifests still load.
+    """
+    return written_by.get("tradefloor_version", written_by.get("pretium_version"))
+
+
+#: The default preset of each release line that changed it, for a manifest
+#: written before 0.10.0, whose era block does not name the preset its probe
+#: ran under. The same table as `tools/presets/record.py`'s DEFAULT_SINCE.
+_DEFAULT_SINCE = (
+    ("0.1.0", "pt-v3"), ("0.2.0", "pt-v10"), ("0.3.0", "pt-v12"),
+    ("0.4.0", "pt-v14"), ("0.6.0", "pt-v16"), ("0.7.0", "pt-v18"),
+    ("0.8.0", "pt-v19"), ("0.8.5", "pt-v20"), ("0.10.0", "pt-v21"),
+)
+
+
+def _era_preset(written_by: dict[str, Any]) -> str | None:
+    """The preset a manifest's era probe ran under: the one its era block
+    names, else its writer's default by version, else this build's."""
+    era = written_by.get("era") or {}
+    if era.get("preset"):
+        return era["preset"]
+    try:
+        wrote = tuple(int(x) for x in str(_writer_version(written_by)).split(".")[:3])
+    except ValueError:
+        return None
+    name = None
+    for since, preset in _DEFAULT_SINCE:
+        if wrote >= tuple(int(x) for x in since.split(".")):
+            name = preset
+    return name if name in preset_names() else None
+
+
+def era_fingerprint(preset: str | None = None) -> str:
     """Digest of a fixed probe simulation: the build's behavioural identity.
+
+    `preset` is the model the probe's coupled engine runs and whose values it
+    hashes: the build's default when None, as every manifest records it. A
+    manifest written under another default (0.9.1's pt-v20) is checked by
+    running the probe under that one, so a default that moved does not read
+    as an engine that did.
 
     Two builds that agree here produce the same numbers for the arithmetic
     the probe exercises: the generator, fair value across every sector and
@@ -1404,6 +1447,7 @@ def era_fingerprint() -> str:
         for i in range(8)
     ]
     engine = Engine(
+        **({} if preset is None else {"model": ModelParams.from_preset(preset)}),
         seed=20260821,
         universe=instruments,
         macro_state=Macro(
@@ -1423,9 +1467,9 @@ def era_fingerprint() -> str:
 
     # The preset values themselves, sorted by key, so a coefficient edit that
     # somehow escaped the run above still moves the digest.
-    preset = model_preset()
-    for key in sorted(k for k in preset if k != "name"):
-        _f64(buf, float(preset[key]))
+    values = model_preset(preset)
+    for key in sorted(k for k in values if k != "name"):
+        _f64(buf, float(values[key]))
 
     return hashlib.sha256(bytes(buf)).hexdigest()
 
@@ -1959,7 +2003,10 @@ class RunManifest:
             "schema": MANIFEST_SCHEMA,
             "label": label,
             "written_by": {
-                "pretium_version": version(),
+                # `pretium_version` until 0.9.1, the package's name before
+                # 0.5.0; `_writer_version` reads either. `written_by` is in
+                # no fingerprint, so the rename moves none.
+                "tradefloor_version": version(),
                 # The Python version as well, since 0.8.5. The engine does
                 # not depend on it, so a replay of this log does not either;
                 # an agent re-run to regenerate the log does, because the
@@ -1974,7 +2021,9 @@ class RunManifest:
                 # preset travel: a fingerprint identifies, it cannot
                 # reconstruct.
                 "model": dict(engine.model_params),
-                "era": {"probe": ERA_PROBE, "digest": era_fingerprint()},
+                # `preset` since 0.10.0: the default the probe ran under.
+                "era": {"probe": ERA_PROBE, "digest": era_fingerprint(),
+                        "preset": model_preset()["name"]},
             },
             "seed": seed,
             "universe": universe_payload,
@@ -2466,14 +2515,14 @@ class RunManifest:
                 "cannot be compared. Upgrade tradefloor rather than concluding "
                 "anything from two different measurements."
             )
-        mine = era_fingerprint()
+        mine = era_fingerprint(_era_preset(wrote))
         if mine != era.get("digest"):
             platform_info = wrote.get("platform", {})
             raise ValidationError(
                 "this build does not reproduce the manifest's era: the "
                 f"fixed probe simulation digests {mine[:12]}... against the "
                 f"recorded {str(era.get('digest'))[:12]}.... Written under "
-                f"tradefloor {wrote.get('pretium_version')} on "
+                f"tradefloor {_writer_version(wrote)} on "
                 f"{platform_info.get('os')}-{platform_info.get('machine')}; "
                 f"this is tradefloor {version()} on {_platform.system()}-"
                 f"{_platform.machine()}. An engine, calibration or platform "
@@ -2683,7 +2732,7 @@ class RunManifest:
             f"{len(doc['universe']['instruments'])} instruments, "
             f"{doc['result']['days']} days, "
             f"{len(doc['order_log'])} log entries",
-            f"  written by tradefloor {wrote['pretium_version']} on "
+            f"  written by tradefloor {_writer_version(wrote)} on "
             f"{wrote['platform']['os']}-{wrote['platform']['machine']}"
             f"{f' under Python {python}' if python else ''}, "
             f"model {wrote['model'].get('name')!r}, "

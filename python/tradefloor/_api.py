@@ -15,12 +15,11 @@ ADVANCED
     constants, ``version()``, and the submodules the import system binds on
     the package. Supported, with no tutorial of its own.
 DEPRECATED
-    Engine internals that were exported by accident. Each still resolves at
-    the top level, through ``tradefloor.__getattr__``, and warns with a
-    ``DeprecationWarning`` that names its home module. They stay in
-    ``__all__`` until they leave, so ``from tradefloor import *`` still binds
-    them, without a warning; reading one through the package warns. They
-    leave the top level no earlier than ``REMOVAL``.
+    Names on their way out. Each still resolves at the top level, through
+    ``tradefloor.__getattr__``, and warns with a ``DeprecationWarning`` that
+    names its home module, until it leaves no earlier than ``REMOVAL``.
+    Empty since 0.10.0, which removed the ten engine internals that 0.9.0
+    deprecated (``REMOVED``).
 INTERNAL
     Reachable, but not API: the standard-library names ``__init__`` imports,
     and submodules that exist to serve the rest of the package. A submodule
@@ -30,10 +29,8 @@ INTERNAL
 from __future__ import annotations
 
 #: The first release that may drop a ``DEPRECATED`` name from the top level.
-#: The warnings cannot ship in an 0.8 patch, because the LTS line adds no
-#: features, so they arrive with 0.9.0 at the earliest
-#: and the names stay through that whole minor line.
-REMOVAL = "0.10.0"
+#: None while nothing is deprecated.
+REMOVAL: str | None = None
 
 STABLE: tuple[str, ...] = (
     # markets
@@ -90,7 +87,12 @@ ADVANCED: tuple[str, ...] = (
 )
 
 #: Each deprecated name and the module to import it from.
-DEPRECATED: dict[str, str] = {
+DEPRECATED: dict[str, str] = {}
+
+#: The engine internals 0.9.0 deprecated and 0.10.0 removed from the top
+#: level, each with the module that still has it. Reading one through the
+#: package raises an AttributeError that names that module.
+REMOVED: dict[str, str] = {
     "MispricingState": "tradefloor._core",
     "apply_mispricing": "tradefloor._core",
     "characteristic_root_moduli": "tradefloor._core",
@@ -126,3 +128,10 @@ def deprecation_message(name: str) -> str:
     return (f"tradefloor.{name} is an engine internal and leaves the top "
             f"level no earlier than tradefloor {REMOVAL}. Import it from "
             f"{DEPRECATED[name]} instead.")
+
+
+def removal_message(name: str) -> str:
+    """What reading a ``REMOVED`` name through the package says."""
+    return (f"tradefloor.{name} was an engine internal and left the top "
+            f"level in tradefloor 0.10.0. Import it from {REMOVED[name]} "
+            f"instead.")

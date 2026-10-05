@@ -24,9 +24,10 @@ MOMENTUM = {"signal": {"kind": "momentum", "lookback_days": 1.0},
             "portfolio": {"top_k": 3}}
 
 #: The provenance keys an isolated evaluate_strategies result carried
-#: before the run tools took a population.
+#: before the run tools took a population, less `pretium_version`, which
+#: 0.10.0 dropped (#237).
 ISOLATED_PROVENANCE = {
-    "tradefloor_version", "pretium_version", "model_preset",
+    "tradefloor_version", "model_preset",
     "model_fingerprint", "spec_version", "seed", "universe",
     "universe_fingerprint", "days", "steps_per_day",
 }

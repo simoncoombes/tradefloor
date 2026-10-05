@@ -59,6 +59,12 @@ PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20"}
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
 
 
+def _panel_version(panel: dict) -> str:
+    """The version a preset_panel.py artefact names: `tradefloor_version` from
+    0.10.0, `pretium_version` in the artefacts written before it."""
+    return panel.get("tradefloor_version", panel.get("pretium_version"))
+
+
 def public_paths(block: dict) -> dict:
     """A copy of a `long_run` block whose grade paths point into `validation/`.
 
@@ -169,7 +175,7 @@ def structure_measured(panel: dict) -> dict:
     opposite of what the check is for.
     """
     return {
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         # The PANEL's commit first, for `build`'s reason: `git rev-parse
         # HEAD` here names the checkout writing the file, which is the
         # measuring one only when the record is written on the box.
@@ -259,7 +265,7 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         # The panel names the version and the box it ran on. A figure without
         # the build that produced it cannot be re-derived, which is the whole
         # reason `RunManifest` exists for runs.
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         # The panel's own commit first. `git rev-parse HEAD` here names the
         # checkout writing the file, which is the measuring one only when the
         # record is written on the box that measured it.
@@ -1021,7 +1027,7 @@ def write_mechanism_gate(panel_path: str) -> int:
     """
     panel = json.loads(pathlib.Path(panel_path).read_text(encoding="utf-8"))
     measured = {
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         "commit": git("rev-parse", "HEAD") or None,
         "method": panel["method"],
     }

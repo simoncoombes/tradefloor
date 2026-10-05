@@ -14,7 +14,7 @@ ships its own transcendental maths rather than calling the platform's libm.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING as _TYPE_CHECKING, Any, Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 from . import _core
 from .portfolio import Cancel, Limit, Portfolio, Position
@@ -98,34 +98,24 @@ from ._core import (  # noqa: F401
     version,
 )
 from ._api import DEPRECATED as _DEPRECATED
-
-if _TYPE_CHECKING:
-    # The deprecated names below still resolve at run time, through
-    # __getattr__, so a type checker is told where they come from.
-    from ._core import (  # noqa: F401
-        MispricingState as MispricingState,
-        apply_mispricing as apply_mispricing,
-        characteristic_root_moduli as characteristic_root_moduli,
-        check_rate as check_rate,
-        crisis_epicentre_solve as crisis_epicentre_solve,
-        crowd_adjusted_root_moduli as crowd_adjusted_root_moduli,
-        impulse_response as impulse_response,
-        sector_daily_sigma as sector_daily_sigma,
-        stationary_sigma as stationary_sigma,
-        step_mispricing_daily as step_mispricing_daily,
-    )
+from ._api import REMOVED as _REMOVED
 
 
 def __getattr__(name: str) -> Any:
     """Serve an engine internal that used to be exported here, with a warning.
 
-    The names are listed in ``tradefloor._api.DEPRECATED``. ``from tradefloor
+    The names are listed in ``tradefloor._api.DEPRECATED``, empty since
+    0.10.0; a name 0.10.0 removed (``_api.REMOVED``) raises an
+    AttributeError that says where it lives now. ``from tradefloor
     import X`` reads the attribute twice, once from inside importlib to see
     whether X is a submodule and once for the import itself, so the first
     read is answered without a warning and the caller sees one.
     """
     home = _DEPRECATED.get(name)
     if home is None:
+        if name in _REMOVED:
+            from ._api import removal_message
+            raise AttributeError(removal_message(name))
         raise AttributeError(f"module 'tradefloor' has no attribute {name!r}")
     import importlib
     import sys
@@ -199,13 +189,6 @@ __all__ = [
     "bonds", "rate_specs", "RATE_TICKERS", "RATE_SECTOR",
     "sectors", "version",
     "__version__",
-    # Deprecated engine internals (`_api.DEPRECATED`). Kept here so
-    # `from tradefloor import *` binds them as it always has; `__getattr__`
-    # serves them, silently to a star import and with a warning otherwise.
-    "MispricingState", "apply_mispricing", "characteristic_root_moduli",
-    "check_rate", "crisis_epicentre_solve", "crowd_adjusted_root_moduli",
-    "impulse_response", "sector_daily_sigma", "stationary_sigma",
-    "step_mispricing_daily",
 ]
 
 # The fields an Instrument round-trips through JSON. Declared once, in one

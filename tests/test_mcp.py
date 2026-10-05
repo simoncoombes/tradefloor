@@ -299,8 +299,8 @@ def test_every_successful_result_carries_its_provenance(call):
     prov = r["provenance"]
     assert prov["model_preset"] == pt.model_preset()["name"]
     assert prov["tradefloor_version"] == pt.__version__
-    # Kept for the 0.8 line, so an earlier reader does not break.
-    assert prov["pretium_version"] == pt.__version__
+    # The package's name before 0.5.0, carried beside it until 0.9.1 (#237).
+    assert "pretium_version" not in prov
     assert prov["model_fingerprint"], "an empty fingerprint cites nothing"
 
 
