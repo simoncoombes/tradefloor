@@ -78,17 +78,21 @@ markets, so `tf.rank` stays isolated. Scorecards, manifests, checkpoints
 and replays carry the population and its fingerprint; isolated results
 are byte-identical to before.
 
-What it was measured to do, with the crowded population on an earlier
-candidate for pt-v21 (`tf.population.MEASURED` names it):
+What it was measured to do on pt-v21, with the crowded population
+(`tf.population.MEASURED`):
 
-- An edge decays as other traders trade its signal, and a crowded exit
-  costs holders of the same signal on the day the crowd sells out, with
-  the loss coming back over the following week.
-- A predictable programme pays about 1.9% more than it does in isolated
+- An edge decays as other traders trade its signal. Over 30 seeds the
+  one-day reversal's frictionless return falls from 5.7% to 1.8% over 60
+  sessions, and each extra copy of a rule in the same market lowers every
+  copy's return.
+- When the momentum crowd hits its loss limit and sells out, holders of
+  the five-day momentum signal lose 0.06 of a daily standard deviation
+  that day, and the loss comes back over the following week.
+- A predictable programme pays about 2.4% more than it does in isolated
   mode. Real markets show far more: van Kervel and Menkveld (2019) report
   169%. Impact here is mostly transient, so there is less to trade ahead
   of. Treat front-running costs from populated mode as a floor.
-- A run takes about 1.4 times as long as an isolated one.
+- A run takes about 1.5 times as long as an isolated one.
 
 ### MCP server
 
