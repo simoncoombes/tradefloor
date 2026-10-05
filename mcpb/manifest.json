@@ -83,7 +83,7 @@
     },
     {
       "name": "explain_price_move",
-      "description": "Break one day's move for each name into the 11 factor contributions that sum to the day's change in the mispricing, the log gap between the model price and fair value."
+      "description": "Break one day's move for each name into the 12 factor contributions that sum to the day's change in the mispricing, the log gap between the model price and fair value."
     },
     {
       "name": "explain",

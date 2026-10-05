@@ -1683,7 +1683,7 @@ impl Engine {
             block.put("key", V::from_u64(c.key));
             block.put("published", V::Str(c.published.as_str().to_string()));
             block.put("last_true", V::Str(c.last_true.as_str().to_string()));
-            block.put("closes", V::Int(c.closes as i64));
+            block.put("closes", V::Int(c.closes));
             block.put("turns", V::from_u64(c.turns));
             block.put("pending_closes", V::List(c.pending.iter().map(|&(d, _)| V::Int(d)).collect()));
             block.put(
