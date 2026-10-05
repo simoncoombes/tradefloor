@@ -1,44 +1,43 @@
 """Run a plain Python function as if it were a framework agent.
 
-The reference implementation of the adapter contract in ``common.py``, and
-the smallest thing that exercises all of it: the observation allowlist, the
-two-stage validation, the cadence, the record, and the four methods both
-harnesses look for. The framework adapters -- FinRobot, and the ones under
-construction beside it -- are this shape with :meth:`ask` pointed at
-something that costs money.
+This is the reference implementation of the adapter contract in ``common.py``,
+and the smallest adapter that exercises all of it: the observation allowlist,
+the two-stage validation, the cadence, the record, and the four methods both
+harnesses look for. FinRobot and the other framework adapters have the same
+shape, with :meth:`ask` calling something that costs money.
 
-It is also useful in its own right, twice over. A decision RULE written as
-one function gets, for free, everything an adapter provides: participation
-clipping, dust dropping, the fork and state hooks that make it runnable in a
-counterfactual, and a record of every decision it made. And an experiment
-comparing a framework agent against a hand-written baseline wants both sides
-going through the SAME validation path, or the comparison is partly
-measuring two validators.
+It has two uses of its own. A decision rule written as one function gets
+everything an adapter provides: participation clipping, dust dropping, the
+fork and state hooks that make it runnable in a counterfactual, and a record
+of every decision it made. And an experiment comparing a framework agent
+against a hand-written baseline needs both sides to go through the same
+validation path, or the comparison partly measures the difference between two
+validators.
 
 ## The function receives the serialized payload, not the Observation
 
-``fn`` is called with the :func:`~tradefloor.integrations.common.serialize_observation`
-output -- a JSON-able dict -- and never with the Observation itself. The
-Observation carries ``.engine``: a read-only market view by default, the
-live engine, which knows the answer key, under ``trusted_agents=True``. A
-function handed the Observation could read ``obs.engine.macro_state`` today
-and, in a trusted run, ``obs.engine.attribution`` tomorrow, and nothing in
-the allowlist test would see it. Handed the payload, the
-function can only decide from what a framework would be shown, which is
-what makes it an honest baseline for one. A policy that genuinely needs the
-Observation is not an integration; it is a native agent, and it implements
-``act`` directly.
+``fn`` is called with the
+:func:`~tradefloor.integrations.common.serialize_observation` output, a
+JSON-able dict, and never with the Observation itself. The Observation carries
+``.engine``, which is a read-only market view by default and, under
+``trusted_agents=True``, the live engine, which knows the answer key. A
+function handed the Observation could read ``obs.engine.macro_state``, or
+``obs.engine.attribution`` in a trusted run, and nothing in the allowlist test
+would see it. Handed the payload, the function can only decide from what a
+framework would be shown, so it is a fair baseline for one. A policy that
+needs the Observation should be a native agent that implements ``act``
+directly.
 
 ## Record and replay, through the shared mixin
 
-The adapter takes :class:`~tradefloor.integrations.common.ReplayMixin`, so
-it is also the reference implementation of the replay skeleton: attach a
-``recorder`` and every exchange is written down; pass ``mode="replay"``
-with that transcript and the run reproduces without the function ever
-being called. For a deterministic rule that buys nothing, which is why
-``mode`` defaults to "live" here where a framework adapter defaults to
-"replay" -- but a callable wrapping something non-deterministic (a local
-model, say) gets record-once-replay-forever exactly as FinRobot does.
+The adapter uses :class:`~tradefloor.integrations.common.ReplayMixin`, so it
+is also the reference implementation of the replay skeleton. Attach a
+``recorder`` and every exchange is written down. Pass ``mode="replay"`` with
+that transcript and the run reproduces without calling the function. A
+deterministic rule gains nothing from this, which is why ``mode`` defaults to
+"live" here while a framework adapter defaults to "replay". A callable
+wrapping something non-deterministic, such as a local model, can be recorded
+once and replayed any number of times, as FinRobot is.
 
 A replay needs no function at all, so ``fn`` may be left out in replay
 mode:
@@ -48,15 +47,15 @@ agent = CallableAgentAdapter(mode="replay",
                              transcript=Transcript.load("run.json"))
 ```
 
-The key is the payload and nothing else, so a new system prompt inside
-``fn`` does not change it. Put the prompt's digest in the adapter's
+The replay key is computed from the payload alone, so a new system prompt
+inside ``fn`` does not change it. Put the prompt's digest in the adapter's
 ``AdapterInfo(instructions_digest=digest(PROMPT))`` when recording and when
-replaying, and a replay under a different prompt is refused at
-construction. Replaying a transcript that names a prompt digest with an
-adapter that names none (no ``AdapterInfo``, or one without
-``instructions_digest``) warns that this check is off. A recorder whose ``meta`` does not name its instructions yet
-is given the adapter's provenance on its first write, so the digest reaches
-the file without a manual ``meta.update``.
+replaying, and a replay under a different prompt is refused at construction.
+Replaying a transcript that names a prompt digest with an adapter that names
+none (no ``AdapterInfo``, or one without ``instructions_digest``) warns that
+this check is off. A recorder whose ``meta`` does not name its instructions
+yet is given the adapter's provenance on its first write, so the digest
+reaches the file without a manual ``meta.update``.
 
 ## Code that runs after the model answers
 
@@ -84,15 +83,15 @@ before it existed replay as they did.
 
 ## Async goes through the one shared bridge
 
-Tradefloor's run loop is synchronous -- ``World.run`` and ``evaluate`` call
-``act`` inline -- and an async ``fn`` is supported by handing its coroutine
-to :func:`~tradefloor.integrations.common.run_sync`, the one bridge every
-adapter uses. The bridge, not a local answer, because the failure it guards
-against only shows up in a notebook: a naive ``asyncio.run`` works in a
-script and dies inside Jupyter's already-running loop, and four adapters
-solving that four ways is four chances to get it subtly wrong. What the
-bridge does and does not buy is documented on ``run_sync`` itself; the short
-version is that the market still waits for every decision, one at a time.
+Tradefloor's run loop is synchronous (``World.run`` and ``evaluate`` call
+``act`` inline). An async ``fn`` is supported by handing its coroutine to
+:func:`~tradefloor.integrations.common.run_sync`, the bridge every adapter
+uses. The shared bridge matters because the failure it guards against only
+shows up in a notebook. A plain ``asyncio.run`` works in a script and fails
+inside Jupyter's already-running loop, and four adapters solving that four
+different ways would be four chances to get it wrong. ``run_sync`` documents
+what the bridge does and does not do. In short, the market still waits for
+every decision, one at a time.
 """
 
 from __future__ import annotations
@@ -107,7 +106,7 @@ from .common import (MAX_PARTICIPATION, AdapterInfo, FrameworkAdapter,
 
 
 class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
-    """A user function, in the shape :class:`World` and ``evaluate`` run.
+    """A user function run as an agent by :class:`World` and ``evaluate``.
 
     ```python
     def momentum(payload):
@@ -126,18 +125,18 @@ class CallableAgentAdapter(ReplayMixin, FrameworkAdapter):
     :func:`~tradefloor.integrations.common.parse_decision` accepts: a
     :class:`~tradefloor.integrations.common.Decision`, a dict with an
     ``actions`` list, or a JSON string. Invalid output raises
-    :class:`~tradefloor.integrations.common.DecisionError`, exactly as it
-    would from a framework -- this adapter repairs nothing, because its
-    other job is being the baseline a framework is compared against.
+    :class:`~tradefloor.integrations.common.DecisionError`, as it would from a
+    framework. This adapter repairs nothing, because it is also the baseline a
+    framework is compared against.
 
     ``fn`` may be None in replay mode, which never calls it. A live run
     needs it, and so does ``reask``.
 
-    ``postprocess``, when given, is called as ``postprocess(raw, payload)``
-    on whatever ``fn`` returned, in both modes, and ITS return is the
-    decision. ``fn``'s return is then the raw model response, and that is
-    what the transcript records and a replay hands back. See the module
-    docstring for when to use it. Either function may be async.
+    ``postprocess``, when given, is called as ``postprocess(raw, payload)`` on
+    whatever ``fn`` returned, in both modes, and its return is the decision.
+    ``fn``'s return is then the raw model response, and that is what the
+    transcript records and a replay hands back. See the module docstring for
+    when to use it. Either function may be async.
     """
 
     def __init__(self, fn: Callable[[dict[str, Any]], Any] | None = None, *,
@@ -240,8 +239,8 @@ def callable_agent(fn: Callable[[dict[str, Any]], Any] | None = None,
                    **kwargs: Any) -> CallableAgentAdapter:
     """A :class:`CallableAgentAdapter` around ``fn``.
 
-    The convenience spelling, for the common case where the function is the
-    whole configuration:
+    Shorthand for the common case where the function is the whole
+    configuration:
 
     ```python
     agent = callable_agent(momentum, every=6)

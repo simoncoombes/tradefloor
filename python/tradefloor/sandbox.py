@@ -216,7 +216,7 @@ def _refuse(what: str, name: str) -> SandboxError:
 
 
 class PublishedMacro:
-    """The macro state as published: ``Macro``'s fields less the withheld.
+    """The published macro state: ``Macro``'s fields minus the withheld ones.
 
     Read off the engine's own ``macro_state`` at the moment of the call, so
     every value is the float the engine holds and a serialiser that quotes it
@@ -330,7 +330,7 @@ class MarketView:
 
     def book(self, ticker: str):
         """A copy of the instrument's order book. Trading on it changes
-        nothing: orders go through the ``act`` mapping."""
+        nothing, because orders go through the ``act`` mapping."""
         return _WRAPPED[self].book(ticker)
 
     @property
@@ -386,11 +386,11 @@ class MarketView:
         return [dict(row) for row in _WRAPPED[self].rate_instruments]
 
     def news(self) -> list[dict[str, Any]]:
-        """Today's company and sector news: who, not how much.
+        """Today's company and sector news, without the size of each move.
 
         ``Engine.session_news`` carries ``price_impact``, the whole move the
         story adds by the close, which is the answer key. A headline tells a
-        trader that there is news on a name; this says that and no more.
+        trader that there is news on a name, and this says only that.
         """
         return [{"ticker": e.get("ticker"), "sector": e.get("sector"),
                  "day": e.get("day")}

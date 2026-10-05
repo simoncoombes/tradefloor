@@ -1,26 +1,25 @@
 """Reference agents, and a ceiling to measure the others against.
 
-A leaderboard of one agent is not a measurement. `evaluate` will happily
-report that your strategy made $47,000 and that number means nothing on its
-own: it does not say whether the market simply went up, whether random trading
-would have done as well, or whether $47,000 was most of what was available or
-a tenth of it.
+One agent's score says little on its own. `evaluate` can report that your
+strategy made $47,000, but not whether the market went up, whether random
+trading would have done as well, or whether $47,000 was most of what was
+available or a tenth of it.
 
 These are the reference points that make a score readable, from the bottom up:
 
-- **BuyAndHold**: did the strategy beat owning the market? The null
-  hypothesis, and the one most strategies quietly fail.
+- **BuyAndHold**: did the strategy beat owning the market? This is the null
+  hypothesis, and most strategies fail it.
 - **RandomTrader**: did it beat noise? A strategy that cannot beat coin flips
   is measuring its own transaction costs.
 - **Momentum** and **MeanReversion**: did it beat the two simplest things
   anyone would try first?
-- **Oracle**: how much was available *at all*?
+- **Oracle**: how much was available?
 
 ## On pt-v20 and pt-v21 the headline is buy-and-hold
 
 The Oracle answers that last question only where hidden state predicts
 returns, which is every preset through pt-v19. On pt-v20 market moves
-mostly stick: each shock moves fair value for good, so even perfect
+mostly stick. Each shock moves fair value for good, so even perfect
 knowledge of the model's fair value leaves little edge. The Oracle made
 money in 10 of 14 test markets there, and its P&L follows the
 market's month. pt-v21, the default from 0.10.0, keeps that. The Oracle
@@ -30,14 +29,14 @@ score is read against buy-and-hold with
 :func:`versus_buy_and_hold`. The rest of this docstring describes the
 Oracle where it is a ceiling.
 
-## The Oracle is a reference strategy, NOT an upper bound
+## The Oracle is a reference strategy, not an upper bound
 
-This needs saying first because the name invites the opposite reading, and I
-made that mistake in this file's own documentation for a week.
+The name suggests an upper bound, and this file's own documentation said so
+for a week.
 
-The Oracle sees the true mispricing. It does not follow that nothing can beat
-it: the same information spent on a different rule beats it, and until 0.8.5
-the reference agents did too. Counted on a fully stated grid, meaning the
+The Oracle sees the true mispricing, but other agents can still beat it. The
+same information spent on a different rule beats it, and until 0.8.5 the
+reference agents did too. Counted on a fully stated grid, meaning the
 reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
 11, ten days each, and a beat being a capture ratio above 1.0:
 
@@ -48,22 +47,21 @@ reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
         random            0/12       0/12
         largest capture   0.84       1.58
 
-The 0.8.1 column is the harness, not the signal. Every harness held an
+The 0.8.1 column is an artefact of the harness. Every harness held an
 agent's fills on every tick of the step, 65 times at six steps a day, so an
 agent was marked to its own impact, and mean reversion, which buys what it
 just pushed down and sells what it pushed up, collected the most. With the
 fills applied once, no agent that sees only prices beats the Oracle on this
 grid, and the largest capture is buy-and-hold's 0.84. The eras before 0.8.1
-named other winners -- momentum at `pt-v10`, mean reversion at `pt-v12` --
+named other winners (momentum at `pt-v10`, mean reversion at `pt-v12`)
 under the same harness, so read their verdicts the same way.
 
-The durable finding is about constraints, not about the winner's name.
-The default Oracle is long the five most underpriced names and short the
-five most overpriced (``top_k=5`` per side) at equal weight, gross 1.0,
-capped at 2% of ADV, the same budget the trend baselines get. Perfect
-information does not make that the best portfolio the same gross can buy:
-spent on three names a side instead of five it earns more on 6 of the 8
-markets below.
+The finding that has lasted is about constraints. The default Oracle is long
+the five most underpriced names and short the five most overpriced
+(``top_k=5`` per side) at equal weight, gross 1.0, capped at 2% of ADV, the
+same budget the trend baselines get. Even with perfect information that is not
+the best portfolio the same gross can buy. Spent on three names a side instead
+of five, it earns more on 6 of the 8 markets below.
 
 Two levers, measured on the same universe (median Oracle P&L across sim
 seeds 0-7, ten days; "beaten" counts the seeds where the best reference
@@ -73,15 +71,15 @@ agent out-earned that configuration; 0.8.1 in brackets):
     top_k=15, gross=1.0              median P&L  44,245 ( 51,318)   beaten 1/8 (8/8)
     top_k=15, gross=2.0              median P&L  90,789 (123,500)   beaten 0/8 (0/8)
 
-Spreading the same information across more names makes it WORSE, not better.
-What makes it nearly unbeatable is doubling the gross exposure: capital,
-not information. At equal constraints the Oracle is capital-limited like
-everything else.
+Spreading the same information across more names makes it worse. Doubling
+the gross exposure makes it nearly unbeatable, so that gain comes from
+capital. At equal constraints the Oracle is capital-limited like everything
+else.
 
-So read a capture ratio as **P&L relative to a perfectly-informed reference
-portfolio under the same constraints**, not as a fraction of available alpha.
-A ratio above 1.0 is a real result meaning the agent built a better portfolio
-than top-k-by-mispricing. Look at it rather than explain it away.
+So read a capture ratio as P&L relative to a perfectly-informed reference
+portfolio under the same constraints. It is not a fraction of available
+alpha. A ratio above 1.0 is a real result, meaning the agent built a better
+portfolio than top-k-by-mispricing, and should be investigated.
 
 ## The Oracle cheats on purpose
 
@@ -90,29 +88,26 @@ positions. The Oracle reads the mispricing directly out of the engine. It
 knows, exactly and without estimation error, which instruments are trading
 above and below fair value.
 
-That is not a strategy and it is not competing. It is an *instrument*: it
-measures how much alpha the market contains, which turns every other score
-from a bare number into a fraction of what was achievable. An agent that
-captures 60% of the Oracle's P&L is doing well; the same agent in a market
-where the Oracle made twice as much is doing half as well as it looked.
+It is a measuring instrument and does not compete. Its P&L shows how much
+alpha the market contains, so every other score can be read as a fraction of
+what was achievable. An agent that captures 60% of the Oracle's P&L is doing
+well. The same agent in a market where the Oracle made twice as much is doing
+half as well as it looked.
 
-Real markets cannot give you this. You cannot ask what perfect foresight would
-have earned, because you never observe fair value. You only observe price,
-and the difference between them is precisely the unobservable. Here it is a
-column.
+Real markets cannot give you this. You never observe fair value there, only
+price, so you cannot ask what perfect foresight would have earned. Here the
+gap between them is a column.
 
-## And the ceiling is a real ceiling, not an infinite one
+## The ceiling is limited by liquidity
 
 The Oracle cannot win by trading enormous size. Orders match against a real
 book, so the price it gets moves as it consumes levels, and past some
-participation the impact eats the edge that motivated the trade. That makes
-the ceiling *economically* meaningful rather than merely informational: it is
-the best a perfectly-informed trader could do given the liquidity that
-actually exists, not the paper value of knowing everything.
+participation the impact eats the edge that motivated the trade. So the
+ceiling is the best a perfectly-informed trader could do given the liquidity
+that exists, which is less than the paper value of knowing everything.
 
-Which means the Oracle's own scorecard is worth reading. If its `impact_bps`
-is large, the market is thin and the headline mispricing was never harvestable
-in the first place.
+Read the Oracle's own scorecard too. If its `impact_bps` is large, the market
+is thin and the headline mispricing was never harvestable.
 
 ## Every one of these is expressible as data
 
@@ -166,11 +161,11 @@ def rebalance(
 ) -> dict[str, float]:
     """Turn target weights into the share deltas that reach them.
 
-    Shared by every baseline, because getting this wrong is the usual way a
-    reference agent stops being a reference. Three things it handles:
+    Every baseline uses it, because getting this wrong is the usual way a
+    reference agent stops being a reference. It handles three things.
 
     **Weights, not share counts.** A target of "8% of net worth in AAA" means
-    the same thing on day one and day two hundred; "buy 5,000 shares" does
+    the same thing on day one and day two hundred. "Buy 5,000 shares" does
     not, and across a generated roster whose prices span two orders of
     magnitude it does not even mean the same thing across instruments.
 
@@ -227,12 +222,13 @@ RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 class BuyAndHold:
     """Equal weight across the roster, bought once and left alone.
 
-    The null hypothesis. Most of what looks like skill in a rising market is
-    this, and a strategy that does not beat it has not earned its turnover.
+    It is the null hypothesis. Most of what looks like skill in a rising
+    market is this, and a strategy that does not beat it has not earned its
+    turnover.
 
-    It trades on the first observation only. Not rebalanced, deliberately: a
-    rebalanced equal-weight portfolio is a mean-reversion strategy wearing a
-    passive label, and it would stop being the null hypothesis.
+    It trades on the first observation only and never rebalances, because a
+    rebalanced equal-weight portfolio is a mean-reversion strategy and would
+    stop being the null hypothesis.
 
     On a model that pays dividends (``dividend_payout_share``) it earns the
     market's total return through its portfolio's dividend reinvestment
@@ -259,14 +255,14 @@ class BuyAndHold:
 class RandomTrader:
     """Uniformly random target weights, redrawn every step.
 
-    The noise floor. A strategy that does not beat this is not trading on a
-    signal. It is paying spread and impact to express a coin flip, and
-    whatever P&L it shows is the market's drift minus its own costs.
+    It is the noise floor. A strategy that does not beat this has no
+    signal. It pays spread and impact to express a coin flip, and whatever
+    P&L it shows is the market's drift minus its own costs.
 
     Draws from its own RNG stream rather than from the market's, so a random
     agent's decisions cannot shift the market's draw schedule. If it could,
-    every agent would face a subtly different market and the same-seed
-    comparison the harness exists to provide would be gone.
+    every agent would face a slightly different market and the same-seed
+    comparison would be lost.
     """
 
     def __init__(self, *, seed: int = 0, gross: float = 0.5,
@@ -430,8 +426,8 @@ class Balanced:
     target. ``band=None`` never rebalances, which is the buy-and-hold 60/40.
 
     Needs a roster with the rate indices it names (``Universe.random(...,
-    bonds=True)``). Not in :func:`reference_agents`: it is a portfolio policy
-    to study under a scenario, not a signal to rank.
+    bonds=True)``). It is left out of :func:`reference_agents` because it is
+    a portfolio policy to study under a scenario.
 
     ``rebalances`` lists the days it traded back to target, and ``marks``
     records, at each day's first step, the day and the equity and bond
@@ -494,7 +490,7 @@ class Balanced:
 
 
 class Oracle:
-    """Trades the true mispricing. A measuring instrument, not a competitor.
+    """Trades the true mispricing, as a yardstick for the other agents.
 
     **Two rules, picked from the preset's dials** (:meth:`cross_sectional`),
     never from its name. Where every stock-specific move is mispricing
@@ -524,16 +520,16 @@ class Oracle:
     0-15. It lost on sim seed 3 on all three rosters, a month the index fell
     about 11 per cent in log terms, 10 points of it in the names' permanent
     fair-value offsets, and on seed 4 on the third; buy-and-hold lost more
-    in each. A fuller model does no better: the terms :meth:`expected_returns`
+    in each. A fuller model does no better. The terms :meth:`expected_returns`
     leaves out (the crowd's lean on ``s``, the anticipated earnings' drift
     in place of the cycle's pull, the volatility discount's approach to its
     target) were added and re-measured on the same 48 markets, and moved the
     count to between 26 and 30 with the mean still near zero. With the
     opening dispersion at the 0.10 the rule was first measured on, seed 3
-    on roster 3 pays it +152,102 against buy-and-hold's -175,280: that
-    dispersion was its edge. So the Oracle stays a reference agent on
-    pt-v20 but is not a ceiling there: :func:`capture_ratio` reports
-    nothing on it (:data:`ORACLE_NOT_A_CEILING`), and a score is read
+    on roster 3 pays it +152,102 against buy-and-hold's -175,280, so that
+    dispersion was its edge. The Oracle stays a reference agent on pt-v20
+    but is not a ceiling there. :func:`capture_ratio` reports nothing on
+    it (:data:`ORACLE_NOT_A_CEILING`), and a score is read
     against buy-and-hold (:func:`versus_buy_and_hold`). Measure the Oracle
     as a ceiling on pt-v19.
 
@@ -542,25 +538,25 @@ class Oracle:
 
     Reads ``mispricing_s`` straight out of the engine, so it knows without
     estimation error which instruments sit above and below fair value. Prices
-    are ``fair_value * exp(s)``, so positive ``s`` is expensive: it goes short
-    the highest ``s`` and long the lowest.
+    are ``fair_value * exp(s)``, so positive ``s`` is expensive, and it goes
+    short the highest ``s`` and long the lowest.
 
-    Its P&L is the denominator that makes every other agent's readable. Report
-    scores as a fraction of it, not as bare currency.
+    Its P&L is the denominator for every other agent's. Report scores as a
+    fraction of it.
 
-    It is a REFERENCE, not a maximum -- see this module's docstring. It gets
-    the same gross exposure and participation cap as every other baseline,
-    and spends them on a naive rule: equal weight, long the ``top_k`` most
-    underpriced names and short the ``top_k`` most overpriced. A different
-    rule on the same information beats it -- ``top_k=3`` on 6 of 8 markets
-    on the module docstring's grid -- and that is a result rather than a
-    fault. Until 0.8.5 mean reversion beat it in 5 of 12 of them too; that
-    was the harness applying its fills on every tick of the step, and none
-    of the price-only agents beats it there now.
+    It is a reference, and other strategies can beat it (see this module's
+    docstring). It gets the same gross exposure and participation cap as every
+    other baseline, and spends them on a naive rule: equal weight, long the
+    ``top_k`` most underpriced names and short the ``top_k`` most overpriced.
+    A different rule on the same information beats it (``top_k=3`` on 6 of 8
+    markets on the module docstring's grid), and that is a real result. Until
+    0.8.5 mean reversion beat it in 5 of 12 of them too. That was the harness
+    applying its fills on every tick of the step, and none of the price-only
+    agents beats it there now.
 
-    Three further caveats, all worth knowing before quoting a capture ratio:
+    Check three more caveats before quoting a capture ratio.
 
-    **Its height is a CHOICE, and ``top_k`` is a real lever on it.**
+    **Its height is a choice, and ``top_k`` moves it.**
     Re-measured on 0.8.5 under ``pt-v19`` at sim seed 2026 over thirty
     days, holding gross exposure and the participation cap fixed at the values
     every other baseline gets:
@@ -581,8 +577,8 @@ class Oracle:
     here has ranked the same way twice. Do not carry the numbers above to a
     different universe or build; re-measure.
 
-    What follows either way is that **a capture ratio is quoted against a
-    configuration, not against a universal quantity**. Two ratios computed
+    Either way, a capture ratio is quoted against a configuration and is
+    not a universal quantity. Two ratios computed
     with different ``top_k`` are not comparable, and neither is comparable to
     a published number that did not state it.
 
@@ -592,16 +588,14 @@ class Oracle:
     more. Quote the horizon with the ratio.
 
     **It is not an upper bound on any strategy.** On the grid stated in the
-    module docstring the same information on three names a side beats it
-    on 6 of 8 markets, and fifteen names a side at twice the gross earns
-    1.44x its median. No
-    price-only reference agent beats it there since 0.8.5; the ones that
-    did before were marked to their own impact. That a better rule under
-    the same constraints CAN out-earn revealed information has held in
-    every era measured. A capture ratio above 1.0 is a finding about
-    portfolio construction rather than about information, and from a
-    price-only agent it is also a reason to check that its fills reach the
-    market once.
+    module docstring the same information on three names a side beats it on 6
+    of 8 markets, and fifteen names a side at twice the gross earns 1.44x its
+    median. No price-only reference agent beats it there since 0.8.5. The ones
+    that did before were marked to their own impact. That a better rule under
+    the same constraints can out-earn revealed information has held in every
+    era measured. A capture ratio above 1.0 is a finding about portfolio
+    construction rather than about information, and from a price-only agent it
+    is also a reason to check that its fills reach the market once.
     """
 
     #: Marks an agent that sees past the observation wall, and is how it gets
@@ -782,16 +776,14 @@ class Oracle:
         return rebalance(obs, weights, max_participation=self.max_participation)
 
     def explain(self, day: int) -> str | None:
-        """The factor that actually dominated. Correct by construction.
+        """The factor that actually dominated, correct by construction.
 
-        Which makes it a self-test of the scoring machinery rather than a
-        claim about the Oracle: if this does not score close to 1.0, the
-        explanation scorer is broken, not the agent.
+        So it tests the scoring machinery. If this does not score close to
+        1.0, the explanation scorer is broken.
 
-        Computed here rather than by calling the scorer's own
-        ``_dominant_factor``. Sharing the function would make the test a
-        tautology -- the scorer agreeing with itself -- where two independent
-        implementations agreeing is evidence.
+        It is computed here instead of by calling the scorer's own
+        ``_dominant_factor``, because two independent implementations
+        agreeing is evidence and one function agreeing with itself is not.
         """
         if self._engine is None:
             return None
@@ -809,8 +801,8 @@ class Oracle:
 def reference_agents(*, seed: int = 0) -> dict[str, Any]:
     """The standard set, ready to pass to :func:`tradefloor.evaluate`.
 
-    ``seed`` only seeds the random baseline. It is deliberately separate from
-    the market seed: reusing one number for both would couple the noise floor
+    ``seed`` only seeds the random baseline. It is separate from the market
+    seed because reusing one number for both would couple the noise floor
     to the market it is measured in, and two markets could then differ for a
     reason that had nothing to do with the market. Any integer from 0 to
     ``2**64 - 1``.
@@ -906,11 +898,11 @@ def versus_buy_and_hold(scores: dict[str, Any], *,
                         reference: str = "buy_and_hold") -> dict[str, float]:
     """Each agent's P&L less buy-and-hold's in the same market.
 
-    The comparison to quote where the Oracle is not a ceiling
-    (:data:`ORACLE_NOT_A_CEILING`), and a useful one everywhere: did the
-    strategy earn more than owning the market did? In currency, because
+    Quote this where the Oracle is not a ceiling
+    (:data:`ORACLE_NOT_A_CEILING`). Anywhere, it says whether the strategy
+    earned more than owning the market did. It is in currency, because
     every agent in one evaluation starts with the same cash. The Oracle is
-    included; it is a reference agent like the others, and its card says
+    included as a reference agent like the others, and its card says
     ``uses_hidden_state``.
 
     A tampered agent (``Scorecard.tampered``) is left out, since its P&L
@@ -950,12 +942,12 @@ def _refuse_tampered(card: Any, name: str, role: str) -> None:
 def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str, float]:
     """Each agent's P&L as a fraction of the Oracle's.
 
-    The number worth reporting. Raw P&L is not comparable across markets,
-    since a seed with more dispersion pays every strategy more, and dividing by
-    what a perfectly-informed reference earned in *that* market removes
-    exactly that.
+    Report this instead of raw P&L, which is not comparable across markets
+    because a seed with more dispersion pays every strategy more. Dividing by
+    what a perfectly-informed reference earned in that market removes that
+    effect.
 
-    A ratio ABOVE 1.0 is legal. The Oracle is not an upper bound: it holds
+    A ratio above 1.0 is legal. The Oracle is not an upper bound. It holds
     the same gross exposure as everyone else and spends it on a naive
     equal-weight rule, so a better portfolio under the same constraint
     out-earns it, and ``Oracle(top_k=3)`` does on 6 of the 8 markets this
@@ -966,14 +958,13 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     portfolio construction, not as a broken denominator, and from a
     price-only agent check first that its fills reach the market once.
 
-    The ratio is also only comparable across runs that used the SAME Oracle
-    configuration; ``top_k`` moves the denominator substantially. See
+    The ratio is also only comparable across runs that used the same Oracle
+    configuration, because ``top_k`` moves the denominator substantially. See
     :class:`Oracle`.
 
-    Returns an empty mapping when the Oracle lost money or is absent: a ratio
-    against a negative denominator flips sign and would rank the worst agent
-    first. An empty result says "not measurable here", which is true and is
-    better than a confidently wrong table.
+    Returns an empty mapping when the Oracle lost money or is absent, because
+    a ratio against a negative denominator flips sign and would rank the
+    worst agent first. An empty result means "not measurable here".
 
     Returns an empty mapping, too, on a preset where the Oracle is not a
     ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20 and pt-v21), whatever

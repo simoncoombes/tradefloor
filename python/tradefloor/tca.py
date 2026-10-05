@@ -1,109 +1,108 @@
 """Transaction cost analysis against a market where you never traded.
 
-Real TCA has one irreducible problem: the benchmark does not exist. You want
-to know what you would have paid had you not traded, and you cannot observe it,
-because your trading is part of why the prices you see happened. So the
-industry estimates it (arrival price, VWAP, a fitted impact model) and every
-one of those is a proxy standing in for a counterfactual nobody can run.
+In real TCA the benchmark does not exist. You want to know what you would
+have paid had you not traded, and you cannot observe it, because your
+trading is part of why the prices you see happened. So the industry
+estimates it (arrival price, VWAP, a fitted impact model), and each of
+those is a proxy for a counterfactual nobody can run.
 
-Here it runs. Same seed, same universe, same macro, same session; in one world
-the trader executes, in the other nobody does. Every fill is then priced
-against what that instrument was doing in the world where the trader never
-existed.
+This module runs it. Both worlds share the seed, universe, macro and
+session. In one the trader executes and in the other nobody does. Every
+fill is then priced against what that instrument was doing in the world
+where the trader never existed.
 
 ## Two channels, and they are not the same size
 
-Trading moves the price twice over, through mechanisms worth keeping apart:
+Trading moves the price through two separate mechanisms.
 
 **The book channel.** An order matches against resting liquidity with
 price-time priority. A large order walks up the levels and pays worse prices
-as it goes. This is emergent, since nothing multiplies size by a coefficient
-and the order simply consumes what is there. A big trade's cost actually
-comes from there.
+as it goes. Nothing multiplies size by a coefficient. The order consumes
+what is there, and most of a big trade's cost comes from this channel.
 
 **The information channel.** Order imbalance feeds the factor model as a
-signal, moving the mispricing itself. This one PERSISTS: the book recovers as
-liquidity replenishes, but a shift in `s` is a new level. A step's fills reach
-it once, on the tick after they filled (``fills=`` on ``run_session``); until
-0.8.5 they were held on every tick of the step, which counted each order 65
-times at six steps a day.
+signal, moving the mispricing itself. This one persists. The book recovers
+as liquidity replenishes, but a shift in `s` is a new level. A step's fills
+reach it once, on the tick after they filled (``fills=`` on
+``run_session``). Until 0.8.5 they were held on every tick of the step,
+which counted each order 65 times at six steps a day.
 
-The split matters because they decay differently, and every serious execution
-model is built on the distinction. Elsewhere it is fitted from data with
-heroic assumptions. Here both worlds are runnable and the split is measured.
+The two channels decay differently, and execution models are built on
+that distinction. Outside a simulator the split is fitted from data under
+strong assumptions. Here both worlds run and the split is measured.
 
-Be aware of the bounds before sizing an experiment. Under the shipped
-default the information channel's imbalance term is clamped per tick:
-below about 1.33x the instrument's average minute volume a floor applies
+Check the bounds before sizing an experiment. Under the shipped default
+the information channel's imbalance term is clamped per tick. Below about
+1.33x the instrument's average minute volume a floor applies
 and the term is flat, above 10x it is capped and flat again, and between
 them it scales. Both constants live in ``order_imbalance`` in
 ``rust/src/market/factors.rs``. Setting ``order_flow_impact_law`` to 1.0
-replaces both clamps with the measured law -- linear in participation
-below the knee, square root above it -- so the term never goes flat. The
+replaces both clamps with the measured law (linear in participation
+below the knee, square root above it), so the term never goes flat. The
 band between the clamps is identical either way.
 
 Compare names with care. Under the shipped default the term divides by the
 instrument's depth twice, once in the participation and once after it, so
-the same participation costs a thin name far more than a liquid one: on a
+the same participation costs a thin name far more than a liquid one. On a
 hand-built roster with average minute volumes of 154 and 230,769 shares the
 ratio is 1,500. Setting ``order_flow_depth_law`` to 1.0 divides once, so
 equal participation is an equal move in ``s`` on every name above the
 100-share minute floor. A name trading a million shares a day is charged
 the same under either setting.
 
-There is a second bound past it and it is not in the cost law. The session
-breaker holds a name inside ``price_breaker_fraction`` of its previous
-close, 25 per cent by default, and it clamps the PRICE, so a railed run
-carries the same impact vector as any other railed run. Where that bites is
-a property of the instrument: on a thin name it can be between ten and a
-hundred times average minute volume, and on a liquid one past a thousand. A
-cost read at extreme size on a thin name is therefore a breaker reading
-rather than a law reading. Check the close against the bound before
-quoting one. In
-practice an ``analyse`` run hits a harder bound first: the book caps the
-fill at the displayed depth, and identical fills mean identical flow and
-identical numbers. Measured on this build, with ``analyse`` and a single
-first-step buy of the first name of ``Universe.random(20, seed=7)``, sim
-seed 2026, one six-step day, reading ``impact_bps`` on that name: requests of 20x
-and 100x the average minute volume (498 and 2,490 shares) both fill the
-same 483 shares and land exactly the same 74.79 bps of end-of-run impact
-(315.00 under 0.8.1, which held the flow on every tick of the step). The
-response is a function of what actually fills, not of what you ask for.
+A second bound sits outside the cost law. The session breaker holds a
+name inside ``price_breaker_fraction`` of its previous close, 25 per cent
+by default. It clamps the price, so a railed run carries the same impact
+vector as any other railed run. The size at which it bites depends on the
+instrument: on a thin name it can be between ten and a hundred times
+average minute volume, and on a liquid one past a thousand. A cost read at
+extreme size on a thin name is therefore a breaker reading. Check the
+close against the bound before quoting one.
+
+In practice an ``analyse`` run hits a harder bound first. The book caps
+the fill at the displayed depth, and identical fills mean identical flow
+and identical numbers. Measured on this build, with ``analyse`` and a
+single first-step buy of the first name of ``Universe.random(20,
+seed=7)``, sim seed 2026, one six-step day, reading ``impact_bps`` on that
+name, requests of 20x and 100x the average minute volume (498 and 2,490
+shares) both fill the same 483 shares and land exactly the same 74.79 bps
+of end-of-run impact (315.00 under 0.8.1, which held the flow on every
+tick of the step). The response depends on what fills, whatever size you
+ask for.
 
 Most of that 74.79 is not the buy's permanent impact, which moves `s` by
-about 3 bps here. It is the tape: the print chases the model price with a
-gap of tens of basis points, so any change to the model price, however
+about 3 bps here. It comes from the tape. The print chases the model
+price with a gap of tens of basis points, so any change to the model price, however
 small, re-deals where the print sits inside that gap from then on. Read a
 single run's ``impact_bps`` as permanent impact plus that noise, and read
 the permanent part from ``Engine.attribution("order_flow_impact")``.
 
 ## What the number means
 
-Implementation shortfall, signed so positive is always a cost:
+The number is implementation shortfall, signed so positive is always a
+cost:
 
     shortfall = Σ quantity × (fill price − counterfactual price at that step)
 
 A buyer who paid more than the untraded world's price has a positive
-shortfall. So does a seller who received less. Reporting a signed difference
-and leaving the reader to work out which direction hurt is how sign errors get
-into published numbers.
+shortfall. So does a seller who received less.
 
 ## This is an execution measure, not a strategy P&L
 
 Measured on this build, on the first instrument of ``Universe.random(20,
 seed=7)``, one six-step day, buying 1% of ADV (97 shares) at the first
-step: holding costs **+20.18 bps**, identically on every one of the eight
+step, holding costs **+20.18 bps**, identically on every one of the eight
 suite seeds (2026, 1, 2, 3, 4, 5, 7, 11), because the entry lands at step
 zero, before the two worlds can diverge. Selling the same 97 shares three
-steps later costs again: the round trip ends between **+12.7 and +28.8
+steps later costs again, and the round trip ends between **+12.7 and +28.8
 bps** of the notional it traded across those seeds, median +18.0, positive
 on all eight.
 
-Until 0.8.5 the same round trip came back NEGATIVE on seven of the eight,
-median -6.2 bps, and this docstring called that correct: the entry pushed
-the price up, the impact persisted, and the exit sold into it. What
-persisted was the harness counting the entry's flow on every tick of the
-step, so the exit sold into 65 times the impact the order made. An agent
+Until 0.8.5 the same round trip came back negative on seven of the eight,
+median -6.2 bps, and this docstring called that correct, on the grounds
+that the entry pushed the price up, the impact persisted, and the exit
+sold into it. In fact the harness counted the entry's flow on every tick
+of the step, so the exit sold into 65 times the impact the order made. An agent
 cannot sell into more of its own impact than its order causes, and a
 single order's permanent impact is smaller than what the book charges to
 trade it, so a round trip against its own footprint is a cost.
@@ -113,11 +112,9 @@ never traded", which is the execution desk's question. It does not answer
 "did this strategy make money". For that, read `pnl` from
 :func:`tradefloor.evaluate`, which marks the portfolio to the market the agent
 actually created. A strategy can pay a positive shortfall on every trade
-and still profit, from the market's own moves, and the two numbers are not
-in conflict because they are answers to different questions.
+and still profit from the market's own moves.
 
-Use :meth:`Execution.by_step` when the split matters: it shows each leg's
-cost rather than one netted figure.
+Use :meth:`Execution.by_step` to see each leg's cost separately.
 """
 
 from __future__ import annotations
@@ -199,7 +196,7 @@ class Execution:
         """Shortfall as basis points of the notional traded.
 
         Currency alone is not comparable between a $10m programme and a
-        $100k one, and bps is the unit every execution desk already reads.
+        $100k one, and bps is the unit execution desks read.
         """
         notional = ordered_sum(
             abs(f["notional"]) for f in self.fills
@@ -229,10 +226,9 @@ class Execution:
     def by_step(self) -> list[tuple[int, float]]:
         """Shortfall per decision step, in currency.
 
-        A single netted figure hides the structure that matters: what the
-        entry cost and what the exit cost, which differ because the exit
-        trades into a market the entry moved. Both are visible here and
-        neither is visible in the total.
+        The total nets the entry against the exit. Their costs differ
+        because the exit trades into a market the entry moved, and this
+        shows each one.
         """
         buckets: dict[int, float] = {}
         for fill in self.fills:
@@ -253,14 +249,13 @@ class Execution:
     def partial_fills(self) -> list[dict]:
         """Fills that could not be completed at the size requested.
 
-        Worth reading before believing a low shortfall. An order that only
+        Check this before believing a low shortfall. An order that only
         half filled only paid half the impact, and the untraded half cost
-        nothing precisely because it never happened -- measured on this
-        build (half the ADV of the first name of ``Universe.random(20,
-        seed=7)``, sim seed 2026), a request for 4,856 shares filled 483,
-        because that was the whole displayed depth. The cheapest execution
-        is the one that did not occur, which is not a result anyone should
-        quote.
+        nothing because it never happened. Measured on this build (half
+        the ADV of the first name of ``Universe.random(20, seed=7)``, sim
+        seed 2026), a request for 4,856 shares filled 483, because that was
+        the whole displayed depth. A low shortfall from orders that did not
+        fill should not be quoted.
         """
         return [f for f in self.fills if f.get("partial")]
 
@@ -278,62 +273,65 @@ class Execution:
         Includes names the trader never touched, and since the 2026-08 VIX
         coupling those are no longer guaranteed absent. Order flow still
         consumes no RNG draws, so an untraded name sees byte-identical
-        noise; what remains is one non-noise channel, the market being
-        afraid of the trading: the fear gauge reacts same-day to the
-        cap-weighted market return, VIX sets the shared factor's variance
-        target, and the nudge reaches every name's volatility two closes
-        later. Measured under pt-v12, with ``analyse(Momentum(), seed=7,
+        noise. What remains is one non-noise channel, the market reacting
+        to the trading. The fear gauge reacts same-day to the cap-weighted
+        market return, VIX sets the shared factor's variance target, and
+        the nudge reaches every name's volatility two closes later.
+
+        Measured under pt-v12, with ``analyse(Momentum(), seed=7,
         universe=Universe.random(60, seed=11), days=10)``, defaults
-        otherwise: 57 names traded, and all three it never touched moved,
+        otherwise, 57 names traded, and all three it never touched moved,
         by -10.72, +2.00 and +1.97 bps, against a 9.71 bps median
         ``|impact_bps|`` across the traded names that moved. Under 0.8.1
         (pt-v19) the same run traded 54 and five of the six untouched names
         moved, the largest by -15.82 bps. Since 0.8.5, which applies each
-        step's fills once rather than on every tick of the step, it trades
-        57 and none of the three untouched names moves at all: one agent's
-        flow no longer moves the index far enough to reach the gauge. The
-        channel is still there for flow that does, a standing
-        ``flow_impact`` programme for instance. Read the pt-v12 ordering
-        carefully. The largest ripple was bigger than the median
-        direct impact, so this is not a rounding-error channel: on pt-v12
+        step's fills once instead of on every tick of the step, it trades
+        57 and none of the three untouched names moves at all, because one
+        agent's flow no longer moves the index far enough to reach the
+        gauge. The channel is still there for flow that does, a standing
+        ``flow_impact`` programme for instance.
+
+        On pt-v12 the largest ripple was bigger than the median direct
+        impact, so the channel is larger than rounding error. On pt-v12
         ``vix_return_source`` is 1.0, so the fear gauge reads the whole
-        day's cap-weighted index return rather than the closing minute
-        alone, and flow big enough to move the index reaches names it never
+        day's cap-weighted index return and not only the closing minute,
+        and flow big enough to move the index reaches names it never
         touched at the same order of cost the book charges directly.
-        What bounds the channel is the horizon, not the clamp. The reaction
-        has to cross two closes, so on the same configuration one and two
-        days leak nothing, three days leak nine untouched names and four
-        leak eighteen; by ten days it is back to three only because the
+        The horizon bounds the channel, and the clamp does not. The
+        reaction has to cross two closes, so on the same configuration one
+        and two days leak nothing, three days leak nine untouched names and
+        four leak eighteen. By ten days it is back to three only because the
         agent has traded 57 of the 60 and there is almost nothing left
         untouched. ``vix_return_clamp`` is 15.0 on pt-v12, in percent
         (``rust/src/economy/daily.rs``), which no ordinary close comes
         near, and the +/-0.03% clamp that once made the channel
-        intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
-        immune to that channel, its final prices predating the first
-        repriced variance target. On pt-v20 and pt-v21, the default from
-        0.10.0, a
-        faster form of it arrives at the first close: the close's macro
-        step reads the session's index return (the VIX, the 10-year's
-        flight to quality, the corporate yield that follows it), and
+        intermittent was a pt-v1..pt-v8 value. A one-day analysis does not
+        see that channel, because its final prices come before the first
+        repriced variance target.
+
+        On pt-v20 and pt-v21, the default from 0.10.0, a faster form of it
+        arrives at the first close. The close's macro step reads the
+        session's index return (the VIX, the 10-year's flight to quality,
+        the corporate yield that follows it), and
         ``macro_publication_repricing`` re-marks every name to that step
         before the final prices are read. On ``test_tca.py``'s one-day
         buy of 1 per cent of ADV it moves 18 of 19 untouched names by at
-        most 3.4e-5 bps, against +0.80 on the traded name; every
+        most 3.4e-5 bps, against +0.80 on the traded name. Every
         cross-section before the close is identical on them, and the
         pins below take the final one back to identical, which is what
-        ``test_tca.py`` asserts. When the untouched names must be
-        byte-exact, pin
-        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
-        on pt-v20 and pt-v21, the default from 0.10.0, the corporate bond
-        yield too:
-        its flight to quality moves the 10-year with the session's index
-        return, and the corporate yield follows the 10-year every session
-        (``flight_to_quality_day``, ``corporate_yield_daily``). A pinned
-        corporate yield holds through the close. ``hold(vix=15.0,
-        corporate_bond_yield=0.055)``, verified empty on the ten-day run
+        ``test_tca.py`` asserts.
+
+        When the untouched names must be byte-exact, pin VIX in both
+        worlds, via ``scenario=Scenario().hold(vix=15.0)``, and on pt-v20
+        and pt-v21, the default from 0.10.0, pin the corporate bond yield
+        too. Its flight to quality moves the 10-year with the session's
+        index return, and the corporate yield follows the 10-year every
+        session (``flight_to_quality_day``, ``corporate_yield_daily``). A
+        pinned corporate yield holds through the close. ``hold(vix=15.0,
+        corporate_bond_yield=0.055)`` was verified empty on the ten-day run
         above, where the VIX alone leaves one name 5e-6 bps apart. Anything
         here that was not traded and survives both pins means something
-        genuinely leaked between the worlds.
+        leaked between the worlds.
         """
         out = {}
         for i, ticker in enumerate(self.tickers):
@@ -347,10 +345,11 @@ class Execution:
         Empty under a pinned VIX and, on pt-v20, a pinned corporate bond
         yield, over any horizon. Without the pins, empty on a one-day
         analysis only where the close writes no price (every preset
-        through pt-v19): pt-v20's close re-marks every name to the macro
+        through pt-v19). pt-v20's close re-marks every name to the macro
         step the trade moved, so a one-day analysis carries that close's
         share of the fear-gauge and credit channel, and a multi-day one the
-        rest. Either way a small remainder is that channel, not a leak.
+        rest. Either way a small remainder is that channel and is not a
+        leak.
         See :meth:`moved` for the measurement and the bounds.
         """
         traded = {f["ticker"] for f in self.fills}
@@ -402,23 +401,23 @@ def analyse(
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
-    The two runs differ in exactly one thing: whether the trader exists. Same
-    seed, same universe, same macro, same session length, same tick schedule,
-    and the same ``scenario`` if one is given. Anything else that differed
-    between them would surface as impact and be wrong.
+    The trader exists in one run and not the other. Everything else is
+    shared: seed, universe, macro, session length, tick schedule, and the
+    ``scenario`` if one is given. Anything else that differed between them
+    would surface as impact and be wrong.
 
-    Passing a ``scenario`` asks a question real TCA cannot: what did this
-    execution cost DURING a shock, against the same shock without it. Both
-    worlds run the identical macro path, so the difference is still the
-    trading and not the regime.
+    With a ``scenario`` you can ask what this execution cost during a
+    shock, against the same shock without it, which real TCA cannot
+    measure. Both worlds run the identical macro path, so the difference
+    is still the trading.
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`tradefloor.ModelParams`, and BOTH worlds run it, for the same
-    reason they share a scenario: a shortfall priced against a baseline
-    under a different model would measure the model gap, not the trading.
+    :class:`tradefloor.ModelParams`, and both worlds run it, for the same
+    reason they share a scenario. A shortfall priced against a baseline
+    under a different model would measure the model gap.
     The :class:`Execution` records ``model_fingerprint``.
 
-    The agent is sandboxed as :func:`tradefloor.evaluate` sandboxes it: a
+    The agent is sandboxed as :func:`tradefloor.evaluate` sandboxes it, with a
     read-only market view and portfolio view, ``obs.hidden`` for a
     ``privileged`` agent, and the live engine only under
     ``trusted_agents=True``. An agent that changes the market from inside
@@ -433,22 +432,21 @@ def analyse(
     market orders here, or run the agent in :class:`tradefloor.World`,
     whose trace records each limit order's fills. A return that is not an
     order mapping raises the same way. An entry the market refuses,
-    including a quantity that is not a number, is skipped, as a refused
-    trade always has been here.
+    including a quantity that is not a number, is skipped, as refused
+    trades always have been here.
 
     ``history_days=N`` runs the market for N days before day 0 with nobody
     trading, as :func:`tradefloor.evaluate` does, so an agent that needs a
     lookback has ``obs.history`` filled at its first decision. Both worlds
     start day 0 from that warmed market, and the :class:`Execution` records
     ``history_days``. No scenario applies during the warm-up. Left at 0,
-    the run is the one it always was.
+    there is no warm-up.
 
     Both worlds are copies (:meth:`Engine.fork`) of one engine built once,
     which on pt-v20 saves one 755-day macro burn-in per call.
 
-    Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
-    TCA cannot make, because the benchmark it compares against is a market
-    that never happened.
+    Returns an :class:`Execution`. Its ``shortfall`` is priced against a
+    market that never happened, which real TCA cannot observe.
     """
     universe = as_universe(universe)
     from . import _checks

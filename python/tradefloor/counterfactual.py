@@ -1,14 +1,14 @@
 """Run one agent in two worlds that differ by one variable, and measure the gap.
 
-The library already had both halves of a controlled experiment and no way to
-join them. :func:`tradefloor.branch` forks a running engine, and
-:func:`tradefloor.evaluate` runs an agent against a market -- but `evaluate`
-runs a whole evaluation start to finish, so there is no moment inside it at
-which a caller can stop, fork, change one thing and continue. Reaching a state
-and then asking what happens NEXT needed a run loop you can pause.
+:func:`tradefloor.branch` forks a running engine, and
+:func:`tradefloor.evaluate` runs an agent against a market, but `evaluate`
+runs a whole evaluation start to finish. There is no point inside it at
+which a caller can stop, fork, change one thing and continue. Reaching a
+state and then asking what happens next needs a run loop you can pause.
 
-That is what a :class:`World` is: a market, an agent, a portfolio and a macro
-path advancing together, one day at a time, with the pause built in.
+A :class:`World` is that loop. It holds a market, an agent, a portfolio and a
+macro path, advances them together one day at a time, and can stop between
+days.
 
 ```python
 world = World(seed=7, universe=roster, agent=MyAgent(), pins={...})
@@ -30,29 +30,28 @@ trades, because the agent's own orders move the market it is trading. Change
 anything and the whole trajectory moves with it, and there is no way to say
 how much of the difference was the intervention.
 
-A fork removes that. Both arms leave the SAME state -- the same prices, the
-same order book, the same generator position, the same portfolio, the same
-agent -- so everything that differs afterwards descends from the one field
-that was changed. :func:`agree` is the proof, run before the intervention and
-reported rather than assumed, because "identical" is a claim the reader should
-not have to take on trust.
+A fork removes that. Both arms leave the same state (prices, order book,
+generator position, portfolio and agent), so everything that differs
+afterwards descends from the one field that was changed. :func:`agree` checks
+that state before the intervention and reports the result, so the reader does
+not have to take "identical" on trust.
 
 ## Fork on a day boundary, always
 
-:class:`World` runs whole days and forks between them, and does so for a
-reason. `checkpoint.py` records a defect where a snapshot taken BETWEEN
-two sessions of the same day lost the day's accumulators, re-opened the day on
-its next session, and priced differently from the parent it was a copy of.
-Every test forked on a day boundary, so nothing caught it. This module cannot
-reach that state: :meth:`World.run` takes whole days, and :meth:`World.fork`
-refuses an open market.
+:class:`World` runs whole days and forks only between them. `checkpoint.py`
+records a defect where a snapshot taken between two sessions of the same day
+lost the day's accumulators, re-opened the day on its next session, and
+priced differently from the parent it was copied from. Every test forked on a
+day boundary, so nothing caught it. This module cannot reach that state,
+because :meth:`World.run` takes whole days and :meth:`World.fork` refuses an
+open market.
 
 ## Draw surgery
 
-An intervention changes a macro field. A surgery changes a draw: the
-random number one consumer received, at one address, with every other
-draw of every stream left where it was (`tradefloor.noise` states the
-address contract). Four are offered on a world, each recorded in
+An intervention changes a macro field. A surgery changes a draw, the
+random number one consumer received at one address, and leaves every other
+draw of every stream where it was (`tradefloor.noise` states the
+address contract). A world has four, and each is recorded in
 ``surgeries`` beside the interventions:
 
 - :meth:`World.point` replaces one draw.
@@ -65,11 +64,11 @@ address contract). Four are offered on a world, each recorded in
 
 A surgery arm forks from the same state as its control, so :func:`agree`
 is taken at the fork before the surgery and :func:`compare` reads the
-gap after it, exactly as for an intervention. A surgery aimed at a day
-is checked after that day runs: the draw log must show the patched
-address drawn on that day, at the site it was aimed at, and a schedule
-that moved in between raises rather than reporting a surgery that
-landed somewhere else.
+gap after it, as for an intervention. A surgery aimed at a day is
+checked after that day runs. The draw log must show the patched address
+drawn on that day, at the site it was aimed at. If the schedule moved in
+between, the check raises instead of reporting a surgery that landed
+somewhere else.
 
 ## The agent is the subject, not the apparatus
 
@@ -77,15 +76,14 @@ Everything here takes the agent as a parameter and touches nothing about it
 except :meth:`act`. Swapping a deterministic policy for an LLM-driven one, or
 for an adapter around somebody else's framework, changes no line of the
 market, the checkpoint, the fork, the intervention, the execution or the
-comparison. The experiment belongs to Tradefloor; the agent is what is being
-measured.
+comparison.
 
-Two optional hooks, neither required:
+An agent may also define two optional hooks:
 
 - ``decision()`` returns whatever the agent wants recorded about the reasoning
-  behind its last :meth:`act`, as JSON-able data. It is what makes "the first
-  step at which the agent DECIDED differently" answerable separately from "the
-  first step at which it TRADED differently", which is a real distinction: a
+  behind its last :meth:`act`, as JSON-able data. With it, "the first step at
+  which the agent DECIDED differently" can be found separately from "the
+  first step at which it TRADED differently". The two can differ, because a
   policy can change its target and still send no order that step.
 - ``fork()`` returns an independent copy of the agent. Without it a fork falls
   back to :func:`copy.deepcopy`, which is right for a policy holding plain
@@ -96,13 +94,13 @@ Two optional hooks, neither required:
 A world takes ``agents={"a": agent_a, "b": agent_b}`` in place of ``agent=``,
 and then holds one :class:`~tradefloor.Portfolio` per label against one
 engine, which `portfolio.py` was written to allow. Within a step every agent
-sees the same prices and the same book, each over its own portfolio; they are
-asked in label order, they execute in arrival order against the shared book
-(label order unless ``book_arrival_shuffle`` is on; see below), and every
-portfolio's pending flow is merged per ticker and reaches the
-market as the one ``fills`` argument of the one session. Agents see each
-other's impact and never each other's orders, and :meth:`Scenario.apply` runs
-once a day for the whole cohort.
+sees the same prices and the same book, each over its own portfolio. Agents
+are asked in label order and execute in arrival order against the shared
+book (label order unless ``book_arrival_shuffle`` is on, see below). Every
+portfolio's pending flow is merged per ticker and reaches the market as the
+one ``fills`` argument of the one session. Agents see each other's impact
+and never each other's orders, and :meth:`Scenario.apply` runs once a day for
+the whole cohort.
 
 ## Whether agents take each other's liquidity depends on the model
 
@@ -114,21 +112,21 @@ the ladder after both of them is the ladder before either. Measured on this
 build under pt-v19, on ``Universe.random(8, seed=99)`` at seed 42, two
 agents each buying 10,000 shares of the first name at step 0: both fill at
 83.971666 against a first ask level of 9,762 shares at 83.97 that neither of
-them moved, and the sweep walks past that level to a worst price of 84.04,
-so the equality is a claim about a ladder that did not move rather than two
-fills at the top of the book. ``test_externality.py`` pins it. The cohort's
+them moved, and the sweep walks past that level to a worst price of 84.04.
+The two fills are equal because the ladder did not move, and neither filled
+at the top of the book alone. ``test_externality.py`` pins it. The cohort's
 whole footprint reaches the market once, as the merged ``fills`` of that
 step's session, on its first tick, so an agent meets another's trading from
 the next step on and never inside the step it happened.
 
-Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20
-and pt-v21, the default, have it, each portfolio's orders execute in the engine's book,
-under the portfolio's label (its ``owner``). Arrival order then matters:
-the second agent meets the book the first left, pays for the levels
+Under a model with ``book_shared`` on (``Engine.book_live``), which pt-v20
+and the default pt-v21 both have, each portfolio's orders execute in the
+engine's book under the portfolio's label (its ``owner``). Arrival order then
+matters. The second agent meets the book the first left, pays for the levels
 the first took, and can hit the first's resting limit order. Each agent's
 flow reaches the market once, on the next tick, and is attributed to it
 (``Engine.take_impacts``). An agent's value in the ``act()`` mapping may be
-a :class:`tradefloor.Limit` as well as a number: it takes what the book
+a :class:`tradefloor.Limit` as well as a number. A limit takes what the book
 holds at its price and the rest waits, in the book's queue with
 ``book_resting`` on, until it fills, is replaced by the agent's next
 ``Limit`` on that name, or is cancelled with :class:`tradefloor.Cancel`.
@@ -136,38 +134,37 @@ What fills during a session is collected into the agent's portfolio after
 the session, and a live-book row carries it under ``book_fills``.
 ``tests/test_order_book_depth.py`` measures both regimes.
 
-Label order decides three things and no price: the order agents are asked,
-the order their flows are summed into the merged mapping, and the order
-resting fills are collected. It is sorted order, so the same labels give the
-same market whatever order the mapping was built in. A dict literal's own
-order would make the market a property of how the caller typed it, and with
-three or more agents on one ticker the summation order is a float-
-associativity question rather than a cosmetic one.
+Label order decides three things, none of them a price: the order agents are
+asked, the order their flows are summed into the merged mapping, and the
+order resting fills are collected. It is sorted order, so the same labels give
+the same market whatever order the mapping was built in. A dict literal's own
+order would make the market depend on how the caller typed it, and with three
+or more agents on one ticker the summation order changes the floating-point
+result.
 
 Arrival order is the order the agents' orders reach the book, and the order
 :attr:`World.rejected` is written. At ``book_arrival_shuffle`` 0.0, which
 every preset carries, it is label order too, so on a live book the same
-label takes the levels first and stands first in the queue on every step:
-on pt-v20, the later label of two identical buyers of a tenth of a name's
+label takes the levels first and stands first in the queue on every step.
+On pt-v20, the later label of two identical buyers of a tenth of a name's
 daily volume pays about 23 bp more on every held-out seed. With the switch
-on (:meth:`Engine.arrival_order`) it is a seeded shuffle, fresh every step:
-the labels sorted by a counter-based priority of the seed, the day, the step
-within the day and the label, so each label is first equally often and a
-name buys no priority. Arriving second still costs what it costs; it just
-falls on each agent in turn. A label's priority does not depend on which
-other labels are present, so a :meth:`World.without` arm or a world built on
-a subset keeps the others' relative order, and it takes no draw, so the
+on (:meth:`Engine.arrival_order`) it is a seeded shuffle, drawn fresh every
+step. The labels are sorted by a counter-based priority of the seed, the day,
+the step within the day and the label, so each label is first equally often
+and no label gains priority from its name. Arriving second costs the same,
+but the cost falls on each agent in turn. A label's priority does not depend
+on which other labels are present, so a :meth:`World.without` arm or a world
+built on a subset keeps the others' relative order. It takes no draw, so the
 market's streams, snapshots and state hash are untouched. A cohort row then
 carries the step's order under ``arrival``. A one-agent world never reads
 it.
 
 The single-agent form is a one-element cohort under its old names.
 :attr:`World.agent` and :attr:`World.portfolio` read that one element and
-raise on a cohort; :attr:`World.agents` and :attr:`World.portfolios` are the
+raise on a cohort. :attr:`World.agents` and :attr:`World.portfolios` are the
 per-label collections. A single-agent trace row is the row it always was. A
 cohort row carries the shared fields and an ``agents`` map of the per-agent
-ones, and :func:`agree` grows one row per label rather than one row for a
-collection nobody can read back.
+ones, and :func:`agree` grows one row per label.
 
 :meth:`World.without` is the removal :mod:`tradefloor.externality` measures:
 a fork in which one agent sends no orders from the fork day on, its positions
@@ -176,12 +173,11 @@ left where they were and still marked to that arm's market.
 ## What this deliberately does not do
 
 It does not score. :class:`~tradefloor.Scorecard` and :func:`tradefloor.rank`
-already answer "which agent is better", across many seeds and with a paired
-test, and that asks something different from "what did this one change do".
-A counterfactual is one seed by construction -- that is the point of it -- so
-a single arm's return here is a measurement of this market as much as of the
-agent, and :class:`Comparison` reports behaviour before it reports P&L for
-exactly that reason.
+answer "which agent is better" across many seeds with a paired test, which is
+a different question from "what did this one change do". A counterfactual
+runs one seed by design, so a single arm's return here measures this market
+as much as the agent. For that reason :class:`Comparison` reports behaviour
+before it reports P&L.
 """
 
 from __future__ import annotations
@@ -301,30 +297,30 @@ def _cohort(agent: Any, agents: dict[str, Any] | None
 class World:
     """A market, an agent trading it, and the macro path they run under.
 
-    Advanced a day at a time by :meth:`run`, forked by :meth:`fork`, and
-    changed -- in one arm only -- by :meth:`intervene`.
+    :meth:`run` advances it a day at a time, :meth:`fork` copies it, and
+    :meth:`intervene` changes one arm only.
 
     ``pins`` are the macro fields held constant from day zero, and they stay
-    the day-ZERO levels for the life of the world: an intervention does not
-    rewrite them, it is recorded beside them. That is what makes
-    :meth:`scenario` reconstructible -- the constant levels, then one
-    :meth:`Scenario.step` per intervened field on the day it happened. Written
-    the other way round first, with ``intervene`` updating ``pins`` in place,
-    the derived scenario put the post-intervention rate on day zero and
-    described a world where the shock had always been true.
+    the day-zero levels for the life of the world. An intervention is
+    recorded beside them and does not rewrite them, so :meth:`scenario` can
+    be rebuilt as the constant levels plus one :meth:`Scenario.step` per
+    intervened field on the day it happened. An earlier version had
+    ``intervene`` update ``pins`` in place, and the derived scenario put the
+    post-intervention rate on day zero, describing a world where the shock
+    had always been true.
 
-    ``max_leverage`` defaults to 2x, matching :func:`tradefloor.evaluate`. An
-    agent with no funding limit is not being tested against the market: large
-    trades cost more through the book, but arbitrarily large is always
-    available and "trade everything" wins.
+    ``max_leverage`` defaults to 2x, matching :func:`tradefloor.evaluate`.
+    Without a funding limit an agent is not tested against the market. Large
+    trades cost more through the book, but any size is still available, so
+    "trade everything" wins.
 
     ``margin_interest`` charges borrowing the policy rate, as
     :func:`tradefloor.evaluate` and :func:`tradefloor.rank` do, and is on by
     default from 0.8.5. A portfolio whose cash is negative before a close
     pays a day's interest on the balance at the policy rate the market
     publishes that day (:meth:`Portfolio.accrue`). It changes cash, net
-    worth and P&L, never a price: the engine runs the same market either
-    way. It does change what a levered agent is shown, because its
+    worth and P&L and never a price, so the engine runs the same market
+    either way. It does change what a levered agent is shown, because its
     observation carries its cash, so a run recorded before 0.8.5 replays
     only with ``margin_interest=False``, which lets every portfolio the
     world builds borrow for free and is recorded in :meth:`summary` and the
@@ -332,12 +328,12 @@ class World:
     with ``cash_interest=True`` (``world.portfolio = Portfolio(...,
     cash_interest=True)``).
 
-    ``on_refusal`` decides what an agent that cannot produce a decision
-    costs. ``"raise"`` is the default and ends the run, which is what this
-    class has always done. ``"skip"`` records the refusal, trades nothing
-    that step, and carries on; see :meth:`_ask`. Either way the count is in
-    the trace and in :meth:`summary` under ``unusable_responses``, kept
-    apart from the market-side ``refused`` so a comparison cannot add them.
+    ``on_refusal`` decides what happens when an agent cannot produce a
+    decision. ``"raise"``, the default, ends the run. ``"skip"`` records the
+    refusal, trades nothing that step, and carries on (see :meth:`_ask`).
+    Either way the count is in the trace and in :meth:`summary` under
+    ``unusable_responses``, kept apart from the market-side ``refused`` so a
+    comparison cannot add them.
 
     ``agents`` is the cohort form, ``{label: agent}``, and exactly one of it
     and ``agent`` is given. Each label gets its own portfolio against this
@@ -345,14 +341,14 @@ class World:
     starts with the same cash: ``cash`` is one number, and each label gets
     that amount in its own account, so a three-agent cohort starts with
     three times the capital of a one-agent world. There is no per-agent
-    cash; ``cash={"a": 1e6, "b": 5e6}`` is refused. ``max_leverage`` is
+    cash, and ``cash={"a": 1e6, "b": 5e6}`` is refused. ``max_leverage`` is
     one setting for the whole cohort, applied to each agent's own book.
 
     Agents are sandboxed as :func:`tradefloor.evaluate` sandboxes them: each
     observation carries a read-only market view and a read-only view of the
     agent's own portfolio, a ``privileged`` agent also gets ``obs.hidden``,
     and ``trusted_agents=True`` hands over the live engine and portfolio
-    instead. The engine's state hash is compared around every ``act``; a
+    instead. The engine's state hash is compared around every ``act``. A
     change is recorded in :attr:`tampered` under the agent's label, in its
     :meth:`summary` and in :meth:`manifest`. See :mod:`tradefloor.sandbox`.
 
@@ -360,10 +356,10 @@ class World:
     traders in the world's market (POPULATED mode, see
     :mod:`tradefloor.population`). They trade in the same book as the
     world's agents and react to them, so the agents' presence changes the
-    market: a cohort's agents meet each other and the population in one
-    market. The world is as reproducible as ever, and a fork carries the
+    market, and a cohort's agents meet each other and the population in one
+    market. The world stays reproducible and a fork carries the
     population's state, but a strategy here no longer faces the market it
-    would have faced alone. Left out, the world is the one it always was.
+    would have faced alone. Without it the world has no background traders.
 
     ``history_days=N`` runs the market for N days, with nobody trading,
     when the world is built, so an agent that needs a lookback has one at
@@ -373,7 +369,7 @@ class World:
     scenario, pin and intervention count from the first day after the
     warm-up, while the engine's own day count and its order log include
     the warm-up, so a manifest or a replay rebuilds it. A fork carries the
-    history. Left at 0, a world is the one it always was.
+    history. At 0 there is no warm-up.
     """
 
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
@@ -558,8 +554,10 @@ class World:
 
     @property
     def portfolios(self) -> dict[str, Portfolio]:
-        """Every portfolio here, keyed by the label of the agent it belongs
-        to. A copy of the mapping, holding the live portfolios."""
+        """Every portfolio here, keyed by the label of its agent.
+
+        The mapping is a copy and the portfolios in it are the live ones.
+        """
         return dict(self._portfolios)
 
     @property
@@ -664,14 +662,14 @@ class World:
     def digest(self) -> str:
         """sha256 over the engine's market state.
 
-        :func:`tradefloor.manifest.market_digest`, which covers the continuous
-        internals tomorrow's prices depend on and not only the prices a cent
-        grid has already rounded. Two worlds with equal digests are on the
-        same market to the bit.
+        It is :func:`tradefloor.manifest.market_digest`, which covers the
+        continuous internals tomorrow's prices depend on as well as the prices
+        a cent grid has already rounded. Two worlds with equal digests are on
+        the same market to the bit.
 
-        Comparable between worlds at the same fork depth, the pairing an
-        experiment puts side by side, and NOT between a fork and its parent. The
-        digest folds in ``draws_consumed``, and a branched engine's counter
+        Digests compare between worlds at the same fork depth, the pairing an
+        experiment puts side by side, and not between a fork and its parent.
+        The digest folds in ``draws_consumed``, and a branched engine's counter
         restarts at zero while every column is carried, so a fork and its
         parent report different digests for the same market.
         ``test_a_branch_does_not_carry_the_draw_counter_or_the_log`` pins it.
@@ -684,19 +682,19 @@ class World:
             ledger: Any = None) -> "World":
         """Advance ``days`` whole days, agent trading, and record every step.
 
-        Whole days only. A world stopped mid-day could not be forked safely,
-        and offering a half-day advance would mean offering the fork that goes
-        with it. See the module docstring.
+        It runs whole days only. A world stopped mid-day could not be forked
+        safely, and a half-day advance would invite that fork. See the module
+        docstring.
 
         ``record`` also records each day on the engine before its close,
         the way :func:`tradefloor.facts.measure` does, so ``engine.bars``
         and ``engine.truth`` carry the run and
-        :func:`tradefloor.facts.panel_statistics` can read it. Off by default:
-        a record is an entry in the order log, and a world that recorded
-        would checkpoint and replay differently from one that did not.
-        Nothing about the market moves either way.
+        :func:`tradefloor.facts.panel_statistics` can read it. It is off by
+        default because a record is an entry in the order log, and a world
+        that recorded would checkpoint and replay differently from one that
+        did not. Nothing about the market moves either way.
 
-        The loop is the one :func:`tradefloor.evaluate` runs, deliberately:
+        The loop is the one :func:`tradefloor.evaluate` runs, with
         the same clock, the same order of observe-execute-settle, and the
         same feedback of the agent's own flow into the next session. A
         counterfactual run that stepped the market differently from the
@@ -1173,11 +1171,11 @@ class World:
         """This world's macro path, as a :class:`~tradefloor.Scenario`.
 
         Built fresh from the constant pins, one step per :meth:`intervene`,
-        and the rebased interventions of anything handed to :meth:`apply` --
-        so it is always what this world ran rather than a description written
-        alongside it. Serialise it into a manifest and the reader has the
-        experiment as data: the field, the day, the value before, the value
-        after, and for a scenario the shocks kept apart from the assumptions.
+        and the rebased interventions of anything handed to :meth:`apply`, so
+        it always describes what this world ran. Serialised into a manifest,
+        it gives the reader the experiment as data: the field, the day, the
+        value before and after, and for a scenario the shocks kept apart from
+        the assumptions.
         """
         scenario = Scenario(label=self.label)
         if self.pins:
@@ -1205,23 +1203,22 @@ class World:
         stress.apply(tf.Scenario.load("liquidity_crisis"), at=0)
         ```
 
-        The complement of :meth:`intervene`, and worth having beside it
-        rather than instead of it. `intervene` changes one macro field to one
-        absolute value and reads perfectly for the canonical experiment: one
-        variable, named on the line that changes it. A scenario reaches what
-        that cannot -- relative operations, whose value depends on where the
+        It complements :meth:`intervene`. `intervene` changes one macro
+        field to one absolute value, which suits the canonical experiment of
+        one variable named on the line that changes it. A scenario can also
+        express relative operations, whose value depends on where the
         endogenous chain has arrived; `market.liquidity`, which is not a
-        macro field at all and is the only lever that touches execution;
-        windows that end; and the split between what a scenario asserts
-        happened and what it merely assumes followed.
+        macro field and is the only lever that touches execution; windows
+        that end; and the split between what a scenario asserts happened and
+        what it assumes followed.
 
         # Timing, and why this rebases
 
         A scenario counts `at` from where the run loop starts applying it.
         A `World` counts days from the beginning of its own history, which a
-        forked arm shares with its sibling -- so an arm forked on day 20 is
-        on day 20, not day 0. Handing the same file to both would otherwise
-        mean two different experiments.
+        forked arm shares with its sibling, so an arm forked on day 20 is on
+        day 20. Without a rebase, the same file handed to the parent and the
+        arm would mean two different experiments.
 
         So each intervention is rebased by the day it is applied on: a file
         that says `at: 50` fires on this world's day 20 + 50. "Today" is
@@ -1236,19 +1233,18 @@ class World:
         first. It is :meth:`Scenario.starting_at` and then the same rebase.
         Left at None, the file's own days are rebased as above.
 
-        What the manifest records is the rebased form, which is the one that
-        says which days things actually fired, and beside it, in
-        :meth:`scenario`'s `origins`, the scenario as written: its name, its
-        own fingerprint, how far every day moved and the day it was applied
-        on. A packaged scenario applied with `at=0` is therefore cited by
-        the packaged file's fingerprint, not by a copy's.
+        The manifest records the rebased form, which gives the days things
+        actually fired on, and beside it, in :meth:`scenario`'s `origins`,
+        the scenario as written: its name, its own fingerprint, how far every
+        day moved and the day it was applied on. A packaged scenario applied
+        with `at=0` is therefore cited by the packaged file's own fingerprint.
 
         The scenario is not stored by reference. Rebasing produces new
         :class:`~tradefloor.Intervention` objects, so applying one document
         to two arms on different days gives each the timing it asked for and
         neither can perturb the other.
 
-        Refused: a scenario with no interventions, and one that carries
+        It refuses a scenario with no interventions, and one that carries
         pins. A pin is a whole path from day zero and belongs in `pins` when
         the world is built. Applying the interventions and dropping the pins
         would run a different experiment from the one handed in.
@@ -1285,23 +1281,24 @@ class World:
 
     @property
     def firings(self) -> tuple:
-        """Every intervention that fired in this world's history, with the
-        values it saw and the day it fired on. Empty until something has
-        run. A fork carries its parent's, as it carries its trace."""
+        """Every intervention that fired in this world's history.
+
+        Each carries the values it saw and the day it fired on. Empty until
+        something has run. A fork carries its parent's, as it carries its
+        trace.
+        """
         return self._ran.log if self._ran is not None else ()
 
     def intervene(self, **fields: Any) -> "World":
         """Change one or more macro fields, from this world's next day on.
 
-        What the module exists for, and deliberately narrow: it writes
-        macro fields and nothing else. An intervention that could also reach
-        into the portfolio, the book or the agent would not be a controlled
-        variable, it would be a second experiment.
+        It writes macro fields and nothing else. An intervention that could
+        also reach the portfolio, the book or the agent would change more
+        than one variable at once.
 
-        Recorded three times over, because a counterfactual whose intervention
-        is not written down is an anecdote: here on the world, in the
-        :meth:`scenario` it derives, and -- once the next day opens and
-        ``pin_macro`` runs -- in the engine's own order log, which travels
+        The intervention is recorded in three places: here on the world, in
+        the :meth:`scenario` it derives, and, once the next day opens and
+        ``pin_macro`` runs, in the engine's own order log, which travels
         inside a :class:`~tradefloor.Checkpoint` and a
         :class:`~tradefloor.RunManifest`.
         """
@@ -1324,10 +1321,10 @@ class World:
     def checkpoint(self, label: str = "") -> Checkpoint:
         """This world's history as data, replayable without this process.
 
-        The log-based fork rather than the snapshot one. It costs what the run
-        cost, and what it buys is that the point the experiment starts from is
-        a few kilobytes of JSON somebody else can resume, rather than a memory
-        image of this interpreter.
+        This is the log-based fork, not the snapshot one. It costs what the
+        run cost, and in return the point the experiment starts from is a few
+        kilobytes of JSON somebody else can resume, where a snapshot is a
+        memory image of this interpreter.
         """
         from . import __version__
         from .manifest import era_fingerprint
@@ -1350,16 +1347,14 @@ class World:
     def fork(self, *labels: str) -> list["World"]:
         """Independent continuations of this world, one per label.
 
-        Independent in the strong sense: separate engines, separate
-        portfolios, separate agents. Driving one cannot perturb another, which
-        is what makes the arms a controlled comparison rather than two runs
-        that started similarly.
+        Each arm has its own engine, portfolios and agents, so driving one
+        cannot perturb another. That is what makes the arms a controlled
+        comparison.
 
         The agent is copied by its own ``fork()`` if it has one and by
         :func:`copy.deepcopy` otherwise. A policy holding plain Python state
-        copies correctly either way; one holding a client, a socket or a file
-        handle needs to say what a copy of it means, and the hook is where it
-        says so.
+        copies correctly either way. One holding a client, a socket or a file
+        handle needs a ``fork()`` that says what a copy of it means.
 
         A cohort forks whole: every agent and every portfolio is copied,
         under the labels they had, and the arms carry the same frozen set.
@@ -1448,17 +1443,16 @@ class World:
     def without(self, label: str) -> "World":
         """A fork in which ``label`` sends no orders from this day on.
 
-        The removal an externality matrix measures. The named agent is asked
-        nothing and executes nothing in the arm this returns; it keeps the
-        positions it held at the fork and they go on being marked to the
+        This is the removal an externality matrix measures. In the returned
+        arm the named agent is asked nothing and executes nothing. It keeps
+        the positions it held at the fork and they go on being marked to the
         arm's own market, so its net worth still moves with prices it no
         longer influences.
 
-        Removal is inaction from the fork day on rather than a world the
-        agent never traded in. The shared history stands in both arms, which
-        is what makes them comparable at all: a world where the agent had
-        never existed would differ from day zero and there would be no fork
-        to measure from.
+        Removal means inaction from the fork day on. The agent still traded
+        in the shared history, which stands in both arms and makes them
+        comparable. A world where the agent had never existed would differ
+        from day zero and leave no fork to measure from.
         """
         if self._single:
             raise ValidationError(
@@ -1510,8 +1504,8 @@ class World:
         tick at a hundred names and a log of a whole run is the size of the
         tape. Read it back with :meth:`draws`. A transplant reads the
         SOURCE world's log, so a source is traced before it runs the days
-        to be copied. Named as the engine method it wraps; ``trace`` is the
-        world's step record.
+        to be copied. It is named after the engine method it wraps, because
+        ``trace`` is already the world's step record.
         """
         self.engine.trace_draws(stream, int(from_day), int(to_day))
         return self
@@ -1527,8 +1521,8 @@ class World:
 
         The generator still advances at that address, so every other draw
         of every stream is where it was. The address must lie ahead of the
-        stream's position; a draw already taken cannot be replaced, and
-        asking is refused rather than the patch being kept for nothing.
+        stream's position. A draw already taken cannot be replaced, so asking
+        for one is refused.
 
         A point surgery names an address, not a day, so it does not get
         the check after its day that the other surgeries do. Use
@@ -1554,16 +1548,16 @@ class World:
         one uniform ``u`` on the jumps stream, then one normal, and the
         market jump fires when ``u < intensity``, where ``intensity`` is
         ``jump_intensity_market`` scaled by the VIX coupling. ``u`` lies
-        in ``[0, 1)``. The value installed is ``1.0``: never below an
-        intensity of at most one, which is what a daily probability is.
+        in ``[0, 1)``. The value installed is ``1.0``, which is never below
+        an intensity of at most one, the range of a daily probability.
         The normal is still drawn, so the company jumps that follow, and
-        every later day, are exactly where they were. That is what makes
-        the unfired arm a control for the jump: ``draws_by_stream`` is
+        every later day, are exactly where they were. So the unfired arm is
+        a control for the jump. ``draws_by_stream`` is
         identical and every price up to and including the close of
         ``day`` is identical, because the jump lands at that close and is
         first seen at the next open.
 
-        What it cannot do: stop an intensity above one. A market whose
+        It cannot stop an intensity above one. A market whose
         daily intensity exceeds one fires every day by construction, and
         ``1.0`` is below it too. No shipped preset sets one.
 
@@ -1578,20 +1572,20 @@ class World:
         ``delist(0)``. A listing moves it the same way.
 
         So the arithmetic assumes the active set does not change between
-        the surgery and the day, and the check after ``day`` runs is what
-        holds that assumption to account: the draw log must show the
-        patched address at the market jump site on that day, with the value
-        that was installed, and a schedule that moved raises rather than
-        reporting a surgery that landed on a company.
+        the surgery and the day, and the check after ``day`` runs tests that
+        assumption. The draw log must show the patched address at the market
+        jump site on that day, with the value that was installed. If the
+        schedule moved, the check raises instead of reporting a surgery that
+        landed on a company.
 
         # Whether the jump would have fired
 
         The record carries ``intensity``, which the ENGINE reports for
         its own dials and its current VIX, and ``fires``. An
         intensity of zero makes ``u < intensity`` false for every ``u`` in
-        ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``: the
-        surgery is a no-op and the record says so, rather than leaving an
-        unfired arm that is identical to its control and silent about why.
+        ``[0, 1)``, so the jump cannot fire and ``fires`` is ``False``. The
+        surgery is a no-op and the record says so, which explains an unfired
+        arm that is identical to its control.
         An intensity of one or more fires on every day, so ``fires`` is
         ``True``. Between the two the draw decides it, ``fires`` is
         ``None``, and the control arm is what shows it.
@@ -1607,10 +1601,10 @@ class World:
         ``stoppable`` is false above an intensity of one. The value
         installed is ``1.0`` and the engine fires on ``u < intensity``, so
         at an intensity above one the installed value is itself under the
-        threshold: the jump fires in the surgery's arm as well and the arm
-        comes back identical to its control. Reported rather than left as
-        a record saying ``fires`` with nothing to show for it. No shipped
-        preset sets an intensity above one.
+        threshold, so the jump fires in the surgery's arm as well and the arm
+        comes back identical to its control. ``stoppable`` reports that case,
+        where ``fires`` alone would show nothing. No shipped preset sets an
+        intensity above one.
         """
         self._refuse_open_market("unfire")
         day = int(day)
@@ -1657,8 +1651,8 @@ class World:
         ``surgery_seed`` per the surgery derivation contract in
         ``rust/src/rng.rs`` (``GameRng::surgery``), which a golden test
         pins. The same ``surgery_seed`` on the same world reproduces the
-        window; a different one is a different window; every other stream
-        delivers exactly what it did. ``surgery_seed``, like the world's
+        window, a different one gives a different window, and every other
+        stream delivers exactly what it did. ``surgery_seed``, like the world's
         own seed, is any integer from 0 to ``2**64 - 1``.
 
         # How the addresses are found
@@ -1669,7 +1663,7 @@ class World:
         draws per day fixed by the roster and the tick count, so their
         addresses on those days are the fork's. The economy chain's count
         depends on its own state, so a window on it can be aimed a draw
-        wide by the surgery itself; the check after each day of the
+        wide by the surgery itself. The check after each day of the
         window confirms every patched address was drawn on the day it was
         aimed at, and raises if the schedule moved.
 
@@ -1709,20 +1703,20 @@ class World:
     def transplant(self, source: "World", stream: str, days: Any) -> "World":
         """Copy ``source``'s draws of ``stream`` on ``days`` into this world.
 
-        Address for address: what ``source`` received at each address the
-        stream took on those days, this world receives at the same
-        address. The source must have been traced on those days before it
-        ran them (:meth:`trace_draws`); an untraced source has no record to copy
-        and the call says so rather than running it again.
+        It copies address for address. What ``source`` received at each
+        address the stream took on those days, this world receives at the
+        same address. The source must have been traced on those days before
+        it ran them (:meth:`trace_draws`). An untraced source has no record
+        to copy, and the call raises instead of running the source again.
 
         The addresses are the source's. On a world with the same roster
         and tick count they name the same draws of the same days, and the
         check after each day confirms it. A source with a different roster
-        size is refused up front: its schedule puts the same address on a
-        different day, which is a different experiment. Two worlds of
-        different seeds may transplant between them; the address then
-        names a position in the schedule rather than a draw of the same
-        generator, and the record carries the source's seed and label.
+        size is refused up front, because its schedule puts the same address
+        on a different day. Two worlds of different seeds may transplant
+        between them. The address then names a position in the schedule
+        rather than a draw of the same generator, and the record carries the
+        source's seed and label.
         """
         self._refuse_open_market("transplant")
         first, last = _days(days)
@@ -1827,14 +1821,14 @@ class World:
 
         Written from a REPLAY of the full log, not from the live engine.
         A forked arm's engine holds only its own post-fork log, so a manifest
-        taken straight off it records a run that begins at the fork: it
-        reproduces cleanly, into a market nobody ran. Measured before this
+        taken straight off it records a run that begins at the fork, which
+        reproduces cleanly into a market nobody ran. Measured before this
         was fixed, on a four-day fork of a four-day history, ``reproduce()``
         rebuilt a different market and said so.
 
         The replay is checked against the live engine before the manifest is
-        built, so a fork that did not carry its state faithfully fails here
-        rather than shipping a document that disagrees with the run it came
+        built, so a fork that did not carry its state faithfully fails here,
+        before it can produce a document that disagrees with the run it came
         from.
         """
         engine = self.replay()
@@ -1856,9 +1850,9 @@ class World:
     def replay(self) -> Engine:
         """A fresh engine rebuilt from this world's whole log.
 
-        The canonical form of the run: an engine anybody with the log can
-        reconstruct, carrying its own draw count and its own log, which a
-        branched engine does not.
+        This is the canonical form of the run. Anybody with the log can
+        rebuild it, and it carries its own draw count and its own log, which
+        a branched engine does not.
         """
         from .replay import replay as _replay
 
@@ -1867,8 +1861,11 @@ class World:
                        model=self.model, population=self.population)
 
     def net_worth(self, *, agent: str | None = None) -> float:
-        """One agent's cash plus marked positions. ``agent`` names which on
-        a cohort and is left out on a single-agent world."""
+        """One agent's cash plus marked positions.
+
+        ``agent`` names which on a cohort and is left out on a single-agent
+        world.
+        """
         return self._portfolios[
             self._label_for(agent, "net_worth")].net_worth(self.engine)
 
@@ -1876,16 +1873,16 @@ class World:
                 agent: str | None = None) -> dict[str, Any]:
         """The numbers a comparison quotes for one arm.
 
-        Behaviour first, P&L last, in the order the module argues they should
-        be read. Every value is computed from the trace or the portfolio;
-        nothing here is stated for presentation.
+        Behaviour comes first and P&L last, the order the module docstring
+        gives for reading them. Every value is computed from the trace or the
+        portfolio.
 
         ``since`` is the step the activity counts start from, defaulting to
-        this world's own :attr:`fork_step` and to zero for a root. It matters:
-        both arms of a fork carry the same shared history, so a turnover
-        figure that counts it is mostly prologue in both columns and the
-        difference between them is buried. The END state -- value, cash,
-        exposure, holdings -- is always the end state, and ``pnl`` is always
+        this world's own :attr:`fork_step` and to zero for a root. Both arms
+        of a fork carry the same shared history, so a turnover figure that
+        counts it is mostly prologue in both columns and hides the difference
+        between them. The end state (value, cash, exposure, holdings) is
+        always the end state, and ``pnl`` is always
         measured from the starting capital, because neither is a windowed
         quantity. ``pnl_since`` is the windowed one, and for a forked arm it
         is the number the experiment is actually about.
@@ -1894,7 +1891,7 @@ class World:
         window opens on. Measured from the fork step, that is the worth
         marked at the fork, after the last shared close. From any other
         step it is the net worth of the trace row before it, which for a
-        step that opens a day marks before the previous close: on pt-v20,
+        step that opens a day marks before the previous close. On pt-v20,
         where the close re-marks every name, that value misses the
         re-mark.
 
@@ -2034,11 +2031,10 @@ def _execution_cost(fills: Sequence[dict]) -> float:
 # ---------------------------------------------------------------------------
 
 class Agreement:
-    """What two worlds share, checked rather than asserted.
+    """What two worlds share, checked field by field.
 
-    Every check is something Tradefloor can genuinely compare. Nothing is
-    listed that the library cannot read back off the two objects, because a
-    verification table with a decorative row in it is worse than no table.
+    Every row is read back off the two objects, and nothing is listed that
+    the library cannot read back.
     """
 
     __slots__ = ("checks",)
@@ -2103,14 +2099,13 @@ def agree(a: World, b: World) -> Agreement:
     not come back identical the experiment has no control, and every number
     downstream of it is describing two different markets.
 
-    Nine checks between two single-agent worlds, and seven plus two per
-    label between two cohorts, every one of them read back off the two
-    objects. The engine state
-    snapshot subsumes several of the others on its own -- it carries every
-    column, the generator position, the per-day accumulators, the macro chain
-    and the central bank -- but they are listed beside it rather than folded
-    into it, because a reader checking that a portfolio survived a fork should
-    not have to know that a dict of eighteen columns implies it.
+    It runs nine checks between two single-agent worlds, and seven plus two
+    per label between two cohorts, each read back off the two objects. The
+    engine state snapshot covers several of the others on its own (it
+    carries every column, the generator position, the per-day accumulators,
+    the macro chain and the central bank), but they are listed beside it,
+    because a reader checking that a portfolio survived a fork should not
+    have to know that a dict of eighteen columns implies it.
 
     A draw surgery is engine state. The snapshot carries the overlay a
     surgery installs, so after one the ``whole engine state`` row reads
@@ -2118,18 +2113,18 @@ def agree(a: World, b: World) -> Agreement:
     are where they were, and what a consumer will receive is not. Take the
     agreement at the fork, before the surgery, as for an intervention.
 
-    What is NOT here, and why. ``draws_consumed`` and ``order_log`` are both
-    zero and empty on a freshly branched engine -- :func:`tradefloor.branch`
+    ``draws_consumed`` and ``order_log`` are not checked. Both are zero and
+    empty on a freshly branched engine, because :func:`tradefloor.branch`
     builds new engines and restores state into them, and neither the counter
     nor the log is part of that state. Comparing them across two branches
-    would pass every time, on nothing. The generator POSITION is a real check
-    and it is here, inside the snapshot's ``rng``.
+    would always pass. The generator position is a real check, and it is
+    here, inside the snapshot's ``rng``.
 
     Between two cohorts the portfolio and agent rows become one row per
     label, named ``portfolio[label]`` and ``agent state[label]``, so a check
     count grows with the cohort and a difference names the agent it belongs
-    to. A label present in one world and absent from the other is a
-    difference rather than a skipped row.
+    to. A label present in one world and absent from the other counts as a
+    difference and is not skipped.
     """
     prices_a, prices_b = a.engine.prices(), b.engine.prices()
     snap_a, snap_b = a.engine.state_snapshot(), b.engine.state_snapshot()
@@ -2223,14 +2218,14 @@ def _agent_state(agent: Any) -> Any:
 class Divergence:
     """The first step at which each part of the experiment came apart.
 
-    Four separate answers, and they are usually four different steps. The
-    order they arrive in is the causal chain the experiment exists to show:
-    the macro changed, the agent's target changed, its orders changed, the
-    market it traded changed, and the portfolio followed.
+    Four separate answers, usually at four different steps. The order they
+    arrive in shows the causal chain: the macro changed, the agent's target
+    changed, its orders changed, the market it traded changed, and the
+    portfolio followed.
 
-    ``None`` means that part never diverged, which is a finding rather than a
-    gap: an intervention that moved prices and never changed a decision says
-    the agent is not macro-aware, and the table should be able to say so.
+    ``None`` means that part never diverged, which is itself a result. An
+    intervention that moved prices and never changed a decision says the
+    agent is not macro-aware.
     """
 
     __slots__ = ("intervention_step", "intervention_day", "macro", "decision",
@@ -2357,14 +2352,15 @@ def compare(control: World, treatment: World,
 
     ``agreement`` is the :class:`Agreement` taken at the fork, carried through
     so the comparison document says on its face that the arms started
-    identical. Optional, because a comparison is still computable without it
-    -- but a published one without it is asking to be believed rather than
-    checked.
+    identical. It is optional, because a comparison is computable without
+    it, but a published comparison without it gives the reader no way to
+    check that the arms started identical.
 
     ``agent`` names the agent the comparison is about, and a cohort world
-    requires it: two columns of behaviour and P&L belong to one trader, and a
-    cohort has several. The shared rows, macro and prices, come from the
-    world either way; decisions, orders and net worth come from that agent.
+    requires it, because two columns of behaviour and P&L belong to one
+    trader and a cohort has several. The shared rows, macro and prices,
+    come from the world either way. Decisions, orders and net worth come
+    from that agent.
     Both arms are read under the same label, so the arms must hold it.
     """
     if control.steps_per_day != treatment.steps_per_day:
@@ -2492,25 +2488,23 @@ def _field_of(line: str) -> str:
 class Resample:
     """One decision point, asked N times per arm.
 
-    `compare` reports one trajectory each, which is the whole answer for a
-    deterministic policy and half of it for a language model: the agent is
-    the one stochastic component left in an otherwise bit-identical
-    experiment, and a single pair of trajectories cannot separate "the
-    agent responded to the intervention" from "the agent answered the same
-    question two ways".
+    `compare` reports one trajectory per arm. That is enough for a
+    deterministic policy but not for a language model, which is the one
+    stochastic component left in an otherwise bit-identical experiment. A
+    single pair of trajectories cannot separate "the agent responded to the
+    intervention" from "the agent answered the same question two ways".
 
-    Everything else has already been eliminated by construction, which is
-    what makes a small N enough here. :func:`agree` verifies the whole
-    engine state at the fork, and the two arms' inputs at the first
-    post-fork decision differ only in the intervened fields -- checked, not
-    assumed, by :attr:`identical_inputs`. So this measures exactly one
-    thing.
+    Every other source of difference is removed by construction, so a small
+    N is enough here. :func:`agree` verifies the whole engine state at the
+    fork, and the two arms' inputs at the first post-fork decision differ
+    only in the intervened fields, which :attr:`identical_inputs` checks.
+    So this measures one thing.
 
-    Read :attr:`separation` against :attr:`noise`: a between-arm gap
+    Read :attr:`separation` against :attr:`noise`. A between-arm gap
     smaller than an arm's own within-arm spread is not a finding. Read
     ``distinct`` and ``modal_share`` as well, because two arms can differ
-    in decision STABILITY at the same mean -- one distinct answer in eight
-    calls against four is a real difference that a mean hides.
+    in decision stability at the same mean. One distinct answer in eight
+    calls against four is a difference that a mean hides.
     """
 
     __slots__ = ("at", "n", "control", "treatment", "noise", "separation",
@@ -2549,10 +2543,10 @@ class Resample:
         self.intervened_fields = intervened_fields
 
     def as_dict(self) -> dict[str, Any]:
-        """Artifact-shaped, like :meth:`Comparison.as_dict`.
+        """This result as a dict, shaped like :meth:`Comparison.as_dict`.
 
-        JSON-serialisable and credential-free: counts, symbol names, and
-        the differing prompt lines, which come from the allowlisted
+        It is JSON-serialisable and holds no credentials: counts, symbol
+        names, and the differing prompt lines, which come from the allowlisted
         observation and carry nothing the agent was not shown.
         """
         return {
@@ -2739,10 +2733,10 @@ def resample(control: World, treatment: World, *, at: int | None = None,
              n: int = 8) -> Resample:
     """Ask one decision point ``n`` times per arm, and report the spread.
 
-    The measurement that keeps a false finding out of a paper. Worked
-    example, live, both arms at temperature 0: at the first post-fork
+    It tells a between-arm difference apart from the agent's own noise. A
+    live example, both arms at temperature 0: at the first post-fork
     decision the prompts differed in 2 lines of 376, and the recorded
-    trajectories then diverged readably -- control bought the dip, the
+    trajectories then diverged visibly. Control bought the dip, and the
     shock arm cut exposure "to manage downside risk". Resampling those two
     exact prompts eight times each: control gave 4 distinct answers with a
     net of 0.62 +/- 0.99, the shock arm gave 1 answer in 8 calls with a net
@@ -2750,19 +2744,19 @@ def resample(control: World, treatment: World, *, at: int | None = None,
     spread. The recorded split was one of control's four available answers,
     and nothing in this library would have said so.
 
-    The same numbers carry a second reading worth keeping: four distinct
-    answers against one is a difference in decision STABILITY rather than
-    in direction, it is invisible to :func:`compare`, and it is only
-    observable because the input was byte-identical eight times.
+    The same numbers show a second difference. Four distinct answers
+    against one is a difference in how stable the decision is, separate
+    from its direction. :func:`compare` cannot see it, and it is observable
+    only because the input was byte-identical eight times.
 
     ``at`` defaults to the treatment arm's fork step, the first decision
     the intervention could have reached. No market is advanced: this
     replays two frozen inputs, so N paired samples cost N calls rather than
     N re-simulations.
 
-    No p-value. The gap is reported in units of the noise floor and the
-    reader judges; a significance test would imply an inference model
-    nobody here has argued for.
+    It reports no p-value. The gap is given in units of the noise floor for
+    the reader to judge, because a significance test would imply an
+    inference model nobody here has argued for.
     """
     if n < 2:
         raise ValidationError(
@@ -2827,17 +2821,18 @@ class Invariance:
     side by side: :attr:`presentation`, the first step at which any two
     renderers' arms came apart, and :attr:`floor`, the same agent's own
     noise on one renderer's identical, repeated input. A presentation
-    effect smaller than the floor is not a finding; it is the agent
-    answering the same question twice, the way :func:`resample` already
-    reads a between-arm gap against a within-arm one.
+    effect smaller than the floor is the agent answering the same question
+    twice, read the way :func:`resample` reads a between-arm gap against a
+    within-arm one.
 
     It cannot say a difference is a defect. An agent may read basis points
     more reliably than dollars, or a compact table better than nine lines a
     name. :attr:`presentation` says where two renderings first diverged and
-    what diverged -- the decision, the orders, the resulting prices, the
-    portfolio -- not which renderer was right. :meth:`agreement_rate` and
-    :meth:`most_agreed` say which renderer's decisions the others matched
-    most often, which is as close to "right" as this function gets.
+    what diverged (the decision, the orders, the resulting prices, the
+    portfolio). It does not say which renderer was right.
+    :meth:`agreement_rate` and :meth:`most_agreed` say which renderer's
+    decisions the others matched most often, which is as close to "right"
+    as this function gets.
     """
 
     __slots__ = ("renderers", "days", "decisions", "presentation", "floor",
@@ -2945,17 +2940,17 @@ class Invariance:
         renderer's, over every renderer it shares a step with.
 
         Compared by equality on the same dictionary :func:`compare` diffs
-        on -- the actions and the rationale, published by
-        :meth:`~tradefloor.integrations.common.FrameworkAdapter.decision`
-        -- at matching positions in :attr:`decisions`, which are aligned
+        on (the actions and the rationale, published by
+        :meth:`~tradefloor.integrations.common.FrameworkAdapter.decision`)
+        at matching positions in :attr:`decisions`, which are aligned
         because every measured arm ran the same number of days from the
         same fork. Since :attr:`decisions` holds the agent's STANDING
         decision at every STEP, not one entry a day, an agent asked once
         a day (the default cadence) has each real decision counted
-        `steps_per_day` times over -- consistent across renderers, since
-        every measured arm runs the same cadence, but a rate near the
-        agent's own repeat-length is not automatically a strong
-        agreement; read it against how often the agent actually decides.
+        `steps_per_day` times over. That is consistent across renderers,
+        since every measured arm runs the same cadence, but a rate near the
+        agent's own repeat-length is not automatically strong agreement.
+        Read it against how often the agent actually decides.
         Empty when fewer than two renderers were measured.
         """
         keys = [k for k in self.renderers if k in self.decisions]
@@ -2979,15 +2974,12 @@ class Invariance:
         or `None` when fewer than two renderers were measured, or when two
         or more renderers tie for the highest rate.
 
-        A tie is not a finding, and reporting one of the tied renderers as
-        the winner -- which a naive `max` would, by whichever happened to
-        come first in :attr:`renderers` -- would print a result this
-        function has no basis for: this package's whole premise is that it
-        cannot say which renderer is right, and a "winner" drawn from list
-        order is exactly the claim it must not make. Two renderers that
-        fully agree with each other tie at `1.0` and this returns `None`
-        for them, correctly -- there is nothing to prefer between two
-        renderings the agent read identically.
+        A tie is not a finding. A naive `max` would report whichever tied
+        renderer came first in :attr:`renderers`, a result this function has
+        no basis for, since this package cannot say which renderer is right.
+        Two renderers that fully agree with each other tie at `1.0`, and
+        this returns `None` for them because there is nothing to prefer
+        between two renderings the agent read identically.
         """
         rates = self.agreement_rate()
         if len(rates) < 2:
@@ -3003,16 +2995,16 @@ class Invariance:
         Columns: `renderer_a`, `renderer_b`, `fork_agreed` (whether
         :func:`agree` found the two arms identical at the fork, before
         either renderer had rendered a step), `days_compared` (from
-        :attr:`days_compared` -- how many days this ROW actually covers,
-        which is :attr:`days` unless one side is in
-        :attr:`stopped_early`), and the first post-fork step at which
-        `decision`, `orders`, `prices` and `portfolio` diverged, `None`
-        where they never did over `days_compared` days -- NOT necessarily
-        :attr:`days`, and a reader comparing rows across a table where
-        `days_compared` varies is comparing spans of different length.
+        :attr:`days_compared`, how many days this row covers, which is
+        :attr:`days` unless one side is in :attr:`stopped_early`), and the
+        first post-fork step at which `decision`, `orders`, `prices` and
+        `portfolio` diverged, `None` where they never did over
+        `days_compared` days. That is not necessarily :attr:`days`, and rows
+        with different `days_compared` cover spans of different length.
 
-        Lazily imports `pyarrow`, a TEST and TOOLING dependency the library
-        itself does not carry; see `tests/test_arrow.py`.
+        It imports `pyarrow` lazily. `pyarrow` is a test and tooling
+        dependency the library itself does not carry (see
+        `tests/test_arrow.py`).
         """
         try:
             import pyarrow as pa
@@ -3130,26 +3122,26 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
 
     Each renderer gets its own fork of `world`, taken in one call to
     :meth:`World.fork` so every arm shares identical pre-fork state, and
-    its own copy of `world.agent` with `renderer` replaced -- everything
+    its own copy of `world.agent` with `renderer` replaced. Everything
     else about the agent (its framework, its instructions, its cadence)
-    stays what `world` was already running. `world.agent` must carry a
+    stays as `world` was running it. `world.agent` must carry a
     `renderer` attribute, which every adapter under
-    `tradefloor.integrations` does; a plain policy with no rendering step
+    `tradefloor.integrations` does. A plain policy with no rendering step
     has nothing for this function to vary.
 
     On a `LangGraphAdapter` built with its own `input_builder=` (not the
-    default), the swap changes nothing a live graph actually receives:
-    a caller's own builder does not read `self.renderer`, only the
-    adapter's DEFAULT one does. This function does not detect that case
-    and will run every arm anyway, quietly measuring nothing -- the
-    graph sees the same input on every arm, so every comparison finds no
-    presentation effect, which looks identical to a real one. Pass a
+    default), the swap changes nothing a live graph receives, because a
+    caller's own builder does not read `self.renderer` and only the
+    adapter's default one does. This function does not detect that case
+    and runs every arm anyway. The graph sees the same input on every arm,
+    so every comparison finds no presentation effect, and the result looks
+    the same as a real finding of none. Pass a
     `LangGraphAdapter` at its default `input_builder` to this function,
     or vary the renderer some other way (a custom `input_builder` reading
     `self.renderer` itself) if the graph needs its own.
 
-    `floor`, true by default, forks one more arm under `renderers[0]` --
-    the first renderer, taken as the reference -- and calls
+    `floor`, true by default, forks one more arm under `renderers[0]`
+    (the first renderer, taken as the reference) and calls
     :func:`resample` between it and the `renderers[0]` arm above, asking
     the agent's own first post-fork decision again several times. Both
     arms saw identical input, so the resulting gap is the agent's own
@@ -3160,32 +3152,31 @@ def invariance(world: World, renderers: Sequence[Renderer], *, days: int,
     Against a replaying agent, a renderer whose text does not match what
     the transcript was recorded under raises a
     :class:`~tradefloor.integrations.common.DecisionError` at its first
-    post-fork decision. This function catches that PER ARM: the renderer
-    is reported in :attr:`Invariance.unrecorded` rather than the whole
-    call failing, which is what lets a single recorded transcript still
-    answer "what would a different rendering have looked like" even
-    though only one rendering was ever actually asked. A live framework
-    failure is a different kind of failure and is not caught here; it
-    propagates. A malformed recorded response would, ideally, be a third
-    kind and also propagate -- three of the four adapters raise
+    post-fork decision. This function catches that per arm. The renderer
+    is reported in :attr:`Invariance.unrecorded` and the call carries on,
+    so a single recorded transcript can still answer "what would a
+    different rendering have looked like" when only one rendering was
+    ever asked. A live framework failure is not caught here and
+    propagates. A malformed recorded response should ideally propagate
+    too. Three of the four adapters raise
     :class:`~tradefloor.integrations.common.ReplayMiss`, a distinct
-    subclass, for exactly this reason, and a narrower catch would leave
-    it alone. FinRobot does not: it raises the same
+    subclass, for this reason, and a narrower catch would leave
+    it alone. FinRobot does not. It raises the same
     :class:`~tradefloor.integrations.finrobot.DecisionError` for a
     replay miss and for a response that failed to parse, so on FinRobot
     the two are indistinguishable from here and this function reports
-    both as unrecorded rather than reaching into one adapter's exception
+    both as unrecorded instead of reaching into one adapter's exception
     hierarchy by name to tell them apart. In practice this is the
-    narrower, likelier case: every shipped fixture is checked elsewhere
-    for exactly this (`tests/test_integrations.py`'s
+    narrower, likelier case, and every shipped fixture is checked for it
+    elsewhere (`tests/test_integrations.py`'s
     `test_a_committed_recording_is_valid_without_its_framework`).
 
-    This depends on the exception reaching this function at all. `World`
-    built with `on_refusal="skip"` -- not the default -- swallows a
-    generic `DecisionError` as a refused step rather than raising it, and
-    re-raises only `ReplayMiss` specifically. A FinRobot fork under a
-    `world` configured that way will not report a non-matching renderer
-    as unrecorded; it will report a run full of refusals instead. Forks
+    This depends on the exception reaching this function at all. A `World`
+    built with `on_refusal="skip"`, which is not the default, records a
+    generic `DecisionError` as a refused step instead of raising it, and
+    re-raises only `ReplayMiss`. A FinRobot fork under a `world`
+    configured that way will not report a non-matching renderer as
+    unrecorded. It reports a run full of refusals instead. Forks
     inherit `on_refusal` from `world`, unchanged.
 
     Raises :class:`~tradefloor._core.ValidationError` on fewer than two

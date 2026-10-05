@@ -574,11 +574,11 @@ impl PyArrowStream {
 impl PyArrowStream {
     /// The Arrow PyCapsule stream protocol.
     ///
-    /// `requested_schema` is accepted and ignored, which the protocol allows:
-    /// it is a hint for casting, and this stream has exactly one schema it can
-    /// produce. Silently casting f64 columns to something narrower on request
-    /// is precisely the parity-breaking switch the dtype rule exists to
-    /// prevent, so a caller asking for one gets the honest schema instead.
+    /// `requested_schema` is accepted and ignored, which the protocol allows.
+    /// It is a hint for casting, and this stream can produce exactly one
+    /// schema. Casting f64 columns to something narrower on request would
+    /// break the bit parity the dtype rule protects, so a caller who asks
+    /// for that gets the stream's own schema.
     #[pyo3(signature = (requested_schema = None))]
     fn __arrow_c_stream__<'py>(
         &self,
@@ -791,10 +791,10 @@ pub fn fills_batch(
 
 /// Build a `fills` stream from parallel columns.
 ///
-/// Takes columns rather than a list of row objects because that is the shape
-/// the data is already in on both sides, and marshalling a million small
-/// objects across the boundary to immediately transpose them would be the cost
-/// this whole surface exists to avoid.
+/// It takes columns rather than a list of row objects because the data is
+/// already in columns on both sides. Marshalling a million small objects
+/// across the boundary only to transpose them is the cost this surface
+/// exists to avoid.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub fn fills_stream(

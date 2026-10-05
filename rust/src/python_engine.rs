@@ -63,11 +63,11 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 ///
 /// # `market_cap` is derived, not given
 ///
-/// It is definitionally `price x shares_outstanding`, and the spread tier is
+/// It is `price x shares_outstanding` by definition, and the spread tier is
 /// selected from it. If the API accepted all three, a caller could pass an
-/// inconsistent triple and the liquidity of a name would quietly disagree with
-/// its priced value. So price and shares are the inputs; market cap follows,
-/// and keeps following as price moves.
+/// inconsistent triple and a name's liquidity would disagree with its priced
+/// value. So price and shares are the inputs, and market cap follows them as
+/// price moves.
 #[pyclass(name = "Instrument", module = "tradefloor._core", get_all)]
 #[derive(Debug, Clone)]
 pub struct PyInstrument {
@@ -1997,16 +1997,16 @@ fn report_to_py(py: Python<'_>, r: &crate::engine::OrderReport) -> PyResult<PyOb
 impl PyEngine {
     /// Build an engine over a universe.
     ///
-    /// `seed` is required, never defaulted. A simulator that seeds itself from
-    /// the clock when you forget produces a run nobody can reproduce, and the
-    /// failure is invisible until someone tries. It is any integer from 0 to
-    /// `2**64 - 1`; every seed below `2**32` is the market it was when seeds
+    /// `seed` is required and has no default. A simulator that seeds itself
+    /// from the clock when you forget produces a run nobody can reproduce,
+    /// and nobody notices until they try. It is any integer from 0 to
+    /// `2**64 - 1`. Every seed below `2**32` is the market it was when seeds
     /// were 32-bit, and `rust/src/rng.rs` states how a wider one is derived.
     ///
     /// `model` selects the coefficient set: a shipped preset's name
-    /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
-    /// deliberately ceremonial, because the fingerprint means an overridden run
-    /// can never silently masquerade as the benchmark model (API §3).
+    /// (`"pt-v1"`, the default) or a `ModelParams`. Overriding coefficients
+    /// takes the extra step on purpose, and the fingerprint means an
+    /// overridden run can never pass as the benchmark model (API §3).
     ///
     /// Keyword arguments only. `*args` is taken so that `Engine(7, universe)`
     /// is refused in words that show the call, rather than as pyo3's
@@ -2261,7 +2261,7 @@ impl PyEngine {
     /// Roll the day's opening marks. Call once before the session's ticks.
     ///
     /// Numbers the day from the engine's own counter, or `day` when given,
-    /// the way `run_days(first_day=...)` does. The number is a LABEL: the
+    /// the way `run_days(first_day=...)` does. The number is a LABEL. The
     /// draw log, the day marks and the book's fill stamps carry it, and
     /// nothing that prices reads it. The valuation counts the days this
     /// engine has run, so a label cannot reprice the market. A label that
@@ -2270,8 +2270,8 @@ impl PyEngine {
     ///
     /// Refused while a day is open. Until 0.8.5 a second call reopened the
     /// day: it cleared the day's tape, logged a second open and changed the
-    /// state hash, so the run no longer matched one that closed first, and
-    /// nothing said so. Close the day with `close_market()` first. A day
+    /// state hash, so the run no longer matched one that closed first, with
+    /// no warning. Close the day with `close_market()` first. A day
     /// closed by `run_session(close_at_end=True)` is closed, and opening the
     /// next one after it works as it always did.
     #[pyo3(signature = (*, day = None))]
@@ -2297,8 +2297,8 @@ impl PyEngine {
 
     /// Advance one game-minute.
     ///
-    /// A closed market costs nothing and draws nothing, which is why a caller
-    /// may tick straight through a weekend without special-casing it.
+    /// A closed market costs nothing and draws nothing, so a caller can tick
+    /// straight through a weekend without special-casing it.
     #[pyo3(signature = (
         hour, minute, day_of_week, *, volatility = 1.0,
         news = None, news_impacts = None, order_flow = None
@@ -2358,11 +2358,9 @@ impl PyEngine {
 
     /// Run many ticks in one crossing of the boundary.
     ///
-    /// The reason this exists: 390 ticks a day through per-call marshalling is
-    /// 390 boundary crossings, and the hot loop belongs in Rust. Identical
-    /// results to calling `tick` in a loop -- asserted by a test, because a
-    /// faster path that is not the same simulation is a second engine wearing
-    /// the same name.
+    /// Running 390 ticks a day through per-call marshalling is 390 boundary
+    /// crossings, and the hot loop belongs in Rust. The results are identical
+    /// to calling `tick` in a loop, and a test asserts it.
     ///
     /// Returns the number of ticks written.
     ///
@@ -2371,16 +2369,16 @@ impl PyEngine {
     /// `fills` is what a trader filled at the step boundary just before this
     /// session, `{ticker: (bought, sold)}` in shares, which is what
     /// `Portfolio.pending_flow()` returns. It reaches the market ONCE, on the
-    /// session's first tick, whatever `ticks` is. That is the argument an
-    /// agent loop wants.
+    /// session's first tick, whatever `ticks` is. An agent loop passes its
+    /// fills here.
     ///
-    /// `flow_per_tick` is a standing rate instead: that many shares bought
+    /// `flow_per_tick` is a standing rate: that many shares bought
     /// and sold on EVERY tick of the session, a program that trades all
     /// session long. `tf.flow_impact` uses it. Handing an agent's fills to
     /// it counts one order once a minute for the whole step.
     ///
     /// `order_flow` is refused here since 0.8.5, because it was the second
-    /// kind under a name that read as the first: every harness in the
+    /// kind under a name that read as the first. Every harness in the
     /// package passed an agent's fills through it, so one order was counted
     /// on each of a step's 65 ticks and landed after the fill it came from.
     /// `tick(order_flow=...)` is unchanged, since a tick is one minute.
@@ -2619,16 +2617,15 @@ impl PyEngine {
 
     /// Advance whole days: open, session, close, repeat.
     ///
-    /// The backtest shape. Decisions daily or slower means one call for the
-    /// whole span rather than a Python loop over sessions, and it records each
-    /// day as it goes so the results tables stream.
+    /// For backtests. With decisions daily or slower, one call covers the
+    /// whole span instead of a Python loop over sessions, and it records
+    /// each day as it goes so the results tables stream.
     ///
-    /// Measured, so the claim is honest: the boundary crossing this saves
-    /// costs 0.357 microseconds against 249 microseconds of engine work per
-    /// tick at a hundred instruments. Chunking is the natural shape for
-    /// columnar output, and it is NOT a meaningful speedup -- a Python loop
-    /// over `run_session` loses well under one per cent. Use this because it
-    /// reads better and records for you, not because a loop would be slow.
+    /// The boundary crossing this saves costs 0.357 microseconds against 249
+    /// microseconds of engine work per tick at a hundred instruments.
+    /// Chunking suits columnar output, but it is NOT a meaningful speedup. A
+    /// Python loop over `run_session` loses well under one per cent. Use
+    /// this because it reads better and records for you.
     ///
     /// `ledger` is an optional `tradefloor.DayLedger`, which is handed the
     /// state hash after every close and, when it keeps them, the state
@@ -2638,7 +2635,8 @@ impl PyEngine {
     ///
     /// `first_day` numbers the days for the record, the draw log and the
     /// fills, and defaults to the engine's own counter. It is a label and
-    /// prices nothing: the valuation counts the days the engine has run.
+    /// prices nothing, because the valuation counts the days the engine has
+    /// run.
     ///
     /// Returns the number of days run.
     #[pyo3(signature = (
@@ -2742,18 +2740,17 @@ impl PyEngine {
 
     /// Advance until a price leaves a band, or until `max_ticks` elapses.
     ///
-    /// The interactive shape, for logic that must run inside the day. A
-    /// crossing per DECISION is irreducible, so the goal is to make decision
-    /// points sparser than ticks rather than pretend the crossing away: an
-    /// algorithm watching for a level crosses when the level is hit, not 390
-    /// times a day hoping.
+    /// For logic that must run inside the day. Every DECISION costs one
+    /// boundary crossing, so this makes decision points sparser than ticks.
+    /// An algorithm watching for a level crosses once, when the level is
+    /// hit, instead of 390 times a day.
     ///
     /// Returns the tick the condition fired on, or None if `max_ticks` ran
-    /// out first. None is a real outcome, not a failure -- "it never got
-    /// there" is usually the answer you needed.
+    /// out first. None means the price never got there, which is often the
+    /// answer you need.
     ///
-    /// The close is NOT run when the condition fires. The day is not over;
-    /// the caller interrupted it.
+    /// The close is NOT run when the condition fires, because the day is not
+    /// over.
     #[pyo3(signature = (
         *, ticker, above = None, below = None, max_ticks = 390,
         hour = 9, minute = 30, day_of_week = 3, volatility = 1.0
@@ -2868,36 +2865,34 @@ impl PyEngine {
     /// day's total return.
     ///
     /// `DayCloseRequest` documents `None` as falling back to the total
-    /// return, and this passed `None` for every company on every close -- so
-    /// the fallback was not a fallback, it was the behaviour. Silently: no
-    /// error, no implausible number, just a variance process driven by drift
-    /// plus news plus flow when the model says it should be driven by the
-    /// idiosyncratic shock alone.
+    /// return, and this passed `None` for every company on every close, so
+    /// the fallback was the behaviour. Nothing reported it. The variance
+    /// process was driven by drift plus news plus flow when the model says
+    /// it should be driven by the idiosyncratic shock alone.
     ///
-    /// Measured before changing it, over 397 company-days: the two differ by
+    /// Measured before changing it, over 397 company-days, the two differ by
     /// a median factor of 0.82, a tenth percentile of 0.22 and a ninetieth of
-    /// 3.20. Not a rounding difference -- a different quantity.
+    /// 3.20. They are different quantities.
     ///
     /// # The macro chain advances here
     ///
-    /// `Engine::advance_day` -- economy update, cycle transition, central
-    /// bank -- runs at the end of every close. Before this it was implemented,
-    /// unit-tested, and reachable from nowhere in Python: every macro field
-    /// sat at its initial value for the whole run and fair value never
-    /// revalued, so the fundamentals anchoring was inert by default. The
-    /// recorded design decision is that the
-    /// full chain runs endogenously by default; this is that default, wired.
+    /// `Engine::advance_day` (economy update, cycle transition, central
+    /// bank) runs at the end of every close. Before this it was implemented
+    /// and unit-tested but reachable from nowhere in Python, so every macro
+    /// field sat at its initial value for the whole run and fair value never
+    /// revalued, which left the fundamentals anchoring inert by default. The
+    /// recorded design decision is that the full chain runs endogenously by
+    /// default, and this is where it runs.
     ///
-    /// The close is the day boundary the reference implementation uses too:
-    /// the rates and VIX the factor model reads on the first tick of a new
+    /// The close is also the day boundary the reference implementation uses.
+    /// The rates and VIX the factor model reads on the first tick of a new
     /// day are already the day's NEW values.
     ///
     /// Interaction with `pin_macro`: a pin applied at the START of a day (the
     /// `Scenario` convention) overrides whatever the previous close evolved,
     /// so a day-by-day pinned series stays exogenous exactly as before. A
-    /// single pin no longer freezes its field forever -- the chain keeps
-    /// evolving FROM the pinned value, which is what "everything else keeps
-    /// responding" was always meant to say.
+    /// single pin no longer freezes its field forever. The chain keeps
+    /// evolving FROM the pinned value.
     fn close_market(&mut self) {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
         // The day is over, so the next session opens a new one.
@@ -2916,7 +2911,7 @@ impl PyEngine {
     ///
     /// Read it with `numpy.frombuffer(buf, dtype="<f8")`, which adopts the
     /// bytes without copying. Values are in roster order, which is
-    /// contractual -- see `tickers`.
+    /// contractual (see `tickers`).
     ///
     /// Rate instruments come after the equities, as in `tickers`. A field that
     /// does not exist for an index reads NaN there (`garch_variance`, `beta`,
@@ -2976,12 +2971,11 @@ impl PyEngine {
     /// The last session's price path: `ticks_written x instruments`, row-major.
     ///
     /// Row-major means one tick's cross-section is contiguous and one
-    /// instrument's path is strided. That is the right way round: emission is
-    /// per tick, so the contiguous direction is the hot one.
+    /// instrument's path is strided. Emission is per tick, so the contiguous
+    /// direction is the hot one.
     ///
     /// Sliced to `ticks_written`, not to capacity. The buffer is reused across
-    /// sessions, so anything past that point is the previous session's data --
-    /// returning it would hand back a market that did not happen.
+    /// sessions, so anything past that point is the previous session's data.
     fn session_prices(&self, py: Python<'_>) -> Py<PyBytes> {
         f64_bytes(py, self.written(&self.buffer.prices))
     }
@@ -3012,14 +3006,13 @@ impl PyEngine {
     ///
     /// # This changes the whole market from here, and that is correct
     ///
-    /// It does not append a name to an otherwise-unchanged simulation. The
-    /// tick draws per instrument, so a larger roster shifts every subsequent
-    /// draw and every existing instrument's path moves too. That is the model,
-    /// not a limitation.
+    /// The tick draws per instrument, so a larger roster shifts every
+    /// subsequent draw and every existing instrument's path moves too. That
+    /// is how the model works.
     ///
-    /// What IS guaranteed is reproducibility: the generator carries across the
+    /// Reproducibility is guaranteed. The generator carries across the
     /// change, so one seed plus the same edits at the same ticks reproduces
-    /// the same market exactly. Replay works; invariance was never available.
+    /// the same market exactly, and a replay works.
     ///
     /// Equities only. A rate index is part of the universe an engine is built
     /// with, and listing one mid-run is refused.
@@ -3122,21 +3115,21 @@ impl PyEngine {
     /// Cumulative draws across all three engine streams.
     ///
     /// Two runs that agree here consumed the generators identically, which is
-    /// the precondition for their prices agreeing. Diagnostic: it reports
-    /// alignment, it does not enforce it. The per-stream split is
-    /// `draws_by_stream()`, and since the 2026-08 stream split THAT is the
-    /// sharper question: two runs whose `market` counts agree saw the same
-    /// market noise even if their macro chains branched apart.
+    /// the precondition for their prices agreeing. It is a diagnostic and
+    /// enforces nothing. The per-stream split is `draws_by_stream()`, which
+    /// since the 2026-08 stream split is the more useful comparison. Two
+    /// runs whose `market` counts agree saw the same market noise even if
+    /// their macro chains branched apart.
     #[getter]
     fn draws_consumed(&self) -> usize {
         self.inner.draws_consumed()
     }
 
-    /// The honest name of the model this engine runs: a shipped preset's
-    /// name when the coefficients are bit-identical to it, and
-    /// `custom-XXXXXXXX` otherwise. Joins `seed` and the universe
-    /// fingerprint in identifying a run, since a result under a non-shipped
-    /// model can never present as a standard one.
+    /// The name of the model this engine runs: a shipped preset's name when
+    /// the coefficients are bit-identical to it, and `custom-XXXXXXXX`
+    /// otherwise. With `seed` and the universe fingerprint it identifies a
+    /// run, and a result under a non-shipped model can never present as a
+    /// standard one.
     #[getter]
     fn model_fingerprint(&self) -> String {
         self.inner.model_fingerprint().to_string()
@@ -3167,24 +3160,23 @@ impl PyEngine {
     /// session) and `implied` (that variance as a VIX, through
     /// `(1 + premium) * 100 * sqrt(252 * total)`).
     ///
-    /// THE NUMBER THE UPDATE READ, not a recomputation. The identity's
-    /// instantaneous terms — the sector draw's sigma and the jump arrival
-    /// rate — are read at the VIX the close saw, `VIX_{t-1}`, and the
+    /// These are THE NUMBERS THE UPDATE READ, not a recomputation. The
+    /// identity's instantaneous terms (the sector draw's sigma and the jump
+    /// arrival rate) are read at the VIX the close saw, `VIX_{t-1}`, and the
     /// update then moves the VIX. A getter that evaluated the identity
     /// afresh would read those two terms at `VIX_t` and disagree with the
-    /// update by a day's VIX move, which is exactly the size of the
-    /// quantity a loop measurement is trying to see.
+    /// update by a day's VIX move, which is the size of the quantity a loop
+    /// measurement is trying to see.
     ///
-    /// `None` rather than zeroes when the identity is off: there the
-    /// read-back is not computed at all, and a dictionary of zeroes would
-    /// read as a market with no variance rather than as a run with no
-    /// read-back.
+    /// `None` when the identity is off, because the read-back is not
+    /// computed at all, and a dictionary of zeroes would read as a market
+    /// with no variance rather than as a run with no read-back.
     ///
     /// This is a diagnostic and it is not carried in `state_snapshot`, so
-    /// it moves no state hash. A fork carries it — a fork is a copy, and
-    /// its last VIX update really was the parent's — but `restore_state`
-    /// does not: a restored engine keeps its own last reading, `None` if
-    /// it had advanced no day, until its own next day advances.
+    /// it moves no state hash. A fork carries it, since a fork is a copy and
+    /// its last VIX update was the parent's. `restore_state` does not. A
+    /// restored engine keeps its own last reading, `None` if it had advanced
+    /// no day, until its own next day advances.
     fn index_variance_terms<'py>(
         &self,
         py: Python<'py>,
@@ -3228,7 +3220,7 @@ impl PyEngine {
     /// `(fast, slow)`, or `None` before any close.
     ///
     /// `slow` is `None` when the preset has no slow component
-    /// (`market_vol_slow_weight == 0.0` — pt-v1 through pt-v3 and the
+    /// (`market_vol_slow_weight == 0.0`, as on pt-v1 through pt-v3 and the
     /// default `PT_V1`), because `factor_vol.rs::close_day_at` returns
     /// before a slow target is computed on that branch. On such a preset
     /// the first element is THE target, not a "fast" one.
@@ -3250,7 +3242,7 @@ impl PyEngine {
 
     /// The full coefficient dictionary of the model this engine runs,
     /// `ModelParams.to_dict()` of `model`, with `"name"` set to the
-    /// fingerprint. What a manifest embeds.
+    /// fingerprint. A manifest embeds this.
     #[getter]
     fn model_params(&self, py: Python<'_>) -> PyResult<PyObject> {
         crate::python_params::PyModelParams {
@@ -3265,9 +3257,9 @@ impl PyEngine {
     /// active roster, sector count), so equal `market` counts between two
     /// runs of the same tick schedule mean the two markets consumed, and
     /// therefore saw, an identical noise sequence. The economy stream's
-    /// count genuinely varies with macro state (a chain in contraction
-    /// draws a shock the expansion never rolls), which is why it is
-    /// reported separately instead of polluting the market comparison.
+    /// count varies with macro state (a chain in contraction draws a shock
+    /// the expansion never rolls), so it is reported separately and stays
+    /// out of the market comparison.
     fn draws_by_stream<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let draws = self.inner.draws_by_stream();
         let out = PyDict::new_bound(py);
@@ -3334,7 +3326,7 @@ impl PyEngine {
     /// number the rest of that day's draws carry and leaves the day mark on
     /// the number the open stamped.
     ///
-    /// A label only. The valuation counts the days the engine has run, so
+    /// It is a label only. The valuation counts the days the engine has run, so
     /// this moves no price. Until 0.8.5 it was the buyback factor's elapsed
     /// time as well, and `set_day(5000)` mid-day moved the next session's
     /// prices by 0.21 in log with the state hash unchanged. The call goes
@@ -3459,11 +3451,11 @@ impl PyEngine {
     /// writer uses. Empty before the first open and on any
     /// preset with `endogenous_news_intensity` at zero.
     ///
-    /// A read. It draws nothing, writes nothing and is not logged, so
-    /// calling it cannot change a run: `state_hash` is the same with and
-    /// without it. `price_impact` is the whole move the event adds to the
-    /// price by the close, which makes it the answer key; never hand it to
-    /// an agent (a headline writer cuts it to its sign).
+    /// It draws nothing, writes nothing and is not logged, so calling it
+    /// cannot change a run, and `state_hash` is the same with and without
+    /// it. `price_impact` is the whole move the event adds to the price by
+    /// the close, which makes it the answer key. Never hand it to an agent
+    /// (a headline writer cuts it to its sign).
     fn session_news<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         let day: Option<i64> = if self.market_open {
             Some(i64::from(self.day_count))
@@ -3497,8 +3489,8 @@ impl PyEngine {
     /// snapshot does not carry it and a restored engine learns it again at
     /// its next open.
     ///
-    /// A read of a counter the engine already keeps: no draw, no write, so
-    /// it cannot change a run.
+    /// It reads a counter the engine already keeps, with no draw and no
+    /// write, so it cannot change a run.
     #[getter]
     fn session_tick(&self) -> Option<u32> {
         self.inner.day_marks().last().map(|m| m.ticks)
@@ -3671,8 +3663,7 @@ impl PyEngine {
     /// The current macro state.
     ///
     /// Rates come back FRACTIONAL, matching what the constructor takes, so a
-    /// value read here can be written straight back without a conversion --
-    /// which is the whole point of having one denomination at the boundary.
+    /// value read here can be written straight back without a conversion.
     ///
     /// `cycle` is the phase as PUBLISHED: under `cycle_publication_lag`, the
     /// phase of that many sessions before, so a turn reaches it when it is
@@ -3710,16 +3701,13 @@ impl PyEngine {
     /// # A scenario is a path, not a feature
     ///
     /// A rate shock is `federal_funds_rate` stepping 0.025 -> 0.05 over N
-    /// days, supplied day by day by whoever is running the study. It is NOT a
-    /// `rate_shock=True` flag. Every macro narrative worth expressing -- QE, a
-    /// hiking cycle, stagflation -- is a path over these fields, so the API
-    /// gives you the fields and refuses to grow named scenarios that are
-    /// paths in disguise.
+    /// days, supplied day by day by whoever is running the study. There is
+    /// no `rate_shock=True` flag. QE, a hiking cycle and stagflation are
+    /// each a path over these fields, so the API gives you the fields and
+    /// has no named scenarios for them.
     ///
-    /// Only the named fields are written; everything else keeps evolving
-    /// endogenously. That is the "narrow write surface, generous read
-    /// surface" the design asks for: pinning the policy rate should not also
-    /// freeze inflation.
+    /// Only the named fields are written, and everything else keeps evolving
+    /// endogenously, so pinning the policy rate does not freeze inflation.
     ///
     /// Rates are FRACTIONAL, as everywhere else, and validated before being
     /// converted.
@@ -3728,17 +3716,16 @@ impl PyEngine {
     ///
     /// `gdp_growth`, `unemployment_rate`, `tariff_rate` and `oil_price` sit
     /// in the same economy struct as the rest, but nothing in the market
-    /// reads them: the tick reads `federal_funds_rate`, `corporate_bond_yield`,
+    /// reads them. The tick reads `federal_funds_rate`, `corporate_bond_yield`,
     /// `qe_pe_boost`, `vix` and the cycle phase, and NOTHING else. These four
-    /// reach a price only through the macro chain -- the monthly inflation
-    /// update, then the central bank's next MEETING, then the curve. That is
-    /// slower than a short study, and it is the same horizon trap the
+    /// reach a price only through the macro chain: the monthly inflation
+    /// update, then the central bank's next MEETING, then the curve. That
+    /// takes longer than a short study, the same horizon trap the
     /// `tradefloor.scenario` module documents for the policy rate.
     ///
-    /// They are here because they are what a supply shock or a tariff
-    /// actually IS in this model, and because the alternative -- moving
-    /// inflation by hand and calling it an oil shock -- states the
-    /// transmission as a fact rather than as an assumption.
+    /// They are here because a supply shock or a tariff IS one of these in
+    /// this model. Moving inflation by hand and calling it an oil shock
+    /// would state the transmission as a fact when it is an assumption.
     ///
     /// `gdp_growth`, `unemployment_rate` and `tariff_rate` are FRACTIONAL
     /// like every other rate here (0.025 is 2.5%). `oil_price` is a price in
@@ -3756,7 +3743,8 @@ impl PyEngine {
     /// is not marked closes free, from the level the mark left, which is the
     /// free law's own fixed point at that VIX. `tradefloor.Scenario` sets it
     /// on every session it forces the VIX when the scenario asks for it
-    /// (`Scenario(vix_sets_variance=True)`), which is the intended way in.
+    /// (`Scenario(vix_sets_variance=True)`), and that is the intended way to
+    /// set it.
     ///
     /// # The treasury curve
     ///
@@ -4095,9 +4083,6 @@ impl PyEngine {
         Ok(())
     }
 
-    /// Whether tonight's close will SET the market factor's variance from
-    /// the VIX, because a scenario forced the VIX today with
-    /// `vix_sets_variance` on. Cleared by the close.
     /// The anticipated earnings level's offset over the earnings cycle's
     /// current level, which the valuation reads beside it
     /// (`earnings_anticipation_half_life`); 0.0 with it off.
@@ -4106,6 +4091,9 @@ impl PyEngine {
         self.inner.economy().earnings_anticipation
     }
 
+    /// Whether tonight's close will SET the market factor's variance from
+    /// the VIX, because a scenario forced the VIX today with
+    /// `vix_sets_variance` on. Cleared by the close.
     #[getter]
     fn vix_sets_variance_pending(&self) -> bool {
         self.inner.vix_sets_variance_pending()
@@ -4114,9 +4102,9 @@ impl PyEngine {
     /// The crisis episode: `(in_episode, sessions_under, epicentre)`.
     ///
     /// `epicentre` is the sector key, or `"none"` for a crisis with no
-    /// epicentre, or `None` when no episode is running -- so a caller can
-    /// tell "no crisis" from "a crisis nobody is at the centre of", which
-    /// the tick deliberately cannot. Always `(False, 0, None)` while
+    /// epicentre, or `None` when no episode is running, so a caller can
+    /// tell "no crisis" from "a crisis nobody is at the centre of". The tick
+    /// does not distinguish the two. Always `(False, 0, None)` while
     /// `crisis_epicentre_extra` is 0.0, which is every preset before pt-v19.
     /// pt-v19 ships `crisis_epicentre_extra` at 1.93, so on the default an
     /// episode starts at the first session above the crisis threshold. This
@@ -4128,21 +4116,19 @@ impl PyEngine {
 
     /// Every field [`PyEngine::pin_macro`] can write, as it can write it.
     ///
-    /// The read side of the narrow write surface, and the reason it exists
-    /// separately from [`PyEngine::macro_state`] is UNITS. `macro_state`
-    /// returns the seven fields the `Macro` constructor takes;
+    /// It exists separately from [`PyEngine::macro_state`] because of UNITS.
+    /// `macro_state` returns the seven fields the `Macro` constructor takes;
     /// `state_snapshot()["economy"]` returns the whole economy in the CORE'S
     /// percent denomination. Neither is the set `pin_macro` accepts, and an
     /// intervention that multiplies a value it read by 1.4 and writes it back
-    /// has to read and write in the same units or it is a factor of a hundred
-    /// out, silently, on a plausible-looking trajectory. See `units.rs`.
+    /// has to read and write in the same units, or it is out by a factor of
+    /// a hundred on a trajectory that looks plausible. See `units.rs`.
     ///
-    /// So this returns exactly the pinnable fields, in exactly the
-    /// denomination `pin_macro` takes: fractional rates, VIX in points,
-    /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
-    /// write it back.
+    /// This returns the pinnable fields in the denomination `pin_macro`
+    /// takes: fractional rates, VIX in points, `oil_price` in dollars,
+    /// `cycle` as its name. Read one, change it, write it back.
     ///
-    /// Two exceptions to "read it back": under `cycle_publication_lag`,
+    /// There are two exceptions. Under `cycle_publication_lag`,
     /// `cycle` is the phase as PUBLISHED, that many sessions late, so a
     /// phase pinned today reads back only once it is published; and under
     /// `gdp_publication_lag`, `gdp_growth` is the last quarter's mean growth
@@ -4238,8 +4224,8 @@ impl PyEngine {
     /// Replace every company's fair-value inputs, in roster order, NaN to
     /// clear one. The equities only, one value each.
     ///
-    /// The embedder's hook for reported earnings, and the one the
-    /// `market.earnings` scenario target writes through. It consumes no
+    /// An embedder sets reported earnings through this, and so does the
+    /// `market.earnings` scenario target. It consumes no
     /// draws, so it cannot move the generator, and an engine that is never
     /// told anything values on the figures it was built with, exactly as
     /// before this was exposed. A change moves every affected fair value, and
@@ -4290,24 +4276,23 @@ impl PyEngine {
     /// printed volume of a tick is bounded by `avg_volume / 390`. Halve it
     /// and the book is half as deep at every level, a marketable order walks
     /// further up it, and the impact an agent pays for the same trade rises.
-    /// That is a liquidity shock as this simulator can actually express one:
-    /// not a number called "liquidity" multiplied by 0.4, but less depth to
-    /// trade against.
+    /// This simulator expresses a liquidity shock as less depth to trade
+    /// against.
     ///
     /// # Why the engine never writes it itself
     ///
     /// The shipped close policy is [`AvgVolumePolicy::Hold`], so `avg_volume`
-    /// stays whatever the universe calibrated it to be for the whole run --
-    /// see `market::daily`, which names writing `PriceField::AvgVolume` as
-    /// the embedder's route. This is that route, and it is recorded in the
-    /// order log like any other input, so a replay, a checkpoint and a fork
-    /// all carry it.
+    /// stays whatever the universe calibrated it to be for the whole run.
+    /// `market::daily` names writing `PriceField::AvgVolume` as the
+    /// embedder's route, and this method is that route. It is recorded in
+    /// the order log like any other input, so a replay, a checkpoint and a
+    /// fork all carry it.
     ///
-    /// Values must be finite and strictly positive. Zero is not "no
-    /// liquidity": `base_quote_size` treats a zero as ABSENT and falls
+    /// Values must be finite and strictly positive. A zero does not mean no
+    /// liquidity. `base_quote_size` treats a zero as ABSENT and falls
     /// through to realised volume, then to half a percent of shares
-    /// outstanding, so a zeroed column quietly quotes a book off a different
-    /// input rather than a thin one.
+    /// outstanding, so a zeroed column quotes the book off a different input
+    /// instead of making it thin.
     ///
     /// One value per instrument in `tickers` order, rate instruments included,
     /// so a column read with `column("avg_volume")` can be scaled and written
@@ -4372,7 +4357,7 @@ impl PyEngine {
     /// The simulator computed every driver of `mispricing_s`, the log gap
     /// between the model price and fair value, so it can report how much
     /// each one moved it. No historical dataset carries these labels. They
-    /// decompose the change in `s` and nothing else: when fair value itself
+    /// decompose the change in `s` and nothing else. When fair value itself
     /// moves, on rates, earnings or the VIX, that move is not split up here,
     /// and on pt-v20 it is most of a price's daily move. For a breakdown that
     /// sums to the log price move, call `keep_explanations` before the run
@@ -4415,17 +4400,16 @@ impl PyEngine {
     ///   moved, and they explained 75%.
     ///
     /// This is the DAY grain of exactly what `truth` reports per tick, so
-    /// summing a `truth` column over a day reproduces the value here. Two
-    /// surfaces that disagreed about what drove a price would be worse than
-    /// either alone.
+    /// summing a `truth` column over a day reproduces the value here.
     ///
-    /// These are the APPLIED contributions -- what each driver did to `s` --
-    /// not the raw factors before scaling. Raw was the earlier behaviour and
-    /// it was wrong: the drift factors are divided by 390 on their way into
-    /// `s` while noise is multiplied by the intraday volatility curve, so raw
-    /// sums overstate news, flow and squeeze by around 390x against noise.
-    /// Ranking raw magnitudes named `company_news` the dominant driver on
-    /// sessions that were almost entirely noise.
+    /// These are the APPLIED contributions, what each driver did to `s`,
+    /// and not the raw factors before scaling. Raw factors were the earlier
+    /// behaviour, and they were wrong because the drift factors are divided
+    /// by 390 on their way into `s` while noise is multiplied by the
+    /// intraday volatility curve. Raw sums overstate news, flow and squeeze
+    /// by around 390x against noise, and ranking raw magnitudes named
+    /// `company_news` the dominant driver on sessions that were almost
+    /// entirely noise.
     fn attribution(&self, py: Python<'_>, factor: &str) -> PyResult<Py<PyBytes>> {
         let index = FACTOR_NAMES
             .iter()
@@ -4617,13 +4601,12 @@ impl PyEngine {
     /// The day's `random_noise` column split into the three draws it sums,
     /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
     ///
-    /// A window on the innovation the close feeds the per-name GJR. The
-    /// `random_noise` column is that innovation, and it is the sum of the
-    /// factor's transmission, the sector's and the name's own draw; only
-    /// the split says which of the three the name's variance process is
-    /// responding to. Reading it changes nothing: the close reads the same
-    /// accumulator directly, and only while
-    /// `garch_innovation_commensurate` is non-zero.
+    /// The `random_noise` column is the innovation the close feeds the
+    /// per-name GJR, and it is the sum of the factor's transmission, the
+    /// sector's and the name's own draw. Only the split says which of the
+    /// three the name's variance process is responding to. Reading it
+    /// changes nothing. The close reads the same accumulator directly, and
+    /// only while `garch_innovation_commensurate` is non-zero.
     fn noise_split(&self, py: Python<'_>, part: &str) -> PyResult<Py<PyBytes>> {
         let index = match part {
             "market" => 0,
@@ -4640,9 +4623,8 @@ impl PyEngine {
 
     /// `count` independent engines at exactly this state.
     ///
-    /// A deep copy of the whole engine, so the branches share no memory and
-    /// driving one cannot perturb another. That is what makes a fork a
-    /// controlled experiment rather than two runs that started similarly.
+    /// Each is a deep copy of the whole engine, so the branches share no
+    /// memory and driving one cannot perturb another.
     ///
     /// # Why a copy and not a rebuilt snapshot
     ///
@@ -4651,21 +4633,21 @@ impl PyEngine {
     /// time the engine grew: the per-day attribution accumulators and the
     /// market-open flag went missing first, then the market factor's variance
     /// state, then the common log-volume state, then the day counter, then the
-    /// day's endogenous news -- and that last one made a mid-day fork price
+    /// day's endogenous news. The last one made a mid-day fork price
     /// DIFFERENTLY from the parent it was supposed to be a copy of, on the
     /// shipped default preset, with nothing to indicate it.
     ///
-    /// Each of those was a real divergence found after the fact. The list
-    /// cannot be trusted, so this does not keep one: `#[derive(Clone)]` copies
-    /// whatever the struct holds, and a field added tomorrow is carried
-    /// without anyone remembering to carry it.
+    /// Each of those was a real divergence, found after the fact, so this
+    /// keeps no list. `#[derive(Clone)]` copies whatever the struct holds,
+    /// and a field added later is carried without anyone remembering to
+    /// carry it.
     ///
     /// Unlike [`PyEngine::state_snapshot`] this also carries the run's ORDER
     /// LOG, so a fork can itself be checkpointed, forked again, or written to
     /// a `RunManifest`. Reconstructing a fork from a snapshot left its log
     /// empty, and a `Checkpoint` taken on one then replayed a market that
-    /// began at day zero -- silently, because a checkpoint has no way to know
-    /// the history it was handed is short.
+    /// began at day zero, with no error, because a checkpoint has no way to
+    /// know the history it was handed is short.
     #[pyo3(signature = (count = 2))]
     fn fork(&self, count: i64) -> PyResult<Vec<PyEngine>> {
         if count < 1 {
@@ -4740,17 +4722,17 @@ impl PyEngine {
     /// order log and the recorded tape are outside it, exactly as they
     /// are outside the snapshot.
     ///
-    /// One difference is worth knowing before two runs are compared.
-    /// `run_session` with `close_at_end` leaves this binding's session flag
-    /// set where `close_market` clears it, so the two spellings of one close
-    /// hash apart on a market that is otherwise identical to the bit. The
-    /// flag is state rather than bookkeeping: it decides whether the next
+    /// Check one difference before comparing two runs. `run_session` with
+    /// `close_at_end` leaves this binding's session flag set where
+    /// `close_market` clears it, so the two spellings of one close hash
+    /// apart on a market that is otherwise identical to the bit. The flag is
+    /// state rather than bookkeeping, because it decides whether the next
     /// session re-opens the day and re-anchors `previous_close`. A recorded
     /// run still verifies against itself either way, because a replay runs
     /// the spelling its own log holds.
     ///
-    /// Each per-slot array is hashed at the width the engine holds for it.
-    /// That is the invariant, whatever the roster does.
+    /// Each per-slot array is hashed at the width the engine holds for it,
+    /// whatever the roster does.
     ///
     /// Every per-slot array follows the roster, `volume_idio` included
     /// since the resize that landed with this one, so the width this walks
@@ -4769,15 +4751,15 @@ impl PyEngine {
 
     /// Every column plus the generator position, as one dict.
     ///
-    /// A market's complete state, in constant time. The alternative already
-    /// here -- replaying an order log -- costs what the original run cost,
+    /// It captures a market's complete state in constant time. Replaying an
+    /// order log, the other way to get it, costs what the original run cost,
     /// measured at 1.04x on a sixty-day run.
     ///
     /// The columns are generated from `COLUMN_FIELDS`, not listed, so a field
-    /// added to the engine appears here without anyone remembering. That is
-    /// the same discipline the Rust side uses: `set_column` matches
-    /// exhaustively on `PriceField`, so a new variant fails to compile until
-    /// it is handled, and a snapshot cannot silently omit it.
+    /// added to the engine appears here without anyone remembering. The Rust
+    /// side works the same way. `set_column` matches exhaustively on
+    /// `PriceField`, so a new variant fails to compile until it is handled,
+    /// and a snapshot cannot silently omit it.
     ///
     /// The dict carries `state_schema`, its layout version
     /// ([`STATE_SCHEMA`]), and [`PyEngine::restore_state`] reads every field
@@ -4787,19 +4769,19 @@ impl PyEngine {
     /// # What it does NOT carry
     ///
     /// Everything here drives the market. Two things that do not are left
-    /// out deliberately, and each of them makes a restored engine differ from
-    /// the one it copied in a way no price will show:
+    /// out, and each of them makes a restored engine differ from the one it
+    /// copied in a way no price will show:
     ///
-    /// - **The order log.** A snapshot reproduces a STATE; the log reproduces
-    ///   a HISTORY, and a published result cites the second. An engine
-    ///   restored from a snapshot has an EMPTY log, so a `Checkpoint` or
+    /// - **The order log.** A snapshot reproduces a STATE and the log
+    ///   reproduces a HISTORY, which is what a published result cites. An
+    ///   engine restored from a snapshot has an EMPTY log, so a `Checkpoint` or
     ///   `RunManifest` taken on it describes a run that began at day zero.
     /// - **The day's recorded tape.** `record` accumulates the day's ticks;
     ///   a restore starts that accumulation empty, so a day half-recorded
     ///   before the snapshot comes back half as long.
     ///
-    /// Both are recording and history rather than market state, which is
-    /// the line this method draws. [`PyEngine::fork`] carries them, because it
+    /// Both are recording and history rather than market state.
+    /// [`PyEngine::fork`] carries them, because it
     /// copies the engine rather than rebuilding one, and it is what
     /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
@@ -4852,16 +4834,16 @@ impl PyEngine {
     ///
     /// # Matching tickers do NOT mean a matching universe
     ///
-    /// The check is on identity and order, which is all an engine knows -- it
-    /// holds no fundamentals. And tickers are generated positionally, so
+    /// The check is on identity and order, which is all an engine knows,
+    /// because it holds no fundamentals. Tickers are generated positionally, so
     /// `Universe.random(40, seed=1)` and `Universe.random(40, seed=99)` have
     /// exactly the same names and entirely different earnings, sectors and
     /// share counts.
     ///
     /// Restoring across those two would pass this check and produce a market
     /// with the right prices and the wrong fair values. The caller must supply
-    /// the universe the snapshot came from; this guard catches a re-ordered or
-    /// resized roster, not a substituted one.
+    /// the universe the snapshot came from. This guard catches a re-ordered or
+    /// resized roster, but not a substituted one.
     fn restore_state(&mut self, snapshot: &Bound<'_, PyDict>) -> PyResult<()> {
         self.copies.bump();
         // The dict as the core's field tree, then `Engine::restore`, which
@@ -4888,15 +4870,14 @@ impl PyEngine {
 
     /// Capture the session just run, and the macro state, as one day.
     ///
-    /// Explicit rather than automatic. The session buffer is reused, so
-    /// anything not captured before the next `run_session` is gone -- but a
-    /// caller who does not want a table should not pay to build one every
-    /// session.
+    /// Recording is explicit. The session buffer is reused, so anything not
+    /// captured before the next `run_session` is gone, but a caller who does
+    /// not want a table should not pay to build one every session.
     ///
-    /// The RAW buffers are kept rather than a finished batch. It costs the
-    /// same memory and it keeps grain a read-time decision: one recording can
-    /// answer tick, five-minute and daily questions. Re-running a day to
-    /// change its grain would be the alternative, and it is a much worse one.
+    /// The RAW buffers are kept rather than a finished batch. That costs the
+    /// same memory and leaves grain a read-time decision, so one recording
+    /// can answer tick, five-minute and daily questions without re-running
+    /// the day.
     #[pyo3(signature = (day))]
     fn record(&mut self, day: u32) -> PyResult<()> {
         self.log.push(crate::python_log::LogEntry::Record { day });
@@ -4962,8 +4943,8 @@ impl PyEngine {
     /// The `bars` table.
     ///
     /// Grain is chosen here, and downsampling happens in RUST rather than in
-    /// the consumer: bucketing ten million rows in Python to get two hundred
-    /// is the cost this surface exists to avoid.
+    /// the consumer, because bucketing ten million rows in Python to get two
+    /// hundred is the cost this surface exists to avoid.
     ///
     ///   `bars()`             tick grain: day, tick, instrument_id, close, volume
     ///   `bars(minutes=5)`    five-minute OHLCV bars
@@ -4971,8 +4952,7 @@ impl PyEngine {
     ///
     /// The tick schema has no open/high/low because at tick grain a bar IS the
     /// print and those columns would repeat close. Once ticks are bucketed
-    /// they carry real information, so the coarse schema is genuinely wider
-    /// rather than the same columns rearranged.
+    /// those columns carry real information, so the coarse schema is wider.
     ///
     /// `volume` is the volume traded inside the bar, at every grain: a tick
     /// row holds that minute's volume, a five-minute bar the five minutes',
@@ -5097,11 +5077,10 @@ impl PyEngine {
     /// `day = None`, the default, is every recorded day: one batch each, so a
     /// year streams. `day = N` is that day alone.
     ///
-    /// It was ignored entirely once anything had been recorded -- the argument
-    /// only ever labelled the un-recorded fallback -- so `truth(day=4)` on a
-    /// hundred-day run returned all hundred days and looked like it had
-    /// answered. The table had the right schema and plausible values, which is
-    /// why nothing noticed for as long as it did.
+    /// It used to be ignored once anything had been recorded (the argument
+    /// only labelled the un-recorded fallback), so `truth(day=4)` on a
+    /// hundred-day run returned all hundred days. The table had the right
+    /// schema and plausible values, so nothing flagged it.
     #[pyo3(signature = (*, day = None))]
     fn truth(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let batches = if self.recorded.is_empty() {
@@ -5164,20 +5143,19 @@ impl PyEngine {
     ///
     /// The market does not change. The second settlement runs on its own
     /// book, takes no draw, and its fills reach no company field, so the
-    /// known-answer digest is the same digest with the arm on. What it costs
-    /// is roughly one settlement per active company per open tick, which is
-    /// the largest single item in a tick.
+    /// known-answer digest is the same digest with the arm on. It costs
+    /// roughly one settlement per active company per open tick, which is the
+    /// largest single item in a tick.
     ///
     /// Set it before the FIRST session of a day. A day whose sessions
     /// disagree records fewer counterfactual values than it has rows, and
     /// `prints()` drops both columns for that whole day rather than serving
     /// one with a gap in it. The table's schema caveat names that case, so a
-    /// caller who switched the arm mid-day is told why the columns are gone
-    /// rather than being told to do what they just did. Days that disagree
-    /// with EACH OTHER are a different matter and raise.
+    /// caller who switched the arm mid-day can see why the columns are gone.
+    /// Days that disagree with EACH OTHER raise.
     ///
     /// The run log does not carry it, because the log carries INPUTS and this
-    /// is not one: no draw, no price and no company field depends on it. A
+    /// is not one. No draw, no price and no company field depends on it. A
     /// replay therefore rebuilds the same market and the same `shock` and
     /// `absorbed` columns, and rebuilds the arm only if it is asked for
     /// again.
@@ -5209,12 +5187,12 @@ impl PyEngine {
     /// circuit breaker as well as the book. `clamp` is the breaker's own
     /// part of it, and `absorbed - clamp` is the book's.
     ///
-    /// Read them apart. On every clamped print measured, the book and the
-    /// breaker pull opposite ways, and on roughly three fifths of them they
-    /// cancel to the last bit, so `absorbed` alone reads exactly zero on a
-    /// name the breaker had just moved 513 basis points -- the same value it
-    /// takes on a tick that never settled. `clamp` is what tells those two
-    /// rows apart.
+    /// Read them separately. On every clamped print measured, the book and
+    /// the breaker pull opposite ways, and on roughly three fifths of them
+    /// they cancel to the last bit, so `absorbed` alone reads exactly zero on
+    /// a name the breaker had just moved 513 basis points. That is the same
+    /// value it takes on a tick that never settled, and `clamp` tells those
+    /// two rows apart.
     ///
     /// `unbounded_print` and `liquidity_share` are present only when
     /// `settle_depth_counterfactual(True)` was set before the run, and the
@@ -5385,19 +5363,18 @@ impl PyEngine {
     ///
     /// This is the same book the tick settles prices through, not a display
     /// copy of it. So `sweep_cost` tells you what size would ACTUALLY cost,
-    /// and submitting an order pays those prices because it consumed those
-    /// levels -- market impact is emergent rather than a coefficient.
+    /// and an order submitted to it pays those prices because it consumed
+    /// those levels. Market impact is emergent, with no impact coefficient.
     ///
     /// # It is a snapshot, and trading it does not move the market
     ///
-    /// Worth being explicit, because the opposite is easy to assume. The book
-    /// is rebuilt per call from current state, so the object returned is
-    /// detached: filling against it tells you your execution price, but the
-    /// market only learns about your trading through `fills` on the next
-    /// `run_session` (or `order_flow` on the next `tick`). Those are two
-    /// separate channels on purpose -- one prices your fill, the other
-    /// applies your pressure, once -- and a harness that wants both must do
-    /// both.
+    /// The book is rebuilt per call from current state, so the object
+    /// returned is detached. Filling against it tells you your execution
+    /// price, but the market only learns about your trading through `fills`
+    /// on the next `run_session` (or `order_flow` on the next `tick`). The
+    /// two channels are separate on purpose. One prices your fill and the
+    /// other applies your pressure, once, so a harness that wants both must
+    /// do both.
     fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
         let index = self.tickers.iter().position(|t| t == ticker).ok_or_else(|| {
             ValidationError::new_err(format!(
@@ -5420,20 +5397,21 @@ impl PyEngine {
     /// default would make every run twenty times more expensive to answer a
     /// question most runs never ask.
     ///
-    /// The multiplier is the book's structure, not the `levels` argument:
-    /// the maker quotes `BOOK_LEVELS = 10` a side (microstructure.rs), and
-    /// `price_levels()` can only return what the book holds, so asking for
-    /// `levels = 20` records the same 20 rows per name. Measured: six
-    /// instruments, one snapshot, 120 rows at levels 10 and 20 alike.
+    /// The book's structure sets the multiplier, and the `levels` argument
+    /// does not. The maker quotes `BOOK_LEVELS = 10` a side
+    /// (microstructure.rs), and `price_levels()` can only return what the
+    /// book holds, so asking for `levels = 20` records the same 20 rows per
+    /// name. Measured on six instruments, one snapshot gave 120 rows at
+    /// levels 10 and 20 alike.
     ///
-    /// So the caller decides when and how deep. Nothing samples on their
-    /// behalf: a sampling rate baked into the engine would be a modelling
-    /// decision wearing the costume of a default, and two studies using
-    /// different rates would silently be measuring different things.
+    /// So the caller decides when and how deep, and nothing samples on their
+    /// behalf. A sampling rate built into the engine would be a modelling
+    /// decision presented as a default, and two studies using different
+    /// rates would be measuring different things without knowing it.
     ///
-    /// This is NOT logged as a replayable input, and correctly so -- it reads
-    /// state without changing it, consumes no draws, and replaying a run
-    /// produces the same depth whether or not anyone looked.
+    /// This is NOT logged as a replayable input. It reads state without
+    /// changing it and consumes no draws, so replaying a run produces the
+    /// same depth whether or not anyone looked.
     #[pyo3(signature = (*, day = 0, tick = 0, levels = 10))]
     fn snapshot_book(&mut self, day: u32, tick: u32, levels: usize) -> PyResult<usize> {
         if levels == 0 {
@@ -5467,9 +5445,9 @@ impl PyEngine {
     /// The `book` table: recorded depth, one row per (tick, instrument, side,
     /// level).
     ///
-    /// `side` is 0 for bids and 1 for asks -- an integer rather than a string
-    /// because it repeats on every row, the same reason `instrument_id` is an
-    /// index.
+    /// `side` is 0 for bids and 1 for asks. It is an integer rather than a
+    /// string because it repeats on every row, the same reason
+    /// `instrument_id` is an index.
     ///
     /// Empty unless `snapshot_book` was called.
     fn book_table(&self) -> PyResult<crate::python_arrow::PyArrowStream> {
@@ -5530,9 +5508,9 @@ impl PyEngine {
     /// ``orders`` is a list of dicts with ``agent``, ``ticker``,
     /// ``quantity`` and optionally ``limit_price`` and ``order_id``. They
     /// are processed sorted by agent label, and within one agent in the
-    /// order the list gives: the arrival order of a step is a property of
-    /// who sent what, never of how the caller happened to build the list,
-    /// so the same orders give the same market. Each one meets the book the
+    /// order the list gives. The arrival order of a step depends on who sent
+    /// what and never on how the caller built the list, so the same orders
+    /// give the same market. Each one meets the book the
     /// ones before it left, so an agent later in the order pays for the
     /// levels an earlier one took and can hit an earlier one's resting
     /// order.
@@ -5676,19 +5654,19 @@ impl PyEngine {
     ///
     /// # A seed alone does not reproduce a run
     ///
-    /// It would, if nothing else varied. But the market an agent trades in
+    /// It would if nothing else varied. But the market an agent trades in
     /// depends on the agent's own orders, so one seed with different flow is a
-    /// different market -- correctly. Reproducing a run means reproducing
-    /// every input, and this is that sequence.
+    /// different market. Reproducing a run means reproducing every input, and
+    /// this is that sequence.
     ///
     /// It records INPUTS only. Prices, attribution and draw counts are
     /// consequences of replaying them, and logging those too would create a
     /// second source of truth that could disagree with the first.
     ///
-    /// Embedder draws are in here, which is easy to overlook: they move the
-    /// EXTERNAL stream, so a replay that skipped one would hand the embedder
-    /// different values than the run it claims to reproduce, because the market
-    /// itself no longer depends on them since the stream split.
+    /// Embedder draws are in here too. They move the EXTERNAL stream, which
+    /// the market no longer depends on since the stream split, so a replay
+    /// that skipped one would hand the embedder different values from the
+    /// run it claims to reproduce.
     #[getter]
     fn order_log(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
         self.log.iter().map(|e| e.to_py(py)).collect()
@@ -5831,10 +5809,10 @@ fn cycle_name(p: CyclePhase) -> &'static str {
 
 /// A news event, as the price model sees it.
 ///
-/// Reduced to the three fields the factor model actually reads. The game's
-/// richer event objects -- headlines, bodies, storyline phases -- never reach
-/// the price loop, so carrying them across the boundary would be marshalling
-/// cost for nothing.
+/// It has only the three fields the factor model reads. The game's richer
+/// event objects (headlines, bodies, storyline phases) never reach the price
+/// loop, so carrying them across the boundary would be marshalling cost for
+/// nothing.
 ///
 /// Scope is decided by which fields are set, and the rules are not symmetric:
 ///
@@ -5842,9 +5820,9 @@ fn cycle_name(p: CyclePhase) -> &'static str {
 ///   sector set, no ticker         -> every instrument in that sector
 ///   neither set                   -> market-wide
 ///
-/// So an event with no ticker and no sector is not "unscoped and inert", it is
-/// the broadest possible event. That is the reference behaviour and it
-/// surprises people, which is why it is written down here.
+/// So an event with no ticker and no sector is market-wide, the broadest
+/// possible event, and is not inert. That is the reference behaviour, and it
+/// surprises people.
 #[pyclass(name = "News", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyNews {
@@ -5881,8 +5859,8 @@ impl PyNews {
 
 /// A decaying news impact, carried across ticks.
 ///
-/// Distinct from [`PyNews`]: news is an impulse arriving now, this is the
-/// residue of one still working through the tape. It also drives the volume
+/// A [`PyNews`] is an impulse arriving now, and this is the residue of one
+/// still working through the tape. It also drives the volume
 /// amplifier, which is why a name in the middle of a story trades heavier.
 #[pyclass(name = "NewsImpact", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
@@ -5960,11 +5938,11 @@ pub(crate) use crate::snapshot::COLUMN_FIELDS;
 /// A sector's relative volatility multiplier.
 ///
 /// Exposed so a loader can derive a beta with the same cross-sector structure
-/// a generated universe has, without consuming an RNG draw -- drawing here
+/// a generated universe has, without consuming an RNG draw. A draw here
 /// would make building a universe perturb the market it is built for.
 ///
-/// DIMENSIONLESS and relative (0.6 to 1.3). Not a volatility in any unit, and
-/// not the thing to square for a variance -- see the sector table.
+/// DIMENSIONLESS and relative (0.6 to 1.3). It is not a volatility in any
+/// unit and should not be squared for a variance (see the sector table).
 #[pyfunction]
 pub fn sector_volatility(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
@@ -5976,9 +5954,9 @@ pub fn sector_volatility(sector: &str) -> PyResult<f64> {
 
 /// A sector's long-run daily return standard deviation, as a fraction.
 ///
-/// The real dispersion measure -- NOT the relative `volatility` multiplier,
-/// which is dimensionless and squaring it for a variance is a mistake the
-/// reference implementation made and had to fix.
+/// This is the dispersion measure to use. The relative `volatility`
+/// multiplier is dimensionless, and squaring it for a variance is a mistake
+/// the reference implementation made and had to fix.
 #[pyfunction]
 pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
     crate::sectors::by_key(sector)
@@ -5997,10 +5975,10 @@ pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
 /// their non-market parts while an episode runs; `extra_min` and `extra_max`
 /// are the open interval `ModelParams::invariants` admits.
 ///
-/// A window, not a dial: this computes nothing an engine does not compute
-/// for itself, and it exists so a reader (and
-/// `tests/test_crisis_epicentre.py`) can check the solve against its own two
-/// equations with the engine's numbers rather than a transcription of them.
+/// It is read-only and computes nothing an engine does not compute for
+/// itself. It exists so a reader (and `tests/test_crisis_epicentre.py`) can
+/// check the solve against its own two equations with the engine's numbers
+/// rather than a transcription of them.
 /// It takes the extra rather than a `ModelParams` because the solve reads
 /// exactly one field and a params argument would suggest otherwise.
 #[pyfunction]
@@ -6022,12 +6000,12 @@ pub fn crisis_epicentre_solve(py: Python<'_>, extra: f64) -> PyResult<Bound<'_, 
 ///
 /// A universe priced exactly at fair value starts with zero cross-sectional
 /// mispricing dispersion, so a strategy that harvests mispricing sees nothing
-/// until shocks accumulate -- on the order of one 60-day half-life. This is
-/// the width of the distribution such a universe would eventually reach, so a
-/// caller can start there instead of waiting.
+/// until shocks accumulate, which takes on the order of one 60-day
+/// half-life. This is the width of the distribution such a universe would
+/// eventually reach, so a caller can start there instead of waiting.
 ///
-/// Returns None for non-stationary parameters rather than a large finite
-/// number, which would be worse: it would be used.
+/// Returns None for non-stationary parameters. A large finite number would
+/// be worse, because a caller would use it.
 #[pyfunction]
 #[pyo3(signature = (innovation_sigma, *, phi = None, theta = None))]
 pub fn stationary_sigma(

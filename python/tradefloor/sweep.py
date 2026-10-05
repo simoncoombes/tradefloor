@@ -1,18 +1,18 @@
 """Columnar results for many seeds, without holding them all.
 
-`run_many` returns prices or summaries, small things, one per seed. This
-returns TABLES, which are not small. Everything here is arranged so you never
-hold more than a few at once.
+`run_many` returns small results, prices or summaries, one per seed. This
+returns TABLES, which are large, and it is arranged so you never hold more
+than a few at once.
 
-The arithmetic that motivates it. One recorded engine keeps fourteen f64
-buffers of `days x ticks x instruments` -- price, volume, mispricing,
-fundamental and anchor, plus one per attribution component, and there are nine
-of those. At 252 days, 390 ticks and 100 instruments that is 9.8 million
-elements per buffer, about 1.10 GB retained, and the `truth` table it
-materialises is 9.8 million rows of fifteen columns. A hundred seeds held at
-once is roughly 110 gigabytes. Streamed one at a time it is a little over one,
-and the analysis is usually a reduction anyway (a mean, a regression, a count)
-that never needed the whole thing resident.
+One recorded engine keeps fourteen f64 buffers of `days x ticks x
+instruments`: price, volume, mispricing, fundamental and anchor, plus one per
+attribution component, and there are nine of those. At 252 days, 390 ticks
+and 100 instruments that is 9.8 million elements per buffer, about 1.10 GB
+retained, and the `truth` table it materialises is 9.8 million rows of
+fifteen columns. A hundred seeds held at once is roughly 110 gigabytes.
+Streamed one at a time it is a little over one, and the analysis is usually
+a reduction anyway (a mean, a regression, a count) that never needed the
+whole thing resident.
 
 ```python
 for seed, table in tf.sweep(range(100), universe=u, days=252, collect="truth"):
@@ -22,24 +22,21 @@ for seed, table in tf.sweep(range(100), universe=u, days=252, collect="truth"):
 
 ## Laziness is the feature, so it is a generator
 
-Returning a list would defeat the purpose: building it would hold every table
-before the caller saw the first one. The generator runs a seed, hands it over,
-and drops the engine before starting the next, so peak memory is one engine
-regardless of how many seeds you ask for.
+A list would hold every table before the caller saw the first one. The
+generator runs a seed, hands it over, and drops the engine before starting the
+next, so peak memory is one engine regardless of how many seeds you ask for.
 
-Which means **consuming it out of order, or keeping the tables, brings the
-memory back**. `list(sweep(...))` is the thing this exists to avoid, and it
-is worth saying because it looks like an obvious convenience.
+**Consuming it out of order, or keeping the tables, brings the memory
+back.** `list(sweep(...))` looks like an obvious convenience and is what this
+exists to avoid.
 
 ## Workers trade memory back for speed, explicitly
 
 `workers=n` keeps `n` engines alive at once, so peak memory is `n` times one
-engine. That is a real trade rather than a free speedup, and the default is
-one for that reason. Ordering is preserved regardless: results come back in
-seed
-order even when they finish out of order, because a sweep whose row order
-depended on scheduling would be non-deterministic in exactly the way this
-library exists to avoid.
+engine, which is why the default is one. Results come back in seed order
+even when they finish out of order, because a sweep whose row order depended
+on scheduling would be non-deterministic, which this library exists to
+avoid.
 """
 
 from __future__ import annotations

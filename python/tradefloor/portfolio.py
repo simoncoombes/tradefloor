@@ -1,28 +1,27 @@
 """Positions, cash and P&L for one trader.
 
-Deliberately Python rather than engine state. Position accounting is
+Positions are kept in Python, outside the engine state. Position accounting is
 arithmetic over IEEE-754 doubles, identical in both languages, and keeping it
-out of the engine means the engine stays a *market* rather than becoming a
-broker. It also lets a harness hold several portfolios against one market
-without the engine knowing about any of them, which running N agents on one
-seed requires.
+out of the engine keeps broker logic out of the market model. It also lets a
+harness hold several portfolios against one market without the engine knowing
+about any of them, which running N agents on one seed requires.
 
-## Execution and impact are separate channels, on purpose
+## Execution and impact are separate channels
 
 :meth:`Portfolio.execute` prices a fill against the instrument's live book,
 the same book the tick settles through, so slippage is real levels consumed.
-That tells you what *you* paid. It tells the market nothing.
+That tells you what you paid, and tells the market nothing.
 
 The market learns about your trading through the flow
 :meth:`Portfolio.pending_flow` accumulates, handed to the next session as
-``Engine.run_session(..., fills=...)``, which applies it ONCE, on the
+``Engine.run_session(..., fills=...)``, which applies it once, on the
 session's first tick (or as ``order_flow`` to a single ``Engine.tick``). A
 harness that executes without feeding the flow back has a trader whose fills
 are realistic and whose footprint is invisible, profitable in a way no real
 trader could be.
 
 A harness that feeds it back on every tick of a step is the opposite error,
-and every harness here made it until 0.8.5: ``run_session``'s old
+and every harness here made it until 0.8.5. ``run_session``'s old
 ``order_flow`` held the flow for the whole session, so one order was counted
 65 times at six steps a day, after the agent had already filled at the
 pre-trade book. The agent collected its own impact instead of paying it. A
@@ -39,7 +38,7 @@ Under a model with ``book_shared`` or ``book_resting`` on
 engine's own book instead of pricing it off a snapshot. What it takes is
 gone for every trader after it until the book refills, its fills can be
 another trader's resting order, and the engine applies its flow to the
-market itself, once, on the next tick; :meth:`pending_flow` then holds
+market itself, once, on the next tick. :meth:`pending_flow` then holds
 nothing for that trade, so a harness that passes ``fills=pending_flow()``
 counts it once either way. The portfolio's ``owner`` is the label its
 orders carry in the book, which is how several portfolios share one.
@@ -307,9 +306,8 @@ class Cancel:
 class Position:
     """A holding in one instrument.
 
-    ``quantity`` is signed; negative is short. Shorting is a real strategy, and
-    a harness that could not express it would quietly narrow what an agent can
-    be evaluated on.
+    ``quantity`` is signed, and negative is short. A harness that could not
+    express a short would narrow what an agent can be evaluated on.
     """
 
     __slots__ = ("ticker", "quantity", "avg_cost", "realised")
@@ -372,13 +370,11 @@ class Portfolio:
         not impose a broker's risk policy on a researcher studying, say, what
         an unconstrained strategy does.
 
-        For an EVALUATION harness it should almost always be set. An agent that
-        can trade unlimited size is being tested against nothing: the order
-        book makes large trades cost
-        more, but if there is no funding limit then arbitrarily large is always
-        available and "trade everything" becomes a strategy. A leverage cap is
-        what makes the impact constraint bite economically rather than only
-        mechanically.
+        For an evaluation harness it should almost always be set. The order
+        book makes large trades cost more, but with no funding limit
+        arbitrarily large is always available and "trade everything" becomes
+        a strategy. A leverage cap makes impact limit what a strategy can
+        earn as well as move its prices.
         """
         # `x != x or x <= 0` let +inf through, and an infinite cash balance
         # or leverage cap is not a portfolio anybody can hold.
@@ -433,10 +429,9 @@ class Portfolio:
         worse prices because it consumed levels. There is no slippage
         coefficient anywhere on this path.
 
-        A partial fill is reported as partial rather than being completed at a
-        made-up price. Filling the remainder at the last level would be
-        inventing liquidity that was not there, the kind of convenience that
-        makes a backtest profitable and a live strategy not.
+        A partial fill is reported as partial. Filling the remainder at the
+        last level would invent liquidity that was not there, which makes a
+        backtest profitable and a live strategy not.
 
         ``quantity`` is a finite real number, numpy scalars included. A
         string or a ``bool`` is refused with a :class:`ValidationError`
@@ -731,9 +726,9 @@ class Portfolio:
     def gross_exposure(self, engine: Engine) -> float:
         """Absolute market value across every position, longs and shorts alike.
 
-        Absolute because a long and a short of equal size are two positions
-        with two risks, not a flat book. Netting them would report a hedged
-        trader and a reckless one as identical.
+        It is absolute because a long and a short of equal size are two
+        positions with two risks. Netting them would report a hedged trader
+        and a reckless one as identical.
         """
         prices = self.marks(engine)
         return ordered_sum(
@@ -805,7 +800,7 @@ class Portfolio:
         more than the account is worth, is charged it while
         ``margin_interest`` is on, which is the default, whatever
         ``cash_interest`` says. That is cheaper than any broker lends, so a
-        levered strategy's financing cost is a floor here, not an estimate.
+        levered strategy's financing cost here is a lower bound.
 
         Until 0.8.5 nothing charged borrowing by default:
         :func:`tradefloor.evaluate`, :func:`tradefloor.rank` and
@@ -818,7 +813,7 @@ class Portfolio:
         Call it once per trading day. The harness calls it just before the
         close, so the day's interest is at the rate the day traded under and
         the close's macro step, which may move the rate, applies to the next
-        day. Before ``cash_interest`` existed cash earned nothing: a
+        day. Before ``cash_interest`` existed cash earned nothing. A
         portfolio holding cash through a rate shock gained nothing from the
         higher rate, and a 60/40 portfolio's bond sleeve was compared against
         cash that paid zero.
@@ -847,7 +842,7 @@ class Portfolio:
         pooled purchase is a rounding error on the name's volume. Without
         it the long's dividend is credited as cash.
 
-        Why reinvestment is the default: a holder that buys once and keeps
+        Reinvestment is the default because a holder that buys once and keeps
         its dividends as cash holds less of the market every quarter, and
         with cash earning nothing any strategy that re-targets its net worth
         beats it by reinvesting them. On pt-v20 with dividends on (held-out
@@ -922,8 +917,8 @@ class Portfolio:
 
         Feed this to the next ``run_session`` as ``fills``, or to the next
         single ``tick`` as ``order_flow``, so the market feels the trading
-        once, on the minute after the fills. Then call :meth:`clear_flow`:
-        flow left in place is sent again with the next step's.
+        once, on the minute after the fills. Then call :meth:`clear_flow`,
+        or the flow is sent again with the next step's.
         """
         return {
             ticker: (buy, sell)
@@ -939,25 +934,24 @@ class Portfolio:
         """The fill log as an Arrow stream, joinable to the tape.
 
         ``tickers`` is the roster, so fills carry an ``instrument_id`` index
-        rather than a repeated string -- and so this table joins to ``bars``
-        and ``truth`` on that key rather than on text.
+        rather than a repeated string, and this table joins to ``bars`` and
+        ``truth`` on that key.
 
-        The join is the point: ``bars`` says where the price was, this says
-        where you were filled, and the gap between them is your execution
-        quality. Neither table can answer that alone.
+        ``bars`` says where the price was, this says where you were filled,
+        and the gap between them is your execution quality. Neither table can
+        answer that alone.
 
         # Why there is a ``tick`` column as well as a ``step``
 
-        This docstring used to claim the join and only half-deliver it.
-        ``bars``, ``truth`` and ``book`` are keyed on a WITHIN-DAY tick;
-        ``step`` is a GLOBAL counter, so a fill at ``day=1, step=6`` under
+        ``bars``, ``truth`` and ``book`` are keyed on a within-day tick, and
+        ``step`` is a global counter, so a fill at ``day=1, step=6`` under
         four steps a day looks wrong and joins to nothing. Recovering the tick
         needed ``steps_per_day`` and ``ticks_per_step``, which appear in no
-        table -- so the join was possible only for someone who still had the
+        table, so the join was possible only for someone who still had the
         call that produced the data.
 
         ``tick`` is the number of ticks already run that day when the order
-        crossed. Agents act at the START of a step and the session runs
+        crossed. Agents act at the start of a step and the session runs
         afterwards, so a fill at within-day step ``k`` carries
         ``k * ticks_per_step``: the index of the next tick to run. Joining on
         ``(day, tick, instrument_id)`` therefore lines a fill up with the bar
@@ -983,9 +977,9 @@ class Portfolio:
         at day zero and the fills table could not be joined to anything on
         time, which is most of what it is for.
 
-        ``tick`` is required rather than defaulted. Defaulting it would put
-        every fill at tick zero -- a table that joins cleanly, to the wrong
-        bar, with nothing to indicate it. That is worse than a TypeError.
+        ``tick`` is required. A default would put every fill at tick zero,
+        and the table would join cleanly to the wrong bar with nothing to
+        indicate it. Leaving it out raises a TypeError instead.
         See :meth:`fills_table` for what the value means.
         """
         self._stamp = (int(day), int(step), int(tick))

@@ -1,8 +1,8 @@
-"""One object a stranger can reproduce a run from, and know that they did.
+"""Run manifests: one object anyone can reproduce a run from and check.
 
 `tradefloor-docs: docs/reproducing-a-run.md` lists the five things that
-identify a run and shows a careful reader how to archive and check each one
-by hand. This module is that page as a single artifact:
+identify a run and shows how to archive and check each one by hand. This
+module does the same in one object:
 
 ```python
 manifest = tf.RunManifest.of(engine, seed=42, universe=u, macro=m)
@@ -13,72 +13,71 @@ same = tf.RunManifest.from_json(open("run.json").read()).reproduce()
 ```
 
 `reproduce()` replays the run and checks the result against the digest the
-manifest carries, so the reader is TOLD whether they rebuilt the same market
-rather than eyeballing numbers off a page. On success the returned engine is
-the published market, bit for bit. On any mismatch it raises, and the error
-names the component that disagreed, so every component carries its own
-fingerprint rather than one hash over the whole file.
+manifest carries, so the reader is told whether they rebuilt the same market
+and does not have to compare numbers by eye. On success the returned engine
+is the published market, bit for bit. On any mismatch it raises, and the
+error names the component that disagreed, because every component carries
+its own fingerprint instead of one hash over the whole file.
 
 ## The completeness rule
 
 A manifest reproduces if and only if every component is either shipped with
-the library or embedded in the manifest. A fingerprint identifies; it cannot
+the library or embedded in the manifest. A fingerprint identifies but cannot
 reconstruct, because you cannot invert a hash. So the manifest EMBEDS
-everything user-supplied: the roster itself (never a recipe for one, since generators change
-across versions, and an EDGAR query is not the data it returned), the macro
-initial conditions, the realised scenario path, the full order log, and the
-strategy when it is a :class:`StrategySpec`.
+everything user-supplied: the roster itself (never a recipe for one, since
+generators change across versions, and an EDGAR query is not the data it
+returned), the macro initial conditions, the realised scenario path, the
+full order log, and the strategy when it is a :class:`StrategySpec`.
 
 The one component that cannot always be embedded is a hand-written Python
-agent, and the manifest says so rather than pretending: pass a reference
-string ("repo X at commit Y") and the manifest records the strategy as
-referenced, not carried. Such a manifest is honestly incomplete, and its
-:attr:`~RunManifest.complete` is False and :attr:`~RunManifest.gaps` says
-why. The MARKET still reproduces, because the agent's orders are data in the
-log; what the reader cannot do without the referenced code is re-run the
-strategy itself on new inputs. That mirrors ``Scorecard.strategy_fingerprint``
-being deliberately empty for hand-written agents: an escape hatch that
-declares itself.
+agent. Pass a reference string ("repo X at commit Y") and the manifest
+records the strategy as referenced, not carried. Such a manifest is
+incomplete: its :attr:`~RunManifest.complete` is False and
+:attr:`~RunManifest.gaps` says why. The market still reproduces, because the
+agent's orders are data in the log. Without the referenced code the reader
+cannot re-run the strategy itself on new inputs.
+``Scorecard.strategy_fingerprint`` is empty for hand-written agents for the
+same reason.
 
 ## The era, and why it is a measurement rather than a version number
 
 A run is only reproducible on a build whose arithmetic matches the build that
-ran it. "Across versions, not at all" is the documented guarantee, and the
-hazard is live: one calendar day brought three trajectory-changing fixes
+ran it. "Across versions, not at all" is the documented guarantee, and it
+has mattered. One calendar day brought three trajectory-changing fixes
 (the macro-chain and volume fixes, then the market-factor-sigma
 recalibration) while ``tf.version()`` stayed 0.1.0 and the preset stayed
-"pt-v1", and the recalibrated constant is not even in the preset dictionary,
-so a preset-value comparison holds still with them. Every NAME the
-library could quote held still while the numbers moved. A manifest that
-trusted names would replay on the wrong build, produce a plausible market,
-and manufacture exactly the false confidence it exists to prevent.
+"pt-v1". The recalibrated constant is not in the preset dictionary, so a
+preset-value comparison did not change either. Every name the library could
+quote held still while the numbers moved. A manifest that trusted names
+would replay on the wrong build and produce a plausible but different
+market.
 
-So the era identity here is behavioural: :func:`era_fingerprint` runs a
-small fixed simulation: generator draws, fair value across every sector,
-the daily mispricing step, and a coupled engine run through day closes, and
-digests it, the same canonical-f64 discipline as ``tests/known_answer.py``.
+So the era identity here is behavioural. :func:`era_fingerprint` runs a
+small fixed simulation (generator draws, fair value across every sector,
+the daily mispricing step, and a coupled engine run through day closes) and
+digests it with the same canonical-f64 encoding as ``tests/known_answer.py``.
 The test suite's ``KAT_VERSION`` is the same idea kept by convention, but it
 lives in the test tree, which an installed wheel does not have, and a
-convention depends on a human remembering to bump it. A digest cannot forget.
+convention depends on someone remembering to bump it. A digest does not.
 Two builds that agree on the probe agree on the arithmetic the probe
-exercises; two that disagree will not reproduce each other's runs, whatever
-their version strings say. ``reproduce()`` checks the probe BEFORE replaying
-and refuses on a mismatch, naming both builds, following ``Checkpoint``'s
-precedent of refusing over quietly running against the wrong world.
+exercises, and two that disagree will not reproduce each other's runs,
+whatever their version strings say. ``reproduce()`` checks the probe before replaying
+and refuses on a mismatch, naming both builds, as ``Checkpoint`` refuses to
+run against the wrong build.
 
-The package version, the preset name and the full coefficient dictionary
-still ride along, since they are what a methods section quotes, the coefficient
-values give a mismatch a specific name when the model itself moved, and the
-embedded values are what will let a future custom preset travel without a
-format change, but none of them is trusted as the era. The probe is.
+The manifest still records the package version, the preset name and the
+full coefficient dictionary. A methods section quotes them, the coefficient
+values name a mismatch when the model itself moved, and the embedded values
+will let a future custom preset travel without a format change. None of
+them is trusted as the era. Only the probe is.
 
 ## Sampled verification, for a run too long to replay
 
 `reproduce()` replays the whole run, so a 252-day manifest costs 252 days to
-check. A reader who wants evidence for a fraction of that cost has
-:class:`DayLedger`: the run takes a canonical hash of the engine's state at
-every close, the manifest carries the Merkle root over those leaves, and
-:func:`verify` recomputes k random days from their committed predecessors.
+check. For evidence at a fraction of that cost there is :class:`DayLedger`.
+The run takes a canonical hash of the engine's state at every close, the
+manifest carries the Merkle root over those leaves, and :func:`verify`
+recomputes k random days from their committed predecessors.
 Checking k days costs k days of simulation, whatever the length of the run.
 
 The two checks measure different things and both are here. The market digest
@@ -90,7 +89,7 @@ outside the sample rest on.
 ## What a successful reproduction proves about platforms
 
 Cross-OS bit-identity is measured by commit. The five-target release gate
-has run: at ``ad91026`` (known-answer v5, the RNG stream split), all five
+has run. At ``ad91026`` (known-answer v5, the RNG stream split), all five
 targets (Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows
 x86_64) produced the identical digest, ``76983e65...3180eeb``, each also
 passing against the committed baseline. It has not yet run against a
@@ -98,12 +97,10 @@ tagged release, and the current digest, ``1ee64998...fe3581c`` at v8, was
 regenerated on macOS arm64 and has one platform's confirmation behind it
 until the gate runs again. ``tradefloor-docs: docs/reproducing-a-run.md``
 keeps the full record. The manifest records the writer's platform and claims
-nothing beyond that. What it offers instead is sharper: the manifest carries
-the
-expected output digest, so a successful ``reproduce()`` on a different
-machine IS a cross-platform measurement for that run, made by the reader,
-not promised by the library. A failure after every input verified is
-reported as exactly that: an arithmetic divergence on an unmeasured pair,
+nothing beyond that. It does carry the expected output digest, so a
+successful ``reproduce()`` on a different machine is a cross-platform
+measurement for that run, made by the reader. A failure after every input
+verified is reported as an arithmetic divergence on an unmeasured pair,
 with both platforms named.
 """
 
@@ -336,8 +333,8 @@ def market_digest(engine: Engine) -> str:
 
     Covers :data:`DIGEST_COLUMNS` for every instrument plus the draw count.
     Two engines with equal digests ended on the same market to the bit,
-    including the continuous internals that tomorrow's prices depend on, not
-    only the prices a cent grid has already rounded.
+    including the continuous internals that tomorrow's prices depend on as
+    well as the prices a cent grid has already rounded.
     """
     n = len(engine.tickers)
     buf = bytearray()
@@ -430,11 +427,11 @@ _IDIO_VOL_KEYS = ("idio_variance", "idio_jump_pending", "idio_jump_var_pending")
 def state_hash(snapshot: dict[str, Any]) -> str:
     """sha256 over an engine's state: the per-day ledger leaf, in Python.
 
-    The twin of ``Engine.state_hash``, computed from
-    ``Engine.state_snapshot()`` rather than from the engine, and a test holds
-    the two equal. It exists so a reader can check a ledger's leaves against
-    an archived snapshot with the package alone, and so the encoding has a
-    second implementation that a divergence between the two would expose.
+    It matches ``Engine.state_hash`` but is computed from
+    ``Engine.state_snapshot()`` instead of the engine, and a test holds the
+    two equal. With it a reader can check a ledger's leaves against an
+    archived snapshot with the package alone, and the encoding has a second
+    implementation, so a divergence between the two shows up.
 
     ## What it covers
 
@@ -470,11 +467,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     the same, which is the property that lets a replayed day be checked
     against a recorded one.
 
-    One difference is worth knowing before two runs are compared.
+    Note one difference before comparing two runs.
     ``run_session(close_at_end=True)`` leaves the binding's session flag set
     where ``close_market()`` clears it, so the two spellings of one close
     hash apart on a market that is otherwise identical to the bit. The flag
-    is state rather than bookkeeping: it decides whether the next session
+    is state, because it decides whether the next session
     re-opens the day and re-anchors ``previous_close``. A recorded run still
     verifies against itself either way, because a replay runs the spelling
     its own log holds.
@@ -493,9 +490,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
 
     Every float is eight bytes big-endian with one canonical NaN pattern, the
     rule :func:`_f64` and ``tests/known_answer.py`` share. The generator
-    states are raw bit patterns instead; :func:`_bits` says why. Strings are
-    length-prefixed, a bool is one byte, and an optional value is a presence
-    byte followed by the value when it is there.
+    states are raw bit patterns instead, and :func:`_bits` says why. Strings
+    are length-prefixed, a bool is one byte, and an optional value is a
+    presence byte followed by the value when it is there.
 
     A snapshot carrying a key this function does not know, or missing one it
     does, is refused by name. The alternative is a leaf that silently stops
@@ -1368,7 +1365,7 @@ def _era_preset(written_by: dict[str, Any]) -> str | None:
 
 
 def era_fingerprint(preset: str | None = None) -> str:
-    """Digest of a fixed probe simulation: the build's behavioural identity.
+    """Digest of a fixed probe simulation, used as the build's identity.
 
     `preset` is the model the probe's coupled engine runs and whose values it
     hashes: the build's default when None, as every manifest records it. A
@@ -1381,11 +1378,11 @@ def era_fingerprint(preset: str | None = None) -> str:
     both valuation paths, the daily mispricing step, and a coupled engine run
     through day closes, where the macro chain advances. Version strings and
     preset names are quoted in a manifest but not trusted as the era, because
-    both have already held still across a boundary that moved every
-    trajectory; this digest moved. See the module docstring for the argument.
+    both have held still across a boundary that moved every trajectory, and
+    this digest moved. See the module docstring for the argument.
 
-    Deliberately a smaller sibling of ``tests/known_answer.py``, living in
-    the package because the test tree does not ship in a wheel and a reader
+    It is a smaller version of ``tests/known_answer.py``, kept in the
+    package because the test tree does not ship in a wheel and a reader
     checking a manifest has nothing else.
     """
     buf = bytearray()
@@ -1572,9 +1569,9 @@ class DayLedger:
 
     A leaf is ``Engine.state_hash()`` taken after a day's close, and the root
     of the binary tree over the leaves is what a :class:`RunManifest` carries.
-    The manifest stays a document a person can read: a year of snapshots at
-    forty names is several megabytes, so the states live here, beside the
-    manifest rather than inside it.
+    A year of snapshots at forty names is several megabytes, so the states
+    live here, beside the manifest, and the manifest stays small enough for
+    a person to read.
 
     ```python
     ledger = tf.DayLedger()
@@ -1593,19 +1590,19 @@ class DayLedger:
     is for a ledger that has to stay small and whose days will be checked
     rarely.
 
-    The size is what decides between them, and it is why the states sit
-    here rather than inside the manifest. On ``Universe.random(40,
-    seed=7)``, seed 42, 252 days at 30 ticks a day with ``record=False``,
-    at ``fd7b6dc``: the ledger writes 4,880,447 bytes with the states and
-    16,924 without them, beside a 61,781-byte manifest. The run shape
-    belongs in that sentence, because ``record=True`` takes the manifest to
-    68,223 bytes and leaves the ledger where it is. A manifest is meant to
-    be read, so it carries the root alone.
+    Size decides between them. On ``Universe.random(40, seed=7)``, seed 42,
+    252 days at 30 ticks a day with ``record=False``, at ``fd7b6dc``, the
+    ledger writes 4,880,447 bytes with the states and 16,924 without them,
+    beside a 61,781-byte manifest. The run shape matters, because
+    ``record=True`` takes the manifest to 68,223 bytes and leaves the ledger
+    where it is. A manifest is meant to be read, so it carries the root
+    alone.
 
     ## The leaf is taken after the close
 
-    Not after ``record``, so a run that never recorded a tape still ledgers,
-    and the state a leaf commits to is the one the next day starts from.
+    It is not taken after ``record``, so a run that never recorded a tape
+    still ledgers, and the state a leaf commits to is the one the next day
+    starts from.
     That is what makes day d checkable from day d - 1.
     """
 
@@ -1688,7 +1685,7 @@ class DayLedger:
     # -- serialisation -----------------------------------------------------
 
     def to_json(self, *, with_snapshots: bool = True) -> str:
-        """The ledger as JSON: the file that travels beside a manifest.
+        """The ledger as JSON, the file that travels beside a manifest.
 
         ``with_snapshots=False`` writes the leaves alone, which is the small
         artifact. A ledger that never held snapshots writes none either way,
@@ -1712,11 +1709,11 @@ class DayLedger:
     def from_json(cls, text: str) -> "DayLedger":
         """Load a ledger written by :meth:`to_json`.
 
-        Refuses a hash version this build does not compute, by name: a leaf
-        from another version of the state hash is a different measurement,
-        and checking a day against one would report a tampered day that is
-        not. Refuses a leaf that is not 64 lowercase hex characters, by
-        position, for the reason :func:`_is_leaf` gives.
+        It refuses, by name, a hash version this build does not compute. A
+        leaf from another version of the state hash is a different
+        measurement, and checking a day against one would report a tampered
+        day that is not. It refuses a leaf that is not 64 lowercase hex
+        characters, by position, for the reason :func:`_is_leaf` gives.
         """
         try:
             payload = json.loads(text)
@@ -1871,21 +1868,21 @@ class RunManifest:
            agent_access: dict[str, Any] | None = None) -> "RunManifest":
         """Capture a finished run.
 
-        ``universe`` and ``seed`` are passed rather than read off the engine
-        for the same reason ``Checkpoint.of`` requires them: an engine is
-        built FROM them and keeps neither.
+        ``universe`` and ``seed`` are passed rather than read off the engine,
+        as ``Checkpoint.of`` requires them, because an engine is built from
+        them and keeps neither.
 
         ``strategy`` is a :class:`StrategySpec` (carried in full, cited by
         its fingerprint) or a reference string for a hand-written agent,
         "repo X at commit Y", which the manifest records as referenced, not
-        carried, and declares in :attr:`gaps`. An agent OBJECT is refused:
-        the manifest cannot serialise code, and accepting it would embed a
-        ``repr`` while implying it embedded a strategy.
+        carried, and declares in :attr:`gaps`. An agent object is refused,
+        because the manifest cannot serialise code, and accepting one would
+        embed a ``repr`` while implying it embedded a strategy.
 
         ``universe_source`` is optional provenance (the ``random(n, seed)``
         recipe, an EDGAR snapshot hash and as-of date) recorded for the
-        methods section. The roster itself is always embedded regardless,
-        because a recipe reproduces only while the generator behaves the same
+        methods section. The roster itself is always embedded, because a
+        recipe reproduces only while the generator behaves the same
         and a query is not the data it returned.
 
         ``derived_from`` is the :class:`tradefloor.Checkpoint` this run
@@ -1893,16 +1890,16 @@ class RunManifest:
         started at day zero. It records the checkpoint's fingerprint, its
         label and how many log entries it held, which is the fork point.
 
-        Without it, lineage is only DERIVABLE: two branches of one experiment
-        share a log prefix and its length is where they parted, so a reader
-        holding both manifests can recover the structure by comparing them.
-        A reader holding one cannot, and nothing says a run is a branch of
-        anything. This is that sentence, written down.
+        Without it, lineage can only be derived. Two branches of one
+        experiment share a log prefix and its length is where they parted,
+        so a reader holding both manifests can recover the structure by
+        comparing them. A reader holding one cannot, and nothing says a run
+        is a branch of anything. ``derived_from`` records it.
 
         ``ledger`` is the :class:`DayLedger` the run filled, and it adds one
         ``days`` block holding the Merkle root over the per-day state hashes,
         the day count and the hash version. The manifest carries the root
-        alone; the leaves and the states stay in the ledger, because a year
+        alone. The leaves and the states stay in the ledger, because a year
         of snapshots at forty names is several megabytes and a manifest is
         meant to be read. :func:`verify` is what the block is for.
 
@@ -1912,10 +1909,9 @@ class RunManifest:
         the capability), ``tampered`` (label to the steps on which agent
         code changed the market) and ``margin_interest`` (False when the
         world let its portfolios borrow for free). :meth:`World.manifest`
-        fills it. Absent,
-        the key is not written, so every other document is the one it was.
-        It sits outside ``fingerprints``: it describes the agents, and the
-        market's replay does not depend on it.
+        fills it. When it is absent the key is not written, so every other
+        document is unchanged. It sits outside ``fingerprints``, because it
+        describes the agents and the market's replay does not depend on it.
         """
         from . import Universe
 
@@ -2120,7 +2116,7 @@ class RunManifest:
         return cls(doc)
 
     def to_json(self) -> str:
-        """The whole manifest as JSON: the artifact you hand over."""
+        """The whole manifest as JSON, the artifact you hand over."""
         return _canonical(self._doc)
 
     # -- reading -----------------------------------------------------------
@@ -2130,10 +2126,10 @@ class RunManifest:
         """Load a manifest, checking every carried component's fingerprint.
 
         A component that arrives not matching the fingerprint it was written
-        with is refused BY NAME, before anything runs: a manifest that
-        travelled and arrived changed no longer describes the run it came
-        from, and replaying it anyway would produce a market that fails the
-        result check for a reason the error could no longer locate.
+        with is refused by name before anything runs. A manifest that
+        changed in transit no longer describes the run it came from, and
+        replaying it would produce a market that fails the result check for
+        a reason the error could no longer locate.
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "order_log" not in payload \
@@ -2274,12 +2270,12 @@ class RunManifest:
     # -- checking ----------------------------------------------------------
 
     def reproduce(self) -> Engine:
-        """Replay the run and verify the result. Returns the rebuilt market.
+        """Replay the run, verify the result, and return the rebuilt market.
 
-        Refuses BEFORE replaying if this build is a different era from the
-        one that wrote the manifest, because a manifest that silently produced
-        different numbers across an era boundary would manufacture false
-        confidence, which is worse than no manifest at all. On a result
+        It refuses before replaying if this build is a different era from
+        the one that wrote the manifest, because a manifest that silently
+        produced different numbers across an era boundary would be trusted
+        when it should not be. On a result
         mismatch after every input and the era verified, the error reports
         both platforms and the draw counts, which is where a bisection
         starts.
@@ -2400,9 +2396,10 @@ class RunManifest:
 
     @property
     def population(self) -> Any:
-        """The :class:`tradefloor.Population` a populated run was recorded
-        with, rebuilt from the carried participants, or None for an
-        isolated run."""
+        """The :class:`tradefloor.Population` the run was recorded with.
+
+        Rebuilt from the carried participants, or None for an isolated run.
+        """
         block = self._doc.get("population")
         if block is None:
             return None
@@ -2544,8 +2541,9 @@ class RunManifest:
 
     @property
     def derived_from(self) -> dict[str, Any] | None:
-        """The checkpoint this run branched from, or ``None`` for a run that
-        started at day zero.
+        """The checkpoint this run branched from, or ``None``.
+
+        ``None`` means a run that started at day zero.
 
         ``{"checkpoint": <fingerprint>, "label": ..., "entries": <fork point>}``.
         The entry count is where this run's history stops being its parent's,
@@ -2556,17 +2554,16 @@ class RunManifest:
         return dict(recorded) if recorded else None
 
     def verify_lineage(self, checkpoint: Any) -> None:
-        """Check this manifest's declared parent IS the given checkpoint.
+        """Check that this manifest's declared parent is the given checkpoint.
 
-        The declaration alone is a claim: it names a digest, and a reader
-        holding only the manifest cannot test it. A reader holding the
-        checkpoint can, and this test covers it -- the fingerprint must match,
-        and the run's first entries must be the checkpoint's log.
+        The declaration alone names a digest, and a reader holding only the
+        manifest cannot test it. A reader holding the checkpoint can. The
+        fingerprint must match, and the run's first entries must be the
+        checkpoint's log.
 
-        Raises rather than returning a bool, for the same reason
-        :meth:`reproduce` does: a lineage check whose result can be ignored
-        by writing ``manifest.verify_lineage(cp)`` and reading nothing is a
-        check that will be.
+        It raises instead of returning a bool, as :meth:`reproduce` does, so
+        a caller who writes ``manifest.verify_lineage(cp)`` and reads nothing
+        still gets the failure.
         """
         recorded = self.derived_from
         if recorded is None:
@@ -2593,9 +2590,11 @@ class RunManifest:
 
     @property
     def agent_access(self) -> dict[str, Any] | None:
-        """How the run's agents were given the market, or ``None`` for the
-        default read-only view with no privileged agent and no tampering.
-        See :meth:`of`."""
+        """How the run's agents were given the market, or ``None``.
+
+        ``None`` means the default read-only view with no privileged agent
+        and no tampering. See :meth:`of`.
+        """
         recorded = self._doc.get("agent_access")
         return json.loads(_canonical(recorded)) if recorded else None
 
@@ -2604,11 +2603,11 @@ class RunManifest:
         """The run's per-day commitment, or ``None`` when it has none.
 
         ``{"root": <Merkle root>, "count": <days>, "hash": "state/1"}``,
-        under the document's ``day_ledger`` key. Named apart from
-        ``result["days"]``, which is the number of days the run traded: one
-        is a count and the other is a commitment, and a document that
-        answered to ``days`` twice at two levels would make a reader work
-        out which one they had opened.
+        under the document's ``day_ledger`` key. It is named apart from
+        ``result["days"]``, the number of days the run traded, because one
+        is a count and the other is a commitment, and two ``days`` keys at
+        two levels would leave a reader working out which one they had
+        opened.
 
         :func:`verify` pairs this with a :class:`DayLedger` and recomputes a
         sample of the days it commits to.
@@ -2625,8 +2624,10 @@ class RunManifest:
 
     @property
     def universe_source(self) -> Any:
-        """Provenance of the roster, if recorded. Informational: the roster
-        itself is embedded and authoritative."""
+        """Provenance of the roster, if recorded.
+
+        Informational only. The roster itself is embedded and authoritative.
+        """
         return self._doc.get("universe_source")
 
     @property
@@ -2644,8 +2645,11 @@ class RunManifest:
 
     @property
     def strategy(self) -> StrategySpec | None:
-        """The carried spec, or None, including for a strategy that is only
-        referenced. :attr:`strategy_reference` holds the reference."""
+        """The carried spec, or None.
+
+        None also for a strategy that is only referenced.
+        :attr:`strategy_reference` holds the reference.
+        """
         payload = self._doc.get("strategy")
         if payload is None or "spec" not in payload:
             return None
@@ -2678,16 +2682,20 @@ class RunManifest:
 
     @property
     def model(self) -> dict[str, Any]:
-        """The coefficient dictionary of the model the run ran under, with
-        ``"name"`` as its fingerprint: a shipped preset's name, or
-        ``custom-XXXXXXXX`` for a run that must never be mistaken for one."""
+        """The coefficient dictionary of the model the run ran under.
+
+        ``"name"`` holds its fingerprint: a shipped preset's name, or
+        ``custom-XXXXXXXX`` for a run that must never be mistaken for one.
+        """
         return dict(self._doc["written_by"].get("model") or {})
 
     @property
     def model_fingerprint(self) -> str:
-        """The model's honest name, as recorded. Falls back to the model
-        dict's own name for manifests written before the fingerprint joined
-        :attr:`fingerprints`."""
+        """The model's fingerprint name, as recorded.
+
+        Falls back to the model dict's own name for manifests written before
+        the fingerprint joined :attr:`fingerprints`.
+        """
         recorded = self._doc.get("fingerprints", {}).get("model")
         if recorded is not None:
             return recorded
@@ -2697,12 +2705,11 @@ class RunManifest:
 
     @property
     def gaps(self) -> list[str]:
-        """What a reader needs from OUTSIDE this manifest, spelled out.
+        """What a reader needs from outside this manifest.
 
-        Empty for a complete manifest. A gap is no defect, since a
-        hand-written agent is the escape hatch working as designed, but the
-        reader needs the fact, so the manifest states it rather than leaving
-        it to be discovered.
+        Empty for a complete manifest. A gap is not a defect (a hand-written
+        agent is one by design), but the reader needs to know about it, so
+        the manifest states it.
         """
         out = []
         reference = self.strategy_reference
@@ -2716,13 +2723,19 @@ class RunManifest:
 
     @property
     def complete(self) -> bool:
-        """True when every component is embedded or ships with the library,
-        the condition under which this manifest alone reproduces the run."""
+        """True when every component is embedded or ships with the library.
+
+        That is the condition under which this manifest alone reproduces the
+        run.
+        """
         return not self.gaps
 
     def describe(self) -> str:
-        """A reader's summary: what is carried, what is referenced, and what
-        checking it here would compare against."""
+        """A reader's summary of the manifest.
+
+        It lists what is carried, what is referenced, and what checking it
+        here would compare against.
+        """
         doc = self._doc
         wrote = doc["written_by"]
         python = wrote["platform"].get("python")
@@ -2867,8 +2880,8 @@ def _count(n: int, noun: str) -> str:
 class Verification:
     """What a sampled verification measured, and over what.
 
-    Returned by :func:`verify`. It reports rather than raising because k and
-    the days drawn are part of the answer on a pass: "this run verifies" is a
+    Returned by :func:`verify`. It reports instead of raising because k and
+    the days drawn are part of the answer on a pass. "This run verifies" is a
     different claim from "these four of sixty days recompute on this build",
     and only the second is true. :meth:`check` raises for a caller that wants
     the failure to end the program.
@@ -2917,9 +2930,9 @@ class Verification:
         """Everything wrong with this verification, in one list.
 
         The root first, then the days that did not replay, then any proof
-        that failed under a matching root. Reading the length of this as a
-        count of failed days is what produced "10 of 9 sampled days did not
-        verify" on a nine-day ledger with one edited leaf, so the count in
+        that failed under a matching root. Its length is not a count of
+        failed days. Reading it that way produced "10 of 9 sampled days did
+        not verify" on a nine-day ledger with one edited leaf, so the count in
         :meth:`check` runs over :attr:`replay_failures` alone.
         """
         root = () if self.root_ok else (self.root_note,)
@@ -2941,8 +2954,8 @@ class Verification:
         """What this particular verification does and does not establish.
 
         Computed from the call: the sample, the cost, the platforms and the
-        span the hash covers. A caveat typed into this docstring would go on
-        being printed after the thing it describes had changed.
+        span the hash covers. A fixed caveat could go on being printed after
+        the thing it described had changed.
         """
         if self.k == self.count:
             out = [
@@ -3000,7 +3013,7 @@ class Verification:
         return out
 
     def check(self) -> "Verification":
-        """Raise when anything did not verify. Returns self otherwise.
+        """Raise when anything did not verify, and return self otherwise.
 
         For a caller that wants the failure to end the program, in the shape
         :meth:`RunManifest.verify_lineage` uses. The message separates the
@@ -3082,7 +3095,7 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
 
     So a pass says two things about each sampled day: this build recomputes
     it to the same state, and that state was committed at that position when
-    the manifest was written. A tampered day fails on its own leaf; a
+    the manifest was written. A tampered day fails on its own leaf, and a
     tampered predecessor state fails on the day that follows it.
 
     ## The cost
@@ -3095,9 +3108,9 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     committed predecessor, which is every one of them except day 0.
 
     The unit is day-runs and engine ticks, and it is exact in those units.
-    Wall time tracks it, and the ratio is the part worth quoting: seconds on
-    one machine say as much about what else was running as about this
-    function. On ``Universe.random(40, seed=7)``, seed 42, twenty days at
+    Wall time tracks it, and the ratio is the figure to quote, because
+    seconds on one machine depend as much on what else was running as on
+    this function. On ``Universe.random(40, seed=7)``, seed 42, twenty days at
     390 ticks, at ``c40fd39``, with the three modes interleaved in one
     process and medians of seven, verifying every day costs 1.10 times what
     running those days live costs and ``reproduce()`` over the same log
@@ -3114,9 +3127,9 @@ def verify(manifest: RunManifest, ledger: DayLedger, k: int, *,
     filled in. ``reproduce()`` remains the whole-run check: it replays every
     day and compares the market digest at the end.
 
-    ``seed`` chooses the sample and is required rather than defaulted, for
-    the reason ``GameRng`` requires a sequence: a verification is repeatable
-    only if the reader can name the days it drew, and a hidden default makes
+    ``seed`` chooses the sample and has no default, for the reason
+    ``GameRng`` requires a sequence. A verification is repeatable only if
+    the reader can name the days it drew, and a hidden default would make
     "four random days" a claim nobody can check.
     """
     manifest._check_era()

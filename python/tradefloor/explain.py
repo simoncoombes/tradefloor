@@ -4,10 +4,10 @@
 move in the printed price, its children are the contributions that make
 that move up, each contribution names the Rust that computed it and the
 state and dials that Rust read at the open, and each mechanism's leaves
-are the addresses of the draws it consumed. Every node is replayable: a
-fork of the engine as it stood before the day opened, the node's logged
-draw values installed at their addresses, the day's own inputs replayed,
-and the node's quantity measured again on that run.
+are the addresses of the draws it consumed. Every node can be replayed.
+The replay forks the engine as it stood before the day opened, installs
+the node's logged draw values at their addresses, replays the day's own
+inputs, and measures the node's quantity again on that run.
 
 ## What has to be on before it works
 
@@ -18,29 +18,30 @@ the market it would have been without one. ``explain`` on a day outside
 the window raises and names the days that were kept.
 
 A window costs one engine copy per day kept, and a fork pays it again
-per arm. Measured as the PROCESS peak working set, which is the figure
-that sees the store, at forty names over thirty days on the same box and
-with ``record=True``: 436 to 457 MB with a thirty-day window against 89
-to 92 MB with none, the lower of each pair the reviewer's and the higher
-this author's. A fork of a sixty-day window takes 0.13 seconds.
+per arm. Measured as the process peak working set, which is the figure
+that includes the store, at forty names over thirty days on the same box
+and with ``record=True``, it is 436 to 457 MB with a thirty-day window
+against 89 to 92 MB with none, the lower of each pair the reviewer's and
+the higher this author's. A fork of a sixty-day window takes 0.13
+seconds.
 
-Recorded because ``explain`` reads the day off ``truth()``, so a window
-is only useful on a run that recorded. The same pair unrecorded is 333
-and 28 MB, and quoting those would describe a configuration this feature
-refuses: 61 MB of the difference is the tape itself. Ask for the days
-you mean to explain.
+Those figures are for a recorded run because ``explain`` reads the day
+off ``truth()``, so a window is only useful on a run that recorded. The
+same pair unrecorded is 333 and 28 MB, but this feature refuses that
+configuration, and 61 MB of the difference is the tape itself. Ask for
+the days you mean to explain.
 
 ``explain`` also needs pyarrow, because the tree's contributions are the
 ``truth()`` table's columns and that table arrives as an Arrow stream. A
-default install raises from the first call with the extra to install; the
-library itself still imports nothing.
+default install raises from the first call, naming the extra to install.
+The library itself still imports nothing.
 
 ## The tree
 
 The root is the move, ``log(close / previous close)``, with the close
 read from the replayed day and the previous close from the copy taken
 before the open. Both are the price the engine holds after a close, which
-is the day's last print on every preset through pt-v19; under
+is the day's last print on every preset through pt-v19. Under
 ``macro_publication_repricing`` (pt-v20) the close re-marks every traded
 name to the macro state it publishes, after that print.
 
@@ -48,8 +49,8 @@ Its children are fifteen contributions, of kind ``factor``. Twelve are
 the ``truth()`` columns for the name on that day, in ``Engine.FACTORS``
 order, and they sum to the day's change in ``mispricing_s``. The
 eleventh, ``fair_value_shift``, is minus the part of the day's shocks that
-moved the name's fair value for good rather than its mispricing (pt-v20's
-permanent share; zero on every earlier preset). The twelfth, ``dividend``,
+moved the name's fair value for good instead of its mispricing (pt-v20's
+permanent share, zero on every earlier preset). The twelfth, ``dividend``,
 is the change in ``mispricing_s`` at an ex-date open, where the price drops
 by the amount and fair value gives up the dividend it had accrued (zero on
 every model without dividends, ``dividend_payout_share``). Two more close the
@@ -57,20 +58,20 @@ arithmetic: ``fair_value`` is the day's change in log fundamental value,
 which carries that same permanent part with the opposite sign, and
 ``book`` is the change in the log distance from the model price to the
 day's last print. The fifteenth, ``repricing``, is the change in the log
-distance from that print to the price the close left: the close's re-mark
-tonight less the one the day opened on. The tape's fundamental value is
+distance from that print to the price the close left, which is the close's
+re-mark tonight less the one the day opened on. The tape's fundamental value is
 the one the last tick read, before the close's macro step, so a published
 decision reaches ``fair_value`` on the next day's tape while the price
 took it the evening before, and ``repricing`` carries it between the two.
 It is exactly zero on every preset through pt-v19. All fifteen are
 measured, so their sum against the move is an identity the engine can
-fail; :meth:`Explanation.check` states the residual rather than
-asserting it. Where the day before is not on the tape its closing levels
-are unknown, ``fair_value`` and ``repricing`` read zero and ``book`` is
-what the mispricing leaves over, which the caveats say.
+fail. :meth:`Explanation.check` reports the residual. Where the day
+before is not on the tape its closing levels are unknown, ``fair_value``
+and ``repricing`` read zero and ``book`` is what the mispricing leaves
+over, which the caveats say.
 
 ``fair_value`` is zero on a day the valuation holds still, which is most
-days of most presets: earnings and the sector anchor are fixed for a run,
+days of most presets. Earnings and the sector anchor are fixed for a run,
 the QE channel is off, and the discount rate moves only on the days the
 corporate bond yield does. It moves under a scenario that moves the macro
 path, and ``tests/test_explain.py`` measures one. Under pt-v18 and pt-v19
@@ -91,19 +92,19 @@ with no draw of its own has no ``draw`` child, and
 
 It measures which draws and which state the recorded move came from,
 under the engine's own attribution. It cannot say what the move would
-have been WITHOUT a draw. That is a counterfactual and it needs an arm
-per draw, which is :func:`tradefloor.noise.attribute`;
+have been without a draw. That is a counterfactual and it needs an arm
+per draw, which is :func:`tradefloor.noise.attribute`, and
 :meth:`Explanation.render` names it. Nothing here re-implements a
-formula: a replay is the engine running the same day from the same state
+formula. A replay is the engine running the same day from the same state
 under the same draws, which is what ``CONTRIBUTING.md`` requires of
 anything that decides a price.
 
 ## What a call costs
 
-What a call does is fixed and what it takes in wall time is not, so the
-counts come first. A ``check()`` runs the day once per DISTINCT overlay
-rather than once per node, since a replay is a function of its patch set:
-19 runs, whatever the roster, the 15 before the overnight contribution
+What a call does is fixed and its wall time is not, so the counts come
+first. A ``check()`` runs the day once per distinct overlay and not once
+per node, since a replay is a function of its patch set. That is 19 runs,
+whatever the roster, the 15 before the overnight contribution
 and its three sites plus their union. The tree is 69 nodes where
 ``Engine.prints()`` splits the book contribution and 67 where the build
 has no print table: the 55 and 53 before plus the overnight
@@ -125,36 +126,35 @@ names    logged     peak A     peak B
   100   478,944     220 MB     200 MB
 ===== ========= ========== ==========
 
-Peak here is PYTHON-SIDE allocation, from ``tracemalloc``, over one
+Peak here is Python-side allocation, from ``tracemalloc``, over one
 ``explain`` and one ``check``. It counts the draw log the call
 materialises and not the engine copies the store holds, which are Rust
 memory ``tracemalloc`` cannot see and which report as zero to it. The
 window's own cost below is a process figure and the two are not
 comparable.
 
-Two columns because two readers measured that same quantity on the same
-machine and got answers ten per cent apart, each repeating to the tenth
-of a megabyte across its own runs. A is this author's and B is the
-reviewer's. Neither is quoted as the number.
+There are two columns because two readers measured that same quantity
+on the same machine and got answers ten per cent apart, each repeating
+to the tenth of a megabyte across its own runs. A is this author's and B
+is the reviewer's. Neither is quoted as the number.
 
-No wall time is quoted at all. The same two readers measured a
-``check()`` at a third of an ``explain`` and at 1.1 to 1.3 times one, and
-a ratio a reader would take as a fact is worse than no number. The counts
-above are what both reproduced exactly. A filtered read on the extension
-side would remove most of what a call holds, and this build does not have
-one.
+No wall time is quoted. The same two readers measured a ``check()`` at a
+third of an ``explain`` and at 1.1 to 1.3 times one, so any single ratio
+would mislead. The counts above are what both reproduced exactly. A
+filtered read on the extension side would remove most of what a call
+holds, and this build does not have one.
 
 Keeping a window costs a run a copy of the engine per kept day. Its cost
-in time is inside the noise at this size: over three repetitions at a
+in time is inside the noise at this size. Over three repetitions at a
 hundred names for twenty days, a windowed run took 0.95, 1.02 and 1.56
-times an unwindowed one, so the measurement says the overhead is smaller
-than what else the machine is doing.
+times an unwindowed one, so the overhead is smaller than the variation
+from whatever else the machine is doing.
 
 ## The jump slot's day
 
 ``Engine::apply_jumps`` runs at a close and moves ``mispricing_s`` after
 the tick loop, so the jump a day's ``truth()`` table carries was drawn at
-the close of the day BEFORE it, and the draw log stamps those draws with
+the close of the day before it, and the draw log stamps those draws with
 that earlier day. ``keep_explanations`` therefore starts the draw log one
 day early, and the jump node's addresses are read from ``day - 1``.
 """
@@ -177,7 +177,7 @@ class Mechanism(NamedTuple):
     ``function`` is the Rust that computes the contribution, as a path
     into ``rust/src``. ``via`` names further Rust that the same
     contribution passes through, which is where a dial read by the caller
-    and handed on as an argument is found: ``compute_fair_value_with``
+    and handed on as an argument is found. ``compute_fair_value_with``
     takes the book floor and the two QE gains as arguments, so those
     names are in the tick that calls it. ``tests/test_explain.py`` checks
     every name below against the source of the function it is declared
@@ -437,20 +437,20 @@ class Node(NamedTuple):
     Rust function, an engine column or a draw site, by kind. ``value`` is
     the quantity the node states, in log price units for a ``move``,
     ``factor`` or ``mechanism`` node and in the field's own units for a
-    ``state`` node; a ``draw`` node states the sum of the values its
+    ``state`` node. A ``draw`` node states the sum of the values its
     addresses delivered. ``addresses`` are the draws under this node
     alone, and ``children`` the nodes under it.
 
-    ``inputs`` differs by kind rather than being one thing, and the
-    Arrow table's ``inputs`` column is this map as JSON, so a reader
-    taking it for one thing reads a draw's count as a dial. A
-    ``mechanism`` node's inputs are the dials that function reads, which
-    is the case the name was written for. The ``move`` node's are the
+    ``inputs`` means something different for each kind, and the Arrow
+    table's ``inputs`` column is this map as JSON, so a reader who assumes
+    one meaning will read a draw's count as a dial. A ``mechanism`` node's
+    inputs are the dials that function reads, which is the case the name
+    was written for. The ``move`` node's are the
     close, the previous close and the sum of the contributions under it.
     A ``draw`` node's are how many draws it holds and the day they were
     logged under. A ``factor`` node's and a ``state`` node's are empty.
     The macro fields a mechanism read are ``state`` children beside the
-    engine columns rather than inputs.
+    engine columns, not inputs.
     """
 
     kind: str
@@ -635,7 +635,7 @@ class Explanation:
     """One name's day, decomposed and replayable.
 
     Built by ``Engine.explain``. Every number on it is measured when it
-    is built: the day is run again from the copy taken before its open,
+    is built. The day is run again from the copy taken before its open,
     under the inputs the run log holds for it, and the tree is read off
     that run. :meth:`replay` runs it again under one node's draws and
     :meth:`check` does that for every node and reports what did not come
@@ -964,11 +964,11 @@ class Explanation:
     def replay(self, node: Node) -> float:
         """Run the day again under ``node``'s draws and read it back.
 
-        A fork of the copy taken before the day opened, the node's logged
-        draw values installed as patches at their addresses, the day's own
-        inputs replayed, and the enclosing contribution measured on that
+        The replay forks the copy taken before the day opened, installs the
+        node's logged draw values as patches at their addresses, replays the
+        day's own inputs, and measures the enclosing contribution on that
         run. For a leaf that is its parent's value, which is the claim
-        "replaying any leaf reproduces its parent"; :meth:`check` makes it
+        "replaying any leaf reproduces its parent". :meth:`check` tests it
         for every node.
 
         The patches are the values the log delivered, installed
@@ -976,15 +976,15 @@ class Explanation:
         correctly addressed node reproduces the day. What it establishes
         is that the copy, the log and the overlay rebuild the day, and
         that the addresses a node carries are the ones its values came
-        from wherever the difference reaches this name: a node aimed one
+        from wherever the difference reaches this name. A node aimed one
         draw late installs the right values in the wrong places.
 
-        How far that reaches is measured rather than assumed. On the
-        market factor and on this name's settlement uniforms a slip of
-        one address moves the close; on its idiosyncratic, sector, news
-        and jump draws the slip lands on a neighbour's slot and the close
-        is bit-identical inside the day. Nor does a replay establish that
-        a node addresses the right NAME at all, since a node built off
+        How far that reaches has been measured. On the market factor and
+        on this name's settlement uniforms a slip of one address moves the
+        close. On its idiosyncratic, sector, news and jump draws the slip
+        lands on a neighbour's slot and the close is bit-identical inside
+        the day. A replay also does not establish that a node addresses
+        the right name at all, since a node built off
         another company's tag carries that company's addresses and values
         together. `tests/test_explain.py` measures both limits and checks
         the tags against the log and the market slots against
@@ -997,7 +997,7 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        Four claims, each stated as a line per miss. The fifteen
+        It checks four claims and reports a line per miss. The fifteen
         contributions sum to the move. Every node's replay reproduces the
         contribution it sits under. And where the run recorded this day,
         the replay reproduces both the eleven columns the run recorded and

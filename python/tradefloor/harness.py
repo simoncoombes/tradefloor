@@ -2,44 +2,43 @@
 
 ## What this measures, and what it does not
 
-It compares agents against each other on a market that never existed. That is
-worth being precise about, because the obvious stronger claim is false.
+It compares agents against each other on a market that never existed.
 
 What it gives you:
 
-- **No contamination.** The market was generated, not recorded, so no model has
-  read its history. A backtest on real data cannot say that.
+- **No contamination.** The market is generated, so no model has read its
+  history. A backtest on real data cannot say that.
 - **Identical conditions.** Every agent gets its own engine built from the same
-  seed, so they face the same market, not a similar one.
+  seed, so they face the same market.
 - **Ground truth.** The simulator knows why each price moved, so an agent's
-  stated reasoning can be checked rather than only its P&L.
+  stated reasoning can be checked as well as its P&L.
 - **Real impact.** Fills come from the order book and trading feeds back as
-  pressure, so size costs money and cannot be ignored.
+  pressure, so size costs money.
 
-What it does NOT give you: evidence that an agent would trade real markets
-well. This is a *model* market with knowable structure, a mean-reverting
-mispricing process anchored to a computable fair value, and a determined agent
-can learn that structure in ways that will not transfer. Use it to rank agents
-against each other, not to certify one as good at trading.
+It gives no evidence that an agent would trade real markets well. This is a
+*model* market with knowable structure, a mean-reverting mispricing process
+anchored to a computable fair value, and a determined agent can learn that
+structure in ways that will not transfer. Use it to rank agents against each
+other. It cannot certify one as good at trading.
 
 ## Each agent gets its own market
 
-They do not trade against each other. That is a deliberate choice and it is a
-trade-off: agents sharing one market would interact realistically, but then
-each agent's result would depend on what the others did, and a comparison in
-which the ranking moves when an unrelated competitor changes strategy is not a
-comparison. Identical independent markets keep the contrast clean.
+They do not trade against each other. Agents sharing one market would
+interact realistically, but each agent's result would then depend on what the
+others did, and the ranking would move when an unrelated competitor changed
+strategy. Separate identical markets keep each result independent of the
+others.
 
 ## The agent does not see the answer
 
 The observation carries prices, the book and the agent's own portfolio. It does
-NOT carry ``mispricing_s``, fair value, or the factor attribution. Those are
+not carry ``mispricing_s``, fair value, or the factor attribution. Those are
 what the agent is supposed to infer, and handing them over would make the
-exercise trivial. They are used for SCORING, on the other side of the wall.
+exercise trivial. The harness uses them only for scoring.
 
-Until 0.8.5 that was a statement about the fields and not about the engine:
-``obs.engine`` was the live engine, and an agent could fork it and trade on
-the fork's future or write the market with ``set_fundamentals``. It is now a
+Until 0.8.5 this held for the fields but not for the engine. ``obs.engine``
+was the live engine, and an agent could fork it and trade on the fork's
+future or write the market with ``set_fundamentals``. It is now a
 read-only :class:`~tradefloor.sandbox.MarketView`, the portfolio is a
 read-only :class:`~tradefloor.sandbox.PortfolioView`, and the harness checks
 the engine's state hash around every call into agent code. An agent that
@@ -130,37 +129,35 @@ def _f64(buf: bytes) -> list[float]:
 class Observation:
     """What an agent sees at one decision point.
 
-    Deliberately narrow. Everything here is something a real trader could
-    observe: prices, the book, their own position. Nothing here is something
-    only the simulator knows.
+    Everything here is something a real trader could observe: prices, the
+    book, their own position. The simulator's hidden state is left out.
 
-    ## ``step`` counts the WHOLE RUN, not the day
+    ## ``step`` counts decision points across the whole run
 
     It is a running index over every decision point in the evaluation, so at
     the harness default of six steps a day, day 1 begins at ``step == 6`` and
     day 3 at ``step == 18``. Only day zero starts at zero.
 
-    That has cost people real runs. ``if obs.step != 0: return {}`` reads like
-    a once-a-day guard and is a once-a-RUN guard: the agent trades on the
-    first step of day zero and never again, produces a scorecard with
+    This mistake has cost people real runs. ``if obs.step != 0: return {}``
+    reads like a once-a-day guard but is a once-a-run guard. The agent trades
+    on the first step of day zero and never again, produces a scorecard with
     ``trades=1`` and an empty ``errors`` list, and looks exactly like an agent
     that considered the market and declined. Nothing in the result says
     otherwise.
 
     The library cannot refuse that, because it is arithmetic on an integer
-    and there is no call to intercept, so the answer is to make the
-    within-day index a thing you can ASK for rather than a thing you have to
-    derive. Use :attr:`step_of_day`, or the two predicates:
+    and there is no call to intercept. So the within-day index is provided
+    directly. Use :attr:`step_of_day`, or the two predicates:
 
     ```python
     if not obs.is_first_step_of_day:
         return {}                     # once a day, correctly
     ```
 
-    ``step`` itself stays a run-wide counter: it is what makes an
-    observation's position in the run unambiguous, it is what the fills table
-    stamps, and changing its meaning would silently re-time every agent
-    already written against it, which is the same defect in a new place.
+    ``step`` itself stays a run-wide counter. It gives an observation an
+    unambiguous position in the run, it is what the fills table stamps, and
+    changing its meaning would silently re-time every agent already written
+    against it.
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
@@ -199,12 +196,12 @@ class Observation:
 
     @property
     def step_of_day(self) -> int:
-        """This step's index WITHIN the day: 0 at every open.
+        """This step's index within the day, 0 at every open.
 
-        The value ``obs.step`` is usually mistaken for. Derived rather than
-        stored so it cannot disagree with ``step`` and ``steps_per_day``,
-        which is the same expression the harness itself uses to advance the
-        session clock and to stamp fills.
+        It is the value ``obs.step`` is usually mistaken for. It is derived
+        from ``step`` and ``steps_per_day`` so it cannot disagree with them,
+        using the same expression the harness uses to advance the session
+        clock and to stamp fills.
         """
         return self.step % self.steps_per_day
 
@@ -212,8 +209,8 @@ class Observation:
     def is_first_step_of_day(self) -> bool:
         """True on the day's opening decision point.
 
-        The once-a-day guard, spelled so it cannot be confused with
-        once-a-run: ``if not obs.is_first_step_of_day: return {}``.
+        Use it as a once-a-day guard:
+        ``if not obs.is_first_step_of_day: return {}``.
         """
         return self.step_of_day == 0
 
@@ -221,9 +218,9 @@ class Observation:
     def is_last_step_of_day(self) -> bool:
         """True on the day's final decision point, before the close.
 
-        The other half of a daily cadence: flattening or rebalancing into the
-        close is a different decision from the one at the open, and both need
-        a name that does not depend on the caller knowing ``steps_per_day``.
+        Flattening or rebalancing into the close is a different decision
+        from the one at the open, and this names it without the caller
+        needing ``steps_per_day``.
         """
         return self.step_of_day == self.steps_per_day - 1
 
@@ -250,12 +247,11 @@ class Observation:
     def avg_volume(self, ticker: str) -> float:
         """Average daily volume, which is public information a real trader has.
 
-        Exposed because it is how size should be reasoned about. Impact scales
-        with participation, not with notional: 13.7 million shares is 0.05x a
-        day's volume in one name here and 407x in another, and the same order
-        moves the first by nothing and the second by 47%. An agent sizing in
-        flat share counts is choosing a different experiment per instrument
-        rather than a position.
+        Use it to size orders. Impact scales with participation, not with
+        notional. 13.7 million shares is 0.05x a day's volume in one name here
+        and 407x in another, and the same order moves the first by nothing and
+        the second by 47%. An agent sizing in flat share counts runs a
+        different experiment in each instrument.
         """
         return self._adv[self._index(ticker)]
 
@@ -470,8 +466,8 @@ class Agent(Protocol):
     ``on_refusal="raise"``, so a World run ends there. See
     :func:`tradefloor.portfolio.check_order`.
 
-    Numbers of shares, not portfolio weights: ``{'AAA': 0.2}`` buys a fifth
-    of one share. :func:`evaluate` warns when every order in a step is such a
+    Values are share counts, so ``{'AAA': 0.2}`` buys a fifth of one
+    share. :func:`evaluate` warns when every order in a step is such a
     fraction.
 
     ``explain`` is optional. When present, ``explain(day)`` returns the
@@ -481,9 +477,8 @@ class Agent(Protocol):
     close: for each factor it adds up the size of its push on every name's
     price, up or down alike, and the factor with the largest total is the
     right answer. ``fair_value_shift`` is never the answer, because it moves
-    no price (see :data:`DRIVER_NAMES`). That is what lets the harness ask
-    whether the agent was right for the right reasons, rather than only
-    whether it made money.
+    no price (see :data:`DRIVER_NAMES`). So the harness can ask whether the
+    agent was right for the right reasons as well as whether it made money.
 
     ``refusals`` is optional too. When present, :func:`evaluate` calls it
     after every ``act`` and writes each string it returns to the
@@ -499,10 +494,9 @@ class Agent(Protocol):
 class Scorecard:
     """One agent's result.
 
-    Attributes are declared rather than assigned through a ``setattr`` loop.
-    The loop was shorter and made the class opaque: nothing could introspect
-    it, no checker could see a field, and a mistyped key would have set
-    nothing and read back ``None``.
+    Attributes are declared rather than set through a ``setattr`` loop, so
+    tools can introspect the class and a checker can see each field. Under a
+    loop, a mistyped key would set nothing and read back ``None``.
 
     Read ``errors`` before the P&L. It holds every step at which the agent
     raised, returned something that is not an order mapping, or sent an
@@ -517,7 +511,7 @@ class Scorecard:
     agent was given, so it is measured on closes and misses a dip that
     recovered inside a day, and it passes 100 when net worth goes below
     zero. ``ruined`` is True when net worth was at or
-    below zero at any close. There is no margin call: under
+    below zero at any close. There is no margin call. Under
     ``max_leverage=None`` a ruined agent keeps its positions and the
     scorecard reports what they did. With a leverage limit set, every
     order is refused once net worth is gone, because leverage over a net
@@ -529,10 +523,10 @@ class Scorecard:
     ``equity_curve``, starting from the cash the agent was given, and are
     annualised over 252 days. Sharpe subtracts no risk-free rate. Both are
     None with fewer than two days, and once net worth has been at or below
-    zero; Sharpe is None too when the returns did not vary. The repr prints
+    zero. Sharpe is also None when the returns did not vary. The repr prints
     ``sharpe=n/a (short run)`` for a run of fewer than
     :attr:`SHARPE_MIN_DAYS` (20) scored days, because a Sharpe ratio from a
-    few days of returns is mostly noise: its standard error is about
+    few days of returns is mostly noise. Its standard error is about
     ``sqrt(252 / days)``, 3.5 at 20 days. The property still returns it.
     ``exposure_curve`` is gross exposure as a multiple of net worth after
     each step's session (infinite once net worth is gone), and the other two
@@ -548,7 +542,7 @@ class Scorecard:
     scored days won by the factor that won most often.
     ``explanation_edge`` is ``explanation_accuracy`` minus that baseline,
     and the repr prints all three together. On pt-v20 a constant answer
-    scores near the top: ``random_noise`` moves prices most on 294 of 300
+    scores near the top. ``random_noise`` moves prices most on 294 of 300
     days over three rosters and five seeds, and ``jump`` on five, so
     answering ``random_noise`` every day scores 0.95 to 1.0. Only the edge
     says anything about the agent. An accuracy of 0.97 against a baseline
@@ -732,7 +726,7 @@ class Scorecard:
         better the agent's answers to ``explain`` scored than naming the
         most common answer every day. None when the agent has no
         ``explain`` or answered on no day. On pt-v20 the baseline is 0.95
-        to 1.0, so this is the figure to compare, not the accuracy."""
+        to 1.0, so compare agents on this figure."""
         if self.explanation_accuracy is None or self.explanation_baseline is None:
             return None
         return self.explanation_accuracy - self.explanation_baseline
@@ -814,25 +808,23 @@ def session_clock(start: tuple[int, int, int], step_within_day: int,
 
     A tick is a minute, so a step of ``ticks_per_step`` ticks advances the
     clock by that many minutes. Without this every step of a day started at
-    ``start`` and the market open was replayed N times instead of a trading
-    day being traversed.
+    ``start`` and the market open was replayed N times.
 
-    That was not cosmetic. Time of day drives the intraday activity profile:
-    measured on twenty names, a day run as six 65-tick steps all starting at
-    09:30 produced **1,840,015,161** shares of volume against **1,181,790,628**
-    for the same day run as one 390-tick session -- 56% too much, because the
-    busiest hour was counted six times.
+    Time of day drives the intraday activity profile. Measured on twenty
+    names, a day run as six 65-tick steps all starting at 09:30 produced
+    1,840,015,161 shares of volume against 1,181,790,628 for the same day run
+    as one 390-tick session. That is 56% too much, because the busiest hour
+    was counted six times.
 
-    With the clock advancing, a stepped day is **bit-identical** to the single
-    session: prices, GARCH variance and draw count, for every split tried
-    (2x195, 3x130, 4x100, 6x65). That is the property an evaluation harness
-    needs -- stepping is how the agent is given a turn, and it must not be a
-    change to the market.
+    With the clock advancing, a stepped day is bit-identical to the single
+    session in prices, GARCH variance and draw count, for every split tried
+    (2x195, 3x130, 4x100, 6x65). An evaluation harness needs that, because
+    stepping is how the agent gets a turn and must not change the market.
 
-    Steps that run past the close are allowed rather than refused. The engine
-    models after-hours as reduced activity rather than as nothing (measured:
-    about 25 draws a tick against 49 while open), so a caller who configures
-    more minutes than a session holds gets a modelled evening, not silence.
+    Steps that run past the close are allowed. The engine models after-hours
+    as reduced activity (measured at about 25 draws a tick against 49 while
+    open), so a caller who configures more minutes than a session holds gets
+    a modelled evening.
     """
     hour, minute, day_of_week = start
     total = hour * 60 + minute + step_within_day * ticks_per_step
@@ -883,43 +875,41 @@ def evaluate(
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
-    One market. Every agent meets the same one, so the comparison is exact
-    -- but a verdict from a single seed is a measurement of
-    that seed as much as of the agents. See :func:`tradefloor.rank` for the
-    across-seed version, and :func:`leaderboard` for the measured size of the
-    effect. ``seed`` is any integer from 0 to ``2**64 - 1``; every seed below
-    ``2**32`` is the market it was when seeds were 32-bit.
+    Every agent meets the same market, so the comparison is exact. But a
+    verdict from a single seed measures that seed as much as the agents. See
+    :func:`tradefloor.rank` for the across-seed version, and
+    :func:`leaderboard` for the measured size of the effect. ``seed`` is any
+    integer from 0 to ``2**64 - 1``; every seed below ``2**32`` is the market
+    it was when seeds were 32-bit.
 
-    ``max_leverage`` defaults to 2x rather than to unlimited. An agent that can
-    trade arbitrary size is not being tested against the market: the book makes
-    large trades expensive, but with no funding limit arbitrarily large is
-    always available and "trade everything" wins. Pass ``None`` deliberately if
-    that is what you want to study.
+    ``max_leverage`` defaults to 2x. The book makes large trades expensive,
+    but with no funding limit arbitrarily large is always available and "trade
+    everything" wins, so the agent is no longer tested against the market.
+    Pass ``None`` if that is what you want to study.
 
     A value in ``agents`` may be a :class:`tradefloor.StrategySpec` instead of a
-    built agent. The spec is built HERE, freshly, on every call, which is
-    both what makes a spec-carrying result citable (the scorecard's
-    ``strategy_fingerprint`` names exactly what ran) and what closes a real
-    trap: agents are stateful, and a built instance reused across two
-    evaluations carries the first market's history into the second with no
-    visible symptom. A spec cannot, because it is not the agent; it is the
-    instruction for building one.
+    built agent. The spec is built fresh here on every call. That makes a
+    spec-carrying result citable (the scorecard's ``strategy_fingerprint``
+    names exactly what ran), and it avoids a trap. Agents are stateful, and a
+    built instance reused across two evaluations carries the first market's
+    history into the second with no visible symptom. A spec cannot, because
+    it is the instruction for building an agent.
 
     ``model`` selects the coefficient set every engine in the evaluation
     runs, either a preset name or a :class:`tradefloor.ModelParams`, and defaults
-    to the shipped preset. One model for the whole evaluation, baseline
-    included: scoring agents across different models would compare markets,
-    not agents. Each scorecard records ``model_fingerprint``.
+    to the shipped preset. One model runs the whole evaluation, baseline
+    included, because agents scored on different models would be measured on
+    different markets. Each scorecard records ``model_fingerprint``.
 
     ``cash_interest=True`` pays each agent's uninvested cash the policy rate,
     one day's worth before each close (:meth:`Portfolio.accrue`). Off by
-    default: cash earns nothing, as it always has here.
+    default, so cash earns nothing, as it always has here.
 
     ``margin_interest`` charges borrowing the policy rate, and is on by
     default. An agent whose cash goes negative, holding more than it is
     worth under ``max_leverage``, pays a day's interest on the balance
     before each close, at the policy rate the market publishes that day.
-    This changes scores and never prices: the market is the same run with or
+    This changes scores and never prices. The market is the same run with or
     without it. ``margin_interest=False`` lets a levered agent borrow for
     free, as every run did before 0.8.5, and its scorecard says
     ``free-borrowing``.
@@ -936,8 +926,8 @@ def evaluate(
     :mod:`tradefloor.sandbox`.
 
     An agent that raises, or returns something that is not an order
-    mapping, is scored rather than allowed to end the run: the step trades
-    nothing and its card's ``errors`` names the step and what came back. A
+    mapping, is scored and the run goes on. The step trades nothing and its
+    card's ``errors`` names the step and what came back. A
     bad entry in a good mapping, an unknown ticker or a quantity of
     ``"100"``, is refused and counted in ``rejected``, and the rest of the
     mapping trades. See :class:`Agent` for what ``act`` may return. A
@@ -987,16 +977,16 @@ def evaluate(
     order the book could not fill in full is listed in the card's
     ``partial_fills``.
 
-    ``population`` runs the evaluation in POPULATED mode: a
+    ``population`` runs the evaluation in populated mode. A
     :class:`tradefloor.Population` of background traders shares each
     agent's market and reacts to what the agent does (see
     :mod:`tradefloor.population`). Each agent still gets its own copy of the
     market, and the untraded baseline gets one too, all with the same
-    population; but because the population reacts to each agent, the agents
-    no longer face identical markets. A populated result is reproducible (the
+    population. Because the population reacts to each agent, the agents no
+    longer face identical markets. A populated result is reproducible (the
     same seed and population give the same scorecards), and it measures
-    whether an edge survives other traders, not which of two strategies is
-    better: rank strategies in isolated mode, the default. Each card's
+    whether an edge survives other traders. To compare two strategies, rank
+    them in isolated mode, the default. Each card's
     ``population_fingerprint`` names the population, and is "" for an
     isolated run.
 
@@ -1536,7 +1526,7 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
 
 
 def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard]:
-    """Scorecards sorted best-first, for ONE market.
+    """Scorecards sorted best-first, for one market.
 
     Ties break on name, so the order is total and reproducible. A leaderboard
     whose order depended on dict insertion would rank differently for reasons
@@ -1544,18 +1534,17 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
 
     .. warning::
 
-       This ranks the seed at least as much as the agents, and the effect is
-       not subtle. Measured on the reference agents over twelve ten-day
-       markets on ``Universe.random(30, seed=11)``, a single seed usually
-       NAMES the across-seed leader, nine times in twelve, but what it
-       says that leader is worth ranges from a capture of -0.776 to +0.836
-       depending only on which market it drew.
+       This ranks the seed at least as much as the agents. Measured on the
+       reference agents over twelve ten-day markets on
+       ``Universe.random(30, seed=11)``, a single seed named the across-seed
+       leader nine times in twelve, but what it says that leader is worth
+       ranges from a capture of -0.776 to +0.836 depending only on which
+       market it drew.
 
        Use this to read one market. To rank agents, use :func:`tradefloor.rank`,
        which takes the verdict across seeds and reports a paired sign test
-       saying whether the ordering is established at all -- because even the
-       across-seed aggregate can order two agents that a paired test cannot
-       separate.
+       saying whether the ordering is established. Even the across-seed
+       aggregate can order two agents that a paired test cannot separate.
 
     A tampered card (``Scorecard.tampered``) is sorted after every other
     card whatever it scored, because its score is of a market the agent
