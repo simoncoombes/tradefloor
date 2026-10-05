@@ -417,10 +417,14 @@ def test_a_crowd_past_its_loss_limit_sells_out_and_comes_back():
     assert report["volume"] != free.population_report()[0]["volume"]
 
 
+@pytest.mark.parametrize("crowded", [False, True], ids=["crowd", "crowded"])
 @pytest.mark.parametrize("mid_day", [False, True])
-def test_a_crowd_restores_in_a_fresh_process(tmp_path, mid_day):
-    crowd = Population([Participant.crowd(signal="reversal", lookback=390,
-                                          stop=0.002), Participant.detector()])
+def test_a_crowd_restores_in_a_fresh_process(tmp_path, mid_day, crowded):
+    # The crowded population carries five detectors that share their
+    # profile and their spread readings: both are in the snapshot.
+    crowd = Population.crowded() if crowded else Population(
+        [Participant.crowd(signal="reversal", lookback=390, stop=0.002),
+         Participant.detector()])
     e = tf.Engine(seed=3, universe=UNIVERSE, model="pt-v20", population=crowd)
     for _ in range(3):
         _day(e, UNIVERSE[2])
