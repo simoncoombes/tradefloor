@@ -346,3 +346,23 @@ def test_pt_v21_run_box_stages_the_files_the_boxes_ran(tmp_path):
     for sha, inside, _ in as_run21():
         box, _, path = inside.partition(":")
         assert sha256(tmp_path / box.replace("box-", "") / path) == sha, inside
+
+
+def test_the_files_the_pt_v21_registration_cites_are_here():
+    """`ptv21-registration-18.md` is published as registered, and the files
+    it cites by name are published beside it at the paths it names, each
+    with the hash it had at the commit it was read from."""
+    rows = [line.split(None, 3)
+            for line in (GRADE21 / "registration-files.txt").read_text().splitlines()
+            if line.strip() and not line.startswith("#")]
+    assert len(rows) == 37
+    wrong = [r[2] for r in rows if sha256(GRADE21 / r[2]) != r[0]]
+    assert not wrong, wrong
+    cited = (GRADE21 / "programme" / "ptv21-registration-18.md").read_text()
+    for name in ("r13reg/grade-seeds.json", "r13reg/grade_all.py",
+                 "r13reg/box/digests.py", "r13reg/arms/arm-R21E1.txt",
+                 "programme/screen/box.sh", "programme/screen/box/screen_box.py",
+                 "programme/screen/box/merge_out.py", "screen/stages.json",
+                 "programme/longrun/CRITERIA-pt-v21.md"):
+        assert name in cited, name
+        assert (GRADE21 / "programme" / name.removeprefix("programme/")).is_file(), name

@@ -1,0 +1,48 @@
+The eighteenth registration's exam seeds (260201-264400): the proof that none had been run (2026-10-05, before the
+registration commit). layout.py wrote ../grade-seeds.json; increment.py built the record sets below and report.py wrote
+the rest of this file. The seventeenth registration's proof is proof-17.txt, the sixteenth's proof-16.txt, the
+fifteenth's proof.txt, the fourteenth's proof-14.txt and the thirteenth's proof-13.txt.
+
+Method: the seventeenth proof's. local (every file modified since 2026-09-28 11:00 local under /private/tmp/claude-501
+and /Users/simoncoombes/Dev; this registration's own files left out: grade-seeds.json, freshseeds/, tests/,
+ptv21-registration-18.md, the screen's tests and the proof's working folder), s3 (every key under pretium-calib/
+modified since 2026-09-28 15:00 UTC, with the body of each text key, and every run folder's jobs.log and run.log) and
+git (every commit of the design repo, the engine, tradefloor-serve and tradefloor-docs). The 2026-09-28 index the
+earlier proofs read is no longer in its scratchpad, so the index part was not run; before 2026-09-28 the record of what
+ran is layout.py's USED list, which places no block between 244401 and 300200.
+
+Not a record of these tools: after grade 17 the seed-set check built an engine for each seed from 1 to 400000 and read
+its day-0 economy opening (phase and age of the cycle); no market history, no row. The registration records it.
+
+exam set 260201-260400,260431-260590,260801-260890,261201-261230,261501-261530,261801-261830,262001-262270,262301-262308,262401-262408,262501-262534,263001-263030,263201-263230,263501-263530,263801-263830,264001-264400: 1380 distinct seeds, span 260201-264400
+
+sources (increment.py's logs):
+  [index] index: the 2026-09-28 seed-use index (scratchpad fresh/*.jsonl) is no longer on disk; before 2026-09-28 the record is layout.py's USED list
+  [index] 0 records touch it; the index part was not run
+  [local] local files modified since 2026-09-28 11:00: 533675
+  [local] 4 records touch it; 428 wider than 20000 not listed
+  [s3] s3 keys 546493 run folders 985 modified since 2026-09-28 15:00 UTC 217192 older jobs.log/run.log 1200
+  [s3] s3 text read 89927 big streamed 1 errors 0
+  [s3] 0 records touch it; 41 wider than 20000 not listed
+  [git] git /Users/simoncoombes/Dev/tradefloor-design commits 1986 matching 8
+  [git] git /Users/simoncoombes/Dev/tradefloor commits 2308 matching 0
+  [git] git /Users/simoncoombes/Dev/tradefloor-serve commits 650 matching 0
+  [git] git /Users/simoncoombes/Dev/tradefloor-docs commits 810 matching 0
+  [git] 0 records touch it; 0 wider than 20000 not listed
+
+== index: 0 records touch an exam seed
+
+== local: 4 records touch an exam seed
+      4  [no seed context] the script that wrote the eighteenth registration's text (its seed section), not a run
+         range-any    261201-261830  e/tmp/claude-501/-Users-simoncoombes-Dev/011f3e71-5320-439f-8ac1-131d7b1cbbb5/scratchpad/reg18doc.py
+             'ich take blocks of their own (261201-261830, 263201-2'
+         range-any    263201-263830  e/tmp/claude-501/-Users-simoncoombes-Dev/011f3e71-5320-439f-8ac1-131d7b1cbbb5/scratchpad/reg18doc.py
+             ' of their own (261201-261830, 263201-263830; 264001-2'
+         range-any    264001-264400  e/tmp/claude-501/-Users-simoncoombes-Dev/011f3e71-5320-439f-8ac1-131d7b1cbbb5/scratchpad/reg18doc.py
+             '261201-261830, 263201-263830; 264001-264400). 1320 di'
+
+== s3: 0 records touch an exam seed
+
+== git: 0 records touch an exam seed
+
+verdict: CLEAN: no record names an exam seed as run; every record touching the set is explained

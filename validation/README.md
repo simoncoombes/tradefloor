@@ -158,6 +158,7 @@ seeds is 0.598. Both verdicts are here, and `criteria.py` writes either.
 | `programme/results/ptv21/verdict-pt-v21-c1-reg12.json` | the same grade on the twelfth registration's definitions (38 of 40) |
 | `programme/results/ptv21/equiv/` | pt-v21 by name on 0.10.0 against the graded arm's dials on the build the eighteenth grade ran: six trajectory digests, all identical |
 | `scripts-as-run.txt` | the sha256 of each of the 47 files the two boxes unpacked |
+| `registration-files.txt` | the 37 files the registration cites by name (its seed file, the grade plan, the grading and screen scripts, `CRITERIA-pt-v21.md`), published at the paths it names, with the commit each was read from and its sha256 |
 | `run-box.sh` | runs both boxes and the grading again, end to end |
 
 From `validation/pt-v21/`:

@@ -1,0 +1,44 @@
+# The files ptv21-registration-18.md cites by name, from the design repository
+# at the registration's commit, 0b623a87, or at the commit the registration
+# names for them: the grade plan at 54361aae, ptv21.py, metaorder_curve.py,
+# CRITERIA-pt-v21.md and real.json at 3fdb518c, readings-E.json on
+# ptv21/tooling and test_registration_17.py on the seventeenth registration.
+# Columns: the file's sha256, the commit it was read from, and its path in
+# this folder.
+86cbed2007166d90c7befd289fcc76a751be42c32977be56eec31833ab85a456  0b623a87bd15  programme/r13reg/grade-seeds.json
+4137a8226488e840dd99aa49e00ac6ebd16d83e5c4fd2b38f52e3f96ee110b2e  0b623a87bd15  programme/r13reg/grade_all.py
+8c8c185121afe748994cf3b94b86ddc223f8e1aaefda585bf180782cf5487de1  0b623a87bd15  programme/r13reg/exploits.py
+f62d50682178b6a7a0e76b2d269d043f6ce401c841fc8ea160529176412f8d16  0b623a87bd15  programme/r13reg/exploits_summary.py
+6aa641858f9c448a5657640203bee59abbd3d373807050086220e20ef74c7b6e  0b623a87bd15  programme/r13reg/verdict16.py
+ce3eca6ee723cb23ee5fc70ebf6bb48d0e361d150587af12c810f1236879e1f6  0b623a87bd15  programme/r13reg/rulecut_lr.py
+c73b24ea859638e8141c8d39577475d1784ea9e21372f75dd26f0e78c900c95f  0b623a87bd15  programme/r13reg/ao5.py
+abbb04d90f5da58b626a2743d7b26e61a0b6bd9110f346caa9414c2dc17966ae  0b623a87bd15  programme/r13reg/margins.py
+c12d21218cc09fe4b8eef29087dbc6d79cc9b204977f88532c9b27e25804b296  0b623a87bd15  programme/r13reg/lever_lr.py
+6259872274808fdbc04a682575f3798c2c6f8d39d4a3733e97463f0062ba69cd  0b623a87bd15  programme/r13reg/arms/arm-R21E1.txt
+da8397ff7251636a56dd005572cf0879fbe71e34471b5b9c427c5820187afbdf  0b623a87bd15  programme/r13reg/box/digests.py
+306fab4098500cca42e278f9ba3110d2a13a411b1cd9e6e0f9089be8d8e1cd23  0b623a87bd15  programme/r13reg/box/ph_rows.py
+77c0ed6a631838fc12e6ca56bc292adc8a663ee6cd95453094cb583673e20771  0b623a87bd15  programme/r13reg/freshseeds/layout.py
+fea1160dbc2efc71d9fb6cb7b6473712c7f91713c4382c53a21b00b3797d84f4  0b623a87bd15  programme/r13reg/freshseeds/proof-18.txt
+7b94082ba89eb7bc61ce709cd0307f1b2225517cf66881e5e11de9fe04a81836  0b623a87bd15  programme/r13reg/freshseeds/report.py
+895234be476ff499f8936e15c7458dc1ca4e339f18e6162d7631abd4947fc14e  0b623a87bd15  programme/r13reg/freshseeds/increment.py  (the S3 bucket name and AWS account id replaced by <bucket> and <account>)
+2e6b20d543f72da173e05b3a9be6569c1b0add006990bb8938fc2b842399c2fe  54361aae23bf  programme/r13reg/grade18/plan-g18.json
+0ffebae06e563228b0e1bd4203ee8ce139861133c64eae556fb012347a6c7d21  54361aae23bf  programme/r13reg/grade18/plan-g18-box1.json
+e2ce6d703c35cef6ba12efbdd0ebd11313368d17a971ed1ade86ef09c531619c  54361aae23bf  programme/r13reg/grade18/plan-g18-box2.json
+90db53b47ebc285c36416e39390e089b929768e3c3b2b11f2d3755201c667d6e  54361aae23bf  programme/r13reg/grade18/plan-g18-box3.json
+0911c6c23b93dfea9cb0583570fb31e8ce77b547ccd5abf34f1f342f78db31ad  54361aae23bf  programme/r13reg/grade18/plan-g18-box4.json
+b97d0b5beae7c447a53a00737572b71f63e79950773b2537ffd1b6ee35d820db  0b623a87bd15  programme/r13reg/tests/test_registration_18.py
+c8d85d5285bde4528beafcd5ee8e384ece451029fc70924064569634e377c95e  0b623a87bd15  programme/screen/box.sh
+8c01a889e49955357a6377efd6d7d93feec0af1fbfb571edd34c04178dead687  0b623a87bd15  programme/screen/screen.py
+f00ae81f40e84815faf097018655ab445a244fc676c2ca602acf0cfa8fa3579d  0b623a87bd15  programme/screen/stages.json
+03f79f9138c1d8e6f0f796f222c4bf6cf3d2a296d2cca2a7671e81d818f31025  0b623a87bd15  programme/screen/box/merge_out.py
+3bf3048ae4d846a2e9fe157239458f64815c111118cf1bb1a61439d1e5664eec  0b623a87bd15  programme/screen/box/screen_box.py
+531f84c946284951b60eccc7a81739ce869770561a12bd0ce9e2400aedce8b43  0b623a87bd15  programme/screen/box/wheel.sh
+c1de74b1bb719f4c99628174e3ecfc101b9b029d26a633bbaf83e7f908c5a81a  0b623a87bd15  programme/screen/box/ph_rows_port.py
+c2bf308937d903ee2044acf15908059571cc0cabc12d564b3f03daf595a0cf91  0b623a87bd15  programme/screen/box/graded_scenarios.py
+3ca6360adb420ed65db4c67d65c34919fd4779d70860759f56b5a4045e3d7a83  0b623a87bd15  programme/screen/box/graded-scenarios.txt
+f9894a513a02e10f1cb95242862da0afb1bd3d2ff9b0dd4779cdfa1dbedf1f10  3fdb518c4575  programme/longrun/CRITERIA-pt-v21.md
+ea67b735baabfa18a3e1204a5f56ab40224bc0a03d1cb6a3a4a068648f33552a  3fdb518c4575  programme/longrun/ptv21.py
+ef06b1b1a9cb85d4f906e82a9c90d41b21d555c2b55eb90b1ae797d9f36a0e59  3fdb518c4575  programme/longrun/metaorder_curve.py
+9ef00365a276d6dbe4a446b6454f661c678ca08cbb86f31fcb0af248d2aa6c3f  3fdb518c4575  programme/longrun/data/ptv21/real.json
+30a964db699220da1188a83991dae504034cfcca5622a4cd6409cb3c5828c92a  eefa0d5178d3  programme/ptv21/ph5/readings-E.json
+9b5c9089e7408526209897f5c084816ebd05d80ab415edc3ebe51769b7f6765d  ae782593587d  programme/r13reg/tests/test_registration_17.py
