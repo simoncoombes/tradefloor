@@ -42,15 +42,15 @@ scores = tf.evaluate({"pm": agent}, seed=4242, universe=roster)
 Your `deps_type`, your tools, your `RunContext` usage, your instructions and
 your toolsets all keep working, because the adapter changes none of them.
 
-## What you give up, stated plainly
+## What you give up
 
-**The observation arrives as text, in the run's prompt.** Your tools cannot
-query it programmatically: there is no `ctx.deps.observation`, and a tool
+The observation arrives as text, in the run's prompt. Your tools cannot
+query it programmatically. There is no `ctx.deps.observation`, and a tool
 that wants the day's prices cannot ask for them. In exchange, nothing about
 your existing agent has to change.
 
-That trade was measured, not assumed. PydanticAI has exactly one dependency
-slot -- `run(deps=...)`, read by every tool through `RunContext.deps` -- and
+That trade was measured. PydanticAI has exactly one dependency slot,
+`run(deps=...)`, read by every tool through `RunContext.deps`.
 `Agent._get_deps` does no runtime type check, so an adapter that wrapped
 your deps in a container of its own would hand your tools an object of the
 wrong type and they would fail on the attribute access, one frame away from
@@ -58,67 +58,68 @@ any explanation. There is no second channel and no `RunContext.extras`. An
 adapter cannot both carry its own payload in `deps` and leave yours intact,
 so it carries nothing there and passes yours through untouched.
 
-If a tool of yours genuinely needs the observation, put a mutable holder on
-your own deps object and fill it from a decision rule you own; the adapter
-never constructs deps, so it cannot collide with whatever you put there.
+If a tool of yours needs the observation, put a mutable holder on your own
+deps object and fill it from a decision rule you own. The adapter never
+constructs deps, so it cannot collide with whatever you put there.
 
-## The mandate is added, not substituted
+## The mandate is appended to your instructions
 
-`MANDATE` rides on the run's `instructions=` argument, which PydanticAI
-APPENDS to the agent's own instructions rather than replacing them. Measured
-against 2.36.0: an agent instructed "USER MANDATE." run with
-`instructions="TRADEFLOOR RULES."` sends the model
+`MANDATE` is passed as the run's `instructions=` argument, which PydanticAI
+appends to the agent's own instructions. Measured against 2.36.0, an agent
+instructed "USER MANDATE." run with `instructions="TRADEFLOOR RULES."`
+sends the model
 `'USER MANDATE.\\n\\nTRADEFLOOR RULES.'`. The context-manager form,
-`Agent.override(instructions=...)`, REPLACES instead -- including
-instructions contributed by capabilities -- which is why it is not used
-here. Your agent still knows what you told it; it additionally knows the
-rules of this market.
+`Agent.override(instructions=...)`, replaces them instead, including
+instructions contributed by capabilities, so it is not used here. Your
+agent still knows what you told it, and it also knows the rules of this
+market.
 
 ## The answer shape is bound per run
 
 `output_type=common.decision_model()` is passed to `run()`, which builds a
 fresh output schema for that run and leaves the agent's own `output_type`
-untouched. The point is not convenience: the model class is what PydanticAI
-turns into the output tool's parameter schema, so the side enum and the
-non-negative quantity are stated to the model BEFORE it answers, and a
-violation is caught inside the framework's own retry loop -- fed back as the
-pydantic error text and fixed within the turn -- instead of dying one layer
-later in `parse_decision` and costing the decision point.
+untouched. PydanticAI turns the model class into the output tool's
+parameter schema, so the side enum and the non-negative quantity are
+stated to the model before it answers. A violation is caught inside the
+framework's own retry loop (fed back as the pydantic error text and fixed
+within the turn) instead of dying one layer later in `parse_decision` and
+costing the decision point.
 
-One case is refused rather than worked around. PydanticAI raises
+One case is refused. PydanticAI raises
 `UserError("Cannot set a custom run output_type when the agent has output
 validators")`, because a validator registered with `@agent.output_validator`
 expects the agent's own output type. An agent with output validators
-therefore cannot have its output type overridden, and the adapter says so
-with the fix rather than letting the framework's message surface bare. Pass
-`bind_output_type=False` and the agent's own output type is used; whatever
-it produces still goes through `parse_decision`, which is total.
+therefore cannot have its output type overridden, and the adapter's error
+says so and gives the fix, so the framework's message does not surface
+bare. Pass `bind_output_type=False` and the agent's own output type is
+used. Whatever it produces still goes through `parse_decision`, which is
+total.
 
 ## Which exception means what
 
 `common.FrameworkAdapter.act` wraps any non-Integration exception from
-`ask()` in `FrameworkError` -- "the call never completed" -- and it wraps
-CONTROL-FLOW exceptions too, which are not failures at all. PydanticAI has
-two, and each is decided here rather than left to the default, because this
-is where the framework knowledge is.
+`ask()` in `FrameworkError` ("the call never completed"), and it wraps
+control-flow exceptions too, which are not failures at all. PydanticAI has
+two, and each is handled here and not left to the default, because this is
+where the framework knowledge is.
 
-**`UsageLimitExceeded` becomes `UsageLimitReached`**, a `FrameworkError`
+`UsageLimitExceeded` becomes `UsageLimitReached`, a `FrameworkError`
 subclass defined in this module. A caller who set `request_limit` did so on
-purpose and should be able to catch the stop by name rather than by
-inspecting `__cause__` on a generic error. Being a `FrameworkError` it is
+purpose and should be able to catch the stop by name, without inspecting
+`__cause__` on a generic error. As a `FrameworkError` it is
 still in the shared family, so `act()` passes it through untouched and code
 that catches `IntegrationError` or `FrameworkError` is unaffected. The
 original exception stays on `__cause__`.
 
-**`UnexpectedModelBehavior` becomes `DecisionError`.** It covers two
-different things, and they land on the same side of the Tradefloor
-boundary. One is a schema violation the retry budget could not fix; the
+`UnexpectedModelBehavior` becomes `DecisionError`. It covers two
+different things, and both land on the same side of the Tradefloor
+boundary. One is a schema violation the retry budget could not fix. The
 other is a model that answered in prose where the output tool was required.
-Both produce the identical message, `"Exceeded maximum output retries (N)"`.
-And both mean the same thing to an experiment: the agent was given N chances
-to produce a valid decision and did not. Scoring that as an outage would let
-an agent that reliably emits garbage read as a flaky network, which is the
-one reading that would make the error columns useless.
+Both produce the identical message, `"Exceeded maximum output retries (N)"`,
+and both mean the same thing to an experiment: the agent was given N
+chances to produce a valid decision and did not. Scoring that as an outage
+would let an agent that reliably emits garbage read as a flaky network, and
+the error columns would then be useless.
 
 A caller who needs to tell the two apart reads `__cause__.__cause__`:
 
@@ -130,24 +131,24 @@ A caller who needs to tell the two apart reads `__cause__.__cause__`:
 The message this adapter raises says which of the two it was, so the common
 case needs no chain-walking.
 
-`ContentFilterError` is the exception to the exception. It subclasses
+`ContentFilterError` is handled differently. It subclasses
 `UnexpectedModelBehavior`, but the provider blocked the exchange and the
 model never answered, so it is left alone for `act()` to file under
 `FrameworkError`.
 
-`RunCancelled` is deliberately NOT special-cased. It arises only if the
+`RunCancelled` is not special-cased, on purpose. It arises only if the
 user's own tool calls `ctx.cancel()`, and it arrives as a `FrameworkError`
-with the original on `__cause__`. That is a recorded choice, not an
-oversight: giving it a type would be inventing surface for a case nothing
-in this repo exercises, and it is one line to add when something does.
+with the original on `__cause__`. Giving it a type would add surface for a
+case nothing in this repo exercises, and it is one line to add when
+something does.
 
-## The prompt is JSON, and that is deliberate
+## The prompt is JSON
 
 `render` JSON-dumps the allowlisted payload with sorted keys. The prose
 block `finrobot.render` produces reads better to a human, but three things
 argue for JSON here. The answer shape is already stated to the model by the
 output schema, so the prompt only has to carry data. A hand-written
-formatter is a second place the payload can be described, and it drifts. And
+formatter is a second place the payload can be described, and it can drift. And
 the render must work with no framework installed, because `digest(prompt)`
 is the replay key and a replay needs nothing but the standard library.
 
@@ -156,39 +157,38 @@ is the replay key and a replay needs nothing but the standard library.
 `mode="replay"` reads a recorded response for `digest(prompt)` and never
 imports PydanticAI, so a reader without the extra installed can still run
 the experiment. `mode="live"` calls the real agent and, given a `recorder`,
-writes the same entries back. Change the observation mapping and the digest
-changes, the key goes missing, and the replay raises naming the step --
-which is the point, because replaying anyway would answer the new question
-with a response given to the old one.
+writes the same entries back. If the observation mapping changes, the
+digest changes, the key goes missing, and the replay raises an error naming
+the step. Replaying anyway would answer the new question with a response
+given to the old one.
 
-What a key over the input cannot see is a change to something that never
-enters it. The mandate reaches the agent as `run(instructions=...)`, not as
-part of the prompt, so editing it leaves every recorded key intact -- the run
-completes, all fifteen digests match, and the decisions replayed were taken
-under instructions nobody is running any more. That is a property of any
-adapter whose **instructions travel separately from the keyed input**, not a
-PydanticAI quirk, and the other integrations in this package share it.
+A key over the input cannot see a change to something that never enters
+it. The mandate reaches the agent as `run(instructions=...)`, outside the
+prompt, so editing it leaves every recorded key intact. The run completes,
+all fifteen digests match, and the replayed decisions were taken under
+instructions nobody is running any more. Any adapter whose instructions
+travel separately from the keyed input has this problem, and the other
+integrations in this package share it.
 
-`_check_instructions` refuses that, at construction rather than at the first
-decision: everything it needs is known before the market opens. It compares
-the recorded `instructions_digest` against the configured one and names both.
-A transcript that records no digest is allowed through -- it never claimed a
-mandate, so it is not known to be wrong, and refusing it would break
-hand-written fixtures for no safety gain.
+`_check_instructions` refuses that at construction and not at the first
+decision, because everything it needs is known before the market opens. It
+compares the recorded `instructions_digest` against the configured one and
+names both. A transcript that records no digest is allowed through. It
+never claimed a mandate, so it is not known to be wrong, and refusing it
+would break hand-written fixtures for no safety gain.
 
-There is deliberately no version-only fallback layer. The FinRobot adapter
-has one, for recordings made before its digest field existed; this adapter
-stamps `instructions_digest` and `instructions_version` together, from one
-`provenance()` call, so a transcript carrying the version without the digest
-cannot be produced. A branch that cannot be reached is a branch that cannot
-be tested, and this package has spent enough effort deleting guards that
-could not fire.
+There is no version-only fallback layer. The FinRobot adapter has one, for
+recordings made before its digest field existed. This adapter stamps
+`instructions_digest` and `instructions_version` together, from one
+`provenance()` call, so a transcript carrying the version without the
+digest cannot be produced, and a branch that cannot be reached cannot be
+tested.
 
-## Async, and a trap worth knowing about
+## Async, and context variables
 
 The framework's `Agent.run_sync` is not used. It calls
 `loop.run_until_complete`, which raises `RuntimeError: This event loop is
-already running` inside a notebook -- measured -- so this adapter calls the
+already running` inside a notebook (measured), so this adapter calls the
 async `Agent.run` and hands the coroutine to `common.run_sync`, the one
 shared bridge.
 
@@ -196,8 +196,8 @@ shared bridge.
 0.8.5 the bridge carries the caller's context to the coroutine in a script
 and in a notebook alike, so an override set around `World.run` reaches the
 run either way. Until then it reached it in a script and not in a notebook,
-where the bridge crossed a thread without the context. This adapter never
-depends on either: the model is passed per run through `model=`, a plain
+where the bridge crossed a thread without the context. This adapter depends
+on neither, because the model is passed per run through `model=`, a plain
 argument, which is still the clearer way to choose one.
 """
 
@@ -259,12 +259,11 @@ decision.
 """
 
 class UsageLimitReached(FrameworkError):
-    """The run stopped because it hit the request budget, not because it
-    failed.
+    """The run stopped because it hit the request budget, and did not fail.
 
-    A `FrameworkError` subclass so the shared family still holds -- `act()`
+    It subclasses `FrameworkError` so the shared family still holds: `act()`
     re-raises an `IntegrationError` untouched, and anything catching
-    `FrameworkError` or `IntegrationError` keeps working -- and a named type
+    `FrameworkError` or `IntegrationError` keeps working. It is a named type
     so a caller who set `request_limit` on purpose can catch the stop by
     name instead of matching on a message or walking `__cause__`.
 
@@ -308,7 +307,7 @@ class PydanticAIAdapter(FrameworkAdapter):
     module docstring for what the adapter does and does not touch.
 
     ``mode`` is ``"live"`` or ``"replay"``. Replay imports nothing from
-    PydanticAI and needs no API key; ``"live"`` imports it inside
+    PydanticAI and needs no API key. ``"live"`` imports it inside
     :meth:`_run` and names the extra if that import fails.
 
     ``model`` overrides the model for every run this adapter makes, as a
@@ -320,7 +319,7 @@ class PydanticAIAdapter(FrameworkAdapter):
     constructs, wraps or inspects it.
 
     ``every`` is the decision cadence in steps, and the two arms of a
-    comparison MUST run the same one; :meth:`fork` copies it.
+    comparison must run the same one, and :meth:`fork` copies it.
     """
 
     def __init__(self, agent: Any = None, *, deps: Any = None,
@@ -422,18 +421,18 @@ class PydanticAIAdapter(FrameworkAdapter):
     def ask(self, obs: Any, payload: dict[str, Any]) -> Any:
         """One decision for this payload, as a dict `parse_decision` accepts.
 
-        The envelope is unwrapped here, not by `parse_decision`: PydanticAI
-        returns an `AgentRunResult`, and what the market gets to see is
+        The envelope is unwrapped here and not by `parse_decision`.
+        PydanticAI returns an `AgentRunResult`, and what the market sees is
         `result.output`, converted to a plain mapping. Handing the wrapper
         onwards would present a result object with no `actions` key, which
-        `parse_decision` refuses -- correctly, but one layer too late to say
+        `parse_decision` refuses correctly but one layer too late to say
         anything useful about why.
 
         Exceptions are classified here too, and not in :meth:`_run`, so the
-        classification survives a subclass replacing the framework call: a
+        classification survives a subclass replacing the framework call. A
         test double raising `UsageLimitExceeded` gets the same treatment as
-        the real framework raising it, which is the only way the rule can be
-        tested without a provider. `act()` wraps everything it is handed,
+        the real framework raising it, which is the only way to test the
+        rule without a provider. `act()` wraps everything it is handed,
         control-flow exceptions included, so anything that should not read as
         an outage has to be named before it gets there. See the module
         docstring for the reasoning on each.
@@ -593,15 +592,14 @@ class PydanticAIAdapter(FrameworkAdapter):
         """What a fork has to agree on, plus what would change the question.
 
         The base publishes the price memory, the last decision, the cadence
-        and the instructions digest. Added here: the mode and whether the
+        and the instructions digest. This adds the mode and whether the
         shared decision model was bound. Both change what the agent was
         asked, so two arms that disagreed on either would not be a
         controlled comparison, and `agree()` should say so.
 
-        The agent, the deps and the model stay out. Deps in particular: it
-        is the user's own object, it may hold a client or a key, and this
-        dictionary is printed by the fork agreement and written into
-        artifacts.
+        The agent, the deps and the model stay out. The deps are the user's
+        own object and may hold a client or a key, and this dictionary is
+        printed by the fork agreement and written into artifacts.
         """
         published = super().state()
         published["mode"] = self.mode
@@ -617,10 +615,11 @@ class PydanticAIAdapter(FrameworkAdapter):
     def fork_kwargs(self) -> dict[str, Any]:
         """The constructor arguments a fork is rebuilt with.
 
-        The agent, the deps, the model, the transcript and the recorder are
-        SHARED rather than copied. Every one of them is configuration both
-        arms must agree on, and copying an Agent -- which may hold an HTTP
-        client -- is wasteful at best and a shared socket at worst. A live
+        The fork shares the agent, the deps, the model, the transcript and
+        the recorder, and copies none of them. Every one of them is
+        configuration both arms must agree on, and copying an Agent, which
+        may hold an HTTP client, is wasteful at best and a shared socket at
+        worst. A live
         recording of both arms belongs in one file, and a replay of one arm
         must read the same recorded run as the other.
         """
@@ -645,12 +644,12 @@ class PydanticAIAdapter(FrameworkAdapter):
 def render(payload: dict[str, Any]) -> str:
     """The payload as the text the agent receives.
 
-    Generated from ``payload`` alone, so nothing outside the allowlist can
-    appear here by accident, and with the standard library alone, so a
-    replay -- which keys on ``digest`` of this string -- needs no framework
+    It is generated from ``payload`` alone, so nothing outside the allowlist
+    can appear here by accident, and with the standard library alone, so a
+    replay (which keys on ``digest`` of this string) needs no framework
     installed.
 
-    Sorted keys and a fixed indent, because the replay key is a hash of
+    It uses sorted keys and a fixed indent, because the replay key is a hash of
     these exact bytes. Two runs that show the agent the same market must
     produce the same string, and a dict whose insertion order differed would
     otherwise miss its own recording.

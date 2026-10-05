@@ -6,9 +6,9 @@ round-trips, and process-level parallelism for seed sweeps. Forcing those into
 the extension would mean hand-rolling JSON escaping and reimplementing a
 process pool, both worse than the standard library versions.
 
-Determinism is the point. The same seed and the same inputs are designed to
-produce bit-identical output on Linux, macOS and Windows, because the library
-ships its own transcendental maths rather than calling the platform's libm.
+The same seed and the same inputs are designed to produce bit-identical
+output on Linux, macOS and Windows, because the library ships its own
+transcendental maths instead of calling the platform's libm.
 """
 
 from __future__ import annotations
@@ -209,12 +209,12 @@ _UNIVERSE_SCHEMA = 1
 class Universe(list):
     """An ordered sequence of instruments.
 
-    A ``list`` subclass, deliberately. Roster order is contractual, since the engine
-    iterates instruments in index order and draws as it goes, so a reordered
-    universe is a different market from the same seed. Modelling it as a
-    mapping would invite exactly the ``{ticker: instrument}`` dict that has no
-    stable order, and a ``sort_by(ticker)`` somewhere upstream would be a
-    silent, total divergence.
+    It is a ``list`` subclass because roster order is part of the contract.
+    The engine iterates instruments in index order and draws as it goes, so
+    a reordered universe is a different market from the same seed. A
+    ``{ticker: instrument}`` mapping has no stable order, and a
+    ``sort_by(ticker)`` somewhere upstream would silently change every
+    price.
 
     Subclassing ``list`` also means it is accepted anywhere a list is, so the
     engine needs no special case.
@@ -232,25 +232,22 @@ class Universe(list):
         write nothing back to the economy, so every equity price is
         bit-identical with or without them. Off by default.
 
-        A generator is not a convenience here. A realistic study needs on the
-        order of a hundred names, and nobody hand-authors a hundred rosters,
-        so without this the practical universe size is "however many someone
-        was willing to type", which is not a modelling choice anyone made.
+        A realistic study needs on the order of a hundred names, and nobody
+        hand-authors a hundred rosters. Without a generator the universe size
+        would be however many names someone was willing to type.
 
         ``seed`` is the UNIVERSE seed and is independent of the simulation
-        seed. That separation is what makes "same universe, different market
-        draws" expressible, which is the standard design for variance
-        estimation. It is any integer from 0 to ``2**64 - 1``, like the
+        seed, so you can run the same universe under different market
+        draws, which is the standard design for variance estimation. It is any integer from 0 to ``2**64 - 1``, like the
         simulation seed, and every seed below ``2**32`` draws the roster it
         drew when seeds were 32-bit.
 
-        The generated cross-section is plausible rather than uniform: market
-        caps are log-distributed across all four spread tiers, P/E ratios
-        scatter around each sector's anchor, and about one name in nine is a
-        loss-maker so the book-value valuation path is actually exercised.
-        Those ranges are editorial and are not pinned by any golden vector;
-        what IS guaranteed is that ``(n, seed)`` gives the same universe on
-        every platform, so ``random(108, seed=7)`` is citable.
+        Market caps are log-distributed across all four spread tiers, P/E
+        ratios scatter around each sector's anchor, and about one name in
+        nine is a loss-maker so the book-value valuation path gets used.
+        Those ranges are editorial and no golden vector pins them. What is
+        guaranteed is that ``(n, seed)`` gives the same universe on every
+        platform, so ``random(108, seed=7)`` is citable.
         """
         universe = cls(_core.random_instruments(n, seed=seed))
         if bonds:
@@ -283,9 +280,9 @@ class Universe(list):
 
         Takes a :class:`tradefloor.edgar.Snapshot` or a path to a saved one.
         Extra keyword arguments are the macro conditions the fair values are
-        computed under, and they must match the macro the engine then runs --
-        otherwise every company starts mispriced by the difference, which is a
-        quiet way to get a universe nobody specified.
+        computed under, and they must match the macro the engine then runs.
+        If they don't, every company starts mispriced by the difference and
+        nothing warns you.
         """
         from . import edgar as _edgar
 
@@ -297,16 +294,14 @@ class Universe(list):
     def fingerprint(self) -> str:
         """sha256 over the roster's canonical serialisation.
 
-        Identity for a universe, where the ticker list is not. Tickers are
-        generated positionally, so ``random(40, seed=1)`` and
-        ``random(40, seed=99)`` share every NAME and share no earnings,
-        sectors or share counts. Anything that checks "same universe?" by
-        comparing tickers is checking almost nothing.
+        Use this to identify a universe. The ticker list can't do it, because
+        tickers are generated positionally: ``random(40, seed=1)`` and
+        ``random(40, seed=99)`` share every name and share no earnings,
+        sectors or share counts.
 
         Computed over the same field list ``to_json`` uses, with sorted keys
-        and no indentation, so the hash is a property of the CONTENT rather
-        than of formatting. A fingerprint that moved when a key order changed
-        would be useless as an identifier.
+        and no indentation, so the hash depends on the content and not on
+        formatting or key order.
         """
         import hashlib
 
@@ -317,11 +312,10 @@ class Universe(list):
     def to_json(self, **kwargs: Any) -> str:
         """Serialise to JSON.
 
-        A citable specification has to be able to name its universe exactly,
-        and ``random(108, seed=7)`` is only citable while the generator is
-        versioned with the model. Serialising the roster itself is the escape
-        hatch: it pins the exact instruments regardless of what any later
-        generator would produce.
+        ``random(108, seed=7)`` names a universe only while the generator is
+        versioned with the model. The JSON pins the exact instruments
+        whatever a later generator would produce, so a specification that
+        carries it names its universe exactly.
         """
         payload = {
             "schema": _UNIVERSE_SCHEMA,
@@ -339,12 +333,11 @@ class Universe(list):
     def from_json(cls, text: str) -> "Universe":
         """Rebuild a universe from :meth:`to_json` output.
 
-        Order is preserved exactly, because it is contractual.
+        Order is preserved exactly, because it is part of the contract.
 
-        A newer schema is refused rather than read on a best-effort basis. A
-        field this version does not know about would silently take a default,
-        and the resulting universe would be one nobody specified, the same
-        class of failure as a truncated golden file passing quietly.
+        A newer schema is refused. Reading it anyway would give any field
+        this version does not know about a silent default, and the result
+        would be a universe nobody specified.
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "instruments" not in payload:
@@ -522,10 +515,10 @@ def run_many(
 ) -> list[Any]:
     """Run one simulation per seed, in parallel, and return results in order.
 
-    ``results[i]`` is always the result for ``seeds[i]``, ordered by INPUT
-    POSITION, never by completion order. A sweep whose output order depended on
-    which worker finished first would be non-deterministic in the one way this
-    library exists to avoid, and the bug would look like noise.
+    ``results[i]`` is always the result for ``seeds[i]``. Results are ordered
+    by input position and never by completion order, because an order that
+    depended on which worker finished first would be non-deterministic, and
+    the bug would look like noise.
 
     # Per seed is the only safe boundary
 
@@ -533,52 +526,49 @@ def run_many(
     2026-08 split of the engine's RNG into seven per-domain substreams
     (market, economy, external, jumps, volume, news and volume_idio, see
     ``tradefloor-docs: docs/rng-streams.md``), because the split is by
-    DOMAIN, not by unit of work. The market stream alone serves every draw
+    domain and not by unit of work. The market stream alone serves every draw
     in a tick: the market factor, each sector factor, per-company noise, the
     intraday volume noise and book settlement, in one fixed order across the
     whole roster, with the Box-Muller spare cached per stream so even the
     parity of normal draws is that stream's state. Any within-run
     decomposition would repartition a single sequence, and the draw schedule
-    does not survive that. The economy's separate stream bought
-    comparability, not concurrency: a pinned macro path no longer reshuffles
-    the market's noise, but the day-close economy step feeds the next day's
+    does not survive that. The economy's separate stream means a pinned
+    macro path no longer reshuffles the market's noise. It adds no
+    concurrency, because the day-close economy step feeds the next day's
     pricing, so the domains run in sequence whatever their streams do.
 
-    Parallelising *within* a run is therefore off the table by construction,
-    not merely unimplemented. If you find yourself wanting ``n_threads=``, the
-    honest answer is that it could only be honoured by changing the market.
+    So a run cannot be parallelised *within* itself without changing the
+    market. An ``n_threads=`` option could only be honoured that way.
 
-    Each worker constructs its own engine from its own seed, so the isolation
-    is total: two workers share no state, and running with ``workers=1``
-    produces byte-identical results to any other worker count. That is
-    asserted by a test rather than assumed.
+    Each worker constructs its own engine from its own seed, so two workers
+    share no state, and running with ``workers=1`` produces byte-identical
+    results to any other worker count. A test asserts this.
 
     ``collect`` chooses what comes back: ``"prices"`` (raw f64 bytes),
     ``"attribution"`` (the seven component columns), or ``"summary"`` (prices,
     draw count and tickers).
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`tradefloor.ModelParams`, and every seed runs it, because a sweep
-    is many draws of ONE market and members under different models would be
-    a model comparison presented as a seed distribution. The ``summary``
+    :class:`tradefloor.ModelParams`, and every seed runs it. A sweep is many
+    draws of one market, and members under different models would be a
+    model comparison presented as a seed distribution. The ``summary``
     and ``attribution`` rows record ``model_fingerprint``.
 
-    # Threads, and why that is not a compromise
+    # Threads
 
     The engine releases the GIL for the whole session compute, so a thread
     pool gives real parallelism with no serialisation of the universe into
     each worker and no pickling of results back.
 
-    It also WORKS in the places a process pool does not. Windows spawns rather
-    than forks, and spawning re-imports ``__main__`` in every child -- which a
+    Threads also work where a process pool does not. Windows spawns rather
+    than forks, and spawning re-imports ``__main__`` in every child, which a
     notebook, a REPL and a piped script do not have. The children die, the
-    parent waits, and the sweep hangs with no error. That is the single most
-    likely way to use this library, so the process pool was not an
-    optimisation with an edge case; it was broken where it mattered most.
+    parent waits, and the sweep hangs with no error. Those are the most
+    likely ways to use this library, so a process pool would fail in the
+    common case.
 
-    ``workers`` is still not defaulted to the core count: a sweep small enough
-    to be interactive can be faster serially, and quietly making it slower
-    would be a poor default dressed as a good one.
+    ``workers`` does not default to the core count, because a sweep small
+    enough to be interactive can be faster serially.
 
     A single seed always runs in-process, whatever ``workers`` says.
 
@@ -656,12 +646,10 @@ def run_many(
 class FlowImpact:
     """What a synthetic order-flow imbalance did to the market.
 
-    Named for what it measures rather than for the category it belongs to.
-    It was called `Counterfactual`, which claimed the general concept while
-    doing one narrow part of it -- and the library now has three
+    It was called `Counterfactual` until the library had three
     counterfactuals (this, :func:`tradefloor.tca.analyse`, and
-    :func:`tradefloor.scenario.compare`), so the general name pointed at the
-    least general tool.
+    :func:`tradefloor.scenario.compare`). This one does the narrowest job,
+    so it is now named for what it measures.
 
     .. note::
 
@@ -669,13 +657,12 @@ class FlowImpact:
        It runs an agent that actually executes against the book and prices
        every fill against the untraded world.
 
-       This measures one specific, narrower thing: the effect of an order
-       IMBALANCE fed to the factor model, which is the information channel
-       alone. No order is submitted and no liquidity is consumed, so the book
-       channel -- where a large trade's cost actually comes from -- is not
-       exercised at all.
+       This class measures the effect of an order imbalance fed to the
+       factor model, which is the information channel alone. No order is
+       submitted and no liquidity is consumed, so the book channel, where a
+       large trade's cost actually comes from, is not exercised at all.
 
-       That channel is also bounded at both ends. Below about 1.3x the
+       The information channel is also bounded at both ends. Below about 1.3x the
        average minute volume a floor applies and the response is flat; above
        10x it saturates and is flat again. Doubling the flow outside the band
        between them changes nothing, so this is the wrong tool for asking how
@@ -690,17 +677,14 @@ class FlowImpact:
     Two runs of the SAME seed, one with the trader's order flow and one without,
     and the difference between them.
 
-    This is the measurement no real market can provide. In a real market you
-    observe the price you got; you can never observe the price you would have
-    got had you not traded, because your trading is part of why that price
-    happened. Here both worlds are runnable, so impact is measured rather than
-    estimated from a model of impact.
+    A real market can't give you this. You observe the price you got, but
+    never the price you would have got had you not traded, because your
+    trading is part of why that price happened. Here both worlds run, so
+    impact is measured instead of estimated from a model of impact.
 
-    ``impact[i]`` is ``actual[i] - baseline[i]`` for instrument ``i``: positive
-    means the trader pushed the price up. For a buyer that is a cost, because
-    they moved the market against themselves, so ``cost_bps`` flips sign by
-    side rather than reporting a signed impact and leaving the reader to work
-    out which direction hurt.
+    ``impact[i]`` is ``actual[i] - baseline[i]`` for instrument ``i``. Positive
+    means the trader pushed the price up, which is a cost for a buyer, so
+    ``cost_bps`` flips the sign by side.
     """
 
     __slots__ = ("tickers", "baseline", "actual", "seed", "_flow")
@@ -721,9 +705,9 @@ class FlowImpact:
     def impact_bps(self) -> list[float]:
         """Impact in basis points of the baseline price.
 
-        Basis points rather than currency because impact is only comparable
-        across instruments once it is relative, since a penny on a $3 stock and a
-        penny on a $600 stock are not the same event.
+        Basis points because impact is only comparable across instruments
+        once it is relative. A penny on a $3 stock and a penny on a $600
+        stock are different moves.
         """
         return [
             (a - b) / b * 10_000 if b != 0 else float("nan")
@@ -733,10 +717,8 @@ class FlowImpact:
     def cost_bps(self, ticker: str) -> float:
         """Impact expressed as a COST to the trader, in basis points.
 
-        Signed so that positive always means worse for them: a buyer who
-        pushed the price up paid for it, and a seller who pushed it down did
-        too. Reporting raw signed impact and leaving the caller to reason
-        about direction is how sign errors get into published numbers.
+        Positive always means worse for the trader. A buyer who pushed the
+        price up paid for it, and so did a seller who pushed it down.
         """
         i = self.tickers.index(ticker)
         bps = self.impact_bps[i]
@@ -752,13 +734,12 @@ class FlowImpact:
     def untouched_moved(self) -> list[str]:
         """Instruments the trader did not touch, whose price still moved.
 
-        EMPTY on a one-day run where the close writes no price, and the
-        reason is what makes this measurement clean: order flow consumes no
-        draws. It is an input to the factor calculation, not a call on the
-        generator, so adding flow to one name leaves the shared draw
-        schedule byte-identical and every other name sees exactly the noise
-        it would have seen: its prints through the session are the same to
-        the bit on every preset.
+        Empty on a one-day run where the close writes no price, because
+        order flow consumes no draws. Flow is an input to the factor
+        calculation and makes no call on the generator, so adding flow to
+        one name leaves the shared draw schedule byte-identical. Every other
+        name sees exactly the noise it would have seen, and its prints
+        through the session are the same to the bit on every preset.
 
         The prices compared here are read after the close, and on pt-v20
         and pt-v21, the default, the close re-marks every name to the macro state it
@@ -768,37 +749,38 @@ class FlowImpact:
         it), so on a one-day run the untouched names end apart by the
         difference in their re-marks: +0.03 to +0.04 bps against +2.3 on
         the traded name in ``tests/test_flow_impact.py``. That is the
-        market-wide channel below arriving at the first close, not a leak.
-        This function cannot pin the macro path; ``tradefloor.tca.analyse``
-        with ``scenario=Scenario().hold(vix=..., corporate_bond_yield=...)``
+        market-wide channel described below arriving at the first close. It
+        is not a leak. This function cannot pin the macro path.
+        ``tradefloor.tca.analyse`` with
+        ``scenario=Scenario().hold(vix=..., corporate_bond_yield=...)``
         can, and a model with ``macro_publication_repricing`` 0 writes no
         price at the close.
 
-        Measured, not assumed: a 390-tick session consumes 19,110 draws with
-        or without flow. (Adding an INSTRUMENT is a different matter and does
-        shift the schedule -- 4,900 draws at six names against 5,500 at seven
-        -- so a roster edit does not give you a counterfactual.)
+        Measured on this build, a 390-tick session consumes 19,110 draws
+        with or without flow. Adding an instrument does shift the schedule
+        (4,900 draws at six names against 5,500 at seven), so a roster edit
+        does not give you a counterfactual.
 
-        Over several DAYS one non-noise channel qualifies the emptiness,
-        since the 2026-08 VIX coupling: flow that moves the cap-weighted
+        Over several days one non-noise channel qualifies the emptiness,
+        since the 2026-08 VIX coupling. Flow that moves the cap-weighted
         market return moves the same-day VIX, VIX sets the shared factor's
-        variance target, and untraded names feel it two closes later.
-        Intermittent -- the VIX reaction clamps the market return at
-        +/-0.03% -- but real: measured on this build, flow of 200,000
-        shares against the first name of ``Universe.random(20, seed=7)``
-        run for ten days leaks nothing at sim seeds 2026 and 7 and moves
-        one untouched name +22.8 bps at sim seed 11. Pin VIX in both
-        worlds to restore byte-exactness, and on pt-v20 the corporate bond
-        yield too, which that preset moves at every close with the market;
-        ``tradefloor.tca``'s ``moved()`` docstring carries the full
-        measurement of the channel.
+        variance target, and untraded names feel it two closes later. The
+        effect is intermittent, because the VIX reaction clamps the market
+        return at +/-0.03%, but it is real. Measured on this build, flow of
+        200,000 shares against the first name of
+        ``Universe.random(20, seed=7)`` run for ten days leaks nothing at
+        sim seeds 2026 and 7 and moves one untouched name +22.8 bps at sim
+        seed 11. Pin VIX in both worlds to restore byte-exactness, and on
+        pt-v20 the corporate bond yield too, which that preset moves at
+        every close with the market. The ``moved()`` docstring in
+        ``tradefloor.tca`` has the full measurement of the channel.
 
         So on a one-day run impact is exactly attributable to the names
         traded up to the close's re-mark on pt-v20 (exactly, where the
         close writes no price), and on a longer one it is attributable up
-        to the fear gauge. This accessor exists to prove that rather than to explain
-        it away: a result a pinned VIX does not empty means something
-        leaked, and is worth investigating.
+        to the fear gauge. Use this accessor to check that. A result that a
+        pinned VIX does not empty means something leaked, and is worth
+        investigating.
         """
         touched = set(self._flow)
         return [
@@ -830,20 +812,19 @@ def flow_impact(
     Runs the same seed twice, once with ``order_flow`` and once without, and
     returns both worlds plus their difference.
 
-    ``order_flow`` is a STANDING rate: ``{ticker: (bought, sold)}`` shares
+    ``order_flow`` is a standing rate: ``{ticker: (bought, sold)}`` shares
     on every tick of each day's session, the ``flow_per_tick`` argument of
     :meth:`Engine.run_session`. So ``(6e6, 0.0)`` over the default 390 ticks
-    is a day-long program of 2.34 billion shares, not one order. One agent's
-    one trade is ``fills`` instead, which reaches the market once;
+    is a day-long program of 2.34 billion shares. One agent's one trade is
+    ``fills`` instead, which reaches the market once, and
     :func:`tradefloor.tca.analyse` measures that.
 
-    The two runs are otherwise identical by construction: same seed, same
-    universe, same macro, same session, and the same ``model``, either a preset
-    name or a :class:`tradefloor.ModelParams`, applied to BOTH worlds, since a
-    difference against a baseline under other coefficients would measure
-    the model rather than the flow. The ONLY difference is the flow, which
-    is what makes the subtraction meaningful. Anything else that differed
-    between them would show up as impact and be wrong.
+    The two runs are otherwise identical: same seed, same universe, same
+    macro, same session, and the same ``model``, either a preset name or a
+    :class:`tradefloor.ModelParams`, applied to both worlds. A baseline
+    under other coefficients would measure the model and not the flow.
+    Anything else that differed between the runs would show up as impact
+    and be wrong.
     """
     if not order_flow:
         raise ValidationError(

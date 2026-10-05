@@ -11,8 +11,8 @@ Nothing here changes a trajectory on its own. An engine with an empty
 overlay produces the known-answer digest; a patched draw costs the same
 generator step as an unpatched one, so every address after it keeps its
 value and ``draws_by_stream`` reads the same with and without the
-overlay. The Rust side (``rust/src/rng.rs``) states the contract; this
-module is the Python surface over it.
+overlay. The Rust side (``rust/src/rng.rs``) states the contract, and
+this module is the Python surface over it.
 
 ## Addresses
 
@@ -20,7 +20,7 @@ module is the Python surface over it.
 derives from its seed: ``market``, ``economy``, ``external``, ``jumps``,
 ``volume``, ``news`` and ``volume_idio``. ``kind`` is ``"uniform"`` or
 ``"normal"``. Normals index by normal count and uniforms by uniform
-count, counted apart: Box-Muller takes two uniforms from the generator
+count, counted separately. Box-Muller takes two uniforms from the generator
 for every two normals it returns and caches the second as a spare, so
 counting the underlying uniforms would leave every second normal without
 an address of its own. The two uniforms Box-Muller consumes are not on
@@ -39,8 +39,7 @@ restart its addresses at zero.
 The engine tags each group of draws with the call site that takes them.
 :data:`SITES` lists them in schedule order per stream; the test
 ``test_the_site_sequence_is_the_schedule`` walks one day and asserts the
-sequence, so the list is the draw schedule made legible rather than a
-description of it.
+sequence, so the list is the draw schedule itself, in readable form.
 """
 from __future__ import annotations
 
@@ -103,7 +102,7 @@ class Patch(NamedTuple):
     """One substitution: the address and the value the consumer receives.
 
     A uniform must lie in ``[0, 1)`` to be a uniform the consumer can
-    read; a normal takes any finite value. Neither is enforced here, so a
+    read, and a normal takes any finite value. Neither is enforced here, so a
     caller that wants an event to fire can set a uniform to ``0.0`` and one
     that wants it unfired can set ``1.0``, and the comparison the consumer
     makes is what decides (``World.unfire`` documents the jump site's).
@@ -126,11 +125,11 @@ class LoggedDraw(NamedTuple):
 def patch_draws(engine: Engine, patches: Sequence[Patch]) -> None:
     """Install ``patches`` on ``engine``.
 
-    Each generator still advances at every address; only the value the
+    Each generator still advances at every address. Only the value the
     consumer receives changes, so the draw counts and every unpatched
     address are identical with and without the overlay. A patch at an
-    address the engine has already passed is kept and never lands; the
-    caller reads ``engine.stream_positions()`` to see where each stream is.
+    address the engine has already passed is kept and never lands. Read
+    ``engine.stream_positions()`` to see where each stream is.
     """
     engine.patch_draws([(p.address.check().stream, p.address.kind,
                          int(p.address.index), float(p.value))
@@ -159,8 +158,8 @@ def run_day_with(engine: Engine, day: int, patches: Sequence[Patch],
     """Fork ``engine``, install ``patches``, run ``day`` once, and return
     the day's closes and its ground-truth attribution.
 
-    The primitive every other instrument in this module uses. The fork is
-    a copy, so the parent is untouched whatever the patches do; the fork's
+    Every other instrument in this module is built on this. The fork is a
+    copy, so the parent is untouched whatever the patches do. The fork's
     draw log is traced on every stream in ``streams`` for that day, so the
     result carries what each stream delivered.
 
@@ -168,11 +167,11 @@ def run_day_with(engine: Engine, day: int, patches: Sequence[Patch],
     does. The fork opens the market at that day, runs ``ticks_per_day``
     ticks, records the day, and closes it, which advances the macro chain.
 
-    What this cannot tell a caller: whether the closes it returns are
-    reachable by any draw vector at all. A circuit breaker or the order
-    book clamps the price, and a patched draw large enough to cross a
-    clamp produces the clamped close, not a proportional one. Phase 4's
-    solver reports the binding clamp; this function reports the close.
+    It cannot tell a caller whether the closes it returns are reachable
+    by any draw vector at all. A circuit breaker or the order book clamps
+    the price, and a patched draw large enough to cross a clamp produces
+    the clamped close. Phase 4's solver reports the binding clamp, and
+    this function reports the close.
     """
     forks = engine.fork(1)
     fork = forks[0]
@@ -445,13 +444,13 @@ def attribute(world: Any, window: Any, target: Any,
     one arm per perturbation is forked from the same state, one patch set
     is installed, the arm runs the same days with the same agent, and the
     target is read again. The effect is the difference. Every arm shares
-    every other draw with the control, so the difference is the draw's and
-    not a reshuffle: ``stream_positions`` is identical across arms, on
-    EVERY stream. ``draws_by_stream`` reports three of them and cannot see
+    every other draw with the control, so the difference comes from the
+    draw alone, and ``stream_positions`` is identical across arms on every
+    stream. ``draws_by_stream`` reports three of them and cannot see
     jumps, news, volume or the per-name volume stream, which is four of
     the five attributed at event level.
 
-    Two perturbations, by what a draw is:
+    There are two perturbations, one for each kind of draw:
 
     - A normal moves by ``delta`` in z units, at the value the control
       received. One row.
@@ -477,14 +476,14 @@ def attribute(world: Any, window: Any, target: Any,
     deviation of ``sqrt(T)`` in the units of one tick's noise. A common
     shift of ``delta / sqrt(T)`` on each of them moves the sum by
     ``delta * sqrt(T)`` in those units, which is ``delta`` standard
-    deviations OF THE DAY'S OWN SUM. So a row's ``delta`` is per tick and
+    deviations of the day's own sum. So a row's ``delta`` is per tick and
     the quantity it states is per day, and ``delta * sqrt(count)`` recovers
     the day-sigma step the row was taken at. The effect therefore grows
     with ``T`` at a fixed ``delta``: 0.0725, 0.19, 0.25 and 0.4225 on the
     market factor over 20, 40, 80 and 160 ticks, on
     ``Universe.random(4, seed=99)`` at engine seed 42, at 2ddca7b.
     The effect of one tick normal on its own is not identified from a daily
-    target, and a row for it would be a number without a meaning. The
+    target, so no row is given for it. The
     market stream's other draws (the stash and settlement uniforms) drive
     microstructure and are not attributed;
     the caveats say so whenever the market stream is in the call.
@@ -492,7 +491,7 @@ def attribute(world: Any, window: Any, target: Any,
     # What it cannot do
 
     The agent runs in every arm. An agent whose decisions are a function
-    of what it sees gives the same answer in the same state; one that is
+    of what it sees gives the same answer in the same state. One that is
     not (a model sampled at temperature) puts its own noise into every
     effect, and nothing here separates the two. An effect measured across
     a circuit breaker or a book clamp is the clamped effect. A window on
@@ -504,9 +503,9 @@ def attribute(world: Any, window: Any, target: Any,
     ``horizon`` is the last day the arms run, inclusive, defaulting to the
     window's last day, or the target's day for a column. ``shard=(i, n)``
     keeps every n-th row from the i-th, for a caller spreading the arms
-    over processes; each shard computes its own control.
+    over processes. Each shard computes its own control.
 
-    Cost: one run of the arms' days per row. A day of the market stream
+    Each row costs one run of the arms' days. A day of the market stream
     at forty names is forty-one company and market rows plus one per
     sector; a day of the jumps stream at forty names is forty-one
     uniforms, at two rows each, plus forty-one normals.

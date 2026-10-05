@@ -19,17 +19,15 @@ against ``openai-agents`` 0.22.0.
 Everything except :meth:`OpenAIAgentsAdapter.ask` is
 :class:`~tradefloor.integrations.common.FrameworkAdapter`: the price memory,
 the cadence, the observation allowlist, the two-stage validation, the record
-and the fork. This module is the part that reaches the SDK, and the reasons
-it is shaped the way it is are below.
+and the fork. This module is the part that reaches the SDK.
 
 (``common.ReplayMixin`` packages the record-and-replay branch this module
-writes out by hand. It arrived after this adapter was finished and tested,
-and migrating working adapters onto it was judged churn rather than
-correctness: the record join is already delivered by ``record_exchange``,
-and a positional replay key is caught for every adapter by
-``check_the_replay_key_derives_from_the_input`` whether or not it takes the
-mixin. A NEW adapter should take the mixin; ``callable.py`` is the reference
-for that shape.)
+writes out by hand. This adapter does not use it. The record join is
+already delivered by ``record_exchange``, and
+``check_the_replay_key_derives_from_the_input`` catches a positional replay
+key for every adapter whether or not it takes the mixin. A new adapter
+should take the mixin, and ``callable.py`` is the reference for that
+shape.)
 
 ## The user's agent is used, never altered
 
@@ -40,17 +38,17 @@ is to bind the decision contract as the output type, and it does that with
 ``Agent.clone(output_type=...)``, which is ``dataclasses.replace`` and
 leaves the original untouched.
 
-``clone`` is a SHALLOW copy, and that is a trap worth naming: an attribute
-not passed arrives as the original agent's own list, so ``cloned.tools.
-append(x)`` also appends to the user's agent. Anything this module ever adds
-must be passed as a new list -- ``clone(tools=[*agent.tools, extra])`` --
-never appended to the clone.
+``clone`` is a shallow copy. An attribute not passed arrives as the
+original agent's own list, so ``cloned.tools.
+append(x)`` also appends to the user's agent. Anything this module adds
+must be passed as a new list, as in ``clone(tools=[*agent.tools, extra])``,
+and never appended to the clone.
 
 The instructions are the other half of not altering the agent. The standing
-:data:`BRIEF` is sent as a message in the run, NOT written into
-``instructions``: overwriting a user's system prompt would evaluate a
-different agent, and the brief is a turn in the conversation rather than a
-change to who the agent is.
+:data:`BRIEF` is sent as a message in the run and is not written into
+``instructions``, because overwriting a user's system prompt would evaluate
+a different agent. The brief is a turn in the conversation and does not
+change who the agent is.
 
 ## The decision contract is bound as the output type
 
@@ -62,35 +60,35 @@ limit order, and ``additionalProperties: false``, which stops a model
 inventing a ``stop_loss`` or another field this market has no execution
 path for. The rules a schema cannot state (a limit order needs a price,
 HOLD carries no quantity) are applied by ``parse_decision`` one action at a
-time, so a bad action is refused and the rest of the decision trades
-rather than the SDK failing the whole output.
+time, so a bad action is refused and the rest of the decision trades,
+where the SDK would fail the whole output.
 
-What binding it does NOT buy, measured rather than assumed: on
-``openai-agents`` 0.22.0 there is no client-side retry when validation
-fails. One model call, then ``ModelBehaviorError``. The value of the bound
-type is provider-side constrained decoding, not a repair loop.
+Binding the type does not add a retry. On ``openai-agents`` 0.22.0, as
+measured, there is no client-side retry when validation fails. There is one
+model call, then ``ModelBehaviorError``. The bound type gets provider-side
+constrained decoding and no repair loop.
 
-Which means the guarantee depends on WHICH PROVIDER is behind the agent,
-and that is worth being exact about. The SDK is even-handed: it sends the
-schema and the ``strict`` flag on both of its paths, the Responses API at
-``models/openai_responses.py:2047`` and Chat Completions at
-``models/chatcmpl_converter.py:117``. What differs is who receives it.
+So the guarantee depends on which provider is behind the agent. The SDK
+sends the schema and the ``strict`` flag on both of its paths, the
+Responses API at ``models/openai_responses.py:2047`` and Chat Completions
+at ``models/chatcmpl_converter.py:117``. What differs is who receives it.
 OpenAI implements strict structured outputs natively, so the contract is
-enforced during generation. Route the same agent elsewhere -- through
-``agents.extensions.models.litellm_model.LitellmModel`` to Anthropic, say,
-which this adapter supports and which has no native equivalent -- and the
-schema is TRANSLATED into whatever that provider offers. It still usually
-works, and validation on this side is unchanged either way because
-:func:`~tradefloor.integrations.common.parse_decision` runs regardless. But
-"the provider constrains generation" is a claim about the native path, and
-an agent pointed at a translating proxy is relying on the translation
-rather than on the guarantee.
+enforced during generation. Route the same agent elsewhere, for example
+through ``agents.extensions.models.litellm_model.LitellmModel`` to
+Anthropic (which this adapter supports and which has no native
+equivalent), and the schema is translated into whatever that provider
+offers. It still usually works, and validation on this side is unchanged
+either way because :func:`~tradefloor.integrations.common.parse_decision`
+runs regardless. But "the provider constrains generation" is a claim about
+the native path, and an agent pointed at a translating proxy relies on the
+translation and not on the guarantee.
 
 Validated output still goes through
 :func:`~tradefloor.integrations.common.parse_decision`, which is the one
-validator. Two validations of the same contract is deliberate: the SDK's
-runs inside the framework where it can shape generation, and Tradefloor's
-runs on this side of the wall where it decides what reaches the market.
+validator. The two validations of the same contract are deliberate. The
+SDK's runs inside the framework, where it can shape generation, and
+Tradefloor's runs on this side of the wall, where it decides what reaches
+the market.
 
 ## Errors carry their own step and day
 
@@ -107,10 +105,10 @@ something, somewhere, was invalid.
 :class:`~tradefloor.integrations.common.FrameworkError`, control-flow
 exceptions included, because it cannot tell a signal from a crash. This
 framework signals through exceptions, so :meth:`OpenAIAgentsAdapter._run`
-sorts them here, on purpose, rather than letting the default decide.
+sorts them here instead of leaving that to the default.
 
-Four are OUTCOMES -- the agent was asked and produced no executable
-decision -- and become
+Four are outcomes, where the agent was asked and produced no executable
+decision, and become
 :class:`~tradefloor.integrations.common.DecisionError`:
 
 - ``ModelBehaviorError``: the output did not satisfy the bound contract.
@@ -118,50 +116,49 @@ decision -- and become
   did.
 - ``MaxTurnsExceeded``: the turn budget was spent without converging.
 - the four guardrail tripwires: the user's own guardrail stopped the run.
-  This is the case worth arguing, because a guardrail firing is a
-  deliberate configured outcome and the tempting alternative is to treat it
-  as a decision to trade nothing. It is NOT converted to a HOLD. An empty
-  decision means the agent considered the market and declined, and it
-  scores as ``trades=0`` beside an empty error column; a blocked run wearing
-  that shape would record a considered choice nobody made. The same
-  reasoning refuses an unwrapped envelope in
+  A guardrail firing is a deliberate, configured outcome, so it is
+  tempting to treat it as a decision to trade nothing. It is not converted
+  to a HOLD. An empty decision means the agent considered the market and
+  declined, and it scores as ``trades=0`` beside an empty error column. A
+  blocked run recorded that way would show a considered choice nobody
+  made. The same reasoning refuses an unwrapped envelope in
   :func:`~tradefloor.integrations.common.parse_decision`. A caller who wants
   a tripped guardrail to mean "sit this step out" can catch
-  ``DecisionError`` and continue, which is a decision they take with the
-  fact in hand rather than one this adapter takes for them.
+  ``DecisionError`` and continue. The caller then makes that decision with
+  the fact in hand, and this adapter does not make it for them.
 
-Everything else -- a timeout, a transport failure, a misconfiguration --
-is a FAILURE and is left to ``act``, which wraps it in
+Everything else (a timeout, a transport failure, a misconfiguration) is a
+failure and is left to ``act``, which wraps it in
 :class:`~tradefloor.integrations.common.FrameworkError` with the chain
-intact. The two are scored differently by an experiment: the model said
-something unusable, versus the call never completed.
+intact. An experiment scores the two differently, because in one the model
+said something unusable and in the other the call never completed.
 
 ## Async, and why the SDK's own sync entry point is not used
 
 ``Runner.run_sync`` raises a bare ``RuntimeError`` when a thread already has
 a running event loop (``run.py:2222`` in 0.22.0), which is every Jupyter
 cell. An adapter built on it works in a script and dies in the notebook the
-same reader tries next. So this calls the ASYNC entry point, ``Runner.run``,
+same reader tries next. So this calls the async entry point, ``Runner.run``,
 and bridges with :func:`~tradefloor.integrations.common.run_sync`, which is
 the one supported crossing and behaves the same whether or not a loop is
 already running.
 
-The bridge runs every decision on ONE long-lived loop, and this adapter is
-why. The SDK caches a default ``AsyncOpenAI`` client whose connection pool
+The bridge runs every decision on one long-lived loop because of this
+adapter. The SDK caches a default ``AsyncOpenAI`` client whose connection pool
 is bound to the loop that first used it. Until 0.8.5 the bridge gave each
 call a fresh loop and closed it, so from the second decision on the cached
-client raised "Event loop is closed": a live five-day run recorded 3 of 5
-decisions, on every attempt.
+client raised "Event loop is closed", and a live five-day run recorded 3 of
+5 decisions on every attempt.
 
 ## Tracing is off unless asked for
 
-The SDK's tracing is ON by default and exports to OpenAI. It skips the
-export when no ``OPENAI_API_KEY`` is set, but that is not a guarantee -- a
-developer with a key in their shell running an evaluation WOULD ship trace
-data. So every run this adapter starts passes ``tracing_disabled=True``
-unless ``tracing=True`` was asked for, and it is set per run rather than
-through the SDK's process-global switch, so it cannot alter tracing for
-other code in the same process.
+The SDK's tracing is on by default and exports to OpenAI. It skips the
+export when no ``OPENAI_API_KEY`` is set, but a developer with a key in
+their shell running an evaluation would ship trace data. So every run
+this adapter starts passes ``tracing_disabled=True`` unless
+``tracing=True`` was asked for. It is set per run and not through the
+SDK's process-global switch, so it cannot alter tracing for other code in
+the same process.
 
 With ``tracing=True`` the run is named and stamped: the workflow name, the
 ``run_id`` as the trace group so every step of one experiment links
@@ -174,17 +171,16 @@ metadata.
 
 The key is a digest of the input, so changing the brief or the observation
 mapping makes every lookup miss and the replay refuses, naming the step.
-What a key over the input cannot see is a change to something that never
-enters it. The user's agent carries its OWN instructions, and those reach
-the model as ``system_instructions`` rather than as part of the input --
-so replacing the agent entirely leaves every recorded key intact. Measured
-before this was guarded: an agent instructed "BUY EVERYTHING" and one
-instructed "SELL EVERYTHING" produced byte-identical replay keys, and the
-recording replayed under either as though nothing had changed.
+A key over the input cannot see a change to something that never enters
+it. The user's agent carries its own instructions, and those reach the
+model as ``system_instructions``, outside the input, so replacing the agent
+entirely leaves every recorded key intact. Before this was guarded, an
+agent instructed "BUY EVERYTHING" and one instructed "SELL EVERYTHING"
+produced byte-identical replay keys, and the recording replayed under
+either as though nothing had changed.
 
-That is a property of any adapter whose **instructions travel separately
-from the keyed input**, not an Agents SDK quirk, and the other integrations
-in this package share it.
+Any adapter whose instructions travel separately from the keyed input has
+this problem, and the other integrations in this package share it.
 :meth:`OpenAIAgentsAdapter._check_instructions` closes it by comparing the
 recorded ``instructions_digest`` against the configured one, at
 construction rather than at the first decision. The recorder stamps that
@@ -195,7 +191,7 @@ Live decisions cost money and a model answers differently every time.
 ``mode="replay"`` reads recorded responses keyed by
 :func:`~tradefloor.integrations.common.digest` of the exact input, and never
 reaches :meth:`OpenAIAgentsAdapter._run`, which is where the SDK is
-imported -- so a replay needs no API key, no network and no
+imported, so a replay needs no API key, no network and no
 ``openai-agents`` install. ``examples/integrations/openai_agents/five_days.py``
 records a run and replays it in the same script.
 """
@@ -280,12 +276,12 @@ recorded as an error rather than as a considered decision not to trade.
 def payload_of(call: Any) -> dict[str, Any]:
     """The serialized observation, recovered from a recorded model call.
 
-    A helper for running this adapter offline. Scripting a model -- with
+    A helper for running this adapter offline. Scripting a model (with
     ``agents.testing.ScriptedModel``, or any other
-    :class:`agents.models.interface.Model` -- means answering a call whose
-    input is whatever this module chose to send, and that layout is this
-    module's business rather than the caller's. This reads it back, so a
-    scripted model can decide from the same payload a real one would see:
+    :class:`agents.models.interface.Model`) means answering a call whose
+    input is whatever this module chose to send, and the caller should not
+    need to know that layout. This reads it back, so a scripted model can
+    decide from the same payload a real one would see:
 
     ```python
     from agents.testing import ModelStep, ScriptedModel, assistant_message
@@ -298,8 +294,8 @@ def payload_of(call: Any) -> dict[str, Any]:
     model = ScriptedModel([ModelStep.respond(answer)] * 8)
     ```
 
-    Takes anything carrying the SDK's ``input`` -- a ``ModelCall``, or the
-    input list itself -- because the two are equally natural to have in hand
+    It takes anything carrying the SDK's ``input`` (a ``ModelCall``, or the
+    input list itself), because the two are equally natural to have in hand
     at the point a scripted model answers.
     """
     import json
@@ -408,25 +404,24 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     ```
 
     ``agent`` is the user's :class:`agents.Agent`, taken positionally as
-    every adapter here takes its framework object, and never modified; see
+    every adapter here takes its framework object, and never modified. See
     the module docstring. ``mode`` is ``"replay"`` or ``"live"``, and defaults
-    to replay for the same reason ``FinRobotAdapter`` does: the mode that
-    costs nothing and needs nothing installed is the one to reach by
-    accident.
+    to replay, as ``FinRobotAdapter`` does, because the mode that costs
+    nothing and needs nothing installed is the one to reach by accident.
 
     ``model`` is an :class:`agents.models.interface.Model` instance handed to
     ``RunConfig(model=...)``, which the SDK honours ahead of the agent's own
-    model and ahead of its provider lookup. It is how a run happens with no
-    network -- pass ``agents.testing.ScriptedModel`` -- and it is what the
-    test suite and the shipped example use. Leave it ``None`` and the user's
-    agent talks to whatever it was configured to talk to.
+    model and ahead of its provider lookup. Pass
+    ``agents.testing.ScriptedModel`` to run with no network, as the test
+    suite and the shipped example do. Leave it ``None`` and the user's agent
+    talks to whatever it was configured to talk to.
 
     ``max_turns`` bounds one decision. A turn is one model call, so an agent
     with tools spends several per decision and this is what stops a tool loop
     turning one decision point into an open-ended bill. Six is enough for a
     handful of tool round-trips and far short of the SDK's own default of
-    ten, which was chosen for interactive use rather than for a loop that
-    runs at every cadence step of every arm of an experiment.
+    ten, which was chosen for interactive use and not for a loop that runs
+    at every cadence step of every arm of an experiment.
     """
 
     # `agent` is positional-or-keyword and everything after it is
@@ -610,24 +605,24 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
         """One decision for this payload, from the SDK or from a recording.
 
         Both modes go through the same input construction, so a replay is
-        keyed by the exact input a live run would have sent. Change the brief
-        or the observation mapping and the digest changes, the recorded key
-        goes missing, and the replay RAISES naming the step instead of
-        answering this question with a response given to a different one.
-        The key is a digest of the INPUT and never of a position: keyed by
-        (arm, step) this would pass every test it has and its studies would
+        keyed by the exact input a live run would have sent. If the brief or
+        the observation mapping changes, the digest changes, the recorded key
+        goes missing, and the replay raises an error naming the step instead
+        of answering this question with a response given to a different one.
+        The key is a digest of the input and never of a position. Keyed by
+        (arm, step), this would pass every test it has, and its studies would
         answer new questions with old recorded answers.
 
         The exchange is declared before either branch, so the record carries
         the same input and the same key whether the response came from the
-        SDK or from a recording -- which is what lets a replayed record be
-        compared with the live one it came from.
+        SDK or from a recording. A replayed record can then be compared with
+        the live one it came from.
 
-        The response is a JSON STRING, one level deep, in both branches. That
-        matters: the recorder writes it verbatim and a replay hands the same
-        string to ``parse_decision``, so the two paths parse identical input.
-        A response that had itself been ``json.dumps``-ed would round-trip
-        into a string of a string and fail at REPLAY time, against a
+        The response is a JSON string, one level deep, in both branches. The
+        recorder writes it verbatim and a replay hands the same string to
+        ``parse_decision``, so the two paths parse identical input. A
+        response that had itself been ``json.dumps``-ed would round-trip
+        into a string of a string and fail at replay time, against a
         recording that looked correct when it was written.
         """
         items = self.input_items(payload)
@@ -670,18 +665,18 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     def input_items(self, payload: dict[str, Any]) -> list[dict[str, str]]:
         """The run input: the brief, then `self.renderer`'s text.
 
-        Two messages rather than one concatenated string, so the brief stays
-        separable from the observation for anyone reading a transcript. The
-        brief is never handed to the renderer: structured output is what
-        this adapter keeps of its own, and `self.renderer` only ever
-        decides how the SECOND message reads. On the default renderer,
-        :class:`~tradefloor.render.JSONRenderer`, the second message is the
-        payload as sorted, indented JSON -- character for character what
-        this method always sent -- which is what keeps it exactly
+        It sends two messages and not one concatenated string, so the brief
+        stays separable from the observation for anyone reading a
+        transcript. The brief is never handed to the renderer, because
+        structured output is what this adapter keeps of its own, and
+        `self.renderer` only decides how the second message reads. On the
+        default renderer, :class:`~tradefloor.render.JSONRenderer`, the
+        second message is the payload as sorted, indented JSON, character
+        for character what this method always sent. That keeps it exactly
         recoverable by :func:`payload_of`, so a scripted model decides from
-        the same dict a real one is shown. A renderer whose text is not
-        JSON (:class:`~tradefloor.render.TextRenderer`, say) is valid here
-        and changes what the agent reads; :func:`payload_of` then has
+        the same dict a real one is shown. A renderer whose text is not JSON
+        (:class:`~tradefloor.render.TextRenderer`, for example) is valid
+        here and changes what the agent reads. :func:`payload_of` then has
         nothing to parse back out of the second message, and says so.
         """
         return [
@@ -843,13 +838,13 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
     def fork_kwargs(self) -> dict[str, Any]:
         """The constructor arguments a fork is rebuilt with.
 
-        The user's ``agent`` is SHARED, not copied, and so are the transcript
-        and the recorder. Sharing the agent is safe precisely because this
-        module never mutates it, and copying one would clone whatever HTTP
-        client its model settings hold -- wasteful at best, a shared socket
-        at worst. Both directions want the transcript shared too: a replay of
-        one arm must read the same recorded run as the other, and a live
-        recording of both arms belongs in one file.
+        The fork shares the user's ``agent``, the transcript and the
+        recorder, and copies none of them. Sharing the agent is safe because
+        this module never mutates it, and copying one would clone whatever
+        HTTP client its model settings hold, which is wasteful at best and a
+        shared socket at worst. Both modes need the transcript shared too,
+        because a replay of one arm must read the same recorded run as the
+        other, and a live recording of both arms belongs in one file.
 
         ``_bound`` is deliberately absent. It is derived from ``agent``, so
         the twin rebuilds it on its first live call and the two cannot
@@ -878,7 +873,7 @@ class OpenAIAgentsAdapter(FrameworkAdapter):
 
         The base publishes the price memory, the last decision and the
         cadence. The two additions are the turn budget and the digest of the
-        brief: both change what a decision can be, so two arms differing in
+        brief. Both change what a decision can be, so two arms differing in
         either are not running the controlled comparison they claim to be.
 
         The agent, the model and the transcript stay out. The agent's model

@@ -1,14 +1,14 @@
-"""A scenario is a path, not a setting.
+"""Macro paths and scheduled interventions, applied to a run a day at a time.
 
-A rate shock is not "the federal funds rate is 5%". It is the rate walking from
-2.5% to 5% over sixty days while an agent holds positions through it. The first
-is a different market; the second is an event, and events are what a strategy
-either survives or does not.
+A rate shock is the federal funds rate walking from 2.5% to 5% over sixty
+days while an agent holds positions through it. A rate fixed at 5% is a
+different market. The walk is an event, which a strategy survives or does
+not.
 
-`Macro` is fixed at construction, so driving a path meant hand-writing a loop
-around `pin_macro`. This builds the path as an object: composable, inspectable
-before you run it, and serialisable alongside the seed so a published scenario
-can be cited.
+`Macro` is fixed at construction, so driving a path by hand means writing a
+loop around `pin_macro`. A :class:`Scenario` is the path as an object. You
+can compose it, inspect it before you run it, and serialise it alongside the
+seed so a published scenario can be cited.
 
 ```python
 shock = Scenario.rate_shock(start=0.025, end=0.05, over=30)
@@ -17,9 +17,9 @@ scores = tf.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
 
 ## Two mechanisms, and they answer different questions
 
-The above is a PATH: every day of the run, the policy rate is whatever the
-ramp says, and the endogenous chain does not get a vote. That is right when
-the path is the experiment.
+The above is a path. Every day of the run, the policy rate is whatever the
+ramp says, and the endogenous chain has no say. Use one when the path is the
+experiment.
 
 A `Scenario` also carries INTERVENTIONS, which are relative changes scheduled
 against the live market:
@@ -49,10 +49,10 @@ it saw rather than the recipe. The registry of what may be moved, what each
 target actually reaches and what it was measured to be worth is
 :mod:`tradefloor.interventions`.
 
-`shock` and `assume` do the same thing and are deliberately different words.
-Nothing here derives a transmission: a scenario that assumes an oil shock
-raises inflation by 1.5 points says so under its own heading, and
-:meth:`Scenario.describe` prints it there.
+`shock` and `assume` do the same thing under different names. Nothing here
+derives a transmission. A scenario that assumes an oil shock raises inflation
+by 1.5 points says so under its own heading, and :meth:`Scenario.describe`
+prints it there.
 
 The two compose. Pins are written first each day, then interventions on top,
 so a scenario can hold VIX calm for sixty days and then spike it.
@@ -64,61 +64,58 @@ meeting window **depends on the preset**. Measured on this build, on
 ``Universe.random(20, seed=4)`` at sim seed 5, with a 250bp policy-only ramp
 over thirty days read at 40 days: pt-v12 and pt-v14 move twenty instruments
 by exactly 0.00%, and pt-v20, the default from 0.8.5 to 0.9.1, moves the
-median one down 3.38% (pt-v19 2.56%, pt-v16 2.67%, pt-v18 2.15%; this read 3.34% for the
-default of 2026-08-30).
+median one down 3.38% (pt-v19 2.56%, pt-v16 2.67%, pt-v18 2.15%, and 3.34%
+for the default of 2026-08-30).
 
 `daily_credit_floor_gain` is the difference. It re-asserts both credit floors
 on every daily step rather than at meeting cadence, so from pt-v15 onward the
 spread is touched daily and a policy ramp reaches equities without waiting for
 a meeting.
 
-That is the valuation model doing its job. Equities are discounted off
-the **corporate bond yield**, and the policy rate is only a fallback used when
-no yield is present. `Some(0.0)` is a real zero yield and must be used, so
+This follows from the valuation model. Equities are discounted off the
+corporate bond yield, and the policy rate is only a fallback used when no
+yield is present. `Some(0.0)` is a real zero yield and must be used, so
 inside the engine, where the economy always carries one, the policy rate never
 reaches fair value directly.
 
 Since the macro chain runs endogenously (2026-08), transmission exists but is
-lagged: the corporate yield is recomputed from the 10Y at central-bank
-MEETINGS, the first of which is scheduled 45 days out. Measured at 60 days,
-the same policy-only ramp prices the median instrument down 4.19%. So the
-trap is now a horizon trap: a short study sees nothing, silently.
+lagged. The corporate yield is recomputed from the 10Y at central-bank
+meetings, the first of which is scheduled 45 days out. Measured at 60 days,
+the same policy-only ramp prices the median instrument down 4.19%. So a
+short study sees no effect, and nothing warns it.
 
-The failure mode survives: you run a month-long rate shock, nothing happens,
-and you conclude the model does not care about rates. It cares, but at meeting
-cadence, through the curve. For an immediate repricing you still have to move
-the yield equities actually discount off.
+The failure looks like this: you run a month-long rate shock, nothing
+happens, and you conclude the model does not respond to rates. It does, at
+meeting cadence, through the curve. For an immediate repricing, move the
+yield equities discount off.
 
-So :meth:`Scenario.rate_shock` moves the whole curve, policy rate and
-corporate yield together separated by a credit spread. That is what a rate
-shock is. Moving one alone is still possible through :meth:`ramp`, because
-isolating a channel is a legitimate experiment, but you have to ask for it.
+So :meth:`Scenario.rate_shock` moves the whole curve, the policy rate and the
+corporate yield together, separated by a credit spread. Moving one alone is
+still possible through :meth:`ramp`, because isolating a channel is a
+legitimate experiment, but you have to ask for it.
 
 With both moving, the same 250bp hike (measured at 60 days, same universe
 and seed) prices twenty instruments down a median 4.42%, with the most
 rate-sensitive name down 6.94% and the least sensitive one unmoved at
-0.00%. That dispersion is the point: a scenario that moved everything
+0.00%. The dispersion matters, because a scenario that moved everything
 equally would tell a cross-sectional strategy nothing.
 
 ## What a VIX path actually moves
 
-For most of this model's history the honest answer was "not volatility",
-this section said so, and tests pinned it. That changed in the 2026-08 era:
-the shared market factor carries its own conditional-variance process, and
-its reversion target is now proportional to VIX squared, with VIX read as the
+Before the 2026-08 era a VIX path did not move volatility. Since then the
+shared market factor carries its own conditional-variance process, and its
+reversion target is proportional to VIX squared, with VIX read as the
 factor's implied volatility, anchored so that VIX 15 (the endogenous mean)
 reproduces the autonomous process exactly. The coupling was measured before
-it was switched on, and this section was rewritten in the same change that
-switched it, because the old claims were load-bearing.
+it was switched on.
 
 What VIX reaches now:
 
-1. **The market factor's variance target**, the volatility channel. Each
+1. The market factor's variance target, the volatility channel. Each
    close feeds the day's VIX into the factor's GARCH reversion target as
    ``(vix / 15)^2``. The per-name idiosyncratic GARCH still has no VIX
-   term: what VIX scales is the SHARED component of every return, which is
-   why a crisis VIX is simultaneously a volatility regime and a
-   correlation regime.
+   term. VIX scales the shared component of every return, which is why a
+   crisis VIX is both a volatility regime and a correlation regime.
 2. The quoted bid-ask, through a spread multiplier
    ``1 + max(0, (vix - 15) / 30)``.
 3. Cross-sectional correlation above VIX 25.5 (the crisis threshold since
@@ -138,13 +135,13 @@ seed 3 and pins through the scenario API, annualised realised volatility:
     VIX 65    124.31%
 
 A thirteenfold move in VIX now moves realised volatility by a factor of
-2.5. Sub-15 pins are live too: a low VIX CALMS the factor, where before
-the coupling it changed nothing at all. VIX 5, 10 and 15 produce identical
+2.5. Sub-15 pins are live too. A low VIX calms the factor, where before
+the coupling it changed nothing. VIX 5, 10 and 15 produce identical
 prices only for the first day (the first close is where a pin first enters
-the variance target); from the second day they diverge. The response to a
-held pin saturates: the factor's variance is clamped at 8x its baseline,
-so above VIX ~42 a harder pin buys almost no additional factor variance,
-quadratic inside the plausible band, flat beyond it.
+the variance target). From the second day they diverge. The response to a
+held pin saturates, because the factor's variance is clamped at 8x its
+baseline. Above VIX ~42 a harder pin adds almost no factor variance, so the
+response is quadratic inside the plausible band and flat beyond it.
 
 Mean quoted spread across ``Universe.random(25, seed=11)`` after five days,
 sim seed 3:
@@ -155,22 +152,22 @@ sim seed 3:
     VIX 45    18.87 bps
     VIX 65    25.89 bps
 
-(The multiplier still floors at 1.0 below VIX 15; the small 5-vs-15 gap is
-the variance channel moving prices, not the spread rule.)
+(The multiplier still floors at 1.0 below VIX 15. The small 5-vs-15 gap
+comes from the variance channel moving prices, and the spread rule plays no
+part in it.)
 
-The correlation channel is no longer smaller than the name suggests. Mean
-pairwise correlation of daily log returns, the same 25 names over 120 days,
-300 pairs: +0.269 at VIX 15, +0.678 at VIX 45, +0.759 at VIX 65. A
-high-variance factor regime IS a high-correlation regime, and at crisis
-VIX diversification genuinely stops working. Real crises do that, and this
-model could not produce it before the coupling.
+The correlation channel is large. Mean pairwise correlation of daily log
+returns, the same 25 names over 120 days, 300 pairs: +0.269 at VIX 15,
++0.678 at VIX 45, +0.759 at VIX 65. A high-variance factor regime is a
+high-correlation regime, and at crisis VIX diversification stops working,
+as it does in real crises. This model could not produce that before the
+coupling.
 
-So a VIX path now answers both stress questions: what an execution
-algorithm does when spreads widen, and what a strategy does when
-volatility triples and every name starts moving together. What it still
-does not do is move any single name's IDIOSYNCRATIC variance. It sizes a
-pin to a target per-name volatility goes through the factor's share, not
-one-for-one.
+So a VIX path can test what an execution algorithm does when spreads widen,
+and what a strategy does when volatility triples and every name moves
+together. It does not move any single name's idiosyncratic variance, so
+sizing a pin to a target per-name volatility goes through the factor's
+share, not one-for-one.
 
 ## A forced VIX that sets volatility (``vix_sets_variance``)
 
@@ -196,22 +193,22 @@ trades at it. It is the level a free run would settle at if that VIX were
 held for ever, so nothing new is introduced, and when the scenario stops
 forcing the VIX the free law carries on from its own fixed point without a
 jump. While forced, the day's own market shock does not feed the factor's
-variance; per-name volatility, sector volatility and jumps still cluster on
+variance. Per-name volatility, sector volatility and jumps still cluster on
 their own shocks. The switch is off by default, a scenario without it runs
 exactly as before, and it changes the scenario's fingerprint when on. A
 scenario that turns it on and never forces the VIX is refused when applied.
 
 ## The macro counterfactual is exact on the market stream, and says so
 
-This is the counterfactual real markets cannot offer: you cannot re-run a
-year without its hiking cycle, because your only observation is the one that
+Real markets cannot offer this counterfactual. You cannot re-run a year
+without its hiking cycle, because your only observation is the one that
 happened. Here both are runnable.
 
 Before the RNG stream split (2026-08) this was a weaker guarantee than the
-ORDER-FLOW counterfactual in :mod:`tradefloor.tca`, and this docstring said so:
-a macro path changes prices, prices changed which settlement branch drew
-four uniforms, and the shared draw schedule could shift. An older build measured
--4 draws in 425,600 on an older build. The split closed that mechanism. The
+order-flow counterfactual in :mod:`tradefloor.tca`. A macro path changes
+prices, prices changed which settlement branch drew four uniforms, and the
+shared draw schedule could shift. An older build measured -4 draws in
+425,600. The split closed that mechanism. The
 market stream's schedule is now a pure function of (market status, active
 roster, sector count), so two runs under different macro paths consume, and
 therefore see, identical market noise, draw for draw. The economy
@@ -233,11 +230,9 @@ either.
 
 So :func:`compare` reports ``draw_delta`` from the MARKET stream. Zero means
 the two worlds saw an identical market noise sequence and the difference is
-purely the scenario. A non-zero delta is no longer a small approximation to
-tolerate. It means the scenario changed the market's own draw schedule (a
-halt, a delisting, a roster change), and the result compares two
-structurally different markets. That is worth surfacing, not averaging
-away.
+purely the scenario. A non-zero delta means the scenario changed the
+market's own draw schedule (a halt, a delisting, a roster change), and the
+result compares two structurally different markets.
 
 ## Two pins on one field compose as consecutive segments
 
@@ -246,19 +241,18 @@ and because every driver is a total function of the day the survivor
 back-filled the whole run. ``step(vix, before=15, after=48, at=60)`` followed
 by ``ramp(vix, start=48, end=22, over=45, begin=75)`` opened at VIX 48 on day
 ZERO, a market in crisis for the entire run with no warning, and reversing the
-two calls produced a crisis that never subsided. No ordering worked, so it was
-not an ordering convention anybody could have documented their way out of.
+two calls produced a crisis that never subsided. No ordering worked.
 
 Pins on one field now layer. Each owns ``[its start day, the next pin's start
 day)``, the last owns the rest of the run, and the first also owns everything
 before its own start (so a lone ``ramp`` still holds its ``start`` from day
-zero, exactly as before). A field with one pin behaves identically to the old
-surface; nothing that worked has changed.
+zero, exactly as before). A field with one pin behaves as it did before
+pins could layer.
 
-Start days must therefore be STRICTLY INCREASING within a field, and anything
+Start days must therefore strictly increase within a field, and anything
 else is refused by name. Two pins claiming the same day mean one of them
 states a value that can never be reached, and a pin declared before an earlier
-one would have to back-fill, which is the defect rather than a feature. So the
+one would have to back-fill, which is the defect described above. So the
 step-then-decay path is written in the order it happens::
 
     Scenario().hold(vix=15.0).ramp("vix", start=48.0, end=22.0, over=45,
@@ -274,9 +268,9 @@ value, then the decay. ``hold`` before ``ramp`` is the general idiom for
 :meth:`from_json` each build a WHOLE scenario. They read as chainable, and
 before 2026-08 ``Scenario().ramp("federal_funds_rate", ...).vix_shock(...)``
 silently threw the ramp away and returned a scenario driving only ``vix``.
-Python cannot stop a caller writing that, so the library does: calling one of
-them on an instance raises, names the fields that would have been discarded,
-and gives the composing form.
+Python cannot stop a caller writing that, so the library checks for it.
+Calling one of them on an instance raises, names the fields that would have
+been discarded, and gives the composing form.
 """
 
 from __future__ import annotations
@@ -633,29 +627,27 @@ def _read_origins(raw: Any) -> tuple[dict[str, Any], ...]:
 class Scenario:
     """A macro path and a set of explicit interventions, applied a day at a time.
 
-    Two mechanisms, one object, and they are for different questions.
+    It holds two mechanisms, for different questions.
 
-    **Pins** -- :meth:`hold`, :meth:`ramp`, :meth:`step` -- state a whole
-    PATH for a field: every day of the run, that field is whatever the path
-    says, and the endogenous chain does not get a vote. That is the right
-    shape for "what does a hiking cycle do", where the cycle is the
-    experiment.
+    Pins (:meth:`hold`, :meth:`ramp`, :meth:`step`) state a whole path for
+    a field. Every day of the run, that field is whatever the path says,
+    and the endogenous chain has no say. Use pins for "what does a hiking
+    cycle do", where the cycle is the experiment.
 
-    **Interventions** -- :meth:`shock`, :meth:`assume`, or a YAML file --
-    state a CHANGE relative to whatever the market had arrived at: multiply
-    oil by 1.40 on day 50 and let the chain carry it from there. That is the
-    right shape for a shock, and the only one that can express a relative
-    operation, because the value being multiplied is not knowable until the
+    Interventions (:meth:`shock`, :meth:`assume`, or a YAML file) state a
+    change relative to wherever the market has arrived, such as multiplying
+    oil by 1.40 on day 50 and letting the chain carry it from there. Use
+    them for a shock. Only an intervention can express a relative
+    operation, because the value being multiplied is not known until the
     day arrives.
 
     They compose. Pins are written first on each day, then interventions on
     top, so a scenario can hold VIX calm for sixty days and then spike it.
 
     A scenario also carries a `name` and a `description`, and its
-    interventions are split into `shocks` and `transmission`. That split is a
-    claim about evidence rather than about mechanism: the engine treats both
-    identically, and the point of separating them is that a report can say
-    "this scenario ASSUMES a 1.5pp inflation pass-through" instead of
+    interventions are split into `shocks` and `transmission`. The split is
+    about evidence, and the engine treats both identically. It lets a report
+    say "this scenario ASSUMES a 1.5pp inflation pass-through" instead of
     implying the simulator derived one. See :meth:`describe`.
     """
 
@@ -827,9 +819,9 @@ class Scenario:
         ramp. A path with holes would make the run length change the scenario.
 
         As a LATER pin on a field the pre-``begin`` hold never applies,
-        because whatever pinned the field before keeps its days, so ``start`` is
-        simply the value the field jumps to on day ``begin``. That is what
-        makes ``hold`` then ``ramp`` a step followed by a decay.
+        because whatever pinned the field before keeps its days, so
+        ``start`` is the value the field jumps to on day ``begin``. That is
+        what makes ``hold`` then ``ramp`` a step followed by a decay.
         """
         _check(field, start)
         _check(field, end)
@@ -855,14 +847,14 @@ class Scenario:
     def step(self, field: str, *, before: Any, after: Any, at: int) -> "Scenario":
         """Jump ``field`` from ``before`` to ``after`` on day ``at``.
 
-        A discontinuity, which a ramp is not. Use this for something that
-        genuinely happens at once, such as a surprise cut or a regime change, and a
+        Unlike a ramp, this is a discontinuity. Use it for something that
+        happens at once, such as a surprise cut or a regime change, and a
         ramp for something the market prices in gradually.
 
-        As a LATER pin on a field, ``before`` never applies: the pin that
-        already owns the days up to ``at`` keeps them. Pin the field from day
-        zero with ``hold`` if you want to state that level, and the step is
-        then only the jump.
+        As a LATER pin on a field, ``before`` never applies, because the pin
+        that already owns the days up to ``at`` keeps them. Pin the field
+        from day zero with ``hold`` if you want to state that level, and the
+        step is then only the jump.
         """
         _check(field, before)
         _check(field, after)
@@ -883,11 +875,11 @@ class Scenario:
     def intervene(self, intervention: Intervention) -> "Scenario":
         """Add one built :class:`tradefloor.Intervention`.
 
-        Declared order is kept, and it breaks a tie: two interventions on
-        the same target on the same day compose in the order
-        they were written, the second reading what the first wrote. Shocks
-        run before transmission, always, because that is the order the
-        scenario claims they happen in.
+        Declared order is kept and breaks ties. Two interventions on the
+        same target on the same day compose in the order they were written,
+        the second reading what the first wrote. Shocks always run before
+        transmission, because that is the order the scenario claims they
+        happen in.
         """
         if not isinstance(intervention, Intervention):
             raise ScenarioValidationError(
@@ -913,12 +905,11 @@ class Scenario:
                shape: str | None = None) -> "Scenario":
         """An assumed transmission: what the AUTHOR thinks the shock did next.
 
-        Identical machinery to :meth:`shock`, and deliberately a different
-        word. This library cannot tell you that a 40% oil shock raises
-        inflation by 1.5 percentage points. It can run a market in which
-        somebody assumed exactly that, and :meth:`describe` prints the
-        assumption under its own heading so a reader is never left to guess
-        which half was derived.
+        It uses the same machinery as :meth:`shock` under a different name.
+        This library cannot tell you that a 40% oil shock raises inflation
+        by 1.5 percentage points. It can run a market in which somebody
+        assumed that, and :meth:`describe` prints the assumption under its
+        own heading so a reader can see which entries were assumed.
         """
         return self.intervene(Intervention(
             target, operation=operation, value=value, at=at,
@@ -939,8 +930,11 @@ class Scenario:
 
     @property
     def name(self) -> str:
-        """The scenario's identity: what the YAML spells ``name`` and the
-        older Python surface calls ``label``. One field, two spellings."""
+        """The scenario's name.
+
+        The YAML spells it ``name`` and the older Python surface calls it
+        ``label``. They are the same field.
+        """
         return self._label
 
     @property
@@ -956,8 +950,8 @@ class Scenario:
         one step toward the level that VIX implies, at the free law's own
         pace. A fast component's half-life is about 33 sessions, so a VIX
         that jumps from 15 to 80 in three weeks is felt in the market weeks
-        later. On, every session this scenario forces the VIX -- a pin, or
-        an intervention on ``macro.vix`` -- closes with the factor's variance
+        later. On, every session this scenario forces the VIX (a pin, or
+        an intervention on ``macro.vix``) closes with the factor's variance
         SET to that level, and the next session trades at it. See "A forced
         VIX that sets volatility" in this module's docstring.
         """
@@ -967,11 +961,11 @@ class Scenario:
     def source(self) -> str | None:
         """Where this scenario was read from, if it was read from a file.
 
-        Provenance, not reproduction: a manifest replays the RESOLVED
-        scenario, so a run stays reproducible after the file is edited,
-        renamed or deleted. Only the file's NAME travels in the serialised
-        document -- a full path is machine-specific, and a fingerprint over
-        one would differ between two people running the same experiment.
+        This is provenance only. A manifest replays the resolved scenario,
+        so a run stays reproducible after the file is edited, renamed or
+        deleted. Only the file's name travels in the serialised document,
+        because a full path is machine-specific and a fingerprint over one
+        would differ between two people running the same experiment.
         """
         return self._source
 
@@ -982,15 +976,15 @@ class Scenario:
 
         Every key is present whether or not it was written, and every
         intervention carries its defaults, because a fingerprint over a
-        document whose keys come and go is a fingerprint over the author's
-        typing habits rather than over the experiment.
+        document whose keys come and go would depend on what the author
+        happened to type.
 
-        Pins are represented by their DECLARED CALL rather than by their
-        realised values, because those depend on how many days you run. One
-        consequence worth knowing: a scenario rebuilt by :meth:`from_json`
-        declares a recorded path, so it fingerprints differently from the
-        constructor that produced it. The realised path and the recipe are
-        different statements, and :meth:`to_json` records the first.
+        Pins are represented by their declared call, not their realised
+        values, because those depend on how many days you run. As a result,
+        a scenario rebuilt by :meth:`from_json` declares a recorded path and
+        fingerprints differently from the constructor that produced it.
+        :meth:`to_json` records the realised path, which is a different
+        statement from the recipe.
         """
         document = {
             "schema": SCENARIO_SCHEMA,
@@ -1014,7 +1008,7 @@ class Scenario:
 
     @property
     def fingerprint(self) -> str:
-        """sha256 over the resolved document. Cite this.
+        """sha256 over the resolved document, the value to cite.
 
         Two scenarios fingerprint the same when they are the same experiment,
         so a scenario written in YAML fingerprints the same as the identical
@@ -1027,7 +1021,7 @@ class Scenario:
         return sha256_of(self.document())
 
     def describe(self) -> str:
-        """The scenario as a reader needs to see it, shocks above assumptions."""
+        """The scenario as text, with shocks listed above assumptions."""
         out = [f"SCENARIO  {self._label or '(unnamed)'}"]
         if self._description:
             out.append("")
@@ -1083,8 +1077,9 @@ class Scenario:
     def without_interventions(self) -> "Scenario":
         """The same macro path with every intervention removed.
 
-        The counterfactual :func:`compare` wants: one world where the shock
-        happened and one where everything else was identical and it did not.
+        This is the counterfactual :func:`compare` wants, one world where
+        the shock happened and one where everything else was identical and
+        it did not.
         """
         twin = Scenario(f"{self._label} (no interventions)" if self._label
                         else "")
@@ -1097,11 +1092,11 @@ class Scenario:
     def copy(self) -> "Scenario":
         """An independent scenario with the same declaration.
 
-        Needed to drive two runs AT ONCE from one recipe. A scenario carries
+        Use it to drive two runs at once from one recipe. A scenario carries
         the audit trail and the hold anchors of the run it is applied to, and
         a run is identified by its clock, so two interleaved runs would share
-        one. Sequential runs need no copy: the clock restarting is what
-        starts a new trail.
+        one. Sequential runs need no copy, because a restarted clock starts a
+        new trail.
         """
         twin = Scenario(self._label, description=self._description)
         twin._drivers = {field: list(pins)
@@ -1136,14 +1131,14 @@ class Scenario:
 
         The result is a new scenario, and this one is unchanged. Its
         :attr:`fingerprint` is over the moved days, because it is a
-        different experiment from the file: it is the fingerprint an edited
-        copy with the same days would have. Its :attr:`origins` name the
+        different experiment from the file, and equals the fingerprint an
+        edited copy with the same days would have. Its :attr:`origins` name the
         file it came from by that file's own fingerprint and say how far
         every day moved, so "the packaged scenario, started on day 0" is a
         claim a reader can check. Moving a moved scenario again is measured
         from the file.
 
-        Refused for a scenario that carries pins. A pin is a whole path from
+        It refuses a scenario that carries pins. A pin is a whole path from
         day zero, so a start day means nothing for it.
         """
         day = _start_day(day, "starting_at(day)")
@@ -1218,9 +1213,10 @@ class Scenario:
           counted as this scenario's run loop counts.
         - ``applied_on_day``: the World day it was applied on, or None.
 
-        Provenance, outside :attr:`fingerprint`: two scenarios that fire the
-        same interventions on the same days are the same experiment
-        whatever they were moved from. :meth:`to_json` carries the records,
+        These records are provenance and sit outside :attr:`fingerprint`,
+        because two scenarios that fire the same interventions on the same
+        days are the same experiment whatever they were moved from.
+        :meth:`to_json` carries the records,
         so a :class:`tradefloor.RunManifest` carries them in its scenario
         block, and leaves them out of its scenario and inputs fingerprints
         for the same reason.
@@ -1263,8 +1259,8 @@ class Scenario:
         ``as_dict()`` for a machine and a ``str()`` for a person.
 
         This is the LAST run's trail. A scenario applied to a different
-        engine, or to the same one from day zero again, starts a new one --
-        see :meth:`apply`.
+        engine, or to the same one from day zero again, starts a new one
+        (see :meth:`apply`).
         """
         return tuple(self._log)
 
@@ -1286,9 +1282,8 @@ class Scenario:
     def table(self, days: int) -> list[dict[str, Any]]:
         """The whole path, for inspection BEFORE running it.
 
-        A scenario you cannot look at is a scenario you cannot check, and an
-        off-by-one in a ramp produces a plausible-looking result rather than an
-        error.
+        An off-by-one in a ramp produces a plausible-looking result and no
+        error, so check the path here before a run.
         """
         return [{"day": day, **self.at(day)} for day in range(days)]
 
@@ -1319,13 +1314,13 @@ class Scenario:
         `day` is whatever the run loop counts, and every loop in this library
         starts at zero: :func:`run_scenario`, :func:`tradefloor.evaluate`, and
         a loop you write yourself. So `at: 50` is fifty days after the
-        scenario starts being applied -- simulation day 50 for a fresh run,
-        and fifty days after the FORK for a branch that resumes from a
+        scenario starts being applied: simulation day 50 for a fresh run,
+        and fifty days after the fork for a branch that resumes from a
         checkpoint.
 
-        That is the only reading under which one file means one experiment on
-        both sides of a checkpoint, and forking exists for that. The
-        alternative -- absolute simulation days -- would make the same YAML
+        Only this reading makes one file mean one experiment on both sides of
+        a checkpoint, which is what forking is for. Absolute simulation days
+        would make the same YAML
         fire on day 50 of the parent's history, which for a branch taken at
         day 60 is a day that has already happened. Schema 1 therefore has one
         interpretation, `at: {relative: N}` spells it out, and `absolute` is
@@ -1350,27 +1345,25 @@ class Scenario:
         # One scenario, one run, identified by its clock
 
         A `hold` and a `ramp` both need the value the field had on their
-        first day, so the scenario carries that anchor -- and the audit trail
-        -- for the run it is being applied to. A run is identified by its
-        CLOCK, not by the engine object: `day` going back to or below the
+        first day, so the scenario carries that anchor, and the audit trail,
+        for the run it is being applied to. A run is identified by its
+        clock, not by the engine object. `day` going back to or below the
         last day it saw starts a new run and clears both.
 
-        The engine deliberately does not identify the run, because a
-        checkpoint resume is a NEW engine continuing the SAME run. Days 0-59
+        The engine does not identify the run, because a checkpoint resume
+        is a new engine continuing the same run. Days 0-59
         on the original and 60-119 on the engine `Checkpoint.resume()`
         returns is one experiment, and a hold that began on day 50 has to
         survive the join. Keying the anchor on the engine object would break
-        exactly that, and a checkpoint that could not carry a pending
-        intervention would make forking useless for the scenarios it is most
-        wanted for.
+        that, and a checkpoint that could not carry a pending intervention
+        would make forking useless for the scenarios that most need it.
 
-        The cost of that choice, stated plainly: one scenario object driving
-        two runs AT ONCE shares one clock between them. Alternating
-        `apply(a, 0)`, `apply(b, 0)`, `apply(a, 1)` is not a pattern this
-        object supports -- give each run its own :meth:`copy`. A run that
-        joins a hold part-way through, which is the mistake this actually
-        catches, is refused by name rather than anchored to whatever it
-        happens to find.
+        The cost is that one scenario object driving two runs at once shares
+        one clock between them. This object does not support alternating
+        `apply(a, 0)`, `apply(b, 0)`, `apply(a, 1)`, so give each run its own
+        :meth:`copy`. A run that joins a hold part-way through, which is the
+        mistake this catches, is refused by name instead of being anchored
+        to whatever it finds.
         """
         if day <= self._day:
             self._log = []
@@ -1563,12 +1556,11 @@ class Scenario:
     def to_json(self, days: int | None = None) -> str:
         """The scenario as JSON, so a result can cite what it ran under.
 
-        Two documents, and which one you get depends on what the scenario is.
+        It writes one of two documents, depending on what the scenario holds.
 
-        A scenario built only from pins serialises as it always has: schema
-        1, the realised PATH over ``days``. That is deliberate rather than
-        lazy -- every manifest already published carries this shape, and its
-        fingerprint has to keep meaning the same thing.
+        A scenario built only from pins serialises as schema 1, the realised
+        path over ``days``. Every manifest already published carries this
+        shape, and its fingerprint has to keep meaning the same thing.
 
         A scenario carrying interventions serialises as schema 2: the
         resolved shocks and transmission, the name, the description, the
@@ -1579,14 +1571,14 @@ class Scenario:
         ``days`` may be omitted only when the scenario has no pins, because
         then there is no path to realise.
 
-        The PATH rather than the recipe. A recipe is only citable while the
-        constructor that built it keeps behaving the same way; the realised
-        values are the scenario regardless of what any later version does.
+        It records the path, not the recipe. A recipe is only citable while
+        the constructor that built it keeps behaving the same way, and the
+        realised values stay the scenario whatever any later version does.
 
         ``days`` must be at least one. A zero-day document carries no path,
-        and :meth:`from_json` reading it back produced a scenario driving
-        NOTHING: a round trip that quietly discarded every field, and a
-        reproduced run that applied no pins at all.
+        and :meth:`from_json` reading one back produced a scenario driving
+        nothing. The round trip discarded every field, and a reproduced run
+        applied no pins.
         """
         if self._drivers and (days is None or days < 1):
             raise ValidationError(
@@ -1645,20 +1637,19 @@ class Scenario:
     def from_json(cls, text: str) -> "Scenario":
         """Rebuild a scenario from :meth:`to_json` output.
 
-        What comes back is the REALISED PATH as an object: a scenario whose
+        What comes back is the realised path as an object, a scenario whose
         every day returns exactly the recorded values, whatever constructor
-        originally built them. That is the honest direction of the round trip
-        The serialised form is the path rather than the recipe, so the restored
-        object is the path too. Beyond the recorded horizon it holds its final
-        values, the same rule :meth:`ramp` applies after its end, so a longer
-        run is defined rather than an IndexError.
+        originally built them. The serialised form is the path, so the
+        restored object is the path too. Beyond the recorded horizon it holds
+        its final values, the same rule :meth:`ramp` applies after its end,
+        so a longer run is defined and does not raise IndexError.
 
-        A newer schema is refused rather than read on a best-effort basis, and
-        so is an inconsistent document, such as a day count that disagrees with the
-        path, days out of order, or fields that appear and disappear between
-        rows. Each of those describes a scenario nobody constructed, and a
-        loader that guessed its way past them would replay a run under pins
-        the original never applied.
+        A newer schema is refused rather than read on a best-effort basis,
+        and so is an inconsistent document, such as a day count that
+        disagrees with the path, days out of order, or fields that appear and
+        disappear between rows. Each of those describes a scenario nobody
+        constructed, and a loader that guessed its way past them would
+        replay a run under pins the original never applied.
         """
         payload = json.loads(text)
         if not isinstance(payload, dict):
@@ -1781,7 +1772,7 @@ class Scenario:
         scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
         ```
 
-        A string that names a readable file is read as one; anything else is
+        A string that names a readable file is read as one. Anything else is
         treated as the document itself, so a scenario can be written inline
         in a notebook or a test. A one-line string that looks like a path
         (it ends in ``.yml`` or ``.yaml``, or holds a path separator, and has
@@ -1789,12 +1780,12 @@ class Scenario:
         0.8.5 it was parsed as YAML text and refused as a syntax error.
 
         The reader is :mod:`tradefloor.yaml_subset`, which implements the
-        block-style subset this schema uses and REFUSES everything else by
-        name -- tags, anchors, flow collections, multiple documents. It has
+        block-style subset this schema uses and refuses everything else by
+        name: tags, anchors, flow collections, multiple documents. It has
         no constructor to reach, so a scenario file cannot name a Python
-        type, and the loader then rejects every key outside the schema. The
-        library keeps its promise of no dependencies, and a configuration
-        file stays configuration.
+        type, and the loader then rejects every key outside the schema. So
+        the library needs no dependency for YAML, and a configuration file
+        cannot run code.
 
         The YAML and the Python forms resolve to the same object: the same
         interventions in the same order, and therefore the same
@@ -1830,11 +1821,9 @@ class Scenario:
         scenario = tf.Scenario.load("liquidity_crisis")
         ```
 
-        The pack travels inside the wheel rather than only in the repository,
-        so this works on a pip install. That is the point: a scenario named
-        in the README that only resolves in a clone is a promise the package
-        does not keep, and an agent driving the library over MCP has no clone
-        at all.
+        The pack ships inside the wheel, so this works on a pip install,
+        including for an agent driving the library over MCP, which has no
+        clone.
 
         :meth:`available` lists them. For a file of your own, use
         :meth:`from_yaml` with its path.
@@ -1869,9 +1858,8 @@ class Scenario:
     def available(cls) -> tuple[str, ...]:
         """The names :meth:`load` accepts, sorted.
 
-        Read from the installed package rather than from a list, so a
-        scenario added to the pack appears here without anyone remembering
-        to write it down twice.
+        Read from the installed package, so a scenario added to the pack
+        appears here without being listed a second time.
         """
         return tuple(sorted(
             path.name[:-4] for path in _pack().iterdir()
@@ -1882,10 +1870,10 @@ class Scenario:
                       source: str | None = None) -> "Scenario":
         """Build a scenario from an already-parsed configuration mapping.
 
-        The layer under :meth:`from_yaml`, and the one that decides what a
-        scenario document may say. Everything outside the schema is refused
-        rather than ignored: an unknown key is either a typo or a newer
-        schema, and running it either way applies an experiment nobody wrote.
+        This is the layer under :meth:`from_yaml`, and it decides what a
+        scenario document may say. Everything outside the schema is refused.
+        An unknown key is either a typo or a newer schema, and running it
+        either way applies an experiment nobody wrote.
         """
         if not isinstance(document, dict):
             raise ScenarioValidationError(
@@ -2006,15 +1994,15 @@ class Scenario:
                    credit_spread: float = 0.02) -> "Scenario":
         """A hiking (or cutting) cycle across the whole curve.
 
-        Moves the policy rate AND the corporate bond yield, held apart by
-        ``credit_spread``. Both, because the valuation discounts off the
+        It moves both the policy rate and the corporate bond yield, held
+        apart by ``credit_spread``, because the valuation discounts off the
         corporate yield and pinning the policy rate alone changes nothing at
-        all, silently. See this module's docstring.
+        all, with no warning. See this module's docstring.
 
-        ``credit_spread`` is held constant, which is a simplification worth
-        naming: in a real tightening cycle spreads usually widen as well, so
-        this understates the equity impact. Widen it deliberately with a second
-        ``ramp`` on ``corporate_bond_yield`` if that is what you want to study.
+        ``credit_spread`` is held constant. In a real tightening cycle
+        spreads usually widen as well, so this understates the equity
+        impact. To study that, widen it with a second ``ramp`` on
+        ``corporate_bond_yield``.
         """
         return (
             cls(label=f"rate_shock {start:.3%}->{end:.3%} over {over}d")
@@ -2035,21 +2023,20 @@ class Scenario:
 
     def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
-        """A VIX spike that decays back: a volatility, correlation and
-        spread stress in one, the shape a real one takes.
+        """A VIX spike that decays back.
 
-        Up as a step, down as a ramp, because that is the shape a stress
-        episode has: it arrives at once and subsides slowly.
+        It stresses volatility, correlation and spreads at once. It goes up
+        as a step and down as a ramp, because a stress episode arrives at
+        once and subsides slowly.
 
-        **This raises realised volatility**, since the 2026-08 coupling of
-        the market factor's variance target to VIX, and not before, which
-        is why this docstring once said the opposite and was right then.
+        Since the 2026-08 coupling of the market factor's variance target to
+        VIX, this raises realised volatility. It did not before.
         Measured on ``Universe.random(20, seed=11)`` over 120 days, sim
         seed 3: the default spike to 45 moves annualised realised
         volatility from a no-scenario 58.17% to 67.01%, a peak of 80 to
-        74.57%, and volatility clustering RISES with it (|r| acf(1) 0.334
-        to 0.357 and 0.378), where the pre-coupling model measurably
-        moved clustering the wrong way. The spike also widens the quoted
+        74.57%, and volatility clustering rises with it (|r| acf(1) 0.334
+        to 0.357 and 0.378). The pre-coupling model moved clustering the
+        other way. The spike also widens the quoted
         bid-ask and, above VIX 25.5, pulls returns toward the market
         factor. This module's docstring sets out the four channels and
         what each one is worth.
@@ -2085,16 +2072,16 @@ class Scenario:
                   at: int = 10, over: int = 20) -> "Scenario":
         """Deprecated alias for :meth:`vix_shock`. Same path, same results.
 
-        History with a twist: the constructor was renamed when it was
-        measured that VIX did not drive realised volatility, so "vol_shock"
-        was a name making a false claim. The 2026-08 coupling then wired
-        VIX into the market factor's variance target, which made the OLD
-        name accurate again, but the rename stands. :meth:`vix_shock`
-        names the lever (the path it drives is a VIX path), which stays
-        true under any future model change, where a name promising an
-        effect has already been wrong once. The path is unchanged, so a
-        run under this name reproduces exactly; only the ``label``
-        differs, because the serialised path carries the honest name.
+        The constructor was renamed when measurement showed VIX did not
+        drive realised volatility, which made "vol_shock" a false claim.
+        The 2026-08 coupling then wired VIX into the market factor's
+        variance target, which made the old name accurate again, but the
+        rename stands. :meth:`vix_shock` names the lever (the path it
+        drives is a VIX path), which stays true under any future model
+        change, and a name promising an effect has already been wrong once.
+        The path is unchanged, so a run under this name reproduces exactly.
+        Only the ``label`` differs, because the serialised path carries the
+        new name.
         """
         warnings.warn(
             "Scenario.vol_shock is deprecated; use Scenario.vix_shock. Both "
@@ -2139,7 +2126,7 @@ def run_scenario(
     record: bool = False,
     model: str | ModelParams | None = None,
 ) -> Engine:
-    """Run a market under a macro path. Returns the finished engine.
+    """Run a market under a macro path and return the finished engine.
 
     The scenario is applied at the START of each day, before that day's
     session, so day zero is already under the path rather than under whatever
@@ -2384,37 +2371,35 @@ def compare(
 ) -> dict[str, Any]:
     """Run the same seed under two macro paths and difference them.
 
-    The counterfactual real markets cannot offer. You cannot re-run a year
-    without its hiking cycle. Your only observation is the one that happened.
-    Here both are runnable, holding every noise draw, every news item and every
-    shock identical, so the difference is the scenario and nothing else.
+    Real markets cannot offer this counterfactual, because you cannot re-run
+    a year without its hiking cycle. Here both are runnable, holding every
+    noise draw, every news item and every shock identical, so the difference
+    is the scenario and nothing else.
 
     ``baseline`` defaults to holding the scenario's fields at their day-zero
-    values, which is the right comparison: it isolates the PATH rather than
-    conflating it with the level the path started from.
+    values, which separates the path from the level it started from.
 
-    That default is only meaningful for a scenario that MOVES inside the
-    horizon, and a scenario that does not is refused rather than reported.
+    That default is only meaningful for a scenario that moves inside the
+    horizon, and a scenario that does not is refused.
     For a ``hold``-only scenario, or a ``step`` at day zero, or any shock
     whose start day falls outside ``days``, the default baseline IS the
     scenario, and the comparison returns exactly 0.00% on every instrument.
-    A confident, meaningless zero reads as "the shock did nothing", which is
-    the worst answer available: it is wrong, it looks like a finding, and
-    nothing about it looks like a mistake. See :meth:`Scenario.hold`.
+    That zero would read as "the shock did nothing", which is wrong and
+    looks like a finding. See :meth:`Scenario.hold`.
 
     Keyword arguments, ``model=`` among them, pass through to
     :func:`run_scenario` and apply to BOTH worlds, because a shocked world
     differenced against a baseline under a different coefficient set would
-    measure the model gap dressed up as the scenario's effect. The result
+    report the gap between the models as the scenario's effect. The result
     records ``model_fingerprint``.
 
     ``trace=True`` runs the two worlds a day at a time and reports
-    ``first_divergence``: the first day on which the two markets differ at
-    all. For an intervention scenario that is a CHECK and not a curiosity,
-    because it should equal the day the first intervention fires. Earlier
-    means the scenario reached the market before it said it did; later means
-    it fired into a market that did not notice. It costs a market digest per
-    day per world, so it is off by default rather than free.
+    ``first_divergence``, the first day on which the two markets differ at
+    all. For an intervention scenario it is a check, because it should equal
+    the day the first intervention fires. Earlier means the scenario reached
+    the market before it said it did, and later means it fired into a market
+    that did not notice. It costs a market digest per day per world, so it
+    is off by default.
     """
     import struct
 

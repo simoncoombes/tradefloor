@@ -1,8 +1,8 @@
-"""`python -m tradefloor` -- read a scenario file without running a market.
+"""`python -m tradefloor` reads a scenario file without running a market.
 
-A scenario is configuration, and configuration that can only be checked by
-running a hundred-day simulation is configuration nobody checks. These
-commands parse, validate, resolve and fingerprint a file in milliseconds:
+Configuration that can only be checked by running a hundred-day simulation
+does not get checked, so these commands parse, validate, resolve and
+fingerprint a scenario file in milliseconds:
 
     tradefloor scenario validate liquidity_crisis ./my-scenario.yml
     tradefloor scenario show     oil_price_spike

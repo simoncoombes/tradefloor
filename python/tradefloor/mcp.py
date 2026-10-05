@@ -1,58 +1,54 @@
 """An MCP server, so an LLM agent can drive the simulator.
 
-`tradefloor` is a Python library, which means its audience is a person writing
-code. An MCP server adds a second audience that cannot write code against
-it: a model that calls tools and reads back JSON. Everything here follows
-from that one difference.
+`tradefloor` is a Python library, written for a person writing code. An
+MCP server adds a second audience that cannot write code against it, a
+model that calls tools and reads back JSON. The design below follows from
+that difference.
 
 ## The strategy surface is data, never a callable
 
-`evaluate` accepts any object with an `act` method. A tool call cannot
-carry one, and the alternative -- accepting a string of Python and running
-it -- would make this server a remote code execution endpoint with a market
-simulator attached. :class:`tradefloor.StrategySpec` already closed this gap
-for citability, and its module docstring anticipated this exact use:
+`evaluate` accepts any object with an `act` method. A tool call cannot carry
+one, and accepting a string of Python and running it would make this server
+a remote code execution endpoint with a market simulator attached.
+:class:`tradefloor.StrategySpec` already closed this gap for citability, and
+its module docstring anticipated this exact use:
 
     It is also what an MCP server needs -- a tool cannot accept a callable
     -- and what stops callers inventing their own serialisation on the way
     to one.
 
-So the grammar the spec expresses is the grammar this server exposes, and
-what the spec cannot say, this server cannot run. Path dependence,
-conditional logic and custom signals need a Python agent and the library.
-That limit is stated in `describe_simulator` rather than discovered.
+So this server exposes the spec's grammar, and cannot run anything the
+spec cannot express. Path dependence, conditional logic and custom signals
+need a Python agent and the library. `describe_simulator` states that
+limit.
 
 ## Every result carries its own caveats
-
-This part goes beyond ordinary MCP plumbing, and carries real weight.
 
 A person calling `evaluate` has the docstring, the README and the realism
 envelope page in reach. A model calling `evaluate_strategies` has the tool
 result and nothing else, and it will summarise that result to a human who
-has even less. The failure mode is not hypothetical -- it is the single
-most repeated failure in this project's history: a correct number under a
-sentence that inverted it. A design document described crisis severity as
-arriving "through correlation" when that was backwards for one of two
-parameters. A survey classifier printed `[MOVES]` for a parameter measured
-to move things the wrong way. Every one had sound arithmetic and a wrong
-connecting sentence, because **a number invites scepticism and a sentence
-does not**.
+has even less. The most repeated failure in this project's history is a
+correct number under a sentence that inverted it. A design document
+described crisis severity as arriving "through correlation" when that was
+backwards for one of two parameters. A survey classifier printed `[MOVES]`
+for a parameter measured to move things the wrong way. Every one had sound
+arithmetic and a wrong connecting sentence, because **a number invites
+scepticism and a sentence does not**.
 
 A model handed `{"return_pct": 88.7}` will report that a strategy made
 88.7%. So every tool here returns a `caveats` list beside its numbers, and
 the caveats are **computed from the envelope and the measured facts at call
-time** -- never retyped prose. That rule has already earned itself: while
-this module was being written, the product brief and `README.md` were both found
-still asserting a return autocorrelation of +0.219 and +0.249 from an
-earlier preset, where the shipped `pt-v3` measures 0.0485 across the
-README's own published method. Hardcoding a caveat is how a caveat becomes
-false.
+time**, never retyped prose. While this module was being written, the
+product brief and `README.md` were both found still asserting a return
+autocorrelation of +0.219 and +0.249 from an earlier preset, where the
+shipped `pt-v3` measures 0.0485 across the README's own published method.
+A hardcoded caveat goes stale the same way.
 
 ## What is deliberately not exposed
 
-**Atlas.** A survey is thousands of simulations and runs for hours; a tool
-call that cannot return inside a conversation is not a tool. Atlas stays a
-library API, driven by `tools/calibration/atlas_survey.py`.
+**Atlas.** A survey is thousands of simulations and runs for hours, which
+is too long for a tool call inside a conversation. Atlas stays a library
+API, driven by `tools/calibration/atlas_survey.py`.
 
 **Arbitrary model parameters.** `ModelParams` has over 200 settable
 coefficients and a preset fingerprint that makes a result citable. Letting
@@ -62,33 +58,33 @@ name and nothing finer. The default runs when none is named, and it is the
 only preset the realism envelope certifies, so a result under another one
 carries a caveat that says so and quotes that preset's own measured record
 (`tf.preset_record`), and its provenance names the preset. A population of
-background traders is taken the same way, a shipped one by name; a
-population of one's own participants is a library call.
+background traders is taken the same way, a shipped one by name. A
+population of your own participants needs the library.
 
 **Anything that writes, outside a session.** Every tool but the session
-tools and `start_job` is read-only and pure: same arguments, same bytes, on
-every platform. `start_job` adds a job to this process's memory. The session
-tools keep a market in this process between calls, and the sessions block
-further down says why each choice was made. `session_step` advances one,
-`session_fork` copies one, `session_rewind` puts one back to a checkpoint
-and `close_session` frees one. The same calls from the same open give the
-same bytes, apart from the session id.
+tools and `start_job` is read-only and pure, and the same arguments give the
+same bytes on every platform. `start_job` adds a job to this process's
+memory. The session tools keep a market in this process between calls, and
+the sessions block further down says why each choice was made.
+`session_step` advances one, `session_fork` copies one, `session_rewind`
+puts one back to a checkpoint and `close_session` frees one. The same calls
+from the same open give the same bytes, apart from the session id.
 
 **The live engine, to a strategy.** A strategy here is data, and it runs
 through `evaluate` and `rank` with `trusted_agents=False`, stated at each
-call: it is handed the read-only market view every sandboxed agent gets
+call. It is handed the read-only market view every sandboxed agent gets
 (see `tradefloor.sandbox`), so it cannot read the true business-cycle
 phase, the economy block, the mispricing or the fundamentals, fork the
 market or write it. The `oracle` signal is the one declared exception, and
-its row says `uses_hidden_state`. There is no opt-in: a tool call cannot
-carry the code that would need one. `explain_price_move` and `explain`
-answer the experimenter about a run of their own, after it has run; no
-strategy is running inside them, so they hand no agent anything.
+its row says `uses_hidden_state`. There is no opt-in, because a tool call
+cannot carry the code that would need one. `explain_price_move` and
+`explain` answer the experimenter about a run of their own, after it has
+run. No strategy runs inside them, so they hand no agent anything.
 
 A session hands its caller what `MarketView` and `PortfolioView` serve and
 nothing else, so a model trading by hand sees what a sandboxed agent sees.
-It does not stop look-ahead, and cannot: the caller can fork, rewind or
-reopen the market from the same seed. So a session's P&L is never offered
+It cannot stop look-ahead, because the caller can fork, rewind or reopen
+the market from the same seed. So a session's P&L is never offered
 as a strategy's score, and every session result says so.
 """
 
@@ -1361,15 +1357,15 @@ book. Orders match against real depth, so trading moves the price.
 Start with `describe_simulator`. It reports what this market is certified to
 reproduce and what it is not, and everything else is easier to read after it.
 
-Strategies are DATA, not code: build one with `validate_strategy`, then run it
-with `evaluate_strategies`. There is no way to submit Python here.
+Strategies are data. Build one with `validate_strategy`, then run it with
+`evaluate_strategies`. There is no way to submit Python here.
 
 Every result carries a `caveats` list. It is computed for that specific call
-and is part of the result, not decoration -- a summary of a tradefloor result
-that drops the caveats is a misreport.
+and is part of the result. A summary of a tradefloor result that drops the
+caveats misreports it.
 
-A single seed measures the seed as much as the strategy. `rank_strategies` is
-the honest version of `evaluate_strategies`.
+A single seed measures the seed as much as the strategy. `rank_strategies`
+runs the same evaluation across many seeds.
 
 To trade step by step yourself, open a session with `open_session` and advance
 it with `session_step`. A session can be forked and rewound, so its P&L is not
@@ -1678,7 +1674,7 @@ def check_envelope(
         f"roster mixes are granted only on "
         f"{envelope.ROSTER_MEASUREMENT['preset']}."))] = None,
 ) -> dict[str, Any]:
-    """The honesty gate. Cheap, and worth calling before an expensive run.
+    """Check a question against the realism envelope before an expensive run.
 
     `sector_concentrated` takes a mix name as well as a flag, and
     `macro_regime` is exposed, since 0.8.5. Both are `envelope.check`
@@ -1744,7 +1740,7 @@ def check_envelope(
 )
 @_guarded
 def validate_strategy(spec: SpecArg) -> dict[str, Any]:
-    """The authoring loop.
+    """Parse and fingerprint one strategy spec without running it.
 
     Separate from `evaluate_strategies` because a model gets the grammar
     wrong several times before it gets it right, and each of those attempts
@@ -1780,8 +1776,9 @@ def validate_strategy(spec: SpecArg) -> dict[str, Any]:
     description=(
         "Run strategies on one simulated market, beside the baseline agents "
         "on the same market, and score each one: return, P&L, the cost of "
-        "its own trading in basis points, turnover and errors. The right first look, but it is ONE "
-        "seed, so use rank_strategies before believing an ordering. A "
+        "its own trading in basis points, turnover and errors. Use it first, "
+        "but it runs one seed, so use rank_strategies before believing an "
+        "ordering. A "
         f"strategy is data, for example {_SPEC_EXAMPLE}, and "
         "validate_strategy checks one without running it. days 1 to "
         f"{MAX_DAYS} here (a few seconds), up to {MAX_DAYS_ASYNC} through "
@@ -1807,9 +1804,9 @@ def evaluate_strategies(
     preset: PresetArg = None,
     population: PopulationArg = None,
 ) -> dict[str, Any]:
-    """The headline tool.
+    """Run strategies on one market beside the baselines, and score each one.
 
-    `include_baselines` defaults to True on purpose. A return of +4% means
+    `include_baselines` defaults to True because a return of +4% means
     nothing without knowing what buy-and-hold did on the same market, and a
     model handed a bare number will report the bare number.
     """
@@ -1934,15 +1931,15 @@ def rank_strategies(
     preset: PresetArg = None,
     population: RankPopulationArg = None,
 ) -> dict[str, Any]:
-    """The honest version.
+    """Score strategies across many seeds and rank them with paired tests.
 
-    `rank` takes a factory rather than instances because agents are stateful
+    `rank` takes a factory and not instances because agents are stateful,
     and a reused instance carries one market's history into the next with no
-    visible symptom. Specs are immune -- they are rebuilt per seed -- which
-    is why this server only ever passes specs.
+    visible symptom. Specs are rebuilt per seed, so they carry nothing over,
+    and this server only ever passes specs.
 
-    Omitted seeds are `DEFAULT_SEEDS`. An EMPTY list is refused like any
-    other count outside 2 to `MAX_SEEDS`; until 0.8.5 `seeds or [...]` ran
+    Omitted seeds are `DEFAULT_SEEDS`. An empty list is refused like any
+    other count outside 2 to `MAX_SEEDS`. Until 0.8.5 `seeds or [...]` ran
     the six defaults for it without a word.
 
     `population` is always refused (`_RANK_ISOLATED` says why). It is a
@@ -2307,12 +2304,12 @@ def list_scenarios() -> dict[str, Any]:
     A model authoring a scenario is choosing between fifteen targets whose
     effect sizes differ by three orders of magnitude, and nothing on the wire
     told it which. `macro.corporate_yield` held 200bp higher moves the median
-    instrument -4.02%; `macro.fear_greed` moves it exactly 0.00%, measured,
-    because nothing in the market reads it. Both are legitimate to write and
-    only one of them is an experiment.
+    instrument -4.02%. `macro.fear_greed` moves it exactly 0.00%, measured,
+    because nothing in the market reads it. Both are valid to write, and
+    only the first changes the market.
 
     So every target here carries the note the library carries: what reads it,
-    how long it takes to arrive, and what it was MEASURED to be worth. The
+    how long it takes to arrive, and what it was measured to be worth. The
     refusals come too, because "there is no volatility level to set in this
     model" is a more useful answer than a schema error.
     """
@@ -2416,14 +2413,14 @@ def build_scenario(
     """Compose a scenario as data, and check it before spending anything.
 
     Separate from `run_stress_scenario` for the same reason
-    `validate_strategy` is separate from `evaluate_strategies`: a model gets
+    `validate_strategy` is separate from `evaluate_strategies`. A model gets
     a grammar wrong several times before it gets it right, and each of those
-    attempts should cost a parse rather than a simulation.
+    attempts should cost a parse and not a simulation.
 
     `days` is checked against the scenario's timing, the way
     `run_stress_scenario` checks it, so a shock on day 100 in a 20-day run
-    is refused here rather than accepted and then run to a difference of
-    0.0.
+    is refused here instead of being accepted and then run to a difference
+    of 0.0.
     """
     cap = _day_cap()
     if not 1 <= days <= cap:
@@ -2524,10 +2521,10 @@ def run_stress_scenario(
 ) -> dict[str, Any]:
     """Stress testing, always paired against the unshocked control.
 
-    A scenario result on its own is unreadable: a -3% return under a rate
-    shock could be the shock or could be the market. Running the identical
-    seed with and without the scenario is the counterfactual the simulator
-    exists to provide, so this tool always returns both.
+    A scenario result on its own cannot be read, because a -3% return under
+    a rate shock could be the shock or could be the market. Running the
+    identical seed with and without the scenario separates the two, so this
+    tool always returns both.
 
     The run length is checked against the scenario's timing before
     anything runs (`_timing`). Every shipped document starts on day 30 or
@@ -2753,7 +2750,7 @@ def explain_price_move(
     """How much each driver moved each name's mispricing on one day.
 
     A price history shows that a stock fell. It cannot show how much of the
-    fall was order-flow pressure and how much was noise, and this can,
+    fall was order-flow pressure and how much was noise. This tool can,
     because the simulator computed each part. It covers the mispricing
     only. On pt-v20 most of a price's move is fair value moving, and these
     factors do not split that move up.
@@ -2897,11 +2894,11 @@ def explain(
     """One name's day, from its move down to the draws that seeded it.
 
     `explain_price_move` says which factors moved a price. This says which
-    DRAWS moved those factors, and hands back a tree whose every node can
+    draws moved those factors, and hands back a tree whose every node can
     be run again from the state the day started in.
 
-    Read-only, like every tool here: it builds its own engine, runs the
-    days, and returns what it measured. It exposes no replay, because a
+    It is read-only, like every tool here. It builds its own engine, runs
+    the days, and returns what it measured. It exposes no replay, because a
     replay runs engines and a tool call answers inside a conversation.
     """
     if (refused := _seed_refusal(seed=seed)) is not None:
@@ -3015,16 +3012,16 @@ def build_universe(
     limit: Annotated[int, Field(description=(
         "How many instruments the preview lists."))] = 20,
 ) -> dict[str, Any]:
-    """Construct and inspect in one call.
+    """Construct a roster and inspect it in one call.
 
     Rosters were previously only reachable as `(size, seed)` arguments on
-    every other tool, which made two questions unaskable: a
-    sector-CONCENTRATED roster -- one of the six named envelope gaps -- and
-    a hand-authored one. Both are expressible as data, so both belong here.
+    every other tool, so a caller could not ask for a sector-concentrated
+    roster (one of the six named envelope gaps) or a hand-authored one. Both
+    can be expressed as data, so this tool builds them.
 
     Returns a `universe` document. Pass it to any run tool as `universe` and
     it supersedes that tool's inline size/seed/sectors, so a roster is
-    composed once and reused rather than re-specified per call.
+    composed once and reused instead of re-specified per call.
     """
     try:
         universe, concentrated, doc = _resolve_universe(

@@ -76,14 +76,14 @@ impl PyEngineBatch {
     /// Build one engine per seed, all over the same universe.
     ///
     /// Seeds must be distinct. Two members with the same seed would be the
-    /// same market twice, which is almost always a mistake in a sweep and is
-    /// silent if allowed: the results look like two samples and are one.
+    /// same market twice, which in a sweep is almost always a mistake, and
+    /// nothing would flag it because the results look like two samples.
     /// Each is any integer from 0 to `2**64 - 1`, as on `Engine`.
     ///
-    /// `model` selects the coefficient set, exactly as on `Engine`: one
-    /// model for every member, because a batch is N seeds of the same
-    /// market and members under different models would be a comparison of
-    /// models presented as a comparison of seeds.
+    /// `model` selects the coefficient set, as on `Engine`. Every member
+    /// runs the same model, because a batch is N seeds of one market.
+    /// Members under different models would compare models while
+    /// presenting it as a comparison of seeds.
     #[new]
     #[pyo3(signature = (*, seeds, universe, macro_state = None, model = None))]
     fn new(
@@ -266,9 +266,8 @@ impl PyEngineBatch {
 
     /// Prices across every member: `len(seeds) x len(tickers)`, row-major.
     ///
-    /// Row-major with one member per row, so a vectorised policy reads one
-    /// market's cross-section contiguously, which is the direction it
-    /// actually consumes.
+    /// One member per row, so a vectorised policy reads one market's
+    /// cross-section contiguously, which is the direction it consumes.
     fn prices(&self, py: Python<'_>) -> Py<PyBytes> {
         let mut out = Vec::with_capacity(self.engines.len() * self.tickers.len());
         for engine in &self.engines {
@@ -289,16 +288,16 @@ impl PyEngineBatch {
 
     /// Draws consumed by each member, in seed order.
     ///
-    /// Two members should NOT agree here in general -- different seeds
-    /// consume differently -- so this is a diagnostic for comparing a batch
-    /// member against the same seed run alone.
+    /// Members should NOT agree here in general, because different seeds
+    /// consume differently. Use it to compare a batch member against the
+    /// same seed run alone.
     #[getter]
     fn draws_consumed(&self) -> Vec<usize> {
         self.engines.iter().map(|e| e.draws_consumed()).collect()
     }
 
-    /// The honest name of the model every member runs: a shipped preset's
-    /// name, or `custom-XXXXXXXX`. One value rather than one per member, since the
+    /// The name of the model every member runs: a shipped preset's name, or
+    /// `custom-XXXXXXXX`. One value for the whole batch, since the
     /// constructor builds every engine from the same coefficient set.
     #[getter]
     fn model_fingerprint(&self) -> String {

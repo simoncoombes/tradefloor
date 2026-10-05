@@ -30,99 +30,97 @@ response to the engine runs through :func:`parse` and :func:`orders_from`.
 
 ## The observation allowlist
 
-:class:`~tradefloor.harness.Observation` carries ``.engine``: a read-only
-market view by default (:mod:`tradefloor.sandbox`), and under
-``trusted_agents=True`` the live engine, which knows the answer key: :func:`tradefloor.fair_value`, the factor
+:class:`~tradefloor.harness.Observation` carries ``.engine``. By default
+that is a read-only market view (:mod:`tradefloor.sandbox`). Under
+``trusted_agents=True`` it is the live engine, which knows the answer key:
+:func:`tradefloor.fair_value`, the factor
 :meth:`~tradefloor.Engine.attribution` of every price move, each company's
-``mispricing_s``, and -- through a :class:`~tradefloor.Scenario` -- the macro
+``mispricing_s``, and, through a :class:`~tradefloor.Scenario`, the macro
 path the run has not reached yet. An agent reading any of those inverts the
 simulator, and the experiment around it measures nothing.
 
 So :func:`observe` names every field it emits, one at a time, and reads
 nothing by reflection. Adding a field takes a deliberate edit here. A
-denylist would go stale the first time the engine gained an attribute; an
-allowlist survives that.
+denylist would go stale the first time the engine gained an attribute, and
+an allowlist does not.
 
 The allowlist does not change with the size of the roster. :func:`observe`
 takes an optional ``detail`` argument that decides which symbols are
-rendered in full and which appear as a compact row, and it adds no field:
-the sector summary it also emits is computed from the asset rows already on
-the list. A five-hundred-name universe therefore sees the same categories of
-information as a four-name one, in less space per name. See
-:func:`observe` for the shape. A published study using it lives at
+rendered in full and which appear as a compact row. It adds no field,
+because the sector summary it also emits is computed from the asset rows
+already on the list. A five-hundred-name universe therefore sees the same
+categories of information as a four-name one, in less space per name. See
+:func:`observe` for the shape. A published study using it is at
 https://github.com/simoncoombes/tradefloor-experiments.
 
-``OBSERVABLE_MACRO`` is the macro half of the list, bound to
-``counterfactual.MACRO_FIELDS`` on purpose: the library has already settled
-which macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
-model coefficient no exchange publishes. Its ``cycle`` is the phase as
+``OBSERVABLE_MACRO`` is the macro half of the list. It is bound to
+``counterfactual.MACRO_FIELDS`` because the library has already settled
+which macro fields a run is about, and that set leaves out ``qe_pe_boost``,
+a model coefficient no exchange publishes. Its ``cycle`` is the phase as
 published, late under ``cycle_publication_lag``. ``tests/test_finrobot.py``
 runs the mapping against an engine proxy that raises on the forbidden
 attributes, so a future edit reaching for one fails on the access.
 
-Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
-not come off the engine either. The caller supplies them as ``fundamentals``.
+Company fundamentals (sector, EPS, book value, revenue growth, beta) do not
+come off the engine either. The caller supplies them as ``fundamentals``.
 An analyst reads all five off a filing, and keeping them out of the adapter
 leaves one less line to audit.
 
-What that does NOT do is withhold the valuation, and an earlier version of
-this docstring claimed it did. :func:`tradefloor.fair_value` is public, and
-its arguments are ``sector``, ``eps``, ``book_value_per_share`` and
-``revenue_growth`` -- the four fields the caller is invited to supply --
-plus ``federal_funds_rate`` and ``corporate_bond_yield``, both in
-``OBSERVABLE_MACRO``. So a caller who supplies full fundamentals has supplied
-the means to reconstruct the model's own anchor, and no engine attribute is
-read to do it -- the ``Sealed`` proxy in ``tests/test_finrobot.py`` cannot
-see it happen, and neither can any allowlist of engine reads.
+That does not withhold the valuation. :func:`tradefloor.fair_value` is
+public, and its arguments are ``sector``, ``eps``,
+``book_value_per_share`` and ``revenue_growth`` (four of the fields the
+caller supplies) plus ``federal_funds_rate`` and ``corporate_bond_yield``,
+both in ``OBSERVABLE_MACRO``. So a caller who supplies full fundamentals
+has supplied the means to reconstruct the model's own anchor without
+reading any engine attribute. The ``Sealed`` proxy in
+``tests/test_finrobot.py`` cannot see that happen, and neither can any
+allowlist of engine reads.
 
-Two different claims sit here and they are worth separating, because three
-people measured this and produced three numbers by conflating them.
+There are two separate claims here, one about ``fair_value`` and one about
+``mispricing_s``, and they are easy to conflate.
 
-``fair_value`` reconstructs EXACTLY. It is a pure function of six inputs,
-four supplied and two observable, so there is nothing approximate about it.
-On pt-v19 and every preset before it, that public function IS the engine's
-anchor. From pt-v20 on, and so on pt-v21, the default since 0.10.0, it
-is not: the engine's fair
-value carries a level of its own -- the part of each name's opening premium
+``fair_value`` reconstructs exactly. It is a pure function of six inputs,
+four supplied and two observable. On pt-v19 and every preset before it,
+that public function is the engine's anchor. From pt-v20 on, including
+pt-v21 (the default since 0.10.0), it is not, because the engine's fair
+value carries a level of its own: the part of each name's opening premium
 the published fundamentals do not explain, news that moves value for good,
-and an earnings cycle -- so the published fundamentals are a noisy read of
+and an earnings cycle. The published fundamentals are then a noisy read of
 it, and the inversion below misses by more (0.09 against 0.02 on the test
 roster after four days).
 
-``mispricing_s`` is closely APPROXIMABLE and not recoverable. The engine
-applies it as ``fair_value * exp(s)``, so the inversion is
-``log(price / fair_value)`` and not ``price / fair_value - 1``; the ratio
-form is simply the wrong arithmetic and every figure derived from it was an
-artefact. Even the right inversion lands near rather than on, because a
-traded price carries microstructure on top of the anchor. How near depends
-on the roster and the moment, which is why no distance is quoted here. The
-tolerance lives in
+``mispricing_s`` can be approximated closely but cannot be recovered. The
+engine applies it as ``fair_value * exp(s)``, so the inversion is
+``log(price / fair_value)``. The ratio form ``price / fair_value - 1`` is
+the wrong arithmetic. Even the right inversion only lands near the value,
+because a traded price carries microstructure on top of the anchor. How
+near depends on the roster and the moment, so no distance is quoted here.
+The tolerance is in
 ``test_the_valuation_is_reconstructible_from_what_the_caller_supplies``,
-where it can be re-derived, rather than in prose where it would rot.
+where it can be re-derived.
 
-The boundary is unchanged by this: a native agent reads ``mispricing_s``
+None of this moves the boundary. A native agent reads ``mispricing_s``
 straight off the engine without reconstructing anything, and the allowlist
-still stops that. What is true is narrower and worth stating plainly.
-Supplying fundamentals is the caller's decision about their own experiment,
-this adapter only declines to make it for them, and the shipped example --
-which does supply all five -- is trading that ground-truth distance for a
-roster an analyst could reason about.
+still stops that. Supplying fundamentals is the caller's decision about
+their own experiment, and this adapter does not make it for them. The
+shipped example supplies all five, and so trades that ground-truth
+distance for a roster an analyst could reason about.
 
 ## Which FinRobot abstraction
 
 :class:`finrobot.agents.workflow.SingleAssistant`, FinRobot's supported
 single-agent entry point, driven through the real ``autogen`` chat plumbing.
-It assembles a ``finrobot.agents.workflow.FinRobot`` assistant -- an
+It assembles a ``finrobot.agents.workflow.FinRobot`` assistant (an
 ``autogen.AssistantAgent`` subclass, including FinRobot's own role-prompt
-preprocessing -- opposite an ``autogen.UserProxyAgent``.
+preprocessing) opposite an ``autogen.UserProxyAgent``.
 
 Two constructor arguments matter:
 
-- ``toolkits=[]``. Every FinRobot library role carrying toolkits carries ones
-  that fetch REAL market data: FinnHub company news, Yahoo Finance prices,
-  SEC filings. Those describe a different world from the simulated one. An
-  agent given them reasons about securities it is not trading, and the roster
-  here is synthetic down to its tickers.
+- ``toolkits=[]``. Every FinRobot library role that carries toolkits
+  carries ones that fetch real market data: FinnHub company news, Yahoo
+  Finance prices, SEC filings. Those describe a different world from the
+  simulated one. An agent given them reasons about securities it is not
+  trading, and the roster here is synthetic down to its tickers.
 - ``code_execution_config=False``. The ``SingleAssistant`` default gives the
   user proxy a working directory and lets it run model-authored code. This
   integration needs one JSON object.
@@ -133,36 +131,36 @@ report. A portfolio decision every simulated day is one question to one role.
 A group chat multiplies the cost per decision by the number of participants
 and measures the same thing.
 
-FinRobot ships no structured-output mechanism: no Pydantic response model, no
-schema binding. So the contract is a JSON object requested in the mandate and
-validated here. :func:`parse` is strict and total. A response it cannot
-read as a decision raises :class:`DecisionError`, and the caller decides
-whether that ends the run or costs the agent a step. A bad action inside a
-decision is refused on its own and the rest of the decision trades.
+FinRobot ships no structured-output mechanism (no Pydantic response model,
+no schema binding), so the contract is a JSON object requested in the
+mandate and validated here. :func:`parse` is strict and total. A response it
+cannot read as a decision raises :class:`DecisionError`, and the caller
+decides whether that ends the run or costs the agent a step. A bad action
+inside a decision is refused on its own and the rest of the decision trades.
 
 ## Replay
 
 A live decision costs money, and running one twice gives two answers.
-Tradefloor's market is deterministic; an LLM behind an API is not. The
+Tradefloor's market is deterministic, but an LLM behind an API is not. The
 adapter has two modes over one code path. ``mode="live"`` calls FinRobot and,
 with a recorder attached, writes every interaction to a :class:`Transcript`.
 ``mode="replay"`` reads that transcript back, keyed by the SHA-256 of the
 exact text FinRobot was sent.
 
-The key is a hash of the input. Change the observation mapping and the digest
-changes, the key goes missing, and the replay RAISES naming the step. Keyed
-by (arm, step) it would answer the new question with a response given to the
-old one.
+Because the key is a hash of the input, a change to the observation mapping
+changes the digest, the key goes missing, and the replay raises an error
+naming the step. A key of (arm, step) would answer the new question with a
+response given to the old one.
 
-What a key over the input cannot see is a change to something that never
-enters it. The mandate reaches FinRobot as the agent profile, not as part of
-the prompt, so editing it leaves every recorded key intact -- the run
-completes, all sixty digests match, and the decisions replayed were taken
-under instructions nobody is running any more. That is a property of any
-adapter whose instructions travel separately from the keyed input, not a
-FinRobot quirk, and the other integrations in this package share it. Replay
-therefore compares the mandate's own digest against the one the transcript
-recorded, and refuses on a mismatch. See ``_refuse_a_changed_mandate``.
+A key over the input cannot see a change to something that never enters
+it. The mandate reaches FinRobot as the agent profile, outside the prompt,
+so editing it leaves every recorded key intact. The run completes, all
+sixty digests match, and the replayed decisions were taken under
+instructions nobody is running any more. Any adapter whose instructions
+travel separately from the keyed input has this problem, and the other
+integrations in this package share it. Replay therefore compares the
+mandate's own digest against the one the transcript recorded, and refuses
+on a mismatch. See ``_refuse_a_changed_mandate``.
 
 Replay needs no FinRobot, no API key and no network. The shipped example and
 notebook default to it, and CI runs them.
@@ -332,12 +330,10 @@ class DecisionError(_CommonDecisionError):
     non-finite quantity, a symbol named twice.
 
     It derives from the shared
-    :class:`~tradefloor.integrations.common.DecisionError` rather than from
-    ``ValidationError`` directly, which reaches ``ValidationError`` by the
-    same path and adds one thing: code written against the shared adapter
-    layer catches FinRobot's refusals without naming FinRobot. Nothing that
-    already caught this stops catching it -- that is the only reason the base
-    moved.
+    :class:`~tradefloor.integrations.common.DecisionError`, which itself
+    derives from ``ValidationError``, so code written against the shared
+    adapter layer catches FinRobot's refusals without naming FinRobot.
+    Anything that caught this error before still catches it.
 
     It raises instead of repairing. A guess at what the model meant would be a
     second, unrecorded agent between FinRobot and the market, and every
@@ -354,11 +350,11 @@ class Action(_CommonAction):
     and a second copy of the action rules is a second place for them to
     drift.
 
-    The constructor validates rather than trusts. ``Action("A", "SHORT",
-    -5)`` used to construct: ``signed()`` returns 0.0 for an unrecognised
-    side, so an unknown side became a silent hold, and a negative SELL
-    became a sign-flipped BUY. Case is normalised in :func:`parse`, not
-    here, because leniency belongs at the boundary where model output
+    The constructor validates its arguments. ``Action("A", "SHORT",
+    -5)`` used to construct, and because ``signed()`` returns 0.0 for an
+    unrecognised side, an unknown side became a silent hold and a negative
+    SELL became a sign-flipped BUY. Case is normalised in :func:`parse`
+    instead, because leniency belongs at the boundary where model output
     arrives.
     """
 
@@ -370,7 +366,7 @@ class Decision(_CommonDecision):
     """What FinRobot decided at one decision point, after validation.
 
     ``refused`` lists the actions that were refused on their own, each with
-    its reason; see the shared
+    its reason. See the shared
     :class:`~tradefloor.integrations.common.Decision`.
     """
 
@@ -384,7 +380,7 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
             fundamentals: dict[str, dict[str, Any]] | None = None,
             max_participation: float = MAX_PARTICIPATION,
             detail: Sequence[str] | None = None) -> dict[str, Any]:
-    """The observable state, as a JSON-able payload. An allowlist.
+    """The observable state as a JSON-able payload, built from an allowlist.
 
     Every key below is written out by hand. Nothing is copied off the engine
     by reflection, and ``obs.engine`` is read for exactly two things: the
@@ -395,14 +391,13 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     shown. A recent return and a realised volatility come from that, without
     asking the simulator for either.
 
-    ``detail`` switches the payload into its large-universe form, and it is
-    the only thing that does. Left at ``None``, which is the default and what
-    every existing caller gets, the payload carries the keys it has always
-    carried and :func:`render` writes a full block per asset. That is the
-    right shape for the four-name and ten-name rosters the shipped studies
-    use, and it does not survive a roster of five hundred: the block runs
-    nine lines a name before its fundamentals, so the observation reaches a
-    size where the market data crowds out the question. Measured on a 421
+    ``detail`` switches the payload into its large-universe form, and
+    nothing else does. At ``None``, the default, the payload carries the
+    keys it has always carried and :func:`render` writes a full block per
+    asset. That suits the four-name and ten-name rosters the shipped studies
+    use, but not a roster of five hundred. The block runs nine lines a name
+    before its fundamentals, so at that size the market data crowds out the
+    question. Measured on a 421
     company roster built from SEC filings, the compact form renders in
     58,390 characters at step zero.
 
@@ -412,8 +407,8 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     as a row in a compact table carrying price, five-day return, position
     and order cap. So the agent still sees the whole universe, every symbol
     in it stays a legal action, and no field arrives that was not already on
-    the allowlist: the two new keys are a projection of ``assets``, computed
-    here rather than read off anything.
+    the allowlist. The two new keys are a projection of ``assets``, computed
+    here and not read off anything.
 
     Symbols in ``detail`` that this market does not list are dropped. A
     caller's panel outliving a roster edit is a stale configuration, and
@@ -524,33 +519,29 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 def render(payload: dict[str, Any], *, objective: str = "") -> str:
     """The payload as the text FinRobot receives.
 
-    A thin wrapper over :class:`tradefloor.render.TextRenderer`. This
-    function and :class:`~tradefloor.render.TextRenderer` were briefly two
-    implementations of the same text -- this one written first, the other
-    added generalised over ``units``, ``order`` and ``language`` for the
-    P6 observation-invariance experiment -- and ``tests/test_render.py``
-    proved them character for character equal before this wrapper existed.
-    Keeping both would have meant one drifting from the other the first
-    time either changed, silently, with nothing to say so; this is the
-    fix. ``objective``, when given, is appended as its own section here
-    rather than inside the renderer, the same choice
-    :meth:`FinRobotAdapter.act` makes for its own default renderer -- a
-    renderer renders the payload, and a mandate is the caller's.
+    A thin wrapper over :class:`tradefloor.render.TextRenderer`, which is
+    generalised over ``units``, ``order`` and ``language``. This function
+    used to hold its own copy of the same text, and ``tests/test_render.py``
+    proved the two character for character equal before this became a
+    wrapper, so there is now one implementation and nothing to drift.
+    ``objective``, when given, is appended as its own section here and not
+    inside the renderer, the same choice :meth:`FinRobotAdapter.act` makes
+    for its own default renderer, because a renderer renders the payload
+    and a mandate is the caller's.
 
     A payload carrying ``detail`` renders in the large-universe form: a
     sector summary, one compact row per symbol, and a full block for
-    EXACTLY the symbols ``payload["detail"]`` names -- no union with
-    whatever is held, because this function calls
+    exactly the symbols ``payload["detail"]`` names, with no union with
+    whatever is held. This function calls
     :class:`~tradefloor.render.TextRenderer` at its default
-    ``union_held=False``, which is what makes it byte-identical to what
-    a direct caller of :func:`observe` and this function has always
-    published. The union that includes a held name whether or not it is
-    in the panel is :class:`FinRobotAdapter`'s OWN setting
-    (``union_held=True``, on its default renderer only); see
-    :class:`~tradefloor.render.TextRenderer` for why the two callers
-    read ``detail`` differently. Every other payload renders exactly as
-    it always has, which ``test_finrobot.py``'s fixture-replay tests pin
-    byte for byte.
+    ``union_held=False``, which keeps it byte-identical to what a direct
+    caller of :func:`observe` and this function has always published. The
+    union that includes a held name whether or not it is in the panel is
+    :class:`FinRobotAdapter`'s own setting (``union_held=True``, on its
+    default renderer only). See :class:`~tradefloor.render.TextRenderer`
+    for why the two callers read ``detail`` differently. Every other
+    payload renders as it always has, and the fixture-replay tests in
+    ``test_finrobot.py`` pin that byte for byte.
     """
     body = TextRenderer(detail=payload.get("detail")).render(payload)
     if objective:
@@ -592,13 +583,13 @@ def _no_duplicate_keys(pairs: list) -> dict[str, Any]:
 def parse(text: str) -> Decision:
     """Turn a FinRobot response into a validated :class:`Decision`.
 
-    Structural validation only: this checks that the answer is a decision.
+    Structural validation only. This checks that the answer is a decision.
     Whether the symbols exist and the sizes are executable belongs to
     :func:`orders_from`, which has the observation needed to answer it.
 
     A response that is not a decision (no JSON object, no ``actions`` list,
     an unknown top-level key) raises :class:`DecisionError`. A bad action
-    inside a decision does not: from decision schema 2 it is left out and
+    inside a decision does not. From decision schema 2 it is left out and
     listed in :attr:`Decision.refused` with its reason, and the other
     actions trade. The action rules are the shared layer's, so FinRobot and
     every other adapter refuse the same actions.
@@ -715,8 +706,8 @@ def orders_from(decision: Decision, obs: Any, *,
 def digest(prompt: str) -> str:
     """The replay key: SHA-256 of the exact text FinRobot was sent.
 
-    Sixteen hex characters: ample for the few dozen decision points of one
-    experiment, and short enough to compare by eye in an error message.
+    Sixteen hex characters, which is ample for the few dozen decision points
+    of one experiment and short enough to compare by eye in an error message.
     """
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
 
@@ -726,9 +717,9 @@ class Transcript:
 
     A file of these lets ``python rate_shock.py`` reproduce a real agent run
     with no API key, no network and no FinRobot install. It holds what
-    re-executing and auditing the experiment need -- the prompt, the raw
-    response, the parsed decision -- and nothing else. No API keys, no account
-    identifiers, no request IDs, no provider headers.
+    re-executing and auditing the experiment need (the prompt, the raw
+    response, the parsed decision) and nothing else. It holds no API keys,
+    account identifiers, request IDs or provider headers.
 
     ``meta`` records what the run cannot reconstruct: the FinRobot version,
     the provider and model, the generation parameters and the mandate version.
@@ -742,15 +733,12 @@ class Transcript:
     the market are the two halves of the question FinRobot was asked, and
     ``_refuse_a_changed_mandate`` guarded only the first of them.
 
-    :meth:`save` stamps what every recording gains on becoming a file --
-    ``recorded_utc``, and ``model_preset`` as a floor -- through
-    :func:`~tradefloor.integrations.common.stamp_artefact`, the one rule
-    the shared :class:`~tradefloor.integrations.common.Transcript` uses.
-    This class predates that one and kept its own ``save``, which wrote the
-    bytes and stamped nothing, so the FinRobot recording re-made at 0.8.0
-    was the only one of five without a date. Both fields are facts about
-    the artefact rather than about FinRobot, and a second copy of the rule
-    here would be a second thing to drift.
+    :meth:`save` stamps ``recorded_utc``, and ``model_preset`` as a floor,
+    through :func:`~tradefloor.integrations.common.stamp_artefact`, the one
+    rule the shared :class:`~tradefloor.integrations.common.Transcript`
+    uses. This class predates the shared one and keeps its own ``save``.
+    Both fields are facts about the artefact and not about FinRobot, and a
+    second copy of the rule here could drift from the first.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -774,10 +762,9 @@ class Transcript:
     def entry_for(self, key: str) -> dict[str, Any] | None:
         """The whole recorded entry, or None only when none exists.
 
-        Distinct from :meth:`response_for`, which returns None BOTH for a
-        missing entry and for an entry whose recorded response is null --
-        two situations with opposite remedies, which :meth:`_ask` has to
-        tell apart.
+        :meth:`response_for` returns None both for a missing entry and for
+        an entry whose recorded response is null. Those two situations have
+        opposite remedies, and :meth:`_ask` has to tell them apart.
         """
         return self._by_digest.get(key)
 
@@ -801,9 +788,9 @@ class Transcript:
         return cls.from_json(pathlib.Path(path).read_text(encoding="utf-8"))
 
     def save(self, path: Any) -> None:
-        """Write the recording. The bytes do not depend on the platform.
+        """Write the recording as bytes that do not depend on the platform.
 
-        `write_bytes` rather than `write_text`, so a recording made on
+        It uses `write_bytes` and not `write_text`, so a recording made on
         Windows and one made on Linux from the same transcript are the
         same file. Recordings get committed, diffed and hashed, and text
         mode would answer all three differently per machine.
@@ -887,7 +874,7 @@ class FinRobotAdapter:
     day, the default of six gives one decision per simulated day. That matches
     how often a portfolio manager decides, and it keeps the bill proportional
     to the experiment instead of to the tick rate. The two arms of a
-    comparison MUST run the same cadence, and :meth:`fork` copies it.
+    comparison must run the same cadence, and :meth:`fork` copies it.
 
     ``mode`` is ``"replay"`` or ``"live"``. Replay imports nothing from
     FinRobot, so a reader without the extra installed can still run the
@@ -900,26 +887,26 @@ class FinRobotAdapter:
     panel switches the observation to the large-universe form described in
     :func:`observe`: the whole universe in a compact table, a full block for
     the panel and for every name the book holds. The panel belongs to the
-    EXPERIMENT and must be chosen before the run: :meth:`state` publishes it
+    experiment and must be chosen before the run. :meth:`state` publishes it
     so :func:`tradefloor.agree` checks both arms carry the same one, and
     :meth:`fork` copies it.
 
-    ``renderer`` is what turns the observation into the text FinRobot reads,
-    in place of the ``detail=`` argument :func:`observe` and :func:`render`
-    took directly until this argument existed. Left at ``None``, it defaults
-    to ``TextRenderer(detail=panel or None, union_held=True)`` -- a
-    renderer that reproduces this adapter's own historical text character
-    for character, which is what lets the shipped fixtures keep replaying.
-    ``union_held`` is this adapter's own setting and not
-    :func:`observe`'s or :func:`render`'s: it restores the "a name you
-    hold is always detailed" guarantee this class always gave, without
-    changing what those two functions publish for a caller who reaches
-    them directly -- see :class:`~tradefloor.render.TextRenderer`. Pass a
-    :class:`~tradefloor.render.Renderer` of your own -- another
+    ``renderer`` turns the observation into the text FinRobot reads. It
+    replaces the ``detail=`` argument :func:`observe` and :func:`render`
+    took directly before this argument existed. At ``None`` it defaults to
+    ``TextRenderer(detail=panel or None, union_held=True)``, a renderer
+    that reproduces this adapter's earlier text character for character,
+    so the shipped fixtures keep replaying. ``union_held`` is this
+    adapter's own setting and does not apply to :func:`observe` or
+    :func:`render`. It restores the guarantee this class always gave, that
+    a name you hold is always detailed, without changing what those two
+    functions publish for a caller who reaches them directly. See
+    :class:`~tradefloor.render.TextRenderer`. To change what FinRobot is
+    shown without changing ``panel`` or any other argument here, pass a
+    :class:`~tradefloor.render.Renderer` of your own, such as another
     :class:`~tradefloor.render.TextRenderer` with different ``units``,
-    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`
-    -- to change what FinRobot is shown without changing ``panel`` or any
-    other argument here. :meth:`fork` copies whichever renderer this
+    ``order`` or ``language``, or a :class:`~tradefloor.render.JSONRenderer`.
+    :meth:`fork` copies whichever renderer this
     instance holds, and :meth:`state` publishes its :meth:`~.Renderer.key`
     so two arms built by hand cannot silently disagree about it.
     """
@@ -1068,11 +1055,12 @@ class FinRobotAdapter:
                    "mandate_version": MANDATE_VERSION})
 
     def provenance(self) -> dict[str, Any]:
-        """What ``Transcript.meta`` should carry, as the shared layer shapes
-        it: the framework's identity plus the two Tradefloor-side settings a
-        recording cannot reconstruct without them -- the decision cadence,
-        without which an agent asked once a day and one asked every step read
-        as the same agent, and the participation cap, which decides what
+        """What ``Transcript.meta`` should carry, in the shared layer's shape.
+
+        That is the framework's identity plus two Tradefloor-side settings a
+        recording cannot reconstruct. One is the decision cadence, without
+        which an agent asked once a day and one asked every step read as the
+        same agent. The other is the participation cap, which decides what
         "clipped" means in the record."""
         out = self.info.as_dict()
         out["observation_schema_version"] = OBSERVATION_SCHEMA_VERSION
@@ -1094,9 +1082,9 @@ class FinRobotAdapter:
     # -- the agent protocol ----------------------------------------------
 
     def act(self, obs: Any) -> dict[str, Any]:
-        """The orders for this step. Empty on the steps between decisions.
+        """The orders for this step, empty on the steps between decisions.
 
-        The market advances every step; FinRobot is asked every ``every``
+        The market advances every step, and FinRobot is asked every ``every``
         steps. On the steps in between, this records the prices it saw and
         returns nothing. A human manager watches the book continuously and
         revisits it on a schedule. Each value is a signed share count, a
@@ -1184,21 +1172,23 @@ class FinRobotAdapter:
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
 
-        The actions and the rationale. The prompt, the raw response and the
-        arm stay out: :func:`~tradefloor.counterfactual.compare` finds the
-        first step at which two arms' decisions differ by comparing these
-        dictionaries, so a field varying for any other reason would report a
-        divergence that never happened.
+        It holds the actions and the rationale. The prompt, the raw response
+        and the arm stay out, because
+        :func:`~tradefloor.counterfactual.compare` finds the first step at
+        which two arms' decisions differ by comparing these dictionaries,
+        and a field varying for any other reason would report a divergence
+        that never happened.
         """
         return self._decision
 
     def state(self) -> dict[str, Any]:
         """What a fork has to agree on, for :func:`tradefloor.agree`.
 
-        The price memory and the last decision: everything surviving from one
-        step to the next that could make two arms behave differently for some
-        reason other than the intervention. The ``llm_config`` stays out. It
-        carries an API key, and this dictionary gets printed.
+        That is the price memory and the last decision, which is everything
+        surviving from one step to the next that could make two arms behave
+        differently for some reason other than the intervention. The
+        ``llm_config`` stays out because it carries an API key, and this
+        dictionary gets printed.
         """
         return {
             "history": [list(row) for row in self.history],
@@ -1243,19 +1233,19 @@ class FinRobotAdapter:
     def fork(self) -> "FinRobotAdapter":
         """An independent copy, for :meth:`World.fork`.
 
-        Written out instead of left to ``copy.deepcopy``: in live mode this
-        object holds a FinRobot assistant holding an HTTP client, and copying
-        one is wasteful at best and a shared socket at worst. The copy takes
-        the decision state and SHARES the transcript and the recorder. Both
-        directions want that -- a replay of one arm must read the same
-        recorded run as the other, and a live recording of both arms belongs
-        in one file.
+        It is written out and not left to ``copy.deepcopy``, because in live
+        mode this object holds a FinRobot assistant holding an HTTP client.
+        Copying one is wasteful at best and a shared socket at worst. The
+        copy takes the decision state and shares the transcript and the
+        recorder. Both modes need that, because a replay of one arm must read
+        the same recorded run as the other, and a live recording of both arms
+        belongs in one file.
 
-        ``type(self)``, so a subclass forks into its own type. Hard-coding the
-        class name broke this: a subclass overriding how a decision is
+        It builds ``type(self)``, so a subclass forks into its own type. With
+        the class name hard-coded, a subclass overriding how a decision is
         obtained kept the override through the shared history and lost it in
-        both arms. The run then completes, and the comparison it prints is
-        between two agents neither of which was the one under test.
+        both arms. The run then completed, and the comparison it printed was
+        between two agents, neither of which was the one under test.
 
         Built from :meth:`fork_kwargs`, so a subclass's own constructor
         arguments reach the twin when it extends that method.
@@ -1341,22 +1331,22 @@ class FinRobotAdapter:
     def call_or_resume(self, key: str, live: Any) -> Any:
         """The answer recorded for ``key`` in :attr:`prior`, or ``live()``.
 
-        Any live run can die -- a rate limit, a dropped connection, a
-        keyboard interrupt -- and without this the second attempt re-asks
-        every question it already holds an answer to. Measured: a 60-call
-        pilot died on call 36 and the 35 answers it had paid for were
-        unreachable to the next attempt.
+        Any live run can die (a rate limit, a dropped connection, a keyboard
+        interrupt), and without this the second attempt re-asks every
+        question it already holds an answer to. In one measured case a
+        60-call pilot died on call 36, and the 35 answers it had paid for
+        were unreachable to the next attempt.
 
         The market is deterministic, so a resumed run reaches the same
         prompts and computes the same digests, and a recorded answer is
-        still an answer to the question being asked. That is the property
-        the replay path already rests on; this changes which source is
+        still an answer to the question being asked. The replay path already
+        rests on that property. This method changes which source is
         consulted first, and a miss falls through to FinRobot.
 
-        The same method as
+        It is the same method as
         :meth:`~tradefloor.integrations.common.FrameworkAdapter.call_or_resume`,
-        written out here for the reason everything else in this file is:
-        the adapter predates the shared base and does not take it.
+        written out here because this adapter predates the shared base and
+        does not inherit from it.
         """
         if self.prior is not None:
             entry = self.prior.entry_for(key)

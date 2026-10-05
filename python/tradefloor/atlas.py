@@ -1,21 +1,20 @@
-"""Atlas: a map of how the model responds, instead of a search that guesses.
+"""Atlas: a map of how the model responds across its parameter space.
 
 A calibration search walks the parameter space from wherever it starts,
 minimising one number. That works when you already know which parameters
-matter and what you are trading away. When you do not, it fails in a
-specific and expensive way: the optimiser sells whatever the objective
-cannot see, and you discover which thing that was only after the run, by
-noticing a gate you never put in the loss. Six consecutive searches were
-rejected that way in two days, each rejection revealing a trade the scalar
-objective had made silently.
+matter and what you are trading away. When you do not, the optimiser gives
+up whatever the objective cannot see, and you find out which thing that was
+only after the run, by noticing a gate you never put in the loss. Six
+consecutive searches were rejected that way in two days, each for a trade
+the scalar objective had made without showing it.
 
 This module surveys the space instead. Sample it broadly, measure
 everything you care about at every point, and then ask the resulting table
 the questions a search cannot answer:
 
 - **Which parameters move which outputs?** (`Survey.sensitivity`)
-- **What SHAPE does the effect have** -- monotone, saturating, an interior
-  optimum, nothing? (`Survey.profile`)
+- **What shape does the effect have** (monotone, saturating, an interior
+  optimum, nothing)? (`Survey.profile`)
 - **Which parameters move nothing**, and are wasting a search's budget?
   (`Survey.unidentified`)
 - **What trades are available**, all at once, rather than one rejection at
@@ -27,39 +26,38 @@ the questions a search cannot answer:
 - **Does a screening finding survive fresh paths at full resolution?**
   (`Survey.confirm`)
 
-The frontier is the point. A scalar objective picks a trade FOR you,
-silently, and the only way to see which one is to check a gate afterwards.
-A frontier shows every trade at the same time and lets a human choose.
+A scalar objective picks a trade for you without showing it, and the only
+way to see which one is to check a gate afterwards. A frontier shows every
+trade at the same time and lets a human choose.
 
 # It is not a training loop
 
 Nothing here fits parameters to a target. There is no gradient, no
 objective, and no "best" vector: `survey` measures, and the analysis
-methods describe. That is deliberate. The failure this module exists to
-prevent is trusting an optimiser over a landscape nobody has looked at, and
-a second optimiser layered on the first would not fix it.
+methods describe. This module exists to stop people trusting an optimiser
+over a landscape nobody has looked at, and a second optimiser layered on the
+first would not fix that.
 
-# Explanations state their basis, or they are worse than numbers
+# Explanations state their basis
 
-Half of this module renders words: `explain`, `report_front`, and the
-`summary` inside `attribution`. The register those follow is fixed by a
-recent, concrete failure: the best known candidate was described in a
-design document as delivering crisis severity "through correlation", which
-was right for one of its two parameters and backwards for the other --
-every number involved was correct, and the connective sentence was
-invented. So every rendered explanation here carries the row counts, the
+Three parts of this module render words: `explain`, `report_front`, and the
+`summary` inside `attribution`. Their wording rules come from a past
+failure. The best known candidate was described in a design document as
+delivering crisis severity "through correlation", which was right for one of
+its two parameters and backwards for the other. Every number involved was
+correct, and the connecting sentence was invented. So every rendered
+explanation here carries the row counts, the
 ranges, and the dropped-row tally it stands on, and states its own limits
 inline: a rank correlation is not an elasticity, a binned marginal is an
 estimate with every other surveyed parameter varying, an attribution
-assumes additivity. A number invites scepticism; a sentence does not, so the
-sentence has to carry its own.
+assumes additivity. Readers question a number more readily than a
+sentence, so the sentence carries its own caveats.
 
-# Cost, stated plainly
+# Cost
 
-A survey costs whatever `measure` costs, times the sample count. It is
-meant to be run once at a screening resolution and reused via `save`/`load`
-for every later question, not re-run per question. A screening resolution
-is exactly that. On pt-v19, over the thirty certification seeds, two of the
+A survey costs whatever `measure` costs, times the sample count. Run it once
+at a screening resolution and reuse it via `save`/`load` for every later
+question. On pt-v19, over the thirty certification seeds, two of the
 fourteen shape rows have their across-seed p10-p90 range crossing an edge of
 `facts.REAL_MARKETS` (`abs_return_acf5` and `sector_excess_corr`, read by
 `envelope.intervals`), and twelve have at least one seed past an edge. This
@@ -67,9 +65,9 @@ read "nine of the fourteen" until 2026-09-24, which was pt-v10's count. A
 single seed can land out of band on most rows, so any point this map
 recommends still needs a full-seed (thirty, not six) confirmation before it
 is believed. `unidentified` and the shapes in `explain` rank and
-describe; they do not certify.
+describe, and certify nothing.
 
-# Considered and rejected, so the next reader does not re-litigate blind
+# Considered and rejected
 
 - **Partial rank correlation (PRCC) beside Spearman.** On a Latin
   hypercube the columns are independent by construction, so partialling
@@ -78,11 +76,10 @@ describe; they do not certify.
   is ever built on a correlated design, revisit.
 - **An automatic all-pairs interaction scan.** Fifty-four parameters, the
   survey's size when this was decided, is 1,431 pairs, each tested on a
-  halved sample at screening resolution:
-  noise dressed as findings. The targeted question -- "does this parameter
-  act differently when that one is high?" -- is asked with the `where=`
-  filter on `sensitivity` and `profile`, deliberately one hypothesis at a
-  time.
+  halved sample at screening resolution, would mostly report noise. The
+  targeted question ("does this parameter act differently when that one is
+  high?") is asked with the `where=` filter on `sensitivity` and `profile`,
+  one hypothesis at a time.
 - **A feasibility gate inside `survey`.** Which vectors a model is
   stationary over is the caller's knowledge (for tradefloor it lives in
   `tools/calibration/instrumentlib.feasibility_violation`, not in the
@@ -121,9 +118,8 @@ def latin_hypercube(n: int, dims: int, seed: int) -> list[list[float]]:
     A plain uniform sample leaves gaps and clumps that read as structure
     when anything is fitted to them. Latin hypercube sampling stratifies
     each axis independently, so every parameter is sampled evenly across
-    its range no matter how many other parameters there are -- the property
-    that makes a few thousand points informative in fifty dimensions rather
-    than merely scattered.
+    its range no matter how many other parameters there are, so a few
+    thousand points are informative in fifty dimensions.
 
     Uses the library's own `GameRng` so a survey is reproducible from its
     seed like everything else here, on any platform.
@@ -190,12 +186,11 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
              log: Iterable[str] = ()) -> list[Axis]:
     """Axes for `names`, defaulting to a multiplicative box around `preset`.
 
-    `ranges` overrides the default box per parameter, and overriding is not
-    an afterthought: the most recent search failed precisely because a
-    default box excluded the known optimum, so any range you have real
-    information about should be passed explicitly.
+    `ranges` overrides the default box per parameter. Pass any range you
+    have real information about explicitly, because a past search failed
+    when a default box excluded the known optimum.
 
-    Three refusals, each closing a silent-failure path:
+    It refuses three things that would otherwise fail silently:
 
     - A parameter shipped at zero (or below) has no multiplicative box, so
       it is refused rather than given an invented range. An inert
@@ -203,15 +198,15 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
       the map's most interesting region somewhere nobody chose.
     - A key in `ranges` or `log` that is not in `names` is refused. A
       typo'd override would otherwise leave the default box silently in
-      place. The caller believes the range was widened when it was not,
-      the crisis_blend_ramp failure with worse ergonomics.
+      place, and the caller would believe the range was widened when it was
+      not, as in the crisis_blend_ramp failure.
     - A duplicated name is refused; two axes over one parameter would make
       the second silently win.
 
-    And one warning: an explicit range that EXCLUDES the preset's shipped
-    value is legal (surveying a far region deliberately is a real use) but
-    suspicious enough to say out loud, because such a survey cannot anchor
-    anything it finds to the model actually being run.
+    It warns when an explicit range excludes the preset's shipped value.
+    That is legal (surveying a far region deliberately is a real use), but
+    such a survey cannot anchor anything it finds to the model actually
+    being run.
     """
     import tradefloor
 
@@ -257,14 +252,14 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
 
 def plan(axes: Sequence[Axis], samples: int, seed: int = DEFAULT_SEED
          ) -> list[dict[str, float]]:
-    """The parameter vectors a survey will measure. Pure and reproducible.
+    """The parameter vectors a survey will measure, pure and reproducible.
 
     Separated from `survey` so a caller can inspect, filter or
     feasibility-check the plan before spending anything on it.
-    `ModelParams.from_preset` accepts any numbers -- the stationarity gate
-    lives in the calibration tooling, not in the type -- and a sweep once
-    ran two non-stationary vectors and reported the best as the day's
-    result. Checking the plan first is how that stops happening.
+    `ModelParams.from_preset` accepts any numbers (the stationarity gate is
+    in the calibration tooling), and a sweep once ran two non-stationary
+    vectors and reported the best as the day's result. Checking the plan
+    first prevents that.
     """
     if samples < 8:
         raise ValidationError(
@@ -280,14 +275,14 @@ class Survey:
     """A measured table of parameter vectors against outcomes.
 
     Rows are appended by `record` (or by `survey`), carry the plan index
-    they came from, and are either measured -- parameters plus outputs --
-    or errored: parameters plus the error string, kept because a parameter
-    region that breaks the model is a fact about the model. The analysis
+    they came from, and are either measured (parameters plus outputs) or
+    errored (parameters plus the error string, kept because a parameter
+    region that breaks the model is a fact about the model). The analysis
     methods that return numbers (`sensitivity`, `profile`, `pareto`,
     `attribution`) report how many rows they used and how many they
-    dropped, because a statistic computed over a quietly shrunken sample
-    carries the full sample's authority -- a bug this project has been
-    bitten by more than once. `unidentified` returns bare names; its
+    dropped, because a statistic computed over a silently shrunken sample
+    looks as reliable as one over the full sample. This project has been
+    caught by that more than once. `unidentified` returns bare names. Its
     basis is the `sensitivity` result it is derived from, and anything
     quoted from it should quote that.
     """
@@ -303,9 +298,10 @@ class Survey:
                error: str | None = None) -> None:
         """Append one measured (or failed) vector.
 
-        Exactly one of `outputs` and `error`. Parameters must cover exactly
-        the axes: a row missing an axis would silently fall out of every
-        sensitivity, and an extra key would be dark data nothing analyses.
+        Pass exactly one of `outputs` and `error`. Parameters must cover
+        exactly the axes, because a row missing an axis would silently fall
+        out of every sensitivity, and an extra key would be data nothing
+        analyses.
         """
         if (outputs is None) == (error is None):
             raise ValidationError(
@@ -352,9 +348,9 @@ class Survey:
         """What this map stands on: counts, ranges, and the survey's meta.
 
         Attach this (or the counts every analysis method already returns)
-        to anything quoted out of the survey. A number that has shed its
-        row count and ranges is a number someone will treat as a property
-        of the model rather than of this sample.
+        to anything quoted out of the survey. Without its row count and
+        ranges, a number gets read as a property of the model when it is a
+        property of this sample.
         """
         return {
             "rows": len(self.rows),
@@ -408,23 +404,22 @@ class Survey:
                     ) -> dict[str, Any]:
         """Rank-correlation of each parameter against one output, ranked.
 
-        Spearman rather than Pearson, because these responses saturate: a
-        curved monotone relationship reads correctly under ranks and reads
-        weak under a linear measure, which would bury exactly the strong
+        It uses Spearman rather than Pearson because these responses
+        saturate. A curved monotone relationship reads correctly under ranks
+        and reads weak under a linear measure, which would hide the strong
         saturating effects a calibration cares about.
 
-        The magnitude ranks INFLUENCE OVER THE SAMPLED RANGE; it is not an
+        The magnitude ranks influence over the sampled range. It is not an
         elasticity and must not be quoted as one. A value near zero is
         evidence of no monotone relationship over this range at this
-        resolution -- not proof of inertness. A parameter that acts only in
-        combination, or only past a threshold the sample never crossed,
-        reads zero here; `where=` restricts the rows to a region of OTHER
-        parameters to ask that targeted question (at the cost of a smaller,
-        noisier sample, which the returned counts make visible).
+        resolution, and does not prove the parameter inert. A parameter that
+        acts only in combination, or only past a threshold the sample never
+        crossed, reads zero here. `where=` restricts the rows to a region of
+        other parameters to ask that targeted question (at the cost of a
+        smaller, noisier sample, which the returned counts make visible).
 
-        Returns the correlations with their basis attached, following the
-        same discipline as `tradefloor.loss`: the numbers ride inside the
-        provenance rather than travelling bare::
+        Returns the correlations with their basis attached, as
+        `tradefloor.loss` does::
 
             {"output", "correlations": {param: rho, ...},   # sorted by |rho|
              "rows_total", "rows_used", "rows_error",
@@ -452,19 +447,19 @@ class Survey:
                      threshold: float | None = None) -> list[str]:
         """Parameters with no monotone influence on ANY named output.
 
-        These are where a search spends its budget for nothing. The default
+        A search spends its budget on these for nothing. The default
         threshold is three standard deviations of a Spearman correlation
         under the null (3 / sqrt(n - 1), n the usable row count), so what
         counts as "no influence" tightens as the survey grows instead of
         being a constant that is generous at four thousand rows and inside
         the noise at forty.
 
-        Same caveat as `sensitivity`, and here it is the operative one: this
-        reads "no monotone effect over THESE ranges at THIS resolution". A
+        The caveat on `sensitivity` applies here most of all. This list
+        means "no monotone effect over these ranges at this resolution". A
         parameter that acts only in combination, or only past a threshold
-        the sample never crossed, appears here without being inert -- so
-        this list justifies deprioritising a parameter in a search, never
-        deleting a mechanism.
+        the sample never crossed, appears here without being inert. Use the
+        list to deprioritise a parameter in a search, never to delete a
+        mechanism.
         """
         keep: set[str] = set()
         for name in outputs:
@@ -481,25 +476,24 @@ class Survey:
                 ) -> dict[str, Any]:
         """The binned marginal of one output against one parameter.
 
-        `sensitivity` gives direction and strength; this gives SHAPE, which
-        is what a decision usually turns on -- an interior optimum says
-        "ship a tuned value" where a monotone slide to the range edge says
-        "the mechanism is net harmful here", and a rank correlation cannot
-        tell those apart.
+        `sensitivity` gives direction and strength, and this gives shape,
+        which a decision usually turns on. An interior optimum says "ship a
+        tuned value" where a monotone slide to the range edge says "the
+        mechanism is net harmful here", and a rank correlation cannot tell
+        those apart.
 
-        Rows are binned by the parameter's value IN THE AXIS'S OWN GEOMETRY
+        Rows are binned by the parameter's value in the axis's own geometry
         (log axes bin in log space), so under Latin hypercube sampling the
-        bin counts come out near-uniform. Read the counts: a lopsided one
+        bin counts come out near-uniform. Read the counts. A lopsided one
         means rows were lost to measurement errors or a `where=` filter,
         and the centre of a thin bin is noise.
 
         Each bin reports a median and the p10-p90 spread, never a bare
-        mean: every other surveyed parameter is VARYING inside a bin, so
-        the within-bin spread is genuinely large, and a centre quoted
-        without it would imply a precision the survey does not have. What
-        the marginal does measure -- and a one-dimensional sweep at a fixed
-        base point does not -- is whether the effect holds with everything
-        else moving, rather than at one configuration.
+        mean. Every other surveyed parameter varies inside a bin, so the
+        within-bin spread is large, and a centre quoted without it would
+        imply a precision the survey does not have. Unlike a
+        one-dimensional sweep at a fixed base point, the marginal measures
+        whether the effect holds with everything else moving.
 
         Returns::
 
@@ -554,14 +548,13 @@ class Survey:
         the frontier when no other row is at least as good on every
         objective and strictly better on one.
 
-        This is the method the whole module exists for. A scalar objective
-        picks a trade for you and hides it; a frontier lays every available
-        trade side by side. Every rejected candidate in this project's
-        history was a trade discovered after a forty-minute run --
-        long-horizon realism sold for short-horizon fit, crisis severity
-        sold for clustering -- and each would have been visible here in
-        advance. `report_front` renders the same frontier with each point's
-        trades in words.
+        This is the module's main method. A scalar objective picks a trade
+        for you and hides it, and a frontier shows every available trade
+        side by side. Every rejected candidate in this project's history was
+        a trade discovered after a forty-minute run (long-horizon realism
+        given up for short-horizon fit, crisis severity for clustering), and
+        each would have been visible here in advance. `report_front`
+        renders the same frontier with each point's trades in words.
 
         Rows missing any named objective (errored, or non-finite there) are
         excluded and counted in the result. Returns::
@@ -602,31 +595,29 @@ class Survey:
                     output: str, bins: int = 12,
                     measured: tuple[float, float] | None = None
                     ) -> dict[str, Any]:
-        """Why does B differ from A on this output, per parameter?
+        """Split the difference between A and B on one output by parameter.
 
         For each parameter where the two vectors differ, reads the survey's
         binned marginal (`profile`) at both values and reports the
         difference as that parameter's estimated contribution, with a rough
-        noise scale beside it. The failure this exists to prevent is
-        specific and recent: a two-parameter candidate was explained with
-        one confident sentence that was right about one parameter and
-        BACKWARDS about the other, because nothing decomposed the effect --
-        the numbers were correct and the explanation was invented.
+        noise scale beside it. It exists because a two-parameter candidate
+        was once explained with one confident sentence that was right about
+        one parameter and backwards about the other. Nothing decomposed the
+        effect, so the numbers were correct and the explanation was invented.
 
-        Honesty about what this is: an ESTIMATE under an additivity
-        assumption. Each contribution is a main effect read off a marginal
-        with every other parameter varying; strong interactions between the
-        changed parameters are attributed to neither and land in the
-        residual (reported when `measured` -- the actually-measured output
-        at A and at B -- is supplied). Contributions smaller than twice
-        their noise scale are listed in `within_noise` rather than in the
-        ranking, because "0.002 from X" at screening resolution is a coin
-        flip wearing four decimals.
+        This is an estimate under an additivity assumption. Each contribution
+        is a main effect read off a marginal with every other parameter
+        varying, so strong interactions between the changed parameters are
+        attributed to neither and land in the residual (reported when
+        `measured`, the actually-measured output at A and at B, is supplied).
+        Contributions smaller than twice their noise scale are listed in
+        `within_noise` rather than in the ranking, because "0.002 from X" at
+        screening resolution cannot be told apart from chance.
 
         Both vectors must state a value for every parameter they set, must
         set only surveyed parameters, and must sit inside the surveyed
-        ranges -- outside them the marginal would be extrapolation, which
-        is refused rather than clamped.
+        ranges. Outside them the marginal would be extrapolation, which is
+        refused rather than clamped.
 
         Returns the decomposition with a rendered `summary` sentence whose
         caveats travel with it::
@@ -706,53 +697,49 @@ class Survey:
                 measure: Callable[[Mapping[str, float], int],
                                   Mapping[str, Any]],
                 seed_blocks: Sequence[Sequence[int]]) -> dict[str, Any]:
-        """Does a screening finding survive fresh paths, at full resolution?
+        """Test a screening finding on fresh paths at full resolution.
 
-        The other half of the survey loop, and still not an optimiser: the
-        survey PROPOSES at screening resolution, and this tests one
-        proposal on paths it was not found on. The failure it exists to
-        prevent was measured the day this was written: a candidate was
-        declared shippable on a +0.1297 gap found on the discovery seed
-        block, and on three fresh blocks the same gap read -0.0315,
-        +0.0209 and +0.0233 -- reversing sign once. The discovery sweep
-        and its "validation" had used the same seeds, so re-measuring
-        reproduced the same fluctuation exactly and called it
-        confirmation: it tested reproducibility of the MEASUREMENT, not
-        of the EFFECT. Seven retractions in this project trace to that
-        distinction.
+        The survey proposes at screening resolution, and this tests one
+        proposal on paths it was not found on. It is not an optimiser. It
+        exists because of a measured failure. A candidate was declared
+        shippable on a +0.1297 gap found on the discovery seed block, and on
+        three fresh blocks the same gap read -0.0315, +0.0209 and +0.0233,
+        reversing sign once. The discovery sweep and its "validation" had
+        used the same seeds, so re-measuring reproduced the same fluctuation
+        exactly and called it confirmation. It showed that the measurement
+        was reproducible and said nothing about the effect. Seven
+        retractions in this project trace to that distinction.
 
-        So the seed hygiene is structural, not advisory. The survey must
-        carry the seeds that measured it in `meta["seeds"]` (the shipped
-        driver records them; set them yourself when building surveys by
-        hand), and any confirmation seed found in that list -- or shared
-        between blocks -- is REFUSED, not warned about, because a warning
-        is a thing people read past and this is the one mistake that has
-        to be impossible. An empty seed record is refused the same way: an
-        empty list is the absence of a record wearing the key. Stated
-        limit: the gate can only see the integers it is handed. It
-        normalises types so '101' cannot slip past 101, but nothing here
-        can detect a `measure` that ignores its `seed` argument and runs
-        whatever paths it likes -- that honesty stays with the caller.
+        So the seed rules are enforced. The survey must carry the seeds
+        that measured it in `meta["seeds"]` (the shipped driver records
+        them; set them yourself when building surveys by hand), and any
+        confirmation seed found in that list, or shared between blocks, is
+        refused. A warning would be read past, and this mistake has to be
+        impossible. An empty seed record is refused the same way, since an
+        empty list is no record. The gate can only see the integers it is
+        handed. It normalises types so '101' cannot slip past 101, but
+        nothing here can detect a `measure` that ignores its `seed`
+        argument and runs whatever paths it likes. That is the caller's
+        responsibility.
 
         `measure(vector, seed)` returns the full-resolution outputs for
-        one vector on one seed; both vectors are measured on the SAME
+        one vector on one seed. Both vectors are measured on the same
         seeds, so each block's gap (median over the block, candidate minus
         baseline) is paired and the path noise largely cancels. A seed
         whose measurement raises fails the whole call rather than being
-        recorded: a confirmation with quietly missing paths would carry
-        the full block's authority, and unlike a survey row, there is no
-        analysis downstream to skip it honestly. The output set is the
-        UNION over every measurement, and every output must be finite at
-        every seed on both vectors -- an output that vanishes or goes
-        non-finite at one seed, the first included, is a hole to refuse
-        rather than a smaller answer to return.
+        recorded, because a confirmation with silently missing paths would
+        look as reliable as a full block, and unlike a survey row there is
+        no analysis downstream to skip it. The output set is the union over
+        every measurement, and every output must be finite at every seed on
+        both vectors. An output that vanishes or goes non-finite at one
+        seed, the first included, is refused.
 
-        Several DISJOINT blocks, not one: one block tells you a number,
-        several tell you whether it is a property of the model, and the
-        rendered summary says so in as many words when only one is given.
-        The baseline is required rather than defaulted, for the reason
-        `attribution` refuses one-sided vectors -- a default filled in
-        here would be this module inventing the comparison.
+        Pass several disjoint blocks. One block gives a number, several
+        show whether it is a property of the model, and the rendered
+        summary says so when only one is given. The baseline is required,
+        because a default filled in here would be this module inventing the
+        comparison (the same reason `attribution` refuses one-sided
+        vectors).
 
         Returns, with a rendered `summary` in the register of `explain`::
 
@@ -861,14 +848,12 @@ class Survey:
                 threshold: float | None = None) -> str:
         """What drives one output, as text a reader can check.
 
-        The ranked drivers with their rank correlations, the SHAPE of each
-        read off its marginal (rising, saturating, interior optimum, ...),
-        and what showed no measurable effect -- with the row counts and the
-        caveats printed in the same block, so the sentence cannot travel
-        without its basis. Shape words are conservative: a reversal or a
-        flattening is only named when it exceeds the marginal's own noise
-        scale, because an explanation that overclaims is worse than a bare
-        number.
+        It gives the ranked drivers with their rank correlations, the shape
+        of each read off its marginal (rising, saturating, interior optimum,
+        ...), and what showed no measurable effect. The row counts and the
+        caveats are printed in the same block, so the sentence cannot be
+        quoted without its basis. A reversal or a flattening is named only
+        when it exceeds the marginal's own noise scale.
         """
         sens = self.sensitivity(output)
         n = sens["rows_used"]
@@ -931,14 +916,13 @@ class Survey:
                      ) -> str:
         """`pareto` rendered with each point's trades stated in words.
 
-        Every one of the six rejected searches behind this module was "it
-        traded X for Y", discovered after the run. This prints, for each
-        frontier point, where it is the frontier's best and where its
-        worst, so the trade each point embodies is on the page before
-        anything is run. The wording is deliberately neutral -- best/worst
-        on named outputs -- because which trade is worth taking is the
-        human's call, and this module has no opinion about what the
-        outputs mean.
+        Each of the six rejected searches behind this module traded one
+        output for another, and the trade was found only after the run.
+        This prints, for each frontier point, where it is the frontier's
+        best and where its worst, so the trade each point makes is on the
+        page before anything is run. The wording is neutral (best or worst
+        on named outputs), because which trade is worth taking is the
+        human's call.
         """
         result = self.pareto(objectives)
         front = result["front"]
@@ -991,17 +975,14 @@ class Survey:
         }
 
     def save(self, path: str) -> str:
-        """Write the survey to JSON -- measured once, questions forever.
+        """Write the survey to JSON, to load and query later.
 
-        STRICT JSON: a non-finite output (a NaN from a degenerate run) is
-        stored as null. Python's serialiser would happily emit a bare
-        `NaN` token, which Python then reads back while `jq` and every
-        non-Python consumer refuse the whole file -- a survey that only
-        its author's runtime can open is not a shared measurement. The
-        analysis methods already treat null and NaN identically (both are
-        non-finite and dropped, counted), so nothing is lost in the
-        translation; `allow_nan=False` enforces the promise rather than
-        trusting it.
+        The file is strict JSON. A non-finite output (a NaN from a
+        degenerate run) is stored as null. Python's serialiser would
+        otherwise emit a bare `NaN` token, which Python reads back but `jq`
+        and every non-Python consumer refuse. The analysis methods already
+        treat null and NaN the same (both are non-finite, dropped and
+        counted), so nothing is lost, and `allow_nan=False` enforces it.
         """
         # write_bytes, not text mode: the caller is told to hash this
         # file and cite the digest, and Python's text mode would make
@@ -1031,23 +1012,20 @@ def survey(axes: Sequence[Axis],
     """Measure `samples` planned vectors and return the map.
 
     `measure` takes one parameter vector and returns whatever outputs you
-    care about, as a mapping. It is supplied by the caller rather than
-    fixed here, because "what you care about" is the question the survey
-    is asking and this module has no business answering it: a panel of
-    realism statistics, a strategy's Sharpe ratio, a fill rate, an agent's
-    score -- all are the same shape of question.
+    care about, as a mapping. The caller supplies it because what you care
+    about is the survey's question. A panel of realism statistics, a
+    strategy's Sharpe ratio, a fill rate and an agent's score all fit.
 
     A vector whose measurement raises is recorded with its error and
     skipped by the analysis methods rather than failing the survey. A
     parameter region that breaks the model is a fact about the model, and
-    losing the other few thousand points to it would be the wrong trade.
+    should not cost the other few thousand points.
 
-    The vectors are exactly `plan(axes, samples, seed)`, in order -- so a
-    caller who feasibility-checked the plan measured what was checked. For
+    The vectors are exactly `plan(axes, samples, seed)`, in order, so a
+    caller who feasibility-checked the plan measures what was checked. For
     a survey too expensive to run in-process (a cluster, a worker pool),
     run `plan` yourself, measure however you like, and `Survey.record`
-    each result; this function is the one-process convenience, not the
-    contract.
+    each result. This function is the one-process convenience.
     """
     vectors = plan(axes, samples, seed)
     out = Survey(axes=list(axes), meta={"samples": samples, "seed": seed})

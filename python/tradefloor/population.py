@@ -2,7 +2,7 @@
 
 An evaluated agent normally trades against a market maker, latent depth and
 the model's own flow, none of which reacts to it. So nothing in the market
-ever notices an edge: ten copies of a strategy each earn what one earns, and
+ever notices an edge. Ten copies of a strategy each earn what one earns, and
 a programme that buys the same slices at the same minutes every day pays
 what a randomised one pays. A :class:`Population` is the opt-in way to ask
 whether an edge survives other traders. It is a small set of deterministic
@@ -58,10 +58,10 @@ the name's daily volume. Five kinds:
   across the night, so a programme that runs for days is held through. It
   adds to a position only where the quoted spread is at most ``max_spread``
   of the name's daily sigma, since on a name whose spread is a large part
-  of its daily move a round trip costs more than the flow can pay. A programme that trades
-  the same minutes every day is what it learns best; flow at random minutes
-  stays an unreliable, small prediction. It sees the agents' flow per name,
-  not per label.
+  of its daily move a round trip costs more than the flow can pay. It
+  learns a programme that trades the same minutes every day best, and flow
+  at random minutes stays a small, unreliable prediction. It sees the
+  agents' flow per name, not per label.
 - ``crowd`` trades a ranked signal, the one
   :class:`tradefloor.baselines.Momentum` and
   :class:`tradefloor.baselines.MeanReversion` trade: the simple return over
@@ -79,14 +79,13 @@ the name's daily volume. Five kinds:
   ``recover`` of its book each session; several crowd participants with
   different limits unwind one after another (a crowded exit).
 
-Every participant decides every ``interval`` ticks (staggered, or at a
-crowd's ``offset``), leaves gaps
-smaller than ``band`` of its size alone, and trades at most ``rate`` of daily
-volume per decision. It acts at the start of a tick, before the market moves:
-an order an agent sends between ticks is ahead of the population on that
-tick. Its orders take the maker's levels and the latent depth, move the
-maker's inventory, can fill an agent's resting order (that fill is the
-agent's, with the participant's label ``population:<name>`` as
+Every participant decides every ``interval`` ticks (staggered, or at a crowd's
+``offset``), leaves gaps smaller than ``band`` of its size alone, and trades
+at most ``rate`` of daily volume per decision. It acts at the start of a tick,
+before the market moves, so an order an agent sends between ticks is ahead of
+the population on that tick. Its orders take the maker's levels and the latent
+depth, move the maker's inventory, can fill an agent's resting order (that
+fill is the agent's, with the participant's label ``population:<name>`` as
 counterparty), and reach the market on the tick they are sent. It takes no
 random draw. Its own fills are on its ledger, which
 :meth:`tradefloor.Engine.population_report` returns, not in any agent's.
@@ -376,7 +375,7 @@ class Population:
     :class:`tradefloor.World` or :class:`tradefloor.Engine` to run in
     POPULATED mode; leave it out for ISOLATED mode, which is unchanged.
     Populated results are reproducible, but strategies in them no longer
-    face identical markets: see :mod:`tradefloor.population`.
+    face identical markets. See :mod:`tradefloor.population`.
 
     ``Population.standard()`` is the shipped population, one participant of
     each of the first four kinds; ``Population.crowded()`` adds crowds that
@@ -458,12 +457,12 @@ class Population:
 
         Its other participants are the standard population's, with two
         changes. The trend follower decides as often as its five-day signal
-        moves (every 130 ticks). And in place of
-        one flow detector it holds ``detectors`` of them, identical (with
-        five-tick buckets) and deciding on different ticks, competing to
-        trade ahead of the same flow: high-frequency trading is several
-        firms, and five is about as many as the flow of a predictable
-        programme keeps profitable together."""
+        moves (every 130 ticks). In place of one flow detector it holds
+        ``detectors`` of them, identical (with five-tick buckets) and
+        deciding on different ticks, competing to trade ahead of the same
+        flow, as several high-frequency firms do.
+        Five is about as many as the flow of a predictable programme keeps
+        profitable together."""
         if not isinstance(members, int) or members < 1:
             raise ValidationError("members is a whole number, at least 1")
         if not isinstance(detectors, int) or detectors < 1:
