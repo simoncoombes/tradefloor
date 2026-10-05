@@ -132,7 +132,7 @@ print(agree(control, shock).render())
   order book             identical  212 levels
   generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  61 fields, day 20
+  whole engine state     identical  62 fields, day 20
   portfolio              identical  $3,558,782 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
