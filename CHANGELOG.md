@@ -57,6 +57,16 @@ The new default adds, on top of pt-v20:
 Each dial's own documentation says what it does at the value pt-v21 sets.
 `ModelParams.from_preset("pt-v20")` is unchanged and still runs.
 
+pt-v21 meets all 40 long-run criteria, read on 270 histories of 21 years.
+The certification, its scripts and its outputs are in `validation/pt-v21/`,
+and `tf.preset_record("pt-v21")` carries the verdict. On the one-year table
+it reads 18 of 19: the share of days the index falls 3% or more is 0.60% on
+the 30 certification seeds, under the floor of 0.64%, and 0.98% over 360
+seeds. Volatility clustering at lag 1 is now close to real, and it fades
+faster than real after the first few days. The VIX is more persistent from
+day to day than the real one (0.956 against 0.930). docs/REALISM.md lists
+what pt-v21 gets right and wrong.
+
 ### Injected order flow
 
 On pt-v21, the impact of order flow a caller injects grows with the
