@@ -1,0 +1,71 @@
+PASS CRITERIA (programme/longrun/CRITERIA.md, adopted 2026-09-23, C4 added 2026-09-24, C5-C8 registered 2026-09-24), computed by criteria.py
+long run  programme/results/ptv21/box-c1/lr270/longrun-report.json
+  pt-v20: base pt-v20, 0 dials, 270 seeds x 21 years, engine 931ed3d4fe65, fingerprint pt-v20
+  pt-v21: base pt-v21, 0 dials, 270 seeds x 21 years, engine 931ed3d4fe65, fingerprint pt-v21
+cert      programme/results/ptv21/certgrade-c1.json  (arms pt-v20=pt-v20, pt-v21=pt-v21)
+edge      pt-v20=pt-v20 from programme/results/ptv21/box-c1/edge.json: base pt-v20, 10 seeds from 101 x 300 days, 6044 events
+edge      pt-v21=pt-v21 from programme/results/ptv21/box-c1/edge.json: base pt-v21, 10 seeds from 101 x 300 days, 6044 events
+c4        pt-v20=pt-v20 from programme/results/ptv21/box-c1/c4a.json, programme/results/ptv21/box-c1/c4b.json (tradefloor 0.10.0 at 931ed3d4fe65): c4a, c4b
+c4        pt-v21=pt-v21 from programme/results/ptv21/box-c1/c4a.json, programme/results/ptv21/box-c1/c4b.json (tradefloor 0.10.0 at 931ed3d4fe65): c4a, c4b
+
+    criterion                                      real/target   pt-v20                    pt-v21                    
+    A1 worst month's volatility within 30%         84 / 95       89 / 75  pass             93 / 74  pass             
+    A2 maximum drawdown within 30%                 0.57 / 0.34   0.46 / 0.37  pass         0.47 / 0.35  pass         
+    A3 peak stock correlation within 0.15          0.75 / 0.87   0.79 / 0.78  pass         0.82 / 0.80  pass         
+    B1 time with VIX above 30, within 1/2x to 2x   8.2%          5.9%  pass                5.2%  pass                
+    B2 fear-spell length above 30, 1/2x to 2x      22            25  pass                  19  pass                  
+    B3 20% bear markets per decade, 1/2x to 2x     1.12          1.96  pass                1.51  pass                
+    B4 10% corrections per decade, 1/2x to 2x      3.65          4.60  pass                4.24  pass                
+    B5 sessions under -5% per decade, 1/2x to 2x   6.2           8.9  pass                 6.9  pass                 
+    B6 time with VIX under 15, 1/2x to 2x          32.6%         38.5%  pass               37.2%  pass               
+    B7 index volatility within 20%                 18.1          19.1  pass                18.0  pass                
+    B8 long-run index return within 2 points       6.25          6.6  pass                 6.4  pass                 
+    B9 annual return spread within 20%; start-up 2/3x-1.5x 17.40 / 1.00  16.65 / 0.80  pass        16.54 / 1.05  pass        
+    C1 crash rate steady, years 3-21 / 1-2         1.0x          0.87x  pass               1.11x  pass               
+    C2 VIX ceiling hits, at most 1 of 30           0             0 of 270  pass            1 of 270  pass            
+    C3 headline edge 5 ticks late, under 20 bp     ~0            +16bp  pass               +15bp  pass               
+    C4a 65-min return ACF1 >= -0.05, or Roll <= 2x ~0 (Roll)     -0.016 / 1.2x  pass       -0.020 / 1.3x  pass       
+    C4b price-only rules: <= +5 pts, <= 14 of 20   ~0            +0.2 pts, 11/20  pass     -2.0 pts, 7/20  pass      
+    C5 stock-level variance ratio, 60 sessions     0.924         0.950  pass               0.954  pass               
+    C6 value signal rank IC, whole / first 60      +0.009        +0.000 / +0.005  pass     +0.003 / -0.000  pass     
+    C7 momentum rank IC, 12-1 / 6-1                +0.027 / +0.041-0.003 / -0.001  pass     -0.003 / -0.002  pass     
+    C8 daily loser-minus-winner, bp                -1.7          -0.1  pass                -0.9  pass                
+    C9 cost of size: exponent / average coefficient 0.5 / 0.5     not measured  n/a         0.515 / 0.438  pass       
+    R1 2-year yield daily sd, bp                   5.23          3.87  pass                5.55  pass                
+    R2 10-year yield daily sd, bp                  5.41          4.96  pass                5.20  pass                
+    R3 stock-Treasury daily correlation            -0.161        -0.136  pass              -0.319  pass              
+    R4 stock-IG corporate daily correlation        +0.272        +0.200  pass              +0.112  FAIL              
+    E1 aggregate earnings fall in a contraction    -0.170        -0.172  pass              -0.110  pass              
+    D2 driven 2020-21: drawdown / sessions back to the high 0.339 / 126   0.374 / 120.5  pass       0.358 / 136.0  pass       
+    F1 driven 2020 fast crash: drop / sessions     0.339 / 23    0.307 / 40.0  pass        0.285 / 38.5  pass        
+    L1 look-through: price trough leads earnings, sessions +68           +10  pass                 +19  pass                 
+    R5 driven 2022: index drawdown                 0.254         0.265  pass               0.238  pass               
+    R6 driven 2022: P/E per 100 bp of the corporate yield, % -5.20         -4.26  pass               -6.97  pass               
+    C10 no public macro signal: worst rule pts/yr / drifts -2.0 / -5.9, +4.3+0.12, 0.61 / +5.0, -0.4  pass+0.07, 0.56 / +0.1, +0.6  pass
+    R7a first bar after a rate decision less all days, bp 0 / 0         -0.1 / -1.7  pass         -0.9 / -0.3  pass         
+    R7b rate-news agent: pts/yr over holding, ahead of 30 0, <=20/30    -0.32, 2/30  pass         -0.79, 2/30  pass         
+    S1a recession: share of the fall won back in 252 0.62 (2009)   0.50  pass                0.52  pass                
+    S1b recession: seeds out of contraction in 24 months all seeds     90/90  pass               90/90  pass               
+    S2 recession: the index's rise 252 after its low, % +69 (2009)    +68.0  pass               +65.3  pass               
+    V1 long-horizon variance ratio, 2y/1y and 5y/1y 0.93 / 0.87   0.81 / 0.65  pass         0.93 / 0.85  pass         
+    D1 every ruled band in, all four cells         --            in  pass                  misses {} level OUT index_tail_dn3_pct  FAIL
+
+Result
+    pt-v20         INCOMPLETE: 1 not scored (C9); fails none
+    pt-v21         fails 2 of 40: R4, D1
+
+Reported, not gated (CRITERIA.md): the certification's VIX rows, the mechanism certificate, the lever
+    pt-v20         VIX row: panel_252 k 15/30 pass; panel_504 k 9/30 refused/below; heldout_seeds k 15/30 pass
+                   mechanisms: panel_252 10/10; heldout_seeds 9/10 (not shown corr_asymmetry_lagged); lever 5.11x (tape 6.16x)
+    pt-v21         VIX row: panel_252 k 25/30 refused/above; panel_504 k 18/30 pass; heldout_seeds k 25/30 refused/above
+                   mechanisms: panel_252 10/10; heldout_seeds 9/10 (not shown corr_asymmetry); lever 4.98x (tape 6.16x)
+
+D1's crisis_sector_dispersion, at least 10 readings per cell (own seeds, then blocks of 30 from 1001 to 1270 at most)
+    pt-v20         panel_252         own  1 of 30, 3 block(s) 1001-1090, total 10, median 1.1904, band [0.79, 1.74]: pass
+    pt-v20         panel_504         own  2 of 30, 2 block(s) 1001-1060, total 13, median 1.2213, band [1.03, 1.66]: pass
+    pt-v20         heldout_seeds     own  1 of 30, 3 block(s) 1001-1090, total 10, median 1.1904, band [0.79, 1.74]: pass
+    pt-v20         heldout_universe  own  2 of 30, 3 block(s) 1001-1090, total 10, median 1.1536, band [0.79, 1.74]: pass
+    pt-v21         panel_252         own  2 of 30, 2 block(s) 1001-1060, total 12, median 1.2530, band [0.79, 1.74]: pass
+    pt-v21         panel_504         own  6 of 30, 1 block(s) 1001-1030, total 18, median 1.3649, band [1.03, 1.66]: pass
+    pt-v21         heldout_seeds     own  5 of 30, 1 block(s) 1001-1030, total 10, median 1.2285, band [0.79, 1.74]: pass
+    pt-v21         heldout_universe  own  5 of 30, 2 block(s) 1001-1060, total 15, median 1.2521, band [0.79, 1.74]: pass

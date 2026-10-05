@@ -1,0 +1,35 @@
+crisis extension: 8 cells, need 10 readings, blocks of 30 from 1001, last 1270, 48 workers, engine 931ed3d4fe659e4dec765673ee3e280a6b40ab2b
+  panel_252         pt-v20: 1 readings from 30 own seeds, extending
+  panel_252         pt-v21: 2 readings from 30 own seeds, extending
+  panel_504         pt-v20: 2 readings from 30 own seeds, extending
+  panel_504         pt-v21: 6 readings from 30 own seeds, extending
+  heldout_seeds     pt-v20: 1 readings from 30 own seeds, extending
+  heldout_seeds     pt-v21: 5 readings from 30 own seeds, extending
+  heldout_universe  pt-v20: 2 readings from 30 own seeds, extending
+  heldout_universe  pt-v21: 5 readings from 30 own seeds, extending
+  panel_252         pt-v20: block 1001-1030 read 2, count 3
+  panel_252         pt-v21: block 1001-1030 read 5, count 7
+  panel_504         pt-v20: block 1001-1030 read 7, count 9
+  panel_504         pt-v21: block 1001-1030 read 12, count 18
+  heldout_seeds     pt-v20: block 1001-1030 read 2, count 3
+  heldout_seeds     pt-v21: block 1001-1030 read 5, count 10
+  heldout_universe  pt-v20: block 1001-1030 read 3, count 5
+  heldout_universe  pt-v21: block 1001-1030 read 4, count 9
+  panel_252         pt-v20: block 1031-1060 read 2, count 5
+  panel_252         pt-v21: block 1031-1060 read 5, count 12
+  panel_504         pt-v20: block 1031-1060 read 4, count 13
+  heldout_seeds     pt-v20: block 1031-1060 read 2, count 5
+  heldout_universe  pt-v20: block 1031-1060 read 2, count 7
+  heldout_universe  pt-v21: block 1031-1060 read 6, count 15
+  panel_252         pt-v20: block 1061-1090 read 5, count 10
+  heldout_seeds     pt-v20: block 1061-1090 read 5, count 10
+  heldout_universe  pt-v20: block 1061-1090 read 3, count 10
+  panel_252         pt-v20       own  1  blocks  3  total  10  reached
+  panel_252         pt-v21       own  2  blocks  2  total  12  reached
+  panel_504         pt-v20       own  2  blocks  2  total  13  reached
+  panel_504         pt-v21       own  6  blocks  1  total  18  reached
+  heldout_seeds     pt-v20       own  1  blocks  3  total  10  reached
+  heldout_seeds     pt-v21       own  5  blocks  1  total  10  reached
+  heldout_universe  pt-v20       own  2  blocks  3  total  10  reached
+  heldout_universe  pt-v21       own  5  blocks  2  total  15  reached
+crisis extension done in 81s

@@ -1,0 +1,101 @@
+{
+ "kind": "crisisext",
+ "rule": {
+  "row": "crisis_sector_dispersion",
+  "need": 10,
+  "block": 30,
+  "first": 1001,
+  "blocks": 9,
+  "last_seed": 1270
+ },
+ "label": "heldout_universe",
+ "cell": "pt-v20",
+ "cell_file": "/home/ec2-user/out/heldu/cells/cell-pt-v20.json",
+ "days": 252,
+ "base": "pt-v20",
+ "overrides": {},
+ "fingerprint": "pt-v20",
+ "commit": "931ed3d4fe659e4dec765673ee3e280a6b40ab2b",
+ "held_roster": [
+  60,
+  909
+ ],
+ "own_seeds": [
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  107,
+  108,
+  109,
+  110,
+  111,
+  112,
+  113,
+  114,
+  115,
+  116,
+  117,
+  118,
+  119,
+  120,
+  121,
+  122,
+  123,
+  124,
+  125,
+  126,
+  127,
+  128,
+  129,
+  130
+ ],
+ "own_readings": 2,
+ "blocks": [
+  {
+   "seeds": [
+    1001,
+    1030
+   ],
+   "readings": {
+    "1011": 1.7402402082101627,
+    "1012": 1.1220222142893528,
+    "1019": 1.0748991971780055
+   },
+   "absent": 27,
+   "count_after": 5,
+   "elapsed_s": 42.7
+  },
+  {
+   "seeds": [
+    1031,
+    1060
+   ],
+   "readings": {
+    "1042": 1.2164329392737692,
+    "1059": 1.4416717870783473
+   },
+   "absent": 28,
+   "count_after": 7,
+   "elapsed_s": 29.1
+  },
+  {
+   "seeds": [
+    1061,
+    1090
+   ],
+   "readings": {
+    "1080": 1.0807425136827502,
+    "1083": 1.0796295520530634,
+    "1087": 1.3336807776232895
+   },
+   "absent": 27,
+   "count_after": 10,
+   "elapsed_s": 8.2
+  }
+ ],
+ "status": "reached",
+ "total_readings": 10
+}

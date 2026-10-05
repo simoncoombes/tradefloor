@@ -1,0 +1,2 @@
+pt-v20 C4a: acf1 -0.016 (se 0.004), Roll 12.0 bp over quoted 10.0 bp = 1.21x -> pass
+pt-v21 C4a: acf1 -0.020 (se 0.004), Roll 13.2 bp over quoted 10.2 bp = 1.29x -> pass

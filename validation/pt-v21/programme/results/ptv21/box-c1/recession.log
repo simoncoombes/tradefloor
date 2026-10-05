@@ -1,0 +1,3 @@
+recession: /home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/scenarios/recession.yml sha256 0c5c10fdd422e7e712adfb5bc1efec2290c0f070eb4df005832ed0bd30ea21f6
+pt-v20       S1a regain 50% pass | S1b out within 24m 90/90 pass | S2 rise +68.0% pass
+pt-v21       S1a regain 52% pass | S1b out within 24m 90/90 pass | S2 rise +65.3% pass

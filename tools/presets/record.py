@@ -53,8 +53,12 @@ DEFAULT_SINCE = {
 #: its inputs by paths that start `programme/`, the layout the grade ran in,
 #: so a verdict from a box listed here has each of those paths rewritten under
 #: the folder when it is written onto a record, and the record then names
-#: files a reader can open.
-PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20"}
+#: files a reader can open. A verdict read from two boxes names both, joined
+#: by "+" (pt-v21's certification and its supplement), and is rewritten only
+#: when both are published to the same folder.
+PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20",
+                    "ptv21c1": "validation/pt-v21",
+                    "ptv21c1s": "validation/pt-v21"}
 
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
 
@@ -72,9 +76,11 @@ def public_paths(block: dict) -> dict:
     other block comes back as it was, because its files are not published
     and a rewritten path would name a file that does not exist.
     """
-    folder = PUBLISHED_GRADES.get((block.get("measured") or {}).get("box"))
-    if folder is None:
+    boxes = str((block.get("measured") or {}).get("box") or "").split("+")
+    folders = {PUBLISHED_GRADES.get(box) for box in boxes}
+    if len(folders) != 1 or None in folders:
         return block
+    folder = folders.pop()
 
     def walk(value):
         if isinstance(value, str):

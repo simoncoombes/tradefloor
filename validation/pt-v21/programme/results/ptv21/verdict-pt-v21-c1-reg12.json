@@ -1,0 +1,507 @@
+{
+ "criteria": "programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24); C5-C8 registered 2026-09-24 in programme/ptv20-registration.md; C10 the eleventh registration, R7, S1 and S2 the twelfth",
+ "verdict": "fail",
+ "passed": 38,
+ "of": 40,
+ "rows": [
+  {
+   "id": "A1",
+   "words": "worst month's volatility in the 2008 and 2020 replays within 30% of real",
+   "value": [
+    93.0,
+    74.4
+   ],
+   "real": [
+    84.3,
+    94.5
+   ],
+   "rule": "within 30%",
+   "pass": true
+  },
+  {
+   "id": "A2",
+   "words": "maximum drawdown in the 2008 and 2020 replays within 30% of real",
+   "value": [
+    0.473,
+    0.352
+   ],
+   "real": [
+    0.568,
+    0.339
+   ],
+   "rule": "within 30%",
+   "pass": true
+  },
+  {
+   "id": "A3",
+   "words": "peak stock correlation in the 2008 and 2020 replays within 0.15 of real",
+   "value": [
+    0.825,
+    0.803
+   ],
+   "real": [
+    0.748,
+    0.872
+   ],
+   "rule": "within 0.15",
+   "pass": true
+  },
+  {
+   "id": "B1",
+   "words": "share of sessions with the VIX above 30",
+   "value": 0.052,
+   "real": 0.082,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B2",
+   "words": "mean length of a fear spell above VIX 30, sessions",
+   "value": 19,
+   "real": 22,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B3",
+   "words": "20% bear markets per decade",
+   "value": 1.51,
+   "real": 1.12,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B4",
+   "words": "10% corrections per decade",
+   "value": 4.24,
+   "real": 3.65,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B5",
+   "words": "sessions down more than 5% per decade",
+   "value": 6.9,
+   "real": 6.2,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B6",
+   "words": "share of sessions with the VIX under 15",
+   "value": 0.372,
+   "real": 0.326,
+   "rule": "1/2x to 2x",
+   "pass": true
+  },
+  {
+   "id": "B7",
+   "words": "index annual volatility, %",
+   "value": 18.0,
+   "real": 18.1,
+   "rule": "within 20%",
+   "pass": true
+  },
+  {
+   "id": "B8",
+   "words": "long-run index return, % a year",
+   "value": 6.4,
+   "real": 6.25,
+   "rule": "within 2 points of the honest target",
+   "pass": true
+  },
+  {
+   "id": "B9",
+   "words": "sd of annual index log returns, years 2-21, per cent; the start-up drift: sd of the first 60 sessions' index return over the steady state's, across 50 markets",
+   "value": [
+    16.5369,
+    1.0467
+   ],
+   "real": [
+    17.4,
+    1.0
+   ],
+   "rule": "annual within 20% of 17.4; start-up 2/3x to 1.5x",
+   "pass": true
+  },
+  {
+   "id": "C1",
+   "words": "crash rate in years 3-21 against years 1-2",
+   "value": 1.11,
+   "real": 1.0,
+   "rule": "2/3x to 1.5x",
+   "pass": true
+  },
+  {
+   "id": "C2",
+   "words": "histories touching the VIX ceiling, of 30",
+   "value": 1,
+   "real": 0,
+   "rule": "at most 1",
+   "pass": true
+  },
+  {
+   "id": "C3",
+   "words": "edge from reading a headline 5 ticks late, bp",
+   "value": 15.3,
+   "real": 0.0,
+   "rule": "under 20 bp",
+   "pass": true
+  },
+  {
+   "id": "C4a",
+   "words": "65-minute lag-1 autocorrelation of print returns, median name; Roll spread over quoted",
+   "value": [
+    -0.02,
+    1.29
+   ],
+   "real": [
+    0.0,
+    1.0
+   ],
+   "rule": "at or above -0.05, or Roll at most 2x quoted",
+   "pass": true
+  },
+  {
+   "id": "C4b",
+   "words": "the price-only rule furthest over its line on tf-suite-2026.1 (named in `worst`): median points over buy-and-hold, markets beaten of 20",
+   "value": [
+    -2.0,
+    7
+   ],
+   "real": [
+    0.0,
+    10
+   ],
+   "rule": "every rule at most +5 points and 14 of 20",
+   "pass": true,
+   "worst": "momentum_5day_daily",
+   "failing": []
+  },
+  {
+   "id": "C5",
+   "words": "stock-level (idiosyncratic) variance ratio at 60 sessions, median name, 30 histories of 2,660 sessions",
+   "value": [
+    0.9537
+   ],
+   "real": [
+    0.9242
+   ],
+   "rule": "in 0.80 to 1.05",
+   "pass": true
+  },
+  {
+   "id": "C6",
+   "words": "rank IC of the value signal on published fundamentals against the next 20 sessions: whole history, first 60 sessions",
+   "value": [
+    0.0033,
+    -0.0005
+   ],
+   "real": [
+    0.0093,
+    0.0093
+   ],
+   "rule": "both in -0.03 to +0.05",
+   "pass": true
+  },
+  {
+   "id": "C7",
+   "words": "rank IC of 12-1 and 6-1 month momentum against the next 20 sessions",
+   "value": [
+    -0.0031,
+    -0.0023
+   ],
+   "real": [
+    0.0267,
+    0.0413
+   ],
+   "rule": "12-1 in -0.04 to +0.095, 6-1 in -0.02 to +0.10",
+   "pass": true
+  },
+  {
+   "id": "C8",
+   "words": "Lo-MacKinlay one-day loser-minus-winner book, bp a day",
+   "value": [
+    -0.8913
+   ],
+   "real": [
+    -1.7388
+   ],
+   "rule": "in -6.4 to +2.9",
+   "pass": true
+  },
+  {
+   "id": "C9",
+   "words": "the cost of size in the agent-facing book: exponent and coefficient of the average cost against Q/V, in sigma units (impact_curve.py)",
+   "value": [
+    0.5149,
+    0.4384
+   ],
+   "real": [
+    0.5,
+    0.5
+   ],
+   "rule": "exponent in 0.4 to 0.7 and coefficient in 0.33 to 0.67",
+   "pass": true
+  },
+  {
+   "id": "R1",
+   "words": "sd of the 2-year Treasury yield's daily change, bp (FRED DGS2 2015-2025)",
+   "value": [
+    5.5518
+   ],
+   "real": [
+    5.226
+   ],
+   "rule": "in 3.65 to 6.80",
+   "pass": true
+  },
+  {
+   "id": "R2",
+   "words": "sd of the 10-year Treasury yield's daily change, bp (FRED DGS10)",
+   "value": [
+    5.2013
+   ],
+   "real": [
+    5.406
+   ],
+   "rule": "in 4.54 to 6.27",
+   "pass": true
+  },
+  {
+   "id": "R3",
+   "words": "daily correlation of the roster index with a Treasury bond's return (minus the 10-year's change; SPY against IEF)",
+   "value": [
+    -0.3192
+   ],
+   "real": [
+    -0.161
+   ],
+   "rule": "in -0.36 to +0.03",
+   "pass": true
+  },
+  {
+   "id": "R4",
+   "words": "daily correlation of the roster index with an IG bond's return (minus the corporate yield's change; SPY against LQD)",
+   "value": [
+    0.1119
+   ],
+   "real": [
+    0.272
+   ],
+   "rule": "in +0.15 to +0.39",
+   "pass": false
+  },
+  {
+   "id": "E1",
+   "words": "the aggregate earnings fall around a contraction, median over the 30 histories' contractions (Shiller 1953-2020)",
+   "value": [
+    -0.1102
+   ],
+   "real": [
+    -0.17
+   ],
+   "rule": "in -0.40 to -0.046",
+   "pass": true
+  },
+  {
+   "id": "D2",
+   "words": "the driven 2020-21 market: the index's maximum drawdown and the sessions from the pre-crash high back to it, medians over histories (driven2020.py)",
+   "value": [
+    0.3581,
+    136.0
+   ],
+   "real": [
+    0.339,
+    126
+   ],
+   "rule": "drawdown in 0.237 to 0.441 and sessions in 63 to 252",
+   "pass": true
+  },
+  {
+   "id": "F1",
+   "words": "the driven 2020 path's fast crash: the high to the lowest close within 60 sessions, and the sessions it took (driven2020.py)",
+   "value": [
+    0.2847,
+    38.5
+   ],
+   "real": [
+    0.339,
+    23
+   ],
+   "rule": "drop in 0.237 to 0.441 within 12 to 46 sessions",
+   "pass": true
+  },
+  {
+   "id": "L1",
+   "words": "look-through: sessions from the index's trough to the aggregate earnings level's trough on the driven 2020 path (driven2020.py)",
+   "value": [
+    19.0
+   ],
+   "real": [
+    68
+   ],
+   "rule": "lead in 1 to 136 sessions",
+   "pass": true
+  },
+  {
+   "id": "R5",
+   "words": "the driven 2022 market: the index's maximum drawdown (driven2022.py)",
+   "value": [
+    0.238
+   ],
+   "real": [
+    0.254
+   ],
+   "rule": "drawdown in 0.178 to 0.330",
+   "pass": true
+  },
+  {
+   "id": "R6",
+   "words": "the driven 2022 market: the market P/E's log change per 100 bp of the corporate yield, monthly averages (driven2022.py)",
+   "value": [
+    -6.9655
+   ],
+   "real": [
+    -5.2
+   ],
+   "rule": "-10.4 to -2.6 per cent",
+   "pass": true
+  },
+  {
+   "id": "C10",
+   "words": "timing rules on published macro data against buy-and-hold, and the drift after a published turn (c10.py)",
+   "value": [
+    0.0721,
+    0.5556,
+    0.0756,
+    0.5721
+   ],
+   "real": [
+    -2.0,
+    0.324,
+    -5.9,
+    4.3
+   ],
+   "rule": "every rule at most +1.0 point a year and ahead in at most 2/3; drifts no larger than the S&P's after NBER turns",
+   "pass": true
+  },
+  {
+   "id": "R7a",
+   "words": "the equal-weight index's mean log move from the first price readable after a changed policy rate to the end of the first 65-minute bar, less the mean first bar of all days, bp: after a hike, after a cut (r7_event.py)",
+   "value": [
+    -0.9235,
+    -0.349
+   ],
+   "real": [
+    0.0,
+    0.0
+   ],
+   "rule": "each within 5 bp, or 2 se where wider",
+   "pass": true
+  },
+  {
+   "id": "R7b",
+   "words": "the audit's rate-news agent through tf.evaluate: mean annual excess over holding in points, histories ahead (r7_eval.py)",
+   "value": [
+    -0.792,
+    2.0
+   ],
+   "real": [
+    0.0,
+    15
+   ],
+   "rule": "at most 0 points a year, ahead in at most 20 of 30",
+   "pass": true
+  },
+  {
+   "id": "S1a",
+   "words": "the packaged recession: share of the index's paired log fall, at its lowest, won back 252 sessions later, mean over seeds (recession_rows.py)",
+   "value": [
+    0.5162
+   ],
+   "real": [
+    0.62
+   ],
+   "rule": "in 45% to 100%",
+   "pass": true
+  },
+  {
+   "id": "S1b",
+   "words": "the packaged recession: seeds whose cycle has left contraction and trough within 24 months of the onset (recession_rows.py)",
+   "value": [
+    90.0
+   ],
+   "real": [
+    90
+   ],
+   "rule": "every seed",
+   "pass": true
+  },
+  {
+   "id": "S2",
+   "words": "the packaged recession: the index's own rise in the 252 sessions after its low, per cent, mean over seeds (recession_rows.py)",
+   "value": [
+    65.3105
+   ],
+   "real": [
+    69.0
+   ],
+   "rule": "in +25% to +80%",
+   "pass": true
+  },
+  {
+   "id": "V1",
+   "words": "the index's variance ratio at two and five years relative to one, years 2-21 of the pooled free histories (v1.py)",
+   "value": [
+    0.9296,
+    0.8492
+   ],
+   "real": [
+    0.93,
+    0.87
+   ],
+   "rule": "2y/1y in 0.75 to 1.15 and 5y/1y in 0.55 to 1.20",
+   "pass": true
+  },
+  {
+   "id": "D1",
+   "words": "ruled bands of the one-year realism table in, on all four cells",
+   "value": "level: index_tail_dn3_pct out",
+   "real": "all",
+   "rule": "every band in",
+   "pass": false
+  }
+ ],
+ "measured": {
+  "engine_commit": "931ed3d4fe659e4dec765673ee3e280a6b40ab2b",
+  "seeds": 270,
+  "years": 21,
+  "box": "ptv21c1",
+  "date": "2026-10-05",
+  "fingerprint": "pt-v21",
+  "base": "pt-v21",
+  "dials": {},
+  "longrun_report": "programme/results/ptv21/box-c1/lr270/longrun-report.json",
+  "certgrade": "programme/results/ptv21/certgrade-c1.json",
+  "c10": "programme/results/ptv21/box-c1/c10.json",
+  "r7": [
+   "programme/results/ptv21/box-c1/r7-event.json",
+   "programme/results/ptv21/box-c1/r7-eval.json"
+  ],
+  "recession": "programme/results/ptv21/box-c1/recession.json",
+  "edge": {
+   "source": "programme/results/ptv21/box-c1/edge.json",
+   "base": "pt-v20",
+   "seeds": 10,
+   "first_seed": 101,
+   "days": 300
+  },
+  "c4": {
+   "source": "programme/results/ptv21/box-c1/c4a.json, programme/results/ptv21/box-c1/c4b.json",
+   "tradefloor_version": "0.10.0 at 931ed3d4fe65"
+  },
+  "computed_by": "programme/longrun/criteria.py",
+  "note": "computed by programme/longrun/criteria.py from the long-run report, the certification grade and the edge named here"
+ }
+}

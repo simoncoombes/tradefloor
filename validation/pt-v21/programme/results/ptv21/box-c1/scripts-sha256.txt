@@ -1,0 +1,1 @@
+797759e7c7a27a40d54cec49ebc273c05e6c7a6f1b4aa9636219b736f022af13  /home/ec2-user/scripts.tgz

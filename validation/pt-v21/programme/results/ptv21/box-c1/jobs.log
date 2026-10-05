@@ -1,0 +1,151 @@
+pt-v21 pt-v21 {'cycle_equity_hazard_opening': 0.011, 'order_flow_coefficient': 800.0, 'order_flow_impact_law': 1.0, 'overnight_market_share': 0.55, 'impact_memory_coefficient': 0.65, 'market_factor_sigma': 0.007099478, 'closing_auction': 1.0, 'earnings_cycle_depth': 0.2} {'cycle_publication_lag': 252.0, 'gdp_publication_lag': 21.0, 'macro_publication_repricing': 1.0, 'unemployment_adjustment_half_life': 84.0, 'fear_greed_published_inputs': 1.0} default pt-v21 version 0.10.0
+=== longrun measure: 30 seeds x 21 years, base pt-v20, 90 workers  15:20:52
+BUILD {"commit": "931ed3d4fe659e4dec765673ee3e280a6b40ab2b", "branch": "HEAD", "rust_dirty": "", "engine_file": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/__init__.py", "so": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/_core.abi3.so", "so_mtime": "2026-10-05 15:20:36", "version": "0.10.0", "python": "3.11.16"}
+540 tasks, 90 workers, arms ['pt-v20', 'pt-v21']
+missing parts: 0 
+=== longrun report  15:23:48
+   worst month's volatility, %    real  94.501  pt-v20 76.477 [58.037, 97.795] (-1.2)  pt-v21 72.898 [55.603, 101.886] (-1.2)
+   calm volatility, %             real  12.769  pt-v20 12.193 [8.360, 21.012] (-0.1)  pt-v21 13.470 [8.697, 21.685] (+0.1)
+   stock correlation, calm        real   0.300  pt-v20 0.314 [0.172, 0.562] (+0.1)  pt-v21 0.277 [0.133, 0.530] (-0.2)
+   stock correlation, peak        real   0.872  pt-v20 0.784 [0.717, 0.842] (-1.8)  pt-v21 0.803 [0.754, 0.876] (-1.6)
+   VIX tracking error, points     real       -  pt-v20 1.965 [1.606, 2.544]  pt-v21 0.000 [0.000, 0.000]
+=== cert cert 252  15:24:27
+BASE pt-v20
+pt-v20  vol 20.55 sector 0.1165 dn3 4.262 ar1 0.9302 lever 5.11x  (17s, 17s total)
+pt-v21  vol 19.17 sector 0.1118 dn3 5.297 ar1 0.9557 lever 4.98x  (34s, 51s total)
+=== cert cert 504  15:25:19
+BASE pt-v20
+pt-v20  vol 21.11 sector 0.1102 dn3 4.393 ar1 0.9406 lever nanx  (13s, 13s total)
+pt-v21  vol 20.44 sector 0.1152 dn3 5.967 ar1 0.9611 lever nanx  (24s, 37s total)
+=== cert heldseeds 252  15:25:57
+BASE pt-v20
+pt-v20  vol 20.05 sector 0.1091 dn3 nan ar1 0.9271 lever nanx  (4s, 4s total)
+pt-v21  vol 20.03 sector 0.1146 dn3 nan ar1 0.9615 lever nanx  (9s, 13s total)
+=== cert heldu 252  15:26:11
+BASE pt-v20
+pt-v20  vol 22.62 sector 0.1070 dn3 nan ar1 0.9303 lever nanx  (5s, 5s total)
+pt-v21  vol 20.78 sector 0.1096 dn3 nan ar1 0.9628 lever nanx  (14s, 19s total)
+=== cert crisis extension  15:26:32
+crisis extension: 8 cells, need 10 readings, blocks of 30 from 1001, last 1270, 48 workers, engine 931ed3d4fe659e4dec765673ee3e280a6b40ab2b
+  panel_252         pt-v20: 1 readings from 30 own seeds, extending
+  panel_252         pt-v21: 2 readings from 30 own seeds, extending
+  panel_504         pt-v20: 2 readings from 30 own seeds, extending
+  panel_504         pt-v21: 6 readings from 30 own seeds, extending
+  heldout_seeds     pt-v20: 1 readings from 30 own seeds, extending
+  heldout_seeds     pt-v21: 5 readings from 30 own seeds, extending
+  heldout_universe  pt-v20: 2 readings from 30 own seeds, extending
+  heldout_universe  pt-v21: 5 readings from 30 own seeds, extending
+  panel_252         pt-v20       own  1  blocks  3  total  10  reached
+  panel_252         pt-v21       own  2  blocks  2  total  12  reached
+  panel_504         pt-v20       own  2  blocks  2  total  13  reached
+  panel_504         pt-v21       own  6  blocks  1  total  18  reached
+  heldout_seeds     pt-v20       own  1  blocks  3  total  10  reached
+  heldout_seeds     pt-v21       own  5  blocks  1  total  10  reached
+  heldout_universe  pt-v20       own  2  blocks  3  total  10  reached
+  heldout_universe  pt-v21       own  5  blocks  2  total  15  reached
+crisis extension done in 81s
+=== pooled long run: 50101-50130,50401-50430,50701-50730,60101-60130,60401-60430,60701-60730  15:27:53
+/home/ec2-user/out/longrun-pool/pt-v20/ 180 free histories
+/home/ec2-user/out/longrun-pool/pt-v21/ 180 free histories
+=== edge  15:33:38
+pt-v20: 6044 events, mean |impact| 140bp
+  captured, bp (hit):  t1 +55.2±1.2 (73%)  t5 +15.8±1.1 (58%)  t30 +9.8±1.1 (55%)  t60 +5.7±1.0 (53%)  t120 +2.4±0.9 (52%)  t210 +0.3±0.8 (51%)  t360 -0.1±0.4 (50%)
+  share in price:      t1 0.601  t5 0.882  t15 0.900  t30 0.924  t60 0.952  t210 0.994  t390 0.998  next-day -0.004±0.008
+pt-v21: 6044 events, mean |impact| 140bp
+  captured, bp (hit):  t1 +54.5±1.3 (73%)  t5 +15.3±1.2 (58%)  t30 +9.4±1.1 (55%)  t60 +5.4±1.1 (53%)  t120 +2.3±0.9 (52%)  t210 +0.1±0.8 (51%)  t360 -0.2±0.4 (50%)
+  share in price:      t1 0.603  t5 0.884  t15 0.901  t30 0.925  t60 0.953  t210 0.991  t390 0.994  next-day +0.000±0.008
+=== c4  15:33:47
+pt-v20 C4a: acf1 -0.016 (se 0.004), Roll 12.0 bp over quoted 10.0 bp = 1.21x -> pass
+pt-v21 C4a: acf1 -0.020 (se 0.004), Roll 13.2 bp over quoted 10.2 bp = 1.29x -> pass
+pt-v20 C4b mean_reversion_5day_daily  median   +0.21 pts, beats 11/20, beats oracle  8/20  pass
+pt-v20 C4b momentum_1step             median  -37.71 pts, beats  0/20, beats oracle  0/20  pass
+pt-v20 C4b momentum_1day              median  -12.25 pts, beats  2/20, beats oracle  2/20  pass
+pt-v20 C4b momentum_5day_daily        median   -0.40 pts, beats  9/20, beats oracle  6/20  pass
+pt-v20 C4b oracle                     median   +1.86 pts, beats 16/20, beats oracle  0/20
+pt-v21 C4b mean_reversion_1step       median  -30.73 pts, beats  1/20, beats oracle  1/20  pass
+pt-v21 C4b mean_reversion_1day        median  -16.20 pts, beats  2/20, beats oracle  1/20  pass
+pt-v21 C4b mean_reversion_5day_daily  median   -4.49 pts, beats  6/20, beats oracle  6/20  pass
+pt-v21 C4b momentum_1step             median  -43.40 pts, beats  0/20, beats oracle  0/20  pass
+pt-v21 C4b momentum_1day              median  -18.31 pts, beats  0/20, beats oracle  0/20  pass
+pt-v21 C4b momentum_5day_daily        median   -1.95 pts, beats  7/20, beats oracle  7/20  pass
+pt-v21 C4b oracle                     median   -0.00 pts, beats 10/20, beats oracle  0/20
+=== xsec  15:34:17
+pt-v20     C4a pass  C5 pass  C6 pass  C7 pass  C8 pass  E1 pass  R1 pass  R2 pass  R3 pass  R4 pass  B9 pass
+           {"C4a_acf1_65m": -0.016, "C4a_roll_over_quoted": 1.1128, "C5_vr60": 0.9498, "C6_value_ic": 0.0003, "C6_value_ic_0_60": 0.0048, "C7_mom12_1": -0.0031, "C7_mom6_1": -0.0013, "C8_lm1_bps": -0.0645, "B9_first60_sd_pct": 8.3181, "B9_steady60_sd_pct": 10.4418, "B9_startup_ratio": 0.7966, "B9_first60_mean_pct": 0.0002, "B9_annual_sd_pct": 16.292, "B9_annual_n": 1710, "R1_dy2_sd_bp": 3.8732, "R2_dy10_sd_bp": 4.9646, "R3_corr_stock_tsy": -0.1357, "R4_corr_stock_corp": 0.1999, "E1_earnings_fall_median": -0.1719, "E1_contractions": 100}
+pt-v21     C4a pass  C5 pass  C6 pass  C7 pass  C8 pass  E1 pass  R1 pass  R2 pass  R3 pass  R4 FAIL  B9 pass
+           {"C4a_acf1_65m": -0.0239, "C4a_roll_over_quoted": 1.2837, "C5_vr60": 0.9537, "C6_value_ic": 0.0033, "C6_value_ic_0_60": -0.0005, "C7_mom12_1": -0.0031, "C7_mom6_1": -0.0023, "C8_lm1_bps": -0.8913, "B9_first60_sd_pct": 8.7291, "B9_steady60_sd_pct": 8.3394, "B9_startup_ratio": 1.0467, "B9_first60_mean_pct": 1.7945, "B9_annual_sd_pct": 16.1552, "B9_annual_n": 1710, "R1_dy2_sd_bp": 5.5518, "R2_dy10_sd_bp": 5.2013, "R3_corr_stock_tsy": -0.3192, "R4_corr_stock_corp": 0.1119, "E1_earnings_fall_median": -0.1102, "E1_contractions": 139}
+73s
+=== impact  15:35:29
+  1.000      1.000     |     77.33    110.26        0.401            0.550        0.80     0.573
+fit, 1% and up, both sides: avg cost exponent 0.515 coefficient 0.438; worst price exponent 0.483 coefficient 0.604
+literature: peak Y in [0.5, 1] (Toth et al. 2011); average cost two thirds of that, [0.33, 0.67]
+volatility regimes, VIX held at 15 and 35: realised sigma 149 and 219 bp (ratio 1.47); median average cost
+  f=0.01: 6.82 and 9.43 bp (ratio 1.38)
+  f=0.1: 25.93 and 39.01 bp (ratio 1.50)
+  f=0.3: 38.75 and 59.80 bp (ratio 1.54)
+refill (half-life 27 ticks, gamma 0.314): extra bp a second order pays k ticks after a first, over no first
+  f=0.03 temporary: k=0:  19.16  k=1:  -3.42  k=5:  -3.10  k=15:  -1.51  k=30:  -0.45  k=65:  -0.04  k=130:  -0.26
+  f=0.03 permanent: k=0:   0.00  k=1:  18.31  k=5:  16.65  k=15:  13.35  k=30:  10.27  k=65:   7.17  k=130:   6.45
+  f=0.1 temporary: k=0:  26.22  k=1: -14.88  k=5: -14.20  k=15: -10.36  k=30:  -8.23  k=65:  -6.42  k=130:  -6.68
+  f=0.1 permanent: k=0:   0.00  k=1:  42.74  k=5:  39.11  k=15:  31.86  k=30:  24.77  k=65:  18.30  k=130:  16.70
+  f=0.3 temporary: k=0:  44.28  k=1: -26.92  k=5: -23.62  k=15: -16.32  k=30: -11.85  k=65: -11.11  k=130: -13.25
+  f=0.3 permanent: k=0:   0.00  k=1:  81.21  k=5:  74.92  k=15:  62.36  k=30:  50.07  k=65:  38.85  k=130:  36.07
+  1.000      1.000     |     62.97     84.28        0.407            0.591        0.33     0.573
+fit, 1% and up, both sides: avg cost exponent 0.484 coefficient 0.424; worst price exponent 0.474 coefficient 0.603
+literature: peak Y in [0.5, 1] (Toth et al. 2011); average cost two thirds of that, [0.33, 0.67]
+volatility regimes, VIX held at 15 and 35: realised sigma 139 and 234 bp (ratio 1.68); median average cost
+  f=0.01: 6.69 and 8.62 bp (ratio 1.29)
+  f=0.1: 22.17 and 40.41 bp (ratio 1.82)
+  f=0.3: 38.68 and 70.91 bp (ratio 1.83)
+refill (half-life 27 ticks, gamma 0.314): extra bp a second order pays k ticks after a first, over no first
+  f=0.03 temporary: k=0:  11.07  k=1:   1.87  k=5:   2.11  k=15:   1.60  k=30:   1.36  k=65:   1.07  k=130:   0.64
+  f=0.03 permanent: k=0:   0.00  k=1:   1.43  k=5:   1.43  k=15:   1.43  k=30:   1.43  k=65:   1.43  k=130:   1.43
+  f=0.1 temporary: k=0:  23.27  k=1:  12.96  k=5:  12.85  k=15:  10.98  k=30:   8.11  k=65:   3.84  k=130:   1.94
+  f=0.1 permanent: k=0:   0.00  k=1:   4.78  k=5:   4.78  k=15:   4.78  k=30:   4.78  k=65:   4.77  k=130:   4.76
+  f=0.3 temporary: k=0:  39.93  k=1:  30.37  k=5:  28.08  k=15:  23.44  k=30:  17.51  k=65:   8.72  k=130:   2.72
+  f=0.3 permanent: k=0:   0.00  k=1:  14.35  k=5:  14.35  k=15:  14.34  k=30:  14.33  k=65:  14.31  k=130:  14.27
+=== scenarios  15:37:07
+8s
+rate_shock             paired index 21/63/85/120d:   -8.0   -8.1   -8.1   -8.3 | scen maxdd120  -12.6 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +205bp policy +200bp | rv63 20.6 vs 15.7
+recession              paired index 21/63/85/120d:  -22.5  -28.1  -34.0  -39.3 | scen maxdd120  -47.0 (base   -9.8) | vix 17.6->70.7 (base peak 25.2) | corp +155bp policy +0bp | rv63 65.9 vs 15.7
+liquidity_crisis       paired index 21/63/85/120d:  -19.8  -14.0  -10.6   -5.8 | scen maxdd120  -38.4 (base   -9.8) | vix 17.6->72.8 (base peak 25.2) | corp +8bp policy +0bp | rv63 68.8 vs 15.7
+geopolitical_conflict  paired index 21/63/85/120d:   -8.4   -1.1   -0.7   -0.5 | scen maxdd120  -14.9 (base   -9.8) | vix 17.6->35.8 (base peak 25.2) | corp +16bp policy +0bp | rv63 29.9 vs 15.7
+oil_price_spike        paired index 21/63/85/120d:   -1.8   -1.9   -1.6   -1.4 | scen maxdd120  -10.1 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +53bp policy +50bp | rv63 14.4 vs 15.7
+policy_regime_shift    paired index 21/63/85/120d:   -0.2   -0.1   +0.1   +0.0 | scen maxdd120   -9.6 (base   -9.8) | vix 17.6->25.2 (base peak 25.2) | corp +5bp policy +0bp | rv63 14.0 vs 15.7
+31s
+rate_shock             paired index 21/63/85/120d:   -7.4   -7.6   -7.6   -7.2 | scen maxdd120  -10.0 (base   -7.5) | vix 16.0->24.5 (base peak 24.1) | corp +201bp policy +200bp | rv63 19.0 vs 12.2
+recession              paired index 21/63/85/120d:  -18.4  -27.7  -31.1  -37.6 | scen maxdd120  -41.6 (base   -7.5) | vix 16.0->52.7 (base peak 24.1) | corp +151bp policy -100bp | rv63 47.3 vs 12.2
+liquidity_crisis       paired index 21/63/85/120d:  -15.8  -19.6  -12.2   -6.2 | scen maxdd120  -32.4 (base   -7.5) | vix 16.0->59.7 (base peak 24.1) | corp -71bp policy -78bp | rv63 49.8 vs 12.2
+geopolitical_conflict  paired index 21/63/85/120d:  -10.1   -2.0   -1.5   -1.9 | scen maxdd120  -15.3 (base   -7.5) | vix 16.0->30.4 (base peak 24.1) | corp -20bp policy -25bp | rv63 30.8 vs 12.2
+oil_price_spike        paired index 21/63/85/120d:   -1.8   -1.5   -1.6   -1.1 | scen maxdd120   -7.4 (base   -7.5) | vix 16.0->24.8 (base peak 24.1) | corp +54bp policy +25bp | rv63 12.2 vs 12.2
+policy_regime_shift    paired index 21/63/85/120d:   -0.0   +0.1   +0.0   +0.4 | scen maxdd120   -7.4 (base   -7.5) | vix 16.0->24.3 (base peak 24.1) | corp +1bp policy +0bp | rv63 11.4 vs 12.2
+17s
+/home/ec2-user/scripts/longrun/recession_proposed.yml paired index 21/63/85/120d:  -18.4  -27.7  -31.1  -37.6 | scen maxdd120  -41.6 (base   -7.5) | vix 16.0->52.7 (base peak 24.1) | corp +151bp policy -100bp | rv63 47.3 vs 12.2
+17s
+/home/ec2-user/scripts/longrun/liquidity_crisis_proposed.yml paired index 21/63/85/120d:  -15.8  -19.6  -12.2   -6.2 | scen maxdd120  -32.4 (base   -7.5) | vix 16.0->59.7 (base peak 24.1) | corp -71bp policy -78bp | rv63 49.8 vs 12.2
+=== driven2020  15:38:19
+pt-v20     D2a mdd 0.374 pass  D2b recovery 120.5 sessions pass  never 21/90  F1 0.307 in 40.0 sessions  L1 lead 10.5  101-130: 0.362/104.5  401-430: 0.364/74.0  701-730: 0.441/183.5
+pt-v21     D2a mdd 0.358 pass  D2b recovery 136.0 sessions pass  never 30/90  F1 0.285 in 38.5 sessions  L1 lead 19.0  101-130: 0.352/113.0  401-430: 0.337/117.0  701-730: 0.398/341.5
+=== c10  15:38:40
+pt-v20       worst out63_after_corporate_bond_yield_p99.9_up +0.12 pts/yr, ahead 0.61; drift63 contraction +5.0 recovery -0.4 -> pass
+pt-v21       worst out21_after_gdp_growth_5d_p95_down +0.07 pts/yr, ahead 0.56; drift63 contraction +0.1 recovery +0.6 -> pass
+=== driven2022  15:39:03
+pt-v20     R5 mdd 0.265 pass  R6 P/E -4.26%/100bp pass
+pt-v21     R5 mdd 0.238 pass  R6 P/E -6.97%/100bp pass
+=== r7  15:39:14
+pt-v20       all-days bar1 +2.27bp | hike n=855 bar1 +2.2 -> excess -0.1 (bound 5.0) | cut n=643 bar1 +0.5 -> excess -1.7 (bound 5.0) | night hike -68.1 cut +157.7 -> R7a pass
+pt-v21       all-days bar1 +2.29bp | hike n=1216 bar1 +1.4 -> excess -0.9 (bound 5.0) | cut n=1352 bar1 +1.9 -> excess -0.3 (bound 5.0) | night hike -24.6 cut +54.0 -> R7a pass
+pt-v20       rate-news agent: mean excess -0.32 pts/yr (se 0.07), ahead 2/30 -> R7b pass
+pt-v21       rate-news agent: mean excess -0.79 pts/yr (se 0.10), ahead 2/30 -> R7b pass
+=== recession  15:42:29
+recession: /home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/scenarios/recession.yml sha256 0c5c10fdd422e7e712adfb5bc1efec2290c0f070eb4df005832ed0bd30ea21f6
+pt-v20       S1a regain 50% pass | S1b out within 24m 90/90 pass | S2 rise +68.0% pass
+pt-v21       S1a regain 52% pass | S1b out within 24m 90/90 pass | S2 rise +65.3% pass
+=== preset panel, pt-v21 and pt-v20  15:43:25
+2 presets, 360 measurements, 48 workers
+  100/360  3.3/s  eta 1.3m
+  200/360  4.3/s  eta 0.6m
+  300/360  5.2/s  eta 0.2m
+pt-v21   252:15/15 504:14/14 hoU:15/15 hoS:15/15 vol: 19.2%  lever:4.98x  mech:10/10  centre: 8/14  vixar1(ungraded):0.9557/0.9611  disp(read):2 of 30/6 of 30
+pt-v20   252:15/15 504:14/14 hoU:15/15 hoS:15/15 vol: 20.5%  lever:5.11x  mech:10/10  centre: 8/14  vixar1(ungraded):0.9302/0.9406  disp(read):1 of 30/2 of 30
+wrote /home/ec2-user/out/preset-panel.json in 65s
