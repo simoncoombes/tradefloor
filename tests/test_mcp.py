@@ -445,8 +445,9 @@ def test_on_pt_v20_the_ranking_quotes_buy_and_hold_and_no_capture():
     table is ordered on it, and the reason is sent."""
     r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
     assert r["ok"]
-    assert r["provenance"]["model_preset"] == "pt-v20"
-    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"]
+    # The default, pt-v21 from 0.10.0 (these read "pt-v20" until then).
+    assert r["provenance"]["model_preset"] == "pt-v21"
+    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"]
     assert "unmeasurable" not in r
     for record in r["records"]:
         assert not {"pooled_capture", "median_capture",
@@ -462,7 +463,7 @@ def test_on_pt_v20_an_evaluation_quotes_buy_and_hold_and_no_capture():
     assert r["ok"]
     assert "capture_ratio" not in r and "capture_note" not in r
     assert r["capture_ratio_withheld"] == (
-        pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"])
+        pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"])  # the default; was pt-v20
     pnl = {row["name"]: row["pnl"] for row in r["scores"]}
     assert set(r["versus_buy_and_hold"]) == set(pnl) - {"buy_and_hold"}
     for name, value in r["versus_buy_and_hold"].items():

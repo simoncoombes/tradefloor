@@ -36,7 +36,7 @@ def ranking():
                         workers=4)
 
 
-#: The preset the capture tests run on. pt-v20, the default, reports no
+#: The preset the capture tests run on. pt-v20, and pt-v21, the default, report no
 #: capture (`baselines.ORACLE_NOT_A_CEILING`), so what a capture table does
 #: is checked where the Oracle is a ceiling: pt-v19, the last such preset.
 CEILING_PRESET = "pt-v19"
@@ -325,8 +325,10 @@ def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
     `capture_withheld` and the report."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    assert ranking.model_fingerprint == "pt-v20"
-    assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v20"]
+    # The default: pt-v21 from 0.10.0, which keeps pt-v20's permanent
+    # share. These two read "pt-v20" while it was the default.
+    assert ranking.model_fingerprint == "pt-v21"
+    assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v21"]
     assert ranking.unmeasurable == []
     for record in ranking.records.values():
         assert record.captures == [None] * len(ranking.seeds)
@@ -338,7 +340,7 @@ def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
     for record in payload["agents"].values():
         assert not {"captures", "pooled_capture",
                     "median_capture"} & set(record)
-    assert "No capture ratio on pt-v20" in ranking.report()
+    assert "No capture ratio on pt-v21" in ranking.report()  # was pt-v20
     assert "capture +" not in ranking.report()
 
 
@@ -740,7 +742,7 @@ def test_the_withheld_capture_reason_is_printed_only_when_the_oracle_ran():
     paragraph is left out."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    reason = ORACLE_NOT_A_CEILING["pt-v20"]
+    reason = ORACLE_NOT_A_CEILING["pt-v21"]  # the default's; was "pt-v20"
     without = tradefloor.rank(
         lambda: {"mine": Momentum(), "buy_and_hold": BuyAndHold()},
         seeds=[1, 2], universe=UNIVERSE, days=1)

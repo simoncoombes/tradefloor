@@ -611,6 +611,15 @@ def test_a_replay_miss_stops_evaluate_and_names_the_step():
                for note in caught.value.__notes__)
 
 
+#: The preset the four scorecard tests below measured their seeds on:
+#: pt-v20, the default until 0.10.0, when they ran on the default. On
+#: pt-v21, the default from then, no jump wins a day of seed 1's twenty
+#: (its market jumps are rarer), so `random_noise` tops every day and a
+#: constant answer scores 1.0 against a baseline of 1.0; on pt-v20 a closing
+#: jump wins day 9 and the constant scores 0.95.
+EXPLAINED_ON = "pt-v20"
+
+
 class Levered:
     """Puts ``gross`` times its net worth into the roster at step zero."""
 
@@ -633,7 +642,7 @@ def test_the_scorecard_has_an_equity_curve_a_drawdown_and_a_ruin_flag():
     scores = tradefloor.evaluate(
         {"long": Levered(100), "short": Levered(-100)}, seed=1,
         universe=tradefloor.Universe.random(8, seed=1), days=2,
-        max_leverage=None)
+        max_leverage=None, model=EXPLAINED_ON)
     for card in scores.values():
         assert len(card.equity_curve) == 2
         assert card.equity_curve[-1] == card.final_net_worth
@@ -669,7 +678,7 @@ def test_the_explanation_baseline_is_what_a_constant_answer_scores():
     claims = ("random_noise", "fair_value_shift", "momentum")
     scores = tradefloor.evaluate({c: Explainer(c) for c in claims}, seed=1,
                                  universe=tradefloor.Universe.random(12, seed=7),
-                                 days=20)
+                                 days=20, model=EXPLAINED_ON)
     baselines = {card.explanation_baseline for card in scores.values()}
     assert baselines == {0.95}
     assert scores["random_noise"].explanation_accuracy == 0.95
@@ -687,7 +696,8 @@ def test_the_accuracy_is_shown_only_beside_the_baseline_and_the_edge():
     scores = tradefloor.evaluate(
         {"noise": Explainer("random_noise"), "momentum": Explainer("momentum"),
          "idle": Idle()},
-        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20)
+        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20,
+        model=EXPLAINED_ON)
     noise, momentum = scores["noise"], scores["momentum"]
     assert noise.explanation_edge == pytest.approx(
         noise.explanation_accuracy - noise.explanation_baseline)
@@ -717,7 +727,8 @@ def test_explanations_are_scored_on_what_moved_prices_over_the_whole_day():
     scores = tradefloor.evaluate(
         {"noise": Explainer("random_noise"), "jump": Explainer("jump"),
          "oracle": tradefloor.baselines.Oracle()},
-        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20)
+        seed=1, universe=tradefloor.Universe.random(12, seed=7), days=20,
+        model=EXPLAINED_ON)
     actual = [answer for _, answer in scores["noise"].explanations]
     assert set(actual) <= set(harness.DRIVER_NAMES)
     assert "fair_value_shift" not in harness.DRIVER_NAMES

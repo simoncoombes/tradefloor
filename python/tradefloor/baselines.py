@@ -16,16 +16,17 @@ These are the reference points that make a score readable, from the bottom up:
   anyone would try first?
 - **Oracle**: how much was available *at all*?
 
-## On pt-v20 the headline is buy-and-hold
+## On pt-v20 and pt-v21 the headline is buy-and-hold
 
 The Oracle answers that last question only where hidden state predicts
 returns, which is every preset through pt-v19. On pt-v20 market moves
 mostly stick: each shock moves fair value for good, so even perfect
 knowledge of the model's fair value leaves little edge. The Oracle made
 money in 10 of 14 test markets there, and its P&L follows the
-market's month. It stays in the reference set, but :func:`capture_ratio`
-reports nothing on pt-v20 (:data:`ORACLE_NOT_A_CEILING` names it, with the
-reason), and a score is read against buy-and-hold with
+market's month. pt-v21, the default from 0.10.0, keeps that. The Oracle
+stays in the reference set, but :func:`capture_ratio` reports nothing on
+either (:data:`ORACLE_NOT_A_CEILING` names them, with the reason), and a
+score is read against buy-and-hold with
 :func:`versus_buy_and_hold`. The rest of this docstring describes the
 Oracle where it is a ceiling.
 
@@ -828,8 +829,9 @@ def reference_agents(*, seed: int = 0) -> dict[str, Any]:
 #: ratio. A capture ratio reads the Oracle's P&L as what was there to earn,
 #: and that holds only where hidden state predicts returns: on every preset
 #: through pt-v19 each shock is mispricing that reverts, and the Oracle
-#: trades it. pt-v20 moves each shock into fair value for good, so the
-#: Oracle's P&L follows the market's month (see :class:`Oracle`).
+#: trades it. pt-v20 moves each shock into fair value for good, and pt-v21
+#: keeps that, so the Oracle's P&L follows the market's month (see
+#: :class:`Oracle`).
 #:
 #: Keyed by the name a scorecard records in ``model_fingerprint``. A custom
 #: model (``custom-XXXXXXXX``) is not in it, whatever preset it was built
@@ -843,6 +845,17 @@ ORACLE_NOT_A_CEILING: dict[str, str] = {
         "model's fair value leaves little edge. The Oracle made money in "
         "10 of 14 test markets and its P&L follows the market's "
         "month, so a fraction of it would measure the month, not the "
+        "agent. Compare against buy-and-hold instead."
+    ),
+    # Measured 2026-10-05 on Universe.random(20, seed=3), sim seeds 0-7,
+    # thirty days: the Oracle made money on 6 and took buy-and-hold's sign
+    # on all 8 (pt-v20 on the same markets: 7, and 8).
+    "pt-v21": (
+        "No capture ratio on pt-v21. As on pt-v20, market moves there "
+        "mostly stick: each shock moves fair value for good, so even perfect "
+        "knowledge of the model's fair value leaves little edge. The Oracle "
+        "made money in 6 of 8 test markets and took buy-and-hold's sign in "
+        "all 8, so a fraction of its P&L would measure the month, not the "
         "agent. Compare against buy-and-hold instead."
     ),
 }
@@ -963,7 +976,7 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     better than a confidently wrong table.
 
     Returns an empty mapping, too, on a preset where the Oracle is not a
-    ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20), whatever
+    ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20 and pt-v21), whatever
     the Oracle earned. :func:`capture_withheld` gives the reason, and
     :func:`versus_buy_and_hold` the comparison to quote there.
 

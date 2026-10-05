@@ -394,9 +394,10 @@ def test_empty_comparisons_come_with_a_reason():
     with pytest.warns(UserWarning, match=r"Did you mean "
                                          r"reference='buy_and_hold'\?"):
         assert tf.versus_buy_and_hold(scores, reference="buy-and-hold") == {}
-    # pt-v20, the default, withholds the capture ratio.
+    # pt-v21, the default from 0.10.0, withholds the capture ratio (as
+    # pt-v20, the default before it, did; this matched "on pt-v20").
     scores = _evaluate({"a": Idle()}, model=None)
-    with pytest.warns(UserWarning, match=r"No capture ratio on pt-v20.*"
+    with pytest.warns(UserWarning, match=r"No capture ratio on pt-v21.*"
                                          r"tf\.versus_buy_and_hold"):
         assert tf.capture_ratio(scores) == {}
 

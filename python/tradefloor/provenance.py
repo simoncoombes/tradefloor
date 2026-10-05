@@ -170,6 +170,11 @@ BASELINE = "pt-v1"
 #: design programme's candidate LMN-Q25A375. Fifteen of those dials left
 #: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
 #: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
+#:
+#: TODO(pt-v21): pt-v21, the default from 0.10.0, is not in this tuple yet.
+#: Adding it brings into scope about a hundred dials it moves off pt-v1, each
+#: of which needs an entry in `DIAL_PROVENANCE` (its value on pt-v21, its
+#: kind and source) or a place in `UNPROVENANCED`; `audit()` lists them.
 REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20")
 
 KINDS = ("derived", "measured", "undetermined")

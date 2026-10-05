@@ -34,9 +34,22 @@ def cap_weighted_beta(universe, betas):
     return sum(c * b for c, b in zip(caps, betas)) / sum(caps)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_the_normalisation_is_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["market_beta_normalise"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "market_beta_normalise",
+    )} == {
+        "market_beta_normalise": 1.0,
+    }
 
 
 def test_the_dial_is_refused_outside_its_domain():

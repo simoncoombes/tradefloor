@@ -40,10 +40,33 @@ def engine(seed=7, **dials):
                      model=tf.ModelParams.from_preset("pt-v20", **dials))
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
     assert all(values[name] == 0.0 for name in DIALS)
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "fed_put_gain",
+        "fed_put_threshold",
+        "fed_put_half_life",
+        "fed_put_emergency_vix",
+        "treasury_put_pricing",
+        "treasury_haven_gain",
+    )} == {
+        "fed_put_gain": 3.0,
+        "fed_put_threshold": 0.0,
+        "fed_put_half_life": 126.0,
+        "fed_put_emergency_vix": 50.0,
+        "treasury_put_pricing": 1.0,
+        "treasury_haven_gain": 0.014,
+    }
 
 
 @pytest.mark.parametrize("dials", [

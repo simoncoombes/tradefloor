@@ -44,7 +44,9 @@ def engine(seed=7, **dials):
                      model=tf.ModelParams.from_preset("pt-v20", **{**ARM, **dials}))
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, runs the calendar; the test after this
+# one holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     for name in ("earnings_surprise_sigma", "earnings_surprise_df", "earnings_session_sigma",
@@ -53,6 +55,19 @@ def test_off_on_every_shipped_preset(preset):
     e = tf.Engine(seed=1, universe=UNIVERSE, model=preset)
     assert e.earnings_calendar() == []
     assert "earnings_key" not in e.state_snapshot()
+
+
+def test_pt_v21_runs_the_calendar():
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {name: d[name] for name in (
+        "earnings_surprise_sigma", "earnings_surprise_df", "earnings_session_sigma",
+        "earnings_followthrough_sigma", "earnings_volume_multiple")} == {
+        "earnings_surprise_sigma": 3.5, "earnings_surprise_df": 0.0,
+        "earnings_session_sigma": 1.9, "earnings_followthrough_sigma": 1.1,
+        "earnings_volume_multiple": 1.2}
+    e = tf.Engine(seed=1, universe=UNIVERSE, model="pt-v21")
+    assert e.earnings_calendar() != []
+    assert "earnings_key" in e.state_snapshot()
 
 
 @pytest.mark.parametrize("dials", [

@@ -183,7 +183,7 @@ with a digest per preset. A run with agent orders in it replays exactly on the
 same release. Across releases the promise is narrower. 0.8.5 changed how an
 agent's fills reach the market, on every preset, so a traded run recorded
 before 0.8.5 matches up to its first trade and differs after it. The default
-preset is `pt-v20`, and any earlier one can be named:
+preset is `pt-v21`, and any earlier one can be named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -206,9 +206,13 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On the default preset, `pt-v20`, all 19 statistics of the one-year table
-(volatility, fat tails, how much stocks move together, how far the VIX jumps
-after a fall) are inside the range real markets show over a year. All 14
+<!-- TODO(pt-v21 grade): restate this paragraph for pt-v21, the default
+since 0.10.0, from its preset record (panel_252, panel_504, long_run) once
+the grade and the paired panel run land. Until then it describes pt-v20. -->
+On `pt-v20`, the default from 0.8.5 to 0.9.1, all 19 statistics of the
+one-year table (volatility, fat tails, how much stocks move together, how far
+the VIX jumps after a fall) are inside the range real markets show over a
+year. All 14
 graded statistics of the two-year panel are inside their two-year ranges.
 The long-run criteria are 40 rows over 21 years for pt-v20, covering crash
 depth, how long fear lasts, bear markets per decade, the 2008 and 2020
@@ -296,7 +300,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v20`, at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v21`, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -359,7 +363,7 @@ several presets, and results depend on the preset.
   version = {0.9.1},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
-  note    = {Model preset pt-v20}
+  note    = {Model preset pt-v21}
 }
 ```
 
@@ -368,7 +372,7 @@ carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
 In the text, say which model you used, for example: "tradefloor 0.9.1,
-preset pt-v20, specified in its docs/MODEL.md".
+preset pt-v21, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
 score was not tuned to its seeds.

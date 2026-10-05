@@ -1795,6 +1795,18 @@ impl PyEngine {
         if nights.iter().any(|v| *v != 0.0) {
             self.pending_overnight = nights;
         }
+        // And what the night's permanent share took from `s` into fair
+        // value, onto the same row's `fair_value_shift`, added to whatever
+        // the last close's jump left pending there.
+        let shifts = self.inner.overnight_fair_value_moves();
+        if shifts.iter().any(|v| *v != 0.0) {
+            if self.pending_fair_value.len() < shifts.len() {
+                self.pending_fair_value.resize(shifts.len(), 0.0);
+            }
+            for (slot, v) in self.pending_fair_value.iter_mut().zip(shifts) {
+                *slot += v;
+            }
+        }
         // The ex-date's move in `s`, booked onto the same row.
         if self.inner.carries_dividends() {
             let moves: Vec<f64> = self.inner.dividend_moves().to_vec();
@@ -3671,7 +3683,8 @@ impl PyEngine {
         let e = self.inner.economy();
         PyMacro {
             // The VIX as PUBLISHED (`Engine::published_vix`): the state
-            // with `vix_stress_premium` at 0.0, which every preset carries.
+            // with `vix_stress_premium` at 0.0, which every preset through
+            // pt-v20 carries (pt-v21 ships 3.0).
             vix: self.inner.published_vix(),
             federal_funds_rate: crate::units::percent_to_fraction(e.federal_funds_rate),
             corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
@@ -4391,7 +4404,7 @@ impl PyEngine {
     ///   little in a day. The eleven summed to a daily standard deviation of
     ///   0.0133 against 0.0143 for the log price change, and explained 69% of
     ///   it.
-    /// - On pt-v20, the default, most of each shock moves fair value
+    /// - On pt-v20, the default from 0.8.5 to 0.9.1, most of each shock moves fair value
     ///   instead, so `random_noise` and `fair_value_shift` are both large and
     ///   mostly cancel (45.3% and 45.6% of the summed absolute
     ///   contributions). The eleven summed to a standard deviation of 0.0019
@@ -4672,6 +4685,20 @@ impl PyEngine {
             .get_item("economy")?
             .ok_or_else(|| ValidationError::new_err("the snapshot carried no economy block"))?;
         Ok(economy.unbind())
+    }
+
+    /// The `dividend` block of [`PyEngine::state_snapshot`], and only that,
+    /// without counting as a copy; `None` on a model without dividends
+    /// (`dividend_payout_share` 0.0). What `economy` is for the economy
+    /// block: `tradefloor.sandbox.HiddenState.dividend_states` serves an
+    /// agent that declared hidden state through it, so the Oracle's read of
+    /// the dividend accrual on a dividend model does not count as look-ahead.
+    fn dividend_states(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let snapshot = self.snapshot_uncounted(py)?;
+        Ok(match snapshot.bind(py).get_item("dividend")? {
+            Some(block) => block.unbind(),
+            None => py.None(),
+        })
     }
 
     /// This market's state as one 64-character hex digest: the ledger leaf.

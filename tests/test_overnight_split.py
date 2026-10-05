@@ -31,11 +31,28 @@ def model(**dials):
     return tf.ModelParams.from_preset("pt-v20", **dials)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     for name in ("overnight_market_share", "overnight_idio_share", "overnight_idio_df"):
         assert d[name] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "overnight_market_share",
+        "overnight_idio_share",
+        "overnight_idio_df",
+    )} == {
+        "overnight_market_share": 0.55,
+        "overnight_idio_share": 0.1,
+        "overnight_idio_df": 4.0,
+    }
 
 
 @pytest.mark.parametrize("dials", [

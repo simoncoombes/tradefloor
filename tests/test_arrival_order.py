@@ -27,6 +27,10 @@ SEED64_TAG = 0x5344_3634
 
 U = tf.Universe.random(8, seed=99)
 T = U[0].ticker
+#: The preset the switch is measured on, off and on: pt-v20 by name. It was
+#: the default (`from_preset()`) until 0.10.0, when pt-v21 took the default
+#: with the switch already on, so "off" there would be pt-v21 less a dial.
+BASE = "pt-v20"
 AT = 1  # the step the one-shot agents trade on
 
 
@@ -63,7 +67,7 @@ def order(seed: int, day: int, step: int, labels) -> list[str]:
 
 
 def on(**over) -> tf.ModelParams:
-    return tf.ModelParams.from_preset(**{"book_arrival_shuffle": 1.0, **over})
+    return tf.ModelParams.from_preset(BASE, **{"book_arrival_shuffle": 1.0, **over})
 
 
 def engine(seed: int, model=None) -> tf.Engine:
@@ -151,7 +155,7 @@ def test_the_engine_orders_by_the_formula():
 
 def test_off_is_sorted_label_order():
     e = tf.Engine(seed=201, universe=U, macro_state=tf.Macro(),
-                  model=tf.ModelParams.from_preset())
+                  model=tf.ModelParams.from_preset(BASE))
     for day in range(5):
         for step in range(6):
             assert e.arrival_order(day, step, ["b", "c", "a"]) == ["a", "b", "c"]
@@ -159,8 +163,8 @@ def test_off_is_sorted_label_order():
 
 def test_the_switch_is_a_switch():
     with pytest.raises(Exception, match="book_arrival_shuffle"):
-        tf.ModelParams.from_preset(book_arrival_shuffle=0.5)
-    assert tf.ModelParams.from_preset().fingerprint == "pt-v20"
+        tf.ModelParams.from_preset(BASE, book_arrival_shuffle=0.5)
+    assert tf.ModelParams.from_preset(BASE).fingerprint == "pt-v20"
 
 
 # -- 2. determinism -------------------------------------------------------------------
@@ -261,7 +265,7 @@ def test_a_checkpoint_and_a_manifest_reproduce_the_market():
 def test_one_agent_is_the_same_market_with_the_switch_on():
     q = round(0.05 * U[0].avg_volume)
     runs = {}
-    for name, model in (("off", tf.ModelParams.from_preset()), ("on", on())):
+    for name, model in (("off", tf.ModelParams.from_preset(BASE)), ("on", on())):
         w = World(seed=21, universe=U, macro=tf.Macro(), model=model,
                   agent=Every(q), max_leverage=None, cash=1e12)
         w.run(days=2)
@@ -282,7 +286,7 @@ def test_evaluate_is_the_same_with_the_switch_on():
         return {"m": Momentum(lookback=2, top_k=2, gross=1.0),
                 "n": Momentum(lookback=3, top_k=2, gross=1.0)}
     kw = dict(seed=5, universe=U, macro=tf.Macro(), days=2)
-    off = tf.evaluate(agents(), model=tf.ModelParams.from_preset(), **kw)
+    off = tf.evaluate(agents(), model=tf.ModelParams.from_preset(BASE), **kw)
     live = tf.evaluate(agents(), model=on(), **kw)
     for name in ("m", "n"):
         a, b = off[name].as_dict(), live[name].as_dict()
@@ -312,7 +316,7 @@ def test_under_label_order_the_later_label_always_pays_more():
     q = round(0.10 * U[0].avg_volume)
     for seed in range(1, 5):
         w = world(seed, {"a": Buyer(q), "b": Buyer(q)},
-                  model=tf.ModelParams.from_preset())
+                  model=tf.ModelParams.from_preset(BASE))
         w.run(days=1)
         assert vwap(w, "b") > vwap(w, "a")
         assert "arrival" not in w.trace[AT]
@@ -342,7 +346,7 @@ def test_rows_carry_arrival_only_while_the_switch_is_on():
     q = round(0.02 * U[0].avg_volume)
     live = world(9, {"a": Every(q), "b": Every(q)})
     off = world(9, {"a": Every(q), "b": Every(q)},
-                model=tf.ModelParams.from_preset())
+                model=tf.ModelParams.from_preset(BASE))
     live.run(days=1)
     off.run(days=1)
     assert all(sorted(r["arrival"]) == ["a", "b"] for r in live.trace)
@@ -355,13 +359,14 @@ def test_rows_carry_arrival_only_while_the_switch_is_on():
 
 def test_off_is_the_plain_cohort():
     """At 0.0 a cohort executes in label order: the model with the switch
-    written as 0.0 and the default are one market, one trace."""
+    written as 0.0 and the preset are one market, one trace (pt-v20, the
+    default until 0.10.0, when this built `World` with no model)."""
     q = round(0.03 * U[0].avg_volume)
     plain = World(seed=13, universe=U, macro=tf.Macro(),
                   agents={"a": Every(q), "b": Every(q)},
-                  max_leverage=None, cash=1e12)
+                  max_leverage=None, cash=1e12, model=BASE)
     zero = world(13, {"a": Every(q), "b": Every(q)},
-                 model=tf.ModelParams.from_preset(book_arrival_shuffle=0.0))
+                 model=tf.ModelParams.from_preset(BASE, book_arrival_shuffle=0.0))
     plain.run(days=1)
     zero.run(days=1)
     assert plain.digest() == zero.digest()

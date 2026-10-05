@@ -777,8 +777,8 @@ class FlowImpact:
         it would have seen: its prints through the session are the same to
         the bit on every preset.
 
-        The prices compared here are read after the close, and on pt-v20,
-        the default, the close re-marks every name to the macro state it
+        The prices compared here are read after the close, and on pt-v20
+        and pt-v21, the default, the close re-marks every name to the macro state it
         publishes (``macro_publication_repricing``). The close's macro step
         reads the session's index return, which the flow moved (the VIX,
         the 10-year's flight to quality, the corporate yield that follows

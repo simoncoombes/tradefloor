@@ -86,8 +86,8 @@ Add `tf.baselines.reference_agents()` to the entrants to read a score against
 buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
 agent's P&L less buy-and-hold's. The reference set includes an Oracle that
 reads the model's fair value. On pt-v19 and earlier `tf.capture_ratio(scores)`
-gives each P&L as a fraction of the Oracle's. On pt-v20, the default, it
-returns `{}` and warns why: market moves there mostly stick, so even perfect
+gives each P&L as a fraction of the Oracle's. On pt-v20 and on pt-v21, the
+default, it returns `{}` and warns why: market moves there mostly stick, so even perfect
 knowledge of fair value leaves little edge, and buy-and-hold is the
 comparison to quote.
 

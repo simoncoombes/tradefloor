@@ -33,10 +33,25 @@ def engine(seed=7, **dials):
                      model=tf.ModelParams.from_preset("pt-v20", **dials))
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
     assert all(values[name] == 0.0 for name in DIALS)
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "fed_put_carry",
+        "fed_drawdown_hold",
+    )} == {
+        "fed_put_carry": 1.0,
+        "fed_drawdown_hold": 0.12,
+    }
 
 
 @pytest.mark.parametrize("dials", [

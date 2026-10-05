@@ -90,11 +90,26 @@ def wash_fills(over):
     return [f for f in x.take_fills("a") if f["ticker"] == t], limits, x
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     p = tf.ModelParams.from_preset(preset).to_dict()
     assert p["book_cross_at_limit"] == 0.0
     assert p["impact_memory_refill"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "book_cross_at_limit",
+        "impact_memory_refill",
+    )} == {
+        "book_cross_at_limit": 1.0,
+        "impact_memory_refill": 1.0,
+    }
 
 
 def test_neither_is_read_without_a_resting_order():

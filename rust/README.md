@@ -20,15 +20,16 @@ libm.
   consumed levels, not because a slippage coefficient said so.
 - **Ground truth.** The simulator knows the fair value it computed and the
   macro regime it is in, so both are readable. No real dataset has labels.
-- **Named, frozen model presets.** Coefficients ship as nineteen presets,
-  `pt-v1` through `pt-v20` with no `pt-v17`, all selectable and all
-  bit-reproducing. `pt-v20` is the default (`params::DEFAULT_PRESET_NAME`). A
+- **Named, frozen model presets.** Coefficients ship as twenty presets,
+  `pt-v1` through `pt-v21` with no `pt-v17`, all selectable and all
+  bit-reproducing. `pt-v21` is the default (`params::DEFAULT_PRESET_NAME`). A
   modified coefficient set fingerprints as `custom-XXXXXXXX` and can never
   present as a shipped one.
 - **A published realism envelope.** A one-year realism table of 19 statistics
   graded against real-market bands, and a long-run check of 17 criteria (40
   rows registered for `pt-v20`, all met), with the misses named as gaps
-  rather than omitted.
+  rather than omitted. <!-- TODO(pt-v21 grade): these counts are pt-v20's;
+  restate them for pt-v21 from its preset record once the grade lands. -->
   See <https://docs.tradefloor.dev/how-its-measured.html>.
 
 ## Using it

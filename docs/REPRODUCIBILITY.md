@@ -10,7 +10,8 @@ for five platforms, runs one fixed simulation on each, and stops if any result
 differs. tradefloor ships its own `exp`, `log`, `pow`, `sin` and `cos`, so
 the system's math library cannot change a result.
 
-`pt-v20` became the default in 0.8.5, replacing `pt-v19`. Every preset from
+`pt-v21` became the default in 0.10.0, replacing `pt-v20`, which was the
+default from 0.8.5. Every preset from
 `pt-v1` on can still be selected, and a market with no agent orders in it
 replays exactly on its named preset in every later release. Each release
 checks that with a digest per shipped preset.
@@ -20,7 +21,8 @@ releases the promise is narrower. 0.8.5 changed how an agent's fills reach
 the market, on every preset, so a traded run recorded before 0.8.5 matches up
 to its first trade and differs after it. One traded `evaluate` run has a
 digest from 0.8.5, checked on all five platforms: the reference agents on
-`pt-v20`, with their orders, fills and scorecards.
+the default preset (`pt-v21` from 0.10.0, `pt-v20` before it), with their
+orders, fills and scorecards.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 lists what each digest covers.
 

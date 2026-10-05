@@ -39,10 +39,27 @@ def prices(model, days=20):
     return f64(e.prices())
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
     assert [values[d] for d in DIALS] == [0.0, 0.0, 0.0]
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "idio_vol_alpha",
+        "idio_vol_beta",
+        "idio_vol_jump_bump",
+    )} == {
+        "idio_vol_alpha": 0.25,
+        "idio_vol_beta": 0.5,
+        "idio_vol_jump_bump": 1.0,
+    }
 
 
 @pytest.mark.parametrize("preset", ["pt-v19", "pt-v20"])

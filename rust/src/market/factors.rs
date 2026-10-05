@@ -1791,8 +1791,8 @@ mod tests {
             let p = crate::params::ModelParams::preset(name).expect("named");
             // pt-v18 switched the recentring on; pt-v19 is built on pt-v18
             // and pt-v20 on pt-v19, and both inherit it. Every preset before
-            // pt-v18 must read 0.0.
-            if *name == "pt-v18" || *name == "pt-v19" || *name == "pt-v20" {
+            // pt-v18 must read 0.0. pt-v21 (0.10.0) is built on pt-v20.
+            if matches!(*name, "pt-v18" | "pt-v19" | "pt-v20" | "pt-v21") {
                 assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
                 continue;
             }
@@ -2316,9 +2316,13 @@ mod tests {
         // trajectory. Asserted against the presets themselves rather than
         // argued from the branch, and it will fail the day a preset turns
         // the law on -- which is the day the change stops being free.
+        // pt-v21 turned it on at 0.10.0, so injected order flow costs
+        // differently on the default from then; every preset before it
+        // still runs the clamped linear law.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
-            assert_eq!(p.order_flow_impact_law, 0.0, "{name}");
+            let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
+            assert_eq!(p.order_flow_impact_law, want, "{name}");
         }
     }
 
@@ -2734,10 +2738,12 @@ mod tests {
     fn every_shipped_preset_divides_by_depth_twice() {
         // The switch ships at 0.0 everywhere. This fails the day a preset
         // turns it on, which is the day order-flow costs change for every
-        // caller who injects flow.
+        // caller who injects flow. pt-v21 turned it on at 0.10.0; every
+        // preset before it divides twice.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
-            assert_eq!(p.order_flow_depth_law, 0.0, "{name}");
+            let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
+            assert_eq!(p.order_flow_depth_law, want, "{name}");
         }
     }
 

@@ -198,6 +198,10 @@ def test_bigger_size_costs_more():
     assert large.cost_bps(thin.ticker) > 2.0 * small.cost_bps(thin.ticker)
 
 
+#: The last default with the clamped participation term (see the test).
+CLAMPED = "pt-v20"
+
+
 def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     """The bound on the test above, asserted rather than left implicit.
 
@@ -212,11 +216,18 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     same three sizes under the measured law. This one stays because the
     default stays, and it will start failing on the day a preset turns the
     law on -- which is the notice anyone reading a cost figure needs.
+
+    That day was 0.10.0: pt-v21, the default from then, runs the measured
+    law (and divides by depth once), and on it the buried pair below reads
+    1763.2 bp against 115.8 and the buried cost is not scale-free (370.7 bp
+    at ten times the gross). So this runs on pt-v20 by name, the last
+    default with the clamp, where every number below was measured; it built
+    the default until then.
     """
     thin = min(UNIVERSE, key=lambda i: i.avg_volume)
     costs = [
         tradefloor.flow_impact(
-            seed=42, universe=UNIVERSE,
+            seed=42, universe=UNIVERSE, model=CLAMPED,
             order_flow={thin.ticker: (size, 0.0)}, ticks=390
         ).cost_bps(thin.ticker)
         for size in (1e4, 1e6, 1e8)
@@ -243,11 +254,11 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     # completely as 114 did. It will fail again when the default next moves
     # the cost surface, which is the notice the docstring above promises.
     lone = tradefloor.flow_impact(
-        seed=42, universe=UNIVERSE,
+        seed=42, universe=UNIVERSE, model=CLAMPED,
         order_flow={thin.ticker: (1e3, 0.0)}, ticks=390
     ).cost_bps(thin.ticker)
     buried = tradefloor.flow_impact(
-        seed=42, universe=UNIVERSE,
+        seed=42, universe=UNIVERSE, model=CLAMPED,
         order_flow={thin.ticker: (1e5, 9.9e4)}, ticks=390
     ).cost_bps(thin.ticker)
     assert lone > 80.0 * buried, (lone, buried)
@@ -255,7 +266,7 @@ def test_order_size_stops_mattering_once_the_imbalance_multiplier_saturates():
     # above cannot make and the half that says there is no floor in it.
     for scale in (10.0, 100.0):
         assert tradefloor.flow_impact(
-            seed=42, universe=UNIVERSE,
+            seed=42, universe=UNIVERSE, model=CLAMPED,
             order_flow={thin.ticker: (1e5 * scale, 9.9e4 * scale)}, ticks=390
         ).cost_bps(thin.ticker) == buried
 

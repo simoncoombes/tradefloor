@@ -499,8 +499,9 @@ class HiddenState(MarketView):
     def dividend_states(self) -> bytes | None:
         """The ``dividend`` block of ``Engine.state_snapshot``: seven f64s a
         name (payout, target yield, price EMA, amount, declared, accrual,
-        paid today), or None on a model without dividends."""
-        return _WRAPPED[self].state_snapshot().get("dividend")
+        paid today), or None on a model without dividends. Read without
+        counting as a copy, as :meth:`economy` is."""
+        return _WRAPPED[self].dividend_states()
 
     def fundamentals(self) -> tuple[list[float], list[float], list[float]]:
         eps, bv, growth = _WRAPPED[self].fundamentals()
@@ -688,10 +689,10 @@ def hidden_state(obs: Any) -> Any:
 
 
 def dividend_states_of(source: Any) -> bytes | None:
-    """The dividend block, from a :class:`HiddenState` or a live engine."""
-    if isinstance(source, HiddenState):
-        return source.dividend_states()
-    return source.state_snapshot().get("dividend")
+    """The dividend block, from a :class:`HiddenState` or a live engine.
+
+    Both read it without counting as a copy of the engine."""
+    return source.dividend_states()
 
 
 def economy_of(source: Any) -> dict[str, Any]:

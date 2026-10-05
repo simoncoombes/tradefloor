@@ -17,7 +17,11 @@ volatility, fat tails, how much stocks move together and how far the VIX jumps
 after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
 `tf.facts.crisis_statistics()` the nineteenth, which needs a run with a crisis
 in it. `tf.envelope.score()` compares each with the range real markets show
-over a year. On the default preset, `pt-v20`, all 19 are inside their ranges.
+over a year. On `pt-v20`, the default from 0.8.5 to 0.9.1, all 19 are inside
+their ranges.
+<!-- TODO(pt-v21 grade): restate this page's counts for pt-v21, the default
+from 0.10.0, from its preset record once the grade and the paired panel run
+land. Every count on the page is pt-v20's until then. -->
 The check runs 30 random seeds. Fifteen of the statistics are read on one
 fixed set of companies, and that fixed-roster panel is repeated on held-out
 seeds and on a held-out set of companies.

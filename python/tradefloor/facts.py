@@ -1,3 +1,5 @@
+# TODO(pt-v21 grade): the headline below names pt-v20, the default from 0.8.5
+# to 0.9.1; restate it for pt-v21 from presets/pt-v21.json once that lands.
 """Stylised facts: what these markets look like, measured, next to real ones.
 
 A simulator you cannot characterise is a simulator you cannot reason about. If
@@ -17,7 +19,7 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days the default preset, pt-v20, holds all fourteen shape
+**At 252 days pt-v20, the default preset from 0.8.5 to 0.9.1, holds all fourteen shape
 statistics in band on the ruled bands `envelope.score` grades with, and at
 504 days all thirteen the ruled 504-day table can read**
 (`corr_persistence_acf1` is unreadable there). On the 2015-2025 decade bands

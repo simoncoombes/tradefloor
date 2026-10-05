@@ -57,7 +57,9 @@ def releases(path):
 # Every preset through pt-v19. pt-v20 sets unemployment_adjustment_half_life to 84 since its graded
 # arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
+# pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names()
+                                    if p not in ("pt-v20", "pt-v21")])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()[
         "unemployment_adjustment_half_life"] == 0.0
@@ -68,6 +70,10 @@ def test_off_on_every_shipped_preset(preset):
 
 def test_pt_v20_sets_the_graded_arms_value():
     assert tf.ModelParams.from_preset("pt-v20").to_dict()["unemployment_adjustment_half_life"] == 84.0
+
+def test_pt_v21_keeps_pt_v20s_value():
+    assert tf.ModelParams.from_preset("pt-v21").to_dict()["unemployment_adjustment_half_life"] == 84.0
+
 
 
 def test_the_impulse_opens_at_its_drive_and_moves_only_at_a_release():

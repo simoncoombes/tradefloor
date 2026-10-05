@@ -157,6 +157,13 @@ PAYLOAD_KEYS = {"step", "day", "steps_per_day", "macro", "assets", "portfolio"}
 ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "best_bid", "best_ask", "avg_daily_volume", "max_order_shares",
               "position", "fundamentals"}
+#: Two more per asset on a model that pays dividends (`dividend`) or runs
+#: the earnings calendar (`next_earnings_in_sessions`). Every preset through
+#: pt-v20 does neither; pt-v21, the default from 0.10.0, does both, so the
+#: default's payload carries them. The assertions below on the default read
+#: `ASSET_KEYS` until then.
+MODEL_ASSET_KEYS = {"dividend", "next_earnings_in_sessions"}
+DEFAULT_ASSET_KEYS = ASSET_KEYS | MODEL_ASSET_KEYS
 PORTFOLIO_KEYS = {"cash", "net_worth", "leverage", "max_leverage",
                   "buying_power", "open_orders"}
 OPEN_ORDER_KEYS = {"symbol", "side", "limit_price", "remaining"}
@@ -176,7 +183,7 @@ def check_the_payload_reaches_the_framework(make_agent):
     assert seen, "the framework was never consulted"
     payload = seen[0]
     assert set(payload) == PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
     assert [a["symbol"] for a in payload["assets"]] == [r[0] for r in ROSTER]
     assert payload["step"] == 0 and payload["day"] == 0
@@ -906,7 +913,7 @@ def test_the_serializer_emits_exactly_the_allowlisted_keys():
     payload = ci.serialize_observation(_observation(world),
                                        history=agent.history)
     assert set(payload) == PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["portfolio"]) == PORTFOLIO_KEYS
 
 
@@ -924,12 +931,12 @@ def test_the_payload_is_frozen_for_the_lts_line():
     payload = ci.serialize_observation(_observation(world))
     assert set(payload) == PAYLOAD_KEYS
     assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["portfolio"]) == PORTFOLIO_KEYS
     assert payload["portfolio"]["open_orders"], "the limit order did not rest"
     assert set(payload["portfolio"]["open_orders"][0]) == OPEN_ORDER_KEYS
     support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
-    for key in sorted(PAYLOAD_KEYS | ASSET_KEYS | PORTFOLIO_KEYS
+    for key in sorted(PAYLOAD_KEYS | DEFAULT_ASSET_KEYS | PORTFOLIO_KEYS
                       | OPEN_ORDER_KEYS):
         assert f"`{key}`" in support, (
             f"docs/SUPPORT.md does not list the frozen payload key {key!r}")

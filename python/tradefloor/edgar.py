@@ -237,8 +237,8 @@ def to_instruments(
 
     That cost, the `initial_s` option below and the macro warning at the
     end describe presets that take the day-zero premium of price over fair
-    value as the mispricing, which is every preset through pt-v19. pt-v20,
-    the default since 0.8.5, draws the opening mispricing itself
+    value as the mispricing, which is every preset through pt-v19. pt-v20
+    and pt-v21, the default since 0.10.0, draw the opening mispricing itself
     (`opening_market_sigma` 0.1 on the index, `opening_mispricing_sigma`
     0.016 per name) and books the rest of each name's premium as its
     fair-value level, which scales the fundamentals it values. On pt-v20 a

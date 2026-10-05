@@ -56,10 +56,45 @@ def prices(days=15, **dials):
     return floats(e.prices())
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
     assert all(values[name] == 0.0 for name in DIALS)
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "market_vol_cycle_ratio",
+        "market_vol_cycle_expansion",
+        "market_vol_cycle_half_life",
+        "market_vol_cycle_relative",
+        "market_vol_cycle_relative_calm",
+        "market_vol_cycle_cap_relative",
+        "market_vol_cycle_pin_neutral",
+        "market_vol_cycle_pin_phase",
+        "market_vol_cycle_trough_release",
+        "market_vol_cycle_release_half_life",
+        "market_vol_cycle_recovery_release",
+        "market_vol_cycle_recovery_scale",
+    )} == {
+        "market_vol_cycle_ratio": 2.4705882352941178,
+        "market_vol_cycle_expansion": 0.82,
+        "market_vol_cycle_half_life": 10.0,
+        "market_vol_cycle_relative": 0.75,
+        "market_vol_cycle_relative_calm": 0.0,
+        "market_vol_cycle_cap_relative": 1.0,
+        "market_vol_cycle_pin_neutral": 1.0,
+        "market_vol_cycle_pin_phase": 1.0,
+        "market_vol_cycle_trough_release": 0.0,
+        "market_vol_cycle_release_half_life": 0.0,
+        "market_vol_cycle_recovery_release": 0.45,
+        "market_vol_cycle_recovery_scale": 0.1,
+    }
 
 
 def test_setting_them_to_zero_changes_nothing():

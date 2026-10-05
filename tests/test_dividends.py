@@ -61,11 +61,26 @@ def states(e):
 # -- off -------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert d["dividend_payout_share"] == 0.0
     assert d["dividend_buyback_substitution"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "dividend_payout_share",
+        "dividend_buyback_substitution",
+    )} == {
+        "dividend_payout_share": 1.2,
+        "dividend_buyback_substitution": 1.0,
+    }
 
 
 def test_the_companions_read_nothing_with_the_dial_at_zero():

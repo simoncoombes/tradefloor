@@ -83,11 +83,21 @@ def formula(ticker, y_before, y_after, one_step):
 
 # -- off, and inert at the default -------------------------------------------
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets four of them; the test after this
+# one holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     for name, value in DEFAULTS.items():
         assert d[name] == value, (preset, name)
+
+
+def test_pt_v21_ships_them_on():
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {name: d[name] for name in DEFAULTS} == {
+        "rate_close_remark": 1.0, "rate_intraday_live": 1.0,
+        "fed_stress_cut": 0.1, "fed_stress_vix": 30.0,
+        "fed_stress_inflation_gap": 2.0}
 
 
 def test_at_the_default_the_fingerprint_is_the_one_before_they_existed():

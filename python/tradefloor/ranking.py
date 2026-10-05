@@ -7,8 +7,9 @@ but it is the wrong unit of judgement, and the difference is not small.
 Measured on this build under pt-v19, with the reference agents over
 ``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11. Every
 capture figure in this docstring is from pt-v19, the last preset where the
-Oracle is a ceiling. The default, pt-v20, reports no capture and ranks each
-agent on its P&L over buy-and-hold's instead (see "On pt-v20" below).
+Oracle is a ceiling. pt-v20 and pt-v21, the default, report no capture and
+rank each agent on its P&L over buy-and-hold's instead (see "On pt-v20"
+below).
 
     pooled capture over 12 seeds        per-seed range      wins
         buy_and_hold     +0.095       [-0.776, +0.836]      9/12
@@ -112,6 +113,7 @@ real.
 A capture divides by the Oracle's P&L, and on pt-v20 that is not a ceiling:
 market moves mostly stick, the Oracle made money in 10 of 14 test markets,
 and its P&L follows the market's month (``baselines.ORACLE_NOT_A_CEILING``).
+The same holds on pt-v21, the default from 0.10.0.
 There `rank` reports no capture at all. :attr:`Ranking.capture_withheld`
 gives the reason, no seed is listed as unmeasurable, and the table sorts on
 each agent's mean P&L over buy-and-hold's in the same market, with the count

@@ -86,10 +86,31 @@ def displacement(over, f, i=2):
     return s, math.log(f64(x.prices())[i] / f64(ctl.prices())[i])
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert all(d[k] == 0.0 for k in DIALS)
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "impact_memory_coefficient",
+        "impact_memory_half_life",
+        "impact_memory_slow_half_life",
+        "impact_memory_slow_weight",
+        "impact_memory_crossover",
+    )} == {
+        "impact_memory_coefficient": 0.65,
+        "impact_memory_half_life": 12.0,
+        "impact_memory_slow_half_life": 780.0,
+        "impact_memory_slow_weight": 0.1,
+        "impact_memory_crossover": 0.001,
+    }
 
 
 def test_shape_dials_are_inert_while_the_coefficient_is_zero():

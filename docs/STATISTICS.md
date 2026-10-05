@@ -12,7 +12,9 @@ The model itself is specified in
 
 ## The sets at a glance
 
-| Set | Count | Horizon | pt-v20, the default from 0.8.5 | pt-v19 |
+<!-- TODO(pt-v21 grade): add a pt-v21 column (the default from 0.10.0) from
+its preset record and grade, and restate the sections below for it. -->
+| Set | Count | Horizon | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
 |---|---|---|---|---|
 | [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 |
 | [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band | 14 of 14 |

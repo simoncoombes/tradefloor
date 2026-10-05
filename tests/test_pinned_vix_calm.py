@@ -50,10 +50,27 @@ def index(e):
     return sum(math.log(p) for p in floats(e.prices())) / len(UNIVERSE)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert [d[n] for n in NAMES] == [0.0, 0.0, 0.0]
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "pinned_vix_calm_knee",
+        "pinned_vix_calm_share",
+        "pinned_vix_priced_cap",
+    )} == {
+        "pinned_vix_calm_knee": 17.6,
+        "pinned_vix_calm_share": 0.2,
+        "pinned_vix_priced_cap": 1.0,
+    }
 
 
 def test_ranges():

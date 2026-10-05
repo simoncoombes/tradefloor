@@ -55,8 +55,8 @@ the nudge reaches every name's volatility two closes later.
 says plainly that it is not a rounding error. It reaches b through names a
 never touched, so ``matrix[a][b]`` is non-zero even when nothing a traded
 is anything b traded or held, and it grows with the horizon because the
-reaction has to cross two closes. On pt-v20, the default, part of it
-arrives at the first close: the close's macro step reads the session's
+reaction has to cross two closes. On pt-v20 and pt-v21, the default, part
+of it arrives at the first close: the close's macro step reads the session's
 index return (the VIX, the 10-year's flight to quality, the corporate
 yield that follows it) and ``macro_publication_repricing`` re-marks every
 name to that step before b's holdings are marked, so one day is enough
@@ -81,7 +81,8 @@ answers as though it did not, and there is no such arm.
 None of the three is the order book. On every preset through pt-v19 agents
 in a cohort take no levels from each other, because
 :meth:`Portfolio.execute` reads the ladder and removes nothing. Under a
-model with ``book_shared`` on, as pt-v20, the default, has it, they do: an
+model with ``book_shared`` on, as pt-v20 and pt-v21, the default, have it,
+they do: an
 agent later in a step's arrival order meets the book an earlier one left.
 That order is label order at ``book_arrival_shuffle`` 0.0, so ``levels``
 then runs mostly from the earlier label to the later one; with the switch
@@ -583,7 +584,8 @@ def _path(world: World, fork_step: int,
     Each step's row is the cross-section the world showed its agents when
     that step opened (``World._step_opens``). Reconstructing it from the
     trace instead, as the row the previous step's session left, is right
-    within a day and wrong across a close on pt-v20, the default: its close
+    within a day and wrong across a close on pt-v20 and on pt-v21, the
+    default: its close
     re-marks every traded name to the macro state it publishes
     (``macro_publication_repricing``), so the next day's first step opens
     at the re-marked price, not the last print. A fill on a day's first

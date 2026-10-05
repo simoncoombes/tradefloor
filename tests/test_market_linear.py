@@ -31,13 +31,18 @@ def offsets(engine):
 # Every preset through pt-v19. pt-v20 sets fair_value_market_linear to 1 since its graded
 # arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
+# pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names()
+                                    if p not in ("pt-v20", "pt-v21")])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_market_linear"] == 0.0
 
 
 def test_pt_v20_sets_the_graded_arms_value():
     assert tf.ModelParams.from_preset("pt-v20").to_dict()["fair_value_market_linear"] == 1.0
+
+def test_pt_v21_keeps_pt_v20s_value():
+    assert tf.ModelParams.from_preset("pt-v21").to_dict()["fair_value_market_linear"] == 1.0
 
 
 def test_it_reads_nothing_without_a_market_share():
@@ -154,9 +159,22 @@ def _level_moves(**dials):
     return [b - a for a, b in zip(before, offsets(e))], floats(e.prices())
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_the_excess_share_is_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_market_excess_share"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "fair_value_market_excess_share",
+    )} == {
+        "fair_value_market_excess_share": 0.5,
+    }
 
 
 def test_the_excess_share_at_zero_is_the_ceiling_as_it_stood():

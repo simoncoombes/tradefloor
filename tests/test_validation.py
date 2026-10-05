@@ -70,8 +70,10 @@ def test_the_box_ran_on_the_engine_and_digest_the_record_names():
     assert record["engine_commit"] == commit
     assert record["box"] == "ptv20g6"
     kat = (BOX / "known-answer.txt").read_text()
-    sim = json.loads((ROOT / "tests" / "known_answer.json").read_text())[
-        "simulationSha256"]
+    # pt-v20's default-trajectory digest, KAT_VERSION 28. This read
+    # `tests/known_answer.json` while pt-v20 was the default; from 0.10.0
+    # that file holds pt-v21's, and the box graded pt-v20.
+    sim = "72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e"
     assert f"sim      {sim}" in kat
 
 

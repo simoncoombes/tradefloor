@@ -81,7 +81,8 @@ people measured this and produced three numbers by conflating them.
 ``fair_value`` reconstructs EXACTLY. It is a pure function of six inputs,
 four supplied and two observable, so there is nothing approximate about it.
 On pt-v19 and every preset before it, that public function IS the engine's
-anchor. From pt-v20, the default since 0.8.5, it is not: the engine's fair
+anchor. From pt-v20 on, and so on pt-v21, the default since 0.10.0, it
+is not: the engine's fair
 value carries a level of its own -- the part of each name's opening premium
 the published fundamentals do not explain, news that moves value for good,
 and an earnings cycle -- so the published fundamentals are a noisy read of
@@ -182,6 +183,7 @@ from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
 from .common import (OBSERVATION_SCHEMA_VERSION, AdapterInfo,
                      FrameworkError, IntegrationError, MissingDependencyError)
 from .common import SIDES as _COMMON_SIDES
+from .common import _dividends_paid, _next_reports
 from .common import Action as _CommonAction
 from .common import Decision as _CommonDecision
 from .common import DecisionError as _CommonDecisionError
@@ -423,10 +425,17 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
 
     rows = [list(row) for row in history]
     facts = fundamentals or {}
+    # The two keys the shared serializer adds on a model that pays dividends
+    # or runs the earnings calendar (`common.serialize_observation`), read
+    # the same way, so the two payloads agree on every model. Absent, and
+    # the payload the bytes it was, on a model with neither.
+    paid = _dividends_paid(obs.engine)
+    reports = _next_reports(obs.engine)
     assets = []
     for i, ticker in enumerate(obs.tickers):
         book = obs.book(ticker)
         adv = obs.avg_volume(ticker)
+        extra = {} if paid is None else {"dividend": paid[i]}
         assets.append({
             "symbol": ticker,
             "price": obs.price(ticker),
@@ -441,7 +450,10 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
             # Public company facts, supplied by the caller rather than read
             # off the simulator. Absent is fine and renders as absent.
             "fundamentals": dict(facts.get(ticker, {})),
+            **extra,
         })
+        if reports:
+            assets[-1]["next_earnings_in_sessions"] = reports.get(ticker)
 
     portfolio = obs.portfolio
     # The funding limit, and what is left under it. Without these the payload

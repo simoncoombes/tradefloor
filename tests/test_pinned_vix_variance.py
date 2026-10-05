@@ -47,9 +47,22 @@ def index(e):
     return sum(math.log(p) for p in floats(e.prices())) / len(UNIVERSE)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_the_share_is_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["pinned_vix_variance_share"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "pinned_vix_variance_share",
+    )} == {
+        "pinned_vix_variance_share": 0.7,
+    }
 
 
 def test_the_share_is_refused_outside_zero_to_one():

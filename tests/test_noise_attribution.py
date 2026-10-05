@@ -335,8 +335,13 @@ def test_the_default_horizon_reaches_the_open_after_an_event():
     `macro_publication_repricing` at 0 here). On pt-v20 itself the close's
     re-mark carries a second-order sliver of the jump into that close's
     price (`REMARK_SHARE`), so the short horizon measures almost nothing
-    rather than nothing, and the default still reaches the open."""
-    root = world()
+    rather than nothing, and the default still reaches the open.
+
+    On pt-v20 by name, the default until 0.10.0, when this built the
+    default: `REMARK_SHARE` is pt-v20's measurement. On pt-v21 the same
+    sliver reads 4.0e-6 of the largest effect for the price and 1.4e-6 for
+    the P&L, so it is still second order, at about sixty times pt-v20's."""
+    root = world(model="pt-v20")
     reached = noise.attribute(root, (1, 1), noise.column("price", 2),
                               "event", streams=["jumps"])
     assert reached.horizon == 2
@@ -629,7 +634,7 @@ def test_the_default_horizon_holds_for_a_target_that_names_no_day():
     writes no price; on pt-v20 the close's re-mark carries the second-order
     sliver `REMARK_SHARE` describes, measured here as a bound.
     """
-    remarked = world()
+    remarked = world(model="pt-v20")  # was world(), the default until 0.10.0
     root = world(model=NO_REMARK)
     for target in (noise.pnl(),
                    lambda arm: float(arm.summary()["pnl_since"])):

@@ -53,12 +53,29 @@ def table(e):
     return pa.table(e.macro_table()).to_pydict()
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert d["vix_stress_premium"] == 0.0
     assert d["vix_stress_premium_knee"] == 0.0
     assert d["vix_stress_premium_cap"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "vix_stress_premium",
+        "vix_stress_premium_knee",
+        "vix_stress_premium_cap",
+    )} == {
+        "vix_stress_premium": 3.0,
+        "vix_stress_premium_knee": 0.6,
+        "vix_stress_premium_cap": 0.35,
+    }
 
 
 def test_inert_at_zero_the_published_vix_is_the_state():

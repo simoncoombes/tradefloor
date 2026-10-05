@@ -310,7 +310,8 @@ class Execution:
         near, and the +/-0.03% clamp that once made the channel
         intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
         immune to that channel, its final prices predating the first
-        repriced variance target. On pt-v20, the default from 0.8.5, a
+        repriced variance target. On pt-v20 and pt-v21, the default from
+        0.10.0, a
         faster form of it arrives at the first close: the close's macro
         step reads the session's index return (the VIX, the 10-year's
         flight to quality, the corporate yield that follows it), and
@@ -323,7 +324,8 @@ class Execution:
         ``test_tca.py`` asserts. When the untouched names must be
         byte-exact, pin
         VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``, and
-        on pt-v20, the default from 0.8.5, the corporate bond yield too:
+        on pt-v20 and pt-v21, the default from 0.10.0, the corporate bond
+        yield too:
         its flight to quality moves the 10-year with the session's index
         return, and the corporate yield follows the 10-year every session
         (``flight_to_quality_day``, ``corporate_yield_daily``). A pinned

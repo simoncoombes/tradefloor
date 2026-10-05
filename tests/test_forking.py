@@ -1303,18 +1303,11 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: and for the same reason: a field that moves nothing WITHOUT a named reason
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
+#:
+#: Three left this table at 0.10.0, when the default moved to pt-v21, whose
+#: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
+#: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
-    "fed_drawdown_mcap_prev":
-        "the total market cap at the last close, the base of the drawdown "
-        "window's next return (`fed_drawdown_hold`, "
-        "`market_vol_cycle_recovery_release`). Given a fresh engine's value, "
-        "the next close books one wrong return into the 252-session window. "
-        "Under `CRISIS` the policy rate sits at 0.05, where the hold has no "
-        "rise to hold, and the phase stays in a contraction whose release "
-        "reads the rally off the low, which one session's return does not "
-        "reach at this model's blanket scale. tests/test_fed_put_carry.py "
-        "carries the window across a restore and holds it in both state "
-        "hashes; a snapshot without the key is refused by name.",
     "idio_jump_pending":
         "the name's own jump waiting to enter the next close's variance "
         "update (`idio_vol_jump_bump`). A fresh engine holds zeros, and "
@@ -1359,14 +1352,6 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_earnings_calendar.py::test_the_key_is_carried_only_while_"
         "the_calendar_runs restores into an engine built from another seed, "
         "where a snapshot without it reports on other dates.",
-    "night_market_factor":
-        "tonight's market draw, which the session's live lagged wire takes "
-        "off the day's factor. Dropped, the wire reads the whole day's "
-        "factor, and only a tick where the two have opposite signs prices "
-        "differently; at this model's wire (tilt 0.025, lag 0.46) and night "
-        "the rest of this session holds none. tests/test_overnight_split.py::"
-        "test_a_restore_mid_session_keys_the_live_wire_on_the_session "
-        "exaggerates the wire and restores without it, and diverges.",
     "jump_move":
         "the jump waiting to be traded in, read by the volume scale only off "
         "`volume_move_jump_share` 1.0 and without a night split. This model "
@@ -1374,15 +1359,6 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "reads the day's move from the last close, jumps included, so "
         "nothing reads it; tests/test_forking.py reached it through the "
         "volume scale before the split was in this model.",
-    "market_vol_cycle_log":
-        "the cycle's volatility multiplier (market_vol_cycle_ratio). It "
-        "leaves its phase's target only after the true phase turns, and an "
-        "engine restored without it restarts ON that target at its next "
-        "close. `CRISIS` fixes the phase in a contraction for every session "
-        "both engines run, so the multiplier sits on its target from the "
-        "first close and a restore without it lands on the same value. "
-        "tests/test_market_vol_cycle.py::test_a_snapshot_without_the_"
-        "multiplier_diverges_after_a_turn turns the phase and sees it.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "

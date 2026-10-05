@@ -153,8 +153,11 @@ def test_a_cohort_trace_row_carries_the_agents_map_and_no_top_level_fields():
     world = cohort()
     world.run(days=1)
     row = world.trace[0]
+    # `arrival`, the step's arrival order, rides along on a model that
+    # shuffles it (`book_arrival_shuffle`), which pt-v21, the default from
+    # 0.10.0, does; this set had no `arrival` while pt-v20 was the default.
     assert set(row) == {"step", "day", "step_of_day", "macro", "prices",
-                        "agents"}
+                        "agents", "arrival"}
     assert set(row["agents"]) == {"alpha", "beta"}
     for fields in row["agents"].values():
         assert set(fields) == {"decision", "orders", "fills", "refused",
@@ -189,13 +192,18 @@ def test_the_cohort_flow_reaches_the_market_as_one_merged_order_flow():
     on a market that never read the flow.
     """
     cash = 10_000_000.0
+    # pt-v20 by name, the default until 0.10.0 (this built the default). On
+    # pt-v21 an agent's fills also feed the impact memory, whose law is
+    # concave in size, so two sweeps of 10,000 are not one of 20,000 there.
+    base = "pt-v20"
 
     def solo(agent):
-        world = World(seed=SEED, universe=roster(), agent=agent, cash=cash)
+        world = World(seed=SEED, universe=roster(), agent=agent, cash=cash,
+                      model=base)
         world.run(days=1)
         return world.digest()
 
-    both = cohort(cash=cash,
+    both = cohort(cash=cash, model=base,
                   agents={"alpha": Buyer(0, at=0, shares=10_000.0),
                           "beta": Buyer(0, at=0, shares=10_000.0)})
     both.run(days=1)

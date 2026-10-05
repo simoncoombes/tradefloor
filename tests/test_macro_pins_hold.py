@@ -46,11 +46,26 @@ def index(e):
     return sum(math.log(p) for p in floats(e.prices())) / len(UNIVERSE)
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_both_switches_are_off_on_every_shipped_preset(preset):
     dials = tf.ModelParams.from_preset(preset).to_dict()
     assert dials["macro_pins_hold"] == 0.0
     assert dials["pinned_vix_feedback"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "macro_pins_hold",
+        "pinned_vix_feedback",
+    )} == {
+        "macro_pins_hold": 1.0,
+        "pinned_vix_feedback": 0.8,
+    }
 
 
 def test_the_hold_refuses_anything_but_zero_or_one():

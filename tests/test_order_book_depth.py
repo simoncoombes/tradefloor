@@ -62,8 +62,16 @@ def f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 
+#: The preset the live arms are built on: pt-v20, whose book is `LIVE`.
+#: This was the default (`from_preset()`) until 0.10.0. pt-v21, the default
+#: from then, adds the impact memory on top of the book, which needs
+#: `book_shared` and refuses the arms below that switch it off, and it moves
+#: every impact figure measured here.
+BASE = "pt-v20"
+
+
 def live(**over) -> tf.ModelParams:
-    return tf.ModelParams.from_preset(**{**LIVE, **over})
+    return tf.ModelParams.from_preset(BASE, **{**LIVE, **over})
 
 
 def warmed(model=None, universe=ROSTER, seed=92001) -> tf.Engine:
@@ -102,6 +110,9 @@ BOOK_ON = {"pt-v20": dict(book_depth_coefficient=0.75, book_depth_exponent=0.5,
                           book_depth_reach=1.0, book_shared=1.0,
                           book_refill_half_life=27.0, book_resting=1.0,
                           fill_impact_coefficient=0.314)}
+# pt-v21 (0.10.0) is built on pt-v20 and keeps its book, with the linear fill
+# law at 0.15: the impact memory carries the rest of an agent's impact.
+BOOK_ON["pt-v21"] = dict(BOOK_ON["pt-v20"], fill_impact_coefficient=0.15)
 
 
 @pytest.mark.parametrize("preset", tuple(tf.preset_names()))
@@ -118,7 +129,11 @@ def test_an_untraded_market_is_the_same_at_any_setting_of_the_dials():
     settles through the maker's ladder at any setting, so three untraded
     days are the same market to the bit, every column and every draw."""
     runs = []
-    for model in (None, live()):
+    # pt-v20 with every book dial at 0.0 against pt-v20 itself. This read
+    # `(None, live())`, which was pt-v19 against pt-v19 with the book while
+    # pt-v19 was the default, and a preset against itself from 0.8.5.
+    off = tf.ModelParams.from_preset(BASE, **{name: 0.0 for name in DIALS})
+    for model in (off, live()):
         e = tf.Engine(seed=7, universe=ROSTER, model=model)
         for _ in range(3):
             e.open_market()
@@ -1008,8 +1023,9 @@ def test_evaluate_trades_through_the_live_book_and_counts_the_flow_once():
                            cash=1e12)["a"]
     assert live_card.trades == off_card.trades == 1
     assert live_card.turnover > 2 * off_card.turnover, "size was priced, not cut"
-    # The dials on the default's base are pt-v20 itself. On pt-v19's base,
-    # the default until 0.8.5, they fingerprinted as "custom-".
+    # The dials on pt-v20's base are pt-v20 itself (the default's base until
+    # 0.10.0). On pt-v19's base, the default until 0.8.5, they
+    # fingerprinted as "custom-".
     assert live_card.model_fingerprint == "pt-v20"
 
 

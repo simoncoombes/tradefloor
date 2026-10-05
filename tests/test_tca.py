@@ -270,8 +270,13 @@ def test_a_round_trip_leaves_no_lasting_information_impact():
     from tradefloor.harness import session_clock
     import struct
 
+    # pt-v20 by name, the default until 0.10.0 (this built the default). On
+    # pt-v21 the round trip leaves -3.55e-5 in `order_flow_impact` on this
+    # seed, all of it from the impact memory (`impact_memory_*`; pt-v20 with
+    # those dials alone leaves -7.0e-5): the memory carries the buy's
+    # displacement into the sell, so the two do not cancel to the bit.
     def lasting(unwind: bool) -> float:
-        engine = Engine(seed=2026, universe=UNIVERSE)
+        engine = Engine(seed=2026, universe=UNIVERSE, model="pt-v20")
         portfolio = Portfolio()
         ticker = engine.tickers[0]
         engine.open_market()

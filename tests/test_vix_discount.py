@@ -35,13 +35,18 @@ def engine(gain, **extra):
 # Every preset through pt-v19. pt-v20 sets fair_value_vix_discount to 0.35 since its graded
 # arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
+# pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names()
+                                    if p not in ("pt-v20", "pt-v21")])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_vix_discount"] == 0.0
 
 
 def test_pt_v20_sets_the_graded_arms_value():
     assert tf.ModelParams.from_preset("pt-v20").to_dict()["fair_value_vix_discount"] == 0.35
+
+def test_pt_v21_keeps_pt_v20s_value():
+    assert tf.ModelParams.from_preset("pt-v21").to_dict()["fair_value_vix_discount"] == 0.35
 
 
 def test_nothing_moves_below_the_knee():
@@ -144,9 +149,22 @@ def test_the_smoothed_discount_moves_prices_less_on_the_day_than_the_direct_one(
 # ---- fair_value_vix_release_half_life (r16 spike): the discount is built at
 # `fair_value_vix_half_life` and given back at this. Off (0.0) everywhere.
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_the_release_half_life_is_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_vix_release_half_life"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "fair_value_vix_release_half_life",
+    )} == {
+        "fair_value_vix_release_half_life": 504.0,
+    }
 
 
 def _exposures(release, pinned=6, after=6, **extra):

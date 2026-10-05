@@ -85,11 +85,26 @@ def meeting_steps(rows):
     return steps
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets these; the test after this one
+# holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert d["cycle_nowcast_accuracy"] == 0.0
     assert d["corporate_spread_cycle"] == 0.0
+
+
+def test_pt_v21_ships_them_on():
+    """pt-v21, the default from 0.10.0, ships them at the values its grade
+    read."""
+    d = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {n: d[n] for n in (
+        "cycle_nowcast_accuracy",
+        "corporate_spread_cycle",
+    )} == {
+        "cycle_nowcast_accuracy": 0.4,
+        "corporate_spread_cycle": 0.75,
+    }
 
 
 def test_at_zero_nothing_moves_and_nothing_is_carried():

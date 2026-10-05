@@ -498,7 +498,11 @@ def test_an_upward_market_jump_is_not_recoverable(short_days):
     one number under it and a bar that quoted either end would be picking
     the end that clears.
     """
-    model = dict(tf.ModelParams.from_preset().to_dict())
+    # pt-v20 by name: the default until 0.10.0, when this read
+    # `from_preset()`, and the preset every figure above was measured on.
+    # pt-v21's market jump is -0.03 + 0.01 z, which changes sign at a normal
+    # of exactly 3.0, so the bracket below would not hold there.
+    model = dict(tf.ModelParams.from_preset("pt-v20").to_dict())
     zero_at = -model["jump_mean_market"] / model["jump_sigma_market"]
     assert 3.0 < zero_at < 4.0
 
@@ -508,7 +512,7 @@ def test_an_upward_market_jump_is_not_recoverable(short_days):
 
     rng = np.random.default_rng(7)
     for i, z in enumerate((4.14, 6.0, 8.0)):
-        fwd, r_obs = _planted_day(41 + i, z, rng)
+        fwd, r_obs = _planted_day(41 + i, z, rng, model="pt-v20")
         out = shadow.solve_day(fwd, r_obs, INTENSITIES, sigma=1e-3)
         planted = size_bp(z)
         assert planted > 0.0, z          # the plant really is upward

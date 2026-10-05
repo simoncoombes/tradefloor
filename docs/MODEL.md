@@ -1,7 +1,12 @@
 # The tradefloor model
 
+<!-- TODO(pt-v21): pt-v21 is the default from 0.10.0. State the terms its
+104 dials switch on (ModelParams::pt_v21 in rust/src/params.rs lists them)
+and its grade, and move the pt-v20 text below to a "reproducing earlier
+work" section as was done for pt-v19. -->
 This document states the tradefloor market model as equations. It describes
-**tradefloor 0.8.5** running the default preset **pt-v20**. Every equation
+**tradefloor 0.8.5** running **pt-v20**, the default preset from 0.8.5 to
+0.9.1. Every equation
 was read off the code on the `release/0.8.5` branch at commit `8b7ed44`,
 and the sections on what pt-v20's graded arm added (published macro data,
 the market's permanent share, volatility feedback, the packaged recession)

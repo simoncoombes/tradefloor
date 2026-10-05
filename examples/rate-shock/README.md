@@ -62,10 +62,10 @@ rate_adjustment = 1 - (discount - neutral) * sensitivity * (1 + growth * 2)
 ```
 
 where `neutral` is the preset's `neutral_discount_rate`, 0.0482, and
-`sensitivity` its `rate_pe_sensitivity`, 3 on `pt-v20` (the default) and 1.5
-on `pt-v19`. Revenue growth **is** the duration term. On `pt-v20` a 200bp
-rise costs `NOVA` about 10.6% of its multiple and `STAP` about 6.2%; on
-`pt-v19` it cost them 5.2% and 3.1%.
+`sensitivity` its `rate_pe_sensitivity`, 3 on `pt-v21` (the default) and
+`pt-v20`, and 1.5 on `pt-v19`. Revenue growth **is** the duration term. On
+`pt-v21` and `pt-v20` a 200bp rise costs `NOVA` about 10.6% of its multiple
+and `STAP` about 6.2%; on `pt-v19` it cost them 5.2% and 3.1%.
 
 That correspondence is honest for this market and does not transfer. A real
 utility is a long-duration bond proxy; here, on one percent revenue growth, it
@@ -128,12 +128,12 @@ print(agree(control, shock).render())
 
 ```
   market columns         identical  18 columns x 4
-  prices                 identical  122.94  93.23  71.31  55.37
-  order book             identical  232 levels
+  prices                 identical  114.63  87.74  68.82  52.54
+  order book             identical  212 levels
   generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  43 fields, day 20
-  portfolio              identical  $7,397,523 cash, 4 positions
+  whole engine state     identical  61 fields, day 20
+  portfolio              identical  $3,558,782 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
 ```
@@ -144,7 +144,7 @@ not identical here, everything downstream is comparing two different markets.
 
 The two forks are for different things. `fork()` copies the engine's state
 snapshot and takes under a millisecond; `checkpoint()` records the seed, the
-roster and every input that reached the engine as about 30 kB of JSON, costs
+roster and every input that reached the engine as about 33 kB of JSON, costs
 what the run cost to restore, and survives the process. Use the first for an
 experiment inside one script and the second for anything you save or cite.
 
@@ -191,31 +191,31 @@ not cut evenly:
 
 ```
             growth   control    shock      cut
-    NOVA      0.35    0.2127   0.0535   -74.9%
-    HELX      0.18    0.2127   0.0591   -72.2%
-    BRDG      0.06    0.2127   0.0639   -70.0%
-    STAP      0.01    0.2127   0.0661   -68.9%
+    NOVA      0.35    0.2375   0.0551   -76.8%
+    HELX      0.18    0.2375   0.0609   -74.3%
+    BRDG      0.06    0.2375   0.0658   -72.3%
+    STAP      0.01    0.2375   0.0681   -71.3%
 ```
 
 Twenty days later the two markets are apart, in the same order:
 
 ```
                                NOVA       HELX       BRDG       STAP
-  control        40 days     119.92      94.15      73.21      53.12
-  +200bps        40 days     107.26      86.27      68.24      49.81
-  difference                -10.55%     -8.37%     -6.79%     -6.22%
+  control        40 days     117.90      85.84      72.15      52.31
+  +200bps        40 days     105.45      78.68      67.16      49.04
+  difference                -10.56%     -8.35%     -6.92%     -6.26%
 ```
 
 And the two books:
 
 ```
                                     control          +200bps
-  final gross exposure                0.90x            0.38x
-  turnover                      $17,479,798      $37,342,227
-  cost against arrival               $4,962          $15,561
-  cash                           $5,166,814      $30,466,941
-  P&L since the fork              $-282,549      $-3,602,512
-  max drawdown since                  4.80%            8.16%
+  final gross exposure                0.89x            0.35x
+  turnover                       $4,226,207      $39,778,770
+  cost against arrival               $1,501          $34,185
+  cash                           $5,592,938      $30,721,513
+  P&L since the fork              $+816,937      $-3,423,208
+  max drawdown since                  2.55%            8.08%
 ```
 
 The behaviour comes first here deliberately. The P&L difference is one draw of

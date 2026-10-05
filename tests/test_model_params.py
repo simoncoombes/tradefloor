@@ -32,6 +32,10 @@ DEFAULT = tradefloor.ModelParams.from_preset().fingerprint
 
 UNIVERSE = tradefloor.Universe.random(10, seed=3)
 
+#: The preset `PERTURBATIONS` was measured on: pt-v20, the default from 0.8.5
+#: to 0.9.1 (see the note in the test that reads it).
+TABLE_PRESET = "pt-v20"
+
 
 def run_market(model=None, *, seed=42, days=3, universe=UNIVERSE):
     kwargs = {} if model is None else {"model": model}
@@ -2157,10 +2161,18 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # change, and in the perturbed arm alone it would be read as the dial's.
     # Where every companion is the default's own value the base is the
     # default engine bit for bit.
+    #
+    # PINNED TO pt-v20 BY NAME at 0.10.0, when pt-v21 took the default. Every
+    # row and reason below was measured on pt-v20, the default from 0.8.5,
+    # and on pt-v21 a hundred and four of the dials are already off zero, so
+    # many rows would perturb a dial to the value the base already carries.
+    # Re-basing the table on pt-v21 needs new values for those rows and a
+    # fresh reading of every reason; until then the table is pt-v20's, which
+    # it describes exactly. Was the default engine (`None`).
     companions = COMPANIONS.get(name, {})
     base = market_state(run_market(
-        tradefloor.ModelParams.from_preset_unchecked(**companions)
-        if companions else None))
+        tradefloor.ModelParams.from_preset_unchecked(TABLE_PRESET, **companions)
+        if companions else TABLE_PRESET))
     #
     # `from_preset_unchecked`, and this is the case the hatch exists for.
     # EIGHT rows of this table move a dial pt-v19 DERIVES -- the cap off its
@@ -2188,7 +2200,7 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # The universal invariant is NOT waived and cannot be; the one row that
     # would have tripped it carries its companion dial instead.
     custom = tradefloor.ModelParams.from_preset_unchecked(
-        **{name: value}, **companions)
+        TABLE_PRESET, **{name: value}, **companions)
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
@@ -2815,8 +2827,15 @@ def test_tca_analyse_runs_the_model_in_both_worlds():
     # The custom model is a different market...
     assert custom.baseline_final != default.baseline_final
     # ...but BOTH of its worlds ran it, so the counterfactual is still
-    # clean: on one day nothing untraded can move under any model.
-    assert custom.untouched_moved() == []
+    # clean. This read "on one day nothing untraded can move under any
+    # model" and asserted it unpinned while pt-v20 was the default. On
+    # pt-v21 the close's macro step, which the trade's index move reaches,
+    # re-marks the untouched names by about 0.003 bp here, the channel
+    # `Execution.untouched_moved` documents; with the VIX and the corporate
+    # yield pinned, as that docstring says, nothing untraded moves.
+    pinned = tradefloor.Scenario().hold(vix=15.0, corporate_bond_yield=0.055)
+    assert tradefloor.tca.analyse(_BuyFirst(), **kwargs, model=CUSTOM,
+                                  scenario=pinned).untouched_moved() == []
 
 
 def test_run_scenario_and_compare_run_the_model():

@@ -8,7 +8,7 @@ re-running a 96-core measurement.
 
     >>> import tradefloor as tf
     >>> rec = tf.preset_record()            # the shipped default
-    >>> rec["in_band"]["252"]            # pt-v20, the shipped default
+    >>> rec["in_band"]["252"]            # on pt-v20's record
     15
 
 The point is that a figure and the preset it describes travel together. The

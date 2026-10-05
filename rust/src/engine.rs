@@ -556,6 +556,14 @@ pub struct Engine {
     /// process, in roster order, 0.0 where nothing moved. Per-day state
     /// like the attribution: the tape books it onto the day's first row.
     overnight_moves: Vec<f64>,
+    /// What each name's `s` gave up to its fair value at the last open under
+    /// a night split with a permanent share (`overnight_market_share` or
+    /// `overnight_idio_share` beside `fair_value_news_share`), in roster
+    /// order, 0.0 where nothing moved. Per-day output like `overnight_moves`
+    /// and for the same reader: the tape books it onto the day's first row
+    /// as `fair_value_shift`, so the columns sum to the change in `s` there.
+    /// Not state, not hashed, not in the snapshot.
+    overnight_fair_value_moves: Vec<f64>,
     /// What each name's `s` gave up to its fair value at the last close's
     /// jump, in roster order (`fair_value_shift`), 0.0 where nothing moved.
     /// Per-day state like `overnight_moves`: the tape books it onto the row
@@ -1736,7 +1744,13 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.8.5 this is [`PT_V20`]: pt-v19 with a tape that follows the
+    /// Since 0.10.0 this is [`PT_V21`]: pt-v20 with 104 dials moved, each
+    /// inert on every earlier preset (see [`crate::params::ModelParams::pt_v21`]).
+    // TODO(pt-v21 grade): the rows it holds and the rows it reads further
+    // from real than pt-v20, from the grade and the paired level run, as
+    // the paragraph below states them for pt-v20.
+    ///
+    /// From 0.8.5 to 0.9.1 it was [`PT_V20`]: pt-v19 with a tape that follows the
     /// model price, a closing cross, the stock- and sector-specific part of
     /// every shock in fair value, the agent-facing book on, the curve dials
     /// and the aggregate earnings cycle. It holds all fifteen rows of the
@@ -1776,8 +1790,9 @@ impl Engine {
     ///
     /// [`PT_V19`]: crate::params::PT_V19
     /// [`PT_V20`]: crate::params::PT_V20
+    /// [`PT_V21`]: crate::params::PT_V21
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V20
+        crate::params::PT_V21
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam).
@@ -1937,6 +1952,7 @@ impl Engine {
             },
             opening_carry: Vec::new(),
             overnight_moves: vec![0.0; companies_len],
+            overnight_fair_value_moves: vec![0.0; companies_len],
             jump_fair_value_moves: vec![0.0; companies_len],
             dividend_moves: vec![0.0; companies_len],
             distribution_log: Vec::new(),
@@ -6684,6 +6700,8 @@ impl Engine {
         self.draw_market_day_scale();
         self.overnight_moves.clear();
         self.overnight_moves.resize(self.companies.len(), 0.0);
+        self.overnight_fair_value_moves.clear();
+        self.overnight_fair_value_moves.resize(self.companies.len(), 0.0);
         self.earnings_moves.clear();
         self.earnings_moves.resize(self.companies.len(), 0.0);
         if self.night_split_on() {
@@ -7262,6 +7280,13 @@ impl Engine {
                     if let Some(acc) = self.attribution.get_mut(index) {
                         acc[crate::market::factors::FAIR_VALUE_SLOT] += s_new - after;
                     }
+                    // For the tape, beside `overnight_moves`: the first
+                    // row's `fair_value_shift` carries it, or the columns
+                    // miss that row's change in `s` by the night's
+                    // permanent part.
+                    if let Some(slot) = self.overnight_fair_value_moves.get_mut(index) {
+                        *slot = s_new - after;
+                    }
                     let v = company.stock.fair_value_offset.unwrap_or(0.0);
                     company.stock.fair_value_offset = Some(v + (dv - 0.5 * dv * dv));
                     s_now = s_new;
@@ -7314,6 +7339,14 @@ impl Engine {
     /// process, in roster order; 0.0 where nothing moved.
     pub fn overnight_moves(&self) -> &[f64] {
         &self.overnight_moves
+    }
+
+    /// What each name's `s` gave up to its fair value at the last open
+    /// under a night split with a permanent share, in roster order; 0.0
+    /// where nothing moved. The tape's `fair_value_shift` on the day's first
+    /// row.
+    pub fn overnight_fair_value_moves(&self) -> &[f64] {
+        &self.overnight_fair_value_moves
     }
 
     /// The move each name's `s` took at the last open's ex-date drop, in
@@ -7851,7 +7884,8 @@ impl Engine {
         // stood here, unchanged.
         //
         // THE CYCLE'S VOLATILITY MULTIPLIER (`market_vol_cycle_ratio`): a
-        // branch at 0.0, every shipped preset, that reads and moves nothing.
+        // branch at 0.0, every preset through pt-v20, that reads and moves
+        // nothing (pt-v21 sets it).
         // Off it, the multiplier steps toward the true phase's value every
         // close and scales the level the variance's baseline is taken at
         // and the VIX coupling's denominator -- except on a FORCED close,
@@ -12754,8 +12788,8 @@ mod tests {
     }
 
     /// [`engine`] under pt-v19: the snapshot-priced flow path, where an
-    /// agent's fills reach the first tick's `order_volumes`. pt-v20, the
-    /// default from 0.8.5, turns `fill_impact_coefficient` on and routes them
+    /// agent's fills reach the first tick's `order_volumes`. pt-v20 and
+    /// pt-v21 turn `fill_impact_coefficient` on and routes them
     /// through the agent-facing book's pending flow instead.
     fn engine_v19(seed: u64) -> Engine {
         Engine::with_params(
@@ -12765,6 +12799,21 @@ mod tests {
             create_initial_central_bank_state(0),
             sectors(),
             crate::params::PT_V19,
+        )
+    }
+
+    /// [`engine`] under pt-v20 by name: the default until 0.10.0, and the
+    /// preset with every one of pt-v21's dials off, which the tests of those
+    /// dials read as "off". They read `engine(seed)` while pt-v20 was the
+    /// default.
+    fn engine_v20(seed: u64) -> Engine {
+        Engine::with_params(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            crate::params::PT_V20,
         )
     }
 
@@ -12795,7 +12844,7 @@ mod tests {
         }
 
         fn with(d: f64) -> Engine {
-            let mut params = Engine::default_model();
+            let mut params = crate::params::PT_V20;
             params.market_beta_normalise = d;
             Engine::with_params(
                 13,
@@ -12865,7 +12914,7 @@ mod tests {
         use super::*;
 
         fn with(dials: impl FnOnce(&mut crate::params::ModelParams)) -> Engine {
-            let mut params = Engine::default_model();
+            let mut params = crate::params::PT_V20;
             dials(&mut params);
             Engine::with_params(
                 13,
@@ -12956,7 +13005,7 @@ mod tests {
         use crate::economy::CyclePhase;
 
         fn with(dials: impl FnOnce(&mut crate::params::ModelParams)) -> Engine {
-            let mut params = Engine::default_model();
+            let mut params = crate::params::PT_V20;
             dials(&mut params);
             Engine::with_params(
                 11,
@@ -13004,7 +13053,9 @@ mod tests {
 
         #[test]
         fn off_the_multiplier_is_never_set_read_or_hashed() {
-            let mut e = engine(11);
+            // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+            // this test reads as off. Each `engine_v20` here read `engine`.
+            let mut e = engine_v20(11);
             assert_eq!(e.params().market_vol_cycle_ratio, 0.0);
             for day in 1..=5 {
                 e.close_day(day);
@@ -13018,7 +13069,7 @@ mod tests {
                 c.close_day(day);
             }
             assert_eq!(c.market_vol_cycle_log(), None);
-            let mut d = engine(11);
+            let mut d = engine_v20(11);
             for day in 1..=5 {
                 d.close_day(day);
             }
@@ -13166,7 +13217,9 @@ mod tests {
         /// before a close), so the close reads the same state.
         #[test]
         fn a_free_close_scales_the_baseline_by_the_multiplier_squared() {
-            let mut off = engine(11);
+            // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+            // this test reads as off. Each `engine_v20` here read `engine`.
+            let mut off = engine_v20(11);
             let mut e = on(2.0, 0.75, 21.0, 0.0);
             let phase = e.economy().cycle_phase;
             assert_eq!(phase, off.economy().cycle_phase);
@@ -13248,7 +13301,9 @@ mod tests {
         /// but writes the variance the off engine writes.
         #[test]
         fn a_forced_close_moves_the_multiplier_but_does_not_apply_it() {
-            let mut off = engine(11);
+            // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+            // this test reads as off. Each `engine_v20` here read `engine`.
+            let mut off = engine_v20(11);
             let mut e = on(2.0, 0.75, 21.0, 1.0);
             off.set_vix_sets_variance_pending(true);
             e.set_vix_sets_variance_pending(true);
@@ -13489,7 +13544,7 @@ mod tests {
         let lag = 4usize;
         let params = crate::params::ModelParams {
             cycle_publication_lag: lag as f64,
-            ..Engine::default_model()
+            ..crate::params::PT_V20
         };
         let mut e = Engine::with_params(
             7,
@@ -13528,13 +13583,14 @@ mod tests {
         assert!(engine_v19(7).clone().set_cycle_history(vec![opening]).is_err());
     }
 
-    /// The engine the nowcast tests read: the default, pt-v20, with
+    /// The engine the nowcast tests read: pt-v20 by name (the default until
+    /// 0.10.0; pt-v21 sets both dials), with
     /// `cycle_nowcast_accuracy` and `corporate_spread_cycle` as given.
     fn engine_nowcast(seed: u64, q: f64, s: f64) -> Engine {
         let params = crate::params::ModelParams {
             cycle_nowcast_accuracy: q,
             corporate_spread_cycle: s,
-            ..Engine::default_model()
+            ..crate::params::PT_V20
         };
         Engine::with_params(
             seed,
@@ -13554,8 +13610,10 @@ mod tests {
     /// state hash covers the belief.
     #[test]
     fn the_cycle_nowcast_prices_a_belief_not_the_true_phase_only_under_the_dial() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         let phases = crate::economy::cycle::phase_cycle();
-        let off = engine(7);
+        let off = engine_v20(7);
         assert_eq!(off.cycle_nowcast(), [0.0; 5]);
         assert_eq!(off.cycle_nowcast_terms, ([0.0; 5], 0.0));
         assert!(off.clone().set_cycle_nowcast([1.0, 0.0, 0.0, 0.0, 0.0], None).is_err());
@@ -13613,10 +13671,12 @@ mod tests {
     /// stream (the report is on its own stream).
     #[test]
     fn the_cycle_nowcast_tracks_the_occupancy_on_its_own_stream() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         let phases = crate::economy::cycle::phase_cycle();
         let days = 5040i64;
         let mut e = engine_nowcast(11, 0.4, 0.75);
-        let mut control = engine(11);
+        let mut control = engine_v20(11);
         let mut mean = [0.0; 5];
         let mut occupancy = [0.0; 5];
         let mut turns = 0;
@@ -13673,7 +13733,7 @@ mod tests {
         assert_eq!(off.market_variance_state().0, base);
         // A named opening is a statement: no prehistory runs.
         let named = |dials: &[(&str, f64)]| {
-            let mut params = Engine::default_model();
+            let mut params = crate::params::PT_V20;
             for (name, value) in dials {
                 params = params.with_override(name, *value).unwrap();
             }
@@ -13782,7 +13842,7 @@ mod tests {
         }
         assert!(first[1].opening_carry().is_empty());
         // Refused without a prehistory, and off the switch.
-        let base = Engine::default_model();
+        let base = crate::params::PT_V20;
         let refused = |p: Result<ModelParams, String>| p.and_then(|p| p.invariants()).is_err();
         assert!(refused(base.with_override("market_prehistory_valuation", 1.0)));
         let pre = base.with_override("market_prehistory_sessions", 21.0).unwrap();
@@ -13790,10 +13850,11 @@ mod tests {
         assert!(!refused(pre.with_override("market_prehistory_valuation", 1.0)));
     }
 
-    /// The engine the macro-clock tests read: the default, pt-v20, with the
+    /// The engine the macro-clock tests read: pt-v20 by name (the default
+    /// until 0.10.0), with the
     /// dials given.
     fn engine_macro_clock(seed: u64, dials: &[(&str, f64)]) -> Engine {
-        let mut params = Engine::default_model();
+        let mut params = crate::params::PT_V20;
         for (name, value) in dials {
             params = params.with_override(name, *value).unwrap();
         }
@@ -13814,7 +13875,9 @@ mod tests {
     /// half-life 0.0 reads 1260, and the state hash covers `D`.
     #[test]
     fn the_anticipation_drift_is_left_out_only_under_the_share() {
-        let off = engine(7);
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
+        let off = engine_v20(7);
         assert!(!off.carries_anticipation_drift());
         assert_eq!(off.anticipation_drift(), (0.0, 0.0));
         assert!(off.clone().set_anticipation_drift(0.1, 0.0).is_err());
@@ -13864,8 +13927,10 @@ mod tests {
     /// phase, and at 0.0 it is the phase's own.
     #[test]
     fn the_full_spread_blend_prices_the_occupancy_mean_in_every_phase() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         let e = engine_macro_clock(7, &[("corporate_spread_cycle", 1.0)]);
-        let off = engine(7);
+        let off = engine_v20(7);
         let mbar = e.cycle_nowcast_terms.1;
         let (mean, cycle) = crate::economy::cycle::stationary_phase_shares_for(&e.cycle_spec());
         let phases = crate::economy::cycle::phase_cycle();
@@ -13912,15 +13977,17 @@ mod tests {
     /// takes no draw from any stream.
     #[test]
     fn the_drawn_publication_schedule_publishes_each_turn_in_order() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         use crate::economy::CyclePhase;
-        let off = engine(7);
+        let off = engine_v20(7);
         assert!(off.carries_cycle_history());
         assert!(off.clone().set_cycle_publication(off.cycle_publication().clone()).is_err());
 
         let days = 5040i64;
         let run = |seed: u64| {
             let mut e = engine_macro_clock(seed, &[("cycle_publication_lag_draw", 1.0)]);
-            let mut control = engine(seed);
+            let mut control = engine_v20(seed);
             assert!(!e.carries_cycle_history());
             assert!(e.cycle_history().is_empty());
             assert!(e.clone().set_cycle_history(vec![e.economy().cycle_phase; 253]).is_err());
@@ -14022,7 +14089,7 @@ mod tests {
         let lag = 5i64;
         let params = crate::params::ModelParams {
             gdp_publication_lag: lag as f64,
-            ..Engine::default_model()
+            ..crate::params::PT_V20
         };
         let mut e = Engine::with_params(
             7,
@@ -14448,6 +14515,8 @@ mod tests {
     /// bit-identical and a down session raises it.
     #[test]
     fn the_daily_step_runs_economy_then_cycle_then_the_bank() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         let day = DayAdvanceRequest {
             volatility: 0.7,
             active_shocks: &[],
@@ -14456,7 +14525,7 @@ mod tests {
             timestamp: 24 * 60,
         };
 
-        let mut e = engine(21);
+        let mut e = engine_v20(21);
         let before = e.economy().clone();
         let mut trace = SiteTrace {
             inner: GameRng::new(21, stream::ECONOMY),
@@ -14482,7 +14551,7 @@ mod tests {
         );
 
         // The draw count the counting entry point reports is the same work.
-        let mut counted = engine(21);
+        let mut counted = engine_v20(21);
         let out = counted.advance_day(&day);
         assert!(out.draws_consumed > 0, "the daily macro step must draw");
 
@@ -14497,7 +14566,7 @@ mod tests {
             before.vix.to_bits(),
             "a flat session moved the VIX, which the identity has no term for"
         );
-        let mut down = engine(21);
+        let mut down = engine_v20(21);
         down.open_market();
         for c in down.companies_mut().iter_mut() {
             c.stock.price *= 0.95;
@@ -15013,11 +15082,13 @@ mod tests {
     /// ratios as an empty slice, fails here.
     #[test]
     fn the_vix_identity_reads_the_idiosyncratic_variance_ratio() {
-        let off = engine(7).index_conditional_variance_terms_now();
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
+        let off = engine_v20(7).index_conditional_variance_terms_now();
         let params = crate::params::ModelParams {
             idio_vol_alpha: 0.2,
             idio_vol_beta: 0.5,
-            ..Engine::default_model()
+            ..crate::params::PT_V20
         };
         let mut e = Engine::with_params(
             7,
@@ -15116,7 +15187,7 @@ mod tests {
         // would be pointless work.
         //
         // The revision lands after the open. Before it, pt-v20's stationary
-        // opening (the default from 0.8.5) adopts any premium into the
+        // opening (pt-v20 and pt-v21) adopts any premium into the
         // mispricing so the opening price holds, and a revision there moved
         // no price inside a 60-tick session; after the open it moves the
         // price on every preset.
@@ -15354,13 +15425,15 @@ mod tests {
 
     #[test]
     fn a_pt_v20_engine_walks_the_cycle_shares_once() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         // `refresh_earnings_anticipation` asks for the cycle's stationary
         // shares on every close, burn-in included, and pt-v20 is the first
         // preset that turns anticipation on. Each answer is a survival walk
         // of about a thousand `pow` calls a phase. Before the memo, building
         // this engine took 756 walks, 96 per cent of its construction time.
         let start = crate::economy::cycle::share_walks();
-        let mut e = engine(7);
+        let mut e = engine_v20(7);
         assert_ne!(e.params().earnings_anticipation_half_life, 0.0);
         for day in 1..=3i64 {
             e.open_market();
@@ -15375,11 +15448,13 @@ mod tests {
 
     #[test]
     fn the_state_hash_works_out_the_model_fingerprint_once() {
+        // pt-v20 by name, the default until 0.10.0: pt-v21 sets the dials
+        // this test reads as off. Each `engine_v20` here read `engine`.
         // The sandbox's tamper guard hashes the state before and after every
         // call into agent code. The hash folds in the model's fingerprint,
         // which was twenty digests of the preset surface each time and about
         // 90 per cent of the hash's cost.
-        let e = engine(7);
+        let e = engine_v20(7);
         let first = e.state_hash(0, false);
         let taken = crate::params::digests_taken();
         for _ in 0..5 {
@@ -15390,6 +15465,8 @@ mod tests {
         assert_eq!(crate::params::digests_taken(), taken, "the fingerprint was worked out again");
         assert_eq!(e.model_fingerprint(), e.params().fingerprint());
         assert_eq!(e.model_fingerprint(), "pt-v20");
+        // And the default engine, which is pt-v21 from 0.10.0.
+        assert_eq!(engine(8).model_fingerprint(), "pt-v21");
         assert_eq!(engine_v19(7).model_fingerprint(), "pt-v19");
     }
 

@@ -118,8 +118,12 @@ def test_the_baseline_runs_the_same_warm_up(monkeypatch):
     monkeypatch.setattr(harness, "_run_untraded", spy)
     tf.evaluate({"w": Watcher()}, seed=SEED, universe=U, days=1,
                 history_days=3)
-    _, opens, _ = _plain_run(4)
-    assert seen == [opens[18]]
+    # The warmed market as the third day's close left it. This compared the
+    # fourth day's first step (`opens[18]`) until 0.10.0, which is the same
+    # prices where the open moves nothing; pt-v21, the default from then,
+    # moves every name at the open (`overnight_market_share`).
+    warmed, _, _ = _plain_run(3)
+    assert seen == [_f64(warmed.prices())]
 
 
 def test_warm_up_bars_are_what_a_recorded_run_reports():

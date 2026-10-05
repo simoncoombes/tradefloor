@@ -754,7 +754,7 @@ _register(_make_macro_target(
     units="fraction",
     note=(
         "The 2-year treasury yield. The UST2Y rate index reads it and nothing in "
-        "the equity market does. On pt-v20, the default from 0.8.5, the 2-year "
+        "the equity market does. On pt-v20, the default from 0.8.5 to 0.9.1, the 2-year "
         "is its own process, closing 5% of its gap to 0.85 x the policy rate + "
         "0.15 x the 10-year each session, so a write decays over weeks; on "
         "every preset through pt-v19 the chain recomputes it as that formula at "

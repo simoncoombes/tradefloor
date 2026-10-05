@@ -121,8 +121,8 @@ whole footprint reaches the market once, as the merged ``fills`` of that
 step's session, on its first tick, so an agent meets another's trading from
 the next step on and never inside the step it happened.
 
-Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20,
-the default, has it, each portfolio's orders execute in the engine's book,
+Under a model with ``book_shared`` on (``Engine.book_live``), as pt-v20
+and pt-v21, the default, have it, each portfolio's orders execute in the engine's book,
 under the portfolio's label (its ``owner``). Arrival order then matters:
 the second agent meets the book the first left, pays for the levels
 the first took, and can hit the first's resting limit order. Each agent's

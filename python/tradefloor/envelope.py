@@ -71,6 +71,19 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
                     SEED_SD_504, band_distance)
 
 #: The preset these measurements describe.
+#:
+#: TODO(pt-v21 grade): pt-v21 is the default from 0.10.0 and this module
+#: still describes pt-v20, the default from 0.8.5 to 0.9.1, so every table
+#: below is pt-v20's and `model_preset()["name"] != PRESET` until the grade
+#: lands (the module note above says what that means for a caller). Moving
+#: it takes measured numbers, not typed ones (RELEASING.md, step 5b):
+#: `record.py --panel` on the paired preset_panel artefact (pt-v21 beside
+#: pt-v20, one build), then `level_panel.py` and `level_rows.py` for the
+#: level and crisis block, then `envelope_tables.py --write`, which rewrites
+#: PRESET, CERTIFIED, MEASURED_504, CERTIFIED_LEVEL and CERTIFIED_CRISIS
+#: from `presets/pt-v21.json`. DECAY_252, DECAY_SLOPE,
+#: MEMORY_VALID_TO_LAG, ROSTER_MEASUREMENT and the GAPS prose are typed
+#: and need their own runs on pt-v21.
 PRESET = "pt-v20"
 
 #: The measurement horizon the envelope certifies, in trading days.
@@ -417,7 +430,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: is new is that a verdict is now taken on it and refused on.
 #:
 #: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above.
-#: pt-v20, the default since 0.8.5, reads 0.930223 on its graded arm as the
+#: pt-v20, the default from 0.8.5 to 0.9.1, reads 0.930223 on its graded arm as the
 #: median of thirty seeds at 252 days (box ptv20g6, `presets/pt-v20.json`)
 #: and PASSES on both panels, k = 15 of 30 at 252 and 15 held out against a
 #: cut of 21. Before the graded arm it read 0.932337 at the same k (box
@@ -849,7 +862,8 @@ ROSTER_SHAPES: dict[str, dict[str, int]] = {
 #: `check` accepts a concentrated roster only for a question on the preset
 #: named here. The preset is `check`'s `preset` argument, `PRESET` when it
 #: is not passed, so a new default loses the grant until it is measured
-#: again. Since 0.8.5 the default is pt-v20 and the mixes are pt-v19's, so
+#: again. The default was pt-v20 from 0.8.5 and is pt-v21 from 0.10.0, and
+#: the mixes are pt-v19's, so
 #: a caller whose run names pt-v19 keeps the grant and every other caller
 #: is refused. The same run on pt-v20 is kept as
 #: `measurements/roster-shapes-pt-v20.json` and grants nothing: two mixes
@@ -1346,8 +1360,9 @@ GAPS: tuple[Gap, ...] = (
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
-            "or crisis row, past 504 days, on any preset but pt-v19 (the "
-            "default pt-v20 included), or for a sector mix other than the "
+            "or crisis row, past 504 days, on any preset but pt-v19 (pt-v20 "
+            "and the default, pt-v21, included), or for a sector mix other "
+            "than the "
             "four measured"
         ),
         statistics=_facts.LEVEL + _facts.CRISIS + ("sector_excess_corr",),
@@ -2000,7 +2015,8 @@ def check(
     `preset` names the preset the question's run uses, and defaults to
     `PRESET`, the shipped default this module describes. It decides one
     thing: the roster mixes were measured on pt-v19 only, so a concentrated
-    roster is refused on any other preset, the default pt-v20 included.
+    roster is refused on any other preset, pt-v20 and the default, pt-v21,
+    included.
     Every other table here describes `PRESET` whatever is passed, and a
     verdict on another preset says so in a warning. An unknown name raises.
 

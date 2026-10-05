@@ -196,7 +196,8 @@ def test_support_says_what_each_digest_covers():
     # A traded evaluate run has had a digest since 0.8.5. Before it, this
     # page said none did, and that sentence must not come back.
     assert "has no digest yet" not in text
-    assert "one traded `tf.evaluate` run is pinned on pt-v20" in text
+    # The default preset by name since 0.10.0 (pt-v21); "on pt-v20" before.
+    assert "one traded `tf.evaluate` run is pinned on the default preset" in text
     assert "does not recompute a score" in text
 
 

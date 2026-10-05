@@ -58,7 +58,9 @@ def path(seed, days, **dials):
     return out
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v21, the default from 0.10.0, sets Okun's law and both oil switches;
+# the test after this one holds its values.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
 def test_off_on_every_shipped_preset_and_silent_in_its_digest(preset):
     params = tf.ModelParams.from_preset(preset)
     values = params.to_dict()
@@ -67,6 +69,17 @@ def test_off_on_every_shipped_preset_and_silent_in_its_digest(preset):
         assert values[name] == 0.0
         assert name in silent
         assert tf.ModelParams.from_preset(preset, **{name: -0.0}).fingerprint == preset
+
+
+def test_pt_v21_ships_three_of_them_on():
+    values = tf.ModelParams.from_preset("pt-v21").to_dict()
+    assert {name: values[name] for name in SWITCHES} == {
+        "unemployment_natural_pull": 0.0,
+        "unemployment_okun_coefficient": 0.75,
+        "unemployment_natural_rate": 0.0,
+        "oil_inventory_reversion": 0.002,
+        "oil_inflation_passthrough": 1.0,
+    }
 
 
 @pytest.mark.parametrize("name", sorted(SWITCHES))
