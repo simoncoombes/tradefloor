@@ -1463,6 +1463,11 @@ impl Engine {
         let flat3: Vec<f64> = self.noise_parts().iter().flat_map(|r| r.iter().copied()).collect();
         out.put("noise_parts", V::from_f64s(&flat3));
         out.put("noise_own_scale2", V::from_f64s(self.noise_own_scale2()));
+        // The day's GJR sum under a night split, which the attribution no
+        // longer carries in `random_noise` (see `Engine::innovation_day`).
+        if self.night_split_on() {
+            out.put("innovation_day", V::from_f64s(self.innovation_day()));
+        }
         // The jump each name booked at the last close, for the session that
         // trades the gap in.
         out.put("jump_move", V::from_f64s(self.jump_move()));
@@ -1911,6 +1916,15 @@ impl Engine {
                     p.market_prehistory_valuation
                 ),
             ),
+            Gated::when(
+                "innovation_day",
+                p.overnight_market_share != 0.0 || p.overnight_idio_share != 0.0,
+                format!(
+                    "overnight_market_share or overnight_idio_share is not 0, and this \
+                     engine's are {} and {}",
+                    p.overnight_market_share, p.overnight_idio_share
+                ),
+            ),
             Gated::dial("dividend", "dividend_payout_share", p.dividend_payout_share),
             Gated::held("pending_dividend", "dividend_payout_share", p.dividend_payout_share),
             Gated::dial("earnings_key", "earnings_surprise_sigma", p.earnings_surprise_sigma),
@@ -2236,6 +2250,13 @@ impl Engine {
                 &read_buffer(snapshot, "", "noise_own_scale2")?,
             )
             .map_err(core)?;
+        // Required on a model with a night split, refused on any other by
+        // the key check above.
+        if inner.night_split_on() {
+            inner
+                .restore_innovation_day(&read_buffer(snapshot, "", "innovation_day")?)
+                .map_err(core)?;
+        }
         inner.set_jump_move(&read_buffer(snapshot, "", "jump_move")?).map_err(core)?;
         let market_open = read_bool(snapshot, "", "market_open")?;
         inner.set_volume_state(read_finite(snapshot, "", "volume_state")?);

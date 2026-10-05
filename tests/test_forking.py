@@ -1308,6 +1308,14 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "attribution":
+        "the day's decomposition of the change in `s`. This model splits the "
+        "day (`overnight_market_share`), and under a split the close's GJR "
+        "steps on `innovation_day`, the noise slot's sum with the night ahead "
+        "of it, so the attribution is reporting only and a restore without it "
+        "prices the same. Without a split the close reads its `random_noise` "
+        "slot, and a fork that lost it closes on a different variance "
+        "(Engine::restore_day_state says so).",
     "idio_jump_pending":
         "the name's own jump waiting to enter the next close's variance "
         "update (`idio_vol_jump_bump`). A fresh engine holds zeros, and "

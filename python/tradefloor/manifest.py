@@ -567,6 +567,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # Tonight's market draw under a night split, only while the
          # session's live lagged wire reads it.
          "night_market_factor",
+         # The day's GJR innovation under a night split, which the
+         # attribution books in `overnight` alone.
+         "innovation_day",
          # The per-name idiosyncratic variance state, its three vectors
          # together, only while `idio_vol_alpha`, `_beta` or `_jump_bump`
          # is set.
@@ -673,10 +676,19 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                         # the pending jump move, hashed here because they sit
                         # beside the accumulators above in the snapshot and
                         # are lost the same way.
-                        ("noise_parts", 3), ("noise_own_scale2", 1),
-                        ("jump_move", 1)):
+                        ("noise_parts", 3), ("noise_own_scale2", 1)):
         for value in _column(snapshot[name], n * width, name):
             _f64(buf, value)
+    # The day's GJR innovation under a night split, length first, as the
+    # engine hashes it.
+    if "innovation_day" in snapshot:
+        values = _column(snapshot["innovation_day"],
+                         len(snapshot["innovation_day"]) // 8, "innovation_day")
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    for value in _column(snapshot["jump_move"], n, "jump_move"):
+        _f64(buf, value)
     _flag(buf, bool(snapshot["market_open"]))
 
     variance = list(snapshot["market_variance"])
@@ -1440,14 +1452,16 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: share-count reductions, what names hold back of the earnings cycle for
 #: their reports, the idiosyncratic variance state, the prehistory's carried
 #: opening, the dividend states and an ex-date's move waiting for its tape
-#: row, and the drawdown hold's window. Encoded where
+#: row, the drawdown hold's window and the day's GJR innovation under a
+#: night split. Encoded where
 #: present and left out where not. The ``fundamentals`` block's three
 #: buffers and the book's consumed depth are encoded beside them.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
                             "garch_cascade", "buyback_log_shares", "earnings_withheld",
                             "idio_variance", "idio_jump_pending",
                             "idio_jump_var_pending", "opening_carry", "dividend",
-                            "pending_dividend", "fed_drawdown_returns")
+                            "pending_dividend", "fed_drawdown_returns",
+                            "innovation_day")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

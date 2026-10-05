@@ -355,6 +355,10 @@ class Engine:
     # The twelve sum to the day's change in `mispricing_s`. On pt-v20 most
     # of a price's move is fair value moving, which they do not split up.
     def attribution(self, factor: FactorName) -> bytes: ...
+    # The day's noise the per-name GJR steps on at the close: `random_noise`,
+    # and under a night split the night's noise too, which `attribution`
+    # books in `overnight` alone.
+    def garch_innovation(self) -> bytes: ...
     # The earnings reports ahead (dates only), and the surprise each name's
     # opening print realised at the last open; empty and zero off the
     # calendar (`earnings_surprise_sigma` 0.0, every preset).

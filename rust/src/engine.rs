@@ -687,6 +687,19 @@ pub struct Engine {
     /// parent it is meant to be a copy of.
     noise_parts: Vec<[f64; 3]>,
     noise_own_scale2: Vec<f64>,
+    /// The day's innovation for each name's GJR under a night split
+    /// (`overnight_market_share` or `overnight_idio_share` set): the night's
+    /// own noise, then every tick's `random_noise`, summed in that order.
+    ///
+    /// The attribution counts the night once, in its `overnight` slot, so
+    /// its twelve slots sum to the day's change in `s` and agree with the
+    /// tape. The GJR steps on the whole day's noise, the night's included,
+    /// and this keeps that sum in the order the `random_noise` slot summed
+    /// it when it also carried the night, so the close feeds the GJR the
+    /// same bits. Empty while the split is off, where the close reads the
+    /// `random_noise` slot as before. Per-day state, sized from construction
+    /// and snapshotted and hashed exactly while the split is on.
+    innovation_day: Vec<f64>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -1969,6 +1982,13 @@ impl Engine {
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
             noise_parts: vec![[0.0; 3]; companies_len],
             noise_own_scale2: vec![0.0; companies_len],
+            innovation_day: if params.overnight_market_share != 0.0
+                || params.overnight_idio_share != 0.0
+            {
+                vec![0.0; companies_len]
+            } else {
+                Vec::new()
+            },
             tick_components: vec![[0.0; crate::market::factors::TICK_COMPONENT_COUNT]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -4552,6 +4572,14 @@ impl Engine {
                     acc[crate::market::factors::attribution_slot_for_tick(k)] += value;
                 }
             }
+            // The GJR's own sum under a night split, the noise slot's
+            // increment added in the same order the slot adds it.
+            if let (Some(acc), Some(computed)) = (
+                self.innovation_day.get_mut(*slot),
+                outcome.s_components.get(n),
+            ) {
+                *acc += computed[random_noise_index()];
+            }
             if let (Some(row), Some(computed)) = (
                 self.tick_components.get_mut(*slot),
                 outcome.s_components.get(n),
@@ -5721,6 +5749,39 @@ impl Engine {
         Ok(())
     }
 
+    /// The day's noise each name's GJR steps on at tonight's close, before
+    /// `garch_innovation_commensurate` rescales it: the `random_noise`
+    /// attribution column, and under a night split the night's noise ahead
+    /// of it (`innovation_day`), which the attribution books in `overnight`.
+    pub fn day_noise_column(&self) -> Vec<f64> {
+        if self.innovation_day.is_empty() {
+            return self.attribution_column(random_noise_index());
+        }
+        (0..self.companies.len())
+            .map(|i| self.innovation_day.get(i).copied().unwrap_or(0.0))
+            .collect()
+    }
+
+    /// The day's GJR sum under a night split, per company slot; empty while
+    /// the split is off. See [`Engine::day_noise_column`].
+    pub fn innovation_day(&self) -> &[f64] {
+        &self.innovation_day
+    }
+
+    /// Put the day's GJR sum back (see [`Engine::innovation_day`]). Empty
+    /// clears it, which is the state of a model without a night split.
+    pub fn restore_innovation_day(&mut self, values: &[f64]) -> Result<(), String> {
+        if !values.is_empty() && values.len() != self.companies.len() {
+            return Err(format!(
+                "innovation_day has {} values, expected {}",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        self.innovation_day = values.to_vec();
+        Ok(())
+    }
+
     /// The day's `random_noise` split, per company slot: market, sector,
     /// idiosyncratic. See [`Engine::noise_part_column`].
     pub fn noise_parts(&self) -> &[[f64; 3]] {
@@ -5851,7 +5912,7 @@ impl Engine {
     /// the whole column: that is the pre-dial value, and a zero divisor is
     /// not a smaller innovation, it is no statement at all.
     fn daily_innovation_column(&self) -> Vec<f64> {
-        let whole = self.attribution_column(random_noise_index());
+        let whole = self.day_noise_column();
         let share = self.params.garch_innovation_commensurate;
         if share == 0.0 {
             return whole;
@@ -6470,6 +6531,10 @@ impl Engine {
         self.noise_parts.resize(self.companies.len(), [0.0; 3]);
         self.noise_own_scale2.clear();
         self.noise_own_scale2.resize(self.companies.len(), 0.0);
+        self.innovation_day.clear();
+        if self.night_split_on() {
+            self.innovation_day.resize(self.companies.len(), 0.0);
+        }
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.clear();
@@ -7202,7 +7267,6 @@ impl Engine {
         }
         let key = self.earnings_key;
         let day = self.elapsed_days;
-        let noise_slot = random_noise_index();
         // The idiosyncratic variance state (`idio_vol_alpha`) reaches the
         // night's own draw as it reaches the session's: through the own unit,
         // so `noise_own_scale2` carries it and the close's `u^2` reads the
@@ -7247,9 +7311,14 @@ impl Engine {
             if let Some(prev) = company.stock.mispricing_s_prev_close {
                 company.stock.mispricing_s_prev_close = Some(prev + moved);
             }
+            // The night counts once in the attribution, in `overnight`, so
+            // the day's slots sum to its change in `s` and match the tape.
+            // The GJR still steps on it: it starts the day's innovation.
             if let Some(acc) = self.attribution.get_mut(index) {
                 acc[crate::market::factors::OVERNIGHT_SLOT] += moved;
-                acc[noise_slot] += night;
+            }
+            if let Some(acc) = self.innovation_day.get_mut(index) {
+                *acc += night;
             }
             if let Some(parts) = self.noise_parts.get_mut(index) {
                 parts[0] += market;
@@ -10643,6 +10712,9 @@ impl Engine {
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
         self.noise_own_scale2.push(0.0);
+        if !self.innovation_day.is_empty() {
+            self.innovation_day.push(0.0);
+        }
         self.tick_components.push([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
@@ -10737,6 +10809,9 @@ impl Engine {
         }
         if index < self.noise_parts.len() {
             self.noise_parts.remove(index);
+        }
+        if index < self.innovation_day.len() {
+            self.innovation_day.remove(index);
         }
         if index < self.noise_own_scale2.len() {
             self.noise_own_scale2.remove(index);
@@ -11347,6 +11422,14 @@ impl Engine {
         }
         for value in &self.noise_own_scale2 {
             hash_f64(&mut buf, *value);
+        }
+        // The day's GJR sum under a night split, the only engines that keep
+        // one, so every other engine hashes as it did.
+        if !self.innovation_day.is_empty() {
+            hash_u32(&mut buf, self.innovation_day.len() as u32);
+            for value in &self.innovation_day {
+                hash_f64(&mut buf, *value);
+            }
         }
         // The jump waiting to be traded in, which the volume scale reads on
         // the session after the close that booked it.

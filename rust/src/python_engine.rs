@@ -4389,7 +4389,9 @@ impl PyEngine {
     /// `short_squeeze_effect` and `random_noise` are the shocks.
     /// `circuit_breaker` is the correction when the session breaker clamps a
     /// price. `jump` is the daily jump and `overnight` the move applied at
-    /// the open. `fair_value_shift` is minus the part of the shocks that
+    /// the open, the whole night under a night split (which `random_noise`
+    /// does not count again; `garch_innovation` is the noise the GJR steps
+    /// on, the night's included). `fair_value_shift` is minus the part of the shocks that
     /// moved the name's fair value for good instead of `s`. `dividend` is the
     /// change in `s` at an ex-date open, zero on every model without
     /// dividends (`dividend_payout_share`).
@@ -4437,6 +4439,18 @@ impl PyEngine {
         // Zero in every rate instrument's slot: none of these drivers moves
         // an index. Its move is in `rate_attribution`.
         Ok(f64_bytes(py, &self.padded(self.inner.attribution_column(index), 0.0)))
+    }
+
+    /// The day's noise each name's GJR variance steps on at tonight's
+    /// close, before `garch_innovation_commensurate` rescales it: the
+    /// `random_noise` attribution, and under a night split
+    /// (`overnight_market_share` or `overnight_idio_share` set) the night's
+    /// own noise ahead of it. The attribution counts the night once, in
+    /// `overnight`, so its twelve factors sum to the day's change in `s`;
+    /// the GJR reads the whole day's noise, and this is that sum. Zero in
+    /// every rate instrument's slot. Not a decomposition of the price move.
+    fn garch_innovation(&self, py: Python<'_>) -> Py<PyBytes> {
+        f64_bytes(py, &self.padded(self.inner.day_noise_column(), 0.0))
     }
 
     /// The earnings reports ahead, as a real calendar lists them: one dict

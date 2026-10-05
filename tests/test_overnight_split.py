@@ -126,18 +126,23 @@ def test_the_night_reaches_the_names_gjr_and_the_fair_value_level():
     e.open_market()
     night = floats(e.attribution("overnight"))
     noise = floats(e.attribution("random_noise"))
+    innovation = floats(e.garch_innovation())
     shift = floats(e.attribution("fair_value_shift"))
     assert all(x != 0.0 for x in night)
-    # The whole night joins the name's `random_noise` slot, the innovation
-    # its GJR steps on tonight, and the permanent share leaves `s` for the
-    # fair-value level as the tick's does (pt-v20: news share 1.0, market
-    # share 1.0 on the plain loading).
-    for a, b in zip(night, noise):
+    # The attribution counts the night once, in `overnight`: before the
+    # session `random_noise` holds nothing. The whole night starts the
+    # innovation the name's GJR steps on tonight (`garch_innovation`), and
+    # the permanent share leaves `s` for the fair-value level as the tick's
+    # does (pt-v20: news share 1.0, market share 1.0 on the plain loading).
+    # Until 0.10.0 the attribution booked the night in `random_noise` too,
+    # and its twelve factors overstated the day's change in `s` by it.
+    assert noise == [0.0] * len(noise)
+    for a, b in zip(night, innovation):
         assert b == pytest.approx(a, abs=1e-12)
     assert all(x != 0.0 for x in shift)
-    # Before the session the noise split's parts sum to the slot.
+    # Before the session the noise split's parts sum to the innovation.
     parts = floats(e.state_snapshot()["noise_parts"])
-    for i, total in enumerate(noise):
+    for i, total in enumerate(innovation):
         assert sum(parts[3 * i:3 * i + 3]) == pytest.approx(total, abs=1e-12)
 
 
