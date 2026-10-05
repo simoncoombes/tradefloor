@@ -49,6 +49,9 @@
 //!   quoted spread is at most `max_spread` of the name's daily sigma: on a
 //!   name whose spread is a large part of its daily move, a round trip costs
 //!   more than riding the flow can earn.
+//!   Detectors with the same `memory` and `bucket` see the same flow, so
+//!   they keep one profile, held by the first of them; each still trades on
+//!   its own ticks and books its own fills.
 //! - **Crowd** trades a ranked signal, the one an agent's ranked trend rule
 //!   trades: the simple return over `lookback` open ticks, momentum (long
 //!   the risers) or reversal (long the fallers), long the first `top_k`
