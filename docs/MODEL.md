@@ -3080,6 +3080,44 @@ that reports no volume. Equal participation is then an equal move on every
 name above the 100-share minute floor, and a name trading a million shares a
 day is charged what it is charged at 0.
 
+### Injected order flow on pt-v21
+
+pt-v21 sets `order_flow_depth_law` to 1, `order_flow_impact_law` to 1 and
+$c_{OF}$ to 800. With the impact law at 1 the participation multiplier is
+$0.15\,p$ for a tick's participation $p$ up to 10, with no floor, and
+$1.5\sqrt{p/10}$ above 10, where $p$ is the tick's gross flow over the
+name's average minute volume. A programme spread evenly over a session
+has $p = Q/\bar A_i$ on every tick, so any programme below ten days'
+volume stays in the linear part, and its impact grows in proportion to its
+size measured in the day's volume.
+
+Measured with `tradefloor.flow_impact` on a name trading 30,318 shares a
+day with a daily standard deviation of 2.03 per cent, one session, seed
+42, the flow bought at an even rate over the session, impact read on the
+close against the same run without it:
+
+| $Q/\bar A_i$ | impact (bp) | impact in daily standard deviations |
+|---|---|---|
+| 0.01 | 1.3 | 0.006 |
+| 0.05 | 6.3 | 0.031 |
+| 0.10 | 12.6 | 0.062 |
+| 0.25 | 31.6 | 0.156 |
+| 1.00 | 127.0 | 0.63 |
+
+Impact is linear in size across this range. Published metaorder studies
+fit $Y\sigma\sqrt{Q/V}$ with $Y$ between 0.5 and 1 (Tóth et al. 2011);
+read that way these programmes give $Y$ of 0.06 at 1 per cent of the day's
+volume, 0.20 at 10 per cent and 0.63 at the whole day's volume, so at
+ordinary sizes injected flow costs less than those studies find.
+
+The day's volume scales the effect of a net imbalance. The same net 1,000
+shares a tick on this name moves the close 1,763 bp when it is the whole
+flow, 380 bp inside 10,000 shares a tick of gross flow, 116 bp inside
+100,000 and 36 bp inside a million: above the knee the multiplier reads
+the gross flow, and the imbalance is its net share. A single tick of five
+times a name's daily volume, on a name trading a million shares a day,
+moves the price 60 bp.
+
 ### The metaorder memory (off on every preset)
 
 Without it, a half-day order's displacement of the tape is linear in its

@@ -9640,7 +9640,8 @@ impl ModelParams {
         // refills, a fill's linear impact is smaller, a cohort's arrival order
         // at the book is shuffled, the latent depth nests the maker's ladder, a
         // crossed resting order trades at its own limit, and injected order flow
-        // divides by depth once, on a linear-then-square-root law.
+        // divides by depth once, linear in a tick's participation up to ten
+        // times the name's minute volume.
         p.impact_memory_coefficient = 0.65;
         p.impact_memory_half_life = 12.0;
         p.impact_memory_slow_half_life = 780.0;
