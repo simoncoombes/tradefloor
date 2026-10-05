@@ -690,6 +690,9 @@ FIXTURE_KINDS = {
     #: 0.8.8, read by `tests/test_state_schema.py`. Engine state, not a
     #: transcript.
     "snapshots": "state-snapshots",
+    #: A run manifest written by the released 0.9.1 wheel, read by
+    #: `tests/test_manifest.py`. A saved run, not a transcript.
+    "manifests": "run-manifests",
 }
 
 _RECORDING_DIRS = {name for name, kind in FIXTURE_KINDS.items()

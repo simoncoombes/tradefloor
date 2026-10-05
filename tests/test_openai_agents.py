@@ -1402,9 +1402,11 @@ def test_the_committed_recording_replays_end_to_end():
     # And RE-RECORDED for 0.10.0, when pt-v21 became the default and the
     # payload went to version 2. The values that recording replaced (pt-v20,
     # schema 2): trades 2, pnl 21509.93, turnover 1565500.0, rejected 1.
-    assert card.trades == 5, card.trades
-    assert card.pnl == pytest.approx(23972.2, abs=0.5), card.pnl
-    assert card.turnover == pytest.approx(1644990.6, abs=0.5), card.turnover
+    # A recording on an earlier pt-v21 vector, before its opening hazard
+    # moved, read trades 5, pnl 23972.2, turnover 1644990.6, rejected 0.
+    assert card.trades == 4, card.trades
+    assert card.pnl == pytest.approx(58712.16, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(2630686.0, abs=0.5), card.turnover
 
     # Refusals are a fact about each recording, not a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
     # pt-v19 as first composed it asked for 2.06x against a 2.00x cap on day
@@ -1419,12 +1421,16 @@ def test_the_committed_recording_replays_end_to_end():
     # errors list, so the list holding only the market's own refusal is
     # what says every decision replayed. On the schema-2 recording gpt-5.2
     # asked for 100,000 TECH_B on day 1, which would have taken the book to
-    # 9.34x, and the market refused it. Previously: rejected 0. On pt-v21
-    # it bought TECH_B and STAPLE_A on day 1, trimmed TECH_B on day 2,
-    # held on day 3 and bought BANK_A on day 4, peaking at 1.20x, and
-    # nothing was refused (the pt-v20 recording: rejected 1, at 9.34x).
-    assert card.rejected == 0, card.errors
-    assert card.errors == [], card.errors
+    # 9.34x, and the market refused it. Previously: rejected 0. On the
+    # earlier pt-v21 vector it bought TECH_B and STAPLE_A on day 1, trimmed
+    # TECH_B on day 2, held on day 3 and bought BANK_A on day 4, peaking at
+    # 1.20x, and nothing was refused. On pt-v21 as shipped it asked for
+    # 20,000 TECH_B and 20,000 STAPLE_A on day 1, 2.86x together; TECH_B
+    # filled and the market refused STAPLE_A.
+    assert card.rejected == 1, card.errors
+    assert card.errors == [
+        "step 6: trade would take leverage to 2.86x, above the 2.00x limit"
+    ], card.errors
 
 
 @needs_fixture
