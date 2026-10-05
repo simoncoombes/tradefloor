@@ -56,7 +56,7 @@ Three of them run twenty simulated days, although two are named
 five days, and on pt-v21, the default, no name on their roster does that
 until day 13, so a five-day run would trade nothing. The names are older
 than that, and renaming the files would break every link to them. The
-LangGraph example runs five days on its own roster. The recorded model runs
+LangGraph example runs five days on its own roster and seed. The recorded model runs
 in the notebooks use five days too, because a language model reads the
 observation instead of waiting for a window.
 
@@ -72,7 +72,7 @@ two adapters:
 | [`callable/five_days.py`](callable/five_days.py) | 20 | 13 | -2.37% | +0.08 bps |
 | [`openai_agents/five_days.py`](openai_agents/five_days.py) | 20 | 13 | -2.37% | +0.08 bps |
 | [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 14 | -2.43% | -0.72 bps |
-| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 0 | +0.00% | +0.00 bps |
+| [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 8 | +0.24% | +4.33 bps |
 
 These are the figures on pt-v21, the default from 0.10.0. The impact column is the end-of-run price
 against the untraded run, and at these sizes it is mostly which way the
@@ -532,8 +532,10 @@ run can see what it printed.
 
 On pt-v20, the default from 0.8.5 to 0.9.1, callable and openai_agents read
 9 trades -1.71% +0.04 bps, pydantic_ai 10 trades -3.33% +0.98 bps, and
-langgraph 1 trade +0.64% +1.24 bps. On pt-v21 the LangGraph rule holds on
-all five days and the run trades nothing.
+langgraph 1 trade +0.64% +1.24 bps. On pt-v21 seed 4242's first five days
+move no LangGraph name more than two per cent, so the rule held every day
+and traded nothing; from 0.10.0 that example runs seed 4244 (its forked
+experiment keeps 4242).
 
 Before the 0.8.5 payload freeze, the five-day return the rule reads spanned
 29 steps rather than 30, and on pt-v20 callable and openai_agents read 10

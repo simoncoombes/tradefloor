@@ -93,6 +93,13 @@ SEED = 4242
 #: The flat example's length. The forked experiment uses the two below.
 DAYS = 5
 
+#: The flat example's seed, apart from the experiment's. On pt-v21, the
+#: default from 0.10.0, `SEED`'s first five days move no name more than two
+#: per cent, so the rule held every day and the example traded nothing; on
+#: this seed a market-wide fall on days 3 and 4 has it buy all four names.
+#: The example ran on `SEED` until then.
+EXAMPLE_SEED = 4244
+
 #: Days before the fork, and days each arm runs after it. Twenty is not
 #: arbitrary: ``return_5d`` is None until five days have been observed and
 #: the adapter's price memory holds thirty steps, so a short warm-up asks
@@ -693,11 +700,11 @@ def table(rows, columns):
 def main() -> dict:
     """The five-day offline example. No key, no network, seconds."""
     agent = LangGraphAdapter(build_graph(), fundamentals=FUNDAMENTALS)
-    scores = tf.evaluate({"langgraph": agent}, seed=SEED,
+    scores = tf.evaluate({"langgraph": agent}, seed=EXAMPLE_SEED,
                          universe=universe(), days=DAYS, cash=CASH)
     card = scores["langgraph"]
 
-    print(f"seed {SEED}, {DAYS} days, {len(ROSTER)} instruments")
+    print(f"seed {EXAMPLE_SEED}, {DAYS} days, {len(ROSTER)} instruments")
     print(f"framework          {agent.info.reference()}")
     print(f"decisions          {len(agent.record)}")
     print(f"trades             {card.trades}")
