@@ -1,13 +1,13 @@
 {
-  "bondsNote": "Re-based 2026-09-24 on fix/ptv20-core: the session pins the corporate yield on day 2, and on pt-v20, the default, a pinned corporate yield now holds through the close (before, corporate_yield_daily moved it at the close by the 10-year's change, so it was not the pinned value overnight). A traded, pinned session; the simulation, metadata and per-preset digests are unchanged. Re-based again 2026-09-26 with the default trajectory when pt-v20 took its graded arm (see note).",
-  "bondsSha256": "cac3ff44c713aa1845f18d702b1bf2b2c38e99b516e23aab14053a76109ae13e",
+  "bondsNote": "Re-based 2026-10-05 with the default trajectory when pt-v21 became the default (see note): bondsSha256 cac3ff44 to aae52e08. Before that, re-based 2026-09-24 on fix/ptv20-core, where on pt-v20 a pinned corporate yield holds through the close, and 2026-09-26 when pt-v20 took its graded arm.",
+  "bondsSha256": "aae52e08c038f68fec696cec15af4ebbda2743edf5dc9b634a3f67f25635c2d1",
   "bytes": 16920,
   "days": 250,
-  "katVersion": 28,
+  "katVersion": 29,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Re-based 2026-09-24 for 0.8.5, where pt-v20 becomes the default: the tape follows the model price, a closing cross, every stock- and sector-specific shock in fair value, the agent-facing book, the curve dials and the aggregate earnings cycle, taken on all 28 rows registered for it (validation/pt-v20/programme/ptv20-registration.md). Every seeded default trajectory changes; pt-v19 and every preset before it replay exactly (tests/known_answer_presets.json). Produced on macOS arm64 (M-series) first; the five-target determinism workflow is the second architecture. Re-based again 2026-09-24 on fix/ptv20-core: pt-v20, the default, responds to a move with volume at 0.6 rather than 0.8, which moves every seeded default trajectory; named presets before it replay exactly. Re-based again 2026-09-26 on fix/ptv20-final: pt-v20, the default, takes the eighteen dials of the twelfth registration's graded arm (validation/pt-v20/programme/ptv20-registration.md, 'The graded arm'), which moves every seeded default trajectory: simulationSha256 b644d9ae to 72485a9f, sha256 1a0bd15d to ac004fea, bondsSha256 47e65c9d to cac3ff44. metadataSha256 does not move. Named presets before pt-v20 replay exactly; pt-v20 has not shipped in a tagged release, so KAT_VERSION stays 28.",
+  "note": "Re-based 2026-10-05 for 0.10.0, where pt-v21 becomes the default: pt-v20 with 104 dials moved, every one inert on every earlier preset (the economy's cycle feeding back from equity stress, the Fed's stress and growth rules, a curve that prices the policy path, payouts as accrued state, a market variance that follows the cycle, a market that opens on its own prehistory, overnight and earnings-day returns, a name's own variance clustering, the traded path's impact memory, unemployment on Okun's law and oil that reverts to its inventory). Every seeded default trajectory changes: simulationSha256 72485a9f to 3a063f0d, sha256 ac004fea to 4ea1d563. metadataSha256 does not move. pt-v20 and every named preset before it replay exactly (tests/known_answer_presets.json, where only pt-v21's row is new). Produced on macOS arm64 (M-series) first; the five-target determinism workflow is the second architecture.",
   "seed": 20260820,
-  "sha256": "ac004feaa3fecaa325073882a82eb2b5870b6c3ce0d86976a1f91146b1758fb7",
-  "simulationSha256": "72485a9fb16ba12d633fbc587dc63fb7293852b08219c8a84a8ed2cb40b7634e"
+  "sha256": "4ea1d56340a3357db730764c3e24c131c5e0883efa4cd6f7f56c83ea9674033c",
+  "simulationSha256": "3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c"
 }

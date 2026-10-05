@@ -351,7 +351,20 @@ import tradefloor
 # at a time; pt-v20's own row there is 149d72de... and
 # does not move with this bump. `metadataSha256` does NOT move: pt-v20
 # carries pt-v19's mispricing and crowd coefficients.
-KAT_VERSION = 28
+#
+# v29: pt-v21 IS THE DEFAULT (0.10.0, 2026-10-05). pt-v20 with 104 dials
+# moved, every one inert on every earlier preset: the economy's cycle
+# feeding back from equity stress, the Fed's stress and growth rules and a
+# curve that prices the policy path, payouts as accrued state, a market
+# variance that follows the cycle, a market that opens on its own
+# prehistory, overnight and earnings-day returns, a name's own variance
+# clustering, the traded path's impact memory, unemployment on Okun's law
+# and oil that reverts to its inventory. Every seeded default trajectory
+# changes. pt-v20 and every preset before it replay exactly
+# (tests/known_answer_presets.py); pt-v21's own row there is e3cf4410...
+# and does not move with this bump. `metadataSha256` does NOT move: pt-v21
+# carries pt-v20's mispricing and crowd coefficients.
+KAT_VERSION = 29
 
 SEED = 20260820
 DAYS = 250

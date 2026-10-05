@@ -1,10 +1,10 @@
 {
  "kind": "tradefloor.known-answer.traded",
- "tradedKatVersion": 1,
+ "tradedKatVersion": 2,
  "seed": 20260930,
  "agentSeed": 5,
- "preset": "pt-v20",
- "presetRow": "07ab6e0c1cea8fe42eb5e801afa0c725f7c6e8e6e1e56ba622eaa1efa9577520",
+ "preset": "pt-v21",
+ "presetRow": "e3cf44104024d8a43a472d046f9c5d836266d7b94045126936b4478f1490ee78",
  "days": 10,
  "stepsPerDay": 6,
  "ticksPerStep": 65,
@@ -12,37 +12,37 @@
  "maxLeverage": 2.0,
  "agents": {
   "buy_and_hold": {
-   "orders": "4d622471e6cf6d420e9fa546ea36174540b4d3bcea6bd046c141083d9f5a706c",
-   "fills": "0ab38749981d688b0e25fca8450c2569e65fdf22e1a5cded306d4dfb6893439a",
-   "scorecard": "d5be0092c49c0ce97ce512c116fb92e8bcc195d0f9ed426d09e4ae710c753ea3"
+   "orders": "7403bc32f1286324ce0d32b3a98f309bfc801baed866e392a27149f4d7ff97d7",
+   "fills": "f2098b37b576e272670822e255eb4f4d4d8131bdef292d68e7d5287b040f62cd",
+   "scorecard": "080350554df219bfeecca7b5aa02472f68470e3d82079f387eaee32fd515150c"
   },
   "random": {
-   "orders": "63e6341fa7c97721853fe95206cadd18bb0c2de8aac690c26f9fbe4d4188286a",
-   "fills": "60cc6e79554649088f581050c5f10de4c3f9d1e5b579a3d80957f6ec48bf1981",
-   "scorecard": "7732714b95763ff1454334bdbca3f3e646b03aa59f3faf2c5e3d95e4af772e87"
+   "orders": "f2039e928732f804fd5b9e96dd60e87d3d617d90652051627353fb059efb67f9",
+   "fills": "5cf5ab148763fca2c68f9c2eb6fe0f389a2ef1ebe277fc38369dc651cedb24c4",
+   "scorecard": "c77d138d1e3ffa70bd7593747eb5c544155e1250abf9add17221d44a0a5f24bc"
   },
   "momentum": {
-   "orders": "e7998f820715919e155ee4f3244c68509e87bcb0f843d167da211b9456484961",
-   "fills": "188ef9124ed7addb4e9bedc44605071f19b6888ee26a4ed43d9bf3c4dd5bbd5c",
-   "scorecard": "7b626e154424a0a24db81e550badc3a182f299770be04815338a652f9c8e8f59"
+   "orders": "e8a589ac06049c598b2101ba9a851d530cdcc4ccff0adacb59a2417475bdeba6",
+   "fills": "60c5a6be30ad624ecd6bb3e446e5e14a6cd13c6c261a57c517b59e10c67abede",
+   "scorecard": "695c050810ed239336b772f1d1ebe1020d5e180915c63446c9ed8f4487d51805"
   },
   "mean_reversion": {
-   "orders": "6f7a1d38a53607351570dba25f2ea6c1f5b5833f394597237973abe7da4ba186",
-   "fills": "ceca13cb4d3e35c75f61a81374479fcdd7dc6d00dc5d0af12d9cbcdcf623bb96",
-   "scorecard": "e598b0bc0ba361fb9a7e0793ca5b1d57018305e9b32098ff43d8dac9cc932e19"
+   "orders": "18349aa3b1e6764007f3a0774e8f1f9a411384b85aa18a5f94af65f7d98e6c62",
+   "fills": "ff82d6b3709e04759ead41a54f8ad51ec337dce84042f758bb8d4cf6475d672b",
+   "scorecard": "7c3549e80e7f46895e40471ce412155f0ba1105dceb6c177626210cab7c1a36e"
   },
   "oracle": {
-   "orders": "f0e600c005110de39c6323060f146cf7586634a1aeb38a1a0e67e17dc5305729",
-   "fills": "c00a6ce8856fd934cac9c411ed72ecdd22bb22073e9bb0881e9a4d4ac84b516f",
-   "scorecard": "decc1baaea23a8b906e10d79a0b1b87a3d87d602c632974d3ff7e31d8591a754"
+   "orders": "e8b5c6a25217f8d7ff20f79188d7120518dea0a4b8e53a178d508d931e5dbcd0",
+   "fills": "3b4b252625f57130de1b2d605b8d02ca408fcbb336ffeccebb258aa198932b8d",
+   "scorecard": "a43eff3b3ccc39e9915255f4a468d6647a5ee6754ceec996574342cf4c53cea9"
   },
   "resting": {
-   "orders": "bae1c64ddecc3089889836743c8050259d97c27e385d49080f6e26d6b397b3d4",
-   "fills": "f64d47c44c120330c61c599cd9f2314a08e2783903ddcdfa2cdba412ee58e0ce",
-   "scorecard": "47b7139f432234807c42ca86c9c881d519dd96e73ad2bf73a6a0a895e9a47d7e"
+   "orders": "f9b603a12736cd4a290bf6215c0d06604382ea8ae6cfb190ce8443dea97b43a9",
+   "fills": "31354e849c24920031a0c5c70455a34d15fa5b20b764a91c6c024411c21a77d2",
+   "scorecard": "b925b387ebd97a0bcc9637cfd0505d8002b92fef85ed352df67d2a6ac996cad2"
   }
  },
- "bytes": 277358,
- "sha256": "8e032d381e2b4b41254a24f6be0917b05006cbff10af20254fa2888abd2d282d",
- "note": "Recorded 2026-09-30 on fix085/traded-known-answer, branched from rel085/candidate at f3eec5a. The reference agents and the scripted limit-order agent through tradefloor.evaluate on pt-v20 as it stood there, whose row in known_answer_presets.json is presetRow. The same digest on Python 3.11.16, 3.12.14 and 3.13.15 on macOS arm64; the five-target determinism workflow is the check on the other platforms. This row moves when pt-v20 moves, when a reference agent changes, or when evaluate scores differently: re-base it then with `python tests/known_answer_traded.py --write` and add a sentence here saying what moved. Re-based 2026-10-01 on rel085/candidate after the 0.8.5 decision merges, pt-v20's row unchanged. Decision 8 asks explain() after the close and scores it on the ten price drivers, so the oracle's order log (its explain answers) and its scorecard moved. Scorecard gained history_days and margin_interest, both now in SCORECARD_FIELDS, so every scorecard digest moved; hashed with the old field list, the other five scorecards are the ones recorded before. No agent's orders or fills moved apart from the oracle's explain answers: every fills digest is the one recorded on fix085/traded-known-answer. Re-based 2026-10-01 on rel085/fix-book, pt-v20's row unchanged. The model's flow used to walk past the last level of the maker's ladder into a resting limit at any price; it now stops at the ladder's last price. Only the scripted limit-order agent moved: its first 147 fills are the ones recorded before, and the 148th, a sell of 28 TRD9 at 95.18 that the flow filled on day 8, tick 196, past the ladder, no longer happens. From there its own market's prices differ, so its order log, fills (170 before, 163 after) and scorecard moved. The five reference agents send market orders only and every one of their digests is unchanged. The five-target determinism workflow has to run again on this digest."
+ "bytes": 282072,
+ "sha256": "64b896ef2b8e806523bc7a2cd71711bf8cf6b24ac8b6cb34bb3dc7b8b3555fba",
+ "note": "Recorded 2026-09-30 on fix085/traded-known-answer, branched from rel085/candidate at f3eec5a. The reference agents and the scripted limit-order agent through tradefloor.evaluate on pt-v20 as it stood there, whose row in known_answer_presets.json is presetRow. The same digest on Python 3.11.16, 3.12.14 and 3.13.15 on macOS arm64; the five-target determinism workflow is the check on the other platforms. This row moves when pt-v20 moves, when a reference agent changes, or when evaluate scores differently: re-base it then with `python tests/known_answer_traded.py --write` and add a sentence here saying what moved. Re-based 2026-10-01 on rel085/candidate after the 0.8.5 decision merges, pt-v20's row unchanged. Decision 8 asks explain() after the close and scores it on the ten price drivers, so the oracle's order log (its explain answers) and its scorecard moved. Scorecard gained history_days and margin_interest, both now in SCORECARD_FIELDS, so every scorecard digest moved; hashed with the old field list, the other five scorecards are the ones recorded before. No agent's orders or fills moved apart from the oracle's explain answers: every fills digest is the one recorded on fix085/traded-known-answer. Re-based 2026-10-01 on rel085/fix-book, pt-v20's row unchanged. The model's flow used to walk past the last level of the maker's ladder into a resting limit at any price; it now stops at the ladder's last price. Only the scripted limit-order agent moved: its first 147 fills are the ones recorded before, and the 148th, a sell of 28 TRD9 at 95.18 that the flow filled on day 8, tick 196, past the ladder, no longer happens. From there its own market's prices differ, so its order log, fills (170 before, 163 after) and scorecard moved. The five reference agents send market orders only and every one of their digests is unchanged. The five-target determinism workflow has to run again on this digest. Re-based 2026-10-05 for 0.10.0 with TRADED_KAT_VERSION 2: the run moved from pt-v20 to pt-v21, which becomes the default, so every agent's orders, fills and scorecard moved (the market is a different preset) and presetRow is pt-v21's row, e3cf4410. The digest on pt-v20 is unchanged by the default move: 8e032d38 on this tree with the preset set back to pt-v20. sha256 8e032d38 to 64b896ef. A first recording on this branch, 0af5f640 and never released, differed only in the Oracle's scorecard, which read tampered on pt-v21: its read of the dividend block took a counted snapshot of the engine, and the tamper guard reads that as a copy. `HiddenState.dividend_states` now reads the block uncounted, as `economy` reads the economy block. The five-target determinism workflow has to run again on this digest."
 }

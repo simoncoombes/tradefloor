@@ -379,10 +379,13 @@ def test_scenario_show_takes_a_start(capsys):
 #: bundle, commit 7410aec0, `World.manifest(strategy="tests").fingerprints`).
 #: The record of where a scenario's days came from must not change the
 #: identity of a run that applied it with no start given.
+#: On the default model: re-taken at 0.10.0 when it moved to pt-v21. On
+#: pt-v20 `inputs` read 4e7b3124...8e69 and `model` "pt-v20"; the rest did
+#: not move.
 FINGERPRINTS_BEFORE_ORIGINS = {
-    "inputs": "4e7b31245dcd29cb82c29cdea857b1d01ccdff8577bfbc60ec548a00f07b8e69",
+    "inputs": "d0cfcb8d9481599f102bfcd731484e3d47bebad5d60f7dbf125ce8b193a49518",
     "macro": None,
-    "model": "pt-v20",
+    "model": "pt-v21",
     "order_log":
         "2b18dc6a1de91ad40db53f2ece40f174debf1254135af8bb2667af134d5f5fa3",
     "scenario":
