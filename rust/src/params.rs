@@ -741,6 +741,200 @@ pub struct ModelParams {
     /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
     /// and the state hash carry the impulse only while this is set.
     pub unemployment_adjustment_half_life: f64,
+    /// The share of unemployment's gap to the natural rate closed at each
+    /// monthly release, a dial. 0.0, on every shipped preset, keeps the
+    /// release's own constant 0.06 and is a branch, so every preset reproduces bit for bit
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// # Why the shipped pull holds nothing
+    ///
+    /// The release adds the phase's trend, Okun's law on the day's growth
+    /// and a recovery term, and pulls toward the natural rate at 0.06 of
+    /// the gap. On pt-v20, seeds 101-108 over 5,292 sessions, those drivers
+    /// average -0.26 points a month (-0.46 in an expansion, where the
+    /// economy spends 72 per cent of its months), against a pull of 0.06
+    /// times a gap of at most 2 points. So the rate runs to its 2.5 floor
+    /// and stays: on pt-v20, seeds 101-108 over 1,008 sessions, it sits at
+    /// the floor on 78 per cent of days and ends there on 5 of 8 seeds
+    /// (issue #172). FRED UNRATE has never been below 2.5 (1948 to 2026:
+    /// mean 5.65, 10th to 90th percentile 3.7 to 7.8) and spent 2 per cent
+    /// of months at or under 3.0, all of them in 1951 to 1953.
+    ///
+    /// # The natural rate
+    ///
+    /// The pull acts toward `EconomyState::structural_unemployment`, the
+    /// rate the Phillips curve and wage growth already read as the NAIRU:
+    /// 4.0 plus 0.3 times long-term unemployment, so 4.15 after a long
+    /// expansion and up to about 4.6 after a deep recession. The CBO's
+    /// natural rate (FRED NROU) averaged 4.50 over 2015 to 2026 (range 4.40
+    /// to 4.75) and 4.80 over 2000 to 2026. Anchoring to the rate the
+    /// Phillips curve reads, and not to a second constant, means a held
+    /// unemployment rate stops pushing inflation one way. UNRATE's mean of
+    /// 5.65 sits above the NAIRU because recessions raise it quickly and
+    /// expansions bring it down slowly, which the cycle supplies.
+    ///
+    /// # The dial
+    ///
+    /// The release's pull is `k * (natural - unemployment)` a month in
+    /// place of `0.06 * (natural - unemployment)`. A month's share k is a
+    /// half-life of `ln 2 / -ln(1 - k)` months: 0.03 is 23 months, 0.05 is
+    /// 13.5, 0.10 is 6.6. Alone it cannot hold the rate near the natural
+    /// rate without losing its persistence, because the drivers' -0.26 a
+    /// month set the gap at about `-0.26 / k`. Measured on pt-v20, seeds
+    /// 101-108 over 2,520 sessions: at 0.3 alone the rate still sits at the
+    /// floor on 8 per cent of days, with a 12-month autocorrelation of
+    /// 0.22. With `unemployment_okun_coefficient` at 0.5 the drivers average
+    /// about -0.02 a month, and the constant 0.06 already keeps the rate off
+    /// the floor (mean 3.79, 0.37 under the natural rate); 0.10 takes the
+    /// mean to 3.94 and 0.03 lets the floor back on 6 per cent of days. It
+    /// takes no draw.
+    pub unemployment_natural_pull: f64,
+    /// Okun's law at the monthly release, as the annual coefficient it
+    /// states: points of unemployment a year per point of growth below 2
+    /// per cent. 0.0, on every shipped preset, is the shipped term and is a
+    /// branch, so every preset reproduces bit for bit and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// # The shipped term
+    ///
+    /// At 0.0 the release adds `(2 - growth) * 0.20` and, in an expansion
+    /// or recovery above 1 per cent growth, `-growth * 0.08`, every month.
+    /// The comment above it says 1 point of growth below trend is about
+    /// 0.5 points of unemployment, which is Okun's law as an annual
+    /// relation. Applied at every monthly release it is 2.4 points a year.
+    /// The recovery term counts the same growth a second time: at 3 per
+    /// cent growth it is -0.24 a month, six times the Okun term at a
+    /// coefficient of 0.5. Together they take an expansion's unemployment
+    /// down 5.5 points a year; UNRATE fell 0.6 a year over 2010 to 2019 and
+    /// 0.5 a year over 1992 to 2000.
+    ///
+    /// # Off zero
+    ///
+    /// The release adds `(2 - growth) * beta / 12` a month and no recovery
+    /// term, in the release and in the impulse
+    /// `unemployment_adjustment_half_life` adjusts. The phase's trend, the
+    /// natural-rate pull and the noise act as before. Okun (1962) put the
+    /// coefficient near 1/3; Ball, Leigh and Loungani (Journal of Money,
+    /// Credit and Banking 49(7), 2017) estimate about 0.4 to 0.5 for the
+    /// US, stable since 1948. 0.5 is the value the shipped comment states.
+    /// A contraction at the model's mean growth of -2.6 per cent then adds
+    /// about 0.28 a month with the phase's trend, a rise near 2 points over
+    /// a nine-month recession; UNRATE rose 1.6 to 2.4 points in 1990-91 and
+    /// 2001 and 5.0 in 2007-09. Measured on pt-v20, seeds 101-108 over
+    /// 2,520 sessions, the largest rise in the 18 months after a
+    /// contraction begins goes from 4.5 points at 0.0 to 1.8 at 0.5 and 3.1
+    /// at 1.0 with `unemployment_natural_rate` 5.0.
+    ///
+    /// The central bank's recession cuts read unemployment's LEVEL (above
+    /// 7, 8 and 10 per cent) and its Taylor rule a fixed 4.0 target. At 0.5
+    /// on the shipped natural rate a recession no longer reaches 7, so the
+    /// policy rate changes 0.6 times a year where it changed 1.9 times, and
+    /// cuts 0.4 points in the year after a contraction begins where it cut
+    /// 1.3. At 1.0 with a natural rate of 5.0 it changes 1.7 times a year
+    /// and cuts 1.2. It takes no draw.
+    pub unemployment_okun_coefficient: f64,
+    /// The natural rate of unemployment with no long-term unemployment,
+    /// percent, a dial. 0.0, on every shipped preset, is the release's own
+    /// constant 4.0 and is a branch, so every preset reproduces bit for bit and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// The monthly release sets `EconomyState::structural_unemployment` to
+    /// this plus 0.3 times long-term unemployment, the NAIRU the Phillips
+    /// curve, wage growth and the natural-rate pull read. Moving it moves
+    /// unemployment and its NAIRU together, so the Phillips gap is
+    /// unchanged and what moves is everything that reads the level:
+    /// consumer and business confidence, housing volume above 5 per cent,
+    /// participation in a contraction and discretionary fiscal stimulus
+    /// above 7 per cent.
+    ///
+    /// The constant 4.0 gives a NAIRU of 4.15 to about 4.6, which matches
+    /// the CBO's natural rate (FRED NROU) over 2015 to 2026, 4.40 to 4.75.
+    /// Over 1990 to 2026 NROU averaged 4.97 and over 1949 to 2026 5.40,
+    /// and UNRATE averaged 5.65 over both 1948 to 2026 and 1990 to 2026,
+    /// with a 120-month window's mean between 4.62 and 7.12 (10th to 90th
+    /// percentile, 1948 to 2026). A screen that wants the long history and
+    /// not the last decade would set about 4.5 to 5.0. The bank's Taylor
+    /// rule keeps its own 4.0 target, so a higher natural rate is also a
+    /// standing dovish gap: at 5.0 with `unemployment_okun_coefficient` 1.0
+    /// the policy rate averages 0.58 points lower on pt-v20 (seeds 101-108,
+    /// 2,520 sessions). It takes no draw.
+    pub unemployment_natural_rate: f64,
+    /// The daily share of oil inventory's gap to its normal level, 50,
+    /// closed by production and storage, a dial. 0.0, on every shipped
+    /// preset, is a branch, so every preset reproduces bit for bit and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// # The defect at 0.0
+    ///
+    /// Inventory is a pure integrator of demand against supply plus noise
+    /// (driftless at `oil_supply_response` 1.0), and outside its 40 to 60
+    /// dead zone it pushes the oil price by `0.08` a day per unit, up to
+    /// plus or minus 3.2 a day at its bounds. Oil's own reversion is 0.03 a
+    /// day toward about 81, so a saturated push rests oil at about 190 or
+    /// -25, outside both clamps (issue #170). Nothing returns inventory to
+    /// the dead zone, so a random walk that wanders far enough pins oil at
+    /// a clamp for the rest of the run. On pt-v20, seeds 101-108 over 1,008
+    /// sessions, one seed's inventory reached 100 and its oil sat at the 35
+    /// floor on 44 per cent of days.
+    ///
+    /// # Off zero
+    ///
+    /// Inventory moves by `k * (50 - inventory)` a day beside demand,
+    /// supply and noise, so it is an Ornstein-Uhlenbeck process around the
+    /// middle of the dead zone, with a standard deviation of
+    /// `0.5 / sqrt(2k)` units at `oil_supply_response` 1.0. That gives the
+    /// oil price a stable interior: the push is bounded in distribution
+    /// and oil's own reversion holds the level. In the theory of storage
+    /// (Working, American Economic Review 39(6), 1949; Brennan, AER 48(1),
+    /// 1958) stocks above normal depress the spot price and draw down as
+    /// carry turns costly, and stocks below normal raise it until
+    /// production and imports refill them, so inventory reverts to a
+    /// normal level; Pindyck (Journal of Political Economy 102(2), 1994)
+    /// estimates that adjustment for crude and products. The coefficient is
+    /// not identified by those papers and is a dial: at 0.002 (a half-life
+    /// of 347 sessions) inventory's spread is 7.9 units, and oil's
+    /// multi-year swings come from inventory's slow excursions out of the
+    /// dead zone, as the long-run factor of Schwartz and Smith (Management
+    /// Science 46(7), 2000) does. With `oil_supply_response` at 0.0
+    /// inventory's mean sits at `50 - 0.15 * growth / k`, so the dial is
+    /// meant beside a supply response of 1.0. It takes no draw.
+    pub oil_inventory_reversion: f64,
+    /// Inflation's monthly response to the oil price, the same either side of
+    /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
+    /// above 80.
+    /// 0.0, on every shipped preset, is the
+    /// shipped three-way branch and is a branch, so every preset
+    /// reproduces bit for bit and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// # The asymmetry at 0.0
+    ///
+    /// The release adds `(oil - 80) * 0.01` above 80, `(oil - 50) * 0.005`
+    /// below 50 and nothing between. Oil opens at 75 and reverts toward
+    /// about 81, so a rise of 10 pays at 0.01 and the matching fall of 10
+    /// pays nothing: for any oil path symmetric about its anchor the term
+    /// has a positive mean, and oil raises inflation while it is itself
+    /// driftless (issue #171). Measured on pt-v20, seeds 101-108 over 1,008
+    /// sessions, the slope of the monthly inflation change on oil's
+    /// distance above 75 is 0.0008 and below 75 -0.0001.
+    ///
+    /// # Off zero
+    ///
+    /// The release adds `0.01 * c * (oil - 81)`, where 81 is the level oil's own
+    /// reversion target takes at the 2 per cent trend growth Okun's law
+    /// pivots on (`OIL_BASELINE + 3 * 2`), so oil at its anchor adds
+    /// nothing and a rise and a fall of equal size add equal and opposite
+    /// amounts. Kilian and Vigfusson (Quantitative Economics 2(3), 2011)
+    /// find no evidence that the US economy responds asymmetrically to oil
+    /// price increases and decreases once the response is estimated
+    /// symmetrically in the shock. At 1.0, the shipped coefficient above
+    /// 80 on both sides, a sustained 10 per cent rise from 81 adds 0.08 a
+    /// month, which the inflation reversion of 0.55 holds at about 0.15
+    /// points of inflation; energy is about 7 per cent of the CPI basket (BLS
+    /// relative importance), and motor fuel, about half of it, moves
+    /// roughly half as much as crude, a direct effect near 0.2 points. It
+    /// takes no draw.
+    pub oil_inflation_passthrough: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7020,6 +7214,11 @@ impl ModelParams {
             cycle_publication_lag_draw: 0.0,
             gdp_publication_lag: 0.0,
             unemployment_adjustment_half_life: 0.0,
+            unemployment_natural_pull: 0.0,
+            unemployment_okun_coefficient: 0.0,
+            unemployment_natural_rate: 0.0,
+            oil_inventory_reversion: 0.0,
+            oil_inflation_passthrough: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -9436,6 +9635,11 @@ impl ModelParams {
             "cycle_publication_lag_draw" => self.cycle_publication_lag_draw,
             "gdp_publication_lag" => self.gdp_publication_lag,
             "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
+            "unemployment_natural_pull" => self.unemployment_natural_pull,
+            "unemployment_okun_coefficient" => self.unemployment_okun_coefficient,
+            "unemployment_natural_rate" => self.unemployment_natural_rate,
+            "oil_inventory_reversion" => self.oil_inventory_reversion,
+            "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -9781,6 +9985,11 @@ impl ModelParams {
             "cycle_publication_lag_draw" => out.cycle_publication_lag_draw = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
             "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
+            "unemployment_natural_pull" => out.unemployment_natural_pull = value,
+            "unemployment_okun_coefficient" => out.unemployment_okun_coefficient = value,
+            "unemployment_natural_rate" => out.unemployment_natural_rate = value,
+            "oil_inventory_reversion" => out.oil_inventory_reversion = value,
+            "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -10989,6 +11198,36 @@ impl ModelParams {
                  in [0, 2520]; 0 is off.",
                 self.unemployment_adjustment_half_life));
         }
+        if !(self.unemployment_natural_pull >= 0.0 && self.unemployment_natural_pull <= 1.0) {
+            return Err(format!(
+                "unemployment_natural_pull is {}. It is the share of the gap to the natural \
+                 rate closed at a monthly release, in [0, 1]; 0 keeps the shipped 0.06.",
+                self.unemployment_natural_pull));
+        }
+        if !(self.unemployment_okun_coefficient >= 0.0 && self.unemployment_okun_coefficient <= 2.4) {
+            return Err(format!(
+                "unemployment_okun_coefficient is {}. It is points of unemployment a year per \
+                 point of growth below 2 per cent, in [0, 2.4]; 0 is the shipped term.",
+                self.unemployment_okun_coefficient));
+        }
+        if !(self.unemployment_natural_rate >= 0.0 && self.unemployment_natural_rate <= 8.0) {
+            return Err(format!(
+                "unemployment_natural_rate is {}. It is the natural rate with no long-term \
+                 unemployment, percent, in [0, 8]; 0 is the shipped 4.0.",
+                self.unemployment_natural_rate));
+        }
+        if !(self.oil_inventory_reversion >= 0.0 && self.oil_inventory_reversion <= 1.0) {
+            return Err(format!(
+                "oil_inventory_reversion is {}. It is the daily share of inventory's gap to 50 \
+                 closed, in [0, 1]; 0 is off.",
+                self.oil_inventory_reversion));
+        }
+        if !(self.oil_inflation_passthrough >= 0.0 && self.oil_inflation_passthrough <= 3.0) {
+            return Err(format!(
+                "oil_inflation_passthrough is {}. It is the oil pass-through as a multiple of \
+                 the shipped 0.01 a dollar, both sides, in [0, 3]; 0 is the shipped branch.",
+                self.oil_inflation_passthrough));
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -11456,6 +11695,11 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "vix_stress_premium",
     "vix_stress_premium_cap",
     "vix_stress_premium_knee",
+    "unemployment_natural_pull",
+    "unemployment_okun_coefficient",
+    "unemployment_natural_rate",
+    "oil_inventory_reversion",
+    "oil_inflation_passthrough",
 ];
 
 #[cfg(test)]
@@ -11623,6 +11867,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_publication_lag_draw",
         "gdp_publication_lag",
         "unemployment_adjustment_half_life",
+        "unemployment_natural_pull",
+        "unemployment_okun_coefficient",
+        "unemployment_natural_rate",
+        "oil_inventory_reversion",
+        "oil_inflation_passthrough",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

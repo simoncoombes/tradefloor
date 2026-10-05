@@ -595,6 +595,23 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Two levels for the same reason: 0.0 divides by depth twice and 1.0
     # once, and nothing between them is a law anybody measured.
     "order_flow_depth_law": (0.0, 1.0),
+    # Unemployment's anchor (issue #172). The pull is a monthly share of
+    # the gap to the natural rate: 0.0 keeps the shipped 0.06, and past
+    # 0.3 (a half-life under two months) the rate loses the persistence
+    # UNRATE has. Okun's coefficient is annual: 0.0 is the shipped term,
+    # and 1.0 is twice what Ball, Leigh and Loungani (2017) estimate for
+    # the US. The natural rate with no long-term unemployment: 0.0 is the
+    # shipped 4.0, and the box spans the CBO's NROU, 4.4 to 6.2 since 1949.
+    "unemployment_natural_pull": (0.0, 0.3),
+    "unemployment_okun_coefficient": (0.0, 1.0),
+    "unemployment_natural_rate": (0.0, 6.0),
+    # Oil's interior (issues #170 and #171). The inventory reversion is a
+    # daily share: 0.01 is a half-life of 69 sessions, at which inventory
+    # stays inside the dead zone and the channel goes quiet. The
+    # pass-through is a multiple of the shipped 0.01 a dollar above 80,
+    # applied both sides, and 2.0 is twice it.
+    "oil_inventory_reversion": (0.0, 0.01),
+    "oil_inflation_passthrough": (0.0, 2.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

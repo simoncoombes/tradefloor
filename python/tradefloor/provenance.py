@@ -1181,6 +1181,27 @@ OUT_OF_SCOPE = {
         "inert at 0.0: `calculate_live_factors` in market/factors.rs "
         "branches on `== 0.0` and divides by depth twice, as the shipped "
         "law does; at 0.0 it is also left out of the model's digest",
+    "unemployment_natural_pull":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `== 0.0` and pulls toward the natural rate at the literal 0.06; "
+        "at 0.0 it is also left out of the model's digest",
+    "unemployment_okun_coefficient":
+        "inert at 0.0: `update_economy_daily` and `unemployment_drive_with` "
+        "in economy/daily.rs branch on `== 0.0` and take the shipped "
+        "monthly 0.20 and recovery term; at 0.0 it is also left out of the "
+        "model's digest",
+    "unemployment_natural_rate":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `== 0.0` and adds the long-term term to the literal 4.0; at 0.0 "
+        "it is also left out of the model's digest",
+    "oil_inventory_reversion":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `== 0.0` and integrates inventory as the shipped step does; at "
+        "0.0 it is also left out of the model's digest",
+    "oil_inflation_passthrough":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `!= 0.0` and otherwise takes the shipped three-way branch; at "
+        "0.0 it is also left out of the model's digest",
     "overnight_variance_ratio":
         "inert at 0.0: the overnight move is this ratio of a session's "
         "variance (engine.rs:1856), and nothing moved a price between "

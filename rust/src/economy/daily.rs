@@ -283,6 +283,25 @@ pub struct DailyInputs<'a> {
     /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
     /// and the release adds the drive whole, as it always has.
     pub unemployment_adjustment: f64,
+    /// The monthly share of unemployment's gap to the natural rate closed
+    /// at a release. 0.0 is the shipped 0.06. See
+    /// `ModelParams::unemployment_natural_pull`.
+    pub unemployment_natural_pull: f64,
+    /// Okun's law as its annual coefficient. 0.0 is the shipped monthly
+    /// 0.20 and the recovery term. See
+    /// `ModelParams::unemployment_okun_coefficient`.
+    pub unemployment_okun_coefficient: f64,
+    /// The natural rate of unemployment with no long-term unemployment,
+    /// percent. 0.0 is the shipped 4.0. See
+    /// `ModelParams::unemployment_natural_rate`.
+    pub unemployment_natural_rate: f64,
+    /// The daily share of oil inventory's gap to [`OIL_INVENTORY_NORMAL`]
+    /// closed. 0.0 is off. See `ModelParams::oil_inventory_reversion`.
+    pub oil_inventory_reversion: f64,
+    /// Inflation's monthly response to oil off [`OIL_PASSTHROUGH_ANCHOR`],
+    /// both sides, as a multiple of the shipped 0.01 a dollar. 0.0 is the
+    /// shipped three-way branch. See `ModelParams::oil_inflation_passthrough`.
+    pub oil_inflation_passthrough: f64,
     /// The business-cycle phase and the GDP growth (percent) the fear/greed
     /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
     /// or `None` for the economy's own, as it always read them.
@@ -440,6 +459,11 @@ impl<'a> Default for DailyInputs<'a> {
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
             unemployment_adjustment: 0.0,
+            unemployment_natural_pull: 0.0,
+            unemployment_okun_coefficient: 0.0,
+            unemployment_natural_rate: 0.0,
+            oil_inventory_reversion: 0.0,
+            oil_inflation_passthrough: 0.0,
             fear_greed_published: None,
             yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
@@ -743,6 +767,33 @@ pub fn expected_return_spike_at_level(
 /// arithmetic; read by the release under `unemployment_adjustment_half_life`
 /// and by the engine to seed the impulse.
 pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f64) -> f64 {
+    unemployment_drive_with(unemployment_trend, phase, growth, 0.0)
+}
+
+/// Oil inventory's normal level: the middle of the 40 to 60 dead zone in
+/// which inventory puts no pressure on the oil price, and the level it
+/// opens at. Read only under `ModelParams::oil_inventory_reversion`.
+pub const OIL_INVENTORY_NORMAL: f64 = 50.0;
+
+/// The oil price at which inflation takes no oil term under
+/// `ModelParams::oil_inflation_passthrough`: the level oil's reversion
+/// target takes at the 2 per cent trend growth the Okun term pivots on,
+/// `OIL_BASELINE + 3 * 2`.
+pub const OIL_PASSTHROUGH_ANCHOR: f64 = OIL_BASELINE + 3.0 * 2.0;
+
+/// [`unemployment_drive`] under `ModelParams::unemployment_okun_coefficient`.
+/// At `okun` 0.0 it is the shipped arithmetic, operation for operation. Off
+/// zero it is the phase's trend and `(2 - growth) * okun / 12`, Okun's law
+/// read as the annual relation it states, with no recovery term.
+pub fn unemployment_drive_with(
+    unemployment_trend: f64,
+    phase: CyclePhase,
+    growth: f64,
+    okun: f64,
+) -> f64 {
+    if okun != 0.0 {
+        return unemployment_trend * 0.3 + (2.0 - growth) * (okun / 12.0);
+    }
     let gdp_effect = (2.0 - growth) * 0.20;
     let recovery_effect = if (phase == CyclePhase::Expansion || phase == CyclePhase::Recovery)
         && growth > 1.0
@@ -1441,12 +1492,33 @@ pub fn update_economy_daily(
         );
 
         // Okun's law: 1pp of GDP below trend (~2%) is ~0.5pp of unemployment.
-        let gdp_effect = (2.0 - new_state.gdp_growth) * 0.20;
+        //
+        // That is an annual relation, and at 0.0 `unemployment_okun_coefficient`
+        // applies 0.20 of it at every monthly release, 2.4 points a year,
+        // beside a recovery term that counts the same growth again. Off
+        // zero the coefficient is annual and divided over the year's twelve
+        // releases, and there is no recovery term. A branch, so 0.0 is the
+        // arithmetic that stood; adding the `+ 0.0` recovery term off zero
+        // moves nothing.
+        let okun = inputs.unemployment_okun_coefficient;
+        let gdp_effect = if okun == 0.0 {
+            (2.0 - new_state.gdp_growth) * 0.20
+        } else {
+            (2.0 - new_state.gdp_growth) * (okun / 12.0)
+        };
         let nairu = economy.structural_unemployment;
-        let nairu_pull = (nairu - economy.unemployment_rate) * 0.06;
+        // `unemployment_natural_pull`: the share of the gap to the natural
+        // rate closed this release. A branch, so 0.0 multiplies by the
+        // literal 0.06 that stood.
+        let nairu_pull = if inputs.unemployment_natural_pull == 0.0 {
+            (nairu - economy.unemployment_rate) * 0.06
+        } else {
+            (nairu - economy.unemployment_rate) * inputs.unemployment_natural_pull
+        };
         let mut recovery_effect = 0.0;
-        if (economy.cycle_phase == CyclePhase::Expansion
-            || economy.cycle_phase == CyclePhase::Recovery)
+        if okun == 0.0
+            && (economy.cycle_phase == CyclePhase::Expansion
+                || economy.cycle_phase == CyclePhase::Recovery)
             && new_state.gdp_growth > 1.0
         {
             recovery_effect = -new_state.gdp_growth * 0.08;
@@ -1469,8 +1541,8 @@ pub fn update_economy_daily(
                 15.0,
             )
         } else {
-            let drive = unemployment_drive(
-                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth);
+            let drive = unemployment_drive_with(
+                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth, okun);
             let impulse = economy.unemployment_impulse
                 + inputs.unemployment_adjustment * (drive - economy.unemployment_impulse);
             new_state.unemployment_impulse = impulse;
@@ -1505,7 +1577,13 @@ pub fn update_economy_daily(
             0.0
         };
 
-        let oil_inflation_effect = if economy.oil_price > 80.0 {
+        // `oil_inflation_passthrough`: 0.0 is the shipped three-way branch,
+        // which pays twice as much above 80 as below 50 and nothing between,
+        // so it has a positive mean about oil's own anchor. Off zero one
+        // coefficient acts either side of `OIL_PASSTHROUGH_ANCHOR`.
+        let oil_inflation_effect = if inputs.oil_inflation_passthrough != 0.0 {
+            (economy.oil_price - OIL_PASSTHROUGH_ANCHOR) * (0.01 * inputs.oil_inflation_passthrough)
+        } else if economy.oil_price > 80.0 {
             (economy.oil_price - 80.0) * 0.01
         } else if economy.oil_price < 50.0 {
             (economy.oil_price - 50.0) * 0.005
@@ -1662,7 +1740,15 @@ pub fn update_economy_daily(
             new_state.long_term_unemployment_rate =
                 mathx::max(0.5, economy.long_term_unemployment_rate * 0.97);
         }
-        new_state.structural_unemployment = 4.0 + new_state.long_term_unemployment_rate * 0.3;
+        // `unemployment_natural_rate`: the natural rate with no long-term
+        // unemployment. A branch, so 0.0 adds to the literal 4.0 that stood.
+        let natural_base = if inputs.unemployment_natural_rate == 0.0 {
+            4.0
+        } else {
+            inputs.unemployment_natural_rate
+        };
+        new_state.structural_unemployment =
+            natural_base + new_state.long_term_unemployment_rate * 0.3;
 
         let lfp_target = if economy.cycle_phase == CyclePhase::Contraction
             || economy.cycle_phase == CyclePhase::Trough
@@ -1731,7 +1817,21 @@ pub fn update_economy_daily(
     };
     let inventory_change =
         oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, 0.5 * volatility);
-    let new_oil_inventory = clamp(oil_inventory - inventory_change, 0.0, 100.0);
+    // `oil_inventory_reversion`: production and storage close this share of
+    // inventory's gap to its normal level each day, so inventory has a
+    // stationary distribution and the pressure below cannot saturate for
+    // good. A branch, so 0.0 is the integrator that stood; the one draw
+    // above is taken either way.
+    let new_oil_inventory = if inputs.oil_inventory_reversion == 0.0 {
+        clamp(oil_inventory - inventory_change, 0.0, 100.0)
+    } else {
+        clamp(
+            oil_inventory - inventory_change
+                + inputs.oil_inventory_reversion * (OIL_INVENTORY_NORMAL - oil_inventory),
+            0.0,
+            100.0,
+        )
+    };
     new_state.oil_inventory_level = new_oil_inventory;
 
     let mut oil_inventory_pressure = 0.0;
@@ -3886,5 +3986,143 @@ mod live_projection {
         };
         let (down, flat, up) = (at(-2.0), at(0.0), at(2.0));
         assert!(down.1 < flat.1 && flat.1 < up.1, "{down:?} {flat:?} {up:?}");
+    }
+}
+
+/// Unemployment's anchor and oil's interior (issues #170 to #172): each
+/// switch at 0.0 is the arithmetic that stood, and off zero it does what
+/// its docstring says, read off one release with a draw-free generator.
+#[cfg(test)]
+mod macro_anchors {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    struct Silent(f64);
+    impl crate::rng::Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            self.0
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    const MONTH: i64 = DAYS_PER_MONTH;
+
+    fn economy() -> EconomyState {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+
+    fn step(e: &EconomyState, inputs: DailyInputs) -> EconomyState {
+        update_economy_daily(e, &inputs, &mut Silent(0.5))
+    }
+
+    fn release() -> DailyInputs<'static> {
+        DailyInputs { game_day: MONTH, ..Default::default() }
+    }
+
+    /// The pull is `k * (natural - u)` in place of `0.06 * (natural - u)`:
+    /// the rise moves by exactly the difference, and 0.06 set by hand is the
+    /// shipped release bit for bit.
+    #[test]
+    fn the_natural_pull_replaces_the_shipped_share() {
+        let mut e = economy();
+        // Clear of both clamps, so the difference is the pull's alone.
+        e.unemployment_rate = 6.0;
+        e.structural_unemployment = 4.5;
+        let off = step(&e, release());
+        let same = step(&e, DailyInputs { unemployment_natural_pull: 0.06, ..release() });
+        assert_eq!(same.unemployment_rate.to_bits(), off.unemployment_rate.to_bits());
+        let on = step(&e, DailyInputs { unemployment_natural_pull: 0.3, ..release() });
+        let want = (0.3 - 0.06) * (4.5 - 6.0);
+        assert!((on.unemployment_rate - off.unemployment_rate - want).abs() < 1e-12);
+        // Nothing else in the release reads the dial.
+        // The Phillips term reads this month's rate, so inflation moves.
+        assert_ne!(on.inflation_rate.to_bits(), off.inflation_rate.to_bits());
+        assert_eq!(on.gdp_growth.to_bits(), off.gdp_growth.to_bits());
+    }
+
+    /// Okun's law read as annual: in an expansion at 3 per cent growth the
+    /// shipped drive is -0.2 for Okun and -0.24 for the recovery term every
+    /// month; off zero it is `(2 - 3) * beta / 12` and no recovery term.
+    #[test]
+    fn the_okun_coefficient_is_annual_and_drops_the_recovery_term() {
+        let phase = phase_characteristics_for(CyclePhase::Expansion, false);
+        let shipped = unemployment_drive(phase.unemployment_trend, CyclePhase::Expansion, 3.0);
+        assert_eq!(
+            unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, 3.0, 0.0)
+                .to_bits(),
+            shipped.to_bits());
+        assert!((shipped - (-0.05 * 0.3 - 0.2 - 0.24)).abs() < 1e-12);
+        let annual =
+            unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, 3.0, 0.5);
+        assert!((annual - (-0.05 * 0.3 - 0.5 / 12.0)).abs() < 1e-12);
+
+        // And the release adds exactly that drive in place of the shipped
+        // one. The economy opens in an expansion; growth after its monthly
+        // step is the same in both, and no fiscal term touches it there.
+        let e = economy();
+        assert_eq!(e.cycle_phase, CyclePhase::Expansion);
+        let off = step(&e, release());
+        let on = step(&e, DailyInputs { unemployment_okun_coefficient: 0.5, ..release() });
+        assert_eq!(on.gdp_growth.to_bits(), off.gdp_growth.to_bits());
+        let g = off.gdp_growth;
+        let d_off = unemployment_drive(phase.unemployment_trend, CyclePhase::Expansion, g);
+        let d_on = unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, g, 0.5);
+        let moved = on.unemployment_rate - off.unemployment_rate;
+        assert!((moved - (d_on - d_off)).abs() < 1e-12, "{moved} {}", d_on - d_off);
+    }
+
+    /// The release resets the NAIRU to the natural rate plus 0.3 times
+    /// long-term unemployment, and 4.0 set by hand is the shipped release.
+    #[test]
+    fn the_natural_rate_sets_the_nairu() {
+        let e = economy();
+        let off = step(&e, release());
+        let same = step(&e, DailyInputs { unemployment_natural_rate: 4.0, ..release() });
+        assert_eq!(same.structural_unemployment.to_bits(), off.structural_unemployment.to_bits());
+        let on = step(&e, DailyInputs { unemployment_natural_rate: 5.0, ..release() });
+        assert!((on.structural_unemployment - off.structural_unemployment - 1.0).abs() < 1e-12);
+        assert!((on.structural_unemployment
+            - (5.0 + 0.3 * on.long_term_unemployment_rate)).abs() < 1e-12);
+    }
+
+    /// Inventory closes `k` of its gap to 50 each day beside the shipped
+    /// step, on any day, release or not.
+    #[test]
+    fn inventory_reverts_toward_its_normal_level() {
+        let mut e = economy();
+        e.oil_inventory_level = 90.0;
+        let day = DailyInputs { game_day: MONTH + 3, ..Default::default() };
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_inventory_reversion: 0.01, ..day });
+        let want = 0.01 * (OIL_INVENTORY_NORMAL - 90.0);
+        assert!((on.oil_inventory_level - off.oil_inventory_level - want).abs() < 1e-12);
+        // Below the normal level it pushes the other way.
+        e.oil_inventory_level = 10.0;
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_inventory_reversion: 0.01, ..day });
+        assert!((on.oil_inventory_level - off.oil_inventory_level - 0.4).abs() < 1e-12);
+    }
+
+    /// The shipped pass-through pays a rise from 75 and not the matching
+    /// fall; off zero a rise and a fall about the anchor pay equal and
+    /// opposite amounts.
+    #[test]
+    fn the_oil_pass_through_is_symmetric_about_its_anchor() {
+        let at = |oil: f64, c: f64| {
+            let mut e = economy();
+            e.oil_price = oil;
+            step(&e, DailyInputs { oil_inflation_passthrough: c, ..release() }).inflation_rate
+        };
+        // Shipped: +10 from 75 crosses 80 and pays; -10 pays nothing.
+        assert!(at(85.0, 0.0) - at(75.0, 0.0) > 0.04);
+        assert_eq!(at(65.0, 0.0).to_bits(), at(75.0, 0.0).to_bits());
+        // Symmetric about 81.
+        assert_eq!(OIL_PASSTHROUGH_ANCHOR, 81.0);
+        let up = at(96.0, 1.0) - at(81.0, 1.0);
+        let down = at(66.0, 1.0) - at(81.0, 1.0);
+        assert!((up - 0.15).abs() < 1e-9, "{up}");
+        assert!((up + down).abs() < 1e-9, "{up} {down}");
     }
 }

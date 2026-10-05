@@ -924,6 +924,15 @@ PERTURBATIONS = [
     # its graded arm, so the row perturbs to 42; LIVE, and it moves the
     # economy stream as before (two fewer economy draws, measured).
     ("unemployment_adjustment_half_life", 42.0, True),
+    # Unemployment's anchor and oil's interior (issues #170 to #172), each a
+    # switch at 0.0 on every preset. LIVE on the probe through the 755-day
+    # burn-in: each moves the unemployment rate, the oil price or the
+    # inflation the bank and the curve read before the first session.
+    ("unemployment_natural_pull", 0.1, True),
+    ("unemployment_okun_coefficient", 0.5, True),
+    ("unemployment_natural_rate", 4.5, True),
+    ("oil_inventory_reversion", 0.002, True),
+    ("oil_inflation_passthrough", 1.0, True),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1833,6 +1842,13 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # transition roll through the 755-day burn-in, so which state-dependent
     # sites fire moves with it; the market stream stays put.
     "unemployment_adjustment_half_life",
+    # Two of the macro anchors (2026-10-04), measured on this probe: Okun's
+    # coefficient at 0.5 and the inventory reversion at 0.002 each move the
+    # economy stream by +34 draws and the market stream by 0. Both change
+    # the burn-in's macro path, so which state-dependent sites fire moves
+    # with it. The natural pull, the natural rate and the pass-through move
+    # prices on the probe and no draw count.
+    "unemployment_okun_coefficient", "oil_inventory_reversion",
     # TWO RETURNED WITH pt-v20's GRADED ARM (2026-09-26), measured on this
     # probe: `oil_supply_response` 0.5 moves the economy stream by +34
     # draws and `oil_opec_symmetry` 0.5 by -2, the market stream by 0. The
