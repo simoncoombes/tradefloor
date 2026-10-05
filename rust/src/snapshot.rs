@@ -910,6 +910,10 @@ fn read_finite(d: &SnapshotMap, at: &str, key: &str) -> Result<f64> {
 /// An integer field, refusing one out of `T`'s range.
 fn read_int<T: TryFrom<i64>>(d: &SnapshotMap, at: &str, key: &str, kind: &str) -> Result<T> {
     let v = field(d, at, key)?;
+    if let SnapshotValue::UInt(u) = v {
+        return Err(SnapshotError::value(format!(
+            "snapshot field {at}{key} must be {kind}, got {u}, which is out of range")));
+    }
     let i = v.integer().ok_or_else(|| wrong(at, key, kind, v))?;
     T::try_from(i).map_err(|_| {
         SnapshotError::value(format!("snapshot field {at}{key} must be {kind}, got {i}"))
@@ -1168,11 +1172,27 @@ fn book_entry<'a>(v: &'a SnapshotValue, what: &str) -> Result<&'a SnapshotMap> {
 }
 
 /// A field of the book or of one of its entries: refused by name when
-/// absent, as the book is read without a key check.
+/// absent.
 fn book_field<'a>(d: &'a SnapshotMap, what: &str, key: &str) -> Result<&'a SnapshotValue> {
     d.get(key).ok_or_else(|| {
         SnapshotError::new(SnapshotErrorKind::Fields, format!("{what} has no {key:?}"))
     })
+}
+
+/// Refuse a field of the book or of one of its entries that this build
+/// does not write, by name, as every other level of a snapshot does: a
+/// misspelt optional field (`memory`, `transient`) would otherwise restore
+/// as absent.
+fn book_unknown(d: &SnapshotMap, what: &str, known: &[&str]) -> Result<()> {
+    let unknown: Vec<String> =
+        d.keys().filter(|k| !known.contains(k)).map(str::to_string).collect();
+    if unknown.is_empty() {
+        return Ok(());
+    }
+    Err(SnapshotError::new(
+        SnapshotErrorKind::Fields,
+        format!("{what} carries fields this build does not write: {}", py_names(&unknown)),
+    ))
 }
 
 fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
@@ -1181,6 +1201,8 @@ fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
     // the first one missing.
     let top = "the snapshot's book";
     let at = "book.";
+    book_unknown(d, top, &["sequence", "fill_sequence", "taken", "orders", "flow", "fills",
+                           "impacts", "memory"])?;
     for key in ["sequence", "fill_sequence", "taken"] {
         book_field(d, top, key)?;
     }
@@ -1204,10 +1226,12 @@ fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
     for item in read_items(d, at, "orders", "a list of dicts")? {
         let what = "a snapshot order";
         let o = book_entry(item, "an order")?;
-        for key in ["side", "mode", "order_id", "agent", "ticker", "limit_price",
-                    "quantity", "remaining", "sequence"] {
+        const ORDER: [&str; 9] = ["side", "mode", "order_id", "agent", "ticker", "limit_price",
+                                  "quantity", "remaining", "sequence"];
+        for key in ORDER {
             book_field(o, what, key)?;
         }
+        book_unknown(o, what, &ORDER)?;
         let at = "book.orders[].";
         let mode = read_str(o, at, "mode")?;
         state.orders.push(AgentOrder {
@@ -1246,10 +1270,12 @@ fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
     for item in read_items(d, at, "fills", "a list of dicts")? {
         let what = "a snapshot fill";
         let f = book_entry(item, "a fill")?;
-        for key in ["side", "liquidity", "agent", "order_id", "ticker", "quantity", "price",
-                    "counterparty", "reference", "day", "tick", "sequence"] {
+        const FILL: [&str; 12] = ["side", "liquidity", "agent", "order_id", "ticker", "quantity",
+                                  "price", "counterparty", "reference", "day", "tick", "sequence"];
+        for key in FILL {
             book_field(f, what, key)?;
         }
+        book_unknown(f, what, &FILL)?;
         let at = "book.fills[].";
         let liquidity = read_str(f, at, "liquidity")?;
         state.fills.push(AgentFill {
@@ -1273,9 +1299,11 @@ fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
     for item in read_items(d, at, "impacts", "a list of dicts")? {
         let what = "a snapshot impact";
         let r = book_entry(item, "an impact")?;
-        for key in ["agent", "ticker", "bought", "sold", "permanent", "day", "tick"] {
+        const IMPACT: [&str; 7] = ["agent", "ticker", "bought", "sold", "permanent", "day", "tick"];
+        for key in IMPACT {
             book_field(r, what, key)?;
         }
+        book_unknown(r, what, &[&IMPACT[..], &["transient"]].concat())?;
         let at = "book.impacts[].";
         state.impacts.push(AgentImpact {
             agent: read_str(r, at, "agent")?.to_string(),
@@ -1615,7 +1643,10 @@ impl Engine {
         if !day_loop.pending_fair_value.is_empty() {
             out.put("pending_fair_value", V::from_f64s(&day_loop.pending_fair_value));
         }
-        if !day_loop.pending_dividend.is_empty() {
+        // Only on a model that pays dividends, the one the restore's key
+        // check accepts it on: a host's day loop could carry a buffer here
+        // that this engine's model never fills.
+        if self.carries_dividends() && !day_loop.pending_dividend.is_empty() {
             out.put("pending_dividend", V::from_f64s(&day_loop.pending_dividend));
         }
         // The day's endogenous news, generated once at the open and read by
@@ -1817,8 +1848,9 @@ impl Engine {
         let fair_value = self.carries_fair_value_offsets();
         let fair_value_why = format!(
             "the model can move a fair-value level (fair_value_news_share, \
-             fair_value_market_share, opening_mispricing_sigma or \
-             opening_market_sigma is not 0), and this engine's model {}",
+             fair_value_market_share, opening_mispricing_sigma, \
+             opening_market_sigma or earnings_surprise_sigma is not 0), and \
+             this engine's model {}",
             if fair_value { "can" } else { "cannot" }
         );
         let drawdown = p.fed_drawdown_hold != 0.0 || p.market_vol_cycle_recovery_release != 0.0;
@@ -2035,6 +2067,11 @@ impl Engine {
     /// fundamentals it was built with, and restoring onto one built from
     /// another universe gives the right prices and the wrong fair values.
     /// Build the engine from the universe the snapshot came from.
+    ///
+    /// Build it from the same seed too where a cohort's arrival order
+    /// matters. Every generator's position comes from the snapshot, but
+    /// [`Engine::arrival_order`] under `book_arrival_shuffle` is keyed on the
+    /// seed this engine was built with, which a snapshot does not carry.
     ///
     /// # What a restore resets
     ///
@@ -2375,6 +2412,11 @@ impl Engine {
         let live: Option<[f64; 6]> = match snapshot.get("rate_live_marks") {
             Some(_) => {
                 let values = read_numbers(snapshot, "", "rate_live_marks")?;
+                if let Some(bad) = values.iter().find(|v| !v.is_finite()) {
+                    return Err(core(format!(
+                        "this snapshot's rate_live_marks holds {bad}; the live mark is \
+                         six finite yields.")));
+                }
                 let arr: [f64; 6] = values.as_slice().try_into().map_err(|_| {
                     core(format!(
                         "this snapshot's rate_live_marks carries {} values; the live mark \
@@ -2479,6 +2521,16 @@ impl Engine {
             if r.len() != 5 {
                 return Err(core(format!(
                     "snapshot field cycle_nowcast_rng must be 5 numbers, got {}", r.len())));
+            }
+            // The uniform and normal counts, held as draw_counts are.
+            if let Some(bad) = r[3..]
+                .iter()
+                .find(|c| !c.is_finite() || **c < 0.0 || c.fract() != 0.0 || **c > 9.007_199_254_740_992e15)
+            {
+                return Err(core(format!(
+                    "snapshot field cycle_nowcast_rng holds a draw count of {bad}. Each is a \
+                     count of draws taken: a whole number from 0."
+                )));
             }
             let rng = crate::rng::RngState {
                 state: r[0].to_bits(),
@@ -2906,7 +2958,20 @@ impl Decoder<'_> {
             2 => SnapshotValue::Bool(true),
             3 => SnapshotValue::Int(i64::from_le_bytes(self.word()?)),
             4 => SnapshotValue::Float(f64::from_bits(u64::from_le_bytes(self.word()?))),
-            10 => SnapshotValue::UInt(u64::from_le_bytes(self.word()?)),
+            10 => {
+                // Canonical only: a value that fits an i64 is an `Int` (tag 3),
+                // as `SnapshotValue::from_u64` and every snapshot write it, so
+                // one snapshot has one byte form and decodes to equal trees.
+                let u = u64::from_le_bytes(self.word()?);
+                if i64::try_from(u).is_ok() {
+                    return Err(SnapshotError::encoding(format!(
+                        "this snapshot has an unsigned integer {u} at byte {}, which fits a \
+                         signed one and is written as one (tag 3)",
+                        at + MAGIC.len()
+                    )));
+                }
+                SnapshotValue::UInt(u)
+            }
             5 => SnapshotValue::Str(self.string()?),
             6 => {
                 let len = self.len()?;

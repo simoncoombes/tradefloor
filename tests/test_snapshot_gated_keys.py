@@ -335,3 +335,23 @@ def test_a_held_key_is_refused_by_name_on_a_model_without_its_dial(key):
     target[key] = snapshot[key]
     with pytest.raises(tf.ValidationError, match=key):
         tf.Engine(seed=SEED, universe=UNIVERSE, model="pt-v20").restore_state(target)
+
+
+def test_a_numpy_uint64_key_above_the_signed_range_restores():
+    """A 64-bit key read back through numpy (a ``uint64`` above 2**63 - 1)
+    restores as the Python int it stands for."""
+    np = pytest.importorskip("numpy")
+    for seed in range(3, 40):
+        engine = _engine("earnings", seed=seed)
+        play(engine, "earnings", 0, STEPS)
+        snapshot = engine.state_snapshot()
+        if snapshot["earnings_key"] >= 2**63:
+            break
+    else:
+        pytest.fail("no seed in 3..40 draws an earnings key above 2**63 - 1")
+    plain = _engine("earnings", seed=seed + 6)
+    plain.restore_state(snapshot)
+    snapshot["earnings_key"] = np.uint64(snapshot["earnings_key"])
+    restored = _engine("earnings", seed=seed + 6)
+    restored.restore_state(snapshot)
+    assert restored.state_hash() == plain.state_hash() == engine.state_hash()

@@ -527,3 +527,129 @@ fn another_roster_or_model_is_refused() {
     let err = other.restore(&s).unwrap_err();
     assert_eq!(err.kind(), SnapshotErrorKind::Model, "{err}");
 }
+
+// ---------------------------------------------------------------------------
+// The r21 port's edges
+// ---------------------------------------------------------------------------
+
+/// The engine `every_r21_dial` builds, closed after two days and forty
+/// ticks into the third with an agent's fill and a resting order, so the
+/// book carries orders, fills, impacts and the meta-order memory.
+fn r21_busy() -> Engine {
+    let mut e = engine_with(every_r21_dial(), 3, 6, true);
+    run(&mut e, 0..2);
+    e.open_market();
+    let first = e.companies()[0].ticker.clone();
+    e.submit_order("fund", &first, Side::Buy, 2_000.0, None, None).unwrap();
+    e.submit_order("fund", &first, Side::Buy, 100.0, Some(1.0), None).unwrap();
+    session(&mut e, 2, 9, 30, 40);
+    e
+}
+
+fn r21_refused(snapshot: &EngineSnapshot) -> tradefloor::snapshot::SnapshotError {
+    let mut target = engine_with(every_r21_dial(), 3, 6, true);
+    let before = target.snapshot().to_bytes();
+    let err = target.restore(snapshot).expect_err("the restore was accepted");
+    assert_eq!(target.snapshot().to_bytes(), before, "a refused restore changed the engine");
+    err
+}
+
+/// An unsigned integer that fits an i64 is not the canonical byte form:
+/// one snapshot has one encoding, and it decodes to the tree it came from.
+#[test]
+fn a_u64_tag_holding_a_small_value_is_refused() {
+    let mut fields = tradefloor::snapshot::SnapshotMap::new();
+    fields.insert("key", SnapshotValue::UInt(5));
+    let err = EngineSnapshot::from_map(fields).to_bytes();
+    let err = EngineSnapshot::from_bytes(&err).unwrap_err();
+    assert_eq!(err.kind(), SnapshotErrorKind::Encoding, "{err}");
+    assert!(err.message().contains("tag 3"), "{err}");
+    let mut fields = tradefloor::snapshot::SnapshotMap::new();
+    fields.insert("key", SnapshotValue::UInt(u64::MAX));
+    let bytes = EngineSnapshot::from_map(fields).to_bytes();
+    assert!(EngineSnapshot::from_bytes(&bytes).is_ok());
+}
+
+/// A host's day loop may hold an ex-date move on a model without
+/// dividends; the snapshot leaves it out, so its own restore accepts it.
+#[test]
+fn a_pending_dividend_is_written_only_on_a_model_that_pays_them() {
+    let mut e = engine("pt-v20");
+    run(&mut e, 0..2);
+    let mut day_loop = tradefloor::snapshot::DayLoop::new(2, false);
+    day_loop.pending_dividend = vec![0.01; 6];
+    let saved = e.snapshot_with(&day_loop);
+    assert!(saved.get("pending_dividend").is_none());
+    engine("pt-v20").restore(&saved).unwrap();
+}
+
+/// On a model whose only fair-value dial is the earnings surprise, the
+/// refusal of a snapshot without the levels names that dial.
+#[test]
+fn the_fair_value_refusal_names_the_earnings_surprise() {
+    let mut p = ModelParams::preset("pt-v3").unwrap();
+    for (name, value) in [("earnings_surprise_sigma", 3.5), ("overnight_idio_share", 0.25)] {
+        p = p.with_override(name, value).unwrap();
+    }
+    p.invariants().unwrap();
+    let mut e = engine_with(p.clone(), 3, 6, false);
+    run(&mut e, 0..2);
+    let mut s = e.snapshot();
+    s.fields_mut().remove("fair_value_offset");
+    let err = engine_with(p, 3, 6, false).restore(&s).unwrap_err();
+    assert!(err.message().contains("earnings_surprise_sigma"), "{err}");
+}
+
+/// The nowcast's generator counts and the live rate marks are held as the
+/// other generator counts and scalars are: whole and finite.
+#[test]
+fn a_malformed_nowcast_count_or_live_mark_is_refused_by_name() {
+    let saved = r21_busy().snapshot();
+    let edit = |key: &str, index: usize, value: f64| {
+        let mut s = saved.clone();
+        let Some(SnapshotValue::List(items)) = s.fields_mut().get_mut(key) else { panic!("{key}") };
+        items[index] = SnapshotValue::Float(value);
+        s
+    };
+    for value in [-1.0, 0.5, f64::NAN] {
+        let err = r21_refused(&edit("cycle_nowcast_rng", 3, value));
+        assert!(err.message().contains("cycle_nowcast_rng"), "{err}");
+    }
+    let err = r21_refused(&edit("rate_live_marks", 1, f64::NAN));
+    assert!(err.message().contains("rate_live_marks"), "{err}");
+}
+
+/// A field the book does not write is refused by name at every level, so
+/// a misspelt optional field (`memory`, `transient`) cannot restore as
+/// absent.
+#[test]
+fn an_unknown_field_in_the_book_is_refused_by_name() {
+    let saved = r21_busy().snapshot();
+    let book = |s: &mut EngineSnapshot| -> tradefloor::snapshot::SnapshotMap {
+        let Some(SnapshotValue::Map(b)) = s.fields_mut().remove("book") else { panic!("book") };
+        b
+    };
+    let put = |s: &mut EngineSnapshot, b: tradefloor::snapshot::SnapshotMap| {
+        s.fields_mut().insert("book", SnapshotValue::Map(b));
+    };
+    {
+        let mut s = saved.clone();
+        let mut b = book(&mut s);
+        assert!(b.contains_key("memory"));
+        let memory = b.remove("memory").unwrap();
+        b.insert("memroy", memory);
+        put(&mut s, b);
+        let err = r21_refused(&s);
+        assert!(err.message().contains("memroy"), "{err}");
+    }
+    for list in ["orders", "fills", "impacts"] {
+        let mut s = saved.clone();
+        let mut b = book(&mut s);
+        let Some(SnapshotValue::List(items)) = b.get_mut(list) else { panic!("{list}") };
+        let Some(SnapshotValue::Map(entry)) = items.first_mut() else { panic!("{list} is empty") };
+        entry.insert("transeint", SnapshotValue::Float(0.0));
+        put(&mut s, b);
+        let err = r21_refused(&s);
+        assert!(err.message().contains("transeint"), "{list}: {err}");
+    }
+}

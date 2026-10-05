@@ -494,6 +494,10 @@ fn snapshot_value_from_py(v: &Bound<'_, PyAny>, at: &str) -> PyResult<crate::sna
     if let Ok(i) = v.extract::<i64>() {
         return Ok(V::Int(i));
     }
+    // A numpy uint64 above i64::MAX, as a Python int there would be.
+    if let Ok(u) = v.extract::<u64>() {
+        return Ok(V::UInt(u));
+    }
     if let Ok(f) = v.extract::<f64>() {
         return Ok(V::Float(f));
     }
