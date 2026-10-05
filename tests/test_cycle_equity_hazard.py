@@ -57,7 +57,7 @@ def test_pt_v21_ships_them_on():
     )} == {
         "cycle_equity_hazard": 5.0,
         "cycle_equity_hazard_knee": 0.1,
-        "cycle_equity_hazard_opening": 0.016,
+        "cycle_equity_hazard_opening": 0.011,
     }
 
 

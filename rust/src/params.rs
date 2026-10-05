@@ -2444,7 +2444,7 @@ pub struct ModelParams {
     /// holds 0.667 expansion and 0.153 recovery against the run's 0.690 and
     /// 0.140; at 0.007 each of the five shares is within 0.01 of the run's
     /// (1500 openings, docs/MODEL.md).
-    /// pt-v21 ships 0.016.
+    /// pt-v21 ships 0.011.
     pub cycle_equity_hazard_opening: f64,
     /// Sessions of market the run has lived before day zero: the last this many
     /// days of the economy's burn-in (`macro_burn_in_days`), played on a copy
@@ -7055,13 +7055,13 @@ pub const PT_V21: ModelParams = ModelParams::pt_v21();
 /// one-year drift lower. Moving it renames the preset's digest, so
 /// `PT_V21_DIGEST_PREFIX` moves with it, and every known answer of the
 /// default is re-based.
-const PT_V21_OPENING_HAZARD: f64 = 0.016;
+const PT_V21_OPENING_HAZARD: f64 = 0.011;
 
 /// The first eight hex digits of pt-v21's digest at
 /// `PT_V21_OPENING_HAZARD`: the fingerprint the graded vector had as
-/// overrides on pt-v20 (`custom-e4803fc6`). A test pins it.
+/// overrides on pt-v20 (`custom-2dc32068`). A test pins it.
 #[cfg(test)]
-const PT_V21_DIGEST_PREFIX: &str = "e4803fc6";
+const PT_V21_DIGEST_PREFIX: &str = "2dc32068";
 
 /// The name of the preset an engine runs when none is named.
 ///
