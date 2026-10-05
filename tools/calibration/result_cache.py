@@ -135,24 +135,32 @@ def params_digest(model: Any) -> str:
 
     Names sorted, each as `name=` then the value's IEEE-754 bits big-endian
     then a newline, with every name in `digest_silent_at_zero()` left out
-    while it is 0.0. So the first eight hex characters are a custom model's
-    fingerprint suffix, and a new switch left at zero keys the same entries
-    as the model before it existed.
+    while it is 0.0 and every name in `digest_silent_at_default()` left out
+    while it holds that default. So the first eight hex characters are a
+    custom model's fingerprint suffix, and a new switch left at zero keys
+    the same entries as the model before it existed.
 
     `model` is a `ModelParams` or a plain mapping of its `to_dict()`; the
-    mapping form needs the silent names passed through `silent`.
+    mapping form needs the silent names passed through `__silent__` and the
+    silent defaults through `__silent_default__`.
     """
     if isinstance(model, Mapping):
         values = dict(model)
         silent = set(values.pop("__silent__", ()))
+        silent_default = dict(values.pop("__silent_default__", {}))
     else:
         values = model.to_dict()
         silent = set(type(model).digest_silent_at_zero())
+        silent_default = dict(type(model).digest_silent_at_default())
     values.pop("name", None)
     h = hashlib.sha256()
     for name in sorted(values):
         v = float(values[name])
         if v == 0.0 and name in silent:
+            continue
+        if name in silent_default and struct.pack(">d", v) == struct.pack(
+            ">d", float(silent_default[name])
+        ):
             continue
         h.update(name.encode("utf-8") + b"=" + struct.pack(">d", v) + b"\n")
     return h.hexdigest()
