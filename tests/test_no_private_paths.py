@@ -7,13 +7,15 @@ records, the Rust comments and the tests cited about 900 such paths, and the
 box scripts and their logs named the S3 bucket the boxes wrote to, whose name
 carries the AWS account id. 0.8.6 removed them; these tests keep them out.
 
-The path check skips `validation/`. It publishes pt-v20's grade in the
-layout the grade ran in, so `validation/pt-v20/programme/...` is a public
-path, and the same `programme/` prefix anywhere else is the private one.
+The path check skips `validation/`. It publishes pt-v20's and pt-v21's
+grades in the layout each grade ran in, so `validation/pt-v20/programme/...`
+and `validation/pt-v21/programme/...` are public paths, and the same
+`programme/` prefix anywhere else is the private one.
 
 Each path pattern is a kind of private location:
 
-- `programme/` not preceded by `validation/pt-v20/`: the design notes' tree.
+- `programme/` not preceded by `validation/pt-v20/` or `validation/pt-v21/`:
+  the design notes' tree.
 - `tradefloor-design`: the private repository's name.
 - `/private/tmp` and `scratchpad`: a working machine's temporary files.
 - `vix-dynamics.md`: the design note most cited by name, kept out except
@@ -38,7 +40,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 PATTERNS = {
-    "programme/": re.compile(r"(?<!validation/pt-v20/)programme/"),
+    "programme/": re.compile(r"(?<!validation/pt-v2[01]/)programme/"),
     "tradefloor-design": re.compile(r"tradefloor-design", re.I),
     "/private/tmp": re.compile(r"/private/tmp"),
     "scratchpad": re.compile(r"scratchpad", re.I),
@@ -55,12 +57,14 @@ ALLOWED = {
     "tools/presets/record.py": {
         "programme/": "`public_paths` rewrites the `programme/` paths in a "
                       "published grade's verdict to `validation/pt-v20/"
-                      "programme/` when it writes a record, so it has to "
+                      "programme/` or `validation/pt-v21/programme/` when "
+                      "it writes a record, so it has to "
                       "match the prefix",
     },
     "tests/test_validation.py": {
         "programme/": "runs the recorded commands from inside "
-                      "`validation/pt-v20/`, where the paths are relative to "
+                      "`validation/pt-v20/` and `validation/pt-v21/`, where "
+                      "the paths are relative to "
                       "that folder, and feeds `programme/` paths to "
                       "`record.public_paths` to check the rewrite",
     },

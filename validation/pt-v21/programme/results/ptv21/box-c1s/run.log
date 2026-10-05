@@ -1,4 +1,4 @@
-+ BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s
++ BUCKET=s3://<bucket>/pretium-calib/out/ptv21c1s
 + BRANCH=rel/0.10-ptv21
 + dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 Amazon Linux 2023 repository                     88 MB/s |  80 MB     00:00    
@@ -173,21 +173,21 @@ Installed:
 Complete!
 ++ date -u
 + echo 'preflight Mon Oct  5 16:34:50 UTC 2026'
-+ aws s3 cp /tmp/PREFLIGHT-S3 s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
-Completed 39 Bytes/39 Bytes (925 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://<bucket>/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (925 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://<bucket>/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
 + cat
 + chmod +x /home/ec2-user/stream.sh
 + SCRIPTS_TGZ=in/ptv21c1s-scripts.tgz
 + case "$SCRIPTS_TGZ" in
-+ aws s3 cp s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/ptv21c1s-scripts.tgz /home/ec2-user/scripts.tgz
-+ setsid nohup /home/ec2-user/stream.sh s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s
-Completed 256.0 KiB/438.1 KiB (2.8 MiB/s) with 1 file(s) remainingCompleted 438.1 KiB/438.1 KiB (4.8 MiB/s) with 1 file(s) remainingdownload: s3://dia-test-101631415962-us-east-2-an/pretium-calib/in/ptv21c1s-scripts.tgz to home/ec2-user/scripts.tgz
++ aws s3 cp s3://<bucket>/pretium-calib/in/ptv21c1s-scripts.tgz /home/ec2-user/scripts.tgz
++ setsid nohup /home/ec2-user/stream.sh s3://<bucket>/pretium-calib/out/ptv21c1s
+Completed 256.0 KiB/438.1 KiB (2.8 MiB/s) with 1 file(s) remainingCompleted 438.1 KiB/438.1 KiB (4.8 MiB/s) with 1 file(s) remainingdownload: s3://<bucket>/pretium-calib/in/ptv21c1s-scripts.tgz to home/ec2-user/scripts.tgz
 + chown ec2-user:ec2-user /home/ec2-user/scripts.tgz
 + sha256sum /home/ec2-user/scripts.tgz
-+ aws s3 cp /home/ec2-user/scripts.tgz s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
-Completed 438.1 KiB/438.1 KiB (37.9 MiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
-+ aws s3 cp /tmp/scripts-sha256.txt s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/scripts-sha256.txt
-Completed 93 Bytes/93 Bytes (2.0 KiB/s) with 1 file(s) remainingupload: tmp/scripts-sha256.txt to s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/scripts-sha256.txt
++ aws s3 cp /home/ec2-user/scripts.tgz s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
+Completed 438.1 KiB/438.1 KiB (37.9 MiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
++ aws s3 cp /tmp/scripts-sha256.txt s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-sha256.txt
+Completed 93 Bytes/93 Bytes (2.0 KiB/s) with 1 file(s) remainingupload: tmp/scripts-sha256.txt to s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-sha256.txt
 + mkdir -p /home/ec2-user/out
 + chown -R ec2-user:ec2-user /home/ec2-user/out
 + cat
@@ -716,4 +716,4 @@ d1pool done in 58s
 + JSONS=1
 + '[' 0 -eq 0 ']'
 + echo 'OK exit=0 jsons=1 branch=rel/0.10-ptv21 pin=931ed3d4fe659e4dec765673ee3e280a6b40ab2b'
-+ aws s3 cp /var/log/pretium-run.log s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/ptv21c1s/run.log
++ aws s3 cp /var/log/pretium-run.log s3://<bucket>/pretium-calib/out/ptv21c1s/run.log

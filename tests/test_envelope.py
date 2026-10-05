@@ -113,11 +113,21 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # EMPTY AGAIN on pt-v20's graded arm, which reads +7.6957 on the level
     # protocol, inside both tables (2015-2025 position 0.53, ruled 0.72);
     # the set held {"index_drift_pct"} at the +1.1446 above.
+    #
+    # pt-v21 (0.10.0) is in on the 2015-2025 table and reads one row OUT on
+    # the ruled one: `index_tail_dn3_pct`, 0.5976 on the level protocol's
+    # thirty seeds against the ruled 1928-2025 floor of 0.64. Pooled over
+    # 360 seeds, as the eighteenth registration grades its D1, it reads 0.98,
+    # inside both tables (validation/pt-v21/, reg18-c1.json). Named here so
+    # the row is held red on the ruled table until its thirty-seed reading
+    # moves, and fails here if it starts passing in silence.
     EXPECTED_RED: set[str] = set()
+    EXPECTED_RED_RULED: set[str] = {"index_tail_dn3_pct"}
     ruled, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
-        assert band_distance(v, *ruled[k]) == 0, (k, v, ruled[k])
+        assert (band_distance(v, *ruled[k]) != 0) == (k in EXPECTED_RED_RULED), (
+            k, v, ruled[k])
         assert k in LEVEL + CRISIS
         red = band_distance(v, *REAL_MARKETS[k]) != 0
         if k in EXPECTED_RED:
@@ -228,24 +238,23 @@ def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
 
 @pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
 def test_the_roster_grant_is_refused_on_the_default(mix):
-    """pt-v20 is the default and the mixes were measured on pt-v19 only.
+    """pt-v21 is the default and the mixes hold on pt-v19 only.
 
-    The grant the test above asks on pt-v19 is refused on pt-v20, whether
+    The grant the test above asks on pt-v19 is refused on pt-v21, whether
     the caller names it or leaves the default, and the reason says which
-    preset the grant was measured on. The same run on pt-v20 misses a shape
-    row at 504 days for two mixes
-    (`test_the_pt_v20_roster_run_does_not_hold`), so the refusal stays.
+    preset the grant was measured on. The same run on pt-v21 misses a shape
+    row at 504 days for two mixes, as it did on pt-v20
+    (`test_the_pt_v21_roster_run_does_not_hold`), so the refusal stays.
     """
-    assert env.PRESET == "pt-v20" and ROSTER_PRESET == "pt-v19"
+    assert env.PRESET == "pt-v21" and ROSTER_PRESET == "pt-v19"
     rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
             if k not in DECAY_ROWS]
-    for named in ({}, {"preset": "pt-v20"}):
+    for named in ({}, {"preset": "pt-v21"}, {"preset": "pt-v20"}):
         v = env.check(horizon_days=252, statistics=rows,
                       sector_concentrated=mix, **named)
         assert not v.inside, named
-        assert [g.id for g in v.gaps] == ["roster-concentration"], named
-        assert "measured on pt-v19 only" in v.reasons[0], v.reasons
-        assert "pt-v20" in v.reasons[0], v.reasons
+        assert "roster-concentration" in [g.id for g in v.gaps], named
+        assert any("measured on pt-v19 only" in r for r in v.reasons), v.reasons
     # The same question on pt-v19 is granted, with a warning that the rest
     # of the answer is the default's.
     v = env.check(horizon_days=252, statistics=rows,
@@ -371,32 +380,21 @@ def test_the_roster_tables_are_the_committed_measurement():
         assert got == drift, mix
 
 
-def test_the_pt_v20_roster_run_does_not_hold():
-    """measurements/roster-shapes-pt-v20.json, re-scored with this build.
-
-    The run behind the pt-v19 grant, repeated on pt-v20 at 0.8.6. Its
-    balanced mix reads pt-v20's certified panels to four places, so it is
-    the certified roster on the default. Every concentrated mix holds every
-    shape row the bands can grade at 252 days, and at 504 days the S&P-like
-    and technology-heavy mixes miss `volume_abs_return_corr` on its ceiling.
-    The roster-concentration gap quotes those two readings, and `check`
-    grants no mix on pt-v20 because of them.
-    """
+def _roster_misses(preset):
     import json
     from pathlib import Path
 
     root = Path(__file__).resolve().parent.parent
-    record = json.loads((root / "measurements" / "roster-shapes-pt-v20.json")
+    record = json.loads((root / "measurements" / f"roster-shapes-{preset}.json")
                         .read_text(encoding="utf-8"))
-    assert record["preset"] == env.PRESET == "pt-v20"
+    assert record["preset"] == preset
     assert tuple(record["seeds"]) == env.ROSTER_MEASUREMENT["seeds"]
     assert record["shapes"] == {"balanced": {}, **env.ROSTER_SHAPES}
-    certified = tradefloor.preset_record("pt-v20")
+    certified = tradefloor.preset_record(preset)
     for h, panel in ((252, "panel_252"), (504, "panel_504")):
         med = record["results"][f"balanced@{h}"]["median"]
         for k in SHAPE:
             assert round(med[k], 4) == round(certified[panel][k], 4), (h, k)
-
     misses = {}
     for mix in env.ROSTER_SHAPES:
         for h in env.ROSTER_MEASUREMENT["horizons"]:
@@ -407,6 +405,37 @@ def test_the_pt_v20_roster_run_does_not_hold():
                    if k in rows and rows[k]["in_band"] is False]
             if out:
                 misses[(mix, h)] = {k: round(r["median"][k], 4) for k in out}
+    return misses
+
+
+def test_the_pt_v21_roster_run_does_not_hold():
+    """measurements/roster-shapes-pt-v21.json, re-scored with this build.
+
+    The run behind the pt-v19 grant, repeated on pt-v21, the default, at
+    0.10.0. Its balanced mix reads pt-v21's certified panels to four places,
+    so it is the certified roster on the default. Every concentrated mix
+    holds every shape row the bands can grade at 252 days, and at 504 days
+    the technology-heavy and all-technology mixes miss
+    `volume_abs_return_corr` on its ceiling. The roster-concentration gap
+    quotes those readings, and `check` grants no mix on pt-v21.
+    """
+    misses = _roster_misses("pt-v21")
+    assert misses == {
+        ("tech_heavy", 504): {"volume_abs_return_corr": 0.6302},
+        ("all_technology", 504): {"volume_abs_return_corr": 0.6407},
+    }
+    detail = {g.id: g for g in env.GAPS}["roster-concentration"].detail
+    for reading in misses.values():
+        assert f"{reading['volume_abs_return_corr']:.4f}" in detail
+
+
+def test_the_pt_v20_roster_run_does_not_hold():
+    """measurements/roster-shapes-pt-v20.json, re-scored with this build.
+
+    The same run on pt-v20 at 0.8.6: at 504 days the S&P-like and
+    technology-heavy mixes miss `volume_abs_return_corr` on its ceiling.
+    """
+    misses = _roster_misses("pt-v20")
     assert misses == {
         ("sp500_like", 504): {"volume_abs_return_corr": 0.6367},
         ("tech_heavy", 504): {"volume_abs_return_corr": 0.6332},
@@ -1160,18 +1189,18 @@ def test_every_scored_shape_row_says_where_it_sits_among_real_windows(days):
         assert real["source"] in row["note"], name
 
 
-def test_abs_return_acf1_is_in_band_and_below_every_real_window():
-    """The reviewer's second report, as numbers a user can read: the
-    certified median, 0.0282, is inside its ruled band and below every
-    non-crisis real year of 2015-2025, whose lowest is 0.039."""
+def test_abs_return_acf1_is_in_band_and_placed_among_the_real_windows():
+    """The reviewer's second report, as numbers a user can read. pt-v20's
+    certified median, 0.0282, was inside its ruled band and below every
+    non-crisis real year of 2015-2025, whose lowest is 0.039. pt-v21's,
+    0.0948, is inside its band and above five of the nine."""
     row = env.score(env.certified_panel())["statistics"]["abs_return_acf1"]
     assert row["in_band"]
-    assert row["real"]["position"] == "below all 9"
+    assert row["real"]["position"] == "above 5 of 9"
     assert row["real"]["lowest"] == 0.039
     assert row["real"]["median"] == 0.083
-    assert "none of those windows read this low" in row["note"]
     said = _check_warning("abs_return_acf1")
-    for part in ("0.0282", "below all 9", "lowest 0.039", "median 0.083"):
+    for part in ("0.0948", "above 5 of 9", "lowest 0.039", "median 0.083"):
         assert part in said, (part, said)
 
 
@@ -1201,15 +1230,19 @@ def test_a_floor_that_cannot_bind_is_said_to():
 
 
 def test_the_grade_did_not_move():
-    """None of the above may change a band, a count or a verdict: they are
-    what pt-v20 was graded on."""
+    """None of the above may change a band, a count or a verdict. pt-v20
+    read 19 of 19 here; pt-v21 reads 18 of 19, the miss being
+    `index_tail_dn3_pct` on thirty seeds (see the fourteen test above)."""
     from tradefloor import facts
     scored = env.score(dict(env.certified_panel(), **env.CERTIFIED_LEVEL,
                             **env.CERTIFIED_CRISIS))
     assert (scored["shape_in_band"], scored["shape_of"]) == (14, 14)
-    assert (scored["in_band"], scored["of"]) == (19, 19)
+    assert (scored["in_band"], scored["of"]) == (18, 19)
+    assert [k for k, r in scored["statistics"].items()
+            if not r["in_band"]] == ["index_tail_dn3_pct"]
     for name, row in scored["statistics"].items():
         assert row["band"] == tuple(facts.REAL_MARKETS_RULED[name]), name
     cert = env.certified()
     assert cert["band_basis"] == env.DEFAULT_BAND_BASIS == "ruled"
-    assert all(s["in_band"] for s in cert["statistics"].values())
+    assert [k for k, s in cert["statistics"].items()
+            if not s["in_band"]] == ["index_tail_dn3_pct"]

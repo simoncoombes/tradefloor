@@ -491,7 +491,11 @@ def test_a_silent_switch_at_zero_moves_no_record(path):
     assert silent, "the rule has nothing to test"
     shipped = tradefloor.ModelParams.from_preset(rec["preset"]).to_dict()
     for name in silent:
-        assert shipped[name] == 0.0, (rec["preset"], name)
+        if shipped[name] != 0.0:
+            # A preset that sets the switch (pt-v21 sets most of them)
+            # records it, and its digest is taken with it in.
+            assert rec["coefficients"][name] == shipped[name], (rec["preset"], name)
+            continue
         assert name not in rec["coefficients"], (rec["preset"], name)
         without = {k: v for k, v in shipped.items() if k != name}
         assert coefficient_digest(without) == rec["coefficient_digest"]
@@ -506,7 +510,9 @@ def test_a_silent_switch_at_zero_moves_no_record(path):
         assert name in recorded_values(on)
     at_default = tradefloor.ModelParams.digest_silent_at_default()
     for name, default in at_default.items():
-        assert shipped[name] == default, (rec["preset"], name)
+        if shipped[name] != default:
+            assert rec["coefficients"][name] == shipped[name], (rec["preset"], name)
+            continue
         assert name not in rec["coefficients"], (rec["preset"], name)
         without = {k: v for k, v in shipped.items() if k != name}
         assert coefficient_digest(without) == rec["coefficient_digest"]
