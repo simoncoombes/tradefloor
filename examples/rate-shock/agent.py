@@ -59,6 +59,8 @@ experiment around it does not move.
 from __future__ import annotations
 
 import statistics
+from functools import reduce
+from operator import add
 from typing import Any
 
 from tradefloor.baselines import rebalance
@@ -114,6 +116,17 @@ REBALANCE_BAND = 0.01
 #: for the whole move itself.
 MAX_PARTICIPATION = 0.02
 
+
+
+def _total(values) -> float:
+    """Add left to right, so the run is the same on every Python.
+
+    The built-in ``sum()`` adds floats with a compensation term from Python
+    3.12, and the last bits it returns differ from 3.11's. Those bits reach
+    the order sizes, so the same seed would trade differently on two
+    versions. ``reduce(add, ...)`` is 3.11's ``sum()`` on every version.
+    """
+    return reduce(add, values, 0.0)
 
 class MacroAwareAgent:
     """Cuts risk when the policy rate rises, and cuts duration hardest.
@@ -185,7 +198,7 @@ class MacroAwareAgent:
         raw = {t: 1.0 / (1.0 + self.duration_tilt_per_100bp
                          * self.duration.get(t, 0.0) * hundreds)
                for t in obs.tickers}
-        total = sum(raw.values())
+        total = _total(raw.values())
         weights = {t: gross * value / total for t, value in raw.items()}
 
         self._decision = {
@@ -229,7 +242,7 @@ class MacroAwareAgent:
                        if a > 0]
             if len(returns) >= 2:
                 sigmas.append(statistics.pstdev(returns))
-        return sum(sigmas) / len(sigmas) if sigmas else None
+        return _total(sigmas) / len(sigmas) if sigmas else None
 
     def _drifted(self, obs, weights: dict[str, float]) -> bool:
         """True when some name is further than the band from its target."""

@@ -212,7 +212,7 @@ And the two books:
                                     control          +200bps
   final gross exposure                0.89x            0.35x
   turnover                       $4,226,207      $39,778,770
-  cost against arrival               $1,501          $34,185
+  cost against arrival               $1,454          $34,185
   cash                           $5,592,938      $30,721,513
   P&L since the fork              $+816,937      $-3,423,208
   max drawdown since                  2.55%            8.08%
