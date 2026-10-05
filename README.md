@@ -211,15 +211,13 @@ statistics, listed in
 On pt-v21, the default from 0.10.0, 18 of the 19 statistics of the
 one-year table (volatility, fat tails, how much stocks move together, how far
 the VIX jumps after a fall) are inside the range real markets show over a
-year, on the ruled bands. The tail rate is under the floor on the 30
-certification seeds and inside it pooled over 360: the index falls 3% or more
-on 0.598% of days against a range of 0.64 to 2.34, and on 0.98% over 360
-seeds. All 14 graded statistics of the two-year panel are inside their
+year, on the ruled bands. The one row out is the tail rate, a gap: the
+index falls 3% or more on 0.598% of days on the 30 certification seeds,
+against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 14 graded statistics of the two-year panel are inside their
 two-year ranges. The long-run criteria are 40 rows over 21 years, covering
 crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
 replays, the rate indices and the cost of size in the book. pt-v21 meets all
-40, read on 270 histories. pt-v20, the default from 0.8.5 to 0.9.1, has all
-19 of the one-year table in band and also meets all 40.
+40, read on 270 histories.
 
 Read those claims narrowly:
 
@@ -235,7 +233,6 @@ Read those claims narrowly:
   because its range reaches lower than those windows do.
 - The VIX is stickier than real: its day-to-day persistence reads 0.956
   against the tape's 0.930, and the sign test that grades it refuses it.
-  pt-v20 passed that test.
 - The one-year table helped choose many of the coefficients pt-v21 keeps, so the
   held-out checks are the fresh seeds and the fresh set of companies the
   panel is repeated on.
@@ -244,8 +241,8 @@ Read those claims narrowly:
 - A driven scenario moves prices at about half to four-fifths of the real
   size, in the right direction. Use a scenario to detect a response, and do
   not read its size as a forecast.
-- Volatility memory is close to real at lag 1 and fades much faster after
-  it: at lag 20 it is under a twentieth of real. Nothing below the 65-minute
+- Volatility memory reads 0.095 at lag 1 against a real 0.107 and fades
+  much faster after it: at lag 20 it is under a twentieth of real. Nothing below the 65-minute
   step is calibrated.
 - An order sliced over a day costs a median 0.13 of a daily standard
   deviation for 10% of a day's volume in 36 slices, at the low end of the

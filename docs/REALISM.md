@@ -21,8 +21,7 @@ over a year. On `pt-v21`, the default from 0.10.0, 18 of the 19 are inside
 their ranges on the ruled bands `score()` uses. The tail rate is under the
 floor on the 30 certification seeds and inside it pooled over 360: the index
 falls 3 percent or more on 0.598 percent of days against a range of 0.64 to
-2.34, and on 0.98 percent pooled over 360 seeds. On `pt-v20`, the default
-from 0.8.5 to 0.9.1, all 19 are inside.
+2.34, and on 0.98 percent pooled over 360 seeds.
 The check runs 30 random seeds. Fifteen of the statistics are read on one
 fixed set of companies, and that fixed-roster panel is repeated on held-out
 seeds and on a held-out set of companies.
@@ -46,23 +45,23 @@ changes the simulation, so it waits for the next preset.
 
 Four of the 19 describe the index as a whole. On pt-v21 an equal-weight index
 of the stocks gains 8.8 percent a year over one year, inside a real range of
-1.1 to 10.3 (pt-v20 gains 7.7). On a day the index falls 1 percent or more,
+1.1 to 10.3. On a day the index falls 1 percent or more,
 the VIX rises a median 2.0 points, inside a real range of 0.39 to 3.03. On a
 3 percent fall it rises 5.3, inside 2.6 to 9.58. The index falls 3 percent or
-more on 0.60 percent of days, against 1.21 percent in real markets and 0.89
-percent on pt-v20. That is the row under its floor of 0.64; over 360 seeds
-it reads 0.98.
+more on 0.60 percent of days, against 1.21 percent in real markets. That
+is a gap: the row is under its floor of 0.64 on the 30 certification seeds.
+Over 360 seeds it reads 0.98, inside the band.
 
 The VIX's own day-to-day persistence (`vix_ar1_debiased`) has no band and is
 graded by a sign test against the real tape's centre. pt-v21 reads 0.956
 against the tape's 0.930 and the test refuses it, at one year and on held-out
-seeds, so its VIX is stickier than real. pt-v20 read 0.930 and passed.
+seeds. That is a gap: the VIX is stickier from day to day than the real
+one.
 
 ### The two-year panel
 
 The two-year panel is the fixed-roster panel run for 504 days. Fourteen
-of its 15 statistics have a two-year range, and pt-v21 has all 14 inside, as
-pt-v20 does.
+of its 15 statistics have a two-year range, and pt-v21 has all 14 inside.
 
 ### The long-run criteria
 
@@ -79,14 +78,13 @@ published macro data, the cost of size in the book, the real 2020-21 and
 2022 macro paths, and the packaged recession.
 
 pt-v21 meets all 40, with the long-run rows read on 270 histories and R4 and
-D1 on the definitions it was registered on. On the definitions pt-v20 was
-graded on it reads 38 of 40: the correlation of the index with the corporate
+D1 on the definitions it was registered on. On the twelfth registration's
+definitions it reads 38 of 40: the correlation of the index with the corporate
 bond at the last print is +0.112 against a floor of +0.15, and the tail rate
 on the 30 certification seeds is the miss above. On pt-v21 the 2008 replay
 falls 47 percent against the real 57, the VIX is above 30 on 5.2 percent of
 days against a real 8.2, and the index returns 6.4 percent a year over 21
-years against a real 6.25. pt-v20 also meets all 40 on its own grade, and
-pt-v19, the default before it, fails 16 of the 40. The verdicts ship with
+years against a real 6.25. The verdicts ship with
 the package as `tf.preset_record()["long_run"]`. The scripts that graded
 pt-v21 and pt-v20, their inputs and the grading runs' output are in
 `validation/pt-v21/` and `validation/pt-v20/`, and
@@ -104,7 +102,7 @@ percent in 2009. The price trough leads the earnings trough in the driven
 Two things are still off. The worst month of the 2020 replay is 74 percent
 volatility against a real 95, about a fifth milder. With the VIX held at 65
 the market is 5.0 times as volatile as with it held at 5, against 6.2 times
-in real markets (pt-v20 5.1).
+in real markets.
 
 Each crisis starts in one sector, picked at random. A scenario can pick it for
 you with `Scenario().hold(epicentre="financial_services")`.
@@ -163,7 +161,7 @@ implementation. A channel is outside when any of these holds for it:
 - any macro step carries an active economic shock, since each step's shocks
   add twice the absolute sum of `gdp_impact x severity` to the VIX target,
   and the market factor's variance target follows the VIX
-  (`market_vol_vix_coupling` 0.75 on pt-v21, 0.95 on pt-v20);
+  (`market_vol_vix_coupling` 0.75 on pt-v21);
 - the host writes the economy's VIX by more than 0.1 points a session on
   average, about a sixth of the VIX's own mean daily change on pt-v20;
 - the economy steps more than 1.05 times a trading session, as it does when
@@ -232,15 +230,15 @@ a shipped preset never changes, so those wait for a new one.
 | limit | what it means | closed by |
 |---|---|---|
 | horizon | one year is certified. Two years is graded on the two-year panel, and longer runs only by the long-run criteria | bands derived at longer horizons |
-| volatility memory | close to real at lag 1 on pt-v21 (0.095 against 0.107) and fading much faster after it: 0.020 against 0.052 at lag 5 and 0.001 against 0.029 at lag 20. On pt-v20 it was about a quarter of real at lag 1 and a sixth at lag 20 | the next preset |
-| scenario size | a driven scenario moves prices at about half to four-fifths of the real size, in the right direction. On the real 2020-21 path pt-v21's response to the VIX, the credit yield and valuations is 0.72, 0.79 and 0.54 of real AAPL's (pt-v20: 0.27, 0.47 and 0.26). Use a scenario to detect a response, and do not read its size as a forecast | the next preset |
+| volatility memory | on pt-v21 the |return| autocorrelation reads 0.095 against a real 0.107 at lag 1, 0.020 against 0.052 at lag 5 and 0.001 against 0.029 at lag 20, so the memory fades faster than real after the first day | the next preset |
+| scenario size | a driven scenario moves prices at about half to four-fifths of the real size, in the right direction. On the real 2020-21 path pt-v21's response to the VIX, the credit yield and valuations is 0.72, 0.79 and 0.54 of real AAPL's. Use a scenario to detect a response, and do not read its size as a forecast | the next preset |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it | a scenario |
 | roster | certification used a sector-balanced roster. Four concentrated sector mixes hold every graded shape row for up to two years on pt-v19, so `check` grants them on pt-v19 only. On pt-v21 they hold at one year, but at two years the technology-heavy and all-technology mixes read `volume_abs_return_corr` at 0.630 and 0.641 against a ceiling of 0.63 | the next preset |
 | external flow | every figure is measured under the preset's own shocks. News, economic shocks or earnings revisions a host adds on top move the market outside them, and `tf.envelope.external_flow` says which channels | scale the host's flow to `CALIBRATED_FLOW` |
-| opening state | closed on pt-v21: the market lives 504 sessions of prehistory before day 0, so the opening VIX varies with the seed, from 10.3 to 43.2 on the certified roster over seeds 101 to 130 (median 17.6). On pt-v20 every run on a roster opened at nearly the same VIX (17.66 on the certified roster), so its one-year figures describe years that start calm | pt-v21 |
-| overnight gaps | on pt-v21 each session opens after an overnight move, and a position held overnight can gap through a stop. The open sits 0.52% from the previous close at one standard deviation against 1.05% for the whole day (`Universe.random(20, seed=7)`, seed 2026, 30 days), so about a quarter of a name's daily variance falls overnight, against 0.39 in real large caps from 2015 to 2025. pt-v20 opens at the last print | the next preset |
+| opening state | on pt-v21 the market lives 504 sessions of prehistory before day 0, so the opening VIX varies with the seed, from 10.3 to 43.2 on the certified roster over seeds 101 to 130 (median 17.6) | no limit on pt-v21 |
+| overnight gaps | on pt-v21 each session opens after an overnight move, and a position held overnight can gap through a stop. The open sits 0.52% from the previous close at one standard deviation against 1.05% for the whole day (`Universe.random(20, seed=7)`, seed 2026, 30 days), so about a quarter of a name's daily variance falls overnight, against 0.39 in real large caps from 2015 to 2025 | the next preset |
 | intraday | nothing below the 65-minute step is calibrated. One-minute returns have a lag-1 autocorrelation of -0.40 on pt-v21 from bid-ask bounce | the next preset |
-| slicing a large order | one sweep of the book follows the square-root law. On pt-v21 the metaorder memory makes a sliced order pay for the volume it has already taken: buying 10% of a day's volume in 36 slices over a day costs a median 0.13 of a daily standard deviation (0.06 to 0.35 over 40 programmes), at the low end of the 0.15 to 0.3 from published studies. On pt-v20 the same programme costs 0.09, so a schedule optimiser there will overstate the value of trading slowly | the next preset |
+| slicing a large order | one sweep of the book follows the square-root law. On pt-v21 the metaorder memory makes a sliced order pay for the volume it has already taken: buying 10% of a day's volume in 36 slices over a day costs a median 0.13 of a daily standard deviation (0.06 to 0.35 over 40 programmes), against 0.15 to 0.3 from published studies | the next preset |
 | agent interaction | in isolated mode, the default, no other trader reacts to an agent: volume, depth and the background flow ignore it, so no liquidity spiral or predatory trading can arise. Populated mode (`population=`) adds background traders that trade its signals and front-run predictable flow, but a predictable programme pays only about 2.4% more there than in isolated mode, against the 169% van Kervel and Menkveld (2019) report, because impact here is mostly transient | the next preset |
 
 `tf.envelope.check(horizon_days=...)` refuses a question that falls outside

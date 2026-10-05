@@ -96,7 +96,7 @@ def part_s3(o):
     import concurrent.futures as cf
     import threading
     import boto3
-    sess = boto3.Session(profile_name="margincall")
+    sess = boto3.Session(profile_name="<profile>")
     B, PFX = "<bucket>", "pretium-calib/"
     loc = threading.local()
 

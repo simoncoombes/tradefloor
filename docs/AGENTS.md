@@ -107,8 +107,7 @@ to close, summed over every name. `fair_value_shift` moves no price and is
 never that answer. A constant answer scores near the top, because
 `random_noise` wins most days. On pt-v21 it wins about four days in five and
 `overnight` most of the rest, so answering `random_noise` every day scores
-0.60 to 1.0 (median 0.83) over ten seeds of 20 days on a 20-name roster; on
-pt-v20, where it wins almost every day, the same runs score 0.90 to 1.0. So
+0.60 to 1.0 (median 0.83) over ten seeds of 20 days on a 20-name roster. So
 the scorecard carries `explanation_baseline`, what a constant answer
 scores on the same days, and `explanation_edge`, the accuracy minus the
 baseline, and its repr prints the three together. Only the edge means

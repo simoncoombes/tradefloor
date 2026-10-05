@@ -26,13 +26,12 @@ on the thirty certification seeds against a ruled band of 0.64 to 2.34, and
 0.98 pooled over 360 seeds, so the table is 18 of 19 on the ruled bands. On
 the 2015-2025 decade bands of `REAL_MARKETS` every shape row is in at 252
 days, and at 504 days `excess_kurtosis` is out, 6.64 against a floor of 7.1.
-pt-v21 also loses the structural row `vix_ar1_debiased`, which pt-v20 held:
-0.956 against the tape's 0.930, refused at 252 days and on held-out seeds.
+The structural row `vix_ar1_debiased` is a gap: 0.956 against the tape's
+0.930, refused at 252 days and on held-out seeds.
 The committed record `python/tradefloor/presets/pt-v21.json` is what says so
 and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
-`MEASURED_504` to it. From 0.8.5 to 0.9.1 this headline named pt-v20, which
-holds all 19 rows of the one-year table on the ruled bands. It named pt-v19
-until 0.8.5, whose
+`MEASURED_504` to it. From 0.8.5 to 0.9.1 this headline named pt-v20. It
+named pt-v19 until 0.8.5, whose
 `sector_excess_corr` was out on the decade bands at both horizons, 0.0904
 at 252 days and 0.0906 at 504. It named pt-v16's record and read "all
 fourteen" at both horizons until 2026-09-23, which was pt-v16 on the decade

@@ -20,7 +20,7 @@ da8397ff7251636a56dd005572cf0879fbe71e34471b5b9c427c5820187afbdf  0b623a87bd15  
 77c0ed6a631838fc12e6ca56bc292adc8a663ee6cd95453094cb583673e20771  0b623a87bd15  programme/r13reg/freshseeds/layout.py
 fea1160dbc2efc71d9fb6cb7b6473712c7f91713c4382c53a21b00b3797d84f4  0b623a87bd15  programme/r13reg/freshseeds/proof-18.txt
 7b94082ba89eb7bc61ce709cd0307f1b2225517cf66881e5e11de9fe04a81836  0b623a87bd15  programme/r13reg/freshseeds/report.py
-895234be476ff499f8936e15c7458dc1ca4e339f18e6162d7631abd4947fc14e  0b623a87bd15  programme/r13reg/freshseeds/increment.py  (the S3 bucket name and AWS account id replaced by <bucket> and <account>)
+6f20534be86040d583869583e145dc979d9ef897ab4b9304beca0398db181360  0b623a87bd15  programme/r13reg/freshseeds/increment.py  (the S3 bucket name, AWS account id and credentials profile replaced by <bucket>, <account> and <profile>)
 2e6b20d543f72da173e05b3a9be6569c1b0add006990bb8938fc2b842399c2fe  54361aae23bf  programme/r13reg/grade18/plan-g18.json
 0ffebae06e563228b0e1bd4203ee8ce139861133c64eae556fb012347a6c7d21  54361aae23bf  programme/r13reg/grade18/plan-g18-box1.json
 e2ce6d703c35cef6ba12efbdd0ebd11313368d17a971ed1ade86ef09c531619c  54361aae23bf  programme/r13reg/grade18/plan-g18-box2.json

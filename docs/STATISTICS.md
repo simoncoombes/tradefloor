@@ -31,8 +31,8 @@ envelope publishes, over the one-year horizon it certifies. pt-v21 has 18
 of 19 in band. The one it misses is `index_tail_dn3_pct`: the index falls 3%
 or more on 0.60% of days over the thirty certification seeds, under the band's
 floor of 0.64, where real markets read 1.21. Pooled over 360 seeds of the same
-protocol the rate is 0.98, inside the band. pt-v20 and pt-v19 each have all
-19 in band.
+protocol the rate is 0.98, inside the band. The table above gives the count
+for each preset.
 
 | Statistic | What it measures | Group |
 |---|---|---|
@@ -56,10 +56,9 @@ protocol the rate is 0.98, inside the band. pt-v20 and pt-v19 each have all
 | `fear_gauge_dn3` | the VIX's rise on a day the index falls 3% or more | index |
 | `index_tail_dn3_pct` | the share of days the index falls 3% or more | index |
 
-Volatility clustering is close to real at lag 1 and fades too fast after it.
-pt-v21's certified median is 0.0948 for `abs_return_acf1`, against a median
-real year of 0.1025 in `tf.facts.REAL_MARKETS_WINDOWS` (pt-v20 read 0.0282,
-below every real year). At lag 5 it reads 0.0204 and at lag 20 0.0012,
+Volatility clustering fades faster than real after the first day. pt-v21's
+certified median is 0.0948 for `abs_return_acf1`, against a median real year
+of 0.1025 in `tf.facts.REAL_MARKETS_WINDOWS`. At lag 5 it reads 0.0204 and at lag 20 0.0012,
 where the lowest real years read 0.034 and -0.015, so `abs_return_acf5`
 sits below every one of those windows. The ruled floor, -0.03, is lower
 still, which is why the row counts as in band. The `decay-shape` gap in
@@ -71,7 +70,7 @@ so it is for the next preset.
 `measure()` calls, and it appears only when a run holds at least 30 sessions
 with the VIX above the crisis threshold; otherwise `measure()` reports it
 absent and says why. On pt-v21 two of the thirty certification seeds read
-it at one year, and on pt-v20 one.
+it at one year.
 
 **How it is measured.** Thirty seeds, 101 to 130, of a 252-session run.
 
@@ -105,8 +104,7 @@ the next scoring rule.
 
 **One seed at a time.** The verdict is on the median across seeds. A single
 seed-year often misses one or more shape rows: on pt-v21, seeds 101 to 116
-had all 14 shape rows in band on 8 of the 16, and seed 114 had 11 of 14 (on
-pt-v20, 5 of the 16, and seed 114 had 8).
+had all 14 shape rows in band on 8 of the 16, and seed 114 had 11 of 14.
 `tf.envelope.intervals()` takes one `facts.measure()` result per seed and
 gives each statistic's median, 10th and 90th percentiles and range across
 them, and flags a statistic whose middle 80 percent crosses a band edge.
@@ -181,7 +179,7 @@ blocks offset by 50000 and by 60000. R4 and D1 are read on the definitions
 pt-v21 was registered and graded on
 (`validation/pt-v21/programme/ptv21-registration-18.md`): R4 at the held
 close on 270 histories, and D1's two level rows pooled over 360 seeds. On
-the definitions pt-v20 was graded on, pt-v21 reads 38 of 40: R4 at the last
+the twelfth registration's definitions it reads 38 of 40: R4 at the last
 print is +0.112 against a floor of +0.15, and D1's tail rate on 30 seeds is
 0.598 against the certification's floor of 0.64. The grade, its scripts and
 both verdicts are in `validation/pt-v21/`. The rows nearest their edges are
@@ -274,8 +272,7 @@ sliced over time. On pt-v21 the metaorder memory makes a sliced order pay
 for the volume it has already taken: 10% of a day's volume in 36 slices over
 a day costs a median 0.13 of a daily standard deviation (0.06 to 0.35 over
 40 programmes on seeds 201 to 210, four names each), against 0.15 to 0.3 in
-published studies. On pt-v20 the same programme costs 0.09, because
-consumed depth refills with a 27-tick half-life and nothing remembered it.
+published studies.
 
 D1 contains the one-year table: it requires the fixed-roster panel in band
 at one year, at two years, on held-out seeds and on a held-out roster, and
@@ -298,7 +295,7 @@ on this page are the ones to use.
 ## Other sets you may meet
 
 - **The scoring rule (19 statistics, different members).** pt-v19's dials were chosen with a scoring rule over the 14 shape statistics, the 4 index rows and the VIX's persistence, without crisis dispersion, centred on 2015 to 2025 medians (`loss.rule_table`). pt-v20 keeps those dials, and its new ones were picked on grids and screens against long-run rows (B3, B9, C8, R1 to R4) and the two-year panel. pt-v21 moves 104 of pt-v20's dials, to values picked in screens against registered rows on held-out seeds and then graded on fresh exam seeds. So neither the one-year table nor those rows is a held-out test; the held-out checks are the fresh seeds, the fresh roster, and the rows registered before each final grade.
-- **The VIX persistence row.** `vix_ar1_debiased`, the VIX's own day-to-day persistence. It has no band, and it is graded on its own, by a sign test against the real tape's centre (`structure_252` in a preset record). pt-v21 reads 0.956 against the tape's 0.930 and the test refuses it, at one year and on held-out seeds; pt-v20 read 0.930 and passed. Over two years pt-v21's rise in persistence matches the tape's.
+- **The VIX persistence row.** `vix_ar1_debiased`, the VIX's own day-to-day persistence. It has no band, and it is graded on its own, by a sign test against the real tape's centre (`structure_252` in a preset record). pt-v21 reads 0.956 against the tape's 0.930 and the test refuses it, at one year and on held-out seeds, so it is a gap: the VIX is stickier than real. Over two years pt-v21's rise in persistence matches the tape's.
 - **Reported, not graded (4).** `fear_gauge_dn5`, `fear_gauge_up1`, `index_excess_kurtosis` and `index_tail_up3_pct`. `tf.facts.measure()` returns them beside the graded rows, with the reason each has no band.
 - **Rows a model without the mechanism could pass (5).** `abs_return_acf20`, `leverage_effect`, `corr_asymmetry`, `corr_asymmetry_lagged` and `corr_persistence_acf1`. Their bands include the value a market with no such effect would give, so being in band shows the model is not wrong, not that it has the effect. `tf.facts.report()` names them.
 - **The decade table (18).** The older bands from 2015 to 2025 only, over the shape statistics and the index rows. `basis="shipped"` selects it. The one-year table uses the longer record.

@@ -65,7 +65,6 @@ def test_the_readme_counts_the_long_run_rows_the_record_holds():
     text = flat(read("README.md"))
     assert f"are {record['of']} rows over 21 years" in text
     assert f"{tf.preset_record()['preset']} meets all {record['of']}," in text
-    assert f"pt-v20, the default from 0.8.5 to 0.9.1" in text
     assert "meets all 17" not in text
 
 
@@ -148,12 +147,13 @@ def test_every_limit_the_reviewers_measured_has_a_row(name):
     assert rows[name].endswith("the next preset"), rows[name]
 
 
-def test_the_opening_limit_says_pt_v21_closed_it():
+def test_the_opening_limit_says_pt_v21_has_none():
     """pt-v21 opens after 504 sessions of prehistory, so the opening VIX
-    varies with the seed; on pt-v20 every run opened near 17.66."""
+    varies with the seed, and the row says so with the range."""
     row = limits_table()["opening state"]
-    assert row.startswith("closed on pt-v21"), row
-    assert row.endswith("| pt-v21"), row
+    assert row.startswith("on pt-v21 the market lives 504 sessions"), row
+    assert "from 10.3 to 43.2" in row, row
+    assert row.endswith("| no limit on pt-v21"), row
 
 
 def test_the_roster_limit_names_the_preset_it_was_measured_on():
