@@ -2941,7 +2941,7 @@ impl PyEngine {
             .inner
             .distributions()
             .iter()
-            .filter(|d| day.map_or(true, |x| d.ex_day == x))
+            .filter(|d| day.is_none_or(|x| d.ex_day == x))
             .collect();
         let batch = crate::python_arrow::distributions_batch(&rows)
             .map_err(crate::python_arrow::arrow_err)?;

@@ -2720,8 +2720,8 @@ impl Engine {
             Some((g, c)) => {
                 let gk = if self.params.cycle_nowcast_accuracy != 0.0 {
                     let mut acc = 0.0;
-                    for j in 0..5 {
-                        acc += self.cycle_nowcast[j] * g[j];
+                    for (p, gj) in self.cycle_nowcast.iter().zip(g.iter()) {
+                        acc += p * gj;
                     }
                     acc
                 } else {
@@ -2881,20 +2881,19 @@ impl Engine {
         };
         let lambda = self.cycle_nowcast_terms.0;
         let mut pred = [0.0; 5];
-        for j in 0..5 {
-            let lam = lambda[j];
-            pred[j] += self.cycle_nowcast[j] * (1.0 - lam);
-            pred[(j + 1) % 5] += self.cycle_nowcast[j] * lam;
+        for (j, (&lam, &p)) in lambda.iter().zip(self.cycle_nowcast.iter()).enumerate() {
+            pred[j] += p * (1.0 - lam);
+            pred[(j + 1) % 5] += p * lam;
         }
         let other = (1.0 - q) / 4.0;
         let mut total = 0.0;
-        for j in 0..5 {
-            pred[j] *= if j == r { q } else { other };
-            total += pred[j];
+        for (j, pj) in pred.iter_mut().enumerate() {
+            *pj *= if j == r { q } else { other };
+            total += *pj;
         }
         if total > 0.0 && total.is_finite() {
-            for j in 0..5 {
-                pred[j] /= total;
+            for pj in pred.iter_mut() {
+                *pj /= total;
             }
             self.cycle_nowcast = pred;
         } else {
@@ -2910,8 +2909,8 @@ impl Engine {
         let phases = crate::economy::cycle::phase_cycle();
         let m = if self.params.cycle_nowcast_accuracy != 0.0 {
             let mut acc = 0.0;
-            for j in 0..5 {
-                acc += self.cycle_nowcast[j] * crate::economy::central_bank::spread_multiplier_of(phases[j]);
+            for (p, &ph) in self.cycle_nowcast.iter().zip(phases.iter()) {
+                acc += p * crate::economy::central_bank::spread_multiplier_of(ph);
             }
             acc
         } else {
@@ -7018,7 +7017,7 @@ impl Engine {
         if ss == 0.0 && sf == 0.0 {
             return;
         }
-        let minute = (time.hour as i64 - 9) * 60 + (time.minute as i64 - 30);
+        let minute = (time.hour - 9) * 60 + (time.minute - 30);
         // The session's 390 open minutes, as the tick draws them.
         const MINUTES: i64 = 390;
         if !(0..MINUTES).contains(&minute) {
@@ -7337,7 +7336,7 @@ impl Engine {
         for c in &self.companies {
             match c.stock.dividend {
                 Some(d) => out.extend_from_slice(&d.to_array()),
-                None => out.extend(std::iter::repeat(f64::NAN).take(w)),
+                None => out.extend(std::iter::repeat_n(f64::NAN, w)),
             }
         }
         out
@@ -13773,13 +13772,13 @@ mod tests {
             let mut buf = SessionBuffer::new();
             e.run_session(&session(1, &innovations, &variances), &mut buf);
         }
-        for i in 0..3 {
+        for (i, &ci) in carry.iter().enumerate().take(3) {
             let a = first[0].companies()[i].stock.price;
             let b = first[1].companies()[i].stock.price;
             assert!((a / b).ln().abs() < 1e-3, "name {i}: {a} against {b}");
             // One tick from the copy's mispricing, not from a draw.
             let s = first[1].companies()[i].stock.mispricing_s.unwrap();
-            assert!((s - carry[i]).abs() < 0.01, "name {i}: {s} against {}", carry[i]);
+            assert!((s - ci).abs() < 0.01, "name {i}: {s} against {ci}");
         }
         assert!(first[1].opening_carry().is_empty());
         // Refused without a prehistory, and off the switch.
@@ -13966,9 +13965,9 @@ mod tests {
             last = pi;
             schedule.push((pi, phase));
         }
-        for c in 0..truth.len() {
+        for (c, slot) in expected.iter_mut().enumerate().take(truth.len()) {
             if let Some(&(_, phase)) = schedule.iter().rev().find(|&&(pi, _)| pi <= c as i64) {
-                expected[c] = phase;
+                *slot = phase;
             }
         }
         assert_eq!(published, expected);

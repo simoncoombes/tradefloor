@@ -10288,7 +10288,7 @@ impl ModelParams {
                  day's volume."));
         }
         let k = self.book_depth_nesting;
-        if !(k >= 0.0 && k <= 1.0) {
+        if !(0.0..=1.0).contains(&k) {
             return Err(format!(
                 "book_depth_nesting is {k}. It is the share of the maker's ladder \
                  the latent depth counts as its own front, in [0, 1]: 0.0 puts \
@@ -10323,7 +10323,7 @@ impl ModelParams {
         let y = self.impact_memory_coefficient;
         let (h1, h2, w, m) = (self.impact_memory_half_life, self.impact_memory_slow_half_life,
                               self.impact_memory_slow_weight, self.impact_memory_crossover);
-        if !(y >= 0.0 && y <= 10.0) {
+        if !(0.0..=10.0).contains(&y) {
             return Err(format!(
                 "impact_memory_coefficient is {y}. It is the metaorder memory's Y in \
                  Y sigma (M)^delta, in [0, 10] and at most book_depth_coefficient; 0.0 \
@@ -10332,7 +10332,7 @@ impl ModelParams {
         // The shape dials are range-checked always and read only with the
         // coefficient on, so a vector may carry them at the coefficient's
         // 0.0 (the perturbation table's base does).
-        if !(h1 >= 0.0 && h1 <= 39000.0) {
+        if !(0.0..=39000.0).contains(&h1) {
             return Err(format!(
                 "impact_memory_half_life is {h1}. It is a half-life in open ticks, in \
                  (0, 39000], and required with the memory on."));
@@ -10342,7 +10342,7 @@ impl ModelParams {
                 "impact_memory_slow_half_life is {h2}. It is 0.0 (no slow part) or a \
                  half-life in open ticks from impact_memory_half_life ({h1}) to 98280."));
         }
-        if !(w >= 0.0 && w < 1.0) {
+        if !(0.0..1.0).contains(&w) {
             return Err(format!(
                 "impact_memory_slow_weight is {w}. It is the slow part's weight, in [0, 1)."));
         }
@@ -10351,7 +10351,7 @@ impl ModelParams {
                 "impact_memory_slow_weight is {w} but impact_memory_slow_half_life is 0: \
                  the weight is read by nothing without the slow part."));
         }
-        if !(m >= 0.0 && m <= 0.05) {
+        if !(0.0..=0.05).contains(&m) {
             return Err(format!(
                 "impact_memory_crossover is {m}. It is a fraction of daily volume, in \
                  [0, 0.05]; 0.0 is a pure power law."));
@@ -10633,7 +10633,7 @@ impl ModelParams {
         }
         for (name, v) in [("overnight_market_share", self.overnight_market_share),
                           ("overnight_idio_share", self.overnight_idio_share)] {
-            if !(v >= 0.0 && v <= 0.9) {
+            if !(0.0..=0.9).contains(&v) {
                 return Err(format!(
                     "{name} is {v}. It is the night's share of the day's variance, in \
                      [0, 0.9]; 0 is no split."));
@@ -10652,7 +10652,7 @@ impl ModelParams {
         }
         for (name, v) in [("overnight_idio_df", self.overnight_idio_df),
                           ("earnings_surprise_df", self.earnings_surprise_df)] {
-            if !(v == 0.0 || (v >= 3.0 && v <= 30.0 && v == v.floor())) {
+            if !(v == 0.0 || ((3.0..=30.0).contains(&v) && v == v.floor())) {
                 return Err(format!(
                     "{name} is {v}. It is a student t's degrees of freedom, an integer \
                      in [3, 30], or 0 for a normal."));

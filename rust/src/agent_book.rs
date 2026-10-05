@@ -1237,7 +1237,7 @@ mod tests {
         let b = agent_book(&inputs(&c, &nested, &[]));
         let ladder = maker_ladder(&c, 15.0, &beside);
         let within = |orders: &[BookOrder], owner: Option<&str>, price: f64| -> f64 {
-            orders.iter().filter(|o| o.price <= price && owner.map_or(true, |w| o.owner_id == w))
+            orders.iter().filter(|o| o.price <= price && owner.is_none_or(|w| o.owner_id == w))
                 .map(|o| o.remaining).sum()
         };
         // The ladder is the same in both.
