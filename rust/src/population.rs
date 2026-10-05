@@ -432,7 +432,15 @@ pub struct PopulationRun {
     /// keep the same profile, which the first of them holds. Its own index
     /// for everyone else. Read from the spec, not state.
     pub owners: Vec<usize>,
+    /// With more than one detector: per name, the quoted spread of the
+    /// agent-facing book in the name's daily sigmas and the five-tick window
+    /// it was read in, so detectors deciding in the same window share one
+    /// reading. Empty otherwise (one detector reads the book itself).
+    pub gates: Vec<f64>,
 }
+
+/// Ticks in a window over which several detectors share one spread reading.
+pub const GATE_WINDOW: u32 = 5;
 
 /// Per participant, the first detector with the same `memory` and `bucket`
 /// (itself when it is the first, and for every other kind).
@@ -488,6 +496,7 @@ impl PopulationRun {
             depth,
             states: Vec::new(),
             owners: Vec::new(),
+            gates: Vec::new(),
         };
         run.owners = profile_owners(&run.participants);
         run.states = vec![ParticipantState::default(); run.participants.len()];
@@ -540,6 +549,11 @@ impl PopulationRun {
             })
             .collect();
         self.closes = pick(&self.closes, self.depth, f64::NAN);
+        self.gates = if self.shares_gates() {
+            pick(&self.gates, 2, f64::NAN)
+        } else {
+            Vec::new()
+        };
 
         self.last = last;
         for (k, p) in self.participants.iter().enumerate() {
@@ -673,6 +687,16 @@ impl PopulationRun {
                 }
             }
         }
+    }
+
+    /// Whether the population holds more than one detector, so that they
+    /// share spread readings (`gates`).
+    pub fn shares_gates(&self) -> bool {
+        self.participants
+            .iter()
+            .filter(|p| matches!(p.policy, Policy::Detector { .. }))
+            .count()
+            > 1
     }
 
     /// Whether participant `k` decides at this tick of the session.
@@ -971,6 +995,9 @@ impl PopulationRun {
         ];
         out.extend_from_slice(&self.last);
         out.extend_from_slice(&self.closes);
+        if self.shares_gates() {
+            out.extend_from_slice(&self.gates);
+        }
         for (k, s) in self.states.iter().enumerate() {
             out.push(s.orders);
             for v in [&s.position, &s.cash, &s.volume, &s.notional, &s.average] {
@@ -1025,6 +1052,11 @@ impl PopulationRun {
         };
         let last = take(n)?.to_vec();
         let closes = take(n * self.depth)?.to_vec();
+        let gates = if self.shares_gates() {
+            take(2 * n)?.to_vec()
+        } else {
+            Vec::new()
+        };
 
         let mut states = Vec::with_capacity(self.participants.len());
         for (k, p) in self.participants.iter().enumerate() {
@@ -1092,6 +1124,7 @@ impl PopulationRun {
         self.day = day;
         self.last = last;
         self.closes = closes;
+        self.gates = gates;
         self.states = states;
         Ok(())
     }
@@ -1140,6 +1173,7 @@ mod tests {
             last: Vec::new(),
             closes: Vec::new(),
             owners: vec![0],
+            gates: Vec::new(),
         }
     }
 
