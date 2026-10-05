@@ -82,8 +82,8 @@ A replay refuses a recording made under another payload version before it
 looks anything up, and names both versions. A recording made before 0.8.5
 carries neither field, predates this payload, and does not replay on 0.8.5.
 
-**Observation payload, version 1** (`OBSERVATION_SCHEMA_VERSION`, built by
-`serialize_observation`):
+**Observation payload, version 2** (`OBSERVATION_SCHEMA_VERSION`, built by
+`serialize_observation`, from 0.10.0):
 
 - Top level: `step`, `day`, `steps_per_day`, `macro`, `assets`, `portfolio`.
 - `macro`: the fields in `tradefloor.counterfactual.MACRO_FIELDS`.
@@ -93,6 +93,11 @@ carries neither field, predates this payload, and does not replay on 0.8.5.
 
 A return or volatility the agent has not yet seen enough prices for is
 `null`. `return_5d` covers 30 steps, five days at six steps a day.
+
+Compared with version 1, the 0.8.x and 0.9.x payload: each asset gains
+`dividend` and `next_earnings_in_sessions` on a model that has them, and
+nothing else changes. On a model with neither the payload is version 1's,
+so a version-1 recording still replays there.
 
 Compared with 0.8.1: `portfolio.gross_exposure` is renamed `leverage` (same
 value), `portfolio.open_orders` is new, and `return_5d` covers five days

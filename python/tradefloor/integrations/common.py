@@ -185,9 +185,21 @@ DECISION_SCHEMA_VERSION = "2"
 #:
 #: Version 1 is the payload frozen for the 0.8.x line (``docs/SUPPORT.md``).
 #: No key is added, removed or renamed, and no value changes meaning, in a
-#: 0.8.x patch release. Recordings made before 0.8.5 carry no version: their
+#: patch release. Recordings made before 0.8.5 carry no version: their
 #: payload predates the freeze, and none of their keys match it.
-OBSERVATION_SCHEMA_VERSION = "1"
+#:
+#: Version 2 (0.10.0) adds two keys to each asset, `dividend` on a model
+#: that pays dividends and `next_earnings_in_sessions` on one that runs the
+#: earnings calendar. pt-v21, the default from 0.10.0, does both. On every
+#: other model the payload is version 1's to the byte, so a version-1
+#: recording still replays there (`REPLAYABLE_SCHEMA_VERSIONS`).
+OBSERVATION_SCHEMA_VERSION = "2"
+
+#: The recorded payload versions a replay looks up. Version 2 only adds
+#: keys, and only on a model with dividends or the earnings calendar, so a
+#: version-1 recording's keys are still the digests of what this build sends
+#: on any model without them; on one with them the lookup misses and says so.
+REPLAYABLE_SCHEMA_VERSIONS = ("1", "2")
 
 
 # -- errors -------------------------------------------------------------------
@@ -1258,9 +1270,10 @@ def serialize_observation(obs: Any, *,
     orders needs to see which of them are still working before it sends
     another or a CANCEL.
 
-    The payload is version ``OBSERVATION_SCHEMA_VERSION`` and is frozen for
-    the 0.8.x line: no key is added, removed or renamed, and no value
-    changes meaning, in a 0.8.x patch release (``docs/SUPPORT.md``).
+    The payload is version ``OBSERVATION_SCHEMA_VERSION``: no key is added,
+    removed or renamed, and no value changes meaning, in a patch release
+    (``docs/SUPPORT.md``). Version 2 (0.10.0) added the two conditional
+    asset keys below to version 1.
     ``tests/test_integrations.py`` pins every key.
     """
     macro_state = obs.engine.macro_state
@@ -1929,7 +1942,7 @@ def refuse_a_changed_payload(transcript: "Transcript | None") -> None:
     if transcript is None:
         return
     recorded = (transcript.meta or {}).get("observation_schema_version")
-    if recorded is None or str(recorded) == OBSERVATION_SCHEMA_VERSION:
+    if recorded is None or str(recorded) in REPLAYABLE_SCHEMA_VERSIONS:
         return
     raise ReplayMiss(
         f"this transcript was recorded under observation payload version "

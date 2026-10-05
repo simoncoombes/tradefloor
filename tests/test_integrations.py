@@ -923,7 +923,10 @@ def test_the_payload_is_frozen_for_the_lts_line():
     removes or renames one fails here and has to bump
     OBSERVATION_SCHEMA_VERSION, update SUPPORT.md and re-record every
     fixture, on purpose."""
-    assert ci.OBSERVATION_SCHEMA_VERSION == "1"
+    # 2 from 0.10.0, when the default's payload gained the two conditional
+    # asset keys (docs/SUPPORT.md); "1" through 0.9.x.
+    assert ci.OBSERVATION_SCHEMA_VERSION == "2"
+    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2")
     assert ci.DECISION_SCHEMA_VERSION == "2"
     world = World(seed=7, universe=universe(), agent=callable_agent(rest),
                   cash=1_000_000.0, max_leverage=2.0)
@@ -2140,6 +2143,27 @@ def test_a_replay_under_another_payload_version_is_refused_by_name():
                                       transcript=recorder))
     world.run(days=1)
     assert world.portfolio.positions["TECH_A"].quantity > 0
+
+
+def test_a_version_1_recording_replays_where_the_payload_is_version_1s():
+    """Version 2 only adds keys, and only on a model with dividends or the
+    earnings calendar. On pt-v20, which has neither, the payload is version
+    1's to the byte, so a recording stamped 1 replays; on the default,
+    pt-v21, the same keys miss, and the lookup says so by step."""
+    def world(agent, model):
+        return World(seed=7, universe=universe(), agent=agent,
+                     cash=1_000_000.0, model=model,
+                     pins={"federal_funds_rate": 0.04,
+                           "corporate_bond_yield": 0.055})
+
+    recorder = ci.Transcript()
+    world(callable_agent(buy, mode="live", recorder=recorder), "pt-v20").run(
+        days=1)
+    recorder.meta["observation_schema_version"] = "1"
+    replay = world(callable_agent(None, mode="replay", transcript=recorder),
+                   "pt-v20")
+    replay.run(days=1)
+    assert replay.portfolio.positions["TECH_A"].quantity > 0
 
 
 def test_evaluate_writes_an_agents_refusals_to_its_errors():
