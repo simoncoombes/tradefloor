@@ -109,7 +109,7 @@ def test_the_readme_counts_the_mcp_tools_the_server_registers():
 def test_the_examples_table_says_what_the_factors_sum_to():
     text = read("README.md")
     assert "sum to every move" not in text
-    assert "The eleven factors that sum to the mispricing's move" in text
+    assert "The twelve factors that sum to the mispricing's move" in text
 
 
 # ---------------------------------------------------------------------------

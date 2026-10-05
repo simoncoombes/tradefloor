@@ -2241,15 +2241,17 @@ def check(
             lag = int(name.rsplit("acf", 1)[1])
             fire(decay, (
                 f"{name} leans on how strongly volatility clusters, and "
-                f"the model has too little of it at every lag: the "
-                f"|return| autocorrelation reads {DECAY_252[lag]} at lag "
-                f"{lag} against real markets' {REAL_DECAY[lag]}, "
-                f"{DECAY_252[lag] / REAL_DECAY[lag]:.0%} of real "
+                f"the model's clustering is close to real at lag 1 and "
+                f"falls away faster than real after it: the |return| "
+                f"autocorrelation reads {DECAY_252[lag]} at lag {lag} "
+                f"against real markets' {REAL_DECAY[lag]}, "
+                f"{DECAY_252[lag] / REAL_DECAY[lag]:.0%} of real, and "
+                f"{DECAY_252[20]} against {REAL_DECAY[20]} at lag 20 "
                 f"(envelope.DECAY_252). The row can sit inside its band "
-                f"and still be that far below, so a result that depends on "
-                f"short-lag clustering, such as a volatility forecast over "
-                f"one to five days, is measured on a market with too "
-                f"little of it"
+                f"and still be that far from real, so a result that "
+                f"depends on clustering past the first day or two, such as "
+                f"a volatility forecast over a week, is measured on a "
+                f"market whose memory is shorter than real"
             ))
         if name == "abs_return_acf20":
             g = decay

@@ -158,8 +158,9 @@ def test_every_gap_says_what_it_forbids():
 
 def test_a_one_year_question_on_certified_statistics_is_inside():
     # `abs_return_acf1` stood here until 0.8.5. It is a decay-shape row
-    # now, because the model's lag-1 clustering is about a quarter of real
-    # (`test_persona_round3.py`), so two rows no gap names stand in for it.
+    # now: on pt-v20 the model's lag-1 clustering was about a quarter of
+    # real (`test_persona_round3.py`), and on pt-v21 the memory after lag 1
+    # is shorter than real, so two rows no gap names stand in for it.
     v = env.check(horizon_days=252,
                   statistics=["return_acf1", "cross_sectional_corr"])
     assert v.inside
