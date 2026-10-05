@@ -150,6 +150,9 @@ Python:
 - A `RunManifest` names its writer `written_by.tradefloor_version`
   instead of `pretium_version`. Manifests from 0.9.1 and earlier still
   load, verify and reproduce; the key is in no fingerprint (#237).
+- A checkpoint written by 0.9.x does not resume on 0.10.0. The resume
+  refuses it and names both versions, because its engine check runs under
+  pt-v21. Resume it with the release that wrote it.
 - The default is pt-v21, so every run on the default moves. Name
   `pt-v20` to keep a 0.9 result.
 - Constructing a pt-v21 engine takes about 1.5 seconds for 20 names,
