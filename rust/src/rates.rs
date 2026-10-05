@@ -35,11 +35,11 @@
 //! `y_prev / 252 - D * dy + 0.5 * C * dy^2`.
 //!
 //! Under `rate_close_remark` the close's curve reaches the levels AT that
-//! close ([`RateBook::remark_now`]), beside the equities' re-mark, and the
+//! close ([`RateBook::remark_now`](crate::rates::RateBook::remark_now)), beside the equities' re-mark, and the
 //! next open adds the night's carry alone, so the close-to-close return is
 //! `y_prev / 252` then `- D * dy + 0.5 * C * dy^2` on the SAME close's move,
 //! to the product of the two terms (under 0.01 bp). Under
-//! `rate_intraday_live` the session's print reads a live mark ([`LiveCurve`])
+//! `rate_intraday_live` the session's print reads a live mark ([`LiveCurve`](crate::rates::LiveCurve))
 //! that is never committed to the level, so the identity still holds.
 //!
 //! The quadratic has its minimum at `dy = D / C` and would price a larger

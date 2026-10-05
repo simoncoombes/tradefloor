@@ -549,7 +549,7 @@ pub mod stream {
 
     /// The earnings calendar's key: two raw outputs, taken once when the
     /// engine is built, form the 64-bit key every earnings draw is derived
-    /// from ([`GameRng::keyed`]). A ONE-SHOT stream like [`OPENING`], outside
+    /// from ([`GameRng::keyed`](crate::rng::GameRng::keyed)). A ONE-SHOT stream like [`OPENING`], outside
     /// [`COUNT`]: nothing holds a position on it, and every other stream is
     /// untouched at every setting.
     ///
@@ -593,7 +593,7 @@ pub mod stream {
     pub const SEED64_SURGERY_SEQUENCE_BASE: u32 = 1024;
     /// The tag in a wide root's per-stream key, ASCII "SD64".
     pub const SEED64_TAG: u32 = 0x5344_3634;
-    /// The sequence of every keyed generator ([`GameRng::keyed`]): clear of
+    /// The sequence of every keyed generator ([`GameRng::keyed`](crate::rng::GameRng::keyed)): clear of
     /// the stream, surgery and wide-root sequences above.
     pub const KEYED_SEQUENCE: u32 = 1280;
 }
