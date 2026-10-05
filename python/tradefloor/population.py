@@ -138,11 +138,21 @@ _COMMON = ("size", "rate", "interval", "band")
 #: The shipped populations, by the name :meth:`Population.named` takes.
 SHIPPED = ("standard", "crowded")
 
-#: What populated mode was measured to do on pt-v20, with the checks in
+#: What populated mode was measured to do, with the checks in
 #: ``tools/calibration/population_checks.py`` (``ac3``, ``ac4``, ``cx`` and
 #: ``runtime``, each paired on the seed). The MCP server quotes it in every
 #: populated result, so a figure moves here and nowhere else.
 #:
+#: The figures were read with :meth:`Population.crowded` on R20M, the
+#: candidate vector of 92 dials moved off pt-v20 that
+#: ``tests/test_state_schema_r21.py`` lists, run on the 0.9.1 engine, not on
+#: a shipped preset. They are local runs: ac3 and cx on seeds 92001 to
+#: 92030 (20 names, 60 sessions), ac4 on seeds 201 to 230, the meta-order
+#: rows AC1 and AC2 on 30 seeds by 4 names, ``return_acf1_shift`` on 40
+#: names, 3 seeds of 252 sessions. They are re-measured on the preset that
+#: ships with populated mode.
+#:
+#: - ``model``, ``population``, ``seeds``: what the figures were read on.
 #: - ``edge_decay``: the ac3 finding, that an edge decays as other traders
 #:   trade its signal.
 #: - ``programme_cost_excess``: ac4, what a predictable programme pays in
@@ -153,8 +163,14 @@ SHIPPED = ("standard", "crowded")
 #: - ``crowded_exit``: the cx finding on a crowd's loss limits.
 #: - ``return_acf1_shift``: populated less isolated ``return_acf1``.
 #: - ``runtime_ratio``: populated run time over isolated.
+#: - ``meta_order_rows``: AC1 (a 12-day programme's per-share cost over a
+#:   1-day one's) and AC2 (one programme split over four labels against one
+#:   label), populated, with their bands.
 MEASURED: dict[str, Any] = {
-    "model": "pt-v20",
+    "model": "R20M, a candidate vector of 92 dials moved off pt-v20",
+    "population": "crowded",
+    "seeds": {"ac3": "92001-92030", "cx": "92001-92030", "ac4": "201-230",
+              "ac1_ac2": "30 seeds by 4 names"},
     "method": "tools/calibration/population_checks.py",
     "edge_decay": "an edge decays as other traders trade its signal",
     "programme_cost_excess": 0.019,
@@ -165,6 +181,8 @@ MEASURED: dict[str, Any] = {
         "crowd sells out, and the loss comes back over the following week"),
     "return_acf1_shift": 0.006,
     "runtime_ratio": 1.4,
+    "meta_order_rows": {"ac1": 2.180, "ac1_band": (1.8, 5.0),
+                        "ac2": 1.000, "ac2_band": (0.8, 1.25)},
 }
 
 
