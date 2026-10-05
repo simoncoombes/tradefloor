@@ -226,6 +226,28 @@ impl OrderBook {
         }
     }
 
+    /// Empty this book back to what [`OrderBook::new`] builds, keeping the
+    /// allocations its vectors and id hold, so a caller that builds a book
+    /// per settlement can reuse one. Every field is named, so a field added
+    /// to the struct is a compile error here until it is reset too.
+    pub fn reset(&mut self, company_id: &str, last_price: Option<f64>) {
+        let OrderBook {
+            company_id: id,
+            bids,
+            asks,
+            last_price: last,
+            sequence,
+            cap,
+        } = self;
+        id.clear();
+        id.push_str(company_id);
+        bids.clear();
+        asks.clear();
+        *last = last_price;
+        *sequence = 0;
+        *cap = MAX_DEPTH_PER_SIDE;
+    }
+
     /// The same book with a different per-side cap. See [`OrderBook::cap`].
     pub fn with_cap(mut self, cap: usize) -> Self {
         self.cap = cap;
@@ -373,17 +395,44 @@ impl OrderBook {
         taker_id: &str,
         options: SubmitOptions,
     ) -> MatchResult {
-        let limit_price = options.limit_price;
         let mut fills: Vec<Fill> = Vec::new();
+        let (unfilled, resting) = self.match_into(side, quantity, taker_id, options, &mut fills);
+        let average_price = if fills.is_empty() {
+            None
+        } else {
+            let mut notional = 0.0;
+            let mut shares = 0.0;
+            for f in &fills {
+                notional += f.price * f.quantity;
+                shares += f.quantity;
+            }
+            Some(notional / shares)
+        };
+
+        MatchResult {
+            fills,
+            unfilled,
+            average_price,
+            resting,
+        }
+    }
+
+    /// [`OrderBook::submit`]'s matching, appending its fills to `fills`, so a
+    /// caller that submits many orders can reuse one buffer. Returns the
+    /// unfilled shares and the remainder posted, as `submit` reports them.
+    pub(crate) fn match_into(
+        &mut self,
+        side: Side,
+        quantity: f64,
+        taker_id: &str,
+        options: SubmitOptions,
+        fills: &mut Vec<Fill>,
+    ) -> (f64, Option<BookOrder>) {
+        let limit_price = options.limit_price;
 
         // `!(q > 0)` and not `q <= 0` — the negation also rejects NaN.
         if !(quantity > 0.0) {
-            return MatchResult {
-                fills,
-                unfilled: 0.0,
-                average_price: None,
-                resting: None,
-            };
+            return (0.0, None);
         }
 
         let mut remaining = quantity;
@@ -460,24 +509,7 @@ impl OrderBook {
             }
         }
 
-        let average_price = if fills.is_empty() {
-            None
-        } else {
-            let mut notional = 0.0;
-            let mut shares = 0.0;
-            for f in &fills {
-                notional += f.price * f.quantity;
-                shares += f.quantity;
-            }
-            Some(notional / shares)
-        };
-
-        MatchResult {
-            fills,
-            unfilled: remaining,
-            average_price,
-            resting,
-        }
+        (remaining, resting)
     }
 
     /// Rest a passive order without attempting to cross. Used by makers.

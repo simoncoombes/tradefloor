@@ -212,12 +212,25 @@ pub fn apply_fill_to_inventory(
 /// progressively worse prices — impact becomes a property of resting
 /// liquidity rather than a coefficient.
 pub fn quote_ladder(params: &LadderParams) -> (Vec<LadderLevel>, Vec<LadderLevel>) {
+    let mut bids = Vec::new();
+    let mut asks = Vec::new();
+    quote_ladder_into(params, &mut bids, &mut asks);
+    (bids, asks)
+}
+
+/// [`quote_ladder`] into two buffers the caller owns, cleared first, so a
+/// caller quoting on every tick can reuse them. The levels are the same.
+pub(crate) fn quote_ladder_into(
+    params: &LadderParams,
+    bids: &mut Vec<LadderLevel>,
+    asks: &mut Vec<LadderLevel>,
+) {
+    bids.clear();
+    asks.clear();
     let top = compute_quote(&params.quote);
     let half_spread = (top.ask_price - top.bid_price) / 2.0;
     let step = mathx::max(0.01, half_spread * 2.0 * params.level_step);
 
-    let mut bids = Vec::new();
-    let mut asks = Vec::new();
     // `Math.max(1, levels)`, then a `<` comparison per iteration. NaN makes
     // the comparison false immediately, giving zero levels — a `for` over an
     // integer range could not express that. An infinite `levels` loops
@@ -253,7 +266,6 @@ pub fn quote_ladder(params: &LadderParams) -> (Vec<LadderLevel>, Vec<LadderLevel
         });
         i += 1;
     }
-    (bids, asks)
 }
 
 #[cfg(test)]

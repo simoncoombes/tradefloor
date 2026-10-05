@@ -1222,12 +1222,15 @@ pub fn simulate_market_tick(
     let intraday_volume_mult = intraday_volume(inputs.intraday_t, inputs.market_status);
 
     // ── Phase 1: factors ──────────────────────────────────────────────────
-    let mut active_indices: Vec<usize> = Vec::new();
-    let mut all_factors: Vec<LiveFactors> = Vec::new();
-    let mut all_drifts: Vec<f64> = Vec::new();
-    let mut all_noises: Vec<f64> = Vec::new();
-    let mut all_news_vol_mults: Vec<f64> = Vec::new();
-    let mut all_randoms: Vec<f64> = Vec::new();
+    // Sized for the roster once rather than grown name by name: allocation
+    // only, so no arithmetic or draw moves.
+    let roster = companies.len();
+    let mut active_indices: Vec<usize> = Vec::with_capacity(roster);
+    let mut all_factors: Vec<LiveFactors> = Vec::with_capacity(roster);
+    let mut all_drifts: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_noises: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_news_vol_mults: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_randoms: Vec<f64> = Vec::with_capacity(roster);
 
     for (idx, company) in companies.iter().enumerate() {
         if company.is_bankrupt || !company.is_public {

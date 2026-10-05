@@ -68,7 +68,7 @@
 //!   the guards are copied in that form deliberately.
 
 use crate::market_maker::{
-    quote_ladder, LadderParams, MakerInventory, QuoteParams, MARKET_MAKER_ID,
+    quote_ladder_into, LadderParams, MakerInventory, QuoteParams, MARKET_MAKER_ID,
 };
 use crate::mathx;
 use crate::order_book::{Fill, OrderBook, Side, SubmitOptions};
@@ -363,55 +363,105 @@ impl Default for LiveBookOptions {
 /// anyway, so the book is a pure function of (fair value, spread, resting
 /// orders). That keeps the tick pure and replay deterministic for free.
 pub fn build_live_book(company: &CompanyMicrostructure, options: &LiveBookOptions) -> OrderBook {
-    let fair_value = company.price;
     let mut book = OrderBook::new(company.id.clone(), Some(company.price));
+    fill_live_book(company, options, &mut book);
+    book
+}
+
+/// [`build_live_book`] into a book that is as [`OrderBook::new`] (or
+/// [`OrderBook::reset`]) left it for this company, so a settlement can reuse
+/// one book's allocations. The book that comes out is the same.
+fn fill_live_book(company: &CompanyMicrostructure, options: &LiveBookOptions, book: &mut OrderBook) {
+    let fair_value = company.price;
 
     // Negated comparison, so a NaN price returns an empty book rather than
     // falling through to quote against it.
     if !(fair_value > 0.0) {
-        return book;
+        return;
     }
 
     let spread_bps = compute_spread_bps_with(
         company, options.vix, options.difficulty,
         options.spread_size_smoothness, options.spread_size_exponent);
     let base_size = base_quote_size(company);
-    let (bids, asks) = quote_ladder(&LadderParams {
-        quote: QuoteParams {
-            fair_value,
-            // `computeSpreadBps` returns the FULL spread; the maker takes a half.
-            half_spread_bps: spread_bps / 2.0,
-            base_size,
-            inventory: MakerInventory {
-                // `?? 0` — a real zero inventory is a zero, not "absent".
-                position: company.maker_inventory.unwrap_or(0.0),
-                limit: mathx::max(1.0, base_size * INVENTORY_LIMIT_LEVELS),
+    LADDER.with(|cell| {
+        // The ladder, quoted into this thread's two reused buffers.
+        let (bids, asks) = &mut *cell.borrow_mut();
+        quote_ladder_into(&LadderParams {
+            quote: QuoteParams {
+                fair_value,
+                // `computeSpreadBps` returns the FULL spread; the maker takes a half.
+                half_spread_bps: spread_bps / 2.0,
+                base_size,
+                inventory: MakerInventory {
+                    // `?? 0` — a real zero inventory is a zero, not "absent".
+                    position: company.maker_inventory.unwrap_or(0.0),
+                    limit: mathx::max(1.0, base_size * INVENTORY_LIMIT_LEVELS),
+                },
+                // The reference implementation passes neither `volatilityMultiplier` nor
+                // `maxSkew`, so both take their destructuring default of 1.
+                ..QuoteParams::default()
             },
-            // The reference implementation passes neither `volatilityMultiplier` nor
-            // `maxSkew`, so both take their destructuring default of 1.
-            ..QuoteParams::default()
-        },
-        levels: options.levels,
-        // `levelStep` is likewise omitted upstream, defaulting to 0.5.
-        level_step: 0.5,
-    });
+            levels: options.levels,
+            // `levelStep` is likewise omitted upstream, defaulting to 0.5.
+            level_step: 0.5,
+        }, bids, asks);
 
-    // `quote_ladder` emits both sides best-first, so append straight on
-    // rather than paying the insertion scan per level.
-    for level in &bids {
-        book.push_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
-    }
-    for level in &asks {
-        book.push_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
-    }
+        // `quote_ladder_into` emits both sides best-first, so append straight on
+        // rather than paying the insertion scan per level. The sides are sized
+        // first, the resting orders included: allocation only.
+        let resting = options.resting_orders.len();
+        book.bids.reserve(bids.len() + resting);
+        book.asks.reserve(asks.len() + resting);
+        for level in bids.iter() {
+            book.push_maker_level(Side::Buy, level.price, level.size, MARKET_MAKER_ID);
+        }
+        for level in asks.iter() {
+            book.push_maker_level(Side::Sell, level.price, level.size, MARKET_MAKER_ID);
+        }
+    });
 
     // Player/AI orders join the same queue as maker liquidity and are ranked
     // purely on price-time priority, exactly like a real venue.
     for o in &options.resting_orders {
         book.post_limit(o.side, o.price, o.quantity, &o.owner_id, Some(o.id.clone()));
     }
+}
 
-    book
+std::thread_local! {
+    /// The two sides of the ladder [`fill_live_book`] quotes, kept for their
+    /// allocations. Cleared before every quote.
+    static LADDER: std::cell::RefCell<(Vec<crate::market_maker::LadderLevel>, Vec<crate::market_maker::LadderLevel>)> =
+        const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+    /// The book the last settlement on this thread built, kept for its
+    /// allocations (see [`settle_inner`]). Reset before every use.
+    static SETTLE_BOOK: std::cell::RefCell<Option<OrderBook>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// A settlement's book, handed back to [`SETTLE_BOOK`] when the settlement
+/// returns, on every path.
+struct SettleBook(Option<OrderBook>);
+
+impl SettleBook {
+    fn take(company: &CompanyMicrostructure) -> Self {
+        let book = SETTLE_BOOK
+            .with(|cell| cell.borrow_mut().take())
+            .map(|mut book| {
+                book.reset(&company.id, Some(company.price));
+                book
+            })
+            .unwrap_or_else(|| OrderBook::new(company.id.clone(), Some(company.price)));
+        SettleBook(Some(book))
+    }
+}
+
+impl Drop for SettleBook {
+    fn drop(&mut self) {
+        if let Some(book) = self.0.take() {
+            SETTLE_BOOK.with(|cell| *cell.borrow_mut() = Some(book));
+        }
+    }
 }
 
 // ── Price discovery through the book ───────────────────────────────────────
@@ -692,7 +742,12 @@ fn settle_inner(
         !levels_needed.is_infinite(),
         "levels_needed must stay bounded by BOOK_LEVELS, got {levels_needed}"
     );
-    let mut book = build_live_book(
+    // One book per thread, reset rather than rebuilt: the settlement runs
+    // on every tick of every name, and allocating its book each time was
+    // most of the allocator's share of a session. Same book, same draws.
+    let mut slot = SettleBook::take(company);
+    let book = slot.0.as_mut().expect("SettleBook::take always holds a book");
+    fill_live_book(
         company,
         &LiveBookOptions {
             vix: options.vix,
@@ -705,6 +760,7 @@ fn settle_inner(
             levels: levels_needed,
             resting_orders: Vec::new(),
         },
+        book,
     );
 
     // Guard 2 — still before any draw.
@@ -791,6 +847,8 @@ fn settle_inner(
     let mut traded = 0.0;
     let mut maker_inventory_delta = 0.0;
 
+    // One fills buffer for the slices, cleared before each: allocation only.
+    let mut fills: Vec<crate::order_book::Fill> = Vec::new();
     // Exactly FLOW_SLICES iterations, unconditionally. There is deliberately
     // no early break: a slice that fills nothing must still cost its draw.
     for _ in 0..FLOW_SLICES {
@@ -806,7 +864,8 @@ fn settle_inner(
             Side::Buy => deepest_ask,
             Side::Sell => deepest_bid,
         });
-        let result = book.submit(
+        fills.clear();
+        book.match_into(
             side,
             slice,
             "flow",
@@ -817,13 +876,14 @@ fn settle_inner(
                 skip_own: false,
                 house_ids: false,
             },
+            &mut fills,
         );
-        for f in &result.fills {
+        for f in &fills {
             traded += f.quantity;
         }
-        maker_inventory_delta += maker_delta_from_fills(&result.fills);
+        maker_inventory_delta += maker_delta_from_fills(&fills);
         if !resting.is_empty() {
-            for f in &result.fills {
+            for f in &fills {
                 if is_agent(&f.maker_id) {
                     agent_fills.push(SettledAgentFill {
                         order_id: f.maker_order_id.clone(),
