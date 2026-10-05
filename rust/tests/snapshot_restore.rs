@@ -197,6 +197,153 @@ fn a_model_with_every_gated_field_resumes_exactly() {
     assert_eq!(resumed.snapshot().to_bytes(), original.snapshot().to_bytes());
 }
 
+/// R20M's vector on pt-v20 (the arm the pt-v21 screen graded) with the
+/// prehistory cut to five sessions, plus the dials R20M leaves off whose
+/// state a snapshot carries (the day's t scale, the withheld earnings
+/// cycle): every dial-gated key of the later mechanisms is in play.
+fn every_r21_dial() -> ModelParams {
+    let mut p = ModelParams::preset("pt-v20").unwrap();
+    for (name, value) in [
+        ("cycle_equity_hazard_opening", 0.007), ("cycle_equity_hazard", 5.0),
+        ("cycle_equity_hazard_knee", 0.1), ("cycle_nowcast_accuracy", 0.4),
+        ("corporate_spread_cycle", 0.75), ("fed_growth_cut", 2.0),
+        ("cycle_publication_lag_draw", 1.0), ("earnings_anticipation_drift_half_life", 252.0),
+        ("earnings_anticipation_drift_share", 0.9), ("buyback_accrual", 1.0),
+        ("rate_close_remark", 1.0), ("rate_intraday_live", 1.0), ("fed_stress_cut", 0.1),
+        ("fed_stress_inflation_gap", 2.0), ("macro_pins_hold", 1.0),
+        ("market_vol_vix_coupling", 0.75), ("flight_to_quality_gain", 0.013),
+        ("buyback_payout_share", 0.9), ("dividend_payout_share", 1.2),
+        ("dividend_buyback_substitution", 1.0), ("impact_memory_coefficient", 0.65),
+        ("impact_memory_half_life", 12.0), ("impact_memory_slow_half_life", 780.0),
+        ("impact_memory_slow_weight", 0.1), ("impact_memory_crossover", 0.001),
+        ("fill_impact_coefficient", 0.15), ("book_arrival_shuffle", 1.0),
+        ("overnight_market_share", 0.6), ("overnight_idio_share", 0.25),
+        ("overnight_idio_df", 4.0), ("earnings_surprise_sigma", 3.5),
+        ("earnings_session_sigma", 1.9), ("earnings_followthrough_sigma", 1.1),
+        ("earnings_volume_multiple", 1.2), ("jump_intensity_idio", 0.009),
+        ("jump_sigma_idio", 0.0318), ("idio_sigma_scale", 0.52), ("idio_vol_alpha", 0.25),
+        ("idio_vol_beta", 0.5), ("idio_vol_jump_bump", 1.0), ("market_vol_slow_gamma", 0.05),
+        ("vix_stress_premium", 3.0), ("vix_stress_premium_knee", 0.6),
+        ("vix_stress_premium_cap", 0.35), ("fed_put_gain", 3.0), ("fed_put_half_life", 126.0),
+        ("treasury_put_pricing", 1.0), ("treasury_haven_gain", 0.014),
+        ("fed_stress_hold", 42.0), ("treasury_path_pricing", 1.0),
+        ("treasury_path_half_life", 63.0), ("treasury_policy_damping", 0.5),
+        ("corporate_spread_vix_cut", 1.0), ("corporate_spread_equity_gain", 1.8),
+        ("corporate_spread_equity_half_life", 126.0), ("pinned_vix_feedback", 0.8),
+        ("pinned_vix_variance_share", 0.7), ("market_vol_cycle_ratio", 2.4705882352941178),
+        ("market_vol_cycle_expansion", 0.82), ("market_vol_cycle_half_life", 10.0),
+        ("market_vol_cycle_relative", 0.75), ("market_vol_cycle_cap_relative", 1.0),
+        ("market_vol_cycle_pin_neutral", 1.0), ("market_vol_cycle_pin_phase", 1.0),
+        ("market_vol_leverage", 2.5), ("market_vol_leverage_half_life", 15.0),
+        ("market_vol_leverage_standardise", 1.0), ("vix_level_sigma", 0.009),
+        ("market_vol_vix_smooth", 3.0), ("market_vol_gamma", 0.06),
+        ("market_vol_beta", 0.9446), ("price_hard_cap", 1000000000.0),
+        ("book_depth_nesting", 1.0), ("fair_value_market_excess_share", 0.5),
+        ("fair_value_vix_release_half_life", 504.0), ("book_cross_at_limit", 1.0),
+        ("impact_memory_refill", 1.0), ("pinned_vix_calm_knee", 17.6),
+        ("pinned_vix_calm_share", 0.2), ("pinned_vix_priced_cap", 1.0),
+        ("policy_anticipation", 2.0), ("fair_value_relative_knee", 4.0),
+        ("fair_value_relative_half_life", 63.0), ("market_beta_normalise", 1.0),
+        ("market_factor_sigma", 0.007099478), ("market_prehistory_sessions", 5.0),
+        ("market_prehistory_valuation", 1.0), ("fed_put_carry", 1.0),
+        ("fed_put_emergency_vix", 50.0), ("fed_drawdown_hold", 0.12),
+        ("market_vol_cycle_recovery_release", 0.45), ("market_vol_cycle_recovery_scale", 0.1),
+        ("market_day_tail_df", 7.0), ("market_day_tail_state_share", 1.0),
+        ("earnings_cycle_depth", 0.05), ("earnings_cycle_report_share", 0.5),
+    ] {
+        p = p.with_override(name, value).unwrap();
+    }
+    p.invariants().unwrap();
+    p
+}
+
+/// The r21 mechanisms' state, through the byte form, at a close and in the
+/// middle of a session: on an engine that holds rate instruments and a
+/// used book, the resumed run is the uninterrupted one.
+#[test]
+fn a_model_with_every_r21_dial_resumes_exactly_through_bytes() {
+    let make = || engine_with(every_r21_dial(), 3, 6, true);
+    for mid in [false, true] {
+        resume_matches(make, mid, if mid { "r21 mid-session" } else { "r21 closed" });
+    }
+    let saved = {
+        let mut e = make();
+        mid_day(&mut e);
+        e.snapshot()
+    };
+    for key in ["market_vol_leverage_memory", "vix_stress_memory", "cycle_nowcast_rng",
+                "fed_stress_vix_max", "fed_stress_hold_age", "treasury_policy_path",
+                "fed_drawdown_returns", "fed_drawdown_mcap_prev", "policy_anticipation_priced",
+                "buyback_log_shares", "opening_carry", "dividend", "earnings_key",
+                "earnings_withheld", "idio_variance", "idio_jump_pending",
+                "idio_jump_var_pending", "night_market_factor", "rate_live_marks",
+                "market_day_scale", "market_vol_cycle_log"] {
+        assert!(saved.get(key).is_some(), "{key} not carried");
+    }
+    let Some(SnapshotValue::Map(economy)) = saved.get("economy") else { panic!() };
+    for key in ["cycle_nowcast", "cycle_publication", "anticipation_drift", "anticipation_raw",
+                "intermeeting_return", "fed_put", "fed_put_owed", "fed_put_mcap_prev",
+                "spread_equity_gap", "earnings_cycle"] {
+        assert!(economy.contains_key(key), "economy.{key} not carried");
+    }
+    // With the agents' book in use under the meta-order memory: fills
+    // between the cut and the close read what the memory held at the cut.
+    let make_busy = || {
+        let mut e = make();
+        run(&mut e, 0..2);
+        e.open_market();
+        let first = e.companies()[0].ticker.clone();
+        let second = e.companies()[1].ticker.clone();
+        e.submit_order("fund", &first, Side::Buy, 2_000.0, None, None).unwrap();
+        e.submit_order("fund", &second, Side::Sell, 1_500.0, None, None).unwrap();
+        e.submit_order("fund", &second, Side::Buy, 100.0, Some(1.0), None).unwrap();
+        session(&mut e, 2, 9, 30, 40);
+        e
+    };
+    let saved = make_busy().snapshot();
+    assert!(saved.get("book").is_some());
+    let mut original = make_busy();
+    let mut resumed = make();
+    resumed.restore(&EngineSnapshot::from_bytes(&saved.to_bytes()).unwrap()).unwrap();
+    for e in [&mut original, &mut resumed] {
+        let first = e.companies()[0].ticker.clone();
+        e.submit_order("fund", &first, Side::Buy, 2_000.0, None, None).unwrap();
+        session(e, 2, 10, 10, TICKS - 40);
+        e.close_day(3);
+        run(e, 3..6);
+    }
+    assert_eq!(bits(&resumed.column(PriceField::Price)), bits(&original.column(PriceField::Price)));
+    assert_eq!(resumed.snapshot().to_bytes(), original.snapshot().to_bytes());
+}
+
+/// A 64-bit key above `i64::MAX` travels as `UInt` (tag 0x0a) and comes
+/// back the same; the same key at or below it is an `Int`.
+#[test]
+fn a_u64_key_survives_the_byte_form_and_the_restore() {
+    // Some seed's earnings key is above i64::MAX: half of them are.
+    let (seed, saved) = (3..40)
+        .map(|seed| {
+            let mut e = engine_with(every_r21_dial(), seed, 6, true);
+            run(&mut e, 0..1);
+            (seed, e.snapshot())
+        })
+        .find(|(_, s)| matches!(s.get("earnings_key"), Some(SnapshotValue::UInt(_))))
+        .expect("no seed in 3..40 draws an earnings key above i64::MAX");
+    let bytes = saved.to_bytes();
+    let decoded = EngineSnapshot::from_bytes(&bytes).unwrap();
+    assert_eq!(decoded.get("earnings_key"), saved.get("earnings_key"));
+    let mut resumed = engine_with(every_r21_dial(), seed + 100, 6, true);
+    resumed.restore(&decoded).unwrap();
+    assert_eq!(resumed.snapshot().to_bytes(), bytes);
+    assert_eq!(SnapshotValue::from_u64(u64::MAX), SnapshotValue::UInt(u64::MAX));
+    assert_eq!(SnapshotValue::from_u64(i64::MAX as u64), SnapshotValue::Int(i64::MAX));
+    // A negative key is no key: refused by name, not wrapped.
+    let mut bad = decoded.clone();
+    bad.fields_mut().insert("earnings_key", SnapshotValue::Int(-1));
+    let err = engine_with(every_r21_dial(), seed, 6, true).restore(&bad).unwrap_err();
+    assert!(err.message().contains("earnings_key"), "{err}");
+}
+
 #[test]
 fn a_host_rebuild_without_the_snapshot_drifts_and_with_it_does_not() {
     // What a host could save before this existed: the columns, the
