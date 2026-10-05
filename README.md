@@ -108,7 +108,7 @@ The walkthrough is
 | `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | scenarios | seven packaged shocks, and a file format for your own |
-| MCP server | nineteen tools for a coding agent, thirteen of them read-only, with scenarios, any shipped preset, and market sessions you step, fork and rewind |
+| MCP server | nineteen tools for a coding agent, thirteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
 
 ## Drive it from an agent

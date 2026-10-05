@@ -135,6 +135,38 @@ CROWD_SIGNALS = ("momentum", "reversal")
 
 _COMMON = ("size", "rate", "interval", "band")
 
+#: The shipped populations, by the name :meth:`Population.named` takes.
+SHIPPED = ("standard", "crowded")
+
+#: What populated mode was measured to do on pt-v20, with the checks in
+#: ``tools/calibration/population_checks.py`` (``ac3``, ``ac4``, ``cx`` and
+#: ``runtime``, each paired on the seed). The MCP server quotes it in every
+#: populated result, so a figure moves here and nowhere else.
+#:
+#: - ``edge_decay``: the ac3 finding, that an edge decays as other traders
+#:   trade its signal.
+#: - ``programme_cost_excess``: ac4, what a predictable programme pays in
+#:   populated mode over what it pays in isolated mode, less one.
+#:   ``programme_cost_excess_reported`` is the same excess van Kervel and
+#:   Menkveld (2019) report from real markets; the gap is that impact here
+#:   is mostly transient, so there is less to trade ahead of.
+#: - ``crowded_exit``: the cx finding on a crowd's loss limits.
+#: - ``return_acf1_shift``: populated less isolated ``return_acf1``.
+#: - ``runtime_ratio``: populated run time over isolated.
+MEASURED: dict[str, Any] = {
+    "model": "pt-v20",
+    "method": "tools/calibration/population_checks.py",
+    "edge_decay": "an edge decays as other traders trade its signal",
+    "programme_cost_excess": 0.019,
+    "programme_cost_excess_reported": 1.69,
+    "programme_cost_source": "van Kervel and Menkveld (2019)",
+    "crowded_exit": (
+        "a crowded exit costs holders of the same signal on the day the "
+        "crowd sells out, and the loss comes back over the following week"),
+    "return_acf1_shift": 0.006,
+    "runtime_ratio": 1.4,
+}
+
 
 class Participant:
     """One background trader: a kind, its sizing and its own parameters.
@@ -444,13 +476,15 @@ class Population:
 
     @classmethod
     def named(cls, name: str) -> "Population":
-        """A shipped population by name: ``"standard"`` or ``"crowded"``."""
+        """A shipped population by name: one of :data:`SHIPPED`,
+        ``"standard"`` or ``"crowded"``."""
         if name == "standard":
             return cls.standard()
         if name == "crowded":
             return cls.crowded()
         raise ValidationError(
-            f"no shipped population named {name!r}; there are 'standard' and 'crowded'")
+            f"no shipped population named {name!r}; there are "
+            + " and ".join(repr(n) for n in SHIPPED))
 
     def as_dict(self) -> dict[str, Any]:
         """The population as plain data: what a manifest carries."""

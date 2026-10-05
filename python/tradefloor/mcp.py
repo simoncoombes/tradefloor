@@ -61,7 +61,9 @@ with the authority of a named preset. A run tool takes a shipped preset by
 name and nothing finer. The default runs when none is named, and it is the
 only preset the realism envelope certifies, so a result under another one
 carries a caveat that says so and quotes that preset's own measured record
-(`tf.preset_record`), and its provenance names the preset.
+(`tf.preset_record`), and its provenance names the preset. A population of
+background traders is taken the same way, a shipped one by name; a
+population of one's own participants is a library call.
 
 **Anything that writes, outside a session.** Every tool but the session
 tools and `start_job` is read-only and pure: same arguments, same bytes, on
@@ -108,6 +110,7 @@ from typing import Annotated, Any, Literal
 
 import tradefloor as tf
 from tradefloor import baselines, envelope
+from tradefloor import population as _population
 from tradefloor._arith import ordered_sum
 from tradefloor._core import OrderError, check_seed
 from tradefloor.facts import REAL_MARKETS
@@ -361,7 +364,8 @@ def _whole(name: str, value: Any) -> int:
     return whole
 
 
-def _provenance(preset: str | None = None, **extra: Any) -> dict[str, Any]:
+def _provenance(preset: str | None = None, population: Any = None,
+                **extra: Any) -> dict[str, Any]:
     """What is needed to re-run this exact result somewhere else.
 
     Present on every successful result, because a number from a simulator
@@ -380,6 +384,11 @@ def _provenance(preset: str | None = None, **extra: Any) -> dict[str, Any]:
     before the run tools took a preset. Another preset is named under the
     same two keys, and `certified_preset` names the default beside it, so
     the result says which preset the certification it is outside of is.
+
+    `population` is the run's `tf.Population` after `_population_choice`,
+    None for isolated mode, whose provenance is the one every result
+    carried before the run tools took a population. A populated run names
+    it and its fingerprint, the value a scorecard records.
     """
     name = tf.model_preset()["name"] if preset is None else preset
     return {
@@ -388,6 +397,9 @@ def _provenance(preset: str | None = None, **extra: Any) -> dict[str, Any]:
         "model_preset": name,
         "model_fingerprint": _preset_fingerprint(name),
         **({} if preset is None else {"certified_preset": envelope.PRESET}),
+        **({} if population is None else {
+            "population": population.name,
+            "population_fingerprint": population.fingerprint}),
         "spec_version": tf.SPEC_VERSION,
         **extra,
     }
@@ -499,6 +511,75 @@ def _record_value(name: str, statistic: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
+# -- populations -----------------------------------------------------------
+#
+# The run tools take a `population`, a shipped population's name. Without
+# one a run is in isolated mode, as every run was before populations
+# existed: each strategy meets the same market to the bit. With one, a
+# population of background traders shares each strategy's market and reacts
+# to its trading, so the run asks whether an edge survives other traders. A
+# populated result is reproducible, and it says in a caveat that strategies
+# in it no longer meet identical markets, with what populated mode was
+# measured to do (`tradefloor.population.MEASURED`). `rank_strategies` stays
+# isolated: its paired test needs every strategy on the same market.
+
+
+def _population_choice(population: Any) -> tuple[Any, str | None]:
+    """(the run's `tf.Population`, or None for isolated; a refusal, or None)."""
+    if population is None:
+        return None, None
+    names = list(_population.SHIPPED)
+    if not isinstance(population, str) or population not in names:
+        return None, (
+            f"unknown population {population!r}. The shipped populations "
+            f"are {names}. Omit population for isolated mode, the default, "
+            f"where every strategy meets the same market.")
+    return tf.Population.named(population), None
+
+
+#: Why `rank_strategies` refuses a population, as its refusal says it.
+_RANK_ISOLATED = (
+    "rank_strategies runs in isolated mode only, so it takes no population. "
+    "Its paired sign test rests on common random numbers: on each seed every "
+    "strategy meets the same market draw, so pairing them takes the market "
+    "out of the comparison. A population reacts to what each strategy does, "
+    "so under one the strategies would meet different markets and the test "
+    "would compare strategy and reaction together. To ask whether an edge "
+    "survives other traders, pass population to evaluate_strategies or "
+    "run_stress_scenario.")
+
+
+def _population_summary(pop: Any) -> dict[str, Any]:
+    """A population as `describe_simulator` lists it."""
+    return {
+        "name": pop.name,
+        "fingerprint": pop.fingerprint,
+        "participants": [{"name": p.name, "kind": p.kind}
+                         for p in pop.participants],
+    }
+
+
+def _population_caveat(pop: Any) -> str:
+    """The caveat a populated result earns, from the measured record."""
+    m = _population.MEASURED
+    return (
+        f"POPULATION {pop.name} ({pop.fingerprint}): this run is in "
+        f"populated mode, with {len(pop.participants)} background traders "
+        f"sharing each strategy's market and reacting to its trading. The "
+        f"result is reproducible, but strategies here no longer face "
+        f"identical markets, so a difference between two of them mixes "
+        f"strategy and reaction; rank_strategies, which runs isolated, "
+        f"compares strategies. Measured on {m['model']} with {m['method']}: "
+        f"{m['edge_decay']}; a predictable programme costs about "
+        f"{m['programme_cost_excess']:.1%} more than in isolated mode, far "
+        f"below the {m['programme_cost_excess_reported']:.0%} "
+        f"{m['programme_cost_source']} report from real markets, because "
+        f"impact here is mostly transient; {m['crowded_exit']}. Populated "
+        f"mode moves return_acf1 by about {m['return_acf1_shift']:+.3f} and "
+        f"takes about {m['runtime_ratio']:.1f} times as long to run, and the "
+        f"realism certification was measured without a population.")
+
+
 # -- the caveat engine -----------------------------------------------------
 
 
@@ -603,7 +684,8 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
              scenario_magnitude: bool = False,
              sector_concentrated: bool = False,
              macro_regime: bool = False,
-             preset: str | None = None) -> list[str]:
+             preset: str | None = None,
+             population: Any = None) -> list[str]:
     """The caveats this particular call earns.
 
     Computed, not selected from a list of stock warnings. Each branch below
@@ -613,6 +695,8 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
 
     `preset` is the run's preset after `_preset_choice`, None for the
     default. A run under the default carries the caveats it always carried.
+    `population` is the run's population after `_population_choice`, None
+    for isolated mode, which likewise carries the caveats it always carried.
     """
     out: list[str] = [
         "The price process is a known model, not a forecast. A strategy that "
@@ -621,6 +705,8 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
     ]
     if preset is not None:
         out.append(_preset_caveat(preset))
+    if population is not None:
+        out.append(_population_caveat(population))
 
     # The envelope decides the horizon question, so the answer cannot drift
     # from what the envelope page says.
@@ -716,10 +802,18 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
             "`universe` from `build_universe` with `sectors`, to "
             "concentrate it."
         )
-    out.append(
-        "The market is single-venue with zero latency and no strategic "
-        "counterparties. See `describe_simulator` for the full list."
-    )
+    if population is None:
+        out.append(
+            "The market is single-venue with zero latency and no strategic "
+            "counterparties. See `describe_simulator` for the full list."
+        )
+    else:
+        out.append(
+            "The market is single-venue with zero latency. The only traders "
+            "in it that react to a strategy's trading are the population's, "
+            "and they follow fixed rules. See `describe_simulator` for the "
+            "full list."
+        )
     return out
 
 
@@ -1245,6 +1339,17 @@ PresetArg = Annotated[str | None, Field(description=(
     f"certifies; a result under any other carries a caveat saying it is "
     f"outside the certification, with that preset's own measured record. "
     f"describe_simulator lists every preset's record."))]
+PopulationArg = Annotated[str | None, Field(description=(
+    f"A shipped population of background traders to run beside, by name: "
+    f"{', '.join(_population.SHIPPED)}. They share each strategy's market "
+    f"and react to its trading (populated mode), so a result says whether "
+    f"an edge survives other traders, and strategies no longer meet "
+    f"identical markets. Omit for isolated mode, the default. "
+    f"describe_simulator lists each population's traders."))]
+RankPopulationArg = Annotated[str | None, Field(description=(
+    "rank_strategies refuses any population, because its paired test needs "
+    "every strategy on the same market. Pass population to "
+    "evaluate_strategies or run_stress_scenario instead."))]
 
 
 # -- the server ------------------------------------------------------------
@@ -1321,8 +1426,10 @@ def _measured_cost() -> str:
         "Describe what this simulator is, what its realism checks certify, "
         "what it cannot do, the caps on every tool and how long a run "
         "takes. It also lists every shipped preset with its measured "
-        "record, says which one the certification covers, and describes "
-        "market sessions. Call it first, before any other tool. It takes "
+        "record, says which one the certification covers, lists the shipped "
+        "populations of background traders with what they were measured to "
+        "do, and describes market sessions. Call it first, before any other "
+        "tool. It takes "
         "no arguments, runs no market and returns the same text on every "
         "call."),
     annotations=_READ_ONLY,
@@ -1382,8 +1489,10 @@ def describe_simulator() -> dict[str, Any]:
         "structural_limitations": [
             "Single venue: no fragmentation, no NBBO, no routing.",
             "Zero latency; orders arrive instantly.",
-            "No strategic counterparties -- you trade against a market maker "
-            "and aggregate flow, not agents that adapt to you.",
+            "No strategic counterparties by default. You trade against a "
+            "market maker and aggregate flow, which do not adapt to you. A "
+            "population (see `populations`) adds background traders that "
+            "react to your trading by fixed rules.",
             "Generated rosters are sector-balanced, which no real index is. "
             "build_universe can concentrate one on chosen sectors or take "
             "authored instruments, and a result on either says the roster "
@@ -1464,6 +1573,24 @@ def describe_simulator() -> dict[str, Any]:
                 "does not certify it."),
             "shipped": [_preset_summary(name) for name in tf.preset_names()],
         },
+        "populations": {
+            "default": None,
+            "how": (
+                "evaluate_strategies, run_stress_scenario, open_session and "
+                "start_job take `population`, a shipped population's name. "
+                "Omitted, a run is in isolated mode, the default: every "
+                "strategy meets the same market to the bit. Named, the "
+                "population's traders share each strategy's market and react "
+                "to its trading (populated mode), so the result says whether "
+                "an edge survives other traders. It is reproducible, but "
+                "strategies in it no longer face identical markets; every "
+                "populated result says so in a caveat, and its provenance "
+                "names the population and its fingerprint."),
+            "rank_strategies": _RANK_ISOLATED,
+            "measured": dict(_population.MEASURED),
+            "shipped": [_population_summary(tf.Population.named(name))
+                        for name in _population.SHIPPED],
+        },
         "sessions": {
             "what": (
                 "open_session keeps one market in this server between calls. "
@@ -1501,6 +1628,9 @@ def describe_simulator() -> dict[str, Any]:
                                   "exposed, because improvised coefficients "
                                   "produce a market nobody calibrated. A "
                                   "custom vector is a library call.",
+            "custom_populations": "Runs take a shipped population by name. "
+                                  "A population of your own participants "
+                                  "is a library call (tf.Population).",
         },
         "provenance": _provenance(),
     }
@@ -1656,8 +1786,9 @@ def validate_strategy(spec: SpecArg) -> dict[str, Any]:
         "validate_strategy checks one without running it. days 1 to "
         f"{MAX_DAYS} here (a few seconds), up to {MAX_DAYS_ASYNC} through "
         f"start_job; roster 2 to {MAX_UNIVERSE} names. `preset` runs another "
-        "shipped model preset, outside the certification. Deterministic: "
-        "the same arguments give the same scores."),
+        "shipped model preset, outside the certification, and `population` "
+        "adds background traders that react to each strategy. "
+        "Deterministic: the same arguments give the same scores."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -1674,6 +1805,7 @@ def evaluate_strategies(
     max_leverage: LeverageArg = 2.0,
     include_baselines: BaselinesArg = True,
     preset: PresetArg = None,
+    population: PopulationArg = None,
 ) -> dict[str, Any]:
     """The headline tool.
 
@@ -1684,6 +1816,9 @@ def evaluate_strategies(
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
     preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
+    pop, refusal = _population_choice(population)
     if refusal is not None:
         return _fail(refusal)
     cap = _day_cap()
@@ -1716,6 +1851,8 @@ def evaluate_strategies(
             # Stated rather than defaulted: a strategy here is never handed
             # the live engine. See the module docstring.
             trusted_agents=False, model=preset,
+            # Omitted in isolated mode, so that call is the call it was.
+            **({} if pop is None else {"population": pop}),
         )
     except tf.ValidationError as exc:
         return _fail(str(exc))
@@ -1755,10 +1892,10 @@ def evaluate_strategies(
     result["caveats"] = _caveats(
         days=days, n_seeds=1, signals=_signals_in(specs),
         max_leverage=max_leverage, universe_size=len(roster),
-        sector_concentrated=concentrated, preset=preset,
+        sector_concentrated=concentrated, preset=preset, population=pop,
     )
     result["provenance"] = _provenance(
-        preset,
+        preset, pop,
         seed=seed,
         universe=uni_doc,
         universe_fingerprint=next(iter(scores.values())).universe_fingerprint
@@ -1778,8 +1915,9 @@ def evaluate_strategies(
         f"seeds (default six), days 1 to {MAX_DAYS} here, up to "
         f"{MAX_DAYS_ASYNC} through start_job. Returns each entrant's record "
         "across the seeds (median P&L, seeds ahead of buy-and-hold) and each "
-        "pair's sign test. Takes `preset` as evaluate_strategies does. "
-        "Deterministic."),
+        "pair's sign test. Takes `preset` as evaluate_strategies does. Runs "
+        "isolated only and refuses `population`, because the paired test "
+        "needs every strategy on the same market. Deterministic."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -1794,6 +1932,7 @@ def rank_strategies(
     steps_per_day: StepsPerDayArg = 6,
     max_leverage: LeverageArg = 2.0,
     preset: PresetArg = None,
+    population: RankPopulationArg = None,
 ) -> dict[str, Any]:
     """The honest version.
 
@@ -1805,7 +1944,13 @@ def rank_strategies(
     Omitted seeds are `DEFAULT_SEEDS`. An EMPTY list is refused like any
     other count outside 2 to `MAX_SEEDS`; until 0.8.5 `seeds or [...]` ran
     the six defaults for it without a word.
+
+    `population` is always refused (`_RANK_ISOLATED` says why). It is a
+    parameter so that the refusal can say so, rather than the argument
+    being dropped or refused as unknown.
     """
+    if population is not None:
+        return _fail(_RANK_ISOLATED)
     seeds = list(DEFAULT_SEEDS) if seeds is None else list(seeds)
     if not 2 <= len(seeds) <= MAX_SEEDS:
         return _fail(f"seeds must be 2..{MAX_SEEDS} values, got {len(seeds)}")
@@ -2348,7 +2493,8 @@ def build_scenario(
         "fork of one shared history. Use the result to detect a response, "
         "not to forecast its size. days 1 to "
         f"{MAX_DAYS} here, up to {MAX_DAYS_ASYNC} through start_job. Takes "
-        "`preset` as evaluate_strategies does. Deterministic."),
+        "`preset` and `population` as evaluate_strategies does, the same in "
+        "both markets. Deterministic."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -2374,6 +2520,7 @@ def run_stress_scenario(
         "or a constructor pins the macro from day 0, so it has no fork "
         "point."))] = None,
     preset: PresetArg = None,
+    population: PopulationArg = None,
 ) -> dict[str, Any]:
     """Stress testing, always paired against the unshocked control.
 
@@ -2390,6 +2537,9 @@ def run_stress_scenario(
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
     preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
+    pop, refusal = _population_choice(population)
     if refusal is not None:
         return _fail(refusal)
     cap = _day_cap()
@@ -2488,10 +2638,13 @@ def run_stress_scenario(
             out.setdefault(key, agent)
         return out
 
+    # The same population in both markets, and none in isolated mode, where
+    # the call is the call it was.
+    populated = {} if pop is None else {"population": pop}
     try:
         shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=built,
-                              trusted_agents=False, model=preset)
+                              trusted_agents=False, model=preset, **populated)
         # The control is the same world WITHOUT the thing being tested. For a
         # macro PATH that is no scenario at all. For a scenario carrying
         # INTERVENTIONS it is the same pins with the interventions removed --
@@ -2501,7 +2654,7 @@ def run_stress_scenario(
                    else None)
         control = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=against or None,
-                              trusted_agents=False, model=preset)
+                              trusted_agents=False, model=preset, **populated)
     except tf.ValidationError as exc:
         return _fail(str(exc))
 
@@ -2527,14 +2680,16 @@ def run_stress_scenario(
         days=days, n_seeds=1, signals=_signals_in(specs),
         max_leverage=2.0, universe_size=len(roster),
         scenario_magnitude=True, sector_concentrated=concentrated,
-        macro_regime=_drives_regime(built), preset=preset,
+        macro_regime=_drives_regime(built), preset=preset, population=pop,
     )
-    caveats.insert(1 if preset is None else 2, (
+    # After the model caveat and the preset's and population's, if any.
+    lead = 1 + (preset is not None) + (pop is not None)
+    caveats.insert(lead, (
         "Scenario MAGNITUDE is outside the envelope: the direction of a "
         "shock's effect is certified, the size of it is not. Read these "
         "differences as sign and ordering, not as a calibrated loss."
     ))
-    at = 2 if preset is None else 3
+    at = lead + 1
     caveats[at:at] = timing
     return {
         "ok": True,
@@ -2555,7 +2710,7 @@ def run_stress_scenario(
         **({} if fork_day is None else {"fork_day": fork_day}),
         "caveats": caveats,
         "provenance": _provenance(
-            preset,
+            preset, pop,
             seed=seed, days=days, scenario=label,
             **({} if fork_day is None else {"fork_day": fork_day}),
             scenario_document=json.loads(built.to_json(days)),
@@ -2988,8 +3143,9 @@ def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
 
     Scaled by entrants, roster size, days and steps per day, by the seed
     count for a ranking (six when none are given, as `rank_strategies`
-    runs), and by two for a stress test, which runs its control as well. It is an
-    estimate and the field says so; a model deciding whether to wait or
+    runs), by two for a stress test, which runs its control as well, and by
+    the measured run-time ratio for a populated run. It is an estimate and
+    the field says so; a model deciding whether to wait or
     poll needs an order of magnitude, not a promise. The figures are CPU
     time, so a loaded machine takes longer.
     """
@@ -3008,6 +3164,9 @@ def _estimate_seconds(tool: str, args: dict[str, Any]) -> float:
     run = (_COST_ENGINE
            + days * entrants * (steps / DEFAULT_STEPS_PER_DAY)
            * (_COST_ENTRANT_DAY + _COST_NAME_DAY * _roster_size(args)))
+    # A populated run takes the measured ratio longer.
+    if args.get("population") is not None:
+        run *= _population.MEASURED["runtime_ratio"]
     if tool == "rank_strategies":
         seeds = args.get("seeds")
         count = len(seeds) if isinstance(seeds, list) else len(DEFAULT_SEEDS)
@@ -3097,8 +3256,8 @@ def _run_job(job_id: str, tool: str, args: dict[str, Any]) -> None:
         "arguments are checked before the job starts, and the response "
         f"estimates its run time. At most {MAX_RUNNING_JOBS} jobs run at "
         f"once and the last {MAX_KEPT_JOBS} are kept, in this server's "
-        "memory only. A `preset` in the arguments is checked before the job "
-        "starts. Poll with check_job."),
+        "memory only. A `preset` or `population` in the arguments is checked "
+        "before the job starts. Poll with check_job."),
     annotations=_STARTS_JOB,
 )
 @_guarded
@@ -3138,8 +3297,14 @@ def start_job(
     preset, refusal = _preset_choice(args.get("preset"))
     if refusal is not None:
         return _fail(refusal)
+    # And the population, which a ranking refuses outright.
+    if tool == "rank_strategies" and args.get("population") is not None:
+        return _fail(_RANK_ISOLATED)
+    pop, refusal = _population_choice(args.get("population"))
+    if refusal is not None:
+        return _fail(refusal)
     est = _estimate_seconds(tool, args)
-    provenance = _provenance(preset)
+    provenance = _provenance(preset, pop)
 
     with _jobs_lock:
         running = sum(1 for j in _jobs.values() if j["status"] == "running")
@@ -3254,7 +3419,8 @@ def check_job(
 # - Checkpoints are `Engine.state_snapshot` and `Engine.restore_state` with
 #   copies of the portfolios, the strategy agents and the history: one at
 #   the open and one at the end of every call. A fork and a rewind restore
-#   one onto a fresh engine built from the same seed, roster and preset,
+#   one onto a fresh engine built from the same seed, roster, preset and
+#   population,
 #   and the restored market continues bit for bit, mid-day included; the
 #   tests check both.
 # - The caller sees the market through `tradefloor.sandbox.MarketView` and
@@ -3329,13 +3495,15 @@ class _Session:
     def __init__(self, sid: str, *, seed: int, roster: Any, uni_doc: Any,
                  concentrated: bool, preset: str | None, steps_per_day: int,
                  cash: float, max_leverage: float | None,
-                 specs: dict[str, Any], hand: list[str]) -> None:
+                 specs: dict[str, Any], hand: list[str],
+                 population: Any = None) -> None:
         self.id = sid
         self.seed = seed
         self.roster = roster
         self.uni_doc = uni_doc
         self.concentrated = concentrated
         self.preset = preset
+        self.population = population
         self.steps_per_day = steps_per_day
         self.cash = cash
         self.max_leverage = max_leverage
@@ -3367,8 +3535,13 @@ class _Session:
         self.keep()
 
     def _fresh_engine(self) -> Any:
+        # With the session's population, which a checkpoint's snapshot
+        # carries the state of and restores only into an engine built with
+        # it; none in isolated mode, where the engine is the one it was.
+        populated = ({} if self.population is None
+                     else {"population": self.population})
         return tf.Engine(seed=self.seed, universe=self.roster,
-                         model=self.preset)
+                         model=self.preset, **populated)
 
     # -- the clock --------------------------------------------------------
 
@@ -3732,7 +3905,8 @@ def _session_caveats(sess: "_Session") -> list[str]:
         days=sess.days_touched(), n_seeds=1,
         signals=_signals_in(sess.specs), max_leverage=sess.max_leverage,
         universe_size=len(sess.roster),
-        sector_concentrated=sess.concentrated, preset=sess.preset)
+        sector_concentrated=sess.concentrated, preset=sess.preset,
+        population=sess.population)
     history = []
     for event in sess.lineage:
         if "forked_at_step" in event:
@@ -3741,7 +3915,7 @@ def _session_caveats(sess: "_Session") -> list[str]:
         else:
             history.append(f"was rewound from step {event['rewound_from']} "
                            f"to step {event['to_step']}")
-    out.insert(1 if sess.preset is None else 2, (
+    out.insert(1 + (sess.preset is not None) + (sess.population is not None), (
         "SESSION: this market can be forked, rewound and reopened from the "
         "same seed, so whoever drives it can have seen its future. Its P&L "
         "measures decisions made with that chance open, and it is not a "
@@ -3771,7 +3945,7 @@ def _session_provenance(sess: "_Session", *, orders: bool) -> dict[str, Any]:
         extra["orders"] = copy.deepcopy(sess.live["orders"])
     else:
         extra["orders_sent"] = len(sess.live["orders"])
-    return _provenance(sess.preset, **extra)
+    return _provenance(sess.preset, sess.population, **extra)
 
 
 def _session_view(sess: "_Session", tickers: list[str] | None = None
@@ -3833,7 +4007,8 @@ SessionIdArg = Annotated[str, Field(description=(
         "score a strategy you can write as a spec, use evaluate_strategies "
         "or rank_strategies instead. `agents` names the traders: null for "
         "one you drive with orders, or a strategy spec for one that trades "
-        "itself each step. Opening runs no market. At most "
+        "itself each step. `preset` and `population` choose the market as "
+        "they do for evaluate_strategies. Opening runs no market. At most "
         f"{MAX_SESSIONS} sessions are open at once, in this server's memory "
         f"only, and one idle for {SESSION_IDLE_SECONDS // 60} minutes is "
         "closed."),
@@ -3855,6 +4030,7 @@ def open_session(
     universe_sectors: SectorsArg = None,
     universe: UniverseArg = None,
     preset: PresetArg = None,
+    population: PopulationArg = None,
     steps_per_day: Annotated[int, Field(description=(
         f"Decision points per trading day, 1 to {MAX_STEPS_PER_DAY}. A step "
         f"is 65 minutes, so {DEFAULT_STEPS_PER_DAY} cover the trading "
@@ -3866,6 +4042,9 @@ def open_session(
     if (refused := _seed_refusal(seed=seed)) is not None:
         return refused
     preset, refusal = _preset_choice(preset)
+    if refusal is not None:
+        return _fail(refusal)
+    pop, refusal = _population_choice(population)
     if refusal is not None:
         return _fail(refusal)
     if not 1 <= steps_per_day <= MAX_STEPS_PER_DAY:
@@ -3908,7 +4087,8 @@ def open_session(
         sess = _Session(sid, seed=seed, roster=roster, uni_doc=uni_doc,
                         concentrated=concentrated, preset=preset,
                         steps_per_day=steps_per_day, cash=float(cash),
-                        max_leverage=max_leverage, specs=specs, hand=hand)
+                        max_leverage=max_leverage, specs=specs, hand=hand,
+                        population=pop)
         _sessions[sid] = sess
     return {
         "ok": True,
@@ -4119,6 +4299,8 @@ def session_state(
             "sessions": [
                 {"session_id": s.id, "step": s.step, "agents": s.labels,
                  "preset": s.preset or tf.model_preset()["name"],
+                 **({} if s.population is None
+                    else {"population": s.population.name}),
                  "idle_seconds": round(now - s.touched, 1)}
                 for s in held],
             "note": (f"Sessions live in this server process only. At most "
