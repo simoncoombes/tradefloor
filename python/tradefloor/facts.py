@@ -1,5 +1,3 @@
-# TODO(pt-v21 grade): the headline below names pt-v20, the default from 0.8.5
-# to 0.9.1; restate it for pt-v21 from presets/pt-v21.json once that lands.
 """Stylised facts: what these markets look like, measured, next to real ones.
 
 A simulator you cannot characterise is a simulator you cannot reason about. If
@@ -19,15 +17,22 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At 252 days pt-v20, the default preset from 0.8.5 to 0.9.1, holds all fourteen shape
+**At 252 days pt-v21, the default preset from 0.10.0, holds all fourteen shape
 statistics in band on the ruled bands `envelope.score` grades with, and at
 504 days all thirteen the ruled 504-day table can read**
-(`corr_persistence_acf1` is unreadable there). On the 2015-2025 decade bands
-of `REAL_MARKETS` every shape row is in at both horizons, and the closest to
-its edge is `sector_excess_corr`, 0.1112 at 504 days against a floor of
-0.11. The committed record `python/tradefloor/presets/pt-v20.json` is what
-says so and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
-`MEASURED_504` to it. This headline named pt-v19 until 0.8.5, whose
+(`corr_persistence_acf1` is unreadable there). Of the one-year table's four
+index rows it misses one: `index_tail_dn3_pct` reads 0.598 percent of days
+on the thirty certification seeds against a ruled band of 0.64 to 2.34, and
+0.98 pooled over 360 seeds, so the table is 18 of 19 on the ruled bands. On
+the 2015-2025 decade bands of `REAL_MARKETS` every shape row is in at 252
+days, and at 504 days `excess_kurtosis` is out, 6.64 against a floor of 7.1.
+pt-v21 also loses the structural row `vix_ar1_debiased`, which pt-v20 held:
+0.956 against the tape's 0.930, refused at 252 days and on held-out seeds.
+The committed record `python/tradefloor/presets/pt-v21.json` is what says so
+and `tests/test_preset_records.py` holds `envelope.CERTIFIED` and
+`MEASURED_504` to it. From 0.8.5 to 0.9.1 this headline named pt-v20, which
+holds all 19 rows of the one-year table on the ruled bands. It named pt-v19
+until 0.8.5, whose
 `sector_excess_corr` was out on the decade bands at both horizons, 0.0904
 at 252 days and 0.0906 at 504. It named pt-v16's record and read "all
 fourteen" at both horizons until 2026-09-23, which was pt-v16 on the decade

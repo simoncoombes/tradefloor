@@ -26,10 +26,9 @@ libm.
   modified coefficient set fingerprints as `custom-XXXXXXXX` and can never
   present as a shipped one.
 - **A published realism envelope.** A one-year realism table of 19 statistics
-  graded against real-market bands, and a long-run check of 17 criteria (40
-  rows registered for `pt-v20`, all met), with the misses named as gaps
-  rather than omitted. <!-- TODO(pt-v21 grade): these counts are pt-v20's;
-  restate them for pt-v21 from its preset record once the grade lands. -->
+  graded against real-market bands (18 in band for `pt-v21`), and a long-run
+  check of 40 registered rows (all met by `pt-v21` and by `pt-v20`), with the
+  misses named as gaps rather than omitted.
   See <https://docs.tradefloor.dev/how-its-measured.html>.
 
 ## Using it

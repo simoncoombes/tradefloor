@@ -1759,9 +1759,18 @@ impl Engine {
     ///
     /// Since 0.10.0 this is [`PT_V21`]: pt-v20 with 104 dials moved, each
     /// inert on every earlier preset (see [`crate::params::ModelParams::pt_v21`]).
-    // TODO(pt-v21 grade): the rows it holds and the rows it reads further
-    // from real than pt-v20, from the grade and the paired level run, as
-    // the paragraph below states them for pt-v20.
+    /// It holds all fifteen rows of the fixed-roster panel at 252 days,
+    /// fourteen of fourteen at 504, fifteen on both held-out axes, and all
+    /// 40 long-run criteria, read on 270 histories
+    /// (`validation/pt-v21/programme/ptv21-registration-18.md`). Volatility
+    /// clustering at lag 1 reads 0.095 against a real median of 0.103, where
+    /// pt-v20 read 0.028. It reads further from real on three rows: the
+    /// index falls 3 per cent or more on 0.598 per cent of days on the level
+    /// protocol, under the ruled floor of 0.64 (pt-v20 0.890, real 1.21; 0.98
+    /// pooled over 360 seeds); the crisis lever is 4.98x against a real 6.16x
+    /// (pt-v20 5.11x); and the VIX's persistence reads 0.956 against the
+    /// tape's 0.930, which the structural sign test refuses (pt-v20 0.930,
+    /// passed).
     ///
     /// From 0.8.5 to 0.9.1 it was [`PT_V20`]: pt-v19 with a tape that follows the
     /// model price, a closing cross, the stock- and sector-specific part of

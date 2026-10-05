@@ -72,8 +72,10 @@ A Python agent is any object with `act(obs)` that returns orders: a number
 of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
 It sees a read-only view of the market and its own portfolio, and
 `obs.history` holds a daily bar per name. A bar's close is the day's last
-print. On pt-v20 the close then re-marks every name, so the next day starts
-15 bp away at the median on a 20-name roster.
+print. On pt-v21 the close then re-marks every name and the next session
+opens after an overnight move, so the next day starts away from that print:
+the close sits 11 bp from it at the median on a 20-name roster, and the open
+25 bp from the close.
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 covers what the view holds, how trades are charged, the framework adapters
 (OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
@@ -206,51 +208,52 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-<!-- TODO(pt-v21 grade): restate this paragraph for pt-v21, the default
-since 0.10.0, from its preset record (panel_252, panel_504, long_run) once
-the grade and the paired panel run land. Until then it describes pt-v20. -->
-On `pt-v20`, the default from 0.8.5 to 0.9.1, all 19 statistics of the
+On pt-v21, the default from 0.10.0, 18 of the 19 statistics of the
 one-year table (volatility, fat tails, how much stocks move together, how far
 the VIX jumps after a fall) are inside the range real markets show over a
-year. All 14
-graded statistics of the two-year panel are inside their two-year ranges.
-The long-run criteria are 40 rows over 21 years for pt-v20, covering crash
-depth, how long fear lasts, bear markets per decade, the 2008 and 2020
-replays, the rate indices and the cost of size in the book.
-pt-v20 meets all 40.
+year, on the ruled bands. The tail rate is under the floor on the 30
+certification seeds and inside it pooled over 360: the index falls 3% or more
+on 0.598% of days against a range of 0.64 to 2.34, and on 0.98% over 360
+seeds. All 14 graded statistics of the two-year panel are inside their
+two-year ranges. The long-run criteria are 40 rows over 21 years, covering
+crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices and the cost of size in the book. pt-v21 meets all
+40, read on 270 histories. pt-v20, the default from 0.8.5 to 0.9.1, has all
+19 of the one-year table in band and also meets all 40.
 
 Read those claims narrowly:
 
-- The 19 of 19 is a verdict on figures pooled over 30 seeds. One seed's year
-  often misses some of its 14 shape statistics. On seeds 101 to 116, all 14
-  were in range on 5 of the 16, and one seed had 8 of 14. If you run one
+- The one-year count is a verdict on figures pooled over 30 seeds. One seed's
+  year often misses some of its 14 shape statistics. On seeds 101 to 116, all
+  14 were in range on 8 of the 16, and one seed had 11 of 14. If you run one
   market per condition, read `tf.envelope.intervals()` for each statistic's
   spread across seeds.
 - A shape statistic's range is the median of 35 real one-year windows plus
   or minus 2.1 trimmed standard deviations, so passing one is weak evidence.
-  Volatility clustering is one case. `abs_return_acf1` reads 0.028, below
-  every real 2015 to 2025 window (the lowest is 0.039), and it passes
+  Volatility clustering is one case. `abs_return_acf5` reads 0.020, below
+  every real 2015 to 2025 window (the lowest is 0.034), and it passes
   because its range reaches lower than those windows do.
-- The one-year table helped choose most of pt-v20's coefficients, so the
+- The VIX is stickier than real: its day-to-day persistence reads 0.956
+  against the tape's 0.930, and the sign test that grades it refuses it.
+  pt-v20 passed that test.
+- The one-year table helped choose many of the coefficients pt-v21 keeps, so the
   held-out checks are the fresh seeds and the fresh set of companies the
   panel is repeated on.
 - One year is the certified horizon. Two years is graded on the two-year
-  panel, and longer runs only by the long-run criteria. Every run on a
-  roster opens at nearly the same VIX (17.66 on the certified roster), so
-  the one-year figures describe years that start calm.
-- A driven scenario moves prices at a quarter to a half of the real size, in
-  the right direction. Use a scenario to detect a response, and do not read
-  its size as a forecast.
-- Volatility memory is weaker than real at every lag, about a quarter of
-  real at lag 1. Nothing below the 65-minute step is calibrated.
-- An order sliced over a day costs far less than published studies find:
-  0.04 of a daily standard deviation for 10% of a day's volume in 36
-  slices, against 0.15 to 0.3. A schedule optimiser will overstate the value
-  of trading slowly.
-- Your fills pay for the book depth they take, but that temporary impact
-  barely reaches the printed prices. The lasting part is linear and fades,
-  and no other trader adapts to you, so no liquidity spiral or predatory
-  trading can arise.
+  panel, and longer runs only by the long-run criteria.
+- A driven scenario moves prices at about half to four-fifths of the real
+  size, in the right direction. Use a scenario to detect a response, and do
+  not read its size as a forecast.
+- Volatility memory is close to real at lag 1 and fades much faster after
+  it: at lag 20 it is under a twentieth of real. Nothing below the 65-minute
+  step is calibrated.
+- An order sliced over a day costs a median 0.13 of a daily standard
+  deviation for 10% of a day's volume in 36 slices, at the low end of the
+  0.15 to 0.3 published studies find.
+- By default no other trader reacts to you, so no liquidity spiral or
+  predatory trading can arise. Populated mode adds background traders that
+  trade your signals and front-run predictable flow, but they charge a
+  predictable programme about 2.4% more, far below what real markets show.
 
 `tf.envelope.check(horizon_days=...)` refuses a question that falls outside
 a measured limit.
@@ -260,7 +263,7 @@ has every number behind these claims and the full table of limits.
 ## Before you publish a result
 
 - An agent scored on naming the factor behind each day's move gets an
-  `explanation_accuracy`. On pt-v20 a constant answer scores 0.95 to 1.0, so
+  `explanation_accuracy`. On pt-v21 a constant answer scores 0.70 to 0.95, so
   quote `explanation_edge`, the accuracy minus that baseline, and never the
   accuracy alone.
 - Agents in one `tf.evaluate` or `tf.rank` call run one after another in one

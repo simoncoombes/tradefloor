@@ -52,7 +52,7 @@ def test_the_statistics_summary_row_counts_what_the_record_holds():
     text = read("docs/STATISTICS.md")
     summary = next(line for line in text.splitlines()
                    if line.startswith("| [The long-run criteria]"))
-    assert f"{of} registered rows for pt-v20" in summary, summary
+    assert f"{of} registered rows" in summary, summary
     assert f"{passed} of {of} met" in summary, summary
     assert f"fails 16 of the {of}" in summary, summary
     assert "28" not in summary, summary
@@ -63,8 +63,9 @@ def test_the_readme_counts_the_long_run_rows_the_record_holds():
     """The README said 'meets all 17, and the 23 more'."""
     record = long_run()
     text = flat(read("README.md"))
-    assert f"are {record['of']} rows over 21 years for pt-v20" in text
-    assert f"pt-v20 meets all {record['of']}." in text
+    assert f"are {record['of']} rows over 21 years" in text
+    assert f"{tf.preset_record()['preset']} meets all {record['of']}," in text
+    assert f"pt-v20, the default from 0.8.5 to 0.9.1" in text
     assert "meets all 17" not in text
 
 
@@ -138,13 +139,21 @@ def test_the_scenario_limit_states_the_envelope_s_bias():
 
 
 @pytest.mark.parametrize("name", [
-    "volatility memory", "opening state", "overnight gaps", "intraday",
+    "volatility memory", "overnight gaps", "intraday",
     "slicing a large order", "agent interaction",
 ])
 def test_every_limit_the_reviewers_measured_has_a_row(name):
     rows = limits_table()
     assert name in rows, f"no {name!r} row in the docs/REALISM.md limits table"
     assert rows[name].endswith("the next preset"), rows[name]
+
+
+def test_the_opening_limit_says_pt_v21_closed_it():
+    """pt-v21 opens after 504 sessions of prehistory, so the opening VIX
+    varies with the seed; on pt-v20 every run opened near 17.66."""
+    row = limits_table()["opening state"]
+    assert row.startswith("closed on pt-v21"), row
+    assert row.endswith("| pt-v21"), row
 
 
 def test_the_roster_limit_names_the_preset_it_was_measured_on():
@@ -156,22 +165,23 @@ def test_the_readme_states_the_per_seed_pass_rate():
     """19 of 19 is a verdict on 30-seed medians, not on one seed's year."""
     text = flat(read("README.md"))
     assert "tf.envelope.intervals()" in text
-    assert "all 14 were in range on 5 of the 16" in text
+    assert "all 14 were in range on 8 of the 16" in text
     assert "tf.envelope.intervals()" in flat(read("docs/STATISTICS.md"))
 
 
 def test_the_clustering_shortfall_is_stated_beside_the_certificate():
+    """On pt-v21 clustering is near real at lag 1 and below every real year
+    at lag 5; the pages say both, with the certified figures."""
     certified = tf.envelope.certified()["statistics"]
     lag1 = certified["abs_return_acf1"]["measured"]
     lag5 = certified["abs_return_acf5"]["measured"]
     windows = tf.facts.REAL_MARKETS_WINDOWS["values"]
-    assert lag1 < min(windows["abs_return_acf1"])
     assert lag5 < min(windows["abs_return_acf5"])
     readme = flat(read("README.md"))
-    assert f"`abs_return_acf1` reads {lag1:.3f}" in readme
+    assert f"`abs_return_acf5` reads {lag5:.3f}" in readme
     stats = flat(read("docs/STATISTICS.md"))
     assert f"{lag1:.4f} for `abs_return_acf1`" in stats
-    assert f"{min(windows['abs_return_acf1']):.3f}" in stats
+    assert f"{min(windows['abs_return_acf5']):.3f}" in stats
 
 
 # ---------------------------------------------------------------------------

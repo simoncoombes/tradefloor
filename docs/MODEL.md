@@ -1,39 +1,217 @@
 # The tradefloor model
 
-<!-- TODO(pt-v21): pt-v21 is the default from 0.10.0. State the terms its
-104 dials switch on (ModelParams::pt_v21 in rust/src/params.rs lists them)
-and its grade, and move the pt-v20 text below to a "reproducing earlier
-work" section as was done for pt-v19. -->
 This document states the tradefloor market model as equations. It describes
-**tradefloor 0.8.5** running **pt-v20**, the default preset from 0.8.5 to
-0.9.1. Every equation
-was read off the code on the `release/0.8.5` branch at commit `8b7ed44`,
-and the sections on what pt-v20's graded arm added (published macro data,
-the market's permanent share, volatility feedback, the packaged recession)
-on `fix/ptv20-final`; each one names the source line it comes from, as
-`file:line` under `rust/src/`, on the tree it was read from. Parameter values are pt-v20's, as
-`tf.ModelParams.from_preset("pt-v20").to_dict()` returns them, rounded here
-to four significant figures. Where a table gives two values, the second is
-pt-v19's.
+**tradefloor 0.10.0** running **pt-v21**, the default preset from 0.10.0.
+pt-v21 is pt-v20 with 104 dials moved, and most of the text below was
+written for pt-v20, the default from 0.8.5 to 0.9.1. Every equation was read
+off the code on the `release/0.8.5` branch at commit `8b7ed44`, and the
+sections on what pt-v20's graded arm added (published macro data, the
+market's permanent share, volatility feedback, the packaged recession) on
+`fix/ptv20-final`; each one names the source line it comes from, as
+`file:line` under `rust/src/`, on the tree it was read from. The sections on
+mechanisms pt-v21 switches on were read off the 0.10.0 code.
+
+**Parameter values.** Where a section gives a value without naming a
+preset, it is pt-v20's, as `tf.ModelParams.from_preset("pt-v20").to_dict()`
+returns it, rounded to four significant figures, and where a table gives two
+values the second is pt-v19's. [pt-v21](#pt-v21) lists every value pt-v21
+moves, and that table overrides any pt-v20 value given below.
 
 A preset is a frozen set of coefficients. The equations below hold for every
-preset, but many terms are switched on or off by a preset's dials, and this
-document describes the terms pt-v20 runs. Terms that pt-v20 switches off are
-listed once, in [Off in pt-v20](#off-in-pt-v20), and not written out.
+preset, but many terms are switched on or off by a preset's dials. Terms
+that pt-v20 switches off are described once, in [Off in pt-v20](#off-in-pt-v20);
+many of them are on in pt-v21, and [pt-v21](#pt-v21) says which.
 
-pt-v20 is pt-v19 with 38 dials moved. Work published on pt-v19, the default
-in 0.8.0 and 0.8.1, still replays exactly when it names its preset.
+Work published on an earlier preset still replays exactly when it names its
+preset: pt-v20 and every older preset keep their values.
 [pt-v19: reproducing earlier work](#pt-v19-reproducing-earlier-work) gives
-every equation and value where pt-v19 differs.
+every equation and value where pt-v19 differs from pt-v20.
 
-pt-v20 was graded before it shipped on the 40 rows of its twelfth
-registration, the long-run rows and the one-year table, and passes all 40
-on the grade seeds (grade box `ptv20g6`). [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
-lists the rows. The registration, the scripts that graded it, their inputs
-and the box's outputs are in
-[`validation/pt-v20/`](https://github.com/simoncoombes/tradefloor/tree/main/validation/pt-v20),
-and [`validation/README.md`](https://github.com/simoncoombes/tradefloor/blob/main/validation/README.md)
-says how to check the grade on a laptop or run it again.
+## pt-v21
+
+pt-v21 was certified by name on the 0.10.0 engine against the 40 long-run
+rows pt-v20 was graded on, with the long-run rows read on 270 histories of
+21 years, and meets all 40, on the definitions it was registered on
+([`validation/pt-v21/programme/ptv21-registration-18.md`](https://github.com/simoncoombes/tradefloor/blob/main/validation/pt-v21/programme/ptv21-registration-18.md)).
+The verdict, the scripts that graded it and the boxes' outputs are in
+[`validation/pt-v21/`](https://github.com/simoncoombes/tradefloor/tree/main/validation/pt-v21).
+On the ruled one-year bands it holds 18 of the 19 rows: the index falls 3
+per cent or more on 0.598 per cent of days on the thirty certification
+seeds, under the floor of 0.64, and on 0.98 per cent pooled over 360 seeds.
+[STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
+lists the rows and both presets' readings.
+
+The mechanisms its moved dials switch on, with the section that states each:
+
+- **The cycle and the stock market.** A fall of the index below its slow
+  average adds to the hazard of a downturn, and the opening economy is drawn
+  with that hazard's average (`cycle_equity_hazard*`;
+  [Business cycle](#business-cycle)). The market can price a belief about the
+  phase rather than the true phase (`cycle_nowcast_accuracy`), and the
+  publication lag is drawn (`cycle_publication_lag_draw`).
+- **The central bank and the curve.** Rules for stress and growth, a put that
+  cuts into a falling market and holds rises while the index stays down, and
+  a curve that prices the expected policy path (`fed_*`,
+  `policy_anticipation`, `treasury_path_*`, `treasury_policy_damping`,
+  `treasury_haven_gain`, `treasury_put_pricing`;
+  [Central bank](#central-bank), [Bond yields](#bond-yields)). The curve's
+  rates move intraday and are re-marked at the close (`rate_intraday_live`,
+  `rate_close_remark`; [Bonds](#bonds)), and a scenario's pinned macro
+  fields hold through the close (`macro_pins_hold`).
+- **Credit.** Spreads follow the cycle, the VIX and a leverage term
+  (`corporate_spread_*`; [Bond yields](#bond-yields)).
+- **Payouts.** Dividends and buybacks are paid out of accrued earnings, with
+  the ex-dividend drop at the open (`buyback_accrual`,
+  `dividend_payout_share`, `dividend_buyback_substitution`,
+  `buyback_payout_share`; [The valuation](#the-valuation)).
+- **The market's variance.** It follows the cycle, with a leverage term, a
+  slower GARCH component and a smoothed VIX coupling (`market_vol_cycle_*`,
+  `market_vol_leverage*`, `market_vol_slow_gamma`, `market_vol_vix_smooth`;
+  [Market-factor variance](#market-factor-variance),
+  [The business cycle in the market's volatility](#the-business-cycle-in-the-markets-volatility)).
+  The VIX carries a stress premium (`vix_stress_premium*`;
+  [The published quote](#the-published-quote)), and a pinned VIX is priced
+  and fed back (`pinned_vix_*`; [Off in pt-v20](#off-in-pt-v20)).
+- **Fair value.** A floor under the market's permanent share above the
+  volatility ceiling and a slower give-back of the VIX's discount
+  ([The permanent share of market moves](#the-permanent-share-of-market-moves)),
+  and a knee under a name's level relative to the roster's
+  ([The knee under a name's level](#the-knee-under-a-names-level)).
+- **The opening.** The market lives 504 sessions of prehistory on a copy
+  before day 0, and opens with that copy's volatility and valuation state
+  (`market_prehistory_*`; [The order of a session](#the-order-of-a-session)).
+  Each name's beta is divided by the roster's cap-weighted beta
+  (`market_beta_normalise`; [The universe and the opening](#the-universe-and-the-opening)).
+- **A name's own variance.** An idiosyncratic GARCH with a jump bump
+  (`idio_vol_*`), and market jumps that are rarer, larger and skewed down
+  ([Jumps](#jumps), [Off in pt-v20](#off-in-pt-v20)).
+- **The night and earnings.** Part of each day's draws falls at the open as
+  an overnight move (`overnight_*`), and an earnings calendar adds a
+  surprise, the earnings-day move, its follow-through and the drift before
+  the report (`earnings_*`; [Off in pt-v20](#off-in-pt-v20),
+  [The aggregate earnings cycle](#the-aggregate-earnings-cycle)).
+- **The traded path.** Impact that remembers recent volume and decays on its
+  own clock, a book that crosses at a limit and refills, depth nested behind
+  the ladder, arrival order shuffled within a cohort, and injected flow that
+  divides by depth once and is linear in a tick's participation
+  (`impact_memory_*`, `book_*`, `fill_impact_coefficient`, `order_flow_*`;
+  [The metaorder memory](#the-metaorder-memory),
+  [The latent depth nested behind the ladder](#the-latent-depth-nested-behind-the-ladder),
+  [Arrival order in a cohort](#arrival-order-in-a-cohort),
+  [Injected order flow on pt-v21](#injected-order-flow-on-pt-v21)).
+- **Unemployment and oil.** Unemployment follows Okun's law, and oil reverts
+  to its inventory level and passes through to inflation
+  ([Unemployment's anchor and oil's interior](#unemployments-anchor-and-oils-interior)).
+
+Each dial's own documentation in `rust/src/params.rs` says what it does at
+the value set here.
+
+| Dial | pt-v20 | pt-v21 |
+|---|---|---|
+| `book_arrival_shuffle` | 0 | 1 |
+| `book_cross_at_limit` | 0 | 1 |
+| `book_depth_nesting` | 0 | 1 |
+| `buyback_accrual` | 0 | 1 |
+| `buyback_payout_share` | 0.75 | 0.9 |
+| `corporate_spread_cycle` | 0 | 0.75 |
+| `corporate_spread_equity_gain` | 0 | 1.8 |
+| `corporate_spread_equity_half_life` | 0 | 126 |
+| `corporate_spread_vix_cut` | 0 | 1 |
+| `cycle_equity_hazard` | 0 | 5 |
+| `cycle_equity_hazard_knee` | 0 | 0.1 |
+| `cycle_equity_hazard_opening` | 0 | 0.011 |
+| `cycle_nowcast_accuracy` | 0 | 0.4 |
+| `cycle_publication_lag_draw` | 0 | 1 |
+| `dividend_buyback_substitution` | 0 | 1 |
+| `dividend_payout_share` | 0 | 1.2 |
+| `earnings_anticipation_drift_half_life` | 0 | 252 |
+| `earnings_anticipation_drift_share` | 0 | 0.9 |
+| `earnings_cycle_half_life` | 60 | 150 |
+| `earnings_followthrough_sigma` | 0 | 1.1 |
+| `earnings_session_sigma` | 0 | 1.9 |
+| `earnings_surprise_sigma` | 0 | 3.5 |
+| `earnings_volume_multiple` | 0 | 1.2 |
+| `fair_value_market_excess_share` | 0 | 0.5 |
+| `fair_value_relative_half_life` | 0 | 63 |
+| `fair_value_relative_knee` | 0 | 4 |
+| `fair_value_vix_release_half_life` | 0 | 504 |
+| `fed_drawdown_hold` | 0 | 0.12 |
+| `fed_growth_cut` | 0 | 2 |
+| `fed_put_carry` | 0 | 1 |
+| `fed_put_emergency_vix` | 0 | 50 |
+| `fed_put_gain` | 0 | 3 |
+| `fed_put_half_life` | 0 | 126 |
+| `fed_stress_cut` | 0 | 0.1 |
+| `fed_stress_hold` | 0 | 42 |
+| `fed_stress_inflation_gap` | 1 | 2 |
+| `fill_impact_coefficient` | 0.314 | 0.15 |
+| `flight_to_quality_gain` | 0.008 | 0.013 |
+| `idio_sigma_scale` | 0.5126 | 0.52 |
+| `idio_vol_alpha` | 0 | 0.25 |
+| `idio_vol_beta` | 0 | 0.5 |
+| `idio_vol_jump_bump` | 0 | 1 |
+| `impact_memory_coefficient` | 0 | 0.65 |
+| `impact_memory_crossover` | 0 | 0.001 |
+| `impact_memory_half_life` | 0 | 12 |
+| `impact_memory_refill` | 0 | 1 |
+| `impact_memory_slow_half_life` | 0 | 780 |
+| `impact_memory_slow_weight` | 0 | 0.1 |
+| `jump_intensity_idio` | 0.00689 | 0.009 |
+| `jump_intensity_market` | 0.02829 | 0.005 |
+| `jump_mean_market` | -0.008522 | -0.03 |
+| `jump_sigma_idio` | 0.07521 | 0.0318 |
+| `jump_sigma_market` | 0.00246 | 0.01 |
+| `macro_pins_hold` | 0 | 1 |
+| `market_beta_normalise` | 0 | 1 |
+| `market_factor_sigma` | 0.006454 | 0.007099 |
+| `market_prehistory_sessions` | 0 | 504 |
+| `market_prehistory_valuation` | 0 | 1 |
+| `market_vol_beta` | 0.8946 | 0.9446 |
+| `market_vol_cycle_cap_relative` | 0 | 1 |
+| `market_vol_cycle_expansion` | 0 | 0.82 |
+| `market_vol_cycle_half_life` | 0 | 10 |
+| `market_vol_cycle_pin_neutral` | 0 | 1 |
+| `market_vol_cycle_pin_phase` | 0 | 1 |
+| `market_vol_cycle_ratio` | 0 | 2.471 |
+| `market_vol_cycle_recovery_release` | 0 | 0.45 |
+| `market_vol_cycle_recovery_scale` | 0 | 0.1 |
+| `market_vol_cycle_relative` | 0 | 0.75 |
+| `market_vol_gamma` | 0.1556 | 0.06 |
+| `market_vol_leverage` | 0 | 2.5 |
+| `market_vol_leverage_half_life` | 0 | 15 |
+| `market_vol_leverage_standardise` | 0 | 1 |
+| `market_vol_slow_gamma` | 0 | 0.05 |
+| `market_vol_vix_coupling` | 0.954 | 0.75 |
+| `market_vol_vix_smooth` | 0 | 3 |
+| `oil_inflation_passthrough` | 0 | 1 |
+| `oil_inventory_reversion` | 0 | 0.002 |
+| `order_flow_coefficient` | 50 | 800 |
+| `order_flow_depth_law` | 0 | 1 |
+| `order_flow_impact_law` | 0 | 1 |
+| `overnight_idio_df` | 0 | 4 |
+| `overnight_idio_share` | 0 | 0.1 |
+| `overnight_market_share` | 0 | 0.55 |
+| `pinned_vix_calm_knee` | 0 | 17.6 |
+| `pinned_vix_calm_share` | 0 | 0.2 |
+| `pinned_vix_feedback` | 0 | 0.8 |
+| `pinned_vix_priced_cap` | 0 | 1 |
+| `pinned_vix_variance_share` | 0 | 0.7 |
+| `policy_anticipation` | 0 | 1.8 |
+| `price_hard_cap` | 5e+04 | 1e9 |
+| `rate_close_remark` | 0 | 1 |
+| `rate_intraday_live` | 0 | 1 |
+| `treasury_2y_noise` | 0.022 | 0.008 |
+| `treasury_haven_gain` | 0 | 0.014 |
+| `treasury_path_half_life` | 0 | 63 |
+| `treasury_path_pricing` | 0 | 1 |
+| `treasury_policy_damping` | 0 | 0.5 |
+| `treasury_put_pricing` | 0 | 1 |
+| `unemployment_okun_coefficient` | 0 | 0.75 |
+| `vix_level_sigma` | 0.0181 | 0.009 |
+| `vix_stress_premium` | 0 | 3 |
+| `vix_stress_premium_cap` | 0 | 0.35 |
+| `vix_stress_premium_knee` | 0 | 0.6 |
+| `volume_idio_variance_gain` | 0.2 | 0.65 |
 
 The realism statistics the model is checked against are defined in
 [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
@@ -3118,7 +3296,7 @@ the gross flow, and the imbalance is its net share. A single tick of five
 times a name's daily volume, on a name trading a million shares a day,
 moves the price 60 bp.
 
-### The metaorder memory (off on every preset)
+### The metaorder memory
 
 Without it, a half-day order's displacement of the tape is linear in its
 size and does not decay within the day: on pt-v20 its peak is about
@@ -3201,7 +3379,7 @@ close, 0.57 at the next close and 0.33 five closes later, and a day TWAP at
 and pays only the half-spread, so a sliced order, which pays the memory,
 costs 1.1 to 1.3 times as much there.
 
-### The latent depth nested behind the ladder (off on every preset)
+### The latent depth nested behind the ladder
 
 The latent pool above sits beside the maker's ladder: its $Q$-th share is
 priced on the law as if the ladder were not there, so the depth within a
@@ -3239,7 +3417,7 @@ against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 
 | Symbol | Dial | Value (pt-v19) | Kind | Source |
 |---|---|---|---|---|
-| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424, for one immediate order of 1% to 100% of a day's volume |
+| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
 | $\delta$ | `book_depth_exponent` | 0.5 | derived | the square-root law (Tóth et al. 2011) |
 | $R$ | `book_depth_reach` | 1.0 | derived | the latent book reaches one day's volume |
 | $k$ | `book_depth_nesting` | 0 (beside) | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
