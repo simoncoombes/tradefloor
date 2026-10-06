@@ -409,9 +409,9 @@ caller that supplies a macro state keeps it exactly: Python's
 economy they are given, and `Engine::opening_settled()` says whether it
 ran.
 
-**The market's prehistory** (`market_prehistory_sessions`, off on every
-shipped preset). The burn-in has no market, so without it every volatility
-state opens at its phase-free baseline: the factor variance at
+**The market's prehistory** (`market_prehistory_sessions`, 504 on pt-v21,
+off on every earlier preset). The burn-in has no market, so without it every
+volatility state opens at its phase-free baseline: the factor variance at
 `market_factor_sigma` squared, the VIX where the index's baseline variance
 puts it, the anchor's memory at zero. A run that opens in an expansion then
 falls for two quarters to the level its expansions hold, and one that opens
@@ -467,9 +467,10 @@ zero and drift in that half year: the names' mean mispricing falls to -0.013
 by month 6 and settles near -0.008, and the VIX feedback's exposure
 (`fair_value_vix_discount`) builds from 0 to about 0.02 over nine months.
 
-**The prehistory's valuation** (`market_prehistory_valuation`, a switch, off
-on every shipped preset, and refused without a prehistory). Those are not the
-only states the burn-in leaves where a market that never traded would. On
+**The prehistory's valuation** (`market_prehistory_valuation`, a switch, on
+in pt-v21, off on every earlier preset, and refused without a prehistory).
+Those are not the only states the burn-in leaves where a market that never
+traded would. On
 R17Bd with $N$ = 252 (180 histories, seeds 300401-300580) the names'
 cap-weighted mispricing went from 0 to -0.011 by month 6, the VIX feedback's
 exposure from 0 to 0.035 by month 12 (0.049 over months 12-36, since the
