@@ -9,7 +9,7 @@ statistics, and pt-v21's certification, were measured on the library's own
 day loop with no outside input. The tables below show how much a host's
 choices move them.
 
-The figures below were measured on pt-v21, over 20 seeds and 504 sessions,
+All of them were measured on pt-v21, over 20 seeds and 504 sessions,
 on a 108-name roster of nine names a sector (one mega cap, two large, three
 mid and three small), with the market opened on the host's economy (a kept
 opening, below) unless a table says otherwise. The host flow in them is a
