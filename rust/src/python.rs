@@ -828,6 +828,8 @@ fn calibrated_flow(
     d.set_item("market_factor_sigma", f.market_factor_sigma)?;
     d.set_item("macro_shock_share", f.macro_shock_share)?;
     d.set_item("macro_steps_per_session", f.macro_steps_per_session)?;
+    d.set_item("off_session_ticks_per_session", f.off_session_ticks_per_session)?;
+    d.set_item("news_drift", f.news_drift)?;
     Ok(d.into_py(py))
 }
 
@@ -837,6 +839,13 @@ const FLOW_TALLY_KEYS: [&str; 16] = [
     "sector_sum_sq", "market_events", "market_sum_sq", "fundamental_events",
     "fundamental_sum_sq", "vix_writes", "vix_write_abs", "vix_write_max",
     "macro_steps", "macro_shock_steps", "macro_shock_load",
+];
+
+/// The keys it reads when present and takes as zero when not: the signed
+/// sums behind the drift, and the ticks outside the regular session. Added
+/// after 0.10.0, so a tally written for 0.10.0 still reads.
+const FLOW_TALLY_OPTIONAL_KEYS: [&str; 5] = [
+    "company_sum", "sector_sum", "market_sum", "fundamental_sum", "off_session_ticks",
 ];
 
 /// `tradefloor.flow::ExternalFlow::assess`, from a tally a caller kept.
@@ -852,9 +861,12 @@ fn assess_external_flow(
     let params = crate::python_engine::model_params_from(model)?;
     for key in tally.keys().iter() {
         let k: String = key.extract()?;
-        if !FLOW_TALLY_KEYS.contains(&k.as_str()) {
+        if !FLOW_TALLY_KEYS.contains(&k.as_str())
+            && !FLOW_TALLY_OPTIONAL_KEYS.contains(&k.as_str())
+        {
             return Err(ValidationError::new_err(format!(
-                "unknown flow tally key {k:?}; the keys are {FLOW_TALLY_KEYS:?}")));
+                "unknown flow tally key {k:?}; the keys are {FLOW_TALLY_KEYS:?} and, \
+                 optionally, {FLOW_TALLY_OPTIONAL_KEYS:?}")));
         }
     }
     let get = |k: &str| -> PyResult<Bound<'_, PyAny>> {
@@ -874,7 +886,30 @@ fn assess_external_flow(
         }
         Ok(v)
     };
+    let signed = |k: &str| -> PyResult<f64> {
+        match tally.get_item(k)? {
+            None => Ok(0.0),
+            Some(v) => {
+                let v: f64 = v.extract().map_err(|_| ValidationError::new_err(format!(
+                    "{k} must be a number")))?;
+                if !v.is_finite() {
+                    return Err(ValidationError::new_err(format!(
+                        "{k} must be finite, got {v}")));
+                }
+                Ok(v)
+            }
+        }
+    };
     let mut obs = crate::flow::ExternalFlow::new(count("names")? as usize);
+    obs.company_sum = signed("company_sum")?;
+    obs.sector_sum = signed("sector_sum")?;
+    obs.market_sum = signed("market_sum")?;
+    obs.fundamental_sum = signed("fundamental_sum")?;
+    obs.off_session_ticks = match tally.get_item("off_session_ticks")? {
+        None => 0,
+        Some(v) => v.extract::<u64>().map_err(|_| ValidationError::new_err(
+            "off_session_ticks must be a non-negative integer"))?,
+    };
     obs.sessions = count("sessions")?;
     obs.company_events = count("company_events")?;
     obs.company_sum_sq = real("company_sum_sq")?;
@@ -900,6 +935,9 @@ fn assess_external_flow(
     d.set_item("macro_shock_share", a.macro_shock_share)?;
     d.set_item("macro_shock_load", a.macro_shock_load)?;
     d.set_item("macro_steps_per_session", a.macro_steps_per_session)?;
+    d.set_item("off_session_ticks_per_session", a.off_session_ticks_per_session)?;
+    d.set_item("news_drift", a.news_drift)?;
+    d.set_item("fundamental_drift", a.fundamental_drift)?;
     d.set_item("findings", a.findings)?;
     Ok(d.into_py(py))
 }

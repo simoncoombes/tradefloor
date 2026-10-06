@@ -1,3 +1,82 @@
+## Unreleased
+
+A documentation and host-API release for programs that drive the Rust
+engine themselves. No coefficient, default or trajectory changes, and every
+known-answer digest is 0.10.0's.
+
+docs/EMBEDDING.md is a new guide for a host that runs its own day loop: the
+three ways to open a market and what each does on pt-v21, the day loop the
+certification ran, how much news and how many shocks of its own the model
+takes, and which statistics stay calibrated in which configuration. Its
+figures come from a browser game's host loop, rebuilt from its source, over
+20 seeds and 504 sessions on pt-v21. With every input the game passes,
+index volatility read 19.5% a year, the VIX was above 40 on 2.3% of days
+and the index fell 19.9% over two years. With the host fixed, they read
+14.2%, 0.7% and +21.3%. Most of the fall came from stock splits written
+into the engine as earnings cuts without dividing its price, and most of
+the extra volatility from ticks outside the regular session and from
+economic shocks, which on pt-v21 raise the VIX's target and, through
+`market_vol_vix_coupling`, the market's realised variance.
+
+<!-- release-note-ends -->
+
+### A close that takes shocks
+
+`Engine::close_day_with_shocks(game_day, shocks)` is `close_day` with
+economic shocks active in its macro step, and
+`Engine::advance_macro_day_with_shocks` is the step alone. A host that
+passed shocks had to call `close_market` and `advance_day` itself, which
+skips the market P/E, the re-mark of prices to the published macro data
+and the rate indices' close that `close_day` runs. With no shocks both are
+the existing calls, draw for draw.
+
+### The flow check
+
+- `tradefloor::flow::ExternalFlow::record_tick(&request)` records a tick's
+  news and counts the ticks outside 09:30 to 16:00. The tally is outside
+  above one per cent of a session's 390.
+- The tally keeps the signed sums of news and earnings revisions beside
+  their squares. It is outside once either moves fair value by more than
+  one per cent a year on average, beyond three standard errors of the
+  estimate, as a stock split written as an earnings cut does.
+- `FlowAssessment` gains `off_session_ticks_per_session`, `news_drift` and
+  `fundamental_drift`, and `CalibratedFlow` gains
+  `off_session_ticks_per_session` and `news_drift`, both zero.
+- In Python, `envelope.external_flow` takes `off_session_ticks` and reads
+  the drift from the signed moves it is already given. A list of
+  same-signed sizes passed in place of signed moves now reads as drift, so
+  pass each move with its sign.
+
+### Day numbering
+
+`Engine::set_current_day`, `open_market` and `close_day` now say that a
+host numbers its days before each open. Nothing else advances the engine's
+day, and on pt-v21 a host that never calls it runs with its earnings and
+dividend calendars stopped at day zero.
+
+### RNG states saved in field order
+
+`EngineRngState::to_words` and `from_words`, new in 0.10.0, lay out the ten
+streams by stream id, not in the struct's field order. The fields declare
+`volume_idio` before `news`; the words put `news` (stream 5, words 25 to
+29) before `volume_idio` (stream 6, words 30 to 34). A host that packed the
+fields in declaration order before switching to `to_words` has those two
+streams in each other's slots in every state it saved, and `from_words`
+restores them swapped without an error. Swap the two five-word blocks once
+when loading such a state. The order is now stated on the struct, on each
+field, in `widths.rs` and in rust/README.md, and
+`EngineRngState::STREAM_NAMES`, `to_named_words` and `from_named_words`
+save and read the streams by name.
+
+### Corrections
+
+- REALISM.md said ticks outside the regular session moved index
+  volatility by less than half a point. Called one minute at a time from
+  07:00 to 20:00, they raised it from 12.7% to 14.7% a year on pt-v21 and
+  from 15.7% to 19.2% on pt-v20.
+- rust/README.md said `previous_close` is reset to the day's open. On
+  pt-v21 it is the price the night starts from.
+
 ## 0.10.0
 
 pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20
