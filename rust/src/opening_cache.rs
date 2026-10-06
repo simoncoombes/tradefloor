@@ -148,8 +148,10 @@ fn cache() -> std::sync::MutexGuard<'static, Cache> {
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// What the cache holds and has done since the process started.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What the cache holds and has done since the process started. A host
+/// reads one and never builds one, so a field added later breaks nothing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OpeningCacheInfo {
     /// The most engines it holds.
     pub capacity: usize,
